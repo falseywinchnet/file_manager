@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=thread -fno-omit-frame-pointer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=thread CMakeFiles/gui_forms_png_registry_tests.dir/tests/png_registry_tests.cpp.o -o gui_forms_png_registry_tests  libgui_forms_core.a

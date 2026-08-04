@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Manager — Material Depth Atlas 001</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink:#14283f; --muted:#53697d; --line:#8ca6bd; --line-dark:#315f89;
+      --paper:#f7fafc; --accept:#167747; --adapt:#986100; --reject:#a22d36;
+      --unseen:#5c6270; font-family:Tahoma,Verdana,"Segoe UI",sans-serif;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; color:var(--ink);
+      background:
+        radial-gradient(ellipse at 5% 0%,#cbdcff 0,transparent 28rem),
+        radial-gradient(ellipse at 95% 3%,#ffd6c7 0,transparent 27rem),
+        radial-gradient(ellipse at 54% 100%,#d7d1ff 0,transparent 34rem),
+        linear-gradient(130deg,#edf7ff,#fff 47%,#f8f1ff);
+      background-attachment:fixed;
+    }
+    header { position:sticky; top:0; z-index:20; border-bottom:2px solid var(--line-dark);
+      background:linear-gradient(#fbfdff,#dceaf4 72%,#bfd5e6); box-shadow:0 2px 8px #294b6733; }
+    .titlebar { padding:10px 18px 8px; color:#fff; border-bottom:1px solid #064878;
+      background:radial-gradient(ellipse at 15% 25%,#a6c4ff99,transparent 34%),
+        radial-gradient(ellipse at 72% -20%,#e9c8ff70,transparent 30%),
+        radial-gradient(ellipse at 95% 80%,#ffb28a55,transparent 22%),
+        linear-gradient(90deg,#07598f,#2a88bd 54%,#155b92); text-shadow:0 1px #003e68; }
+    h1 { margin:0; font-size:18px; letter-spacing:.2px; }
+    .subtitle { margin-top:3px; font-size:12px; opacity:.94; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px 18px; }
+    input[type="search"] { width:min(480px,72vw); padding:7px 9px; color:var(--ink);
+      border:1px solid var(--line-dark); background:#fff; box-shadow:inset 0 1px 2px #40608025; }
+    button { appearance:none; border:1px solid #477b9f; border-radius:3px; padding:6px 9px;
+      color:var(--ink); background:linear-gradient(#fff,#dceaf4);
+      box-shadow:inset 0 1px white,0 1px 1px #183d5d22; cursor:pointer; font:12px Tahoma,Verdana,sans-serif; }
+    button:hover { background:linear-gradient(#fff,#c8e3f4); }
+    button:active { box-shadow:inset 0 2px 3px #173d5d44; }
+    main { max-width:1700px; margin:0 auto; padding:18px; }
+    .notice { margin-bottom:16px; padding:11px 13px; border:1px solid var(--line);
+      border-left:5px solid #075f98; background:#ffffffed; font-size:13px; line-height:1.48; }
+    .notice strong { color:#774100; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); gap:16px; align-items:start; }
+    article { overflow:hidden; border:1px solid var(--line-dark); background:#fff; box-shadow:0 4px 15px #1d4c7220; }
+    article > h2 { margin:0; padding:7px 10px; color:#fff; font-size:14px;
+      background:linear-gradient(#3193bc,#086c9f 55%,#07577f); border-bottom:1px solid #06466a;
+      text-shadow:0 1px #06466a; }
+    .context { min-height:36px; padding:7px 10px; color:var(--muted); background:#eef5fa;
+      border-bottom:1px solid var(--line); font-size:11px; line-height:1.4; }
+    figure { margin:0; display:grid; place-items:center; min-height:260px; padding:10px;
+      background:linear-gradient(#e9f0f5,#fff 30px); border-bottom:1px solid var(--line); }
+    figure.dark { background:#0a0a0a; }
+    figure img { display:block; max-width:100%; max-height:600px; object-fit:contain;
+      border:1px solid #627e96; background:#111; }
+    figure.pixel img { width:min(100%,720px); image-rendering:pixelated; }
+    .load-failure { display:none; padding:24px; text-align:center; color:var(--reject); }
+    .source { padding:6px 10px; font-size:11px; color:var(--muted); background:var(--paper);
+      border-bottom:1px solid var(--line); }
+    a { color:#005d9c; }
+    .cues { padding:8px 10px 10px; }
+    .cue { display:grid; grid-template-columns:1fr auto; gap:8px; padding:8px 0;
+      border-bottom:1px solid #dbe6ee; }
+    .cue:last-child { border-bottom:0; }
+    .cue-id { font-weight:bold; color:#006a9d; }
+    .cue-text { font-size:12px; line-height:1.38; }
+    .verdicts { display:flex; gap:3px; align-items:center; }
+    .verdicts button { min-width:27px; padding:4px 5px; font-weight:bold; }
+    .verdicts button.selected[data-value="A"] { color:#fff; background:var(--accept); }
+    .verdicts button.selected[data-value="D"] { color:#fff; background:var(--adapt); }
+    .verdicts button.selected[data-value="R"] { color:#fff; background:var(--reject); }
+    .verdicts button.selected[data-value="U"] { color:#fff; background:var(--unseen); }
+    #exportBox { display:none; width:100%; min-height:150px; margin-top:12px; padding:10px;
+      border:1px solid var(--line-dark); background:#fff; color:var(--ink);
+      font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    footer { padding:28px 18px 50px; color:var(--muted); font-size:11px; text-align:center; }
+    @media (max-width:520px) { main{padding:9px}.grid{grid-template-columns:1fr}.cue{grid-template-columns:1fr}figure{min-height:180px} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="titlebar">
+      <h1>File Manager — Material Depth Atlas 001</h1>
+      <div class="subtitle">Sculpture, relief, instruments, illustrated utility, and frozen procedural pattern</div>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Filter objects and cues…" aria-label="Filter objects and cues">
+      <button id="showAll" type="button">Show all</button>
+      <button id="unanswered" type="button">Unanswered only</button>
+      <button id="export" type="button">Export verdicts</button>
+      <button id="clear" type="button">Clear verdicts</button>
+    </div>
+  </header>
+  <main>
+    <div class="notice">
+      Use <b>A</b> = accept, <b>D</b> = distill/adapt, <b>R</b> = reject, and
+      <b>U</b> = obtain a better reference. Judge named material relationships,
+      not source resolution or host chrome. <strong>“Accept” does not yet mean
+      “use everywhere”</strong>; geographic depth will be assigned after the
+      material vocabulary is known. This is a static-pattern round: motion and
+      music-player aesthetics are excluded.
+    </div>
+    <div id="grid" class="grid"></div>
+    <textarea id="exportBox" aria-label="Exported verdicts" readonly></textarea>
+  </main>
+  <footer>Planning instrument only. External screenshots remain at their source locations.</footer>
+  <script>
+    const objects = [
+      {
+        name:"Microsoft Update Catalog — populated results", era:"captured 2026; preserved legacy design",
+        image:"assets/microsoft-update-catalog-results-2026-08-03.png",
+        source:"Live Microsoft Update Catalog after a Windows 7 search",
+        sourceUrl:"https://www.catalog.update.microsoft.com/",
+        context:"The home page is not the reference. This is the interface after a real query, where the globe shell meets the result instrument.",
+        cues:[
+          ["M001","An illustrated identity world may terminate sharply at the boundary of a severe utility surface"],
+          ["M002","An oversized, softly rendered globe/object may be cropped into a masthead rather than presented as a logo tile"],
+          ["M003","A saturated periwinkle field may coexist with plain white data rather than tinting every surface"],
+          ["M004","Search results may use explicit ruled columns and compact pagination without looking like a modern card list"],
+          ["M005","Long technical names should remain blue linked commands rather than become truncated marketing titles"],
+          ["M006","Display-sized identity typography and ordinary system typography may coexist in deliberately separate zones"],
+          ["M007","Utility density should increase immediately once a query produces real objects"]
+        ]
+      },
+      {
+        name:"Windows 95 Control Panel", era:"1995",
+        image:"https://guidebookgallery.org/pics/gui/settings/menu/win95.png",
+        source:"GUIdebook — Windows 95 settings menu", sourceUrl:"https://guidebookgallery.org/screenshots/win95",
+        context:"The canonical object-grid family: neutral structure, sculpted objects, labels, focus, and almost no decorative container.",
+        cues:[
+          ["M011","Settings and handlers may be represented as literal high-color objects rather than a list of monochrome symbols"],
+          ["M012","Objects may float directly on a white field without cards, tiles, or surrounding wells"],
+          ["M013","Two-line centered labels are acceptable when paired with highly discriminable objects"],
+          ["M014","Neutral chrome should surrender nearly all color to the objects themselves"],
+          ["M015","Keyboard focus may be shown by a precise dotted rectangle without changing the object's material"],
+          ["M016","A small factual status line may complete an otherwise open object field"]
+        ]
+      },
+      {
+        name:"Windows 95 Date/Time Properties", era:"1995",
+        image:"https://guidebookgallery.org/pics/gui/settings/timedate/win95-1-1.png",
+        source:"GUIdebook — Windows 95 Date/Time", sourceUrl:"https://guidebookgallery.org/screenshots/win95",
+        context:"A dense family of relief types in one dialog: etched groups, inset fields, raised buttons, analog instrument, and digital precision.",
+        cues:[
+          ["M021","An analog instrument may sit beside exact editable values when each makes a different property legible"],
+          ["M022","Etched group boxes may create local semantic enclosures without becoming large shaded panels"],
+          ["M023","Inputs should read as inset wells while actions read as raised plates"],
+          ["M024","One-pixel highlight/shadow logic is enough to express depth when used consistently"],
+          ["M025","Spinner buttons may remain visibly separate mechanical actuators attached to a numeric field"],
+          ["M026","A single dialog may combine flat data, inset instruments, and raised actions without visual incoherence"]
+        ]
+      },
+      {
+        name:"Windows 98 Desktop Themes", era:"1998 / Plus! lineage",
+        image:"https://guidebookgallery.org/pics/gui/settings/desktopthemes/win98.png",
+        source:"GUIdebook — Windows 98 Desktop Themes", sourceUrl:"https://guidebookgallery.org/screenshots/win98",
+        context:"The preview is a miniature working diorama, not a generic color swatch. Judge configuration preview and stacked depth.",
+        cues:[
+          ["M031","Appearance settings should preview a miniature, internally consistent UI world rather than isolated tokens"],
+          ["M032","Nested sample windows may demonstrate active, inactive, selection, message, and scrollbar states simultaneously"],
+          ["M033","A preview well may be substantially deeper than the surrounding settings dialog"],
+          ["M034","A visual scheme may alter title, selection, icons, pointer, sound, and typography as one named bundle"],
+          ["M035","Checkboxes may expose exactly which parts of a bundle will be applied"],
+          ["M036","The product may ship several authored visual schemes sharing geometry and behavior"]
+        ]
+      },
+      {
+        name:"Windows Me Control Panel category view", era:"2000",
+        image:"https://guidebookgallery.org/pics/gui/settings/menu/winme-1-1.png",
+        source:"GUIdebook — Windows Me settings menu", sourceUrl:"https://guidebookgallery.org/screenshots/winme",
+        context:"A transitional native/web-view hybrid: illustrated corner identity, object-link-description rows, and open white space.",
+        cues:[
+          ["M041","Sparse printed/halftone corner art may identify a utility without becoming a full background illustration"],
+          ["M042","Object icon, command label, and one-line explanation may form a repeatable settings row"],
+          ["M043","Blue underlined hyperlink styling may be used inside a native custom surface"],
+          ["M044","A short contextual help column may coexist with the primary object list"],
+          ["M045","Decorative color may appear as a small bleed or crop at the content edge"],
+          ["M046","Category descriptions should be concise and factual, never promotional"]
+        ]
+      },
+      {
+        name:"SkyOS Developer Studio", era:"SkyOS 5 / 2003–2008",
+        image:"https://osarchive.sda1.eu/content/photogallery/38/devstd2.jpg",
+        source:"OS Archive — Development Studio in SkyOS", sourceUrl:"https://osarchive.sda1.eu/skyos",
+        context:"A custom OS surface near the declared modern boundary: soft but explicit depth, small sculpted objects, large calm fields, and native density.",
+        cues:[
+          ["M051","Soft window shadows may separate major planes while individual controls keep shallower relief"],
+          ["M052","Rounded internal tabs may coexist with nearly square window and panel geometry"],
+          ["M053","Low-contrast pearl-grey planes may replace classic 95 grey without becoming borderless"],
+          ["M054","Small colored object icons may punctuate long technical lists without coloring the entire row"],
+          ["M055","A dialog may use large calm margins around compact conventional controls"],
+          ["M056","A custom-rendered system may preserve conventional control behavior while owning every material"]
+        ]
+      },
+      {
+        name:"SkyOS System Profiler", era:"SkyOS 5 / 2003–2008",
+        image:"https://osarchive.sda1.eu/content/photogallery/38/profiler2.jpg",
+        source:"OS Archive — System Profiler in SkyOS", sourceUrl:"https://osarchive.sda1.eu/skyos",
+        context:"The professionally distilled end: tree, live instrument, trace, and toolbar packed into a restrained custom shell.",
+        cues:[
+          ["M061","A black instrument well may be embedded inside a light utility when black has a concrete measurement role"],
+          ["M062","One saturated phosphor color may be reserved for live data rather than general decoration"],
+          ["M063","Tree, graph, and event trace may share a single workspace through explicit split geometry"],
+          ["M064","A tiny icon-only tool strip is acceptable when the actions are narrow, stable, and tooltip-exposed"],
+          ["M065","Selected technical rows may use neutral medium grey rather than the product accent"],
+          ["M066","Instrument depth may be stronger than command depth"]
+        ]
+      },
+      {
+        name:"SolusOS Eveline menu", era:"2012 boundary reference",
+        image:"https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjPzMFTAqs4TboMwgCAdK7LBW8uIR9zRDKGv0Egm0buuTHzjCwPQhaYRiWt1Y4SXIKZM682r1gjiF7P0XjrD6dCyY0O-zVfz5XdPYs6sB0xXJC2RHWv5dXM9WF0EIQILd-b4CK-0VW8IbM/s1600/Desktop1.jpeg",
+        source:"Linux notes from DarkDuck — SolusOS Eveline 1.2", sourceUrl:"https://linuxblog.darkduck.com/2012/10/solus-eveline-12-good-for-newbies.html",
+        context:"Included as a ceiling, not a default: dark continuous menu plane, compact rows, high-color icons, search well, and minimal ornament.",
+        cues:[
+          ["M071","A dark charcoal transient menu is within bounds even though dark primary application surfaces are not"],
+          ["M072","High-color small icons may carry category identity on an otherwise quiet near-flat plane"],
+          ["M073","Category and place columns may coexist inside one temporary menu surface"],
+          ["M074","A search input may be inset into the bottom machinery of a menu"],
+          ["M075","Soft corners and a mild vertical gradient mark the closest permissible approach to modern styling"],
+          ["M076","Low visual relief is acceptable only when boundaries, hover, focus, and input remain unequivocal"]
+        ]
+      },
+      {
+        name:"America Online 4.0", era:"1998",
+        image:"https://oldversion-prod-storage.nyc3.cdn.digitaloceanspaces.com/software_assets/screenshots/123-2207-1895.PNG",
+        source:"OldVersion — America Online 4.0 screenshots", sourceUrl:"https://www.oldversion.com/software/america-online/america-online-4-0/",
+        context:"Mosaic-era online-suite exuberance: a purple destination rail, tiny sculpted objects, conventional address machinery, and a compact branded sign-on object.",
+        cues:[
+          ["M081","A toolbar may read as a row of distinct destination objects rather than identical abstract glyph buttons"],
+          ["M082","A saturated purple structural rail may host multicolored object icons without becoming illegible"],
+          ["M083","Text labels may remain attached to every toolbar object even when the icon is individually recognizable"],
+          ["M084","A bright cyan branded side plate may give a small modal dialog ceremonial identity"],
+          ["M085","Exuberant destination chrome may sit above plain grey address/status machinery"],
+          ["M086","Closely packed destination objects may be divided by color family rather than boxed individually"],
+          ["M087","This degree of playful toolbar personality belongs within the File Manager ceiling"]
+        ]
+      },
+      {
+        name:"JumpStart Mystery Mountain — robot programming puzzle", era:"1996 lower-bound reference",
+        image:"https://oldgamesdownload.com/wp-content/uploads/JumpStart_Adventures_3rd_Grade_Mystery_Mountain_Gameplay_Win.jpg",
+        source:"Old Games Download — JumpStart Adventures 3rd Grade screenshots", sourceUrl:"https://oldgamesdownload.com/jumpstart-adventures-3rd-grade-mystery-mountain/",
+        context:"Judge transferable control ideas, not cartoon illustration, game topology, scorekeeping, or the children's-product brief.",
+        cues:[
+          ["M091","Controls may be integrated into a continuous instrument housing rather than float as generic rectangles"],
+          ["M092","A command sequence may appear as a physical stack of labelled plates"],
+          ["M093","Inset displays, sculpted buttons, and a level/status meter may each use visibly different physical roles"],
+          ["M094","Strong orange, blue, green, and red materials may be locally coherent inside one bounded tool"],
+          ["M095","A cursor may remain a high-contrast physical pointer rather than a thin monochrome outline"],
+          ["M096","Professional distillation should preserve diegetic clarity while removing cartoon scale and surface noise"]
+        ]
+      },
+      {
+        name:"Windows 95 Appearance Properties", era:"1995",
+        image:"https://guidebookgallery.org/pics/gui/settings/appearance/win95-1-1.png",
+        source:"GUIdebook — Windows 95 Appearance", sourceUrl:"https://guidebookgallery.org/screenshots/win95",
+        context:"A control case for deeply systematic 3D: the same lighting rule applied to tabs, fields, swatches, samples, and buttons.",
+        cues:[
+          ["M101","One global light direction should govern every highlight, shadow, bevel, icon inset, and selection edge"],
+          ["M102","Controls may be physically distinct without gradients, blur, or large corner radii"],
+          ["M103","A two-step edge—outer contrast plus inner highlight—may be the standard control boundary"],
+          ["M104","Disabled state may lose contrast and depth without disappearing"],
+          ["M105","Default action may receive a second dark perimeter rather than color or glow"]
+        ]
+      },
+      {
+        name:"3D Pipes — frozen pattern", era:"Windows 95/98/2000 lineage",
+        image:"https://www.screensaversplanet.com/img/screenshots/screensavers/3d-pipes-1.png", pixel:true, dark:true,
+        source:"Screensavers Planet — 3D Pipes still", sourceUrl:"https://www.screensaversplanet.com/screensavers/3d-pipes-494/",
+        context:"Judge the frozen procedural material only. The small source still is deliberately enlarged; motion and fidelity are out of scope.",
+        cues:[
+          ["M111","Glossy saturated tubular geometry against a black void belongs in the pattern arsenal"],
+          ["M112","Procedural right-angle networks may be abstracted into a faint fresco or etched structural motif"],
+          ["M113","Different pipe colors may retain independent material identity rather than blend into one gradient"],
+          ["M114","A Pipes-derived pattern is legal only in D4 ceremony or another deliberately bounded ornamental zone"]
+        ]
+      },
+      {
+        name:"3D Maze — frozen pattern", era:"Windows 95/98 lineage",
+        image:"https://www.screensaversplanet.com/img/screenshots/screensavers/3d-maze-1.png", pixel:true,
+        source:"Screensavers Planet — 3D Maze still", sourceUrl:"https://www.screensaversplanet.com/screensavers/3d-maze-461/",
+        context:"Judge texture collision, low-poly perspective, and liminal architectural character—not traversal or animation.",
+        cues:[
+          ["M121","Brick, stone, wood, and glass may coexist as intentionally synthetic computer materials"],
+          ["M122","Low-poly architectural perspective may inspire a rare empty-state or installer vignette"],
+          ["M123","Literal room or corridor imagery is too representational for the File Manager pattern arsenal"],
+          ["M124","The period's imperfect texture mapping is a character cue worth distilling rather than copying"]
+        ]
+      },
+      {
+        name:"3D Flower Box — frozen pattern", era:"Windows 95–XP lineage",
+        image:"https://www.screensaversplanet.com/img/screenshots/screensavers/3d-flower-box-1.png", pixel:true, dark:true,
+        source:"Screensavers Planet — 3D Flower Box still", sourceUrl:"https://www.screensaversplanet.com/screensavers/3d-flower-box-541/",
+        context:"A sparse black field carrying one iridescent polygonal object. Judge silhouette, color separation, and rarity.",
+        cues:[
+          ["M131","A single small iridescent polygonal object may carry an otherwise empty ceremonial field"],
+          ["M132","Adjacent faces may use violently different colors while retaining one coherent silhouette"],
+          ["M133","Black negative space may be acceptable around a tiny exceptional object despite dark UI being rejected"],
+          ["M134","This family should remain an easter-egg-level accent rather than a recurring house motif"]
+        ]
+      },
+      {
+        name:"Flying Windows — frozen pattern", era:"Windows 3.1/95 lineage",
+        image:"https://www.screensaversplanet.com/img/screenshots/screensavers/flying-windows-1.png", pixel:true, dark:true,
+        source:"Screensavers Planet — Flying Windows still", sourceUrl:"https://www.screensaversplanet.com/screensavers/flying-windows-545/",
+        context:"A repeated high-color system glyph receding through a black field. Judge repetition and depth, not the Windows mark.",
+        cues:[
+          ["M141","A recognizable house object may repeat at radically different scales to imply depth"],
+          ["M142","Sparse multicolor objects on black may form a pattern without connective ornament"],
+          ["M143","A File Manager house glyph may replace the Windows mark in a rare frozen ceremonial texture"],
+          ["M144","Repeated branding objects are too self-conscious even when reduced to an occasional background pattern"]
+        ]
+      }
+    ];
+
+    const storageKey="file-manager-material-depth-atlas-001";
+    let verdicts=JSON.parse(localStorage.getItem(storageKey)||"{}");
+    let unansweredMode=false;
+    const grid=document.getElementById("grid"), search=document.getElementById("search");
+    function save(){localStorage.setItem(storageKey,JSON.stringify(verdicts));}
+    function setVerdict(id,value){if(verdicts[id]===value)delete verdicts[id];else verdicts[id]=value;save();render();}
+    function render(){
+      const query=search.value.trim().toLowerCase(); grid.textContent="";
+      for(const object of objects){
+        const visible=object.cues.filter(([id,cue])=>{
+          if(unansweredMode&&verdicts[id])return false;
+          return !query||`${object.name} ${object.era} ${object.context} ${id} ${cue}`.toLowerCase().includes(query);
+        });
+        if(!visible.length)continue;
+        const article=document.createElement("article"), heading=document.createElement("h2");
+        heading.textContent=`${object.name} — ${object.era}`; article.appendChild(heading);
+        const context=document.createElement("div"); context.className="context"; context.textContent=object.context; article.appendChild(context);
+        const figure=document.createElement("figure"); if(object.dark)figure.classList.add("dark"); if(object.pixel)figure.classList.add("pixel");
+        const img=document.createElement("img"); img.src=object.image; img.alt=object.name; img.loading="lazy"; img.referrerPolicy="no-referrer";
+        const failure=document.createElement("div"); failure.className="load-failure";
+        failure.innerHTML=`Image did not load. <a href="${object.image}" target="_blank" rel="noreferrer">Open the still directly</a>.`;
+        img.addEventListener("error",()=>{img.style.display="none";failure.style.display="block";}); figure.append(img,failure); article.appendChild(figure);
+        const source=document.createElement("div"); source.className="source";
+        source.innerHTML=`Source: <a href="${object.sourceUrl}" target="_blank" rel="noreferrer">${object.source}</a> · <a href="${object.image}" target="_blank" rel="noreferrer">direct still</a>`;
+        article.appendChild(source);
+        const cues=document.createElement("div"); cues.className="cues";
+        for(const [id,textValue] of visible){
+          const cue=document.createElement("div"); cue.className="cue";
+          const text=document.createElement("div"); text.className="cue-text"; text.innerHTML=`<span class="cue-id">${id}</span> — ${textValue}`;
+          const controls=document.createElement("div"); controls.className="verdicts";
+          for(const value of ["A","D","R","U"]){
+            const button=document.createElement("button"); button.type="button"; button.dataset.value=value; button.textContent=value;
+            button.title=({A:"Accept",D:"Distill/adapt",R:"Reject",U:"Unseen / better reference"})[value];
+            if(verdicts[id]===value)button.classList.add("selected"); button.addEventListener("click",()=>setVerdict(id,value)); controls.appendChild(button);
+          }
+          cue.append(text,controls); cues.appendChild(cue);
+        }
+        article.appendChild(cues); grid.appendChild(article);
+      }
+    }
+    search.addEventListener("input",render);
+    document.getElementById("showAll").addEventListener("click",()=>{unansweredMode=false;search.value="";render();});
+    document.getElementById("unanswered").addEventListener("click",()=>{unansweredMode=true;render();});
+    document.getElementById("clear").addEventListener("click",()=>{if(!confirm("Clear every saved verdict in this atlas?"))return;verdicts={};save();render();});
+    document.getElementById("export").addEventListener("click",async()=>{
+      const entries=Object.keys(verdicts).sort().map(id=>`${id} ${verdicts[id]}`), output=entries.length?entries.join(", "):"No verdicts recorded.";
+      const box=document.getElementById("exportBox"); box.value=output; box.style.display="block"; box.select();
+      try{await navigator.clipboard.writeText(output);}catch(_){}
+    });
+    render();
+  </script>
+</body>
+</html>

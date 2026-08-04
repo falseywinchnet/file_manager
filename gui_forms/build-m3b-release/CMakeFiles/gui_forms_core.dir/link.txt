@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgui_forms_core.a CMakeFiles/gui_forms_core.dir/src/core/types.cpp.o CMakeFiles/gui_forms_core.dir/src/core/metrics.cpp.o CMakeFiles/gui_forms_core.dir/src/core/resources.cpp.o CMakeFiles/gui_forms_core.dir/src/core/host.cpp.o CMakeFiles/gui_forms_core.dir/src/core/display_chunk.cpp.o CMakeFiles/gui_forms_core.dir/src/core/component.cpp.o CMakeFiles/gui_forms_core.dir/src/core/control.cpp.o CMakeFiles/gui_forms_core.dir/src/core/static_tree.cpp.o CMakeFiles/gui_forms_core.dir/src/core/window.cpp.o
+/usr/bin/ranlib libgui_forms_core.a

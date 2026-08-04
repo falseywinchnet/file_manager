@@ -1,0 +1,92 @@
+form gallery.root {
+  title: "GUI.Forms Gallery";
+  layout: flex-column;
+  min-size: 900 620;
+
+  command-strip gallery.command-strip {
+    layout: flex-row;
+    button gallery.command.reset { text: "Reset"; }
+    button gallery.command.diagnostics { text: "Diagnostics"; toggle: true; }
+    label gallery.command.status { text: "Portable core · Host 0.4 · drop-ready"; flex: 1; }
+  }
+
+  panel gallery.workspace {
+    layout: flex-row;
+
+    group gallery.navigation {
+      text: "CONTROL INDEX";
+      width: 190;
+      list gallery.category-list {
+        row gallery.category.basics { text: "Basic controls"; selected: true; }
+        row gallery.category.values { text: "Values and state"; }
+        row gallery.category.collections { text: "Retained rows"; }
+        row gallery.category.instrument { text: "Custom instrument"; }
+      }
+    }
+
+    panel gallery.surface {
+      layout: flex-column;
+      flex: 1;
+
+      backplane gallery.backplane {
+        material: gallery-fresco;
+        group gallery.basics-group {
+          text: "Basic controls";
+          layout: form-grid;
+          label gallery.intro {
+            text: "Professional retained controls with deterministic native behavior.";
+          }
+          text-input gallery.text-input {
+            text: "Edit this text";
+            placeholder: "Type here";
+          }
+          button gallery.default-button { text: "Apply"; default: true; }
+          button gallery.disabled-button { text: "Unavailable"; enabled: false; }
+          checkbox gallery.checkbox { text: "Enable precise updates"; checked: true; }
+          radio gallery.radio.classic { text: "Classic relief"; group: gallery.style-mode; checked: true; }
+          radio gallery.radio.quiet { text: "Quiet relief"; group: gallery.style-mode; }
+        }
+      }
+
+      group gallery.values-group {
+        text: "Values and retained state";
+        height: 116;
+        slider gallery.slider { minimum: 0; maximum: 100; value: 42; }
+        progress gallery.progress { minimum: 0; maximum: 100; value: 42; }
+        label gallery.value-label { text: "42%"; }
+      }
+
+      group gallery.collection-group {
+        text: "Retained collection";
+        height: 144;
+        list gallery.collection {
+          row gallery.collection.alpha { text: "Alpha channel"; selected: true; }
+          row gallery.collection.beta { text: "Beta channel"; }
+          row gallery.collection.gamma { text: "Gamma channel"; }
+          row gallery.collection.delta { text: "Delta channel"; }
+        }
+      }
+
+      group gallery.instrument-group {
+        text: "Custom instrument";
+        instrument gallery.instrument { value: 0.42; }
+      }
+    }
+
+    diagnostics gallery.diagnostics {
+      text: "Diagnostics";
+      width: 280;
+      visible: false;
+      label gallery.diagnostics.renderer { text: "renderer"; }
+      label gallery.diagnostics.controls { text: "controls"; }
+      label gallery.diagnostics.layout { text: "measure / arrange"; }
+      label gallery.diagnostics.paint { text: "paint / damage"; }
+      label gallery.diagnostics.input { text: "input / focus / activation"; }
+      label gallery.diagnostics.flush { text: "wake / ticks / active"; }
+      label gallery.diagnostics.present { text: "present / worst"; }
+      label gallery.diagnostics.font {
+        text: "Controls: Portsmouth Rapids 1.0; Fields: Lucida Grande.";
+      }
+    }
+  }
+}

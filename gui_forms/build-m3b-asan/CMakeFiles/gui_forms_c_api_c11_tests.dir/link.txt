@@ -1,0 +1,1 @@
+/usr/bin/cc -fsanitize=address -fno-omit-frame-pointer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/gui_forms_c_api_c11_tests.dir/tests/c_api_c11_tests.c.o -o gui_forms_c_api_c11_tests  -Wl,-rpath,/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-asan libgui_forms_abi0.0.1.0.dylib

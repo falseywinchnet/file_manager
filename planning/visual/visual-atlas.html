@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Manager — Visual Cue Atlas 001</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102b49;
+      --muted: #526b83;
+      --line: #8ba9c4;
+      --line-dark: #356f9d;
+      --paper: #f8fbfe;
+      --panel: #e9f1f7;
+      --panel-2: #d7e5f0;
+      --blue-a: #0b699f;
+      --blue-b: #2e94c4;
+      --accept: #167747;
+      --adapt: #976000;
+      --reject: #a22d36;
+      --unseen: #5a6170;
+      font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 0%, #d9ddff 0, transparent 24rem),
+        radial-gradient(circle at 92% 2%, #ffd8c8 0, transparent 24rem),
+        linear-gradient(135deg, #edf7ff, #fff 46%, #f7f1ff);
+      background-attachment: fixed;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 2px solid var(--line-dark);
+      background: linear-gradient(#fafdff, #dbeaf5 72%, #bed5e7);
+      box-shadow: 0 2px 8px #33597933;
+    }
+    .titlebar {
+      padding: 10px 18px 8px;
+      color: white;
+      background:
+        radial-gradient(ellipse at 15% 20%, #96bdf7aa, transparent 35%),
+        radial-gradient(ellipse at 80% 0%, #ebc9ff55, transparent 32%),
+        linear-gradient(90deg, #075c9c, #2688c0 56%, #135f9d);
+      border-bottom: 1px solid #064a82;
+      text-shadow: 0 1px #003e6c;
+    }
+    h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+    .subtitle { margin-top: 3px; font-size: 12px; opacity: .92; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 18px;
+    }
+    input[type="search"] {
+      width: min(420px, 70vw);
+      padding: 7px 9px;
+      color: var(--ink);
+      border: 1px solid var(--line-dark);
+      background: white;
+      box-shadow: inset 0 1px 2px #40608025;
+    }
+    button, .button {
+      appearance: none;
+      border: 1px solid #477b9f;
+      border-radius: 3px;
+      padding: 6px 9px;
+      color: var(--ink);
+      background: linear-gradient(#fff, #dceaf4);
+      box-shadow: inset 0 1px white, 0 1px 1px #183d5d22;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+    }
+    button:hover { background: linear-gradient(#fff, #c8e3f4); }
+    button:active { box-shadow: inset 0 2px 3px #173d5d44; }
+    main { max-width: 1600px; margin: 0 auto; padding: 18px; }
+    .notice {
+      margin-bottom: 16px;
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue-a);
+      background: #ffffffdc;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    article {
+      overflow: hidden;
+      border: 1px solid var(--line-dark);
+      background: #fff;
+      box-shadow: 0 4px 15px #1d4c7220;
+    }
+    article.hidden { display: none; }
+    article > h2 {
+      margin: 0;
+      padding: 7px 10px;
+      color: white;
+      background: linear-gradient(#2e96c1, #086c9f 55%, #07577f);
+      border-bottom: 1px solid #06466a;
+      font-size: 14px;
+      text-shadow: 0 1px #06466a;
+    }
+    figure {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      min-height: 260px;
+      padding: 10px;
+      background: linear-gradient(#eef4f8, #fff 28px);
+      border-bottom: 1px solid var(--line);
+    }
+    figure img {
+      display: block;
+      max-width: 100%;
+      max-height: 520px;
+      object-fit: contain;
+      image-rendering: auto;
+      border: 1px solid #718ba0;
+      background: #eee;
+    }
+    .load-failure {
+      display: none;
+      padding: 24px;
+      text-align: center;
+      color: var(--reject);
+    }
+    .source {
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+    a { color: #005d9c; }
+    .cues { padding: 8px 10px 10px; }
+    .cue {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #dbe6ee;
+    }
+    .cue:last-child { border-bottom: 0; }
+    .cue-id { font-weight: bold; color: #006a9d; }
+    .cue-text { font-size: 12px; line-height: 1.35; }
+    .verdicts { display: flex; gap: 3px; align-items: center; }
+    .verdicts button { min-width: 26px; padding: 4px 5px; font-weight: bold; }
+    .verdicts button.selected[data-value="A"] { color: white; background: var(--accept); }
+    .verdicts button.selected[data-value="D"] { color: white; background: var(--adapt); }
+    .verdicts button.selected[data-value="R"] { color: white; background: var(--reject); }
+    .verdicts button.selected[data-value="U"] { color: white; background: var(--unseen); }
+    #exportBox {
+      display: none;
+      width: 100%;
+      min-height: 150px;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--line-dark);
+      background: white;
+      color: var(--ink);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    footer { padding: 28px 18px 50px; color: var(--muted); font-size: 11px; text-align: center; }
+    @media (max-width: 500px) {
+      main { padding: 9px; }
+      .grid { grid-template-columns: 1fr; }
+      .cue { grid-template-columns: 1fr; }
+      figure { min-height: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="titlebar">
+      <h1>File Manager — Visual Cue Atlas 001</h1>
+      <div class="subtitle">Every verdict is attached to something visible. Nothing outside this page is part of this round.</div>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Filter objects and cues…" aria-label="Filter objects and cues">
+      <button id="showAll" type="button">Show all</button>
+      <button id="unanswered" type="button">Unanswered only</button>
+      <button id="export" type="button">Export verdicts</button>
+      <button id="clear" type="button">Clear verdicts</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      Use <b>A</b> = accept, <b>D</b> = adapt the quality rather than copy it,
+      <b>R</b> = reject, and <b>U</b> = unseen / obtain a better reference.
+      Verdicts are saved in this browser. Failed images show a direct-source
+      fallback instead of pretending you saw them.
+    </div>
+    <div id="grid" class="grid"></div>
+    <textarea id="exportBox" aria-label="Exported verdicts" readonly></textarea>
+  </main>
+
+  <footer>Planning instrument only. External screenshots remain at their source locations.</footer>
+
+  <script>
+    const objects = [
+      {
+        name: "Watercolor desktop and Explorer",
+        era: "Whistler / 2000–2001",
+        image: "file:///var/folders/pq/nd1v64dx01q03pkpcpbty3m40000gn/T/codex-clipboard-96f27a97-8d6d-46a7-971a-e3bf1d48179d.png",
+        source: "Architect-supplied screenshot",
+        sourceUrl: "https://www.betaarchive.com/wiki/index.php/Windows/Visual_Styles/Watercolor",
+        cues: [
+          ["V001", "Lavender–cyan–rose–apricot ambient field for exceptional empty/setup states"],
+          ["V003", "Fresco or aurora modulation inside the active title band"],
+          ["V004", "Thin navy outer keyline around the active window"],
+          ["V007", "Sharp classic geometry softened by color rather than inflated geometry"],
+          ["V011", "High-color material icons with perspective and individual identity"]
+        ]
+      },
+      {
+        name: "Watercolor empty desktop",
+        era: "Whistler / 2000–2001",
+        image: "file:///var/folders/pq/nd1v64dx01q03pkpcpbty3m40000gn/T/codex-clipboard-0b406658-35f7-4772-aa3b-95da86b95be5.png",
+        source: "Architect-supplied screenshot",
+        sourceUrl: "https://www.betaarchive.com/wiki/index.php/Windows/Visual_Styles/Watercolor",
+        cues: [
+          ["V006", "A white working canvas held inside saturated structural chrome"],
+          ["V013", "Green reserved as a small affirmative/action accent"],
+          ["V014", "Orange used rarely as a warmth counterpoint"],
+          ["V194", "Content field: true white, warm pearl, or nearly imperceptible Watercolor"]
+        ]
+      },
+      {
+        name: "Watercolor vs Ergonomic",
+        era: "Whistler appearance schemes",
+        image: "file:///var/folders/pq/nd1v64dx01q03pkpcpbty3m40000gn/T/codex-clipboard-cd8be2a8-2c18-4880-911c-1e17ee9073b4.png",
+        source: "Architect-supplied screenshot",
+        sourceUrl: "https://guidebookgallery.org/screenshots/desktopthemes",
+        cues: [
+          ["V009", "Blue active state with an explicitly greyer inactive state"],
+          ["V010", "Graphite-blue Ergonomic alternate sharing identical geometry"],
+          ["V198", "One house style, or Watercolor and Ergonomic variants"]
+        ]
+      },
+      {
+        name: "phpBB 2 subSilver",
+        era: "2001–2005",
+        image: "https://upload.wikimedia.org/wikipedia/commons/d/d9/PhpBB_2.0.png",
+        source: "Wikimedia Commons",
+        sourceUrl: "https://commons.wikimedia.org/wiki/File:PhpBB_2.0.png",
+        cues: [
+          ["V021", "Blue-grey gradient category bars"],
+          ["V022", "Hairline nested borders that make hierarchy explicit"],
+          ["V023", "Alternating cool-grey information rows"],
+          ["V025", "Tiny glyphs carrying genuine status"],
+          ["V026", "Compact, predictably column-aligned metadata"],
+          ["V031", "Very dense rhythm, redrawn rather than pixel-scaled"],
+          ["V033", "The full-width web-table feeling"]
+        ]
+      },
+      {
+        name: "BeOS Tracker",
+        era: "BeOS R5 / 2000",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/beos5.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V066", "Folder-like yellow title tab attached to the window edge"],
+          ["V068", "A folder window plainly represents one folder"],
+          ["V069", "Menu, content, and status packed with very little dead space"],
+          ["V071", "File attributes treated as first-class sortable columns"],
+          ["V072", "Plain item-count status line"]
+        ]
+      },
+      {
+        name: "IRIX File Manager",
+        era: "IRIX 5.3 / workstation lineage",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/irix53-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V076", "Turquoise/violet accents against neutral machinery"],
+          ["V077", "Deeply beveled Motif controls"],
+          ["V078", "Vector-like file icons with very strong silhouettes"],
+          ["V082", "Dense professional controls without apology"],
+          ["V085", "Workstation seriousness with a few exuberant colors"]
+        ]
+      },
+      {
+        name: "OPENSTEP File Viewer",
+        era: "OPENSTEP 4.2",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/openstep42.png",
+        source: "GUIdebook — direct fallback is always shown below",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V051", "Black/white/grey material hierarchy as a structural base"],
+          ["V052", "Crisp raised wells, buttons, and scroll tracks"],
+          ["V053", "Shelf as a deliberate parking surface"],
+          ["V055", "Path made from tangible object icons"],
+          ["V057", "Controls that look machined and click-capable"],
+          ["V058", "Prominent scrollbars as instruments"]
+        ]
+      },
+      {
+        name: "Rhapsody File Manager",
+        era: "Rhapsody DR2 / 1998 bridge reference",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/rhapsodydr2-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V061", "Monochrome base allowing object icons to own the color"],
+          ["V062", "Very narrow title bars and high information density"],
+          ["V064", "Square corners and unequivocal edges"],
+          ["V195", "Rare types may have eccentric handcrafted icons"]
+        ]
+      },
+      {
+        name: "Windows 2000 Explorer",
+        era: "2000",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/win2000pro.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V201", "Classic menu/toolbar/address stack with explicit boundaries"],
+          ["V202", "Restrained grey structural chrome around a white object field"],
+          ["V203", "Commands remain text-labelled and spatially stable"],
+          ["V204", "Low ornament with small high-color icons"]
+        ]
+      },
+      {
+        name: "Whistler 2257 File Manager",
+        era: "2000",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/whistler2257-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V205", "Classic Explorer structure receiving a richer color/material pass"],
+          ["V206", "Distinct icon, list, details, tile, and thumbnail modes"],
+          ["V207", "Task pane as a bounded optional region rather than a landing page"]
+        ]
+      },
+      {
+        name: "Windows XP Explorer",
+        era: "2001",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/winxppro.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V016", "Gradient collapsible task/property headers"],
+          ["V017", "Category bands without marketing prose"],
+          ["V208", "Large friendly icon objects inside an otherwise plain canvas"],
+          ["V209", "Back/forward/address/search commands remain unmistakable"]
+        ]
+      },
+      {
+        name: "Longhorn 4015 Explorer",
+        era: "2003",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/longhorn4015.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V101", "Dark or translucent side structure"],
+          ["V102", "Large semantic/activity region above folder contents"],
+          ["V210", "Inline faceted filtering at the side"],
+          ["V211", "Collapsible object categories with luminous blue headers"],
+          ["V212", "Overall scale and dead-space inflation"]
+        ]
+      },
+      {
+        name: "GNOME 2 Nautilus",
+        era: "Red Hat 9 / 2003",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/gnome220redhat9-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V213", "Early GNOME's roomy but still explicit command geometry"],
+          ["V214", "Emblems layered onto file objects"],
+          ["V215", "Linux-native visual neutrality as a baseline"]
+        ]
+      },
+      {
+        name: "QNX Photon File Manager",
+        era: "QNX 6.2.1 / 2002",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/qnx621.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V165", "Compact embedded-workstation precision"],
+          ["V216", "Small controls remain visibly physical"],
+          ["V217", "Dense utility surfaces with almost no decoration"]
+        ]
+      },
+      {
+        name: "OS/2 Warp 4 File Manager",
+        era: "1996 bridge reference",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/os2warp4.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V167", "Object-oriented folder semantics"],
+          ["V218", "Notebook/property metaphors and strongly bounded controls"],
+          ["V219", "Pastel structural color used sparingly"]
+        ]
+      },
+      {
+        name: "Mac OS X 10.1 Finder",
+        era: "2001",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/macosx101-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V116", "Strong pulsing default-action treatment"],
+          ["V117", "Pinstripe field material"],
+          ["V120", "Column hierarchy with preview"],
+          ["V122", "Glossy candy controls"],
+          ["V220", "Aqua's large soft geometry"]
+        ]
+      },
+      {
+        name: "Mac OS X Panther Finder",
+        era: "2003",
+        image: "https://guidebookgallery.org/pics/gui/system/managers/filemanager/macosx103-1-1.png",
+        source: "GUIdebook",
+        sourceUrl: "https://guidebookgallery.org/screenshots/filemanager",
+        cues: [
+          ["V118", "Brushed-metal frame around utility content"],
+          ["V119", "Source-list selection and compact sidebar icons"],
+          ["V121", "Unified toolbar/title geometry"],
+          ["V127", "Space-efficient sidebar typography"],
+          ["V221", "Sidebar/place abstraction itself"]
+        ]
+      }
+    ];
+
+    const storageKey = "file-manager-visual-atlas-001";
+    let verdicts = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    let unansweredMode = false;
+    const grid = document.getElementById("grid");
+    const search = document.getElementById("search");
+
+    function save() {
+      localStorage.setItem(storageKey, JSON.stringify(verdicts));
+    }
+
+    function setVerdict(id, value) {
+      if (verdicts[id] === value) delete verdicts[id];
+      else verdicts[id] = value;
+      save();
+      render();
+    }
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      grid.textContent = "";
+      for (const object of objects) {
+        const visibleCues = object.cues.filter(([id, cue]) => {
+          if (unansweredMode && verdicts[id]) return false;
+          return !query || `${object.name} ${object.era} ${id} ${cue}`.toLowerCase().includes(query);
+        });
+        if (!visibleCues.length) continue;
+
+        const article = document.createElement("article");
+        const heading = document.createElement("h2");
+        heading.textContent = `${object.name} — ${object.era}`;
+        article.appendChild(heading);
+
+        const figure = document.createElement("figure");
+        const img = document.createElement("img");
+        img.src = object.image;
+        img.alt = object.name;
+        img.loading = "eager";
+        img.referrerPolicy = "no-referrer";
+        const failure = document.createElement("div");
+        failure.className = "load-failure";
+        failure.innerHTML = `Image did not load. <a href="${object.image}" target="_blank" rel="noreferrer">Open the image directly</a>.`;
+        img.addEventListener("error", () => {
+          img.style.display = "none";
+          failure.style.display = "block";
+        });
+        figure.append(img, failure);
+        article.appendChild(figure);
+
+        const source = document.createElement("div");
+        source.className = "source";
+        source.innerHTML = `Source: <a href="${object.sourceUrl}" target="_blank" rel="noreferrer">${object.source}</a> · <a href="${object.image}" target="_blank" rel="noreferrer">direct image</a>`;
+        article.appendChild(source);
+
+        const cues = document.createElement("div");
+        cues.className = "cues";
+        for (const [id, cueText] of visibleCues) {
+          const cue = document.createElement("div");
+          cue.className = "cue";
+          const text = document.createElement("div");
+          text.className = "cue-text";
+          text.innerHTML = `<span class="cue-id">${id}</span> — ${cueText}`;
+          const controls = document.createElement("div");
+          controls.className = "verdicts";
+          for (const value of ["A", "D", "R", "U"]) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.value = value;
+            button.textContent = value;
+            button.title = ({A:"Accept", D:"Adapt", R:"Reject", U:"Unseen / better reference"})[value];
+            if (verdicts[id] === value) button.classList.add("selected");
+            button.addEventListener("click", () => setVerdict(id, value));
+            controls.appendChild(button);
+          }
+          cue.append(text, controls);
+          cues.appendChild(cue);
+        }
+        article.appendChild(cues);
+        grid.appendChild(article);
+      }
+    }
+
+    search.addEventListener("input", render);
+    document.getElementById("showAll").addEventListener("click", () => {
+      unansweredMode = false;
+      search.value = "";
+      render();
+    });
+    document.getElementById("unanswered").addEventListener("click", () => {
+      unansweredMode = true;
+      render();
+    });
+    document.getElementById("clear").addEventListener("click", () => {
+      if (!confirm("Clear every saved visual verdict in this atlas?")) return;
+      verdicts = {};
+      save();
+      render();
+    });
+    document.getElementById("export").addEventListener("click", async () => {
+      const entries = Object.keys(verdicts).sort().map(id => `${id} ${verdicts[id]}`);
+      const output = entries.length ? entries.join(", ") : "No verdicts recorded.";
+      const box = document.getElementById("exportBox");
+      box.value = output;
+      box.style.display = "block";
+      box.select();
+      try { await navigator.clipboard.writeText(output); } catch (_) {}
+    });
+
+    render();
+  </script>
+</body>
+</html>

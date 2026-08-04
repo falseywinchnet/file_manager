@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-08-03",
+  "license_note": "No source code or data was copied. This manifest records locators and checksums for research inspection only.",
+  "source_repository": {
+    "path": "/Users/quentinkuttenkuler/zeta",
+    "revision": "a27cf26cdf911de6274c253873a21d876274e903",
+    "worktree_clean_when_inspected": true
+  },
+  "files": {
+    "mindlib/cli.py": "1fd95b830bd8a6091221dc8a7161c2a85b586fcc13be8710ce1742dccfcdd24e",
+    "mindlib/identities.py": "7eb938e0000f57f7feabf6ff82f020e451c79ea90092aacbc2439ddfcfea635e",
+    "mindlib/search_backend.py": "a6e2179c03b4a3c46c696f00014e9c5e53cd7ef8771bf419c8b2fcc242c258fc",
+    "mindlib/search_index.py": "993e6bac80ac39181a375fe5a1bec94674785e5529df2544653f2e8256e6583d",
+    "mindlib/similarity.py": "a7cc093af561d703129af12352724e23827118763e44f86e8866bada7f1c7209",
+    "mindlib/store.py": "4c90dc1231675efe6f31b03e63a1fe3c4039e1974292d7d58adba280c688237e",
+    "search_engine_experimental/README.md": "fadd1b42a2bcea61493614f98e77187610b6a5a59a7720647ffbe2ac8c319595",
+    "search_engine_experimental/experiments/analyze_containment_sketch.py": "c2284fe6dc0f82476dc45dbf8fab0c0b6f65039b3cac41f1bcff9962f85b919b",
+    "search_engine_experimental/experiments/benchmark_cone_dag.py": "a126cd2a6ee4add6c83d85f460f061a17ff06f13cb95ad324b5a71230ab2f81f",
+    "search_engine_experimental/experiments/benchmark_drift_rerank.py": "f9be154a835a89caffc6fa9c24515ff56bde921853d9474974053cb523d7399c",
+    "search_engine_experimental/experiments/cone_dag.py": "9bbe1c70c98c94c70492ccef5f872fd46f7d93c2f03cd4a53cb84f7d38fed694",
+    "search_engine_experimental/experiments/drift_retrieval.py": "d5713d55e6f07f20dbf555ae8d85bb31ea2d03fa89ce72fb3525b191f19eee0c",
+    "search_engine_experimental/research/architecture.md": "83db646944f13952dd5fec3ac417ca10d478c15f20029635b794a7efe1b29744",
+    "search_engine_experimental/research/cone_dag.md": "38a4b39642a812455968459f9c3cf0fc9f7f9095206bae1d0270dd3c59f4d74b",
+    "search_engine_experimental/research/cone_dag_mathematics.md": "551d5d3f736934f6c84ce37f82eb3678bfffebaa5f5a8c890213c906c35be9a7",
+    "search_engine_experimental/research/next_experiments.md": "2b0e5fa551090ef9769bfef982b34beb84561e2d0d6d9687b22bdfa4dee848e8",
+    "search_engine_experimental/research/semantic_identity_architecture.md": "e9553553c9bf3b277c6a984cb1baafbd6b7475fab5521851b6dfd9eab824ee76",
+    "search_engine_experimental/research/sense_bridge.md": "4ffec51edd98029a03b20bd4b2e57ed5e97ad14b3909e6ef21e0079b10293604",
+    "search_engine_experimental/results/cone_dag_drift_report.md": "caa26089f100492408147fa495123d7b01f787cf387294972dab34a83800f7eb",
+    "search_engine_experimental/results/cone_dag_report.md": "b25b272d597f266afd3c06eb3c30bdfb7f218924f228e4008bc53f62517e5236",
+    "search_engine_experimental/results/hybrid_secretary_cutoff.md": "bd14b504858c6ef72662b36a0255a6c840b29e77b69f06093fb66f98ac2200ed",
+    "search_engine_experimental/results/initial_results.md": "c6e985d8631dba7c3b9d8a2b7d92bef0d8d378003b7a11a44dbbea0f425c92df",
+    "search_engine_experimental/results/production_search_promotion.md": "70235e101ee78d3e8ed13ab492f320a2ffa8e9b22c1f0830a166406fd914ff6e",
+    "tests/test_search_experimental.py": "b493feb5eb5cc3affc70c7bc380949f8ac59066215d56155b0c6454535181cde"
+  },
+  "copied_snippets": []
+}

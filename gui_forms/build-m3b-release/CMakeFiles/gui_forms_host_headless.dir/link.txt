@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgui_forms_host_headless.a CMakeFiles/gui_forms_host_headless.dir/src/host/headless/headless_host.cpp.o
+/usr/bin/ranlib libgui_forms_host_headless.a

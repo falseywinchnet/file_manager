@@ -1,0 +1,265 @@
+#include "gui_forms/gui_forms.hpp"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <stdexcept>
+#include <thread>
+#include <limits>
+#include <vector>
+
+namespace {
+
+using namespace gui_forms;
+
+constexpr std::array<std::uint8_t, 70> one_pixel_png{
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+    0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xf8, 0xcf, 0xc0, 0xf0,
+    0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x56, 0xc7, 0x2f, 0x0d, 0x00, 0x00,
+    0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+};
+
+void require(bool condition, const char* message) {
+    if (!condition) {
+        throw std::runtime_error(message);
+    }
+}
+
+std::vector<std::byte> valid_bytes() {
+    const auto bytes = std::as_bytes(std::span{one_pixel_png});
+    return {bytes.begin(), bytes.end()};
+}
+
+std::uint32_t crc32(std::span<const std::byte> bytes) {
+    std::uint32_t crc = 0xffffffffU;
+    for (const std::byte value : bytes) {
+        crc ^= std::to_integer<std::uint8_t>(value);
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            const std::uint32_t mask = 0U - (crc & 1U);
+            crc = (crc >> 1U) ^ (0xedb88320U & mask);
+        }
+    }
+    return crc ^ 0xffffffffU;
+}
+
+void write_u32(std::span<std::byte> destination, std::uint32_t value) {
+    destination[0] = static_cast<std::byte>(value >> 24U);
+    destination[1] = static_cast<std::byte>(value >> 16U);
+    destination[2] = static_cast<std::byte>(value >> 8U);
+    destination[3] = static_cast<std::byte>(value);
+}
+
+void repair_chunk_crc(std::vector<std::byte>& bytes, std::size_t chunk_offset) {
+    const std::uint32_t length =
+        (std::to_integer<std::uint32_t>(bytes[chunk_offset]) << 24U) |
+        (std::to_integer<std::uint32_t>(bytes[chunk_offset + 1]) << 16U) |
+        (std::to_integer<std::uint32_t>(bytes[chunk_offset + 2]) << 8U) |
+        std::to_integer<std::uint32_t>(bytes[chunk_offset + 3]);
+    const std::uint32_t crc = crc32(std::span<const std::byte>(
+        bytes.data() + chunk_offset + 4U, static_cast<std::size_t>(length) + 4U));
+    write_u32(std::span<std::byte>(bytes.data() + chunk_offset + 8U + length, 4), crc);
+}
+
+std::vector<std::byte> chunk(const std::array<char, 4>& type,
+                             std::span<const std::byte> data = {}) {
+    std::vector<std::byte> result(12U + data.size());
+    write_u32(std::span<std::byte>(result.data(), 4),
+              static_cast<std::uint32_t>(data.size()));
+    for (std::size_t index = 0; index < type.size(); ++index) {
+        result[4U + index] = static_cast<std::byte>(type[index]);
+    }
+    for (std::size_t index = 0; index < data.size(); ++index) {
+        result[8U + index] = data[index];
+    }
+    repair_chunk_crc(result, 0);
+    return result;
+}
+
+void parser_contract() {
+    const std::vector<std::byte> bytes = valid_bytes();
+    const PngValidationResult valid = validate_png(bytes);
+    require(static_cast<bool>(valid), "valid PNG was rejected");
+    require(valid.metadata.width == 1 && valid.metadata.height == 1,
+            "IHDR dimensions were not retained");
+    require(valid.metadata.bit_depth == 8 &&
+                valid.metadata.color_type == PngColorType::truecolor_alpha,
+            "IHDR color contract was not retained");
+    require(valid.metadata.source_row_bytes == 4 &&
+                valid.metadata.decoded_byte_count == 4,
+            "row/decode budgets were computed incorrectly");
+
+    require(validate_png({}).error == ImageResourceError::empty_input,
+            "empty PNG did not return a typed error");
+    std::vector<std::byte> bad_signature = bytes;
+    bad_signature[0] ^= std::byte{1};
+    require(validate_png(bad_signature).error == ImageResourceError::invalid_signature,
+            "signature mutation was not rejected");
+
+    std::vector<std::byte> bad_crc = bytes;
+    bad_crc[44] ^= std::byte{1};
+    require(validate_png(bad_crc).error == ImageResourceError::crc_mismatch,
+            "chunk CRC mutation was not rejected");
+
+    std::vector<std::byte> oversized = bytes;
+    write_u32(std::span<std::byte>(oversized.data() + 16, 4), 4097);
+    repair_chunk_crc(oversized, 8);
+    require(validate_png(oversized).error == ImageResourceError::dimension_limit_exceeded,
+            "oversized width was not rejected before decode");
+
+    std::vector<std::byte> overflow = bytes;
+    write_u32(std::span<std::byte>(overflow.data() + 16, 4), 0xffffffffU);
+    write_u32(std::span<std::byte>(overflow.data() + 20, 4), 0xffffffffU);
+    repair_chunk_crc(overflow, 8);
+    ImageRegistryLimits widened;
+    widened.maximum_width = 0xffffffffU;
+    widened.maximum_height = 0xffffffffU;
+    widened.maximum_pixels = std::numeric_limits<std::uint64_t>::max();
+    widened.maximum_decoded_bytes_per_image =
+        std::numeric_limits<std::uint64_t>::max();
+    require(validate_png(overflow, widened).error ==
+                ImageResourceError::dimension_limit_exceeded,
+            "decoded RGBA byte multiplication was allowed to overflow");
+
+    std::vector<std::byte> invalid_color = bytes;
+    invalid_color[25] = std::byte{5};
+    repair_chunk_crc(invalid_color, 8);
+    require(validate_png(invalid_color).error == ImageResourceError::unsupported_color_format,
+            "invalid PNG color type was accepted");
+
+    std::vector<std::byte> profile = bytes;
+    const std::array<std::byte, 3> profile_data{
+        std::byte{'x'}, std::byte{0}, std::byte{0}};
+    const std::vector<std::byte> iccp = chunk({'i', 'C', 'C', 'P'}, profile_data);
+    profile.insert(profile.begin() + 33, iccp.begin(), iccp.end());
+    require(validate_png(profile).error == ImageResourceError::unsupported_color_profile,
+            "compressed ICC profile crossed the bounded color policy");
+
+    std::vector<std::byte> unknown = bytes;
+    const std::vector<std::byte> critical = chunk({'A', 'B', 'C', 'D'});
+    unknown.insert(unknown.begin() + 33, critical.begin(), critical.end());
+    require(validate_png(unknown).error == ImageResourceError::unknown_critical_chunk,
+            "unknown critical PNG chunk was ignored");
+
+    std::vector<std::byte> no_end(bytes.begin(), bytes.end() - 12);
+    require(validate_png(no_end).error == ImageResourceError::missing_iend,
+            "missing IEND was not rejected");
+    std::vector<std::byte> trailing = bytes;
+    trailing.push_back(std::byte{0});
+    require(validate_png(trailing).error == ImageResourceError::trailing_data,
+            "trailing data was not rejected");
+}
+
+void ownership_and_quota_contract() {
+    const std::vector<std::byte> bytes = valid_bytes();
+    ImageRegistry registry;
+    const ImageLoadResult first = registry.load_png(bytes);
+    require(static_cast<bool>(first), "registry rejected valid PNG");
+    require(registry.find(first.image).has_value(), "new image ID did not resolve");
+    require(registry.snapshot().resource_count == 1 &&
+                registry.snapshot().encoded_bytes == bytes.size() &&
+                registry.snapshot().decoded_bytes == 4,
+            "registry accounting did not include the loaded resource");
+
+    std::vector<std::byte> invalid = bytes;
+    invalid[0] = std::byte{0};
+    const ImageRegistrySnapshot before_invalid = registry.snapshot();
+    const ImageLoadResult rejected = registry.replace_png(first.image, invalid);
+    require(!rejected && rejected.error == ImageResourceError::invalid_signature,
+            "invalid replacement did not report its parser error");
+    require(registry.snapshot().revision == before_invalid.revision &&
+                registry.find(first.image).has_value(),
+            "failed replacement was not atomic");
+
+    const ImageLoadResult replacement = registry.replace_png(first.image, bytes);
+    require(replacement && replacement.image != first.image,
+            "replacement did not advance the image generation");
+    require(!registry.find(first.image).has_value() &&
+                registry.find(replacement.image).has_value(),
+            "stale image ID resolved after replacement");
+    require(registry.replace_png(first.image, bytes).error ==
+                ImageResourceError::stale_image_id,
+            "stale replacement ID was not typed");
+    require(registry.remove(replacement.image), "current image could not be removed");
+    require(!registry.remove(replacement.image) && registry.snapshot().resource_count == 0 &&
+                registry.snapshot().encoded_bytes == 0 &&
+                registry.snapshot().decoded_bytes == 0,
+            "removal was not deterministic and idempotent");
+    const ImageLoadResult reused = registry.load_png(bytes);
+    require(reused && reused.image != replacement.image,
+            "slot reuse revived a stale image generation");
+
+    ImageRegistryLimits count_limits;
+    count_limits.maximum_resources = 1;
+    ImageRegistry count_bounded(count_limits);
+    require(static_cast<bool>(count_bounded.load_png(bytes)),
+            "bounded registry rejected first image");
+    require(count_bounded.load_png(bytes).error == ImageResourceError::resource_count_exceeded,
+            "resource-count quota was not enforced");
+
+    ImageRegistryLimits encoded_limits;
+    encoded_limits.maximum_total_encoded_bytes = bytes.size();
+    ImageRegistry encoded_bounded(encoded_limits);
+    require(static_cast<bool>(encoded_bounded.load_png(bytes)),
+            "encoded quota rejected first image");
+    require(encoded_bounded.load_png(bytes).error ==
+                ImageResourceError::registry_encoded_limit_exceeded,
+            "aggregate encoded-byte quota was not enforced");
+
+    ImageRegistryLimits decoded_limits;
+    decoded_limits.maximum_total_decoded_bytes = 4;
+    ImageRegistry decoded_bounded(decoded_limits);
+    require(static_cast<bool>(decoded_bounded.load_png(bytes)),
+            "decoded quota rejected first image");
+    require(decoded_bounded.load_png(bytes).error ==
+                ImageResourceError::registry_decoded_limit_exceeded,
+            "aggregate decoded-byte quota was not enforced");
+}
+
+void deterministic_mutation_oracle() {
+    const std::vector<std::byte> source = valid_bytes();
+    std::vector<ImageResourceError> first;
+    std::vector<ImageResourceError> second;
+    for (std::vector<ImageResourceError>* outcomes : {&first, &second}) {
+        outcomes->reserve(source.size());
+        for (std::size_t index = 0; index < source.size(); ++index) {
+            std::vector<std::byte> mutation = source;
+            mutation[index] ^= std::byte{0x01};
+            const ImageResourceError error = validate_png(mutation).error;
+            require(!image_resource_error_name(error).empty(),
+                    "parser returned an unnamed result");
+            outcomes->push_back(error);
+        }
+    }
+    require(first == second, "PNG mutation oracle was nondeterministic");
+}
+
+void window_thread_boundary() {
+    auto root = make_control<Control>(StableId("resource.root"));
+    Window window(root, {32.0, 32.0});
+    const std::vector<std::byte> bytes = valid_bytes();
+    bool rejected = false;
+    std::thread worker([&] {
+        try {
+            static_cast<void>(window.load_png(bytes));
+        } catch (const std::logic_error&) {
+            rejected = true;
+        }
+    });
+    worker.join();
+    require(rejected &&
+                window.metrics_snapshot().rejected_wrong_thread_operations == 1,
+            "window image ownership did not enforce the UI thread");
+}
+
+} // namespace
+
+int main() {
+    parser_contract();
+    ownership_and_quota_contract();
+    deterministic_mutation_oracle();
+    window_thread_boundary();
+    return 0;
+}

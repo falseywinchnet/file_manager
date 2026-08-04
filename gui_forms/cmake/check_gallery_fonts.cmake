@@ -1,0 +1,10 @@
+foreach(face IN ITEMS REGULAR BOLD)
+    if(NOT EXISTS "${${face}_FONT}")
+        message(FATAL_ERROR "Bundled ${face} Portsmouth Rapids face is missing")
+    endif()
+    file(SHA256 "${${face}_FONT}" actual_hash)
+    if(NOT actual_hash STREQUAL "${${face}_SHA256}")
+        message(FATAL_ERROR
+            "Bundled ${face} Portsmouth Rapids hash changed: ${actual_hash}")
+    endif()
+endforeach()

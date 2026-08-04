@@ -1,0 +1,748 @@
+#include "gallery_controls.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <initializer_list>
+#include <stdexcept>
+#include <unordered_map>
+#include <utility>
+
+namespace gui_forms::gallery {
+namespace {
+
+using dml::LayoutKind;
+using dml::NodeKind;
+
+// Demo-private candidate palette: Windows 7/10 professional structure, the
+// Modern.Forms white work canvas, and the parent program's precise material
+// grammar. These are not frozen M9 theme tokens.
+constexpr Color face = Color::rgba(229, 234, 239);
+constexpr Color face_light = Color::rgba(247, 249, 251);
+constexpr Color paper = Color::rgba(255, 255, 255);
+constexpr Color highlight = Color::rgba(255, 255, 255);
+constexpr Color shadow = Color::rgba(148, 162, 175);
+constexpr Color deep_shadow = Color::rgba(76, 94, 111);
+constexpr Color ink = Color::rgba(27, 39, 51);
+constexpr Color disabled_ink = Color::rgba(132, 143, 153);
+constexpr Color accent = Color::rgba(38, 114, 185);
+constexpr Color accent_deep = Color::rgba(25, 82, 139);
+constexpr Color accent_light = Color::rgba(216, 235, 249);
+constexpr Color selection = Color::rgba(43, 120, 197);
+constexpr Color instrument_face = Color::rgba(13, 24, 36);
+constexpr Color cyan = Color::rgba(89, 216, 230);
+constexpr Color amber = Color::rgba(255, 210, 122);
+constexpr Color command_rule = Color::rgba(174, 193, 209);
+
+constexpr double group_caption_height = 22.0;
+constexpr double gap = 6.0;
+
+[[nodiscard]] bool same_rect(Rect left, Rect right) noexcept
+{
+    return left.x == right.x && left.y == right.y && left.width == right.width &&
+           left.height == right.height;
+}
+
+void request_bounds(const Control::Ptr& child, Rect bounds)
+{
+    if (!same_rect(child->requested_bounds(), bounds)) {
+        child->set_requested_bounds(bounds);
+    }
+}
+
+void raised_frame(Painter& painter, Rect rect, bool pressed, bool quiet, Color fill = face)
+{
+    painter.fill_rect(rect, fill);
+    if (!pressed && rect.height > 5.0) {
+        painter.fill_rect({rect.x + 1.0, rect.y + 1.0, rect.width - 2.0,
+                           std::floor((rect.height - 2.0) * 0.46)},
+                          Color::rgba(253, 254, 255));
+    }
+    const Color top = pressed ? shadow : highlight;
+    const Color bottom = pressed ? highlight : deep_shadow;
+    painter.draw_line({rect.x, rect.y}, {rect.x + rect.width - 1.0, rect.y}, top, 1.0);
+    painter.draw_line({rect.x, rect.y}, {rect.x, rect.y + rect.height - 1.0}, top, 1.0);
+    painter.draw_line({rect.x, rect.y + rect.height - 1.0},
+                      {rect.x + rect.width - 1.0, rect.y + rect.height - 1.0}, bottom, 1.0);
+    painter.draw_line({rect.x + rect.width - 1.0, rect.y},
+                      {rect.x + rect.width - 1.0, rect.y + rect.height - 1.0}, bottom, 1.0);
+    if (!quiet && rect.width > 4.0 && rect.height > 4.0) {
+        painter.stroke_rect({rect.x + 1.0, rect.y + 1.0, rect.width - 3.0, rect.height - 3.0},
+                            pressed ? deep_shadow : face_light,
+                            1.0);
+    }
+}
+
+void sunken_frame(Painter& painter, Rect rect, Color fill)
+{
+    painter.fill_rect(rect, fill);
+    painter.draw_line({rect.x, rect.y}, {rect.x + rect.width, rect.y}, deep_shadow, 1.0);
+    painter.draw_line({rect.x, rect.y}, {rect.x, rect.y + rect.height}, deep_shadow, 1.0);
+    painter.draw_line({rect.x, rect.y + rect.height - 1.0},
+                      {rect.x + rect.width, rect.y + rect.height - 1.0}, highlight, 1.0);
+    painter.draw_line({rect.x + rect.width - 1.0, rect.y},
+                      {rect.x + rect.width - 1.0, rect.y + rect.height}, highlight, 1.0);
+}
+
+[[nodiscard]] bool is_container(NodeKind kind) noexcept
+{
+    return kind == NodeKind::form || kind == NodeKind::command_strip ||
+           kind == NodeKind::panel || kind == NodeKind::backplane ||
+           kind == NodeKind::group || kind == NodeKind::list ||
+           kind == NodeKind::diagnostics;
+}
+
+[[nodiscard]] PaintPlane paint_plane_for(const dml::NodeSpec& specification) noexcept
+{
+    if (specification.id.starts_with("gallery.diagnostics")) {
+        return PaintPlane::overlay;
+    }
+    switch (specification.kind) {
+    case NodeKind::form:
+    case NodeKind::command_strip:
+    case NodeKind::panel:
+    case NodeKind::backplane:
+    case NodeKind::group:
+    case NodeKind::list:
+        return PaintPlane::backplane;
+    default:
+        return PaintPlane::control;
+    }
+}
+
+[[nodiscard]] Rect content_rect(NodeKind kind, Size size) noexcept
+{
+    if (kind == NodeKind::group || kind == NodeKind::diagnostics) {
+        return {10.0, group_caption_height, std::max(0.0, size.width - 20.0),
+                std::max(0.0, size.height - group_caption_height - 10.0)};
+    }
+    if (kind == NodeKind::command_strip) {
+        return {6.0, 5.0, std::max(0.0, size.width - 12.0),
+                std::max(0.0, size.height - 10.0)};
+    }
+    if (kind == NodeKind::backplane) {
+        return {16.0, 14.0, std::max(0.0, size.width - 32.0),
+                std::max(0.0, size.height - 28.0)};
+    }
+    if (kind == NodeKind::list) {
+        return {2.0, 2.0, std::max(0.0, size.width - 4.0),
+                std::max(0.0, size.height - 4.0)};
+    }
+    return {0.0, 0.0, size.width, size.height};
+}
+
+[[nodiscard]] std::string metric_text(std::string_view id, const MetricsSnapshot& m)
+{
+    char buffer[192]{};
+    if (id == "gallery.diagnostics.renderer") {
+        std::snprintf(buffer, sizeof(buffer), "%s", m.renderer_name.c_str());
+    } else if (id == "gallery.diagnostics.controls") {
+        std::snprintf(buffer, sizeof(buffer), "controls %llu / IDs %llu / cache %llu",
+                      static_cast<unsigned long long>(m.control_count),
+                      static_cast<unsigned long long>(m.stable_id_count),
+                      static_cast<unsigned long long>(m.display_cache_entries));
+    } else if (id == "gallery.diagnostics.layout") {
+        std::snprintf(buffer, sizeof(buffer), "measure %llu / arrange %llu",
+                      static_cast<unsigned long long>(m.measure_passes),
+                      static_cast<unsigned long long>(m.arrange_passes));
+    } else if (id == "gallery.diagnostics.paint") {
+        std::snprintf(buffer, sizeof(buffer), "paint %llu / chunks %llu new, %llu reused",
+                      static_cast<unsigned long long>(m.paint_passes),
+                      static_cast<unsigned long long>(m.display_chunks_rebuilt),
+                      static_cast<unsigned long long>(m.display_chunks_reused));
+    } else if (id == "gallery.diagnostics.input") {
+        std::snprintf(buffer, sizeof(buffer), "input %llu / focus %llu / activate %llu",
+                      static_cast<unsigned long long>(m.input_events),
+                      static_cast<unsigned long long>(m.focus_transitions),
+                      static_cast<unsigned long long>(m.activations));
+    } else if (id == "gallery.diagnostics.flush") {
+        std::snprintf(buffer, sizeof(buffer), "wake %llu / ticks %llu / active %llu",
+                      static_cast<unsigned long long>(m.scheduler_wakes),
+                      static_cast<unsigned long long>(m.active_surface_ticks),
+                      static_cast<unsigned long long>(m.active_surface_count));
+    } else if (id == "gallery.diagnostics.present") {
+        std::snprintf(buffer, sizeof(buffer), "present %llu / worst %.3f ms",
+                      static_cast<unsigned long long>(m.frames_presented),
+                      static_cast<double>(m.worst_present_duration_nanoseconds) / 1'000'000.0);
+    } else {
+        return {};
+    }
+    return buffer;
+}
+
+}  // namespace
+
+void GalleryContext::synchronize(std::string_view cause)
+{
+    if (window == nullptr) {
+        return;
+    }
+    auto scope = window->begin_update();
+    const auto invalidate = [this](std::string_view id) {
+        if (const Control::Ptr control = window->find(id)) {
+            control->invalidate(Dirty::paint | Dirty::semantics);
+        }
+    };
+    const auto invalidate_set = [&invalidate](std::initializer_list<std::string_view> ids) {
+        for (const std::string_view id : ids) {
+            invalidate(id);
+        }
+    };
+
+    if (cause == "gallery.command.reset") {
+        drop_status.clear();
+        for (const dml::NodeSpec& node : dml::gallery_nodes) {
+            invalidate(node.id);
+        }
+        window->find("gallery.diagnostics")->set_visible(model.state().diagnostics_visible);
+    } else if (cause == "gallery.command.diagnostics") {
+        window->find("gallery.diagnostics")->set_visible(model.state().diagnostics_visible);
+        invalidate(cause);
+    } else if (cause == "gallery.slider") {
+        invalidate_set({"gallery.slider", "gallery.progress", "gallery.value-label",
+                        "gallery.instrument"});
+    } else if (cause == "gallery.radio.classic" || cause == "gallery.radio.quiet") {
+        invalidate_set({"gallery.radio.classic", "gallery.radio.quiet", "gallery.default-button",
+                        "gallery.slider"});
+    } else if (cause.starts_with("gallery.category.")) {
+        invalidate_set({"gallery.category.basics", "gallery.category.values",
+                        "gallery.category.collections", "gallery.category.instrument"});
+    } else if (cause.starts_with("gallery.collection.")) {
+        invalidate_set({"gallery.collection.alpha", "gallery.collection.beta",
+                        "gallery.collection.gamma", "gallery.collection.delta"});
+    } else {
+        invalidate(cause);
+    }
+
+    // Diagnostics are live instrumentation, not a snapshot captured when the
+    // panel opens. Keep their damage localized to the metric rows while
+    // ensuring every retained interaction is observable on the next frame.
+    if (model.state().diagnostics_visible) {
+        invalidate_set({"gallery.diagnostics.renderer", "gallery.diagnostics.controls",
+                        "gallery.diagnostics.layout", "gallery.diagnostics.paint",
+                        "gallery.diagnostics.input", "gallery.diagnostics.flush",
+                        "gallery.diagnostics.present"});
+    }
+}
+
+GalleryControl::GalleryControl(StableId stable_id,
+                               const dml::NodeSpec& specification,
+                               std::shared_ptr<GalleryContext> context)
+    : Control(std::move(stable_id)), specification_(&specification), context_(std::move(context))
+{
+    set_paint_plane(paint_plane_for(specification));
+    set_enabled((specification.flags & dml::enabled) != 0U);
+    set_visible((specification.flags & dml::visible) != 0U);
+    set_focusable((specification.flags & dml::focusable) != 0U);
+    set_allow_drop(specification.id == "gallery.collection");
+    const bool interactive = (specification.flags & dml::enabled) != 0U;
+    if (interactive && specification.kind == dml::NodeKind::text_input) {
+        set_cursor(CursorKind::text);
+    } else if (interactive &&
+               (specification.kind == dml::NodeKind::button ||
+                specification.kind == dml::NodeKind::check_box ||
+                specification.kind == dml::NodeKind::radio_button ||
+                specification.kind == dml::NodeKind::slider ||
+                specification.kind == dml::NodeKind::row)) {
+        set_cursor(CursorKind::hand);
+    }
+}
+
+Size GalleryControl::measure(Size available)
+{
+    const double preferred_width = specification_->preferred_width > 0
+                                       ? static_cast<double>(specification_->preferred_width)
+                                       : available.width;
+    const double preferred_height = specification_->preferred_height > 0
+                                        ? static_cast<double>(specification_->preferred_height)
+                                        : available.height;
+    return {std::min(available.width, preferred_width),
+            std::min(available.height, preferred_height)};
+}
+
+void GalleryControl::arrange(Rect final_bounds)
+{
+    arrange_children({final_bounds.width, final_bounds.height});
+    Control::arrange(final_bounds);
+}
+
+void GalleryControl::arrange_children(Size size)
+{
+    if (!is_container(specification_->kind) || children().empty()) {
+        return;
+    }
+
+    const Rect content = content_rect(specification_->kind, size);
+    if (specification_->layout == LayoutKind::form_grid) {
+        const double first_row_y = content.y;
+        const double second_row_y = first_row_y + 28.0;
+        const double third_row_y = second_row_y + 34.0;
+        for (const Control::Ptr& child : children()) {
+            const std::string_view id = child->stable_id().value();
+            if (id == "gallery.intro") {
+                request_bounds(child, {content.x, first_row_y, content.width, 22.0});
+            } else if (id == "gallery.text-input") {
+                request_bounds(child, {content.x, second_row_y, 250.0, 28.0});
+            } else if (id == "gallery.default-button") {
+                request_bounds(child, {content.x + 256.0, second_row_y, 92.0, 28.0});
+            } else if (id == "gallery.disabled-button") {
+                request_bounds(child, {content.x + 354.0, second_row_y, 108.0, 28.0});
+            } else if (id == "gallery.checkbox") {
+                request_bounds(child, {content.x, third_row_y, 220.0, 24.0});
+            } else if (id == "gallery.radio.classic") {
+                request_bounds(child, {content.x + 226.0, third_row_y, 180.0, 24.0});
+            } else if (id == "gallery.radio.quiet") {
+                request_bounds(child, {content.x + 412.0, third_row_y, 180.0, 24.0});
+            }
+        }
+        return;
+    }
+    if (specification_->layout == LayoutKind::none) {
+        return;
+    }
+
+    const double child_gap = specification_->kind == NodeKind::list ? 0.0 : gap;
+    double fixed = 0.0;
+    std::size_t flexible = 0;
+    for (const Control::Ptr& child : children()) {
+        if (!child->visible()) {
+            continue;
+        }
+        const auto* gallery_child = dynamic_cast<const GalleryControl*>(child.get());
+        const int preferred = specification_->layout == LayoutKind::flex_row
+                                  ? gallery_child->specification_->preferred_width
+                                  : gallery_child->specification_->preferred_height;
+        if (preferred > 0) {
+            fixed += static_cast<double>(preferred);
+        } else {
+            ++flexible;
+        }
+        fixed += child_gap;
+    }
+    if (fixed > 0.0) {
+        fixed -= child_gap;
+    }
+
+    const double extent = specification_->layout == LayoutKind::flex_row ? content.width
+                                                                          : content.height;
+    const double flexible_extent = flexible == 0
+                                       ? 0.0
+                                       : std::max(0.0, extent - fixed) /
+                                             static_cast<double>(flexible);
+    double cursor = specification_->layout == LayoutKind::flex_row ? content.x : content.y;
+    for (const Control::Ptr& child : children()) {
+        if (!child->visible()) {
+            continue;
+        }
+        const auto* gallery_child = dynamic_cast<const GalleryControl*>(child.get());
+        const int preferred = specification_->layout == LayoutKind::flex_row
+                                  ? gallery_child->specification_->preferred_width
+                                  : gallery_child->specification_->preferred_height;
+        const double child_extent = preferred > 0 ? static_cast<double>(preferred) : flexible_extent;
+        Rect bounds = content;
+        if (specification_->layout == LayoutKind::flex_row) {
+            bounds.x = cursor;
+            bounds.width = child_extent;
+        } else {
+            bounds.y = cursor;
+            bounds.height = child_extent;
+        }
+        request_bounds(child, bounds);
+        cursor += child_extent + child_gap;
+    }
+}
+
+void GalleryControl::on_paint(Painter& painter, Rect)
+{
+    const Rect bounds {0.0, 0.0, committed_arranged_bounds().width,
+                       committed_arranged_bounds().height};
+    const bool quiet = context_->model.state().style_mode == StyleMode::quiet_relief;
+    const std::string text = display_text();
+
+    switch (specification_->kind) {
+    case NodeKind::form:
+        painter.fill_rect(bounds, Color::rgba(213, 223, 232));
+        break;
+    case NodeKind::command_strip:
+        painter.fill_rect(bounds, face_light);
+        painter.fill_rect({0.0, 0.0, bounds.width, 3.0}, accent);
+        painter.fill_rect({0.0, 3.0, bounds.width, 1.0}, Color::rgba(151, 201, 235));
+        painter.draw_line({0.0, bounds.height - 1.0}, {bounds.width, bounds.height - 1.0},
+                          command_rule, 1.0);
+        break;
+    case NodeKind::panel:
+        painter.fill_rect(bounds, paper);
+        break;
+    case NodeKind::backplane: {
+        painter.fill_rect(bounds, Color::rgba(222, 235, 247));
+        const double third = bounds.width / 3.0;
+        painter.fill_rect({0.0, 0.0, third, bounds.height}, Color::rgba(207, 227, 244));
+        painter.fill_rect({third, 0.0, third, bounds.height}, Color::rgba(226, 231, 246));
+        painter.fill_rect({third * 2.0, 0.0, third, bounds.height},
+                          Color::rgba(237, 228, 241));
+        painter.fill_rect({0.0, bounds.height * 0.62, bounds.width, bounds.height * 0.38},
+                          Color::rgba(245, 248, 251, 224));
+        painter.fill_rect({0.0, 0.0, 5.0, bounds.height}, accent);
+        break;
+    }
+    case NodeKind::group:
+    case NodeKind::diagnostics:
+        if ((specification_->flags & dml::transparent) == 0U) {
+            painter.fill_rect(bounds,
+                              specification_->kind == NodeKind::diagnostics ? face_light : face);
+        }
+        painter.stroke_rect({0.5, 10.5, std::max(0.0, bounds.width - 1.0),
+                             std::max(0.0, bounds.height - 11.0)}, shadow, 1.0);
+        painter.fill_rect({9.0, 3.0, std::min(bounds.width - 18.0, 190.0), 16.0},
+                          (specification_->flags & dml::transparent) != 0U
+                              ? Color::rgba(230, 238, 247, 232)
+                              : face);
+        painter.draw_text_utf8({13.0, 15.0}, text, {FontRole::control, 12.0, 600, false}, ink);
+        break;
+    case NodeKind::label:
+        if (specification_->id == "gallery.command.status") {
+            painter.draw_image(context_->status_badge, {2.0, 3.0, 16.0, 16.0}, 1.0);
+            painter.draw_text_utf8({24.0, 15.0}, text,
+                                   {FontRole::control, 12.0, 400, false}, ink);
+        } else if (specification_->id == "gallery.diagnostics.font") {
+            painter.draw_text_utf8({2.0, 14.0}, "Controls: Portsmouth Rapids 1.0",
+                                   {FontRole::content, 10.0, 400, false}, ink);
+            painter.draw_text_utf8({2.0, 30.0}, "Fields: Lucida Grande",
+                                   {FontRole::content, 10.0, 400, false}, disabled_ink);
+        } else {
+            const bool field_text = specification_->id == "gallery.intro" ||
+                specification_->id == "gallery.value-label" ||
+                specification_->id.starts_with("gallery.diagnostics.");
+            painter.draw_text_utf8({2.0, 15.0}, text,
+                                   {field_text ? FontRole::content : FontRole::control,
+                                    12.0, 400, false},
+                                   enabled() ? ink : disabled_ink);
+        }
+        break;
+    case NodeKind::button: {
+        raised_frame(painter, bounds, pressed_, quiet,
+                     hovered_ && enabled() && !pressed_ ? accent_light : face);
+        if ((specification_->flags & dml::default_action) != 0U) {
+            painter.stroke_rect({0.5, 0.5, bounds.width - 1.0, bounds.height - 1.0},
+                                accent_deep, 1.0);
+        }
+        if (focused_) {
+            painter.stroke_rect({4.5, 4.5, bounds.width - 9.0, bounds.height - 9.0}, ink, 1.0);
+        }
+        const double offset = pressed_ ? 1.0 : 0.0;
+        painter.draw_text_utf8({9.0 + offset, bounds.height * 0.5 + 5.0 + offset}, text,
+                               {FontRole::control, 12.0, 400, false},
+                               enabled() ? ink : disabled_ink);
+        break;
+    }
+    case NodeKind::text_input:
+        sunken_frame(painter, bounds, paper);
+        if (focused_) {
+            painter.stroke_rect({1.5, 1.5, bounds.width - 3.0, bounds.height - 3.0},
+                                accent, 1.0);
+        }
+        painter.draw_text_utf8({7.0, bounds.height * 0.5 + 5.0}, text,
+                               {FontRole::content, 13.0, 400, false}, ink);
+        if (focused_) {
+            const double caret_x = std::min(bounds.width - 5.0, 7.0 + text.size() * 7.0);
+            painter.draw_line({caret_x, 5.0}, {caret_x, bounds.height - 5.0}, ink, 1.0);
+        }
+        break;
+    case NodeKind::check_box: {
+        const Rect box {1.0, 4.0, 15.0, 15.0};
+        sunken_frame(painter, box, paper);
+        if (checked()) {
+            painter.draw_line({4.0, 11.0}, {7.0, 14.0}, accent, 2.0);
+            painter.draw_line({7.0, 14.0}, {14.0, 6.0}, accent, 2.0);
+        }
+        painter.draw_text_utf8({23.0, 17.0}, text, {FontRole::control, 12.0, 400, false}, ink);
+        break;
+    }
+    case NodeKind::radio_button: {
+        painter.stroke_rect({1.0, 4.0, 15.0, 15.0}, shadow, 1.0);
+        painter.stroke_rect({3.0, 6.0, 11.0, 11.0}, highlight, 1.0);
+        if (checked()) {
+            painter.fill_rect({6.0, 9.0, 5.0, 5.0}, accent);
+        }
+        painter.draw_text_utf8({23.0, 17.0}, text, {FontRole::control, 12.0, 400, false}, ink);
+        break;
+    }
+    case NodeKind::slider: {
+        sunken_frame(painter, {4.0, bounds.height * 0.5 - 3.0, bounds.width - 8.0, 6.0}, face_light);
+        const double ratio = value() / 100.0;
+        const double thumb_x = 4.0 + ratio * std::max(0.0, bounds.width - 20.0);
+        raised_frame(painter, {thumb_x, 3.0, 16.0, bounds.height - 6.0}, pressed_, quiet);
+        break;
+    }
+    case NodeKind::progress: {
+        sunken_frame(painter, bounds, paper);
+        const double filled = std::max(0.0, bounds.width - 4.0) * value() / 100.0;
+        painter.fill_rect({2.0, 2.0, filled, std::max(0.0, bounds.height - 4.0)}, accent);
+        painter.fill_rect({2.0, 2.0, filled, 3.0}, Color::rgba(123, 190, 233));
+        break;
+    }
+    case NodeKind::list:
+        sunken_frame(painter, bounds, paper);
+        if (drag_hovered_) {
+            painter.fill_rect({2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                               std::max(0.0, bounds.height - 4.0)},
+                              Color::rgba(216, 235, 249, 96));
+            painter.stroke_rect({1.5, 1.5, std::max(0.0, bounds.width - 3.0),
+                                 std::max(0.0, bounds.height - 3.0)}, accent, 2.0);
+        }
+        break;
+    case NodeKind::row:
+        painter.fill_rect(bounds, selected() ? selection : paper);
+        if (selected()) {
+            painter.fill_rect({0.0, 0.0, 4.0, bounds.height}, accent_deep);
+            painter.draw_line({4.0, bounds.height - 1.0}, {bounds.width, bounds.height - 1.0},
+                              Color::rgba(31, 91, 151), 1.0);
+        }
+        painter.draw_text_utf8({7.0, 18.0}, text,
+                               {specification_->id.starts_with("gallery.category.")
+                                    ? FontRole::control
+                                    : FontRole::content,
+                                12.0, 400, false},
+                               selected() ? highlight : ink);
+        if (focused_) {
+            painter.stroke_rect({1.5, 1.5, bounds.width - 3.0, bounds.height - 3.0},
+                                selected() ? highlight : accent, 1.0);
+        }
+        break;
+    case NodeKind::instrument: {
+        ++paint_sequence_;
+        painter.fill_rect(bounds, instrument_face);
+        painter.stroke_rect({0.5, 0.5, bounds.width - 1.0, bounds.height - 1.0}, deep_shadow, 1.0);
+        for (int line = 1; line < 5; ++line) {
+            const double y = bounds.height * static_cast<double>(line) / 5.0;
+            painter.draw_line({8.0, y}, {bounds.width - 8.0, y}, Color::rgba(47, 70, 101), 1.0);
+        }
+        const double level = value();
+        const double marker_x = 10.0 + level * std::max(0.0, bounds.width - 20.0);
+        painter.draw_line({10.0, bounds.height - 14.0}, {marker_x, 18.0}, cyan, 2.0);
+        painter.draw_line({marker_x, 18.0}, {bounds.width - 10.0, bounds.height - 25.0}, amber, 2.0);
+        const double sweep_x = 10.0 +
+            std::fmod(static_cast<double>(paint_sequence_) * 0.027,
+                      1.0) * std::max(0.0, bounds.width - 20.0);
+        painter.draw_line({sweep_x, 25.0}, {sweep_x, bounds.height - 8.0},
+                          Color::rgba(128, 223, 239, 150), 1.0);
+        char percent[32]{};
+        std::snprintf(percent, sizeof(percent), "LEVEL %3.0f%%", level * 100.0);
+        painter.draw_text_utf8({12.0, 17.0}, percent, {FontRole::monospace, 12.0, 600, false}, cyan);
+        break;
+    }
+    }
+}
+
+bool GalleryControl::hit_test_local(Point local_point) const
+{
+    return focusable() && Control::hit_test_local(local_point);
+}
+
+void GalleryControl::on_pointer(PointerEvent& event)
+{
+    if (!enabled()) {
+        return;
+    }
+    if (event.action == PointerAction::enter || event.action == PointerAction::move) {
+        if (!hovered_) {
+            hovered_ = true;
+            invalidate(Dirty::paint);
+        }
+    } else if (event.action == PointerAction::leave) {
+        hovered_ = false;
+        pressed_ = false;
+        invalidate(Dirty::paint);
+    }
+    if (event.button == PointerButton::primary && event.action == PointerAction::down) {
+        pressed_ = true;
+        if (specification_->kind == NodeKind::slider) {
+            set_slider_from_window_point(event.position);
+        }
+        invalidate(Dirty::paint);
+        event.handled = true;
+    } else if (event.button == PointerButton::primary && event.action == PointerAction::up) {
+        pressed_ = false;
+        invalidate(Dirty::paint);
+        event.handled = true;
+    } else if (event.action == PointerAction::move && pressed_ &&
+               specification_->kind == NodeKind::slider) {
+        set_slider_from_window_point(event.position);
+        event.handled = true;
+    }
+}
+
+void GalleryControl::on_text_input(TextInputEvent& event)
+{
+    if (specification_->kind != NodeKind::text_input || !enabled() || event.composing) {
+        return;
+    }
+    std::string next = context_->model.state().text;
+    if (event.replacement_start >= 0) {
+        const std::size_t start = std::min(next.size(), static_cast<std::size_t>(event.replacement_start));
+        const std::size_t length = std::min(next.size() - start,
+                                            static_cast<std::size_t>(std::max(0, event.replacement_length)));
+        next.replace(start, length, event.text_utf8);
+    } else {
+        next.append(event.text_utf8);
+    }
+    if (context_->model.replace_text(std::move(next))) {
+        context_->synchronize(specification_->id);
+    }
+    event.handled = true;
+}
+
+void GalleryControl::on_drag(DragEvent& event)
+{
+    if (specification_->id != "gallery.collection") {
+        return;
+    }
+    if (event.action == DragAction::leave) {
+        drag_hovered_ = false;
+        invalidate(Dirty::paint);
+        event.handled = true;
+        return;
+    }
+    drag_hovered_ = event.action != DragAction::drop;
+    if (has_drag_effect(event.allowed_effects, DragEffect::copy)) {
+        event.accepted_effect = DragEffect::copy;
+    }
+    if (event.action == DragAction::drop) {
+        std::size_t files = 0;
+        std::size_t text_items = 0;
+        std::size_t binary_items = 0;
+        for (const DragDataItem& item : event.items) {
+            std::visit([&](const auto& data) {
+                using Data = std::decay_t<decltype(data)>;
+                if constexpr (std::is_same_v<Data, DragFileListData>) {
+                    files += data.paths_utf8.size();
+                } else if constexpr (std::is_same_v<Data, DragTextData>) {
+                    ++text_items;
+                } else if constexpr (std::is_same_v<Data, DragBinaryData>) {
+                    ++binary_items;
+                }
+            }, item);
+        }
+        char status[128]{};
+        std::snprintf(status, sizeof(status),
+                      "Drop received · %zu file%s · %zu text · %zu data",
+                      files, files == 1 ? "" : "s", text_items, binary_items);
+        context_->drop_status = status;
+        context_->synchronize("gallery.command.status");
+    }
+    invalidate(Dirty::paint);
+    event.handled = true;
+}
+
+void GalleryControl::on_focus_changed(bool focused)
+{
+    focused_ = focused;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void GalleryControl::on_activate()
+{
+    if (specification_->kind == NodeKind::slider) {
+        return;
+    }
+    if (context_->model.activate(specification_->id)) {
+        context_->synchronize(specification_->id);
+    }
+}
+
+NodeKind GalleryControl::kind() const noexcept
+{
+    return specification_->kind;
+}
+
+bool GalleryControl::selected() const
+{
+    return context_->model.state().selected_category == specification_->id ||
+           context_->model.state().selected_collection_row == specification_->id;
+}
+
+bool GalleryControl::checked() const
+{
+    if (specification_->id == "gallery.checkbox") {
+        return context_->model.state().precise_updates;
+    }
+    if (specification_->id == "gallery.radio.classic") {
+        return context_->model.state().style_mode == StyleMode::classic_relief;
+    }
+    if (specification_->id == "gallery.radio.quiet") {
+        return context_->model.state().style_mode == StyleMode::quiet_relief;
+    }
+    return false;
+}
+
+double GalleryControl::value() const
+{
+    if (specification_->kind == NodeKind::slider) {
+        return context_->model.state().slider_value;
+    }
+    if (specification_->kind == NodeKind::progress) {
+        return context_->model.state().progress_value;
+    }
+    if (specification_->kind == NodeKind::instrument) {
+        return context_->model.state().instrument_value;
+    }
+    return specification_->value;
+}
+
+std::string GalleryControl::display_text() const
+{
+    if (specification_->id == "gallery.command.status" &&
+        !context_->drop_status.empty()) {
+        return context_->drop_status;
+    }
+    if (specification_->id == "gallery.text-input") {
+        return context_->model.state().text;
+    }
+    if (specification_->id == "gallery.value-label") {
+        return format_percent(context_->model.state().progress_value);
+    }
+    if (specification_->id.starts_with("gallery.diagnostics.") && context_->window != nullptr) {
+        const std::string metrics = metric_text(specification_->id,
+                                                context_->window->metrics_snapshot());
+        if (!metrics.empty()) {
+            return metrics;
+        }
+    }
+    return std::string(specification_->text);
+}
+
+void GalleryControl::set_slider_from_window_point(Point point)
+{
+    const Rect absolute = absolute_bounds();
+    const double usable = std::max(1.0, absolute.width - 20.0);
+    const double ratio = std::clamp((point.x - absolute.x - 10.0) / usable, 0.0, 1.0);
+    if (context_->model.set_slider_value(ratio * 100.0)) {
+        context_->synchronize(specification_->id);
+    }
+}
+
+GalleryTree build_gallery_tree()
+{
+    auto context = std::make_shared<GalleryContext>();
+    std::unordered_map<std::string_view, Control::Ptr> controls;
+    controls.reserve(dml::gallery_nodes.size());
+
+    for (const dml::NodeSpec& node : dml::gallery_nodes) {
+        auto control = make_control<GalleryControl>(StableId(std::string(node.id)), node, context);
+        controls.emplace(node.id, control);
+    }
+    for (const dml::NodeSpec& node : dml::gallery_nodes) {
+        if (node.parent_id.empty()) {
+            continue;
+        }
+        const auto parent = controls.find(node.parent_id);
+        const auto child = controls.find(node.id);
+        if (parent == controls.end() || child == controls.end()) {
+            throw std::logic_error("compiled gallery DML contains an unresolved parent");
+        }
+        parent->second->add_child(child->second);
+    }
+    return {controls.at("gallery.root"), std::move(context)};
+}
+
+}  // namespace gui_forms::gallery

@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address -fno-omit-frame-pointer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/gui_forms_invalidation_damage_tests.dir/tests/invalidation_damage_tests.cpp.o -o gui_forms_invalidation_damage_tests  libgui_forms_core.a

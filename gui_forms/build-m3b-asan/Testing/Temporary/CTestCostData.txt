@@ -1,0 +1,19 @@
+gui_forms_core_tests 8 0.0448661
+gui_forms_retained_lifetime_tests 8 0.01074
+gui_forms_invalidation_damage_tests 8 0.0142676
+gui_forms_display_chunk_tests 8 0.0230991
+gui_forms_frame_scheduler_tests 8 0.0111667
+gui_forms_png_registry_tests 8 0.00992647
+gui_forms_headless_trace_tests 8 0.0124763
+gui_forms_host_protocol_tests 8 0.118338
+gui_forms_host_boundary_audit 9 0.0119331
+gui_forms_c_api_c11_tests 8 0.0203809
+gui_forms_c_api_cpp_tests 8 0.00993072
+gui_forms_c_api_export_policy 9 0.00463552
+gui_forms_gallery_interaction_tests 8 0.0182371
+gui_forms_gallery_font_policy 9 0.00149556
+gui_forms_macos_host_close_tests 8 0.189733
+gui_forms_skia_smoke 8 0.0331462
+gui_forms_skia_archive_policy 9 0.0160703
+gui_forms_coregraphics_smoke 8 0.0115575
+---

@@ -1,0 +1,20 @@
+headless_capabilities={"protocol_version":2,"platform":"headless-reference","available_bits":2047,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard"]}
+seq=1 time_ns=1000 event=attach accepted=1 handled=0 close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=0 monitors=0 captured=0 pointer_id=0 closed=0 shutdown=0
+seq=2 time_ns=1001 event=display accepted=1 handled=0 close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=0 shutdown=0
+seq=3 time_ns=1002 event=activation accepted=1 handled=0 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=0 shutdown=0
+seq=4 time_ns=1003 event=occlusion accepted=1 handled=0 close_allowed=1 error=none attached=1 active=1 occluded=1 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=0 shutdown=0
+seq=5 time_ns=1004 event=occlusion accepted=1 handled=0 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=0 shutdown=0
+seq=6 time_ns=1005 event=pointer accepted=1 handled=1 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 closed=0 shutdown=0
+seq=7 time_ns=1006 event=key accepted=1 handled=1 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 closed=0 shutdown=0
+seq=8 time_ns=1007 event=text accepted=1 handled=1 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 closed=0 shutdown=0
+seq=9 time_ns=1008 event=close_request accepted=1 handled=0 close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 closed=0 shutdown=0
+seq=10 time_ns=1009 event=closed accepted=1 handled=0 close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=1 shutdown=0
+seq=11 time_ns=1010 event=shutdown accepted=1 handled=0 close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 closed=1 shutdown=1
+service=monitors error=none count=1 primary=headless.primary
+service=cursor error=none value=text
+service=capture error=none pointer=7
+service=release error=none
+service=clipboard_write error=none
+service=clipboard_read error=none generation=1 text=service Ω
+snapshot={"capabilities":{"protocol_version":2,"platform":"headless-reference","available_bits":2047,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard"]},"cursor":"text","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":1,"pointer_capture_updates":2,"clipboard_reads":1,"clipboard_writes":1,"clipboard_generation":1,"rejected_requests":0,"shutdown":false}
+gui_forms_host_protocol_tests: all tests passed

@@ -1,0 +1,14 @@
+gui_forms_core_tests 7 0.0304514
+gui_forms_retained_lifetime_tests 7 0.00689557
+gui_forms_invalidation_damage_tests 7 0.00227249
+gui_forms_display_chunk_tests 7 0.00270439
+gui_forms_frame_scheduler_tests 7 0.00421589
+gui_forms_png_registry_tests 7 0.00216191
+gui_forms_headless_trace_tests 7 0.00196898
+gui_forms_host_protocol_tests 7 0.0881731
+gui_forms_host_boundary_audit 7 0.0362319
+gui_forms_c_api_c11_tests 7 0.0364976
+gui_forms_c_api_cpp_tests 7 0.0086853
+gui_forms_c_api_export_policy 7 0.0135239
+gui_forms_coregraphics_smoke 7 0.0141443
+---

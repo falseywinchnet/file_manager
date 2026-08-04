@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgui_forms_gallery_model.a CMakeFiles/gui_forms_gallery_model.dir/src/controls/gallery_controls.cpp.o CMakeFiles/gui_forms_gallery_model.dir/demo/gallery.cpp.o CMakeFiles/gui_forms_gallery_model.dir/demo/gallery_model.cpp.o
+/usr/bin/ranlib libgui_forms_gallery_model.a

@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/gui_forms_png_registry_tests.dir/tests/png_registry_tests.cpp.o -o gui_forms_png_registry_tests  libgui_forms_core.a

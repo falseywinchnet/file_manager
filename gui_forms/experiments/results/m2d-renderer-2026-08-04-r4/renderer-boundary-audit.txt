@@ -1,0 +1,14 @@
+renderer_boundary_audit=passed
+core_bytes=241808
+skia_adapter_bytes=34360
+coregraphics_adapter_bytes=30384
+skia_archive_bytes=5758736
+benchmark_bytes=3393296
+dependencies:
+/tmp/gui_forms_m2d_release/gui_forms_renderer_benchmark:
+	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 3208.0.0)
+	/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics (compatibility version 64.0.0, current version 1889.2.7)
+	/System/Library/Frameworks/CoreText.framework/Versions/A/CoreText (compatibility version 1.0.0, current version 844.2.0)
+	/System/Library/Frameworks/ImageIO.framework/Versions/A/ImageIO (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1800.105.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)

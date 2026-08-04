@@ -1,0 +1,526 @@
+#include "gui_forms/resources.hpp"
+
+#include <array>
+#include <limits>
+#include <new>
+#include <utility>
+
+namespace gui_forms {
+namespace {
+
+constexpr std::array<std::uint8_t, 8> png_signature{
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+constexpr std::uint64_t slot_mask = 0xffffULL;
+constexpr std::uint64_t maximum_generation = (1ULL << 48U) - 1ULL;
+
+constexpr std::uint32_t chunk_type(char a, char b, char c, char d) noexcept {
+    return (static_cast<std::uint32_t>(static_cast<unsigned char>(a)) << 24U) |
+           (static_cast<std::uint32_t>(static_cast<unsigned char>(b)) << 16U) |
+           (static_cast<std::uint32_t>(static_cast<unsigned char>(c)) << 8U) |
+           static_cast<std::uint32_t>(static_cast<unsigned char>(d));
+}
+
+constexpr std::uint32_t ihdr = chunk_type('I', 'H', 'D', 'R');
+constexpr std::uint32_t plte = chunk_type('P', 'L', 'T', 'E');
+constexpr std::uint32_t idat = chunk_type('I', 'D', 'A', 'T');
+constexpr std::uint32_t iend = chunk_type('I', 'E', 'N', 'D');
+constexpr std::uint32_t trns = chunk_type('t', 'R', 'N', 'S');
+constexpr std::uint32_t srgb = chunk_type('s', 'R', 'G', 'B');
+constexpr std::uint32_t gama = chunk_type('g', 'A', 'M', 'A');
+constexpr std::uint32_t chrm = chunk_type('c', 'H', 'R', 'M');
+constexpr std::uint32_t iccp = chunk_type('i', 'C', 'C', 'P');
+
+std::uint32_t read_u32(const std::byte* bytes) noexcept {
+    return (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[0])) << 24U) |
+           (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[1])) << 16U) |
+           (static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[2])) << 8U) |
+           static_cast<std::uint32_t>(std::to_integer<std::uint8_t>(bytes[3]));
+}
+
+bool ascii_letter(std::uint8_t value) noexcept {
+    return (value >= static_cast<std::uint8_t>('A') &&
+            value <= static_cast<std::uint8_t>('Z')) ||
+           (value >= static_cast<std::uint8_t>('a') &&
+            value <= static_cast<std::uint8_t>('z'));
+}
+
+std::uint32_t crc32(std::span<const std::byte> bytes) noexcept {
+    std::uint32_t crc = 0xffffffffU;
+    for (const std::byte value : bytes) {
+        crc ^= std::to_integer<std::uint8_t>(value);
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            const std::uint32_t mask = 0U - (crc & 1U);
+            crc = (crc >> 1U) ^ (0xedb88320U & mask);
+        }
+    }
+    return crc ^ 0xffffffffU;
+}
+
+std::uint64_t hash_bytes(std::span<const std::byte> bytes) noexcept {
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const std::byte value : bytes) {
+        hash ^= std::to_integer<std::uint8_t>(value);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+bool valid_depth(std::uint8_t color, std::uint8_t depth) noexcept {
+    switch (color) {
+    case 0: return depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16;
+    case 2: return depth == 8 || depth == 16;
+    case 3: return depth == 1 || depth == 2 || depth == 4 || depth == 8;
+    case 4:
+    case 6: return depth == 8 || depth == 16;
+    default: return false;
+    }
+}
+
+std::uint8_t channel_count(std::uint8_t color) noexcept {
+    switch (color) {
+    case 0: return 1;
+    case 2: return 3;
+    case 3: return 1;
+    case 4: return 2;
+    case 6: return 4;
+    default: return 0;
+    }
+}
+
+ImageId make_image_id(std::size_t slot, std::uint64_t generation) noexcept {
+    return ImageId{(generation << 16U) | (static_cast<std::uint64_t>(slot) + 1ULL)};
+}
+
+bool split_image_id(ImageId image,
+                    std::size_t& slot,
+                    std::uint64_t& generation) noexcept {
+    const std::uint64_t encoded_slot = image.value & slot_mask;
+    generation = image.value >> 16U;
+    if (encoded_slot == 0 || generation == 0) {
+        return false;
+    }
+    slot = static_cast<std::size_t>(encoded_slot - 1ULL);
+    return true;
+}
+
+std::uint64_t next_generation(std::uint64_t generation) noexcept {
+    return generation >= maximum_generation ? 1ULL : generation + 1ULL;
+}
+
+} // namespace
+
+std::string_view image_resource_error_name(ImageResourceError error) noexcept {
+    switch (error) {
+    case ImageResourceError::none: return "none";
+    case ImageResourceError::empty_input: return "empty_input";
+    case ImageResourceError::encoded_limit_exceeded: return "encoded_limit_exceeded";
+    case ImageResourceError::invalid_signature: return "invalid_signature";
+    case ImageResourceError::truncated_chunk: return "truncated_chunk";
+    case ImageResourceError::invalid_chunk_type: return "invalid_chunk_type";
+    case ImageResourceError::chunk_limit_exceeded: return "chunk_limit_exceeded";
+    case ImageResourceError::crc_mismatch: return "crc_mismatch";
+    case ImageResourceError::ihdr_not_first: return "ihdr_not_first";
+    case ImageResourceError::duplicate_ihdr: return "duplicate_ihdr";
+    case ImageResourceError::invalid_ihdr: return "invalid_ihdr";
+    case ImageResourceError::dimension_limit_exceeded: return "dimension_limit_exceeded";
+    case ImageResourceError::unsupported_color_format: return "unsupported_color_format";
+    case ImageResourceError::unsupported_color_profile: return "unsupported_color_profile";
+    case ImageResourceError::invalid_palette: return "invalid_palette";
+    case ImageResourceError::invalid_transparency: return "invalid_transparency";
+    case ImageResourceError::invalid_color_metadata: return "invalid_color_metadata";
+    case ImageResourceError::noncontiguous_idat: return "noncontiguous_idat";
+    case ImageResourceError::missing_idat: return "missing_idat";
+    case ImageResourceError::missing_iend: return "missing_iend";
+    case ImageResourceError::trailing_data: return "trailing_data";
+    case ImageResourceError::unknown_critical_chunk: return "unknown_critical_chunk";
+    case ImageResourceError::resource_count_exceeded: return "resource_count_exceeded";
+    case ImageResourceError::registry_encoded_limit_exceeded:
+        return "registry_encoded_limit_exceeded";
+    case ImageResourceError::registry_decoded_limit_exceeded:
+        return "registry_decoded_limit_exceeded";
+    case ImageResourceError::stale_image_id: return "stale_image_id";
+    case ImageResourceError::allocation_failed: return "allocation_failed";
+    }
+    return "unknown";
+}
+
+PngValidationResult validate_png(std::span<const std::byte> encoded,
+                                 const ImageRegistryLimits& limits) noexcept {
+    if (encoded.empty()) {
+        return {.error = ImageResourceError::empty_input};
+    }
+    if (encoded.size() > limits.maximum_encoded_bytes_per_image) {
+        return {.error = ImageResourceError::encoded_limit_exceeded};
+    }
+    if (encoded.size() < png_signature.size()) {
+        return {.error = ImageResourceError::invalid_signature};
+    }
+    for (std::size_t index = 0; index < png_signature.size(); ++index) {
+        if (std::to_integer<std::uint8_t>(encoded[index]) != png_signature[index]) {
+            return {.error = ImageResourceError::invalid_signature};
+        }
+    }
+
+    PngMetadata metadata;
+    std::size_t offset = png_signature.size();
+    std::size_t chunk_count = 0;
+    std::uint64_t idat_bytes = 0;
+    std::uint32_t palette_entries = 0;
+    bool saw_ihdr = false;
+    bool saw_plte = false;
+    bool saw_idat = false;
+    bool idat_ended = false;
+    bool saw_trns = false;
+    bool saw_srgb = false;
+    bool saw_gama = false;
+    bool saw_chrm = false;
+
+    while (offset < encoded.size()) {
+        if (++chunk_count > limits.maximum_chunks_per_image) {
+            return {.error = ImageResourceError::chunk_limit_exceeded};
+        }
+        if (encoded.size() - offset < 12U) {
+            return {.error = ImageResourceError::truncated_chunk};
+        }
+        const std::uint32_t length = read_u32(encoded.data() + offset);
+        const std::size_t remaining = encoded.size() - offset;
+        if (length > 0x7fffffffU ||
+            static_cast<std::uint64_t>(length) + 12ULL > remaining) {
+            return {.error = ImageResourceError::truncated_chunk};
+        }
+
+        const std::byte* const type_bytes = encoded.data() + offset + 4U;
+        for (std::size_t index = 0; index < 4; ++index) {
+            if (!ascii_letter(std::to_integer<std::uint8_t>(type_bytes[index]))) {
+                return {.error = ImageResourceError::invalid_chunk_type};
+            }
+        }
+        if ((std::to_integer<std::uint8_t>(type_bytes[2]) & 0x20U) != 0U) {
+            return {.error = ImageResourceError::invalid_chunk_type};
+        }
+        const std::uint32_t type = read_u32(type_bytes);
+        const std::span<const std::byte> crc_input(
+            type_bytes, static_cast<std::size_t>(length) + 4U);
+        const std::uint32_t expected_crc =
+            read_u32(encoded.data() + offset + 8U + length);
+        if (crc32(crc_input) != expected_crc) {
+            return {.error = ImageResourceError::crc_mismatch};
+        }
+        const std::span<const std::byte> data(encoded.data() + offset + 8U, length);
+
+        if (!saw_ihdr && type != ihdr) {
+            return {.error = ImageResourceError::ihdr_not_first};
+        }
+        if (saw_idat && type != idat) {
+            idat_ended = true;
+        }
+
+        if (type == ihdr) {
+            if (saw_ihdr) {
+                return {.error = ImageResourceError::duplicate_ihdr};
+            }
+            if (length != 13U) {
+                return {.error = ImageResourceError::invalid_ihdr};
+            }
+            metadata.width = read_u32(data.data());
+            metadata.height = read_u32(data.data() + 4U);
+            metadata.bit_depth = std::to_integer<std::uint8_t>(data[8]);
+            const std::uint8_t color = std::to_integer<std::uint8_t>(data[9]);
+            const std::uint8_t compression = std::to_integer<std::uint8_t>(data[10]);
+            const std::uint8_t filter = std::to_integer<std::uint8_t>(data[11]);
+            const std::uint8_t interlace = std::to_integer<std::uint8_t>(data[12]);
+            if (metadata.width == 0 || metadata.height == 0 || compression != 0 ||
+                filter != 0 || interlace > 1) {
+                return {.error = ImageResourceError::invalid_ihdr};
+            }
+            if (!valid_depth(color, metadata.bit_depth)) {
+                return {.error = ImageResourceError::unsupported_color_format};
+            }
+            const std::uint64_t pixel_count =
+                static_cast<std::uint64_t>(metadata.width) * metadata.height;
+            if (metadata.width > limits.maximum_width ||
+                metadata.height > limits.maximum_height ||
+                pixel_count > limits.maximum_pixels ||
+                pixel_count > std::numeric_limits<std::uint64_t>::max() / 4ULL) {
+                return {.error = ImageResourceError::dimension_limit_exceeded};
+            }
+            const std::uint64_t row_bits = static_cast<std::uint64_t>(metadata.width) *
+                                           channel_count(color) * metadata.bit_depth;
+            metadata.source_row_bytes = (row_bits + 7ULL) / 8ULL;
+            metadata.decoded_byte_count = pixel_count * 4ULL;
+            if (metadata.decoded_byte_count > limits.maximum_decoded_bytes_per_image) {
+                return {.error = ImageResourceError::dimension_limit_exceeded};
+            }
+            metadata.color_type = static_cast<PngColorType>(color);
+            metadata.interlaced = interlace != 0;
+            saw_ihdr = true;
+        } else if (type == plte) {
+            const std::uint8_t color = static_cast<std::uint8_t>(metadata.color_type);
+            if (saw_plte || saw_idat || length == 0 || length > 768U || length % 3U != 0 ||
+                color == 0 || color == 4) {
+                return {.error = ImageResourceError::invalid_palette};
+            }
+            palette_entries = length / 3U;
+            if (color == 3 && palette_entries > (1U << metadata.bit_depth)) {
+                return {.error = ImageResourceError::invalid_palette};
+            }
+            saw_plte = true;
+        } else if (type == idat) {
+            if (idat_ended) {
+                return {.error = ImageResourceError::noncontiguous_idat};
+            }
+            if (metadata.color_type == PngColorType::indexed && !saw_plte) {
+                return {.error = ImageResourceError::invalid_palette};
+            }
+            saw_idat = true;
+            idat_bytes += length;
+        } else if (type == iend) {
+            if (length != 0) {
+                return {.error = ImageResourceError::missing_iend};
+            }
+            if (!saw_idat || idat_bytes == 0) {
+                return {.error = ImageResourceError::missing_idat};
+            }
+            offset += 12U;
+            if (offset != encoded.size()) {
+                return {.error = ImageResourceError::trailing_data};
+            }
+            return {.metadata = metadata};
+        } else if (type == iccp) {
+            // Compressed ICC profiles are an independent decompression boundary.
+            // This proving slice fixes decoded output to sRGB and rejects them.
+            return {.error = ImageResourceError::unsupported_color_profile};
+        } else if (type == trns) {
+            if (saw_trns || saw_idat) {
+                return {.error = ImageResourceError::invalid_transparency};
+            }
+            const auto color = metadata.color_type;
+            const bool valid =
+                (color == PngColorType::grayscale && length == 2U) ||
+                (color == PngColorType::truecolor && length == 6U) ||
+                (color == PngColorType::indexed && saw_plte && length > 0 &&
+                 length <= palette_entries);
+            if (!valid) {
+                return {.error = ImageResourceError::invalid_transparency};
+            }
+            saw_trns = true;
+        } else if (type == srgb) {
+            if (saw_srgb || saw_plte || saw_idat || length != 1U ||
+                std::to_integer<std::uint8_t>(data[0]) > 3U) {
+                return {.error = ImageResourceError::invalid_color_metadata};
+            }
+            saw_srgb = true;
+        } else if (type == gama) {
+            if (saw_gama || saw_plte || saw_idat || length != 4U ||
+                read_u32(data.data()) == 0U) {
+                return {.error = ImageResourceError::invalid_color_metadata};
+            }
+            saw_gama = true;
+        } else if (type == chrm) {
+            if (saw_chrm || saw_plte || saw_idat || length != 32U) {
+                return {.error = ImageResourceError::invalid_color_metadata};
+            }
+            saw_chrm = true;
+        } else if ((std::to_integer<std::uint8_t>(type_bytes[0]) & 0x20U) == 0U) {
+            return {.error = ImageResourceError::unknown_critical_chunk};
+        }
+
+        offset += static_cast<std::size_t>(length) + 12U;
+    }
+    return {.error = saw_idat ? ImageResourceError::missing_iend
+                              : ImageResourceError::missing_idat};
+}
+
+struct ImageRegistry::Slot final {
+    std::uint64_t generation{1};
+    bool occupied{};
+    PngMetadata metadata{};
+    std::vector<std::byte> encoded;
+    std::uint64_t content_hash{};
+};
+
+ImageRegistry::ImageRegistry(ImageRegistryLimits limits) : limits_(limits) {}
+ImageRegistry::~ImageRegistry() = default;
+ImageRegistry::ImageRegistry(ImageRegistry&&) noexcept = default;
+ImageRegistry& ImageRegistry::operator=(ImageRegistry&&) noexcept = default;
+
+ImageResourceError ImageRegistry::registry_quota_error(
+    std::uint64_t encoded_bytes,
+    std::uint64_t decoded_bytes,
+    std::uint64_t replaced_encoded,
+    std::uint64_t replaced_decoded) const noexcept {
+    const std::uint64_t encoded_base = encoded_bytes_ - replaced_encoded;
+    const std::uint64_t decoded_base = decoded_bytes_ - replaced_decoded;
+    if (encoded_bytes > limits_.maximum_total_encoded_bytes ||
+        encoded_base > limits_.maximum_total_encoded_bytes - encoded_bytes) {
+        return ImageResourceError::registry_encoded_limit_exceeded;
+    }
+    if (decoded_bytes > limits_.maximum_total_decoded_bytes ||
+        decoded_base > limits_.maximum_total_decoded_bytes - decoded_bytes) {
+        return ImageResourceError::registry_decoded_limit_exceeded;
+    }
+    return ImageResourceError::none;
+}
+
+ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
+    const PngValidationResult validated = validate_png(encoded, limits_);
+    if (!validated) {
+        return {.error = validated.error};
+    }
+    if (resource_count_ >= limits_.maximum_resources) {
+        return {.error = ImageResourceError::resource_count_exceeded};
+    }
+    if (const ImageResourceError quota = registry_quota_error(
+            encoded.size(), validated.metadata.decoded_byte_count);
+        quota != ImageResourceError::none) {
+        return {.error = quota};
+    }
+    try {
+        return store_new(std::vector<std::byte>(encoded.begin(), encoded.end()),
+                         validated.metadata, hash_bytes(encoded));
+    } catch (const std::bad_alloc&) {
+        return {.error = ImageResourceError::allocation_failed};
+    }
+}
+
+ImageLoadResult ImageRegistry::store_new(std::vector<std::byte> encoded,
+                                         PngMetadata metadata,
+                                         std::uint64_t content_hash) {
+    std::size_t slot_index = 0;
+    for (; slot_index < slots_.size(); ++slot_index) {
+        if (!slots_[slot_index].occupied) {
+            break;
+        }
+    }
+    if (slot_index >= slot_mask) {
+        return {.error = ImageResourceError::resource_count_exceeded};
+    }
+    if (slot_index == slots_.size()) {
+        slots_.emplace_back();
+    } else {
+        slots_[slot_index].generation = next_generation(slots_[slot_index].generation);
+    }
+    Slot& slot = slots_[slot_index];
+    slot.occupied = true;
+    slot.metadata = metadata;
+    slot.encoded = std::move(encoded);
+    slot.content_hash = content_hash;
+    ++resource_count_;
+    encoded_bytes_ += slot.encoded.size();
+    decoded_bytes_ += slot.metadata.decoded_byte_count;
+    ++revision_;
+    return {.image = make_image_id(slot_index, slot.generation)};
+}
+
+ImageLoadResult ImageRegistry::replace_png(ImageId image,
+                                           std::span<const std::byte> encoded) {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    const PngValidationResult validated = validate_png(encoded, limits_);
+    if (!validated) {
+        return {.error = validated.error};
+    }
+    if (const ImageResourceError quota = registry_quota_error(
+            encoded.size(), validated.metadata.decoded_byte_count,
+            slot.encoded.size(), slot.metadata.decoded_byte_count);
+        quota != ImageResourceError::none) {
+        return {.error = quota};
+    }
+
+    std::vector<std::byte> replacement;
+    try {
+        replacement.assign(encoded.begin(), encoded.end());
+    } catch (const std::bad_alloc&) {
+        return {.error = ImageResourceError::allocation_failed};
+    }
+    encoded_bytes_ -= slot.encoded.size();
+    decoded_bytes_ -= slot.metadata.decoded_byte_count;
+    slot.generation = next_generation(slot.generation);
+    slot.metadata = validated.metadata;
+    slot.encoded = std::move(replacement);
+    slot.content_hash = hash_bytes(encoded);
+    encoded_bytes_ += slot.encoded.size();
+    decoded_bytes_ += slot.metadata.decoded_byte_count;
+    ++revision_;
+    return {.image = make_image_id(slot_index, slot.generation)};
+}
+
+bool ImageRegistry::remove(ImageId image) noexcept {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
+        return false;
+    }
+    Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return false;
+    }
+    encoded_bytes_ -= slot.encoded.size();
+    decoded_bytes_ -= slot.metadata.decoded_byte_count;
+    --resource_count_;
+    slot.occupied = false;
+    slot.metadata = {};
+    std::vector<std::byte>{}.swap(slot.encoded);
+    slot.content_hash = 0;
+    ++revision_;
+    return true;
+}
+
+void ImageRegistry::clear() noexcept {
+    if (resource_count_ == 0) {
+        return;
+    }
+    for (Slot& slot : slots_) {
+        if (slot.occupied) {
+            slot.occupied = false;
+            slot.metadata = {};
+            std::vector<std::byte>{}.swap(slot.encoded);
+            slot.content_hash = 0;
+        }
+    }
+    resource_count_ = 0;
+    encoded_bytes_ = 0;
+    decoded_bytes_ = 0;
+    ++revision_;
+}
+
+std::optional<ImageResourceView> ImageRegistry::find(ImageId image) const noexcept {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
+        return std::nullopt;
+    }
+    const Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return std::nullopt;
+    }
+    return ImageResourceView{image, slot.metadata, slot.encoded, slot.content_hash};
+}
+
+std::vector<ImageId> ImageRegistry::image_ids() const {
+    std::vector<ImageId> result;
+    result.reserve(static_cast<std::size_t>(resource_count_));
+    for (std::size_t index = 0; index < slots_.size(); ++index) {
+        if (slots_[index].occupied) {
+            result.push_back(make_image_id(index, slots_[index].generation));
+        }
+    }
+    return result;
+}
+
+ImageRegistrySnapshot ImageRegistry::snapshot() const noexcept {
+    return {revision_, resource_count_, encoded_bytes_, decoded_bytes_};
+}
+
+const ImageRegistryLimits& ImageRegistry::limits() const noexcept {
+    return limits_;
+}
+
+} // namespace gui_forms

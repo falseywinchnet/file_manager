@@ -1,0 +1,287 @@
+Start testing: Aug 04 07:37 CDT
+----------------------------------------------------------
+1/13 Testing: gui_forms_core_tests
+1/13 Test: gui_forms_core_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_core_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_core_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_core_tests: all tests passed
+<end of output>
+Test time =   0.53 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_core_tests" end time: Aug 04 07:37 CDT
+"gui_forms_core_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/13 Testing: gui_forms_retained_lifetime_tests
+2/13 Test: gui_forms_retained_lifetime_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_retained_lifetime_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_retained_lifetime_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_retained_lifetime_tests: all tests passed
+<end of output>
+Test time =   0.33 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_retained_lifetime_tests" end time: Aug 04 07:37 CDT
+"gui_forms_retained_lifetime_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/13 Testing: gui_forms_invalidation_damage_tests
+3/13 Test: gui_forms_invalidation_damage_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_invalidation_damage_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_invalidation_damage_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_invalidation_damage_tests: all tests passed
+<end of output>
+Test time =   0.26 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_invalidation_damage_tests" end time: Aug 04 07:37 CDT
+"gui_forms_invalidation_damage_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/13 Testing: gui_forms_display_chunk_tests
+4/13 Test: gui_forms_display_chunk_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_display_chunk_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_display_chunk_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_display_chunk_tests: all tests passed
+<end of output>
+Test time =   0.61 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_display_chunk_tests" end time: Aug 04 07:37 CDT
+"gui_forms_display_chunk_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/13 Testing: gui_forms_frame_scheduler_tests
+5/13 Test: gui_forms_frame_scheduler_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_frame_scheduler_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_frame_scheduler_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_frame_scheduler_tests: all tests passed
+<end of output>
+Test time =   0.37 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_frame_scheduler_tests" end time: Aug 04 07:37 CDT
+"gui_forms_frame_scheduler_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/13 Testing: gui_forms_png_registry_tests
+6/13 Test: gui_forms_png_registry_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_png_registry_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_png_registry_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.36 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_png_registry_tests" end time: Aug 04 07:37 CDT
+"gui_forms_png_registry_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/13 Testing: gui_forms_headless_trace_tests
+7/13 Test: gui_forms_headless_trace_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_headless_trace_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_headless_trace_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+create controls=4
+t=10 resize=160x90 scale=2
+paint draws=4
+t=20 pointer id=trace.root phase=preview action=down
+t=20 pointer id=trace.left phase=preview action=down
+t=20 pointer id=trace.target phase=preview action=down
+t=20 focus id=trace.target state=on
+t=20 pointer id=trace.target phase=target action=down
+t=20 pointer id=trace.left phase=bubble action=down
+t=20 pointer id=trace.root phase=bubble action=down
+t=30 pointer id=trace.root phase=preview action=up
+t=30 pointer id=trace.left phase=preview action=up
+t=30 pointer id=trace.target phase=preview action=up
+t=30 pointer id=trace.target phase=target action=up
+t=30 pointer id=trace.left phase=bubble action=up
+t=30 pointer id=trace.root phase=bubble action=up
+t=30 activate id=trace.target
+t=40 key id=trace.root phase=preview code=40
+t=40 key id=trace.left phase=preview code=40
+t=40 key id=trace.target phase=preview code=40
+t=40 key id=trace.target phase=target code=40
+t=40 key id=trace.left phase=bubble code=40
+t=40 key id=trace.root phase=bubble code=40
+t=40 text id=trace.target value=A
+t=50 focus id=trace.target state=off
+t=50 reparent id=trace.target parent=trace.right
+t=50 focus id=trace.target state=on
+t=60 pointer id=trace.root phase=preview action=down
+t=60 pointer id=trace.right phase=preview action=down
+t=60 pointer id=trace.target phase=preview action=down
+t=60 pointer id=trace.target phase=target action=down
+t=60 pointer id=trace.right phase=bubble action=down
+t=60 pointer id=trace.root phase=bubble action=down
+t=60 dispose id=trace.target state=disposed
+t=60 pointer id=trace.root phase=preview action=up
+t=60 pointer id=trace.right phase=preview action=up
+t=60 pointer id=trace.right phase=target action=up
+t=60 pointer id=trace.root phase=bubble action=up
+paint draws=3
+metrics focus=4 activation=1 disposal=1 focus_revoke=2 capture_revoke=1
+t=1060 idle frame=0 wake=0 layout=0 paint=0 present=0 callback=0
+gui_forms_headless_trace_tests: byte-identical replay passed
+<end of output>
+Test time =   0.34 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_headless_trace_tests" end time: Aug 04 07:37 CDT
+"gui_forms_headless_trace_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/13 Testing: gui_forms_host_protocol_tests
+8/13 Test: gui_forms_host_protocol_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_host_protocol_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_host_protocol_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+headless_capabilities={"protocol_version":4,"platform":"headless-reference","available_bits":8191,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","typed_drag_drop","dialogs"]}
+seq=1 time_ns=1000 event=attach accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=0 monitors=0 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=2 time_ns=1001 event=display accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=3 time_ns=1002 event=activation accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=4 time_ns=1003 event=occlusion accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=1 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=5 time_ns=1004 event=occlusion accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=6 time_ns=1005 event=pointer accepted=1 handled=1 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=7 time_ns=1006 event=key accepted=1 handled=1 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=8 time_ns=1007 event=text accepted=1 handled=1 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=9 time_ns=1008 event=close_request accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=1 occluded=0 display_changes=1 monitors=1 captured=1 pointer_id=1 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=0 shutdown=0
+seq=10 time_ns=1009 event=closed accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=1 shutdown=0
+seq=11 time_ns=1010 event=shutdown accepted=1 handled=0 drag_effect=none close_allowed=1 error=none attached=1 active=0 occluded=0 display_changes=1 monitors=1 captured=0 pointer_id=0 modal_depth=0 modal_suppressed=0 drag_events=0 drag_drops=0 closed=1 shutdown=1
+service=monitors error=none count=1 primary=headless.primary
+service=cursor error=none value=text
+service=capture error=none pointer=7
+service=release error=none
+service=clipboard_write error=none
+service=clipboard_read error=none generation=1 text=service Ω
+dialog=message request=40 depth=1 error=none outcome=cancelled choice=cancel
+service=dialog error=none
+snapshot={"capabilities":{"protocol_version":4,"platform":"headless-reference","available_bits":8191,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","typed_drag_drop","dialogs"]},"cursor":"text","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":1,"cursor_updates":1,"pointer_capture_updates":2,"clipboard_reads":1,"clipboard_writes":1,"clipboard_generation":1,"dialog_requests":1,"dialog_completions":1,"dialog_cancellations":1,"modal_depth":0,"maximum_modal_depth":1,"rejected_requests":0,"shutdown":false}
+modal=enter request=70 depth=1
+modal=enter request=71 depth=2
+modal=leave request=71 depth=1
+modal=leave request=70 depth=0
+dialog=message request=71 depth=2 error=none outcome=accepted choice=ok
+dialog=message request=70 depth=1 error=none outcome=cancelled choice=cancel
+services={"capabilities":{"protocol_version":4,"platform":"headless-reference","available_bits":8191,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","typed_drag_drop","dialogs"]},"cursor":"arrow","pointer_captured":false,"captured_pointer_id":0,"monitor_queries":0,"cursor_updates":0,"pointer_capture_updates":0,"clipboard_reads":0,"clipboard_writes":0,"clipboard_generation":0,"dialog_requests":2,"dialog_completions":2,"dialog_cancellations":1,"modal_depth":0,"maximum_modal_depth":2,"rejected_requests":0,"shutdown":false}
+session={"capabilities":{"protocol_version":4,"platform":"headless-reference","available_bits":8191,"capabilities":["lifecycle","scale_notifications","monitor_geometry","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition","pointer_capture","cursor","clipboard","typed_drag_drop","dialogs"]},"last_sequence":0,"events_accepted":0,"events_rejected":0,"close_requests":0,"close_cancellations":0,"display_changes":0,"monitor_count":0,"modal_transitions":4,"modal_input_suppressions":0,"drag_events":0,"drag_drops":0,"modal_depth":0,"attached":false,"active":false,"occluded":false,"closed":false,"shutdown":false}
+gui_forms_host_protocol_tests: all tests passed
+<end of output>
+Test time =   1.66 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_protocol_tests" end time: Aug 04 07:37 CDT
+"gui_forms_host_protocol_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+9/13 Testing: gui_forms_host_boundary_audit
+9/13 Test: gui_forms_host_boundary_audit
+Command: "/opt/homebrew/bin/cmake" "-DCORE_LIBRARY=/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/libgui_forms_core.a" "-DHEADLESS_LIBRARY=/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/libgui_forms_host_headless.a" "-DHEADLESS_TEST_BINARY=/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_host_protocol_tests" "-DPORTABLE_SOURCE_DIRECTORY=/Users/quentinkuttenkuler/file_manager/gui_forms/src" "-DPUBLIC_INCLUDE_DIRECTORY=/Users/quentinkuttenkuler/file_manager/gui_forms/include" "-P" "/Users/quentinkuttenkuler/file_manager/gui_forms/cmake/check_host_boundaries.cmake"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_host_boundary_audit" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+-- host_boundary_audit=passed
+core_bytes=10411920
+headless_host_bytes=2747432
+dependencies:
+/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_host_protocol_tests:
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 1800.105.0)
+	@rpath/libclang_rt.tsan_osx_dynamic.dylib (compatibility version 0.0.0, current version 0.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)
+
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_host_boundary_audit" end time: Aug 04 07:37 CDT
+"gui_forms_host_boundary_audit" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/13 Testing: gui_forms_c_api_c11_tests
+10/13 Test: gui_forms_c_api_c11_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_c_api_c11_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_c_api_c11_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_c_api_c11_tests: all tests passed
+<end of output>
+Test time =   0.28 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_c11_tests" end time: Aug 04 07:37 CDT
+"gui_forms_c_api_c11_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/13 Testing: gui_forms_c_api_cpp_tests
+11/13 Test: gui_forms_c_api_cpp_tests
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_c_api_cpp_tests"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_c_api_cpp_tests" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+gui_forms_c_api_cpp_tests: all tests passed
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_cpp_tests" end time: Aug 04 07:37 CDT
+"gui_forms_c_api_cpp_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/13 Testing: gui_forms_c_api_export_policy
+12/13 Test: gui_forms_c_api_export_policy
+Command: "/opt/homebrew/bin/cmake" "-DC_API_LIBRARY=/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/libgui_forms_abi0.0.1.0.dylib" "-P" "/Users/quentinkuttenkuler/file_manager/gui_forms/cmake/check_c_api_exports.cmake"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_c_api_export_policy" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_c_api_export_policy" end time: Aug 04 07:37 CDT
+"gui_forms_c_api_export_policy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/13 Testing: gui_forms_coregraphics_smoke
+13/13 Test: gui_forms_coregraphics_smoke
+Command: "/Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan/gui_forms_coregraphics_smoke"
+Directory: /Users/quentinkuttenkuler/file_manager/gui_forms/build-m3b-tsan
+"gui_forms_coregraphics_smoke" start time: Aug 04 07:37 CDT
+Output:
+----------------------------------------------------------
+{"renderer":"coregraphics-cpu","width":320,"height":192,"bytes":245760,"checksum":11400881317399868428}
+<end of output>
+Test time =   2.29 sec
+----------------------------------------------------------
+Test Passed.
+"gui_forms_coregraphics_smoke" end time: Aug 04 07:38 CDT
+"gui_forms_coregraphics_smoke" time elapsed: 00:00:02
+----------------------------------------------------------
+
+End testing: Aug 04 07:38 CDT

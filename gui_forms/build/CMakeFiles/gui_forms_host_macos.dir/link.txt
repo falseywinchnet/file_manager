@@ -1,0 +1,2 @@
+/usr/bin/ar qc libgui_forms_host_macos.a CMakeFiles/gui_forms_host_macos.dir/src/host/macos/macos_host.mm.o
+/usr/bin/ranlib libgui_forms_host_macos.a

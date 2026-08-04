@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Manager — Ceremonial Software Atlas 001</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #14283f;
+      --muted: #52677b;
+      --line: #8ba5bc;
+      --line-dark: #315f89;
+      --paper: #f7fafc;
+      --blue-a: #075f98;
+      --blue-b: #2588bb;
+      --accept: #167747;
+      --adapt: #986100;
+      --reject: #a22d36;
+      --unseen: #5c6270;
+      font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at 8% 0%, #cbdcff 0, transparent 28rem),
+        radial-gradient(ellipse at 92% 3%, #ffd6c7 0, transparent 26rem),
+        radial-gradient(ellipse at 54% 100%, #d9d2ff 0, transparent 34rem),
+        linear-gradient(130deg, #edf7ff, #fff 47%, #f8f1ff);
+      background-attachment: fixed;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 2px solid var(--line-dark);
+      background: linear-gradient(#fbfdff, #dceaf4 72%, #bfd5e6);
+      box-shadow: 0 2px 8px #294b6733;
+    }
+    .titlebar {
+      padding: 10px 18px 8px;
+      color: white;
+      background:
+        radial-gradient(ellipse at 15% 25%, #a6c4ff99, transparent 34%),
+        radial-gradient(ellipse at 72% -20%, #e9c8ff70, transparent 30%),
+        radial-gradient(ellipse at 95% 80%, #ffb28a55, transparent 22%),
+        linear-gradient(90deg, #07598f, #2a88bd 54%, #155b92);
+      border-bottom: 1px solid #064878;
+      text-shadow: 0 1px #003e68;
+    }
+    h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+    .subtitle { margin-top: 3px; font-size: 12px; opacity: .94; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 18px;
+    }
+    input[type="search"] {
+      width: min(460px, 72vw);
+      padding: 7px 9px;
+      color: var(--ink);
+      border: 1px solid var(--line-dark);
+      background: white;
+      box-shadow: inset 0 1px 2px #40608025;
+    }
+    button {
+      appearance: none;
+      border: 1px solid #477b9f;
+      border-radius: 3px;
+      padding: 6px 9px;
+      color: var(--ink);
+      background: linear-gradient(#fff, #dceaf4);
+      box-shadow: inset 0 1px white, 0 1px 1px #183d5d22;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+    }
+    button:hover { background: linear-gradient(#fff, #c8e3f4); }
+    button:active { box-shadow: inset 0 2px 3px #173d5d44; }
+    main { max-width: 1700px; margin: 0 auto; padding: 18px; }
+    .notice {
+      margin-bottom: 16px;
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--blue-a);
+      background: #ffffffea;
+      font-size: 13px;
+      line-height: 1.48;
+    }
+    .notice strong { color: #774100; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    article {
+      overflow: hidden;
+      border: 1px solid var(--line-dark);
+      background: white;
+      box-shadow: 0 4px 15px #1d4c7220;
+    }
+    article > h2 {
+      margin: 0;
+      padding: 7px 10px;
+      color: white;
+      background: linear-gradient(#3193bc, #086c9f 55%, #07577f);
+      border-bottom: 1px solid #06466a;
+      font-size: 14px;
+      text-shadow: 0 1px #06466a;
+    }
+    .context {
+      min-height: 34px;
+      padding: 7px 10px;
+      color: var(--muted);
+      background: #eef5fa;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    figure {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      min-height: 260px;
+      padding: 10px;
+      background: linear-gradient(#e9f0f5, white 30px);
+      border-bottom: 1px solid var(--line);
+    }
+    figure img, figure iframe {
+      display: block;
+      width: 100%;
+      max-width: 760px;
+      border: 1px solid #627e96;
+      background: #111;
+    }
+    figure img { max-height: 540px; object-fit: contain; }
+    figure iframe { aspect-ratio: 16 / 9; height: auto; }
+    .load-failure {
+      display: none;
+      padding: 24px;
+      text-align: center;
+      color: var(--reject);
+    }
+    .source {
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+    a { color: #005d9c; }
+    .cues { padding: 8px 10px 10px; }
+    .cue {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #dbe6ee;
+    }
+    .cue:last-child { border-bottom: 0; }
+    .cue-id { font-weight: bold; color: #006a9d; }
+    .cue-text { font-size: 12px; line-height: 1.38; }
+    .verdicts { display: flex; gap: 3px; align-items: center; }
+    .verdicts button { min-width: 27px; padding: 4px 5px; font-weight: bold; }
+    .verdicts button.selected[data-value="A"] { color: white; background: var(--accept); }
+    .verdicts button.selected[data-value="D"] { color: white; background: var(--adapt); }
+    .verdicts button.selected[data-value="R"] { color: white; background: var(--reject); }
+    .verdicts button.selected[data-value="U"] { color: white; background: var(--unseen); }
+    #exportBox {
+      display: none;
+      width: 100%;
+      min-height: 150px;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--line-dark);
+      background: white;
+      color: var(--ink);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    footer { padding: 28px 18px 50px; color: var(--muted); font-size: 11px; text-align: center; }
+    @media (max-width: 520px) {
+      main { padding: 9px; }
+      .grid { grid-template-columns: 1fr; }
+      .cue { grid-template-columns: 1fr; }
+      figure { min-height: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="titlebar">
+      <h1>File Manager — Ceremonial Software Atlas 001</h1>
+      <div class="subtitle">Installers, setup worlds, OOBE motion, and Visual Studio work surfaces · 2000–2012</div>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Filter objects and cues…" aria-label="Filter objects and cues">
+      <button id="showAll" type="button">Show all</button>
+      <button id="unanswered" type="button">Unanswered only</button>
+      <button id="export" type="button">Export verdicts</button>
+      <button id="clear" type="button">Clear verdicts</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      Use <b>A</b> = accept, <b>D</b> = distill/adapt, <b>R</b> = reject, and
+      <b>U</b> = unseen / obtain a better reference. Video objects are embedded
+      from attributed recordings; timestamped excerpts begin near the relevant
+      material. <strong>Music-player aesthetics are not in scope.</strong>
+      Narration, soundtrack, video editing, and unrelated host chrome are not
+      being proposed. Verdicts are saved in this browser.
+    </div>
+    <div id="grid" class="grid"></div>
+    <textarea id="exportBox" aria-label="Exported verdicts" readonly></textarea>
+  </main>
+
+  <footer>Planning instrument only. External recordings and stills remain at their source locations.</footer>
+
+  <script>
+    const objects = [
+      {
+        name: "Visual Studio .NET 2003 setup",
+        era: "2003",
+        kind: "video",
+        videoId: "qE5H1hLj87g",
+        start: 0,
+        context: "Judge the setup shell and its behavior, not the recording's narration or Windows host chrome.",
+        source: "Installing Microsoft Visual Studio .NET 2003 Enterprise Architect",
+        sourceUrl: "https://www.youtube.com/watch?v=qE5H1hLj87g",
+        cues: [
+          ["C001", "A serious installer may create a fully branded visual world rather than look like an ordinary dialog"],
+          ["C002", "A panoramic fresco/banner may persist while the lower setup content changes"],
+          ["C003", "Saturated blue-violet framing around pale technical information panels"],
+          ["C004", "Illustrative installer activity may run continuously during long work instead of using only a bar or spinner"],
+          ["C005", "Component names and current technical work remain visible while the decorative world is present"]
+        ]
+      },
+      {
+        name: "Visual Studio 2005 setup",
+        era: "2005",
+        kind: "video",
+        videoId: "BEhztD6Cgso",
+        start: 0,
+        context: "Compare its more procedural engineering character with the .NET 2003 setup world.",
+        source: "How to Install Microsoft Visual Studio 2005",
+        sourceUrl: "https://www.youtube.com/watch?v=BEhztD6Cgso",
+        cues: [
+          ["C011", "Installer composition should feel like an engineering instrument rather than consumer onboarding"],
+          ["C012", "A visible component list is better long-task instrumentation than a large generic percentage alone"],
+          ["C013", "A quiet progress animation may coexist with dense, precise phase text"],
+          ["C014", "Confirmation, failure, license, progress, and completion should share one stable geometric grammar"]
+        ]
+      },
+      {
+        name: "Visual Studio 2008 setup",
+        era: "2008",
+        kind: "video",
+        videoId: "2YDuYkfg_3E",
+        start: 0,
+        context: "Look for the balance between conventional wizard behavior and a product-specific blue-violet shell.",
+        source: "Installing Visual Studio 2008",
+        sourceUrl: "https://www.youtube.com/watch?v=2YDuYkfg_3E",
+        cues: [
+          ["C021", "A conventional wizard may be redeemed by unusually good art direction and material treatment"],
+          ["C022", "The installer may show a stable list of stages with the active stage visibly marked"],
+          ["C023", "Product illustration may change by major stage while command placement remains fixed"],
+          ["C024", "Long operations should expose what is being installed without turning into a scrolling log"]
+        ]
+      },
+      {
+        name: "Visual Studio 2010 setup",
+        era: "2010",
+        kind: "video",
+        videoId: "qFO8Vc_4oF8",
+        start: 0,
+        context: "This is near the upper temporal boundary: judge gloss, scale, motion, and ceremony independently.",
+        source: "Visual Studio 2010 installation Guide",
+        sourceUrl: "https://www.youtube.com/watch?v=qFO8Vc_4oF8",
+        cues: [
+          ["C031", "Deep blue-violet gloss may be used for a rare setup world even if ordinary File Manager chrome is lighter"],
+          ["C032", "A large brand/illustration region may be worthwhile during installation despite carrying no controls"],
+          ["C033", "Motion inside the brand region should be ambient and slow rather than an explanation of every file operation"],
+          ["C034", "Completion may receive a distinct visual ceremony rather than merely replacing progress text with Done"]
+        ]
+      },
+      {
+        name: "Office 2007 setup",
+        era: "2007",
+        kind: "video",
+        videoId: "UwnWCIKfeiU",
+        start: 0,
+        context: "Judge suite identity, warm color, product mapping, and whether the setup feels too marketing-led.",
+        source: "How to install Microsoft Office 2007",
+        sourceUrl: "https://www.youtube.com/watch?v=UwnWCIKfeiU",
+        cues: [
+          ["C041", "Warm orange, amber, and red may counterweight the project's cooler Watercolor base in rare ceremony"],
+          ["C042", "A family of related capabilities may be represented as a coherent field of distinct product objects"],
+          ["C043", "Installer branding can be friendly and optimistic without using a mascot or conversational prose"],
+          ["C044", "Large empty breathing room is acceptable in installation even though it is rejected in ordinary file browsing"]
+        ]
+      },
+      {
+        name: "Adobe Creative Suite 2 setup",
+        era: "2005",
+        kind: "video",
+        videoId: "ZL2PvSnTKnU",
+        start: 0,
+        context: "A non-Microsoft professional-suite reference: examine exhibition-like branding versus native-dialog discipline.",
+        source: "Adobe Creative Suite CS2 download and Successful Proper Install",
+        sourceUrl: "https://www.youtube.com/watch?v=ZL2PvSnTKnU",
+        cues: [
+          ["C051", "A professional installer may use an editorial black/white/red composition rather than OS chrome colors"],
+          ["C052", "Portfolio imagery or a montage may establish the product world before technical choices begin"],
+          ["C053", "A setup shell may deliberately suppress native appearance while preserving conventional control behavior"],
+          ["C054", "Creative-suite visual richness belongs only in rare ceremonies, never the daily file list"]
+        ]
+      },
+      {
+        name: "Macromedia Flash MX setup",
+        era: "2002",
+        kind: "video",
+        videoId: "mCCe6ltLfY8",
+        start: 0,
+        context: "A compact high-color wizard from the period; useful as a side-art and product-iconography comparison.",
+        source: "How to Install Macromedia Flash MX",
+        sourceUrl: "https://www.youtube.com/watch?v=mCCe6ltLfY8",
+        cues: [
+          ["C061", "Permanent illustrated side art can give a small wizard identity without taking over the screen"],
+          ["C062", "High-saturation retro-futurist product art can coexist with plain, highly legible controls"],
+          ["C063", "Compact modal ceremony is preferable to a full-window setup world for short, bounded operations"],
+          ["C064", "A small bespoke activity vignette is preferable to generic indeterminate motion"]
+        ]
+      },
+      {
+        name: "Whistler 2257 OOBE",
+        era: "2000",
+        kind: "video",
+        videoId: "jrPsIcMKO5g",
+        start: 86,
+        end: 116,
+        context: "Timestamped historical excerpt. Judge the visual field and transition grammar, not the soundtrack.",
+        source: "Evolution of Windows OOBE Setup Screens — Whistler 2257 excerpt",
+        sourceUrl: "https://www.youtube.com/watch?v=jrPsIcMKO5g&t=86s",
+        cues: [
+          ["C071", "A setup experience may begin in an almost borderless illustrated field rather than a window"],
+          ["C072", "Watercolor-like ambient color may move slowly enough to read as atmosphere, not an animation demanding attention"],
+          ["C073", "Text and controls may arrive as stable islands over a living background"],
+          ["C074", "Major setup stages may transition spatially instead of merely replacing a panel in place"]
+        ]
+      },
+      {
+        name: "Windows XP OOBE",
+        era: "2001",
+        kind: "video",
+        videoId: "jrPsIcMKO5g",
+        start: 390,
+        end: 467,
+        context: "Timestamped historical excerpt. Separate its stagecraft from Luna's ordinary control styling.",
+        source: "Evolution of Windows OOBE Setup Screens — Windows XP excerpt",
+        sourceUrl: "https://www.youtube.com/watch?v=jrPsIcMKO5g&t=390s",
+        cues: [
+          ["C081", "Installation may have a friendly, visibly choreographed arrival that ordinary application launch does not"],
+          ["C082", "Curves, paths, and moving scene elements may guide the eye between setup stages"],
+          ["C083", "Large, plain-language stage headings are acceptable during first-run ceremony"],
+          ["C084", "The product should avoid personified assistants even when the surrounding setup world is playful"]
+        ]
+      },
+      {
+        name: "Longhorn 4008 OOBE",
+        era: "2003",
+        kind: "video",
+        videoId: "jrPsIcMKO5g",
+        start: 467,
+        end: 479,
+        context: "A short bridge excerpt. Use U if the recording is too brief to support a verdict.",
+        source: "Evolution of Windows OOBE Setup Screens — Longhorn 4008 excerpt",
+        sourceUrl: "https://www.youtube.com/watch?v=jrPsIcMKO5g&t=467s",
+        cues: [
+          ["C091", "A dark, luminous, glass-like setup world can coexist with a much lighter daily application"],
+          ["C092", "Sparse points of light and slow bloom are preferable to literal illustrated machinery"],
+          ["C093", "Prototype-era mystery and atmosphere are desirable qualities for rare long-running operations"]
+        ]
+      },
+      {
+        name: "Windows Vista OOBE",
+        era: "2006",
+        kind: "video",
+        videoId: "jrPsIcMKO5g",
+        start: 508,
+        end: 541,
+        context: "Judge the completed Vista direction: aurora, compositing, transition softness, and scale.",
+        source: "Evolution of Windows OOBE Setup Screens — Windows Vista excerpt",
+        sourceUrl: "https://www.youtube.com/watch?v=jrPsIcMKO5g&t=508s",
+        cues: [
+          ["C101", "Aurora-like composited light may be used as a transient background material"],
+          ["C102", "Crossfades and gentle scale changes are acceptable between rare setup stages"],
+          ["C103", "The visual field may remain calm while one local progress element carries actual activity"],
+          ["C104", "Translucency is useful only when it clarifies layer and depth, not as a constant surface effect"]
+        ]
+      },
+      {
+        name: "Windows 7 OOBE",
+        era: "2009",
+        kind: "video",
+        videoId: "jrPsIcMKO5g",
+        start: 541,
+        end: 575,
+        context: "A restraint comparison against Whistler, XP, Longhorn, and Vista.",
+        source: "Evolution of Windows OOBE Setup Screens — Windows 7 excerpt",
+        sourceUrl: "https://www.youtube.com/watch?v=jrPsIcMKO5g&t=541s",
+        cues: [
+          ["C111", "Windows 7's quieter ceremony is a better motion ceiling than XP or Vista"],
+          ["C112", "A single ambient flourish is enough; the rest of setup should be nearly static"],
+          ["C113", "Short easing and prompt visual settlement are more important than spectacle"],
+          ["C114", "Setup and long-task animation should stop completely once the task is complete"]
+        ]
+      },
+      {
+        name: "Visual Studio .NET 2003 start page",
+        era: "2003",
+        kind: "image",
+        image: "https://devblogs.microsoft.com/visualstudio/wp-content/uploads/sites/4/2013/10/7271.clip_image004_3411FACE.jpg",
+        context: "Official Microsoft historical still. This is a work-surface reference, not an installer.",
+        source: "Visual Studio Start Page Through the Ages",
+        sourceUrl: "https://devblogs.microsoft.com/visualstudio/visual-studio-start-page-through-the-ages/",
+        cues: [
+          ["C121", "A serious tool may have a richly colored internal title/fresco band without styling every control that way"],
+          ["C122", "Recent work, help, profile, and online material may be separated into explicit stable regions"],
+          ["C123", "The start surface's web-page feeling is an anti-model even when its artwork is attractive"],
+          ["C124", "Small typographic links are acceptable only when each is a real stable command, never promotional content"]
+        ]
+      },
+      {
+        name: "Visual Studio 2005 start page",
+        era: "2005–2008",
+        kind: "image",
+        image: "https://devblogs.microsoft.com/visualstudio/wp-content/uploads/sites/4/2013/10/7183.clip_image006_41E440C9.jpg",
+        context: "Official Microsoft still. The page was moved from HTML to a custom Win32 component for speed and reduced exposure.",
+        source: "Visual Studio Start Page Through the Ages",
+        sourceUrl: "https://devblogs.microsoft.com/visualstudio/visual-studio-start-page-through-the-ages/",
+        cues: [
+          ["C131", "A custom native surface may visually present structured information without exposing web technology"],
+          ["C132", "A colored upper identity region over a dense white information field belongs in the house language"],
+          ["C133", "Recent-project history may be compact, explicit, and dominant without becoming a home-page abstraction"],
+          ["C134", "RSS/news content inside a core utility is an anti-model regardless of period charm"]
+        ]
+      },
+      {
+        name: "Visual Studio 2010 start page",
+        era: "2010",
+        kind: "image",
+        image: "https://devblogs.microsoft.com/visualstudio/wp-content/uploads/sites/4/2013/10/7776.clip_image010_48974A4C.jpg",
+        context: "Official Microsoft still. Compare its WPF-era horizontal information architecture to the native 2005 surface.",
+        source: "Visual Studio Start Page Through the Ages",
+        sourceUrl: "https://devblogs.microsoft.com/visualstudio/visual-studio-start-page-through-the-ages/",
+        cues: [
+          ["C141", "Horizontal topic tabs can organize a temporary start/setup surface without authorizing tabs for folders"],
+          ["C142", "Illustrated platform regions are acceptable when they are compact gateways to concrete work"],
+          ["C143", "A more polished composition is not worth slower startup or a heavier rendering framework"],
+          ["C144", "The balance of saturated identity color and white content is preferable to VS 2003's busier web-page composition"]
+        ]
+      },
+      {
+        name: "Visual Studio 2012 start page",
+        era: "2012",
+        kind: "image",
+        image: "https://devblogs.microsoft.com/visualstudio/wp-content/uploads/sites/4/2013/10/7608.clip_image012_56699047.jpg",
+        context: "Temporal boundary and likely anti-model: judge individual changes rather than the release as one object.",
+        source: "Visual Studio Start Page Through the Ages",
+        sourceUrl: "https://devblogs.microsoft.com/visualstudio/visual-studio-start-page-through-the-ages/",
+        cues: [
+          ["C151", "Large typographic hierarchy with reduced chrome is useful even if the overall Metro direction is rejected"],
+          ["C152", "Monochrome glyphs replacing high-color material icons are an anti-model"],
+          ["C153", "Wide flat color fields are an anti-model for File Manager's everyday work surface"],
+          ["C154", "Video/editorial content inside a utility's start surface is an anti-model"]
+        ]
+      },
+      {
+        name: "Visual Studio 2005 SP1 basic progress UI",
+        era: "2006",
+        kind: "image",
+        image: "https://devblogs.microsoft.com/heaths/wp-content/uploads/sites/13/2006/12/VS2005SP120Execution.png",
+        context: "Official Microsoft engineering record. A deliberately plain counter-reference to the branded setup worlds above.",
+        source: "The Visual Studio 2005 Service Pack 1 Installation Experience — Figure 8",
+        sourceUrl: "https://devblogs.microsoft.com/setup/the-visual-studio-2005-service-pack-1-installation-experience/",
+        cues: [
+          ["C161", "A plain progress dialog is the correct ceiling for routine maintenance that needs no ceremony"],
+          ["C162", "Current phase and operation matter more than an estimated time that cannot be trusted"],
+          ["C163", "Long work should offer an expandable technical trace while keeping the default surface concise"],
+          ["C164", "Indeterminate progress should use a small bespoke activity object rather than a modern circular spinner"]
+        ]
+      }
+    ];
+
+    const storageKey = "file-manager-ceremonial-software-atlas-001";
+    let verdicts = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    let unansweredMode = false;
+    const grid = document.getElementById("grid");
+    const search = document.getElementById("search");
+
+    function save() {
+      localStorage.setItem(storageKey, JSON.stringify(verdicts));
+    }
+
+    function setVerdict(id, value) {
+      if (verdicts[id] === value) delete verdicts[id];
+      else verdicts[id] = value;
+      save();
+      render();
+    }
+
+    function renderMedia(object, figure) {
+      if (object.kind === "video") {
+        const iframe = document.createElement("iframe");
+        const end = object.end ? `&end=${object.end}` : "";
+        iframe.src = `https://www.youtube-nocookie.com/embed/${object.videoId}?start=${object.start || 0}${end}&rel=0`;
+        iframe.title = object.name;
+        iframe.loading = "lazy";
+        iframe.referrerPolicy = "strict-origin-when-cross-origin";
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        iframe.allowFullscreen = true;
+        figure.appendChild(iframe);
+        return;
+      }
+
+      const img = document.createElement("img");
+      img.src = object.image;
+      img.alt = object.name;
+      img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      const failure = document.createElement("div");
+      failure.className = "load-failure";
+      failure.innerHTML = `Image did not load. <a href="${object.image}" target="_blank" rel="noreferrer">Open the still directly</a>.`;
+      img.addEventListener("error", () => {
+        img.style.display = "none";
+        failure.style.display = "block";
+      });
+      figure.append(img, failure);
+    }
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      grid.textContent = "";
+      for (const object of objects) {
+        const visibleCues = object.cues.filter(([id, cue]) => {
+          if (unansweredMode && verdicts[id]) return false;
+          return !query || `${object.name} ${object.era} ${object.context} ${id} ${cue}`.toLowerCase().includes(query);
+        });
+        if (!visibleCues.length) continue;
+
+        const article = document.createElement("article");
+        const heading = document.createElement("h2");
+        heading.textContent = `${object.name} — ${object.era}`;
+        article.appendChild(heading);
+
+        const context = document.createElement("div");
+        context.className = "context";
+        context.textContent = object.context;
+        article.appendChild(context);
+
+        const figure = document.createElement("figure");
+        renderMedia(object, figure);
+        article.appendChild(figure);
+
+        const source = document.createElement("div");
+        source.className = "source";
+        source.innerHTML = `Source: <a href="${object.sourceUrl}" target="_blank" rel="noreferrer">${object.source}</a>`;
+        if (object.kind === "image") {
+          source.innerHTML += ` · <a href="${object.image}" target="_blank" rel="noreferrer">direct still</a>`;
+        }
+        article.appendChild(source);
+
+        const cues = document.createElement("div");
+        cues.className = "cues";
+        for (const [id, cueText] of visibleCues) {
+          const cue = document.createElement("div");
+          cue.className = "cue";
+          const text = document.createElement("div");
+          text.className = "cue-text";
+          text.innerHTML = `<span class="cue-id">${id}</span> — ${cueText}`;
+          const controls = document.createElement("div");
+          controls.className = "verdicts";
+          for (const value of ["A", "D", "R", "U"]) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.value = value;
+            button.textContent = value;
+            button.title = ({A:"Accept", D:"Distill/adapt", R:"Reject", U:"Unseen / better reference"})[value];
+            if (verdicts[id] === value) button.classList.add("selected");
+            button.addEventListener("click", () => setVerdict(id, value));
+            controls.appendChild(button);
+          }
+          cue.append(text, controls);
+          cues.appendChild(cue);
+        }
+        article.appendChild(cues);
+        grid.appendChild(article);
+      }
+    }
+
+    search.addEventListener("input", render);
+    document.getElementById("showAll").addEventListener("click", () => {
+      unansweredMode = false;
+      search.value = "";
+      render();
+    });
+    document.getElementById("unanswered").addEventListener("click", () => {
+      unansweredMode = true;
+      render();
+    });
+    document.getElementById("clear").addEventListener("click", () => {
+      if (!confirm("Clear every saved verdict in this atlas?")) return;
+      verdicts = {};
+      save();
+      render();
+    });
+    document.getElementById("export").addEventListener("click", async () => {
+      const entries = Object.keys(verdicts).sort().map(id => `${id} ${verdicts[id]}`);
+      const output = entries.length ? entries.join(", ") : "No verdicts recorded.";
+      const box = document.getElementById("exportBox");
+      box.value = output;
+      box.style.display = "block";
+      box.select();
+      try { await navigator.clipboard.writeText(output); } catch (_) {}
+    });
+
+    render();
+  </script>
+</body>
+</html>

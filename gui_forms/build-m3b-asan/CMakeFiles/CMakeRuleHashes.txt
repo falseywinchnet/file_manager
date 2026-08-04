@@ -1,0 +1,3 @@
+# Hashes of file build rules.
+1e4527c3ae83f852c8190f49b24d46c5 /Users/quentinkuttenkuler/file_manager/gui_forms/third_party/skia/out/gui_forms-cpu-release/libskia.a
+0f3e6a696d565dde037b7f95f8ae59ed CMakeFiles/gui_forms_skia_dependency

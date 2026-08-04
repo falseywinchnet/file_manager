@@ -1,0 +1,1 @@
+macos_capabilities={"protocol_version":1,"platform":"appkit-macos","available_bits":251,"capabilities":["lifecycle","scale_notifications","occlusion","scheduled_wake","pointer_input","keyboard_input","text_composition"]} close_requests=2
