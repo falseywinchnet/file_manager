@@ -65,10 +65,14 @@ Administrative calls mutate only engine state. They do not create, rename,
 replace, or delete source files.
 
 The experimental M4 status projection distinguishes `manual_reconcile`,
-`baseline_required`, `reconciling`, `catching_up`, `current_volatile`, and
-`observation_unavailable`. It reports adapter source/epoch, observed and
+`baseline_required`, `reconciling`, `catching_up`, `current_volatile`,
+`observation_coverage_incomplete`, and `observation_unavailable`. It reports
+adapter source/epoch, observed and
 reconciled positions, pending observation count/age, gap state, and whether the
-watermark is durable. `backlog_known=false` is not an empty queue. Until the
+watermark is durable. `coverage_incomplete=true` means an exact scan has caught
+up to every delivered hint but the adapter cannot support an exact-current
+claim; queries retain stale-root provenance. `backlog_known=false` is not an
+empty queue. Until the
 cursor is committed in the same manifest as exact components,
 `watermark_durable=false` and every adapter start performs an authoritative
 baseline scan.

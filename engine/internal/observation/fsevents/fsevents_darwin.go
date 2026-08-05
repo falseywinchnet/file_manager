@@ -112,6 +112,16 @@ func New(roots []api.RootSpec, config Config) (observation.Adapter, error) {
 	}, nil
 }
 
+func (a *Adapter) ObservationCoverage() observation.Coverage {
+	// Native measurement did not deliver the removal of the final remaining
+	// hard-link binding. A baseline cannot reconstruct that lifetime history,
+	// so this adapter cannot support an exact-current claim on its own.
+	return observation.Coverage{
+		CompleteForExactCurrent: false,
+		Limitation:              "macOS FSEvents did not prove final-hard-link removal coverage",
+	}
+}
+
 func (a *Adapter) Subscribe(ctx context.Context) (observation.Subscription, error) {
 	if !a.subscribed.CompareAndSwap(false, true) {
 		return observation.Subscription{}, errors.New("FSEvents adapter supports one subscription")
@@ -155,7 +165,9 @@ func (a *Adapter) runNative(ctx context.Context, since uint64, started chan<- er
 		C.filemanAppendCFString(paths, text)
 		C.CFRelease(C.CFTypeRef(text))
 	}
-	flags := C.FSEventStreamCreateFlags(C.kFSEventStreamCreateFlagWatchRoot)
+	flags := C.FSEventStreamCreateFlags(
+		C.kFSEventStreamCreateFlagWatchRoot | C.kFSEventStreamCreateFlagFileEvents,
+	)
 	stream := C.filemanCreateFSEventStream(
 		C.uintptr_t(handle), C.CFArrayRef(paths), C.FSEventStreamEventId(since),
 		C.CFTimeInterval(a.config.Latency.Seconds()), flags,
@@ -355,3 +367,4 @@ func newEpoch() (string, error) {
 }
 
 var _ observation.Adapter = (*Adapter)(nil)
+var _ observation.CoverageReporter = (*Adapter)(nil)

@@ -12,6 +12,7 @@ import (
 
 	"filemanager/engine/api"
 	"filemanager/engine/internal/observation/fsevents"
+	"filemanager/engine/internal/observation/rdcw"
 	"filemanager/engine/internal/sandbox"
 	"filemanager/engine/internal/service"
 	"filemanager/engine/internal/transport"
@@ -22,7 +23,7 @@ func main() {
 	storeRoot := flag.String("store-root", "", "existing engine-owned directory for the M2 one-root durable service")
 	rootID := flag.String("root-id", "", "approved startup root id (requires --root-path)")
 	rootPath := flag.String("root-path", "", "approved startup root inside the disposable sandbox (requires --root-id)")
-	backgroundAdapter := flag.String("background-observation", "", "experimental native adapter: fsevents (macOS only)")
+	backgroundAdapter := flag.String("background-observation", "", "experimental native adapter: fsevents (macOS) or rdcw (Windows)")
 	flag.Parse()
 
 	guard, err := sandbox.New(*sandboxRoot)
@@ -88,6 +89,17 @@ func serveConfigured(input io.Reader, output io.Writer, guard *sandbox.Guard, op
 		}
 		if err := engine.StartBackgroundObservation(context.Background(), adapter, service.DefaultBackgroundPolicy()); err != nil {
 			return fmt.Errorf("start FSEvents observation: %w", err)
+		}
+	case "rdcw":
+		if options.rootID == "" {
+			return errors.New("--background-observation=rdcw requires an explicit startup root")
+		}
+		adapter, err := rdcw.New(engine.Configuration().RootPolicy, rdcw.DefaultConfig())
+		if err != nil {
+			return fmt.Errorf("configure ReadDirectoryChangesW observation: %w", err)
+		}
+		if err := engine.StartBackgroundObservation(context.Background(), adapter, service.DefaultBackgroundPolicy()); err != nil {
+			return fmt.Errorf("start ReadDirectoryChangesW observation: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown background observation adapter %q", options.backgroundAdapter)

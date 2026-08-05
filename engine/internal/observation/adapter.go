@@ -16,3 +16,14 @@ type Subscription struct {
 type Adapter interface {
 	Subscribe(context.Context) (Subscription, error)
 }
+
+// Coverage describes whether an adapter can support an exact-current claim
+// after reconciliation. Omitted CoverageReporter fails closed as incomplete.
+type Coverage struct {
+	CompleteForExactCurrent bool
+	Limitation              string
+}
+
+type CoverageReporter interface {
+	ObservationCoverage() Coverage
+}

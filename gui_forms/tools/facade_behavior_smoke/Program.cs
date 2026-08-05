@@ -48,6 +48,10 @@ if (args.Length == 1 && args[0] == "combo")
 {
     return RunComboHost();
 }
+if (args.Length == 1 && args[0] == "field-live")
+{
+    return RunFieldLiveHost();
+}
 if (args.Length == 1 && args[0] == "font-thread")
 {
     return RunCrossThreadFontHost();
@@ -499,6 +503,25 @@ static int RunComboHost()
     capabilityCombo.SelectedIndex = 0;
     Require(capabilitySelectionEvents == 1,
         "combo explicit post-reset selection event");
+
+    var streamFormatCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+    streamFormatCombo.Items.AddRange([
+        "SHARP IQ", "SHARP IQ legacy", "32 Bit Float", "24 Bit PCM", "16 Bit PCM",
+        "8 Bit PCM", "PCM 4-bit", "PCM 2-bit", "PCM 1-bit",
+    ]);
+    streamFormatCombo.SelectedIndex = 5;
+    var selectedFormat = streamFormatCombo.SelectedItem;
+    streamFormatCombo.Items.Insert(0, "future format");
+    Require(streamFormatCombo.SelectedIndex == 6 && ReferenceEquals(streamFormatCombo.SelectedItem, selectedFormat),
+        "combo insert preserves selected object");
+    streamFormatCombo.Items.RemoveAt(0);
+    Require(streamFormatCombo.SelectedIndex == 5 && ReferenceEquals(streamFormatCombo.SelectedItem, selectedFormat),
+        "combo remove before selection preserves selected object");
+    var rejectedOutOfRange = false;
+    try { streamFormatCombo.SelectedIndex = streamFormatCombo.Items.Count; }
+    catch (ArgumentOutOfRangeException) { rejectedOutOfRange = true; }
+    Require(rejectedOutOfRange && streamFormatCombo.SelectedIndex == 5,
+        "combo rejects impossible positive selection without mutation");
     var opened = 0;
     var closed = 0;
     combo.DropDown += (_, _) => ++opened;
@@ -517,6 +540,28 @@ static int RunComboHost()
     Require(editable.Text == "sdr://new.example:5555", "editable combo control-a replacement");
     comboKeyInput.Invoke(editable, [0x2au, true, 0u, false]);
     Require(editable.Text == "sdr://new.example:555", "editable combo backspace");
+    editable.Select(0, editable.Text.Length);
+    Require(editable.SelectedIndex == -1, "editable combo remains a free-text value");
+    comboTextInput.Invoke(editable, ["sdr://192.168.1.96:5555/", false, -1, 0]);
+    comboKeyInput.Invoke(editable, [0x4au, true, 0u, false]);
+    comboKeyInput.Invoke(editable, [0x4cu, true, 0u, false]);
+    Require(editable.Text == "dr://192.168.1.96:5555/", "editable combo home and delete");
+    comboKeyInput.Invoke(editable, [0x4du, true, 0u, false]);
+    comboKeyInput.Invoke(editable, [0x50u, true, 1u, false]);
+    comboTextInput.Invoke(editable, ["x", false, -1, 0]);
+    Require(editable.Text == "dr://192.168.1.96:5555x", "editable combo shift selection replacement");
+
+    var textBox = new TextBox { Text = "field" };
+    var textKeyInput = typeof(TextBox).GetMethod("__NativeKeyInput",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
+    var textInput = typeof(TextBox).GetMethod("__NativeTextInput",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
+    textKeyInput.Invoke(textBox, [0x04u, true, 2u, false]);
+    textInput.Invoke(textBox, ["replacement", false, -1, 0]);
+    textKeyInput.Invoke(textBox, [0x4au, true, 0u, false]);
+    textKeyInput.Invoke(textBox, [0x4fu, true, 0u, false]);
+    textKeyInput.Invoke(textBox, [0x2au, true, 0u, false]);
+    Require(textBox.Text == "eplacement", "text box select-all, replace, navigation, and backspace");
 
     combo.ReleaseAt(combo.Width - 6, combo.Height / 2);
     ContextMenuStrip? dropDown = null;
@@ -532,10 +577,41 @@ static int RunComboHost()
         "combo drop-down selection");
     Require(opened == 1 && closed == 1 && !activeDropDown.Visible && activeDropDown.Parent is null,
         "combo drop-down lifecycle");
-    Console.WriteLine($"combo=opened:{opened}|closed:{closed}|selected:{combo.SelectedIndex}|text:{combo.Text}|editable:{editable.Text}|reset-events:{capabilitySelectionEvents}|retained:true");
+    Console.WriteLine($"combo=opened:{opened}|closed:{closed}|selected:{combo.SelectedIndex}|text:{combo.Text}|editable:{editable.Text}|field:{textBox.Text}|reset-events:{capabilitySelectionEvents}|stream-format:{streamFormatCombo.SelectedIndex}|bounds:pass|retained:true");
     capabilityCombo.Dispose();
+    streamFormatCombo.Dispose();
     editable.Dispose();
+    textBox.Dispose();
     form.Dispose();
+    return 0;
+}
+
+static int RunFieldLiveHost()
+{
+    var form = new Form
+    {
+        Name = "fieldForm",
+        Text = "GUI.Forms field input",
+        Size = new Size(520, 180),
+    };
+    var editable = new ComboBox
+    {
+        Name = "editableUri",
+        Text = "sdr://old.example:5555/",
+        Bounds = new Rectangle(20, 24, 440, 26),
+        DropDownStyle = ComboBoxStyle.DropDown,
+    };
+    editable.Items.AddRange(["sdr://localhost:5555/", "sdr://192.168.1.96:5555/"]);
+    var field = new TextBox
+    {
+        Name = "plainField",
+        Text = "replace me",
+        Bounds = new Rectangle(20, 70, 440, 26),
+    };
+    form.Controls.Add(editable);
+    form.Controls.Add(field);
+    Application.Run(form);
+    Console.WriteLine($"field-live=combo:{editable.Text}|text:{field.Text}");
     return 0;
 }
 

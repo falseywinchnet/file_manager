@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Reject staged paths and blobs containing a retired compatibility marker."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+
+MARKERS = (b"".join((b"sdr", b"sharp")), b"".join((b"sdr", b"#")))
+
+
+def git(*args: str) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ("git", *args),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def main() -> int:
+    result = git(
+        "diff",
+        "--cached",
+        "--name-only",
+        "--diff-filter=ACMR",
+        "-z",
+    )
+    if result.returncode != 0:
+        sys.stderr.buffer.write(result.stderr)
+        return result.returncode
+
+    rejected: list[str] = []
+    for raw_path in filter(None, result.stdout.split(b"\0")):
+        path = raw_path.decode("utf-8", "surrogateescape")
+        lowered_path = raw_path.lower()
+        if any(marker in lowered_path for marker in MARKERS):
+            rejected.append(path)
+            continue
+
+        blob = git("show", f":{path}")
+        if blob.returncode != 0:
+            continue
+        lowered_blob = blob.stdout.lower()
+        if any(marker in lowered_blob for marker in MARKERS):
+            rejected.append(path)
+
+    if not rejected:
+        return 0
+
+    print("commit blocked: prohibited compatibility material is staged", file=sys.stderr)
+    for path in rejected:
+        print(f"  {path}", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

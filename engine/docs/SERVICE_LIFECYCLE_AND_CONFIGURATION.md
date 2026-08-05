@@ -98,7 +98,13 @@ a quiet engine performs no periodic catalogue write, query telemetry write,
 heartbeat write, or durable status-event append. Observation watermark and
 root policy revision still must commit atomically with component digests in the
 generation manifest. That commit is not implemented, so every adapter start
-forces a baseline scan and may claim only process-local `current_volatile`.
+forces a baseline scan and may claim only process-local `current_volatile`
+when the adapter also declares complete event coverage. The measured macOS
+adapter does not: final-hard-link removal was absent in three file-level APFS
+fixtures. It reports `observation_coverage_incomplete`, leaves readiness false,
+and causes queries to name stale roots even after its delivered watermark is
+reconciled. This limitation is adapter-wide because restart baseline cannot
+recover lifetime hard-link history.
 Gaps, native overflow, cursor/epoch discontinuity, root invalidation, and
 bounded-memory overflow force authoritative reconciliation.
 
@@ -120,7 +126,7 @@ feature:
 | lexical dictionary/postings | **unavailable; M3** |
 | anchored content-feature intake and fragment descriptors | **deferred pending authority/privacy/anchor contract** |
 | fixed-width similarity candidate channel | **OBSERVED experimental and disabled from the public planner** |
-| native observation, watermarks, coalescing | **OBSERVED experimental portable core plus macOS FSEvents; watermark not durable** |
+| native observation, watermarks, coalescing | **OBSERVED experimental portable core, macOS FSEvents, and Windows `ReadDirectoryChangesW`; coverage incomplete and watermark not durable** |
 | bounded status subscription | **negotiating** |
 | authenticated framed local transport | **deferred** |
 
@@ -129,7 +135,8 @@ may be rebuilt, disabled, upgraded, or rejected independently.
 
 ## Native service adapters
 
-These are **CANDIDATE** adapters, not implemented install promises:
+These supervisors remain **CANDIDATE** install boundaries. The macOS and
+Windows observation adapters are implemented experiments, not install promises:
 
 | OS | Supervisor/start-stop candidate | Endpoint candidate |
 |---|---|---|

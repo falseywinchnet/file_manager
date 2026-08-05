@@ -42,10 +42,12 @@ type backgroundController struct {
 	coalescer *observation.Coalescer
 	policy    BackgroundPolicy
 
-	running    bool
-	lastError  string
-	retryAt    time.Time
-	retryDelay time.Duration
+	running                 bool
+	lastError               string
+	retryAt                 time.Time
+	retryDelay              time.Duration
+	completeForExactCurrent bool
+	coverageLimitation      string
 }
 
 // StartBackgroundObservation attaches one platform adapter to the service.
@@ -117,6 +119,15 @@ func (s *Service) StartBackgroundObservation(ctx context.Context, adapter observ
 		ctx: backgroundContext, cancel: cancel, done: make(chan struct{}), wake: make(chan struct{}, 1),
 		batches: subscription.Batches, coalescer: coalescer, policy: policy,
 		running: true, retryDelay: policy.RetryMin,
+		coverageLimitation: "native observation adapter did not declare exact-current coverage",
+	}
+	if reporter, ok := adapter.(observation.CoverageReporter); ok {
+		coverage := reporter.ObservationCoverage()
+		controller.completeForExactCurrent = coverage.CompleteForExactCurrent
+		controller.coverageLimitation = coverage.Limitation
+		if !coverage.CompleteForExactCurrent && controller.coverageLimitation == "" {
+			controller.coverageLimitation = "native observation coverage is incomplete"
+		}
 	}
 	s.background.mu.Lock()
 	s.background.controller = controller
@@ -248,7 +259,8 @@ func (s *Service) runBackgroundWork(controller *backgroundController) {
 	roots, scopeWarning := s.backgroundRoots(work)
 	var workErr error
 	for _, root := range roots {
-		if _, err := s.Reconcile(controller.ctx, root); err != nil {
+		_, err := s.Reconcile(controller.ctx, root)
+		if err != nil {
 			workErr = err
 			break
 		}
@@ -355,6 +367,7 @@ func (s *Service) backgroundWorkStatus(now time.Time) (api.WorkStatus, bool, str
 		ObservedWatermark:   snapshot.Observed.Position,
 		WatermarkDurable:    false,
 		ObservationError:    controller.lastError,
+		CoverageIncomplete:  !controller.completeForExactCurrent,
 	}
 	if snapshot.HasReconciled {
 		status.ReconciledWatermark = snapshot.Reconciled.Position
@@ -371,11 +384,15 @@ func (s *Service) backgroundWorkStatus(now time.Time) (api.WorkStatus, bool, str
 		status.Currentness = api.CurrentnessBaselineRequired
 	case snapshot.PendingObservations != 0 || !sameObservationStream(snapshot.Reconciled, snapshot.Observed) || snapshot.Reconciled.Position != snapshot.Observed.Position:
 		status.Currentness = api.CurrentnessCatchingUp
+	case status.CoverageIncomplete:
+		status.Currentness = api.CurrentnessCoverageIncomplete
 	default:
 		status.Currentness = api.CurrentnessCurrentVolatile
 	}
 	warning := ""
-	if status.Currentness != api.CurrentnessCurrentVolatile {
+	if status.Currentness == api.CurrentnessCoverageIncomplete {
+		warning = controller.coverageLimitation + "; the exact catalogue is reconciled through delivered observations but currentness remains incomplete"
+	} else if status.Currentness != api.CurrentnessCurrentVolatile {
 		warning = "background observation has not reconciled the exact catalogue through its latest volatile watermark"
 	} else if !status.WatermarkDurable {
 		warning = "background currentness is volatile; the live generation manifest does not yet commit its observation watermark"

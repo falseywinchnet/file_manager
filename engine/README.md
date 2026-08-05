@@ -49,9 +49,11 @@ the implementation.
   reconciliation, status, query, inspect, integrity, JSONL projection, and an
   opt-in one-root persistent mode.
 - `internal/ownership/` — longest-approved-root ownership router.
-- `internal/observation/` — bounded chained-cursor coalescing and an opt-in
-  native macOS FSEvents adapter. Events remain hints; gaps and overflow invoke
-  authoritative scans, and the live watermark is explicitly volatile.
+- `internal/observation/` — bounded chained-cursor coalescing plus opt-in native
+  macOS FSEvents and Windows `ReadDirectoryChangesW` adapters. Events remain
+  hints; gaps and overflow invoke authoritative scans. The live watermark is
+  volatile, and both native adapters currently declare incomplete exact-current
+  coverage rather than hiding gaps with periodic scans.
 - `internal/sandbox/` — path containment guard for development and testing.
 - `internal/similarity/` — the versioned candidate-channel seam plus a disabled
   native dogfood adapter for Kolmogrov's sealed literal radius-one coupled
@@ -107,9 +109,13 @@ go run ./cmd/fileman-engine \
   --background-observation=fsevents
 ```
 
-The engine performs a baseline scan before reporting `current_volatile`.
-Windows/Linux builds reject `fsevents` as unavailable. No platform silently
-falls back to polling.
+The engine performs a baseline scan before assessing currentness. The measured
+macOS adapter reports `observation_coverage_incomplete` even after it catches up
+because final-hard-link removal coverage is unproved. Windows builds can select
+`--background-observation=rdcw`; that bounded adapter also reports incomplete
+coverage pending native NTFS journal/root-replacement work. Other platforms
+reject either constructor as unavailable. No platform silently falls back to
+polling.
 
 The process speaks newline-delimited JSON on standard input/output. The M1
 reference and persistent candidate expose the development aliases plus

@@ -20,6 +20,14 @@ type channelObservationAdapter struct {
 	batches chan observation.Batch
 }
 
+type incompleteCoverageAdapter struct {
+	*channelObservationAdapter
+}
+
+func (*incompleteCoverageAdapter) ObservationCoverage() observation.Coverage {
+	return observation.Coverage{CompleteForExactCurrent: false, Limitation: "fixture omits one event class"}
+}
+
 type blockingMetadataScanner struct {
 	delegate scan.Scanner
 	started  chan struct{}
@@ -40,6 +48,10 @@ func (s *blockingMetadataScanner) Scan(ctx context.Context, root api.RootSpec, o
 
 func (a *channelObservationAdapter) Subscribe(context.Context) (observation.Subscription, error) {
 	return observation.Subscription{Initial: a.initial, Batches: a.batches}, nil
+}
+
+func (*channelObservationAdapter) ObservationCoverage() observation.Coverage {
+	return observation.Coverage{CompleteForExactCurrent: true}
 }
 
 func TestBackgroundObservationBaselineGapAndStopState(t *testing.T) {
@@ -182,6 +194,74 @@ func TestBackgroundEventStormBatchesOneDurablePublicationAndThenStaysQuiet(t *te
 	}
 	if quietFiles != afterFiles || quiet.Generation != updated.Generation || quiet.Work.Currentness != api.CurrentnessCurrentVolatile {
 		t.Fatalf("quiet engine wrote or drifted: before=%+v after=%+v status=%+v", afterFiles, quietFiles, quiet)
+	}
+}
+
+func TestIncompleteHardLinkCoverageFailsClosedAcrossReconcileAndRootChange(t *testing.T) {
+	engine, sandboxPath := testService(t)
+	defer engine.Close()
+	source := filepath.Join(sandboxPath, "hard-links")
+	clean := filepath.Join(sandboxPath, "clean")
+	for _, directory := range []string{source, clean} {
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstPath := filepath.Join(source, "first.txt")
+	secondPath := filepath.Join(source, "second.txt")
+	if err := os.WriteFile(firstPath, []byte("shared"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(firstPath, secondPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.ApplyRoots(context.Background(), []api.RootSpec{{ID: "docs", Path: source}}); err != nil {
+		t.Fatal(err)
+	}
+
+	channel := &channelObservationAdapter{
+		initial: observation.Cursor{Source: "incomplete", Epoch: "hard-links", Position: 4},
+		batches: make(chan observation.Batch, 4),
+	}
+	adapter := &incompleteCoverageAdapter{channelObservationAdapter: channel}
+	if err := engine.StartBackgroundObservation(context.Background(), adapter, backgroundTestPolicy()); err != nil {
+		t.Fatal(err)
+	}
+	baseline := waitForBackgroundState(t, engine, func(status api.Status) bool {
+		return status.Work.Currentness == api.CurrentnessCoverageIncomplete && status.Work.ReconciledWatermark == 4
+	})
+	if baseline.Ready || !baseline.Work.CoverageIncomplete {
+		t.Fatalf("hard-link baseline did not fail closed: %+v", baseline)
+	}
+
+	if err := os.Remove(secondPath); err != nil {
+		t.Fatal(err)
+	}
+	channel.batches <- observation.Batch{
+		After: channel.initial, Through: observation.Cursor{Source: "incomplete", Epoch: "hard-links", Position: 5},
+		Events: []observation.Event{{Root: "docs", Kind: observation.KindRemove, Path: "second.txt"}},
+	}
+	afterUnlink := waitForBackgroundState(t, engine, func(status api.Status) bool {
+		return status.Work.Currentness == api.CurrentnessCoverageIncomplete && status.Work.ReconciledWatermark == 5
+	})
+	if afterUnlink.Ready || !afterUnlink.Work.CoverageIncomplete {
+		t.Fatalf("hard-link coverage hazard was not sticky: %+v", afterUnlink)
+	}
+	query, err := engine.Query(context.Background(), api.Query{
+		Scope: api.Scope{Root: "docs", Descendants: true}, Filters: map[string]string{"name": "second.txt"},
+	})
+	if err != nil || len(query.Results) != 0 || len(query.Plan.StaleRoot) != 1 {
+		t.Fatalf("reconciled hard-link removal query=%+v err=%v", query, err)
+	}
+
+	if _, err := engine.ApplyRoots(context.Background(), []api.RootSpec{{ID: "clean", Path: clean}}); err != nil {
+		t.Fatal(err)
+	}
+	current := waitForBackgroundState(t, engine, func(status api.Status) bool {
+		return status.Work.Currentness == api.CurrentnessCoverageIncomplete && len(status.Roots) == 1 && status.Roots[0] == "clean"
+	})
+	if current.Ready || !current.Work.CoverageIncomplete {
+		t.Fatalf("adapter-wide coverage limitation was cleared by root replacement: %+v", current)
 	}
 }
 

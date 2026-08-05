@@ -53,7 +53,7 @@ func TestM4FSEventsBackgroundCurrentnessDogfood(t *testing.T) {
 		t.Fatal(err)
 	}
 	status := waitM4Status(t, engine, 10*time.Second, func(status api.Status) bool {
-		return status.Work.Currentness == api.CurrentnessCurrentVolatile && status.Generation != 0
+		return status.Work.Currentness == api.CurrentnessCoverageIncomplete && status.Generation != 0
 	})
 
 	const serialMutations = 32
@@ -67,7 +67,7 @@ func TestM4FSEventsBackgroundCurrentnessDogfood(t *testing.T) {
 			t.Fatal(err)
 		}
 		status = waitM4Status(t, engine, 10*time.Second, func(candidate api.Status) bool {
-			return candidate.Work.Currentness == api.CurrentnessCurrentVolatile &&
+			return candidate.Work.Currentness == api.CurrentnessCoverageIncomplete &&
 				candidate.Work.ReconciledWatermark > beforeWatermark && candidate.Generation > beforeGeneration
 		})
 		latencies = append(latencies, time.Since(started))
@@ -87,7 +87,7 @@ func TestM4FSEventsBackgroundCurrentnessDogfood(t *testing.T) {
 		}
 	}
 	status = waitM4Status(t, engine, 20*time.Second, func(candidate api.Status) bool {
-		return candidate.Work.Currentness == api.CurrentnessCurrentVolatile &&
+		return candidate.Work.Currentness == api.CurrentnessCoverageIncomplete &&
 			candidate.Work.ReconciledWatermark > stormWatermark && candidate.Generation > stormGeneration
 	})
 	stormElapsed := time.Since(stormStarted)
@@ -102,7 +102,7 @@ func TestM4FSEventsBackgroundCurrentnessDogfood(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if quietAfter != quietBefore || quietStatus.Generation != status.Generation || quietStatus.Work.Currentness != api.CurrentnessCurrentVolatile {
+	if quietAfter != quietBefore || quietStatus.Generation != status.Generation || quietStatus.Work.Currentness != api.CurrentnessCoverageIncomplete {
 		t.Fatalf("quiet currentness changed durable state: before=%+v after=%+v status=%+v", quietBefore, quietAfter, quietStatus)
 	}
 

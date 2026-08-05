@@ -79,17 +79,20 @@ trials, and the copy-on-write-tree control remain open promotion gates.
 - batched durable publication and reader generations;
 - polite scheduling, backlog status, battery/resource policy seams.
 
-Current status: **OBSERVED/MEASURED experimental macOS slice; not durable
-currentness admission**. A platform-neutral chained-cursor model, bounded
+Current status: **OBSERVED/MEASURED experimental macOS slice and OBSERVED
+Windows compatibility slice; not exact or durable currentness admission**. A
+platform-neutral chained-cursor model, bounded
 double-buffered coalescer, replay/gap/overflow/root-invalidation handling,
-scan-overlap state machine, backoff, currentness status, and opt-in macOS
-FSEvents adapter now drive full authoritative reconciliation. Native sandbox
-dogfood and a 4,096-operation storm pass; the retained 50 ms FSEvents / 100 ms
-maximum-age candidate reduced that storm from 20 to 3-4 full-generation
-publications. The live manifest still does not commit the source watermark,
-so restart forces a baseline and status says `current_volatile`. Windows/Linux
-native adapters, live delta publication, ten-minute idle CPU/power evidence,
-and atomic watermark/root-policy manifest admission remain gates.
+scan-overlap state machine, backoff, currentness status, opt-in macOS FSEvents,
+and opt-in Windows `ReadDirectoryChangesW` adapters now drive full authoritative
+reconciliation. Native macOS sandbox dogfood and a 4,096-operation storm pass;
+the retained 50 ms FSEvents / 100 ms maximum-age candidate uses three
+full-generation publications. macOS final-hard-link removal and Windows
+root-replacement/journal coverage remain incomplete, so both adapters fail
+closed rather than reporting current. The live manifest also does not commit
+the source watermark, so restart forces a baseline. Native NTFS validation, a
+Linux adapter, live delta publication, battery/device-power evidence, and
+atomic watermark/root-policy manifest admission remain gates.
 
 ## M5 — fuzzy and structural candidates
 

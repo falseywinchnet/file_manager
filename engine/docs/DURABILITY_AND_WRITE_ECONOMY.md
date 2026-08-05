@@ -85,7 +85,7 @@ on whichever comes first: maximum observation age, maximum operation count, or
 memory budget. The current macOS dogfood candidate uses 50 ms FSEvents latency,
 100 ms maximum age, 4,096 operations, 8,192 retained addresses, and 2 MiB per
 active coalescer buffer. A 4,096-write storm fell from 20 full-generation
-publications under the rejected 25 ms/256-operation tuning to three or four under the
+publications under the rejected 25 ms/256-operation tuning to three under the
 retained envelope. These are experimental full-generation control values, not
 the eventual delta/compaction policy. A quiet engine emits no commit. A
 sustained production burst must write sequential runs rather than repeatedly

@@ -468,6 +468,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             if (errorResult == 0 && error.Message.Data != null && error.Message.Size != 0)
                 detail = Encoding.UTF8.GetString(error.Message.Data, checked((int)error.Message.Size));
         }
+        if (Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_ABI_ERRORS") == "1")
+            Console.Error.WriteLine($"facade-abi-error=result:{result}|thread:{Environment.CurrentManagedThreadId}|detail:{detail}\n{Environment.StackTrace}");
         throw new InvalidOperationException($"GUI.Forms ABI operation failed with result {result}{(detail.Length == 0 ? "." : $": {detail}")}");
     }
 

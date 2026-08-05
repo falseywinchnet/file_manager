@@ -352,8 +352,9 @@ Current declarations include:
 - fixed-width similarity: `available_experimental`, disabled from the public
   planner;
 - native observation/watermark/coalescer: `available_experimental`; portable
-  coalescer plus macOS FSEvents exist, but the reported watermark is volatile
-  and Windows/Linux adapters are absent;
+  coalescing, macOS FSEvents, and Windows `ReadDirectoryChangesW` exist, but
+  exact-current coverage is incomplete, the watermark is volatile, Windows has
+  compatibility-only validation, and Linux is absent;
 - bounded status subscription: `negotiating`;
 - authenticated framed local transport: `deferred`;
 - `ORC-LIF-001`, `ORC-ENG-001`, and `ORC-ENG-002`: `negotiating`;
@@ -448,6 +449,7 @@ observation state =
   reconciling |
   catching_up |
   current_volatile |
+  observation_coverage_incomplete |
   observation_unavailable
 
 observation cursor = (adapter_source, adapter_epoch, opaque_ordered_position)
@@ -457,11 +459,12 @@ committed_current = exact generation and cursor authenticated by one manifest
 
 **OBSERVED:** status projects background activity, whether backlog is known,
 pending count/oldest age, gap state, adapter source/epoch, observed position,
-reconciled position, and `watermark_durable`. The portable coalescer and macOS
-FSEvents adapter converge through duplicates, sparse positions, reported or
-detected gaps, bounded overflow, root invalidation, event storms, and arrivals
-during a scan. Adapter stop makes backlog unknown. Queries name stale roots
-until reconciliation catches up.
+reconciled position, `coverage_incomplete`, and `watermark_durable`. The
+portable coalescer plus macOS FSEvents and Windows `ReadDirectoryChangesW`
+adapters converge through duplicates, sparse positions, reported or detected
+gaps, bounded overflow, root invalidation, event storms, and arrivals during a
+scan. Adapter stop makes backlog unknown. Queries name stale roots until
+reconciliation catches up or whenever adapter coverage remains incomplete.
 
 **GIVEN:** `current_volatile` may not be projected as committed currentness.
 Every adapter start currently forces a full baseline because `MANIFEST.*` does
@@ -469,16 +472,26 @@ not bind the cursor. The engine added no cursor sidecar, per-event journal, or
 durable status log.
 
 **MEASURED:** on native macOS/APFS, two retained 50 ms FSEvents / 100 ms
-coalescer-age repetitions measured 163.281-163.404 ms p50 and
-173.712-175.957 ms p95 across 32 sequential event-to-current cycles. A
-4,096-write/256-path storm converged in 441.467-467.930 ms with three to four
+coalescer-age repetitions measured 161.767-163.695 ms p50 and
+200.987-228.183 ms p95 across 32 sequential event-to-reconciled-generation
+cycles. A 4,096-write/256-path storm converged in 338.253-489.390 ms with three
 full-generation publications; a two-second quiet interval made zero
-application durable writes. See `results/M4_BACKGROUND_CURRENTNESS_001.md`
-for limitations and the retained rejected 20-publication tuning.
+application durable writes. Three file-level hard-link fixtures did not deliver
+the final remaining-link removal within two seconds, so macOS reports
+`observation_coverage_incomplete`. The Windows adapter passes a Wine
+create/cancel compatibility fixture but has no native NTFS credit. See
+`results/M4_BACKGROUND_CURRENTNESS_001.md` for limitations and the retained
+rejected 20-publication tuning.
+
+**MEASURED idle:** a separate 600.008-second native run consumed 39.927 ms of
+process CPU (0.006654% of one core), made zero application durable writes, and
+reported 10,076,160 bytes maximum RSS. Battery/device power and physical-write
+attribution remain open.
 
 Orchestrator reconciliation is requested for:
 
-1. whether the status names above enter `ORC-ENG-003` snapshots/events or map
+1. whether the status names above, including coverage-incomplete separately
+   from catching-up/unavailable, enter `ORC-ENG-003` snapshots/events or map
    to a smaller shared enum;
 2. the atomic manifest fields and acknowledgement boundary for
    `committed_current` (cursor, root-policy revision, generation, schema, and

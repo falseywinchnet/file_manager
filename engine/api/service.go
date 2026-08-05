@@ -75,6 +75,7 @@ const (
 	CurrentnessReconciling            CurrentnessState = "reconciling"
 	CurrentnessCatchingUp             CurrentnessState = "catching_up"
 	CurrentnessCurrentVolatile        CurrentnessState = "current_volatile"
+	CurrentnessCoverageIncomplete     CurrentnessState = "observation_coverage_incomplete"
 	CurrentnessObservationUnavailable CurrentnessState = "observation_unavailable"
 )
 
@@ -97,6 +98,7 @@ type WorkStatus struct {
 	ObservedWatermark    uint64           `json:"observed_watermark,omitempty"`
 	ReconciledWatermark  uint64           `json:"reconciled_watermark,omitempty"`
 	WatermarkDurable     bool             `json:"watermark_durable"`
+	CoverageIncomplete   bool             `json:"coverage_incomplete,omitempty"`
 	ObservationError     string           `json:"observation_error,omitempty"`
 }
 

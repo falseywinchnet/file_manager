@@ -273,7 +273,7 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "engine.content_feature.intake", State: api.CapabilityDeferred, Reason: "anchored fragment/provider input contract is not reconciled"},
 		{ID: "engine.fragment.descriptor", State: api.CapabilityDeferred, Reason: "content-fragment boundaries, anchors, privacy policy, and descriptor lifecycle are not reconciled"},
 		{ID: "engine.similarity.fixed_width", State: api.CapabilityExperimental, Revision: "history-tuple-0.1", Reason: "candidate channel is not admitted to the public planner"},
-		{ID: "engine.background.observation", State: api.CapabilityExperimental, Revision: "portable-coalescer-0.2+macos-fsevents-0.1", Reason: "macOS native observation and bounded reconciliation exist; the watermark is volatile and Windows/Linux adapters remain unimplemented"},
+		{ID: "engine.background.observation", State: api.CapabilityExperimental, Revision: "portable-coalescer-0.2+macos-fsevents-0.2+windows-rdcw-0.1", Reason: "bounded macOS and Windows native adapters exist, but coverage is incomplete, the watermark is volatile, Linux is absent, and Windows has compatibility-only validation"},
 		{ID: "engine.status.subscribe", State: api.CapabilityNegotiating, Reason: "bounded replay and overflow fixtures remain red"},
 		{ID: "engine.transport.framed_local", State: api.CapabilityDeferred, Reason: "production authentication and framed transport are not implemented"},
 		{ID: "contract.ORC-LIF-001", State: api.CapabilityNegotiating, Reason: "engine lifecycle projection awaits Orchestrator reconciliation"},
@@ -301,7 +301,11 @@ func (s *Service) decorateStatus(status api.Status) api.Status {
 		for index := range status.RootStates {
 			status.RootStates[index].Stale = true
 			if status.RootStates[index].Warning == "" {
-				status.RootStates[index].Warning = "background currentness requires authoritative reconciliation"
+				if background.Currentness == api.CurrentnessCoverageIncomplete {
+					status.RootStates[index].Warning = "background observation coverage is incomplete"
+				} else {
+					status.RootStates[index].Warning = "background currentness requires authoritative reconciliation"
+				}
 			}
 		}
 	}

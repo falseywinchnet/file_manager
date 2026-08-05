@@ -41,7 +41,8 @@ suppression, and clean drain behavior in a disposable persistent sandbox. It
 is not native supervisor or power-loss evidence.
 
 `M4_BACKGROUND_CURRENTNESS_001.md` records the portable bounded observation
-state machine, native macOS FSEvents sandbox dogfood, scan-overlap/gap
-conformance, retained storm batching, and zero-write quiet interval. Its
-watermark is deliberately volatile; it is not manifest or cross-platform
-admission.
+state machine, native macOS FSEvents sandbox dogfood, Windows
+`ReadDirectoryChangesW` Wine compatibility, scan-overlap/gap conformance,
+retained storm batching, final-hard-link negative coverage evidence, and a
+zero-write quiet interval. Coverage and watermark durability are deliberately
+fail-closed; this is not manifest or cross-platform admission.

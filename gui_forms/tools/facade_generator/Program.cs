@@ -827,12 +827,14 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private int __selectedIndex = -1;");
             Add("private string __displayMember = string.Empty;");
             Add("private bool __formattingEnabled;");
+            Add("protected virtual int __SelectionItemCount => global::System.Int32.MaxValue;");
             Add("internal void __SetSelectedIndexSilently(int value) { __selectedIndex = value; }");
             Add("protected virtual void __OnSelectedIndexChanged() { SelectedValueChanged?.Invoke(this, global::System.EventArgs.Empty); }");
             break;
         case "System.Windows.Forms.ListBox":
             Add("private readonly ObjectCollection __listItems;");
             Add("private DrawMode __listDrawMode;");
+            Add("protected override int __SelectionItemCount => __listItems.Count;");
             Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != global::System.Windows.Forms.MouseButtons.Left || __listItems.Count == 0) return; var row = global::System.Math.Clamp(e.Y / 22, 0, __listItems.Count - 1); SelectedIndex = row; }");
             break;
         case "System.Windows.Forms.ListBox+ObjectCollection":
@@ -886,17 +888,22 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private bool __integralHeight = true;");
             Add("private ContextMenuStrip? __comboDropDown;");
             Add("private bool __comboDropDownOpen;");
-            Add("private int __comboSelectionStart = -1;");
-            Add("private int __comboSelectionLength;");
-            Add("private void __NormalizeComboSelection() { if (__comboSelectionStart < 0) __comboSelectionStart = Text.Length; __comboSelectionStart = global::System.Math.Clamp(__comboSelectionStart, 0, Text.Length); __comboSelectionLength = global::System.Math.Clamp(__comboSelectionLength, 0, Text.Length - __comboSelectionStart); }");
-            Add("private void __ReplaceComboSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeComboSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __comboSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __comboSelectionLength; Text = Text.Remove(start, length).Insert(start, value); __comboSelectionStart = start + value.Length; __comboSelectionLength = 0; }");
-            Add("internal void __ResetItemsSelection() { __SetSelectedIndexSilently(-1); Text = string.Empty; __comboSelectionStart = 0; __comboSelectionLength = 0; }");
+            Add("private int __comboCaret = -1;");
+            Add("private int __comboAnchor = -1;");
+            Add("protected override int __SelectionItemCount => __comboItems.Count;");
+            Add("private void __NormalizeComboSelection() { if (__comboCaret < 0) __comboCaret = Text.Length; if (__comboAnchor < 0) __comboAnchor = __comboCaret; __comboCaret = global::System.Math.Clamp(__comboCaret, 0, Text.Length); __comboAnchor = global::System.Math.Clamp(__comboAnchor, 0, Text.Length); }");
+            Add("private int __ComboSelectionStart { get { __NormalizeComboSelection(); return global::System.Math.Min(__comboCaret, __comboAnchor); } }");
+            Add("private int __ComboSelectionLength { get { __NormalizeComboSelection(); return global::System.Math.Abs(__comboCaret - __comboAnchor); } }");
+            Add("private void __SetComboSelection(int start, int length) { if (start < 0) throw new global::System.ArgumentOutOfRangeException(nameof(start)); if (length < 0) throw new global::System.ArgumentOutOfRangeException(nameof(length)); start = global::System.Math.Min(start, Text.Length); length = global::System.Math.Min(length, Text.Length - start); __comboAnchor = start; __comboCaret = start + length; Invalidate(); }");
+            Add("private void __MoveComboCaret(int target, bool extend) { __NormalizeComboSelection(); target = global::System.Math.Clamp(target, 0, Text.Length); if (!extend) __comboAnchor = target; __comboCaret = target; Invalidate(); }");
+            Add("private void __ReplaceComboSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeComboSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __ComboSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __ComboSelectionLength; __SetSelectedIndexSilently(-1); Text = Text.Remove(start, length).Insert(start, value); __comboCaret = __comboAnchor = start + value.Length; Invalidate(); }");
+            Add("internal void __ResetItemsSelection() { __SetSelectedIndexSilently(-1); Text = string.Empty; __comboCaret = __comboAnchor = 0; }");
             Add("internal override void __NativeTextInput(string text, bool composing, int replacementStart, int replacementLength) { if (__dropDownStyle != ComboBoxStyle.DropDownList && !global::System.String.IsNullOrEmpty(text)) __ReplaceComboSelection(text, replacementStart, replacementLength); }");
-            Add("internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __dropDownStyle == ComboBoxStyle.DropDownList) return; __NormalizeComboSelection(); if ((modifiers & 2u) != 0 && physicalKey == 0x04u) { __comboSelectionStart = 0; __comboSelectionLength = Text.Length; return; } if (physicalKey == 0x2au) { if (__comboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboSelectionStart > 0) { --__comboSelectionStart; __comboSelectionLength = 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__comboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboSelectionStart < Text.Length) { __comboSelectionLength = 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4au) { __comboSelectionStart = 0; __comboSelectionLength = 0; } else if (physicalKey == 0x4du) { __comboSelectionStart = Text.Length; __comboSelectionLength = 0; } else if (physicalKey == 0x50u) { if (__comboSelectionLength > 0) __comboSelectionLength = 0; else __comboSelectionStart = global::System.Math.Max(0, __comboSelectionStart - 1); } else if (physicalKey == 0x4fu) { if (__comboSelectionLength > 0) { __comboSelectionStart += __comboSelectionLength; __comboSelectionLength = 0; } else __comboSelectionStart = global::System.Math.Min(Text.Length, __comboSelectionStart + 1); } }");
-            Add("protected override void __OnSelectedIndexChanged() { Text = SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? global::System.Convert.ToString(__comboItems[SelectedIndex], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty : string.Empty; __comboSelectionStart = Text.Length; __comboSelectionLength = 0; base.__OnSelectedIndexChanged(); SelectedIndexChanged?.Invoke(this, global::System.EventArgs.Empty); }");
+            Add("internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __dropDownStyle == ComboBoxStyle.DropDownList) return; __NormalizeComboSelection(); var shift = (modifiers & 1u) != 0; var control = (modifiers & 2u) != 0; if (control && physicalKey == 0x04u) { __comboAnchor = 0; __comboCaret = Text.Length; Invalidate(); return; } if (physicalKey == 0x2au) { if (__ComboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboCaret > 0) { __comboAnchor = __comboCaret - 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__ComboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboCaret < Text.Length) { __comboAnchor = __comboCaret + 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4au) __MoveComboCaret(0, shift); else if (physicalKey == 0x4du) __MoveComboCaret(Text.Length, shift); else if (physicalKey == 0x50u) { var target = !shift && __ComboSelectionLength > 0 ? __ComboSelectionStart : control ? 0 : global::System.Math.Max(0, __comboCaret - 1); __MoveComboCaret(target, shift); } else if (physicalKey == 0x4fu) { var target = !shift && __ComboSelectionLength > 0 ? __ComboSelectionStart + __ComboSelectionLength : control ? Text.Length : global::System.Math.Min(Text.Length, __comboCaret + 1); __MoveComboCaret(target, shift); } }");
+            Add("protected override void __OnSelectedIndexChanged() { Text = SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? global::System.Convert.ToString(__comboItems[SelectedIndex], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty : string.Empty; __comboCaret = __comboAnchor = Text.Length; base.__OnSelectedIndexChanged(); SelectedIndexChanged?.Invoke(this, global::System.EventArgs.Empty); }");
             Add("private void __CloseItems() { if (!__comboDropDownOpen) return; __comboDropDownOpen = false; __comboDropDown?.__CloseDropDown(); DropDownClosed?.Invoke(this, global::System.EventArgs.Empty); }");
             Add("private void __ShowItems() { if (__dropDownStyle == ComboBoxStyle.Simple || __comboItems.Count == 0 || __comboDropDownOpen) return; if (__comboDropDown is not null) { __comboDropDown.__CloseDropDown(); __comboDropDown.Dispose(); } var menu = new ContextMenuStrip { Name = Name + \".DropDown\" }; __comboDropDown = menu; for (var index = 0; index < __comboItems.Count; ++index) { var selection = index; var text = global::System.Convert.ToString(__comboItems[index], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty; var item = new ToolStripMenuItem(text) { Name = \"item.\" + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture), Checked = index == SelectedIndex }; item.Click += (_, _) => { SelectedIndex = selection; __CloseItems(); }; menu.Items.Add(item); } DropDown?.Invoke(this, global::System.EventArgs.Empty); __comboDropDownOpen = true; menu.Show(this, new global::System.Drawing.Point(0, Height)); }");
-            Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == global::System.Windows.Forms.MouseButtons.Left) __ShowItems(); }");
+            Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != global::System.Windows.Forms.MouseButtons.Left) return; if (__dropDownStyle == ComboBoxStyle.DropDownList || e.X >= global::System.Math.Max(0, Width - 22)) { __ShowItems(); return; } var target = global::System.Math.Clamp((int)global::System.Math.Round((e.X - 5) / 7.0), 0, Text.Length); __MoveComboCaret(target, false); }");
             break;
         case "System.Windows.Forms.ComboBox+ObjectCollection":
             Add("private readonly global::System.Collections.Generic.List<object> __items = new();");
@@ -907,12 +914,17 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private bool __textReadOnly;");
             Add("private bool __textMultiline;");
             Add("private BorderStyle __textBorderStyle = BorderStyle.Fixed3D;");
-            Add("private int __textSelectionStart = -1;");
-            Add("private int __textSelectionLength;");
-            Add("private void __NormalizeTextSelection() { if (__textSelectionStart < 0) __textSelectionStart = Text.Length; __textSelectionStart = global::System.Math.Clamp(__textSelectionStart, 0, Text.Length); __textSelectionLength = global::System.Math.Clamp(__textSelectionLength, 0, Text.Length - __textSelectionStart); }");
-            Add("private void __ReplaceTextSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeTextSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __textSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __textSelectionLength; Text = Text.Remove(start, length).Insert(start, value); __textSelectionStart = start + value.Length; __textSelectionLength = 0; }");
+            Add("private int __textCaret = -1;");
+            Add("private int __textAnchor = -1;");
+            Add("private void __NormalizeTextSelection() { if (__textCaret < 0) __textCaret = Text.Length; if (__textAnchor < 0) __textAnchor = __textCaret; __textCaret = global::System.Math.Clamp(__textCaret, 0, Text.Length); __textAnchor = global::System.Math.Clamp(__textAnchor, 0, Text.Length); }");
+            Add("private int __TextSelectionStart { get { __NormalizeTextSelection(); return global::System.Math.Min(__textCaret, __textAnchor); } }");
+            Add("private int __TextSelectionLength { get { __NormalizeTextSelection(); return global::System.Math.Abs(__textCaret - __textAnchor); } }");
+            Add("private void __SetTextSelection(int start, int length) { if (start < 0) throw new global::System.ArgumentOutOfRangeException(nameof(start)); if (length < 0) throw new global::System.ArgumentOutOfRangeException(nameof(length)); start = global::System.Math.Min(start, Text.Length); length = global::System.Math.Min(length, Text.Length - start); __textAnchor = start; __textCaret = start + length; Invalidate(); }");
+            Add("private void __MoveTextCaret(int target, bool extend) { __NormalizeTextSelection(); target = global::System.Math.Clamp(target, 0, Text.Length); if (!extend) __textAnchor = target; __textCaret = target; Invalidate(); }");
+            Add("private void __ReplaceTextSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeTextSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __TextSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __TextSelectionLength; Text = Text.Remove(start, length).Insert(start, value); __textCaret = __textAnchor = start + value.Length; Invalidate(); }");
             Add("internal override void __NativeTextInput(string text, bool composing, int replacementStart, int replacementLength) { if (!__textReadOnly && !global::System.String.IsNullOrEmpty(text)) __ReplaceTextSelection(text, replacementStart, replacementLength); }");
-            Add("internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __textReadOnly) return; __NormalizeTextSelection(); if ((modifiers & 2u) != 0 && physicalKey == 0x04u) { __textSelectionStart = 0; __textSelectionLength = Text.Length; return; } if (physicalKey == 0x2au) { if (__textSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textSelectionStart > 0) { --__textSelectionStart; __textSelectionLength = 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__textSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textSelectionStart < Text.Length) { __textSelectionLength = 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4au) { __textSelectionStart = 0; __textSelectionLength = 0; } else if (physicalKey == 0x4du) { __textSelectionStart = Text.Length; __textSelectionLength = 0; } else if (physicalKey == 0x50u) { if (__textSelectionLength > 0) __textSelectionLength = 0; else __textSelectionStart = global::System.Math.Max(0, __textSelectionStart - 1); } else if (physicalKey == 0x4fu) { if (__textSelectionLength > 0) { __textSelectionStart += __textSelectionLength; __textSelectionLength = 0; } else __textSelectionStart = global::System.Math.Min(Text.Length, __textSelectionStart + 1); } }");
+            Add("internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __textReadOnly) return; __NormalizeTextSelection(); var shift = (modifiers & 1u) != 0; var control = (modifiers & 2u) != 0; if (control && physicalKey == 0x04u) { __textAnchor = 0; __textCaret = Text.Length; Invalidate(); return; } if (physicalKey == 0x2au) { if (__TextSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textCaret > 0) { __textAnchor = __textCaret - 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__TextSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textCaret < Text.Length) { __textAnchor = __textCaret + 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4au) __MoveTextCaret(0, shift); else if (physicalKey == 0x4du) __MoveTextCaret(Text.Length, shift); else if (physicalKey == 0x50u) { var target = !shift && __TextSelectionLength > 0 ? __TextSelectionStart : control ? 0 : global::System.Math.Max(0, __textCaret - 1); __MoveTextCaret(target, shift); } else if (physicalKey == 0x4fu) { var target = !shift && __TextSelectionLength > 0 ? __TextSelectionStart + __TextSelectionLength : control ? Text.Length : global::System.Math.Min(Text.Length, __textCaret + 1); __MoveTextCaret(target, shift); } }");
+            Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != global::System.Windows.Forms.MouseButtons.Left) return; var target = global::System.Math.Clamp((int)global::System.Math.Round((e.X - 5) / 7.0), 0, Text.Length); __MoveTextCaret(target, false); }");
             break;
         case "System.Windows.Forms.NumericUpDown":
             Add("private decimal __minimum;");
@@ -1605,7 +1617,10 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         {
             "BorderStyle" => "{ get { return __textBorderStyle; } set { __textBorderStyle = value; } }",
             "Multiline" => "{ get { return __textMultiline; } set { __textMultiline = value; } }",
-            "ReadOnly" => "{ set { __textReadOnly = value; } }",
+            "ReadOnly" => "{ get { return __textReadOnly; } set { __textReadOnly = value; } }",
+            "SelectedText" => "{ get { return Text.Substring(__TextSelectionStart, __TextSelectionLength); } set { if (__textReadOnly) return; __ReplaceTextSelection(value ?? string.Empty); } }",
+            "SelectionLength" => "{ get { return __TextSelectionLength; } set { __SetTextSelection(__TextSelectionStart, value); } }",
+            "SelectionStart" => "{ get { return __TextSelectionStart; } set { __SetTextSelection(value, 0); } }",
             _ => Stub(),
         };
     if (type.FullName == "System.Windows.Forms.Control+ControlCollection" && property.Name == "Item")
@@ -1803,7 +1818,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         {
             "DisplayMember" => "{ set { __displayMember = value ?? string.Empty; } }",
             "FormattingEnabled" => "{ set { __formattingEnabled = value; } }",
-            "SelectedIndex" => "{ get { return __selectedIndex; } set { if (value < -1) throw new global::System.ArgumentOutOfRangeException(nameof(value)); if (__selectedIndex == value) return; __selectedIndex = value; __OnSelectedIndexChanged(); } }",
+            "SelectedIndex" => "{ get { if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=list-selection-get|name=\" + Name + \"|value=\" + __selectedIndex + \"|count=\" + __SelectionItemCount); return __selectedIndex; } set { if (value < -1 || value >= __SelectionItemCount) throw new global::System.ArgumentOutOfRangeException(nameof(value)); if (__selectedIndex == value) return; var previous = __selectedIndex; __selectedIndex = value; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=list-selection-set|name=\" + Name + \"|previous=\" + previous + \"|value=\" + value + \"|count=\" + __SelectionItemCount); __OnSelectedIndexChanged(); } }",
             _ => Stub(),
         };
     if (type.FullName == "System.Windows.Forms.ListBox")
@@ -1854,6 +1869,9 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
             "DropDownWidth" => "{ set { if (value < 1) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __dropDownWidth = value; } }",
             "IntegralHeight" => "{ set { __integralHeight = value; } }",
             "Items" => "{ get { return __comboItems; } }",
+            "SelectedText" => "{ get { return Text.Substring(__ComboSelectionStart, __ComboSelectionLength); } set { if (__dropDownStyle == ComboBoxStyle.DropDownList) return; __ReplaceComboSelection(value ?? string.Empty); } }",
+            "SelectionLength" => "{ get { return __ComboSelectionLength; } set { __SetComboSelection(__ComboSelectionStart, value); } }",
+            "SelectionStart" => "{ get { return __ComboSelectionStart; } set { __SetComboSelection(value, 0); } }",
             "SelectedItem" => "{ get { return SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? __comboItems[SelectedIndex] : null!; } set { __selectedItem = value; SelectedIndex = value is null ? -1 : __comboItems.IndexOf(value); } }",
             _ => Stub(),
         };
@@ -2384,6 +2402,18 @@ static string MethodBody(Type type, MethodInfo method)
         if (method.Name == "OnLayout") return "{ __ApplyDockLayout(); Layout?.Invoke(this, levent); }";
         if (method.Name == "ProcessDialogKey") return "{ return false; }";
     }
+    if (type.FullName == "System.Windows.Forms.ComboBox" && method.Name == "Select")
+        return "{ __SetComboSelection(start, length); }";
+    if (type.FullName == "System.Windows.Forms.TextBoxBase")
+        return method.Name switch
+        {
+            "AppendText" => "{ if (text is null) return; __SetTextSelection(Text.Length, 0); __ReplaceTextSelection(text); }",
+            "Clear" => "{ if (__textReadOnly) return; Text = string.Empty; __textCaret = __textAnchor = 0; Invalidate(); }",
+            "DeselectAll" => "{ __NormalizeTextSelection(); __textAnchor = __textCaret; Invalidate(); }",
+            "Select" => "{ __SetTextSelection(start, length); }",
+            "SelectAll" => "{ __SetTextSelection(0, Text.Length); }",
+            _ => BodyFor(method.ReturnType, false),
+        };
     if (method.Name == "Dispose" && method.GetParameters().Length == 1 &&
         method.GetParameters()[0].ParameterType.FullName == "System.Boolean")
         return "{ base.Dispose(disposing); }";
@@ -2436,13 +2466,13 @@ static string MethodBody(Type type, MethodInfo method)
     if (type.FullName == "System.Windows.Forms.ComboBox+ObjectCollection")
         return method.Name switch
         {
-            "Add" => "{ if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Add(item); return __items.Count - 1; }",
+            "Add" => "{ if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Add(item); __owner?.Invalidate(); return __items.Count - 1; }",
             "AddRange" => "{ if (items is null) throw new global::System.ArgumentNullException(nameof(items)); foreach (var item in items) Add(item); }",
             "Clear" => "{ __items.Clear(); __owner?.__ResetItemsSelection(); }",
             "GetEnumerator" => "{ return __items.GetEnumerator(); }",
             "IndexOf" => "{ return __items.IndexOf(value); }",
-            "Insert" => "{ if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Insert(index, item); }",
-            "RemoveAt" => "{ __items.RemoveAt(index); if (__owner is not null && __owner.SelectedIndex >= __items.Count) __owner.SelectedIndex = __items.Count - 1; }",
+            "Insert" => "{ if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Insert(index, item); if (__owner is not null && __owner.SelectedIndex >= index) __owner.__SetSelectedIndexSilently(__owner.SelectedIndex + 1); __owner?.Invalidate(); }",
+            "RemoveAt" => "{ var selected = __owner?.SelectedIndex ?? -1; __items.RemoveAt(index); if (__owner is not null) { if (selected == index) __owner.SelectedIndex = -1; else if (selected > index) __owner.__SetSelectedIndexSilently(selected - 1); __owner.Invalidate(); } }",
             _ => BodyFor(method.ReturnType, false),
         };
     if (type.FullName == "System.Windows.Forms.ListBox+ObjectCollection")
@@ -3801,6 +3831,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             if (errorResult == 0 && error.Message.Data != null && error.Message.Size != 0)
                 detail = Encoding.UTF8.GetString(error.Message.Data, checked((int)error.Message.Size));
         }
+        if (Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_ABI_ERRORS") == "1")
+            Console.Error.WriteLine($"facade-abi-error=result:{result}|thread:{Environment.CurrentManagedThreadId}|detail:{detail}\n{Environment.StackTrace}");
         throw new InvalidOperationException($"GUI.Forms ABI operation failed with result {result}{(detail.Length == 0 ? "." : $": {detail}")}");
     }
 
