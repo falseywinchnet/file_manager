@@ -45,16 +45,19 @@ damage behavior, text, accessibility, or ABI design.
 
 ### GF004 — typography split
 
-**GIVEN:** ordinary text falls back to the platform `system-ui` family.
-Controls use the in-house **Portmouth Rapids** font. Portmouth Rapids is a
-Latin-only font, not a script engine, symbol grammar, control notation, or text
-rendering procedure.
+**GIVEN owner revision:** product UI text does not rely on host `system-ui`.
+HarfBuzz is the common shaper and FreeType is the common glyph loader, hinter,
+and rasterizer. Controls use the bundled **Portsmouth Rapids** font. Portsmouth
+Rapids is Latin-only and remains a face, not a script engine, symbol grammar,
+control notation, or text-rendering procedure.
 
-GUI.Forms treats it as the preferred face for declared control-label roles and
-falls back to `system-ui` whenever a required character is outside the font's
-coverage. Content/body text uses `system-ui` directly. Layout records name a
-typography role rather than assuming one global family, and fallback must not
-turn one missing character into a different control-wide style.
+GUI.Forms treats Portsmouth as the preferred face for declared control-label
+roles. A separately selected bundled Tahoma/Calibri-like humanist face serves
+content/body roles. Uncovered clusters resolve through bounded bundled fallback
+packs. Layout records name a typography role and font-pack metric generation;
+fallback may not turn one missing cluster into a different control-wide style.
+Exact font bytes, coverage, Portsmouth production rights, body-face selection,
+and raster profiles remain gated in M4/M9.
 
 ### GF005 — staged text correctness
 
@@ -208,8 +211,10 @@ operating system. It must cover at least:
 - IME/text-input sessions and candidate-window positioning;
 - clipboard and typed drag/drop;
 - native file dialogs and any deliberately native menus;
-- platform font discovery and fallback;
-- optional accessibility publication;
+- host text-raster, scale, and accessibility preference signals (font
+  selection/fallback itself is owned by bundled GUI.Forms packs);
+- native accessibility publication, required for File Manager even if another
+  independently packaged consumer does not ship a publisher;
 - power/session/display-change notifications;
 - and native handles required by preview/plugin isolation.
 

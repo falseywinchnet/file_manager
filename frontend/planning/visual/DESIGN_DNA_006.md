@@ -336,7 +336,7 @@ default. “Gate/debt” names what still prevents closure.
 | DNA-V04 | graphite | GIVEN | corrected to middle-value textured graphite, not black | texture frequency and contrast unmeasured |
 | DNA-V05 | pearl | GIVEN | quiet warm/cool pearl supports ribbon hierarchy | must not read as blank modern flatness |
 | DNA-V06 | accent allocation | GIVEN | selection, identity, objects, rare status; not every rail | governing principle; token coverage incomplete |
-| DNA-V07 | typeface | GIVEN | Portsmouth Rapids for titles/control chrome; platform system UI for content and explanatory text with a Tahoma-like fallback | per-platform mapping, shaping, and cluster fallback remain implementation work |
+| DNA-V07 | typeface | GIVEN | Portsmouth Rapids for titles/control chrome; a bundled Tahoma/Calibri-like humanist face for content and explanatory text; bounded bundled per-cluster fallback | body-face selection, production rights, coverage packs, HarfBuzz/FreeType profile remain implementation work |
 | DNA-V08 | type hierarchy | CANDIDATE | size changes are modest; weight, alignment, and placement carry hierarchy | scale and localization testing absent |
 | DNA-V09 | text case | CANDIDATE | sentence case for explanation; compact title case for commands; uppercase only for tiny structural labels | audit current inconsistencies |
 | DNA-V10 | icon perspective | CANDIDATE | consistent mild material perspective for objects; commands may be frontal | House Material drawings absent |
@@ -364,7 +364,7 @@ default. “Gate/debt” names what still prevents closure.
 
 These are not hidden behind polished screenshots.
 
-1. **Typography implementation:** Portsmouth Rapids versus system-content roles
+1. **Typography implementation:** Portsmouth Rapids versus bundled body roles
    are GIVEN, but platform mapping, fallback, hinting, shaping, and metrics are
    not demonstrated.
 2. **Responsive geometry:** content-aware reflow, priority collapse, and the

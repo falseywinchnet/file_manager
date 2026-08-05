@@ -20,7 +20,10 @@ struct MacHostOptions {
     std::uint32_t close_attempts_for_testing{1};
     std::function<void(HostCloseRequest&)> close_request;
     std::function<void(std::function<void()> wake,
-                       std::function<void()> request_close)> host_ready;
+                       std::function<void()> request_close,
+                       std::function<HostDialogResult(const HostDialogRequest&)> show_dialog,
+                       std::function<HostServiceStatus(const HostTooltipRequest&)> show_tooltip,
+                       std::function<void()> hide_tooltip)> host_ready;
     std::function<void()> dispatch_pending;
     std::function<void()> closed;
     std::function<void(std::string_view metrics_json,

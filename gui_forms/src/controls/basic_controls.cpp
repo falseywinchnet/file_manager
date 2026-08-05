@@ -44,8 +44,18 @@ void paint_relief(Painter& painter, Rect bounds, const BasicControlStyle& style,
 
 void paint_focus(Painter& painter, Rect bounds, Color color) {
     if (bounds.width > 9.0 && bounds.height > 9.0) {
-        painter.stroke_rect({bounds.x + 4.5, bounds.y + 4.5,
-                             bounds.width - 9.0, bounds.height - 9.0}, color, 1.0);
+        const double left = bounds.x + 4.5;
+        const double top = bounds.y + 4.5;
+        const double right = bounds.x + bounds.width - 4.5;
+        const double bottom = bounds.y + bounds.height - 4.5;
+        for (double x = left; x < right; x += 2.0) {
+            painter.draw_line({x, top}, {std::min(x + 1.0, right), top}, color, 1.0);
+            painter.draw_line({x, bottom}, {std::min(x + 1.0, right), bottom}, color, 1.0);
+        }
+        for (double y = top + 1.0; y < bottom; y += 2.0) {
+            painter.draw_line({left, y}, {left, std::min(y + 1.0, bottom)}, color, 1.0);
+            painter.draw_line({right, y}, {right, std::min(y + 1.0, bottom)}, color, 1.0);
+        }
     }
 }
 
@@ -469,10 +479,6 @@ void CheckBox::on_paint(Painter& painter, Rect) {
     painter.draw_text_utf8({23.0, std::max(font().size,
                               (bounds.height + font().size) * 0.5 - 1.0)},
                            text(), font(), enabled() ? colors.text : colors.disabled_text);
-    if (focused_visual()) {
-        paint_focus(painter, {19.0, 1.0, std::max(0.0, bounds.width - 19.0),
-                              std::max(0.0, bounds.height - 2.0)}, colors.text);
-    }
 }
 
 void CheckBox::on_activate() {
@@ -575,10 +581,6 @@ void RadioButton::on_paint(Painter& painter, Rect) {
     painter.draw_text_utf8({23.0, std::max(font().size,
                               (bounds.height + font().size) * 0.5 - 1.0)},
                            text(), font(), enabled() ? colors.text : colors.disabled_text);
-    if (focused_visual()) {
-        paint_focus(painter, {19.0, 1.0, std::max(0.0, bounds.width - 19.0),
-                              std::max(0.0, bounds.height - 2.0)}, colors.text);
-    }
 }
 
 void RadioButton::on_activate() {

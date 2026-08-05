@@ -72,13 +72,16 @@ state to keyboard users. Exact animation and hit geometry remain candidates.
 ### DDV-007-05 — Typography roles
 
 **GIVEN:** **Portsmouth Rapids** is the narrow humanist face for titles and
-control chrome. Content, explanatory text, object labels, properties, search
-evidence, and editable values use the platform system UI face with a
-Tahoma-like fallback. The system face wins for language coverage and ordinary
-reading; Portsmouth Rapids never becomes the body face.
+control chrome. **GIVEN owner revision:** content, explanatory text, object
+labels, properties, search evidence, and editable values use a shipped
+Tahoma/Calibri-like humanist body face. Portsmouth Rapids never becomes the
+body face. HarfBuzz shapes, FreeType hints/rasterizes, and bounded bundled packs
+supply per-cluster fallback; arbitrary host font availability is not product
+authority.
 
-Per-cluster fallback, hinting, shaping, and platform font mapping remain owned
-by the GUI.Forms typography boundary.
+Exact body-face selection, font-pack coverage, Portsmouth production rights,
+hint profiles, and metric generations remain owned by the GUI.Forms typography
+gate.
 
 ### DDV-007-06 — Conventional drag and drop
 
@@ -224,4 +227,5 @@ These verdicts deliberately leave the following as **CANDIDATE** work:
 5. criteria cost classification and staged-Apply threshold;
 6. the directory-merge drawer's batching and conflict-resolution model;
 7. interaction-sound assets, mixing, and repetition limits;
-8. per-platform system-font and Tahoma-like fallback mapping.
+8. bundled body-face selection, script-pack coverage, production font rights,
+   and the HarfBuzz/FreeType metric/raster profile.

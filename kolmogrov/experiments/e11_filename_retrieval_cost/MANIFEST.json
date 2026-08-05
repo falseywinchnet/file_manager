@@ -1,0 +1,53 @@
+{
+  "experiment_id": "E11",
+  "title": "Protected filename rows, exact-length retrieval, and posting charge",
+  "status": "synthetic development/evaluation measurement",
+  "profile_id": "org.filemanager.kolmogrov.filename-observation@0.1.0-research.1",
+  "claims_under_test": [
+    "A minimum protected-kernel prefix can preserve the declared development mutation graph.",
+    "Ambient-coset row representatives can generalize protected response to a disjoint generated family.",
+    "Exact-length n-1/n/n+1 certificate plans can retain radius-one candidates without global length transport.",
+    "Posting bytes and verification work can remain bounded as cell depth increases."
+  ],
+  "rejection_criteria": {
+    "source_recall": 1.0,
+    "development_p95_candidate_fraction_maximum": 0.1,
+    "development_p95_false_candidates_maximum": 8,
+    "production_promotion_forbidden": true
+  },
+  "configuration": {
+    "radius": 1,
+    "degree": 2,
+    "certificate_family": "affine coverage order",
+    "certificate_limit": 8,
+    "views": 3,
+    "binary_depths": [1, 2, 3, 4, 5, 6],
+    "source_length_offsets": [-1, 0, 1]
+  },
+  "splits": {
+    "development": {
+      "records": 288,
+      "queries": 180,
+      "separator": "underscore",
+      "mutation_graph": "development only"
+    },
+    "evaluation": {
+      "records": 288,
+      "queries": 180,
+      "separator": "hyphen",
+      "mutation_graph": "disjoint from development"
+    }
+  },
+  "controls": [
+    "low-bit affine whole-pattern projection",
+    "support-balanced binary rows",
+    "protected-kernel rows with balanced ambient-coset representatives"
+  ],
+  "posting_codecs": [
+    "sorted delta varint payload",
+    "dense bitmap payload",
+    "one-byte-tag minimum-payload hybrid"
+  ],
+  "privacy": "synthetic fixtures only; no private or network corpus",
+  "entrypoint": "run.py"
+}

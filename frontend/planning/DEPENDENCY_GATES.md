@@ -16,6 +16,11 @@ Required before Frontend 001 implementation:
 - invalidation/damage and rendering-host behavior;
 - core control/container/range/menu/tree/list primitives needed by the first
   File Manager window;
+- the FM0 subset in
+  `../../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`,
+  including priority-responsive panes, command shelf/ribbon composition,
+  breadcrumb/editor/suggestion primitives, bundled HarfBuzz/FreeType typography,
+  default semantic adapters, and the admitted House Material drawing vocabulary;
 - theme/resource/PNG/language seams;
 - headless deterministic traces plus macOS host demonstration;
 - clean dependency-facing build/install target without demo/build-tree coupling.

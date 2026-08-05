@@ -34,6 +34,11 @@ cover:
 - PNG/resource, semantic naming, theme/state, and headless-test seams;
 - a clean CMake consumption path and named C ABI/C++ wrapper version.
 
+The complete requested substrate and its FM0/FM1/FM2/FMX staging are recorded
+in
+[`../../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`](../../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md).
+Frontend 001 requires the admitted FM0 subset, not every later row.
+
 If GUI.Forms excludes a feature, 001 narrows or records a follow-up. The
 frontend does not implement a shadow widget framework.
 

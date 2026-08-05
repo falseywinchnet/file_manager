@@ -254,6 +254,32 @@ void window_thread_boundary() {
             "window image ownership did not enforce the UI thread");
 }
 
+void scoped_window_replacement_damage() {
+    auto root = make_control<Control>(StableId("resource.damage.root"));
+    auto consumer = make_control<Control>(StableId("resource.damage.consumer"));
+    root->set_requested_bounds({0.0, 0.0, 32.0, 32.0});
+    consumer->set_requested_bounds({5.0, 6.0, 10.0, 8.0});
+    root->add_child(consumer);
+    Window window(root, {32.0, 32.0});
+    window.perform_layout();
+    static_cast<void>(window.take_damage());
+
+    const std::vector<std::byte> bytes = valid_bytes();
+    const ImageLoadResult loaded = window.load_png(bytes);
+    require(static_cast<bool>(loaded), "window rejected scoped-damage fixture PNG");
+    require(window.take_damage().empty(),
+            "loading an unreferenced PNG unexpectedly damaged the window");
+
+    const ImageLoadResult replaced = window.replace_png(loaded.image, bytes, *consumer);
+    require(static_cast<bool>(replaced), "scoped PNG replacement was rejected");
+    const DamageRegion damage = window.take_damage();
+    require(damage.rectangle_count() == 1 &&
+                damage.bounds() == Rect{5.0, 6.0, 10.0, 8.0},
+            "scoped PNG replacement damaged more than its consumer bounds");
+    require(damage.area() == 80.0,
+            "scoped PNG replacement reported the wrong damaged area");
+}
+
 } // namespace
 
 int main() {
@@ -261,5 +287,6 @@ int main() {
     ownership_and_quota_contract();
     deterministic_mutation_oracle();
     window_thread_boundary();
+    scoped_window_replacement_damage();
     return 0;
 }

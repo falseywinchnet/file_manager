@@ -74,7 +74,7 @@ cross-project names.
 | Canonical operation | Current JSONL alias | Engine status |
 |---|---|---|
 | `engine.version` | `version` | **OBSERVED implemented**, incomplete contract-range/build identity |
-| `engine.status` | `status` | **OBSERVED implemented**, incomplete backlog/integrity/instance fields |
+| `engine.status` | `status` | **OBSERVED implemented**, including experimental currentness/backlog cursors; committed watermark and complete integrity projection remain open |
 | `engine.query` | `query` | **OBSERVED implemented** for bounded exact retrieval, evidence, and generation-bound paging |
 | `engine.inspect` | `inspect` | **OBSERVED implemented** |
 | `engine.subscribe_status` | none | **CANDIDATE accepted**, not implemented |
@@ -223,3 +223,271 @@ accidents as a permanent ABI.
 ## Orchestrator reconciliation 001
 
 Status: **not started; waits for engine reply 001**.
+
+## Engine ORC-KOL reply 002
+
+Status: **project reply recorded 2026-08-05 from disabled native dogfood;
+awaiting Orchestrator reconciliation and not a production contract**.
+
+The engine accepts Kolmogrov's sealed
+`filename-literal-r1-q2-d20-n64-p65536` usage guidance as sufficient for an
+experimental adapter. The adapter is implemented under `internal/similarity`
+and measured in `results/M5_KOLMOGROV_HISTORY_TUPLE_001.md`. It does not change
+`engine.v0` features or make fuzzy query available.
+
+### Semantics the engine can now exercise
+
+- complete configuration descriptor plus SHA-256 parameter identity;
+- explicit per-generation coordinate pairs, never the published E13 parameters
+  as the random dogfood default;
+- one coupled 40-bit key per complete literal deletion history and one full key;
+- typed stored-shorter, same-length, and stored-longer plans;
+- exact engine ordinal and committed-generation anchor resolution;
+- a private pinned exact-generation reader exercised across mutation and
+  restart, without exporting the reader or storage layout through `engine.v0`;
+- candidate-only evidence with matched plan/key provenance and no fabricated
+  relevance score;
+- exact one-edit/transposition adjudication as parent-engine evidence;
+- explicit `unsupported_input`, `over_capacity`, `configuration_mismatch`,
+  `rebuild_required`, `budget_exceeded`, `cancelled`, and
+  `corrupt_projection` failures;
+- erase/rebuild migration and immutable segment liveness.
+
+The service dogfood and same-corpus resource result are recorded in
+`results/M5_KOLMOGROV_SERVICE_DOGFOOD_002.md`. This is evidence for eventual
+planner integration, not a counterproposal to expose Go reader handles or
+component bytes across the Orchestrator boundary.
+
+### Counterproposal: sparse address family, not one sketch blob
+
+The coupled-history object has fixed-width addresses but a bounded variable
+number of addresses (`n` history keys plus one full key). `ORC-KOL-001` should
+therefore describe:
+
+```text
+projection descriptor
+address {kind, source_length, semantic_view, coupled_key_bytes}
+candidate {exact anchor/ordinal, matched plans/keys, candidate_only}
+query stats {probes, posting visits, live/dead visits, capacity state}
+```
+
+A single `width_bytes` remains the width of one coupled key, not the entire
+record projection. **REJECTED:** serializing all history keys into one nominal
+fixed sketch and then treating that variable blob as one hash location.
+
+Tuple byte order remains private in this round. If bytes cross the reconciled
+seam, the descriptor must own coordinate order, cell bits, packing, and byte
+order. A parameter digest is correlation evidence; the complete canonical
+descriptor remains semantic authority.
+
+### Still-red fixtures
+
+Production availability, deterministic continuation, live manifest
+publication, configuration rollover while readers are pinned, over-capacity
+fallback through the service planner, update/compaction accounting, folded or
+structural view negotiation, and independent-client wire conformance remain
+red. The engine requests that Orchestrator preserve `available_experimental`
+separately from production `available` and accept `over_capacity` as a terminal
+fallback state rather than an empty result.
+
+## Engine lifecycle and configuration reply 003
+
+Status: **project reply recorded 2026-08-05; development projection implemented;
+native service host and reconciled ORC contracts remain open**.
+
+This reply declares the whole engine service, not a Kolmogrov service. Exact
+catalogue identity and stored records are authoritative. Lexical, metadata,
+content-fragment descriptor, and similarity mechanisms contribute bounded,
+versioned evidence. Kolmogrov-derived descriptors are one such mechanism where
+their measured workload warrants admission.
+
+### Implemented semantic projection
+
+| Operation/field | Engine declaration |
+|---|---|
+| `engine.version` | component/build/protocol, random process `instance_id`, feature list, and enumerated capability states |
+| `engine.status` | lifecycle, active work, enacted configuration, catalogue generation/root state, warnings, and the same capability ledger |
+| `engine.configuration_get` | schema/version, stable content digest, deployment/persistence/store placement, ingestion mode, canonical root policy, and separate durable-policy state |
+| `engine.root_plan` | validates/canonicalizes roots and returns current/proposed configuration digests plus `changed` |
+| `engine.root_apply` | requires `expected_configuration_digest`; returns `STALE_CONFIGURATION` without mutation on mismatch |
+| `engine.shutdown` | rejects new operations, cancels service-derived contexts, drains active work, closes the exact reader, and returns terminal lifecycle status |
+
+The unqualified v0 aliases remain test/development projections. In particular,
+unconditional `root.apply` is not the canonical cross-project operation.
+
+Lifecycle values are `starting`, `ready`, `draining`, `stopped`, and `faulted`.
+The current implementation constructs synchronously into `ready` or returns an
+error; it does not fabricate observable startup progress. `start` is supervisor
+construction and checked recovery. `restart` is supervisor process replacement
+and produces a new `instance_id`; it is not an in-process method. Clean shutdown
+does not create a durable clean-stop record or rewrite the generation.
+
+### Configuration authority and durability
+
+The expected digest is concurrency evidence, not authorization. Orchestrator
+must supply already-authorized policy through an authenticated administrative
+session. The engine validates containment and projects it. Payload JSON cannot
+assert caller identity or authority.
+
+`root_policy_persistent` is health/durability state and is excluded from the
+configuration digest so the digest does not change merely when the same policy
+reaches a checked generation. **Open:** current root policy exists only in
+process memory until persistent reconciliation. Production acknowledgement
+needs the manifest's authoritative root-policy revision and observation
+watermark in the same commit as all component digests. The engine will not
+invent a process-local revision that appears durable.
+
+### Capability declarations for dependency planning
+
+Runtime states use `available`, `available_experimental`, `negotiating`,
+`unavailable`, and `deferred`; every non-available state includes a reason.
+Current declarations include:
+
+- exact catalogue/query, ordered metadata, root policy, and manual scan:
+  `available`;
+- immutable checked generation: `available` only for persistent instances;
+- delta publication: `available_experimental`, component-only and not live;
+- lexical index: `unavailable`;
+- anchored content-feature intake and fragment descriptors: `deferred`;
+- fixed-width similarity: `available_experimental`, disabled from the public
+  planner;
+- native observation/watermark/coalescer: `available_experimental`; portable
+  coalescer plus macOS FSEvents exist, but the reported watermark is volatile
+  and Windows/Linux adapters are absent;
+- bounded status subscription: `negotiating`;
+- authenticated framed local transport: `deferred`;
+- `ORC-LIF-001`, `ORC-ENG-001`, and `ORC-ENG-002`: `negotiating`;
+- `ORC-ENG-003`: `unavailable`.
+
+This list is intentionally honest enough for Frontend/Orchestrator to disable
+or annotate controls without treating absent work as an empty queue or healthy
+production service.
+
+### Native control seam requested from Orchestrator
+
+The engine proposes system service adapters as platform-specific projections:
+launchd plus separated Unix sockets on macOS, SCM plus ACL-separated named
+pipes on Windows, and systemd plus separated `AF_UNIX` sockets on Linux. These
+remain **CANDIDATE** until install/update/uninstall, peer authentication,
+crash-loop, deadline, endpoint-replacement, and native filesystem fixtures
+pass. Wine and Lima remain compatibility oracles, not native durability or
+service-supervisor evidence.
+
+Orchestrator reconciliation is requested for:
+
+1. envelope and terminal mapping for `STALE_CONFIGURATION`;
+2. authoritative policy revision/capability evidence at apply and manifest
+   commit;
+3. instance identity/discovery and supervisor lifecycle mapping;
+4. bounded status replay/resynchronization without a durable event journal;
+5. query/admin authority separation and framed transport limits;
+6. capability state/reason projection to Frontend controls.
+
+Source locators: `api/service.go`, `api/types.go`,
+`internal/service/lifecycle.go`, `internal/service/service.go`,
+`internal/transport/jsonl.go`, and
+`docs/SERVICE_LIFECYCLE_AND_CONFIGURATION.md`. Conformance locators:
+`internal/service/lifecycle_test.go` and
+`internal/transport/jsonl_test.go`.
+
+## Engine tiered-publication reply 004
+
+Status: **project reply recorded 2026-08-05; isolated candidate semantics
+observed; live contract admission remains negotiating**.
+
+The engine now has a checked, isolated `TIERED.0`/`TIERED.1` experiment for an
+authenticated base plus ordered delta/index pairs. This is not a request for
+Orchestrator to consume storage filenames or Go representations. The proposed
+cross-project semantics are:
+
+```text
+committed exact generation {
+  root policy identity,
+  generation,
+  catalogue digest,
+  component health,
+  source observation watermark (still open)
+}
+
+component health = checked | rebuildable_degraded | unavailable
+recovery selection = newest_complete | previous_complete | none
+```
+
+**OBSERVED:** logical and subprocess interruption, partial manifest write,
+corrupt manifest, corrupt/rebuilt sidecar, newer schema, cancellation, and
+pin-aware reclamation tests select one complete exact generation or fail
+closed. The isolated manifest binds root, base, ordered run chain, exact target
+digest, live length, change count, and index bytes.
+
+**GIVEN:** exact source records remain authoritative. A missing disposable
+index is `rebuildable_degraded`, not an empty exact result and not corruption of
+the filesystem. If no complete manifest validates, availability is
+`unavailable`; the engine must not assemble a plausible mixed chain.
+
+**UNRESOLVED:** live manifest schema/ADR, root-policy revision, observation
+watermark, component-level degradation projection, manifest-byte accounting,
+quarantine integration, startup status, and authority for repair/rebuild.
+Until reconciled, `delta publication` remains `available_experimental` and the
+public service continues to use full checked generations.
+
+Source locators: `internal/generation/tiered_manifest_candidate.go`,
+`internal/generation/tiered_manifest_candidate_test.go`, and
+`results/M2_TIERED_MANIFEST_RECOVERY_005.md`.
+
+## Engine background-currentness reply 005
+
+Status: **project reply recorded 2026-08-05; macOS/portable experimental
+semantics observed; committed-currentness contract remains negotiating**.
+
+The engine now proposes these representation-free status meanings:
+
+```text
+observation state =
+  manual_reconcile |
+  baseline_required |
+  reconciling |
+  catching_up |
+  current_volatile |
+  observation_unavailable
+
+observation cursor = (adapter_source, adapter_epoch, opaque_ordered_position)
+current_volatile = exact scan reconciled through observed cursor in this process
+committed_current = exact generation and cursor authenticated by one manifest
+```
+
+**OBSERVED:** status projects background activity, whether backlog is known,
+pending count/oldest age, gap state, adapter source/epoch, observed position,
+reconciled position, and `watermark_durable`. The portable coalescer and macOS
+FSEvents adapter converge through duplicates, sparse positions, reported or
+detected gaps, bounded overflow, root invalidation, event storms, and arrivals
+during a scan. Adapter stop makes backlog unknown. Queries name stale roots
+until reconciliation catches up.
+
+**GIVEN:** `current_volatile` may not be projected as committed currentness.
+Every adapter start currently forces a full baseline because `MANIFEST.*` does
+not bind the cursor. The engine added no cursor sidecar, per-event journal, or
+durable status log.
+
+**MEASURED:** on native macOS/APFS, two retained 50 ms FSEvents / 100 ms
+coalescer-age repetitions measured 163.281-163.404 ms p50 and
+173.712-175.957 ms p95 across 32 sequential event-to-current cycles. A
+4,096-write/256-path storm converged in 441.467-467.930 ms with three to four
+full-generation publications; a two-second quiet interval made zero
+application durable writes. See `results/M4_BACKGROUND_CURRENTNESS_001.md`
+for limitations and the retained rejected 20-publication tuning.
+
+Orchestrator reconciliation is requested for:
+
+1. whether the status names above enter `ORC-ENG-003` snapshots/events or map
+   to a smaller shared enum;
+2. the atomic manifest fields and acknowledgement boundary for
+   `committed_current` (cursor, root-policy revision, generation, schema, and
+   component digests);
+3. supervisor policy when observation is unavailable but a checked stale
+   generation remains queryable;
+4. ownership of battery/power modes and the bounded policy values supplied to
+   the engine.
+
+Source locators: `api/service.go`, `internal/observation`,
+`internal/observation/fsevents`, `internal/service/background.go`, and
+`results/M4_BACKGROUND_CURRENTNESS_001.md`.

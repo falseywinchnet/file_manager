@@ -108,6 +108,128 @@ func TestInvalidParamsAreNamedProtocolErrors(t *testing.T) {
 	}
 }
 
+func TestCanonicalLifecycleAndConfigurationProjection(t *testing.T) {
+	guard, err := sandbox.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := service.New(guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := []Request{
+		{ID: "version", Method: "engine.version"},
+		{ID: "status", Method: "engine.status"},
+		{ID: "configuration", Method: "engine.configuration_get"},
+		{ID: "shutdown", Method: "engine.shutdown"},
+	}
+	var input bytes.Buffer
+	for _, request := range requests {
+		if err := json.NewEncoder(&input).Encode(request); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var output bytes.Buffer
+	if err := Serve(context.Background(), &input, &output, engine); err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(&output)
+	responses := make(map[string]json.RawMessage, len(requests))
+	for range requests {
+		var response decodedResponse
+		if err := decoder.Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Error != nil {
+			t.Fatalf("canonical response %q error=%+v", response.ID, response.Error)
+		}
+		responses[response.ID] = response.Result
+	}
+	var version api.VersionInfo
+	if err := json.Unmarshal(responses["version"], &version); err != nil {
+		t.Fatal(err)
+	}
+	var status api.Status
+	if err := json.Unmarshal(responses["status"], &status); err != nil {
+		t.Fatal(err)
+	}
+	var configuration api.EffectiveConfiguration
+	if err := json.Unmarshal(responses["configuration"], &configuration); err != nil {
+		t.Fatal(err)
+	}
+	var stopped api.LifecycleStatus
+	if err := json.Unmarshal(responses["shutdown"], &stopped); err != nil {
+		t.Fatal(err)
+	}
+	if version.InstanceID == "" || version.InstanceID != status.Lifecycle.InstanceID || stopped.InstanceID != version.InstanceID {
+		t.Fatalf("instance identity mismatch: version=%+v status=%+v stopped=%+v", version, status.Lifecycle, stopped)
+	}
+	if status.Lifecycle.State != api.LifecycleReady || stopped.State != api.LifecycleStopped {
+		t.Fatalf("lifecycle status=%+v stopped=%+v", status.Lifecycle, stopped)
+	}
+	if configuration.Schema != api.EngineConfigurationSchema || configuration.Digest == "" || configuration.IngestionMode != "manual_reconcile" {
+		t.Fatalf("effective configuration=%+v", configuration)
+	}
+}
+
+func TestCanonicalRootApplyRequiresCurrentConfigurationDigest(t *testing.T) {
+	sandboxPath := t.TempDir()
+	firstPath := filepath.Join(sandboxPath, "first")
+	secondPath := filepath.Join(sandboxPath, "second")
+	for _, path := range []string{firstPath, secondPath} {
+		if err := os.Mkdir(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	guard, err := sandbox.New(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := service.New(guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer engine.Close()
+	firstRoots := []api.RootSpec{{ID: "first", Path: firstPath}}
+	secondRoots := []api.RootSpec{{ID: "second", Path: secondPath}}
+
+	planResponse, stop := dispatch(context.Background(), engine, Request{
+		ID: "plan", Method: "engine.root_plan", Params: mustJSON(t, rootParams{Roots: firstRoots}),
+	})
+	if stop || planResponse.Error != nil {
+		t.Fatalf("plan response=%+v stop=%v", planResponse, stop)
+	}
+	plan, ok := planResponse.Result.(api.RootPlan)
+	if !ok || plan.CurrentConfigurationDigest == "" {
+		t.Fatalf("canonical plan=%+v", planResponse.Result)
+	}
+
+	missing, stop := dispatch(context.Background(), engine, Request{
+		ID: "missing", Method: "engine.root_apply", Params: mustJSON(t, rootParams{Roots: firstRoots}),
+	})
+	if stop || missing.Error == nil || missing.Error.Code != api.ErrorInvalidRequest {
+		t.Fatalf("missing digest response=%+v stop=%v", missing, stop)
+	}
+	applied, stop := dispatch(context.Background(), engine, Request{
+		ID: "apply", Method: "engine.root_apply",
+		Params: mustJSON(t, rootParams{Roots: firstRoots, ExpectedConfigurationDigest: plan.CurrentConfigurationDigest}),
+	})
+	if stop || applied.Error != nil {
+		t.Fatalf("apply response=%+v stop=%v", applied, stop)
+	}
+	stale, stop := dispatch(context.Background(), engine, Request{
+		ID: "stale", Method: "engine.root_apply",
+		Params: mustJSON(t, rootParams{Roots: secondRoots, ExpectedConfigurationDigest: plan.CurrentConfigurationDigest}),
+	})
+	if stop || stale.Error == nil || stale.Error.Code != api.ErrorStaleConfiguration {
+		t.Fatalf("stale response=%+v stop=%v", stale, stop)
+	}
+	configuration := engine.Configuration()
+	if len(configuration.RootPolicy) != 1 || configuration.RootPolicy[0].ID != "first" {
+		t.Fatalf("stale canonical apply changed state: %+v", configuration)
+	}
+}
+
 func mustJSON(t *testing.T, value any) json.RawMessage {
 	t.Helper()
 	encoded, err := json.Marshal(value)

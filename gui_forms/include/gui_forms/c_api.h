@@ -28,6 +28,9 @@ extern "C" {
 #define GF_ABI_VERSION_0_5 UINT32_C(0x00000005)
 #define GF_ABI_VERSION_0_6 UINT32_C(0x00000006)
 #define GF_ABI_VERSION_0_7 UINT32_C(0x00000007)
+#define GF_ABI_VERSION_0_8 UINT32_C(0x00000008)
+#define GF_ABI_VERSION_0_9 UINT32_C(0x00000009)
+#define GF_ABI_VERSION_0_10 UINT32_C(0x0000000a)
 
 typedef struct gf_handle {
     uint32_t slot;
@@ -76,7 +79,12 @@ typedef enum gf_event_kind {
     GF_EVENT_MOUSE_UP = 7,
     GF_EVENT_MOUSE_WHEEL = 8,
     GF_EVENT_MOUSE_ENTER = 9,
-    GF_EVENT_MOUSE_LEAVE = 10
+    GF_EVENT_MOUSE_LEAVE = 10,
+    GF_EVENT_KEY_DOWN = 11,
+    GF_EVENT_KEY_UP = 12,
+    GF_EVENT_TEXT_INPUT = 13,
+    GF_EVENT_RANGE_VALUE_CHANGED = 14,
+    GF_EVENT_RANGE_SCROLL = 15
 } gf_event_kind;
 
 typedef enum gf_event_callback_result {
@@ -121,6 +129,18 @@ typedef enum gf_window_run_flag {
     GF_WINDOW_RUN_POPUP = 1 << 3
 } gf_window_run_flag;
 
+typedef enum gf_path_dialog_kind {
+    GF_PATH_DIALOG_OPEN_FILE = 1,
+    GF_PATH_DIALOG_SAVE_FILE = 2,
+    GF_PATH_DIALOG_SELECT_FOLDER = 3
+} gf_path_dialog_kind;
+
+typedef enum gf_path_dialog_flag {
+    GF_PATH_DIALOG_DEFAULT = 0,
+    GF_PATH_DIALOG_ALLOW_MULTIPLE = 1 << 0,
+    GF_PATH_DIALOG_CONFIRM_OVERWRITE = 1 << 1
+} gf_path_dialog_flag;
+
 typedef void (*gf_event_callback)(gf_handle sender, uint32_t event_kind, void* context);
 typedef uint32_t (*gf_event_callback_v2)(gf_handle sender,
                                          uint32_t event_kind,
@@ -133,6 +153,18 @@ typedef uint32_t (*gf_pointer_callback)(gf_handle sender,
                                         double wheel_delta,
                                         uint32_t button,
                                         void* context);
+typedef uint32_t (*gf_key_callback)(gf_handle sender,
+                                    uint32_t event_kind,
+                                    uint32_t physical_key,
+                                    uint32_t modifiers,
+                                    uint32_t repeat,
+                                    void* context);
+typedef uint32_t (*gf_text_callback)(gf_handle sender,
+                                     gf_string_view text,
+                                     uint32_t composing,
+                                     int32_t replacement_start,
+                                     int32_t replacement_length,
+                                     void* context);
 
 typedef struct gf_error_view {
     uint32_t code;
@@ -222,6 +254,45 @@ typedef struct gf_api_v0 {
     /* ABI 0.7 additions: native/managed checked-state projection. */
     gf_result (*set_check_state)(gf_handle control, uint32_t check_state);
     gf_result (*get_check_state)(gf_handle control, uint32_t* check_state);
+
+    /* ABI 0.8 additions: focused key and composed text delivery. */
+    gf_result (*subscribe_key)(gf_handle sender,
+                               gf_key_callback callback,
+                               void* context,
+                               gf_event_token* token);
+    gf_result (*subscribe_text)(gf_handle sender,
+                                gf_text_callback callback,
+                                void* context,
+                                gf_event_token* token);
+
+    /* ABI 0.9 additions: retained range state and explicit pointer capture. */
+    gf_result (*set_range)(gf_handle control, double minimum, double maximum);
+    gf_result (*get_range)(gf_handle control, double* minimum, double* maximum);
+    gf_result (*set_range_value)(gf_handle control, double value);
+    gf_result (*get_range_value)(gf_handle control, double* value);
+    gf_result (*set_pointer_capture)(gf_handle control, uint32_t captured);
+    gf_result (*get_pointer_capture)(gf_handle control, uint32_t* captured);
+
+    /* ABI 0.10 additions: portable common-dialog and tooltip host adapters. */
+    gf_result (*show_path_dialog)(gf_handle owner,
+                                  uint32_t kind,
+                                  gf_string_view title,
+                                  gf_string_view initial_directory,
+                                  gf_string_view suggested_name,
+                                  gf_string_view default_extension,
+                                  gf_string_view filter,
+                                  uint32_t flags,
+                                  uint32_t* accepted);
+    gf_result (*last_dialog_path)(gf_handle owner,
+                                  char* buffer,
+                                  uint64_t capacity,
+                                  uint64_t* required_size);
+    gf_result (*show_tooltip)(gf_handle owner,
+                              gf_string_view text,
+                              double x,
+                              double y,
+                              uint32_t duration_milliseconds);
+    gf_result (*hide_tooltip)(gf_handle owner);
 } gf_api_v0;
 
 /*
@@ -230,6 +301,7 @@ typedef struct gf_api_v0 {
  */
 GF_C_API_EXPORT gf_result gf_get_api_v0(uint32_t requested_version,
                                         gf_api_v0* table);
+
 
 #ifdef __cplusplus
 }

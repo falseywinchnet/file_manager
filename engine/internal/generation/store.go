@@ -30,6 +30,7 @@ var (
 	manifestMagic            = [8]byte{'F', 'M', 'M', 'A', 'N', '0', '0', '1'}
 	quarantineHighWaterMagic = [8]byte{'F', 'M', 'Q', 'H', 'W', '0', '0', '1'}
 	ErrNoGeneration          = errors.New("no committed generation")
+	ErrGenerationChanged     = errors.New("committed generation changed")
 	errInjectedWriteLimit    = errors.New("injected write limit reached")
 )
 
@@ -403,6 +404,30 @@ func (s *Store) Probe() (Head, error) {
 func (s *Store) Recover() (*Reader, error) {
 	reader, _, err := s.RecoverDetailed()
 	return reader, err
+}
+
+// PinCurrent opens a second bounded reader for the current manifest without
+// repeating the streaming integrity pass. The caller must supply metadata from
+// an already checked live reader. A concurrent publication fails closed rather
+// than returning a reader from a different exact generation.
+func (s *Store) PinCurrent(expected Metadata) (*Reader, error) {
+	if expected.Generation == 0 {
+		return nil, errors.New("nonzero expected generation is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	value, reader, err := s.probeCandidateLocked()
+	if err != nil {
+		return nil, err
+	}
+	if value.metadata.Generation != expected.Generation ||
+		value.metadata.CatalogDigest != expected.CatalogDigest ||
+		value.metadata.SegmentDigest != expected.SegmentDigest {
+		_ = reader.Close()
+		return nil, ErrGenerationChanged
+	}
+	s.pinLocked(value.segment, reader)
+	return reader, nil
 }
 
 func (s *Store) RecoverDetailed() (*Reader, RecoveryReport, error) {

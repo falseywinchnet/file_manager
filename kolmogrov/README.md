@@ -135,6 +135,37 @@ It freezes exact source-anchored atom lanes, derives the source-symbol
 certificate Jacobian, rejects low-bit atom projection, separates same-length
 rewrites from cross-length edit spans, and begins the logical posting ledger.
 
+The low-confidence retrieval/resource continuation is
+[FILENAME_RETRIEVAL_REFINEMENT_005.md](docs/FILENAME_RETRIEVAL_REFINEMENT_005.md).
+It derives minimum protected-kernel row support, implements both directions of
+the exact `n-1,n,n+1` radius-one plan, adds a matrix-free exact verifier, and
+records E11's disjoint synthetic result: two rows protect the development graph,
+four pass its candidate-tail gate, six cover the tested unseen differences, and
+the protected route still loses to the balanced control at equal held-out depth.
+
+The broader systems closure is
+[FILENAME_SYSTEM_REFINEMENT_006.md](docs/FILENAME_SYSTEM_REFINEMENT_006.md).
+It separates guard, coverage, coupled-witness, and exact-evidence roles; proves
+the arbitrary-mask posting precombination obstruction and immutable liveness
+law; and records E12's three-way result that split guards mix provenance,
+certificate support dominates late candidate tails, and the frozen tuning gate
+does not transfer.
+
+The hash-boundary continuation is
+[HISTORY_BOUND_HASH_REFINEMENT_007.md](docs/HISTORY_BOUND_HASH_REFINEMENT_007.md).
+It removes ranking from Kolmogrov's capability gate, attributes the E12 tail,
+derives a rolling complete-descendant fingerprint, binds collision-rescue
+coordinates into one tuple per deletion history, proves exact nested scale
+contraction, and records E13's generated capacity crossing. The coupled tuple
+is an experimental hash candidate, not a production selection.
+
+Engine siblings should begin with the sealed candidate guidance in
+[HISTORY_HASH_ENGINE_CONTRACT_001.md](docs/HISTORY_HASH_ENGINE_CONTRACT_001.md)
+and must carry forward
+[HISTORY_HASH_OPEN_CONCERNS_001.md](docs/HISTORY_HASH_OPEN_CONCERNS_001.md).
+The corresponding machine-readable, non-architectural guidance lives at
+[`conformance/orc_kol_001/history_hash_usage_guidance_001.json`](conformance/orc_kol_001/history_hash_usage_guidance_001.json).
+
 The first cross-project conformance seam is the **CANDIDATE**
 [ORC-KOL laboratory profile 001](docs/ORC_KOL_LAB_PROFILE_001.md), with a
 [machine-readable fixture](conformance/orc_kol_001/lab_profile_001.json). It is

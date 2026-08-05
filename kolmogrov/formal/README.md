@@ -53,6 +53,26 @@ experiment until its definitions stabilize.
 - `T-TYPED-EDIT-SEAM-1.md` — same-length secants and cross-length edit spans.
 - `T-POSTING-SUPPORT-1.md` — logical posting membership and information charge.
 - `T-SYMMETRIC-CERTIFICATE-1.md` — same-length common-descendant front index.
+- `T-PROTECTED-KERNEL-1.md` — minimum named-difference kernel avoidance,
+  least two-row obstruction, and ambient-coset row refinement.
+- `T-ONE-EDIT-VERIFIER-1.md` — exact radius-one typed verification in one scan
+  with constant auxiliary state.
+- `T-GUARD-COVERAGE-1.md` — additive guard/coverage support, recall, and the
+  least separate-address provenance obstruction.
+- `T-OCCUPANCY-QUERY-1.md` — exponential universal precombination obstruction
+  and the linear bit-sliced block survivor.
+- `T-SEGMENT-LIVENESS-1.md` — exact immutable-posting deletion through a live
+  ordinal set.
+- `T-TYPED-FILENAME-EVIDENCE-1.md` — exact post-candidate mutation evidence and
+  its relevance sufficiency boundary.
+- `T-CANDIDATE-BREAKDOWN-1.md` — exact separation of relation breadth,
+  incompatible histories, schedule omission, and projection collision.
+- `T-HISTORY-OCCUPANCY-1.md` — rolling whole-descendant fingerprints, exact
+  relation recall, coupled witness keys, and conditional length/pool capacity.
+- `T-HISTORY-SCALE-1.md` — exact coarse/fine quotient compatibility for the
+  nested history-cell tower.
+- `T-HISTORY-INFLUENCE-1.md` — mutation contribution energy, its finite-address
+  obstruction, and conditional private-history decay.
 
 All are **HYPOTHESIS** pending independent review. “Complete paper proof” in
 `PROOF_LEDGER.md` means the definitions, quantifiers, proof, exclusions, and

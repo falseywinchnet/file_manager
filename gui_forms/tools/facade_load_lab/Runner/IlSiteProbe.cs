@@ -24,6 +24,19 @@ internal static class IlSiteProbe
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static |
                                    BindingFlags.Public | BindingFlags.NonPublic |
                                    BindingFlags.DeclaredOnly;
+        if (parts[2] == "*")
+        {
+            foreach (var field in type.GetFields(flags).OrderBy(field => field.MetadataToken))
+                Console.WriteLine($"il-field={field.Name}|type:{FormatType(field.FieldType)}|static:{field.IsStatic}");
+            foreach (var property in type.GetProperties(flags).OrderBy(property => property.MetadataToken))
+                Console.WriteLine($"il-property={property.Name}|type:{FormatType(property.PropertyType)}|get:{property.GetMethod is not null}|set:{property.SetMethod is not null}");
+            foreach (var eventInfo in type.GetEvents(flags).OrderBy(eventInfo => eventInfo.MetadataToken))
+                Console.WriteLine($"il-event={eventInfo.Name}|type:{FormatType(eventInfo.EventHandlerType)}");
+            foreach (var memberMethod in type.GetConstructors(flags).Cast<MethodBase>()
+                         .Concat(type.GetMethods(flags)).OrderBy(method => method.MetadataToken))
+                Console.WriteLine($"il-method={FormatMethod(memberMethod)}|static:{memberMethod.IsStatic}");
+            return;
+        }
         var selector = parts.Length == 4 ? parts[3] : null;
         var parameterCount = int.TryParse(selector, out var parsedCount) ? parsedCount : (int?)null;
         var candidates = parts[2] == ".ctor"
@@ -159,7 +172,10 @@ internal static class IlSiteProbe
     }
 
     private static string FormatMethod(MethodBase method) =>
-        $"{method.Name}({string.Join(',', method.GetParameters().Select(parameter => parameter.ParameterType.FullName))})";
+        $"{method.Name}({string.Join(',', method.GetParameters().Select(parameter => FormatType(parameter.ParameterType)))})";
+
+    private static string FormatType(Type? type) =>
+        type?.FullName ?? type?.Name ?? "<unknown>";
 
     private static IReadOnlyDictionary<ushort, OpCode> BuildOpcodes()
     {

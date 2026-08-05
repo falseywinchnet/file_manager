@@ -62,10 +62,33 @@ bounded change run. Compaction writes one sequential replacement base and
 publishes it through the same manifest rule. Foreground query never triggers
 compaction and waits only for the short manifest exclusion.
 
-**CANDIDATE batch policy:** a bounded volatile coalescer triggers on whichever
-comes first: maximum observation age, maximum operation count, or memory
-budget. Concrete ages/counts are experiment points. A quiet engine emits no
-commit. A sustained burst writes sequential runs rather than repeatedly
+**CANDIDATE intermediate experiment:** several digest-chained runs may be
+collapsed into one net run against the same immutable base. Its first measured
+cycle was about 2.31x application bytes before manifest and replacement-base
+costs. **MEASURED negative:** repeated eight-run enforcement rose to about
+3.52x on cycle three, while replacing the full 250,000-record base at the same
+trigger also failed the named write gate. Those policies are rejected; the
+result does not reject the run format or independently paced base compaction at
+a different measured boundary.
+
+**CANDIDATE retained:** compact only completed eight-run cohorts and leave
+prior cohorts immutable. The checked disk-indexed view and checkpoint-free
+streaming compactor now measure 2.42x final and at most 2.80x cohort-boundary
+application bytes with 12.1/16.7 MB retained growth. Sidecar bytes and header
+rewrites are charged; manifest/filesystem metadata remain open. The warm
+relative exact-query p99 gate now passes. Isolated `TIERED.*` atomic manifest,
+fallback, repair, short-write, abrupt-exit, and pin-aware reclamation tests also
+pass, but the representation remains outside the live service manifest.
+
+**OBSERVED experimental batch policy:** a bounded volatile coalescer triggers
+on whichever comes first: maximum observation age, maximum operation count, or
+memory budget. The current macOS dogfood candidate uses 50 ms FSEvents latency,
+100 ms maximum age, 4,096 operations, 8,192 retained addresses, and 2 MiB per
+active coalescer buffer. A 4,096-write storm fell from 20 full-generation
+publications under the rejected 25 ms/256-operation tuning to three or four under the
+retained envelope. These are experimental full-generation control values, not
+the eventual delta/compaction policy. A quiet engine emits no commit. A
+sustained production burst must write sequential runs rather than repeatedly
 rewriting the same objects.
 
 ## Platform durability adapters
@@ -114,7 +137,10 @@ can separate application bytes from device wear.
 - Keep frequently changing delta runs separate from the mostly static base.
 - Encode each run sequentially in one pass with a bounded final header rewrite.
 - Open a candidate run lazily on its first change; a no-change reconciliation
-  performs no create, write, rename, sync, or removal.
+  performs no create, write, rename, sync, or removal. **OBSERVED:** the live
+  persistent service now suppresses publication when a complete authoritative
+  scan has the same exact catalogue digest; explicit rebuild still forces a
+  checked replacement generation.
 - Alternate small manifest slots; do not rewrite data pages in place.
 - Coalesce duplicate observations for the same exact object/path before the
   durable batch without losing rename/delete semantics.
@@ -130,9 +156,13 @@ can separate application bytes from device wear.
   larger hash solely by intuition. Admit each against the same correctness,
   write, CPU, memory, and latency workload.
 
-The future Kolmogrov “ultimate hashing” component is a versioned optional
-descriptor in a run/manifest. Its absence must not change exact identity or
-recovery. Its update cost and write amplification must pass this same program.
+Content/fragment descriptor components are independently versioned entries in
+a run/manifest. Kolmogrov-derived hashes may fill such an entry where measured
+quality and resource evidence admit them; other descriptor and lexical
+components use the same publication spine. Descriptor absence, corruption, or
+upgrade must not change exact identity or recovery. Every component's update
+cost and write amplification passes this same program; the engine does not
+organize durable publication around one similarity algorithm.
 
 ## Power-loss and disk-full campaign
 
@@ -169,6 +199,18 @@ batching—not weaker integrity—is the primary SSD-wear control.
   `internal/generation/segment.go`, `internal/generation/syncdir_unix.go`, and
   `internal/generation/syncdir_windows.go`.
 - Existing logical evidence: `results/M2_DURABILITY_002.md`.
+- Repeated-cycle negative evidence:
+  `results/M2_REPEATED_CONSOLIDATION_002.md`.
+- Tiered-cohort evidence:
+  `results/M2_TIERED_COHORT_COMPACTION_003.md`.
+- Disk-indexed/streaming tiered evidence:
+  `results/M2_TIERED_INDEXED_COMPACTION_004.md`.
+- Isolated tiered manifest/recovery evidence:
+  `results/M2_TIERED_MANIFEST_RECOVERY_005.md`.
+- Service no-op/drain evidence:
+  `results/M0_SERVICE_LIFECYCLE_DOGFOOD_001.md`.
+- Native coalescing/currentness evidence:
+  `results/M4_BACKGROUND_CURRENTNESS_001.md`.
 - Delta workload and gates: `docs/M2_DELTA_COMPACTION_SLICE.md`.
 - Apple: <https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html>
   and <https://developer.apple.com/documentation/xcode/reducing-disk-writes>.

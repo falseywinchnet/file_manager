@@ -1,6 +1,7 @@
 # Engine API contract
 
-Status: **v0 scaffold; dual JSON transport direction DECIDED**.
+Status: **v0 scaffold; dual JSON transport direction DECIDED; development
+lifecycle/configuration projection OBSERVED**.
 
 The canonical contract is the Go package `api`. Transport encodings project that
 model; they do not define storage.
@@ -29,9 +30,16 @@ ignored within a protocol major version; unknown methods return a named error.
 
 ### Always available
 
-- `version` — protocol, engine build, schema family, feature flags.
-- `status` — ready/degraded/rebuilding, roots, generations, backlog, warnings.
-- `shutdown` — clean supervised shutdown; no source-file operation.
+- `engine.version` — protocol, engine build, process instance, feature flags,
+  and enumerated capability state.
+- `engine.status` — lifecycle/work state, enacted configuration, roots,
+  generations, backlog knowledge, capability state, and warnings.
+- `engine.configuration_get` — enacted service configuration and stable digest.
+- `engine.shutdown` — cancel, drain, and close one process instance; no
+  source-file operation. Start/restart belong to the native supervisor.
+
+The unqualified names remain development/fixture aliases during v0. Canonical
+cross-project names use the `engine.*` family.
 
 ### Query surface
 
@@ -44,8 +52,10 @@ ignored within a protocol major version; unknown methods return a named error.
 
 ### Administrative projection surface
 
-- `root.plan` — validate an approved-root configuration without applying it.
-- `root.apply` — apply an already user-approved root policy to the projection.
+- `engine.root_plan` — validate an approved-root configuration without
+  applying it and return current/proposed configuration digests.
+- `engine.root_apply` — compare the required expected configuration digest and
+  apply an already user-approved root policy to the projection.
 - `scan.reconcile` — observe and reconcile an approved root.
 - `integrity.check` — verify pages, manifests, postings, ownership, and anchors.
 - `projection.rebuild` — rebuild an erasable projection while preserving the last
@@ -53,6 +63,19 @@ ignored within a protocol major version; unknown methods return a named error.
 
 Administrative calls mutate only engine state. They do not create, rename,
 replace, or delete source files.
+
+The experimental M4 status projection distinguishes `manual_reconcile`,
+`baseline_required`, `reconciling`, `catching_up`, `current_volatile`, and
+`observation_unavailable`. It reports adapter source/epoch, observed and
+reconciled positions, pending observation count/age, gap state, and whether the
+watermark is durable. `backlog_known=false` is not an empty queue. Until the
+cursor is committed in the same manifest as exact components,
+`watermark_durable=false` and every adapter start performs an authoritative
+baseline scan.
+
+See `SERVICE_LIFECYCLE_AND_CONFIGURATION.md` for state transitions,
+configuration authority, native supervisor candidates, and the complete
+capability ledger.
 
 ## Result contract
 
@@ -76,8 +99,12 @@ Status: **OBSERVED in the reference implementation; not the complete v0 query
 language**.
 
 - `root.plan` canonicalizes and validates existing directories beneath the
-  mandatory development sandbox without changing service state.
-- `root.apply` atomically publishes approved-root policy. A policy change marks
+  mandatory development sandbox without changing service state. It now also
+  reports current/proposed effective-configuration digests and change state.
+- canonical `engine.root_apply` rejects a missing expected digest and a stale
+  plan with `STALE_CONFIGURATION`. The development `root.apply` alias remains
+  unconditional and is not an authorization or cross-project contract.
+- root apply atomically publishes approved-root policy in process memory. A policy change marks
   reused projections stale until reconciliation.
 - `scan.reconcile` performs a metadata-only full scan, prunes more-specific
   child roots, and publishes one immutable in-memory reader generation.
@@ -110,6 +137,9 @@ Status: **OBSERVED candidate behavior; API v0 remains unfrozen**.
 - Reconciliation publishes a versioned immutable segment through two checksummed
   manifest slots. On restart, full checked recovery selects the newest valid
   pair or reports fallback while serving the last valid generation.
+- A complete reconciliation whose exact catalogue digest is unchanged returns
+  the current generation with `published=false` and performs no durable
+  publication. Explicit projection rebuild remains a forced checked publish.
 - Exact query, inspect, ranking evidence, and generation-bound cursors use the
   same semantic API as the M1 reference. Reopening does not reconstruct the
   complete catalogue on the Go heap.
@@ -117,6 +147,10 @@ Status: **OBSERVED candidate behavior; API v0 remains unfrozen**.
   generation-bound window. Filters, child-root exclusions, alternate scopes,
   and alternate sorts retain exhaustive bounded validation.
 - `version` advertises `immutable-generation-v1` only in persistent mode.
+- `engine.version`, `engine.status`, `engine.configuration_get`, and
+  `engine.shutdown` expose process identity, drain state, capability inventory,
+  and effective configuration. A supervisor-style restart uses a new instance
+  identity while reopening the same checked generation.
 
 `projection.rebuild` performs a full authoritative scan through the same atomic
 publication path and remains reachable when startup has no valid segment but a
@@ -126,7 +160,7 @@ rejected engine-owned artifacts after a valid fallback or replacement exists;
 warning. When both manifests are unreadable, no root is inferred: an approved
 root must be reapplied before `projection.rebuild` can run. The candidate does
 not yet expose a quarantine administration method, migration execution,
-background validation state, or production framed IPC. Its storage layout is
+committed background-watermark state, or production framed IPC. Its storage layout is
 never a public API or Orchestrator ABI.
 
 ## Pagination and motion
@@ -153,6 +187,7 @@ Errors are machine-readable and include at least:
 - provider timeout/failure;
 - protocol/schema mismatch;
 - method unavailable while rebuilding.
+- stale configuration precondition.
 
 No error is encoded as an empty successful result.
 

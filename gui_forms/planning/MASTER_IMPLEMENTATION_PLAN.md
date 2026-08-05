@@ -71,12 +71,18 @@ the lower `gui_forms/` build working without reading File Manager sources.
   incompatibilities; alternate historical orders are not supported. DML
   preserves authored initialization assignment order (ADR-003).
 - Accessibility, tooltips, guidance, automation, and AI-readable inspection use
-  an optional semantic-hook graph. Controls can exist without hook metadata.
+  a retained semantic-hook graph. Controls can exist without authored hook
+  metadata, but supported stock controls provide default semantic adapters.
+  File Manager requires native publication and has no accessibility off switch.
 - Ordinary controls use GUI.Forms-authored material recipes and named
   foreground/background roles. A style-only backplane may be composited below
   controls but cannot intercept input or impersonate controls.
-- Ordinary text uses platform `system-ui`. Control labels prefer the supplied
-  Latin-only Portmouth Rapids face and fall back per uncovered cluster.
+- **GIVEN owner revision:** HarfBuzz shapes and FreeType loads, hints, and
+  rasterizes GUI.Forms text on every host. Product UI fonts come from pinned
+  bundled packs rather than host-installed `system-ui`. Control labels prefer
+  the supplied Latin-only Portsmouth Rapids face; a separately selected bundled
+  humanist face serves body/content roles; uncovered clusters resolve through
+  bounded bundled fallback packs.
 - Theme and language replacements always fall back safely to built-ins.
 - The lower project builds GUI.Forms and its demonstrations only and never
   reaches upward into File Manager.
@@ -244,10 +250,11 @@ immediate-mode GUI. Skia and platform objects remain private adapters.
 The authoritative retired compatibility specimen floor is 353 drawing rows: 307 required static-IL rows
 across 34 types and 46 deferred metadata-only rows. File Manager's broader
 vector-icon, thumbnail, preview, color, text/glyph, compositing, and diagnostic
-needs remain a separate candidate oversight ledger so the retired compatibility specimen closure number
-cannot hide broader product work. Exact families, status vocabulary, platform
-surface-lease boundary, and M11e–M11h stages are in
-`planning/GUI_DRAWING_REVISION_PLAN.md`.
+needs remain a separate consumer-promotion ledger so the retired compatibility specimen closure number
+cannot hide broader product work. Named File Manager workloads now promote the
+minimums recorded there; exact API spelling, renderer realization, and limits
+remain gated. Exact families, status vocabulary, platform surface-lease
+boundary, and M11e–M11h stages are in `planning/GUI_DRAWING_REVISION_PLAN.md`.
 
 ### 4.2 Host boundary
 
@@ -255,10 +262,11 @@ surface-lease boundary, and M11e–M11h stages are in
 GUI.Forms-owned service protocol. The protocol covers lifecycle, scheduled
 wakeup/dispatch, monitors/scaling/coordinates/occlusion, normalized input,
 cursor/capture, IME sessions and candidate geometry, clipboard, typed drag/drop,
-dialogs/menus, font discovery/fallback, optional accessibility publication,
-session/power/display changes, and native surface handles required for isolated
-composition. The deterministic headless implementation is the behavioral
-reference.
+dialogs/menus, text-raster/accommodation preference signals, native
+accessibility publication, session/power/display changes, and native surface
+handles required for isolated composition. Bundled GUI.Forms packs, not the
+host, own product font selection/fallback. The deterministic headless
+implementation is the behavioral reference.
 
 Gain: every desktop hook remains reachable and portable code stays testable.
 Loss: four real adapters, conformance drift, and honest Wayland/X11 differences.
@@ -353,37 +361,39 @@ are never interchangeable integers. The editor stores text, selection,
 composition, undo, paragraph direction, attributes, and line index independently
 of the renderer.
 
-**CANDIDATE T-HB, recommended for test:** HarfBuzz shapes script/language/
-direction runs; platform adapters discover fonts and fallback faces; the private
-renderer rasterizes positioned glyph runs. Alternatives include platform
-shapers behind a common run contract or another portable shaping stack. Gain of
-HarfBuzz: cross-platform shaping behavior and cacheable shape plans. Loss:
-dependency/Unicode-data policy and possible metric differences from platform
-editing conventions.
+**GIVEN T-HB/FT owner direction:** HarfBuzz shapes script/language/direction
+runs on every host. FreeType is the common glyph loader, hinter, and rasterizer.
+The renderer consumes positioned glyph runs and glyph masks without exposing
+either dependency in public controls or the ABI. Platform text stacks remain
+comparison or host-input references, not product font/shaping authority.
 
-Portmouth Rapids selection is by typography role and cluster coverage; content
-uses `system-ui`. Missing face/assets always resolve to a labelled system
-fallback. No missing cluster changes the whole control's family.
+Portsmouth Rapids selection is by typography role and cluster coverage. A
+pinned bundled humanist face serves content/body roles. Missing coverage
+resolves per indivisible cluster through a bounded bundled fallback order. A
+missing face or script pack is a labelled resource/coverage fault; GUI.Forms
+does not silently change the whole control family or search arbitrary host
+fonts.
 
 Staged delivery is allowed: Latin/dead-key editing first, then grapheme-safe
 selection/clipboard/undo, bidi, and representative multi-stage CJK IMEs. The
 data model and ABI may not encode Latin-only assumptions at any stage.
 
-**Gate T1:** approve shaping stack after a corpus of Latin, combining marks,
+**Gate T1:** validate the owner-selected stack after a corpus of Latin, combining marks,
 emoji sequences, Arabic/Hebrew bidi, Indic scripts, fallback runs, malformed
 UTF-8 rejection, and scale/font changes. **Gate T2:** platform editor tests cover
 composition updates, replacement ranges, candidate positioning, commit/cancel,
 selection, navigation, clipboard, undo/redo, password policy, multiline, and
 accessible text ranges.
 
-### 4.7 Optional semantic hooks, accessibility, help, and inspection
+### 4.7 Semantic graph, accessibility, help, and inspection
 
 A semantic node attaches by stable control identity and may state role, name,
 description, value/state, actions, relationships, logical order, bounds policy,
-text ranges, tooltip, and help-overlay anchors. Absence is valid. Platform
+text ranges, tooltip, and help-overlay anchors. Absence of authored augmentation
+is valid; supported stock controls still project default semantics. Platform
 publishers, test automation, tooltips, and the greaseboard help overlay consume
-the graph independently; disabling one consumer does not erase the graph or
-disable another.
+the graph independently; disabling one optional consumer does not erase the
+graph or disable native accessibility publication.
 
 The help overlay is a separate per-panel display plane. It may dim, highlight,
 draw arrows, and label anchors but does not rebuild the control plane or receive
@@ -391,8 +401,9 @@ ordinary application input.
 
 **Gate S1:** headless semantic snapshots plus VoiceOver, UI Automation, and
 AT-SPI tests for roles, focus, actions, selection, values, virtual children,
-geometry, and text ranges. A release policy may choose accessibility as a
-secondary system, but the host and control architecture must not prevent it.
+geometry, and text ranges. File Manager requires this gate; another independent
+consumer may omit a publisher package, but GUI.Forms stock semantics remain the
+same execution path.
 
 ### 4.8 Style, theme, resources, localization, and configuration
 
@@ -411,7 +422,7 @@ removed. External failure falls back per entry, not by blanking the UI.
 Language controls retain message IDs and typed arguments. A replacement entry
 must match the built-in argument signature; a bounded built-in formatter handles
 plural/select forms. Locale resolution and live-vs-restart replacement remain
-decision gates. Portmouth fallback occurs per cluster.
+decision gates. Bundled-face fallback occurs per cluster.
 
 Mutable configuration is separate from immutable packs and high-churn session
 state. **CANDIDATE:** a schema-validated flat namespaced textual map with atomic
@@ -559,6 +570,11 @@ Deliver:
 - PNG resource registry with memory/dimension/color bounds and fuzz target;
 - Skia adapter migrated to chunks, renderer benchmark harness, symbol/dependency
   audit, and at least one credible comparison lane.
+- File Manager-promoted GUI.Drawing work from
+  `FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`: path/curve geometry, stroke
+  semantics, transforms/clips, gradient/texture/opacity-mask paints, nine-patch
+  materials, isolated alpha groups, bounded shadows, positioned glyph runs,
+  owned CPU images, and command inspection.
 
 Exit: 1/10/100-percent damage and 30 Hz bitmap-band workloads record complete
 metrics; idle renders remain zero; renderer ADR may be accepted or Skia remains
@@ -576,9 +592,13 @@ Deliver:
 - portable host service interface and headless reference implementation;
 - AppKit lifecycle, monitor/scale, occlusion, scheduling, pointer/keyboard,
   capture/cursors, clipboard, typed drag/drop, dialogs, menus per decided policy,
-  font discovery, composition geometry, optional VoiceOver publisher, and clean
-  shutdown;
+  text-raster/accommodation preferences, composition geometry, the VoiceOver
+  publisher seam/probe, and clean shutdown;
 - host conformance/event replay suite and platform capability reporting.
+- File Manager host extensions: custom-chrome drag/resize/system zones,
+  key/secondary-participating/deactivated state, outbound drag-source sessions,
+  cross-window drag proximity, typed clipboard ownership, host accommodation
+  signals, and a bounded semantic sound-cue presentation service or callback.
 
 Exit: AppKit appears only under `src/host/macos`; the gallery and laboratories
   run exclusively through the protocol; nested modal and IME traces pass.
@@ -609,7 +629,8 @@ Progress through M3e:
   Headless is the payload/order oracle and AppKit translates pasteboard values
   only inside its adapter. The Gallery collection is a live retained consumer.
 - **OPEN:** outbound drag-source initiation, owned-form/sheet integration and
-  native nested-modal focus restoration, menu policy, font discovery, complete IME geometry,
+  native nested-modal focus restoration, menu policy, font preference/profile
+  mapping, complete IME geometry,
   VoiceOver publication, Windows/Linux adapters, and session/power events. Gate
   H1 remains open.
 
@@ -622,7 +643,11 @@ Deliver in sub-slices:
 2. Latin/dead-key single-line editor with caret, selection, clipboard, undo;
 3. grapheme navigation, multiline layout, password/read-only modes;
 4. bidi, representative complex scripts, multi-stage IME, accessible ranges;
-5. Portmouth Rapids pack integration and per-cluster system fallback.
+5. HarfBuzz shaping plus FreeType loading/hinting/rasterization;
+6. Portsmouth Rapids control pack plus the selected bundled body face and
+   bounded per-cluster script fallback packs;
+7. pinned font/raster profile, exact metric generations, parser-module audit,
+   corpus/fuzzing, and scale/antialias profile tests.
 
 Progress through the M4b grapheme/shaping-seam slice:
 
@@ -645,10 +670,10 @@ Progress through the M4b grapheme/shaping-seam slice:
 - **MEASURED:** all 766 official Unicode grapheme conformance cases pass;
   renderer-free strict and sanitizer builds pass; static MinGW PE32+ focused
   tests also pass under Wine.
-- **CANDIDATE:** `TextShaper` and `FontFallbackResolver` admit backend
-  experiments without selecting HarfBuzz, platform shapers, font discovery, or
-  a cache policy.
-- **OPEN:** actual shaping/fallback, script/bidi analysis, line layout, glyph
+- **GIVEN owner direction:** `TextShaper` and `FontFallbackResolver` will be
+  backed by HarfBuzz, FreeType, and bundled font packs; exact adapters, cache,
+  subset/coverage, and antialias profiles remain implementation gates.
+- **OPEN:** actual shaping/fallback implementation, script/bidi analysis, line layout, glyph
   cache, selection/clipboard/undo, IME, accessible text ranges, editor controls,
   and the M4 exit gate. Evidence: `experiments/M4A_UNICODE_TEXT_STORE.md` and
   `experiments/M4B_GRAPHEME_SHAPING_SEAM.md`.
@@ -666,6 +691,10 @@ Deliver:
 - read-barrier/update-scope contract and pass diagnostics;
 - virtual item realization/recycling with stable model IDs and semantic virtual
   children.
+- File Manager extensions: authored priority collapse, a separate large-text
+  collapse order, one-scroll-plane inspector composition, variable-height
+  virtual rows, stable scroll anchoring, drag autoscroll/hover-expand, and
+  anchored overlay placement.
 
 Exit: golden geometry corpus passes across scale/font/platform reference hosts;
 million-item list/tree fixtures keep realized controls, layout, and paint bounded
@@ -682,6 +711,9 @@ Deliver reusable public controls, not demo node switches:
 - timer, tooltip/help/error provider, image list, command model;
 - property metadata, initialization scopes, owner draw, style/semantic hooks,
   keyboard/mnemonic/default/cancel behavior.
+- File Manager-promoted primitives: disclosure/expander, collapsible pane,
+  command presentation binding, rich factual tooltip, popup ownership, text
+  adornment slots, inline validation, and lightweight property name/value rows.
 
 Exit: gallery is built solely from reusable controls; basic control behavior and
 event traces pass through headless, AppKit, C++, and early C ABI lanes.
@@ -763,16 +795,23 @@ Deliver in independent packages/slices:
 - SDR custom-control porting laboratory. GUI.Forms-native docking or map
   equivalents remain separately admitted parent-use candidates, not M7 or retired compatibility specimen
   bridge exit requirements.
+- File Manager product lane: promote TreeView, ListView/object-view modes,
+  SplitContainer, menu/context/status models, and the required custom-control
+  substrate; add first-party command shelf/ribbon composition, segmented
+  breadcrumb/editor, suggestion popup, anchored recent-path overlay,
+  lightweight PropertyList, preview-host seam, expandable correspondence rows,
+  in-window toast layer, operation drawer, and hierarchical progress list.
 
 Exit: each matrix row has behavior tests; calendar grid edit lifecycle and
 SDR-style theme/invalidation/plugin-subtree fixtures pass. Legacy/browser/
 printing/MDI families remain explicit exclusions or separately approved work.
 
-### M8 — semantic hooks, accessibility, help, and automation
+### M8 — semantic graph, accessibility, help, and automation
 
 Deliver:
 
-- optional semantic graph and stable snapshot/inspection protocol;
+- retained semantic graph, default stock adapters, and stable snapshot/
+  inspection protocol;
 - tooltip and keyboard-help consumers;
 - per-panel greaseboard overlay plane;
 - VoiceOver, UI Automation, and AT-SPI publishers;
@@ -780,8 +819,10 @@ Deliver:
 - keyboard-only and assistive-technology conformance suites.
 
 Exit: every supported stock control has a tested default semantic adapter, while
-controls still instantiate without metadata. Disabling accessibility does not
-disable tooltips/help/inspection.
+controls still instantiate without authored metadata. Native accessibility
+publication is always available for File Manager and is not a user-facing
+toggle. Disabling tooltips/help/inspection does not disable accessibility or
+erase the semantic graph.
 
 ### M9 — style, assets, localization, and configuration
 
@@ -795,6 +836,9 @@ Deliver:
   non-color state cues;
 - typed message formatter/catalogue and live/restart language policy;
 - schema-validated atomic runtime configuration and separate session state.
+- pinned built-in Portsmouth/body/fallback font packs with coverage and license
+  manifests; size-specific icon/precompiled-vector resources; bounded
+  transition recipes; and tiny audited sound-cue assets/policy.
 
 Exit: corrupt/partial packs cannot make the interface unusable; reproducible
 pack output and fallback/fuzz suites pass; theme/language switch is one bounded
@@ -812,6 +856,12 @@ are proven.
 Exit: all shipped examples originate from DML, generated files are reproducible
 and marked, production needs no source parser, and round-trip tests preserve
 authored intent.
+
+File Manager schema coverage includes collapse priority, command binding,
+hosted command items, popup ownership, breadcrumb segments, virtual item-model
+bindings, property rows, semantic task order, material roles, transition/sound
+cue IDs, and declared invalidation. These are reusable schema concepts, not
+serialized filesystem policy.
 
 ### M11 — ABI freeze and supported language bridges
 
@@ -941,6 +991,29 @@ painting, native Portsmouth label projection, and close without terminating the
 main loop. Custom-painted labels are input-transparent, and preferred-size /
 AutoSize table propagation now exposes retired compatibility specimen's previously zero-height source
 URI row and action buttons inside DockPanelSuite. Evidence:
+`experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
+
+**MEASURED CONTINUATION:** experimental ABI 0.10 closes the previously fake-only
+managed file/folder route and the nonvisual tooltip route. Windows/Wine now
+shows Win7-compatible native file and folder dialogs with modal owner
+suppression; AppKit's existing dialog service is connected to the same portable
+request/result seam. Tooltips use delayed/cancellable retained associations and
+custom non-activating host surfaces on Windows and AppKit. Wine visual gates
+cover show, cancel, owner restoration, hover show, leave cancellation, and
+auto-pop. This does not freeze ABI 1.0 or close M11g's direct-chunk,
+differential, or active-source gates. Evidence:
+`experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
+
+**MEASURED MENU CONTINUATION:** the retained menu session now owns one active
+root per UI thread, deterministic keyboard traversal and nested return,
+pointer-down click-away ordering, cancellable hover-open/retirement, edge-aware
+submenu reversal, and idempotent chain teardown. Interactive custom raster
+controls admit real tokenized key input; transparent raster overlays do not.
+Wine proves physical nested keyboard routing and outside-click ordering, while
+24 menu reopen cycles and twelve popup/dialog host cycles leave no retained
+orphans. The unchanged retired compatibility specimen menu passes Down/Right/Left/Escape and remains
+responsive with 165 retained controls. Direct Drawing chunks, differential
+oracles, call counters, and active-source pacing remain open. Evidence:
 `experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
 
 Exit: two independent native consumers plus the C# gallery pass lifetime,
@@ -1077,8 +1150,9 @@ No framework-wide “fast” claim follows from one benchmark lane.
 ## 9. Packaging, versioning, and compatibility policy
 
 - Version independently: DML source schema, compiled schema, C ABI, host
-  protocol, renderer vocabulary, theme pack, language pack, configuration, and
-  semantic snapshot. Do not use one integer to disguise incompatible lifecycles.
+  protocol, renderer vocabulary, theme pack, language pack, font/metric pack,
+  configuration, and semantic snapshot. Do not use one integer to disguise
+  incompatible lifecycles.
 - Semantic-version public packages only after the corresponding contract has a
   compatibility suite. Experimental 0.x artifacts make no binary promise.
 - Generate an ABI symbol and layout report in CI; reject unintended exports.
@@ -1098,6 +1172,7 @@ No framework-wide “fast” claim follows from one benchmark lane.
 | proving demo becomes architecture by inertia | demo-private switches and `shared_ptr` leak into ABI | M1 extraction; ABI 0.x gate; no public freeze before two consumers |
 | Skia becomes framework model | renderer types/resources spread upward | display-chunk vocabulary; include/symbol audits; comparison gate |
 | custom text fails real users | broken clusters, IME, bidi, accessibility | typed positions from day one; staged corpus; platform IME tests |
+| owned fonts only appear safer | pinned fonts still exercise vulnerable parser/shaper code or omit filename scripts | minimal HarfBuzz/FreeType module inventory; bounded signed packs; exact-build fuzzing; declared coverage; isolated untrusted-font preview |
 | portability is false abstraction | AppKit assumptions encoded as common truth | headless trace protocol; platform capability records; early Windows/Linux spikes |
 | “compatibility” becomes unbounded | HWND/ActiveX/browser/bug emulation | declared corpus; matrix status; behavioral contracts; explicit exclusions |
 | designer freezes bad ontology | DML cannot evolve or round-trip | typed IR before GUI designer; schema versions/migrations; unknown-field policy |
@@ -1147,6 +1222,8 @@ idle. It must not freeze the C ABI or replace the Skia/AppKit adapters.
 - `../../planning/gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md`
 - `../../planning/gui_forms/GUI_FORMS_INTERVIEW_LEDGER.md`
 - `../../planning/gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md`
+- `../../planning/gui_forms/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md`
+- `FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`
 - `../../planning/gui_forms/WINFORMS_CONTROL_INVENTORY.md`
 - `../../planning/gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md`
 - `../third_party/SKIA_BUILD_EVIDENCE.md`

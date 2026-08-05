@@ -66,7 +66,7 @@ func TestDeltaCandidateStreamsCheckedExactChanges(t *testing.T) {
 	}
 	if metadata.BaseGeneration != 7 || metadata.Generation != 8 ||
 		metadata.Added != wantSummary.Added || metadata.Updated != wantSummary.Updated || metadata.Deleted != wantSummary.Deleted ||
-		metadata.CatalogDigest != after.Digest() || metadata.Size >= baseMetadata.Size {
+		metadata.BaseCatalogDigest != before.Digest() || metadata.CatalogDigest != after.Digest() || metadata.Size >= baseMetadata.Size {
 		t.Fatalf("delta metadata=%+v base_size=%d summary=%+v", metadata, baseMetadata.Size, wantSummary)
 	}
 

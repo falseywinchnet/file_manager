@@ -76,6 +76,13 @@ func TestSegmentMatchesReferencePathAndName(t *testing.T) {
 		if got[index] != want {
 			t.Fatalf("name result %d mismatch: got %+v want %+v", index, got[index], want)
 		}
+		name, exists, err := reader.Filename(ordinal)
+		if err != nil || !exists || name != want.Name {
+			t.Fatalf("filename ordinal %d=%q exists=%t err=%v, want %q", ordinal, name, exists, err, want.Name)
+		}
+	}
+	if _, exists, err := reader.Filename(uint32(reader.Len())); err != nil || exists {
+		t.Fatalf("out-of-range filename exists=%t err=%v", exists, err)
 	}
 	shared, exists := shard.Path(filepath.Join(root.Path, "alpha", "shared.bin"))
 	if !exists {

@@ -1,0 +1,83 @@
+{
+  "schema": "org.filemanager.orc-kol.experimental-usage-guidance/v0",
+  "guidance_id": "org.filemanager.kolmogrov.filename-history-tuple-guidance@0.1.0",
+  "status": "sealed_candidate_guidance",
+  "not_architecture_decision": true,
+  "availability": "available_experimental",
+  "defaults": {
+    "family_id": "org.filemanager.kolmogrov.filename-history-tuple",
+    "family_version": "0.1.0-experimental.1",
+    "profile_id": "filename-literal-r1-q2-d20-n64-p65536",
+    "observation_profile": "org.filemanager.kolmogrov.filename-observation@0.1.0-research.1",
+    "required_semantic_views": ["filename.literal-scalar"],
+    "optional_evidence_views": [
+      "filename.anchored-nfkc-casefold",
+      "filename.structural-class"
+    ],
+    "transformation": {
+      "kind": "common_one_deletion_descendant_and_directional_seams",
+      "radius": 1,
+      "source_length_offsets": [-1, 0, 1]
+    },
+    "fingerprint": {
+      "modulus_decimal": "2305843009213693951",
+      "coordinate_count": 2,
+      "cell_bits_per_coordinate": 20,
+      "coupled_key_bits": 40,
+      "parameter_policy": "engine_generation_random_explicit_descriptor",
+      "reference_e13_parameters_for_dogfood": "forbidden"
+    },
+    "bounds": {
+      "minimum_literal_atoms": 2,
+      "maximum_literal_atoms": 64,
+      "maximum_live_records_per_plan_partition": 65536,
+      "maximum_candidate_return_count": 4096,
+      "maximum_literal_posting_probes": 129
+    },
+    "storage": {
+      "required_posting_families": ["history", "full"],
+      "deduplicate_history_keys": true,
+      "exact_engine_ordinal_required": true,
+      "segment_liveness_required": true,
+      "projection_migration": "erase_and_rebuild"
+    }
+  },
+  "mandatory_constraints": {
+    "candidate_only": true,
+    "exact_identity_external": true,
+    "mandatory_exact_adjudication_for_exact_relation_claim": true,
+    "ranking_relevance_external": true,
+    "coordinates_coupled_by_history": true,
+    "silent_truncation_forbidden": true,
+    "optional_views_must_not_filter": true,
+    "partial_budget_result_must_not_report_complete": true,
+    "configuration_mismatch_must_not_read_old_keys": true
+  },
+  "terminal_statuses": [
+    "available_experimental",
+    "unavailable",
+    "unsupported_input",
+    "over_capacity",
+    "configuration_mismatch",
+    "rebuild_required",
+    "budget_exceeded",
+    "cancelled",
+    "corrupt_projection",
+    "internal_failure"
+  ],
+  "required_negative_fixture": {
+    "configuration": "e13-two-coordinates-nine-bits",
+    "left_source": "ldfioia",
+    "right_source": "kbmedfa",
+    "declared_relation": false,
+    "hash_candidate": true,
+    "purpose": "prove that a measured zero-excess corpus crossing is not deterministic capacity"
+  },
+  "normative_docs": [
+    "docs/HISTORY_HASH_ENGINE_CONTRACT_001.md",
+    "docs/HISTORY_HASH_OPEN_CONCERNS_001.md",
+    "formal/T-HISTORY-OCCUPANCY-1.md",
+    "formal/T-HISTORY-SCALE-1.md",
+    "formal/T-HISTORY-INFLUENCE-1.md"
+  ]
+}

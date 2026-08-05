@@ -118,3 +118,33 @@ ADR-001 establishes the initial rejection constitution:
 Every report must state whether it tested a gate or merely a component proxy.
 Missing the target is retained evidence; it is not permission to adjust the
 denominator or silently weaken the threshold.
+
+## Kolmogrov history-tuple dogfood
+
+The disabled literal-only adapter has an opt-in native component campaign:
+
+```sh
+FILEMAN_ENGINE_KOLMOGROV_MEASURE=1 FILEMAN_ENGINE_RECORDS=1000000 \
+  go test -v -run '^TestKolmogrovHistoryTupleDistribution$' -count=1 ./benchmarks
+```
+
+It differentially checks sampled verified results against a complete flat
+one-edit scan and reports whole-memory and direct-to-file builds, bounded build
+scratch, checked open, off-heap query distributions, probes, posting visits,
+candidate tails, storage bytes, and retained heap. It is a filename-component
+proxy on generated exact-length partitions, not a judged relevance corpus,
+service admission, durability campaign, idle-service measurement, or native
+filesystem result.
+
+The private persistent-service integration campaign is separately opt-in:
+
+```sh
+FILEMAN_ENGINE_KOLMOGROV_SERVICE_MEASURE=1 FILEMAN_ENGINE_RECORDS=10000 \
+  go test -v -run '^TestKolmogrovServiceGenerationDogfood$' -count=1 ./benchmarks
+```
+
+It uses disjoint temporary source, exact-store, and similarity-store roots and
+reports exact reconcile/query/restart, generation-lease open, direct projection
+build/open/query, retained heap, and identical-corpus bytes. The non-opt-in
+service dogfood test owns mutation, stale-generation, cancellation, capacity,
+corruption, read-only, and exact-fallback assertions.

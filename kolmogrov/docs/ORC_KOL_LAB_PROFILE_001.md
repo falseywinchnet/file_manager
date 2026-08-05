@@ -11,6 +11,12 @@ Go engine implement a reference candidate-posting adapter without claiming that
 File Manager's production feature policy, hash family, or resource budget has
 been selected.
 
+This binary certificate fixture remains the K0 conformance control. It is not
+the current filename dogfood recommendation and is not superseded in place.
+Engine experiments with the coupled filename-history hash use the separate
+sealed candidate guidance in `HISTORY_HASH_ENGINE_CONTRACT_001.md` and
+`conformance/orc_kol_001/history_hash_usage_guidance_001.json`.
+
 The profile exercises the semantic spine that is already stable:
 
 - a configuration descriptor is authoritative and versioned;

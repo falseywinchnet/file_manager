@@ -221,6 +221,15 @@ struct HostDialogResult final {
     HostDialogResultPayload payload;
 };
 
+// A tooltip request is expressed in root-client logical coordinates. Platform
+// adapters own screen conversion, work-area clamping, native window lifetime,
+// and non-activation; no platform handle enters the portable contract.
+struct HostTooltipRequest final {
+    std::string text;
+    Point anchor;
+    std::uint32_t duration_milliseconds{};
+};
+
 struct HostModalTransition final {
     std::uint64_t request_id{};
     std::uint32_t depth{};

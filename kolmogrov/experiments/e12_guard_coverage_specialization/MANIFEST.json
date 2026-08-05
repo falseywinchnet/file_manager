@@ -1,0 +1,33 @@
+{
+  "experiment_id": "E12",
+  "title": "Guard/coverage composition, certificate specialization, and liveness",
+  "status": "three-way generated measurement",
+  "profile_id": "org.filemanager.kolmogrov.filename-observation@0.1.0-research.1",
+  "claims_under_test": [
+    "A guard compiled across independent graphs improves unseen candidate tails at equal dense support.",
+    "Separately addressable guard and coverage cells can recover selectivity economically.",
+    "A bounded certificate count can pass a frozen candidate-tail gate.",
+    "Exact typed evidence can expose genuine one-edit filename policy negatives.",
+    "A liveness bitmap removes deleted exact ordinals without rebuilding immutable similarity postings."
+  ],
+  "splits": {
+    "development": {"records": 288, "queries": 216},
+    "tuning": {"records": 288, "queries": 216},
+    "evaluation": {"records": 288, "queries": 216}
+  },
+  "selection": {
+    "layout": "minimum tuning p95 candidate count, then false candidates, then hybrid payload",
+    "certificate_count": "first of 2,4,8 with full source recall and p95 candidates at most 8",
+    "evaluation_retuning_forbidden": true
+  },
+  "layouts": [
+    "coverage-3",
+    "coverage-4",
+    "union-guard-4",
+    "split-guard3-coverage3",
+    "coupled-guard3-coverage3"
+  ],
+  "certificate_counts": [2, 4, 8],
+  "privacy": "frozen in-tree synthetic generators only",
+  "entrypoint": "run.py"
+}

@@ -282,6 +282,24 @@ bool Control::eligible_for_input() const noexcept {
     return window_ != nullptr && effectively_visible() && effectively_enabled();
 }
 
+void Control::set_pointer_capture(bool captured) {
+    require_mutable();
+    if (window_ == nullptr) {
+        if (!captured) return;
+        throw std::logic_error(
+            "GUI.Forms pointer capture requires an attached control");
+    }
+    if (captured) {
+        window_->capture_pointer(shared_from_this());
+    } else if (window_->captured_control().get() == this) {
+        window_->release_pointer();
+    }
+}
+
+bool Control::has_pointer_capture() const noexcept {
+    return window_ != nullptr && window_->captured_control().get() == this;
+}
+
 void Control::set_paint_plane(PaintPlane plane) {
     require_mutable();
     if (!is_valid_paint_plane(plane)) {

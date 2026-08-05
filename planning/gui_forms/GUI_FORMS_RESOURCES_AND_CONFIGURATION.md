@@ -28,7 +28,7 @@ behavior.
 - retired compatibility specimen 1922's runtime configuration supplies behavioral inspiration, not a
   format that GUI.Forms must copy literally.
 
-## 2. Three resource classes
+## 2. Four resource classes
 
 ### 2.1 Theme collection — immutable, data-only
 
@@ -36,7 +36,8 @@ A compiled theme collection may contain:
 
 - manifest identity, version, compatibility interval, author, and provenance;
 - relational color-pair roles and material/depth recipes;
-- typography-role selection and admitted bundled fonts;
+- typography-role selection among installed, admitted font-pack roles (theme
+  packs do not inject arbitrary font bytes);
 - PNG and precompiled bitmap assets;
 - fresco/backplane resources and bounded procedural parameters;
 - metrics, edge recipes, cursor/pointer resources, and later optional sounds;
@@ -63,16 +64,57 @@ A compiled language assembly contains:
 - translator/provenance metadata and coverage counts;
 - and content hashes/signature metadata.
 
-Portmouth Rapids is a Latin-only control font. A translated control label uses
-Portmouth Rapids only for covered clusters and falls back to `system-ui` for
-uncovered script. Content text uses `system-ui` directly.
+Portsmouth Rapids is a Latin-only bundled control font. A translated control
+label uses it only for covered clusters. Content uses the selected bundled
+Tahoma/Calibri-like humanist body face. Uncovered clusters resolve through a
+bounded ordered set of bundled, hash-pinned script packs; GUI.Forms does not
+silently enumerate arbitrary host fonts. A language pack declares its required
+font-pack coverage before activation and falls back safely when that coverage
+is unavailable.
 
 **HYPOTHESIS:** language assemblies contain no executable formatter code. The
 catalogue compiler validates message arguments and emits a bounded message
 program understood by the built-in formatter. This preserves safety while
 supporting plural and select behavior that plain substitution cannot express.
 
-### 2.3 Runtime configuration — mutable and recoverable
+### 2.3 Font pack — immutable, hash-pinned, and bounded
+
+The product does not use arbitrary host fonts as UI fallback. A font pack is a
+distinct immutable resource class because changing a face changes measurement,
+layout, raster caches, and accessibility text geometry rather than merely
+restyling color.
+
+A built-in or signed product font pack declares:
+
+- pack and metric-generation identity;
+- exact font bytes, content hashes, face indices, weights/styles, and licenses;
+- role eligibility (`control`, `body`, `monospace`, `script-fallback`,
+  `last-resort`);
+- Unicode/script/variation coverage and bounded ordered cluster fallback;
+- admitted OpenType tables and required HarfBuzz/FreeType features;
+- maximum bytes, faces, tables, glyphs, outlines, composites, and variation
+  complexity;
+- compatibility with a GUI.Forms text ABI/profile interval;
+- and provenance/signature metadata.
+
+The base package contains Portsmouth Rapids only after production
+redistribution rights are established, the selected humanist body face, and the
+mandatory filename/path coverage set. Optional product-signed script packs may
+extend coverage for locales and filenames without making arbitrary installed
+fonts authoritative. A minimal build declares its actual coverage rather than
+silently changing geometry by consulting the host.
+
+The first body-face specimen is Carlito because its upstream project identifies
+it as Calibri-metric-compatible and OFL-licensed. IBM Plex Sans and Liberation
+Sans are comparison controls. This is a **CANDIDATE** specimen order, not a face
+selection.
+
+Theme packs may select among installed product font roles but may not insert
+unverified font bytes into the ordinary UI path. Language packs declare required
+coverage; they do not themselves become executable font loaders. Untrusted font
+preview belongs behind a separate parser/threat boundary.
+
+### 2.4 Runtime configuration — mutable and recoverable
 
 Runtime configuration contains user choices and durable operational state. It
 must be written atomically, validated against a compiled schema, and recoverable
@@ -277,4 +319,3 @@ separate decision after representative settings are enumerated.
 
 Personal setting values were not copied or interpreted. Only the schema and
 code behavior were used.
-

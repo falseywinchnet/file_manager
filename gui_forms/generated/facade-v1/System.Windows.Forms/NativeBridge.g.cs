@@ -9,11 +9,16 @@ using System.Threading;
 namespace System.Windows.Forms;
 
 internal enum NativeChange { None, Name, Text, Visible, Enabled, Bounds, Tree }
-internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4 }
+internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4, RangeValueChanged = 14, RangeScroll = 15 }
 internal readonly record struct NativePointer(uint Kind, double X, double Y, double WheelDelta, uint Button);
+internal readonly record struct NativeKey(uint Kind, uint PhysicalKey, uint Modifiers, bool Repeat);
 
 internal sealed unsafe class NativeControlBridge : IDisposable
 {
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private unsafe delegate uint DispatchThunk(void* context, uint cancelled);
+    private static readonly DispatchThunk dispatchThunk = DispatchCallback;
+    private static readonly nint dispatchThunkPointer = Marshal.GetFunctionPointerForDelegate(dispatchThunk);
     [StructLayout(LayoutKind.Sequential)] internal struct Handle { internal uint Slot; internal uint Generation; }
     [StructLayout(LayoutKind.Sequential)] private struct StringView { internal byte* Data; internal ulong Size; }
     [StructLayout(LayoutKind.Sequential)] private struct ErrorView { internal uint Code; internal StringView Message; }
@@ -28,15 +33,22 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint SubscribeV2, BeginInvoke, RequestClose, CallbackFaultCount;
         internal nint SetControlPng, SetChildIndex, SetControlColors, SubscribePointer;
         internal nint SetCheckState, GetCheckState;
+        internal nint SubscribeKey, SubscribeText;
+        internal nint SetRange, GetRange, SetRangeValue, GetRangeValue;
+        internal nint SetPointerCapture, GetPointerCapture;
+        internal nint ShowPathDialog, LastDialogPath, ShowTooltip, HideTooltip;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
     private static extern int GetApi(uint requestedVersion, ref Api api);
-
     private static readonly Api api = LoadApi();
     private static readonly bool traceControls = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_CONTROLS") == "1";
     private static readonly bool traceDelegates = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DELEGATES") == "1";
     private static long nextId;
+    private static long nextAsyncId;
+    [ThreadStatic] private static int nativeCallbackDepth;
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<int,
+        global::System.Collections.Concurrent.ConcurrentDictionary<long, NativeAsyncResult>> pendingByThread = new();
     private SafeControlHandle handle;
     private readonly string stableId;
     private readonly string managedTypeName;
@@ -74,6 +86,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal event Action<NativeChange>? Changed;
     internal event Func<NativeEvent, bool>? NativeEventRaised;
     internal event Action<NativePointer>? PointerRaised;
+    internal event Action<NativeKey>? KeyRaised;
+    internal event Action<string, bool, int, int>? TextRaised;
 
     private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName)
     {
@@ -89,7 +103,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         subscriptions.Add(token);
         if (kind is 4u or 5u or 11u or 14u) SubscribeTyped(NativeEvent.Clicked);
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); }
-        if (kind is 6u or 18u or 0x7fffffffu) SubscribePointer();
+        if (kind == 10u) { SubscribeTyped(NativeEvent.RangeScroll); SubscribeTyped(NativeEvent.RangeValueChanged); }
+        SubscribePointer();
+        if (kind is 6u or 8u or 9u or 16u or 18u) { SubscribeKey(); SubscribeText(); }
+        else if (kind == 0x7fffffffu) SubscribeKey();
     }
 
     internal static NativeControlBridge Create(Type managedType)
@@ -152,6 +169,55 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetCheckState)(handle.Value, &value)); return value; }
         set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetCheckState)(handle.Value, value)); }
     }
+    internal void SetRange(double minimum, double maximum) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, double, double, int>)api.SetRange)(handle.Value, minimum, maximum)); }
+    internal void GetRange(out double minimum, out double maximum) { EnsureAlive(); double minimumValue; double maximumValue; Check(((delegate* unmanaged[Cdecl]<Handle, double*, double*, int>)api.GetRange)(handle.Value, &minimumValue, &maximumValue)); minimum = minimumValue; maximum = maximumValue; }
+    internal double RangeValue
+    {
+        get { EnsureAlive(); double value; Check(((delegate* unmanaged[Cdecl]<Handle, double*, int>)api.GetRangeValue)(handle.Value, &value)); return value; }
+        set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, double, int>)api.SetRangeValue)(handle.Value, value)); }
+    }
+    internal bool Capture
+    {
+        get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetPointerCapture)(handle.Value, &value)); return value != 0; }
+        set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetPointerCapture)(handle.Value, value ? 1u : 0u)); }
+    }
+    internal bool ShowPathDialog(uint kind, string title, string initialDirectory,
+                                 string suggestedName, string defaultExtension,
+                                 string filter, uint flags, out string selectedPath)
+    {
+        EnsureAlive();
+        var titleBytes = Encoding.UTF8.GetBytes(title ?? string.Empty);
+        var directoryBytes = Encoding.UTF8.GetBytes(initialDirectory ?? string.Empty);
+        var suggestedBytes = Encoding.UTF8.GetBytes(suggestedName ?? string.Empty);
+        var extensionBytes = Encoding.UTF8.GetBytes(defaultExtension ?? string.Empty);
+        var filterBytes = Encoding.UTF8.GetBytes(filter ?? string.Empty);
+        uint accepted;
+        fixed (byte* titleData = titleBytes)
+        fixed (byte* directoryData = directoryBytes)
+        fixed (byte* suggestedData = suggestedBytes)
+        fixed (byte* extensionData = extensionBytes)
+        fixed (byte* filterData = filterBytes)
+            Check(((delegate* unmanaged[Cdecl]<Handle, uint, StringView, StringView, StringView, StringView, StringView, uint, uint*, int>)api.ShowPathDialog)(
+                handle.Value, kind,
+                new StringView { Data = titleData, Size = (ulong)titleBytes.Length },
+                new StringView { Data = directoryData, Size = (ulong)directoryBytes.Length },
+                new StringView { Data = suggestedData, Size = (ulong)suggestedBytes.Length },
+                new StringView { Data = extensionData, Size = (ulong)extensionBytes.Length },
+                new StringView { Data = filterData, Size = (ulong)filterBytes.Length },
+                flags, &accepted));
+        selectedPath = accepted == 0 ? string.Empty : GetString(api.LastDialogPath);
+        return accepted != 0;
+    }
+    internal void ShowToolTip(string text, int x, int y, int duration)
+    {
+        EnsureAlive();
+        var bytes = Encoding.UTF8.GetBytes(text ?? string.Empty);
+        fixed (byte* data = bytes)
+            Check(((delegate* unmanaged[Cdecl]<Handle, StringView, double, double, uint, int>)api.ShowTooltip)(
+                handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length },
+                x, y, checked((uint)duration)));
+    }
+    internal void HideToolTip() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.HideTooltip)(handle.Value)); }
     internal bool InvokeRequired => Environment.CurrentManagedThreadId != ownerThreadId;
     internal bool SupportsRaster { get { return supportsRaster && api.SetControlPng != 0; } }
     internal void SetRaster(byte[] encodedPng) { if (!SupportsRaster) return; fixed (byte* data = encodedPng) Check(((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, int>)api.SetControlPng)(handle.Value, data, (ulong)encodedPng.Length)); }
@@ -161,20 +227,46 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.RunWindow)(handle.Value, flags));
         return GetString(api.LastHostTrace);
     }
+    internal static void DoEvents(int ownerThreadId)
+    {
+        // GUI.Forms defines BeginInvoke as a strictly posted boundary: a native
+        // input/lifecycle callback must unwind before work it posts can run.
+        // This prevents DoEvents from turning pointer or load callbacks into an
+        // accidental recursive dispatcher.
+        if (nativeCallbackDepth != 0) return;
+        if (!pendingByThread.TryGetValue(ownerThreadId, out var pending)) return;
+        foreach (var item in pending.OrderBy(item => item.Key).ToArray())
+        {
+            try { item.Value.Execute(); }
+            catch (Exception error) { Application.__ReportCallbackException(error); }
+        }
+        if (pending.IsEmpty) pendingByThread.TryRemove(ownerThreadId, out _);
+    }
+    private static void Track(NativeAsyncResult pending) =>
+        pendingByThread.GetOrAdd(pending.OwnerThreadId, _ => new()).TryAdd(pending.Id, pending);
+    private static void Untrack(NativeAsyncResult pending)
+    {
+        if (!pendingByThread.TryGetValue(pending.OwnerThreadId, out var values)) return;
+        values.TryRemove(pending.Id, out _);
+        if (values.IsEmpty) pendingByThread.TryRemove(pending.OwnerThreadId, out _);
+    }
     internal global::System.IAsyncResult BeginInvoke(global::System.Delegate method)
     {
         if (method is null) throw new global::System.ArgumentNullException(nameof(method));
-        if (traceDelegates)
+        var declaringType = method.Method.DeclaringType?.FullName ?? string.Empty;
+        if (traceDelegates && (declaringType.StartsWith("retired compatibility specimen.FrontEnds.SpyServer", StringComparison.Ordinal) ||
+            declaringType == "retired compatibility specimen.MainForm" && method.Method.Name == "HandleFrontendControllerSampleRateChange"))
         {
             var strings = method.Target?.GetType().GetFields(global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic)
                 .Where(field => field.FieldType == typeof(string)).Select(field => field.GetValue(method.Target) as string).Where(value => value is not null) ?? [];
-            Console.Error.WriteLine($"facade-delegate=begin-invoke|id={stableId}|method={method.Method.DeclaringType?.FullName}.{method.Method.Name}|strings={string.Join(';', strings)}");
+            Console.Error.WriteLine($"facade-delegate=begin-invoke|id={stableId}|method={declaringType}.{method.Method.Name}|thread={Environment.CurrentManagedThreadId}|strings={string.Join(';', strings)}");
         }
-        var pending = new NativeAsyncResult(method);
+        var pending = new NativeAsyncResult(method, ownerThreadId);
+        Track(pending);
         var root = GCHandle.Alloc(pending);
         var result = ((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<void*, uint, uint>, void*, int>)api.BeginInvoke)(
-            handle.Value, &DispatchCallback, (void*)GCHandle.ToIntPtr(root));
-        if (result != 0) { root.Free(); Check(result); }
+            handle.Value, (delegate* unmanaged[Cdecl]<void*, uint, uint>)(void*)dispatchThunkPointer, (void*)GCHandle.ToIntPtr(root));
+        if (result != 0) { root.Free(); pending.Cancel(); Check(result); }
         return pending;
     }
     internal object? Invoke(global::System.Delegate method)
@@ -249,21 +341,41 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         subscriptions.Add(token);
     }
 
+    private void SubscribeKey()
+    {
+        Handle token;
+        Check(((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<Handle, uint, uint, uint, uint, void*, uint>, void*, Handle*, int>)api.SubscribeKey)(
+            handle.Value, &KeyCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
+        subscriptions.Add(token);
+    }
+
+    private void SubscribeText()
+    {
+        Handle token;
+        Check(((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<Handle, StringView, uint, int, int, void*, uint>, void*, Handle*, int>)api.SubscribeText)(
+            handle.Value, &TextCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
+        subscriptions.Add(token);
+    }
+
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void StateCallback(Handle sender, uint kind, void* context)
     {
         if (kind != 1 || context == null) return;
         if (GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return;
+        ++nativeCallbackDepth;
         try { bridge.Changed?.Invoke(bridge.pendingChange); }
         catch (Exception error) { Application.__ReportCallbackException(error); }
+        finally { --nativeCallbackDepth; }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint EventCallback(Handle sender, uint kind, void* context)
     {
         if (context == null || GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return 0;
+        ++nativeCallbackDepth;
         try { return bridge.NativeEventRaised?.Invoke((NativeEvent)kind) == true ? 1u : 0u; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
+        finally { --nativeCallbackDepth; }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -271,15 +383,40 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                                         double wheelDelta, uint button, void* context)
     {
         if (context == null || GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return 0;
+        ++nativeCallbackDepth;
         try { bridge.PointerRaised?.Invoke(new NativePointer(kind, x, y, wheelDelta, button)); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
+        finally { --nativeCallbackDepth; }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static uint KeyCallback(Handle sender, uint kind, uint physicalKey,
+                                    uint modifiers, uint repeat, void* context)
+    {
+        if (context == null || GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return 0;
+        ++nativeCallbackDepth;
+        try { bridge.KeyRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)); return 0; }
+        catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
+        finally { --nativeCallbackDepth; }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static uint TextCallback(Handle sender, StringView text, uint composing,
+                                     int replacementStart, int replacementLength,
+                                     void* context)
+    {
+        if (context == null || GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return 0;
+        ++nativeCallbackDepth;
+        try { var value = text.Data == null || text.Size == 0 ? string.Empty : Encoding.UTF8.GetString(text.Data, checked((int)text.Size)); bridge.TextRaised?.Invoke(value, composing != 0, replacementStart, replacementLength); return 0; }
+        catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
+        finally { --nativeCallbackDepth; }
+    }
+
     private static uint DispatchCallback(void* context, uint cancelled)
     {
         if (context == null) return 0;
         var root = GCHandle.FromIntPtr((nint)context);
+        ++nativeCallbackDepth;
         try
         {
             if (root.Target is NativeAsyncResult pending)
@@ -294,7 +431,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             Application.__ReportCallbackException(error);
             return 2u;
         }
-        finally { root.Free(); }
+        finally { --nativeCallbackDepth; root.Free(); }
     }
 
     private void ReleaseSubscriptions(bool check)
@@ -316,8 +453,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(7, ref value));
-        if (value.AbiVersion != 7 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0) throw new InvalidOperationException("GUI.Forms ABI 0.7 table is incomplete.");
+        Check(GetApi(10, ref value));
+        if (value.AbiVersion != 10 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0) throw new InvalidOperationException("GUI.Forms ABI 0.10 table is incomplete.");
         return value;
     }
     private static void Check(int result)
@@ -347,15 +484,42 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     {
         private readonly global::System.Delegate method;
         private readonly global::System.Threading.ManualResetEvent completed = new(false);
+        private readonly string traceName;
+        private readonly bool traceThis;
+        private int executionState;
         private object? result;
         private Exception? error;
-        internal NativeAsyncResult(global::System.Delegate method) { this.method = method; }
+        internal NativeAsyncResult(global::System.Delegate method, int ownerThreadId)
+        {
+            this.method = method;
+            OwnerThreadId = ownerThreadId;
+            Id = global::System.Threading.Interlocked.Increment(ref nextAsyncId);
+            var declaringType = method.Method.DeclaringType?.FullName ?? string.Empty;
+            traceName = $"{declaringType}.{method.Method.Name}";
+            traceThis = traceDelegates && (declaringType.StartsWith("retired compatibility specimen.FrontEnds.SpyServer", StringComparison.Ordinal) ||
+                declaringType == "retired compatibility specimen.MainForm" && method.Method.Name == "HandleFrontendControllerSampleRateChange");
+        }
+        internal long Id { get; }
+        internal int OwnerThreadId { get; }
         public object? AsyncState => null;
         public global::System.Threading.WaitHandle AsyncWaitHandle => completed;
         public bool CompletedSynchronously => false;
         public bool IsCompleted { get; private set; }
-        internal void Execute() { try { result = method.DynamicInvoke(); } catch (Exception caught) { error = caught; throw; } finally { IsCompleted = true; completed.Set(); } }
-        internal void Cancel() { error = new global::System.OperationCanceledException("GUI.Forms host closed before the queued invocation ran."); IsCompleted = true; completed.Set(); }
+        internal void Execute()
+        {
+            if (global::System.Threading.Interlocked.CompareExchange(ref executionState, 1, 0) != 0) return;
+            Untrack(this);
+            if (traceThis) Console.Error.WriteLine($"facade-delegate=execute-begin|method={traceName}|thread={Environment.CurrentManagedThreadId}");
+            try { result = method.DynamicInvoke(); }
+            catch (Exception caught) { error = caught; throw; }
+            finally
+            {
+                IsCompleted = true;
+                completed.Set();
+                if (traceThis) Console.Error.WriteLine($"facade-delegate=execute-end|method={traceName}|thread={Environment.CurrentManagedThreadId}");
+            }
+        }
+        internal void Cancel() { if (global::System.Threading.Interlocked.CompareExchange(ref executionState, 1, 0) != 0) return; Untrack(this); error = new global::System.OperationCanceledException("GUI.Forms host closed before the queued invocation ran."); IsCompleted = true; completed.Set(); }
         internal object? GetResult() { if (error is not null) throw error; return result; }
     }
 }

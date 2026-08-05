@@ -27,7 +27,9 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md` | Observed serious-consumer compatibility envelope (research in progress) |
 | `gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md` | Renderer, host, text, state, event, DML, ABI, and demonstration choices |
 | `gui_forms/GUI_FORMS_INTERVIEW_LEDGER.md` | Architect's GIVEN GUI.Forms constraints plus CANDIDATE tradeoffs and remaining subquestions; not an ADR |
+| `gui_forms/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md` | Native accessibility verdicts; HarfBuzz/FreeType/bundled-font owner direction; remaining profile, coverage, security, and evidence gates |
 | `gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` | Theme/language assemblies, PNG boundary, safe fallback, and retired compatibility specimen-informed mutable configuration candidates |
+| `../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md` | Generous File Manager control/layout/popup/transfer/accessibility/typography/drawing shopping list promoted into GUI.Forms landmarks |
 | `search/SEARCH_RECONCILIATION_001.md` | Search identity, root ownership, offline-catalogue, result-motion, mutation-boundary, ConeDAG, and semantic-deferral constraints from the first completed board export |
 | `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
 | `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Superseded historical Oracle name and global dependency gate |

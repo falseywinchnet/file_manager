@@ -9,6 +9,7 @@ candidates; exact external verification remains authoritative.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil, log2
 from typing import Iterable, Mapping, Sequence
 
 from .certificates import CertificateSchedule
@@ -102,6 +103,198 @@ def compile_balanced_binary_rows(
             if column & (1 << output_bit):
                 rows[output_bit] |= 1 << input_bit
     return tuple(rows)
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedBinaryRowCompilation:
+    """Ordered ambient rows with an audited protected-kernel prefix."""
+
+    row_masks: tuple[int, ...]
+    protected_difference_count: int
+    protected_rank: int
+    semantic_depth: int | None
+    semantic_depth_is_minimum: bool
+    union_bound_depth: int
+    unresolved_by_prefix: tuple[int, ...]
+
+
+def _gf2_reduced_basis(vectors: Sequence[int]) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Return a reduced binary basis and its unique pivot positions."""
+
+    by_pivot: dict[int, int] = {}
+    for vector in vectors:
+        value = vector
+        while value:
+            pivot = value.bit_length() - 1
+            if pivot in by_pivot:
+                value ^= by_pivot[pivot]
+            else:
+                by_pivot[pivot] = value
+                break
+    for pivot in sorted(by_pivot):
+        row = by_pivot[pivot]
+        for other in tuple(by_pivot):
+            if other != pivot and by_pivot[other] & (1 << pivot):
+                by_pivot[other] ^= row
+    pivots = tuple(sorted(by_pivot))
+    return tuple(by_pivot[pivot] for pivot in pivots), pivots
+
+
+def compile_protected_binary_rows(
+    degree: int,
+    atom_bit_width: int,
+    output_bits: int,
+    protected_differences: Iterable[int],
+    *,
+    exact_rank_limit: int = 18,
+) -> ProtectedBinaryRowCompilation:
+    """Compile rows whose prefix avoids every named nonzero difference.
+
+    The protected differences live in the flattened pattern-bit space.  Row
+    selection is performed on their binary span.  Each selected functional is
+    then lifted into the corresponding ambient coset using a support-balanced
+    row; this changes unprotected columns without changing any protected
+    response.
+
+    Exhaustive functional selection is used only when the protected rank is at
+    most ``exact_rank_limit``.  Above that boundary the candidate family is
+    explicit and the result remains an upper bound, never a minimum claim.
+    """
+
+    if degree < 1 or atom_bit_width < 1 or output_bits < 1:
+        raise ValueError("degree, atom width, and output width must be positive")
+    input_width = degree * atom_bit_width
+    differences = tuple(sorted(set(protected_differences)))
+    if not differences:
+        raise ValueError("at least one protected difference is required")
+    if any(value <= 0 or value >= 1 << input_width for value in differences):
+        raise ValueError("protected differences must be nonzero and fit the input")
+
+    basis, pivots = _gf2_reduced_basis(differences)
+    rank = len(basis)
+    coordinates = tuple(
+        sum(((value >> pivot) & 1) << index for index, pivot in enumerate(pivots))
+        for value in differences
+    )
+    full_cover = (1 << len(differences)) - 1
+
+    candidate_functionals: set[int]
+    if rank <= exact_rank_limit:
+        candidate_functionals = set(range(1, 1 << rank))
+    else:
+        candidate_functionals = {1 << index for index in range(rank)}
+        candidate_functionals.add((1 << rank) - 1)
+        for left in range(rank):
+            for right in range(left + 1, rank):
+                candidate_functionals.add((1 << left) | (1 << right))
+        diagnostic = compile_balanced_binary_rows(1, rank, output_bits)
+        candidate_functionals.update(diagnostic)
+
+    coverage_to_functional: dict[int, int] = {}
+    for functional in candidate_functionals:
+        coverage = sum(
+            ((functional & coordinate).bit_count() & 1) << index
+            for index, coordinate in enumerate(coordinates)
+        )
+        if coverage:
+            current = coverage_to_functional.get(coverage)
+            if current is None or (functional.bit_count(), functional) < (
+                current.bit_count(),
+                current,
+            ):
+                coverage_to_functional[coverage] = functional
+
+    selected: list[int] = []
+    signatures = [0] * len(differences)
+    unresolved_by_prefix: list[int] = []
+    semantic_depth: int | None = None
+    available = set(coverage_to_functional)
+    for output_index in range(output_bits):
+        unresolved = sum(
+            1 << index for index, signature in enumerate(signatures) if signature == 0
+        )
+        if unresolved:
+            coverage = max(
+                available,
+                key=lambda mask: (
+                    (mask & unresolved).bit_count(),
+                    -abs(2 * mask.bit_count() - len(differences)),
+                    -coverage_to_functional[mask].bit_count(),
+                    -coverage_to_functional[mask],
+                ),
+            )
+        elif available:
+            equal_pairs = {
+                (left, right)
+                for left in range(len(signatures))
+                for right in range(left + 1, len(signatures))
+                if signatures[left] == signatures[right]
+            }
+            coverage = max(
+                available,
+                key=lambda mask: (
+                    sum(
+                        ((mask >> left) ^ (mask >> right)) & 1
+                        for left, right in equal_pairs
+                    ),
+                    -abs(2 * mask.bit_count() - len(differences)),
+                    -coverage_to_functional[mask].bit_count(),
+                    -coverage_to_functional[mask],
+                ),
+            )
+        else:
+            selected.append(0)
+            unresolved_by_prefix.append(sum(signature == 0 for signature in signatures))
+            continue
+
+        functional = coverage_to_functional[coverage]
+        selected.append(functional)
+        available.remove(coverage)
+        for index, coordinate in enumerate(coordinates):
+            signatures[index] |= (
+                (functional & coordinate).bit_count() & 1
+            ) << output_index
+        unresolved_count = sum(signature == 0 for signature in signatures)
+        unresolved_by_prefix.append(unresolved_count)
+        if unresolved_count == 0 and semantic_depth is None:
+            semantic_depth = output_index + 1
+
+    ambient_rows = compile_balanced_binary_rows(degree, atom_bit_width, output_bits)
+    lifted_rows = []
+    for ambient, desired in zip(ambient_rows, selected, strict=True):
+        actual = sum(
+            ((ambient & row).bit_count() & 1) << index
+            for index, row in enumerate(basis)
+        )
+        correction = sum(
+            1 << pivots[index]
+            for index in range(rank)
+            if ((actual ^ desired) >> index) & 1
+        )
+        lifted_rows.append(ambient ^ correction)
+
+    for difference_index, difference in enumerate(differences):
+        expected = signatures[difference_index]
+        actual = sum(
+            ((row & difference).bit_count() & 1) << index
+            for index, row in enumerate(lifted_rows)
+        )
+        if actual != expected:
+            raise AssertionError("ambient coset lift changed protected response")
+
+    one_row_exists = full_cover in coverage_to_functional
+    minimum_known = semantic_depth == 1 or (
+        semantic_depth == 2 and not one_row_exists and rank <= exact_rank_limit
+    )
+    return ProtectedBinaryRowCompilation(
+        row_masks=tuple(lifted_rows),
+        protected_difference_count=len(differences),
+        protected_rank=rank,
+        semantic_depth=semantic_depth,
+        semantic_depth_is_minimum=minimum_known,
+        union_bound_depth=min(rank, ceil(log2(len(differences) + 1))),
+        unresolved_by_prefix=tuple(unresolved_by_prefix),
+    )
 
 
 @dataclass(frozen=True, slots=True)

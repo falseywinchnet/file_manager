@@ -267,17 +267,17 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
     if(WIN32)
         set_target_properties(gui_drawing_raster_c_api PROPERTIES PREFIX "")
-        add_custom_command(TARGET gui_drawing_raster_c_api POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
-                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids.ttf"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
-                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids-Bold.ttf"
-        )
     endif()
+    add_custom_command(TARGET gui_drawing_raster_c_api POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
+            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids.ttf"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
+            "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids-Bold.ttf"
+    )
 endif()
 
 if(APPLE)
@@ -334,7 +334,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     )
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE gdi32 ole32 windowscodecs
+        PRIVATE gdi32 ole32 windowscodecs comdlg32 shell32
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)

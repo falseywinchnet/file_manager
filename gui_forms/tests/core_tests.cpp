@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -58,6 +59,9 @@ public:
 
     void on_pointer(PointerEvent& event) override {
         phases.push_back(event.phase);
+        if (event.action == PointerAction::up && release_callback) {
+            release_callback();
+        }
     }
 
     void on_pointer_bubble(PointerEvent& event) override {
@@ -79,6 +83,7 @@ public:
     std::uint64_t activation_count{};
     bool focus_state{};
     bool handle_preview_release{};
+    std::function<void()> release_callback;
     std::vector<EventPhase> phases;
 };
 
@@ -217,6 +222,24 @@ void test_routed_phases_and_consumed_release() {
             "consumed physical release must still clear pointer capture");
 }
 
+void test_capture_released_before_release_callback() {
+    Fixture fixture;
+    bool callback_observed_release = false;
+    fixture.child->release_callback = [&] {
+        callback_observed_release = !fixture.window->captured_control();
+    };
+    fixture.window->dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                      {15.0, 15.0}});
+    require(fixture.window->captured_control() == fixture.child,
+            "primary down must capture before release ordering gate");
+    fixture.window->dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                      {15.0, 15.0}});
+    require(callback_observed_release,
+            "pointer capture must be released before synchronous release callback");
+    require(fixture.child->activation_count == 1,
+            "early capture release must preserve qualified activation");
+}
+
 void test_disabled_control_is_ineligible() {
     Fixture fixture;
     fixture.child->set_enabled(false);
@@ -306,6 +329,7 @@ int main() {
         test_layout_flushes_before_hit_test();
         test_topmost_hit_and_activation();
         test_routed_phases_and_consumed_release();
+        test_capture_released_before_release_callback();
         test_disabled_control_is_ineligible();
         test_stable_ids_and_detached_lifetime();
         test_static_tree_factory();

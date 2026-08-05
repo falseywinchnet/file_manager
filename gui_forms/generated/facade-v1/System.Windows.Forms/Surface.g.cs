@@ -22,15 +22,22 @@ namespace System.Windows.Forms {
         public static int CallbackFaultCount { get; private set; }
         public static event global::System.Threading.ThreadExceptionEventHandler? ThreadException;
         [global::System.ThreadStatic] private static ApplicationContext? __context;
+        [global::System.ThreadStatic] internal static Form? __CurrentForm;
+        [global::System.ThreadStatic] private static ToolStripDropDown? __activeMenu;
         private static readonly object __contextsGate = new();
         private static readonly global::System.Collections.Generic.Dictionary<int, ApplicationContext> __contexts = new();
+        internal static void __RegisterMenu(ToolStripDropDown menu) { var root = menu.__MenuRoot; if (global::System.Object.ReferenceEquals(__activeMenu, root)) return; var previous = __activeMenu; __activeMenu = root; previous?.__CloseDropDown(); }
+        internal static void __MenuClosed(ToolStripDropDown menu) { if (global::System.Object.ReferenceEquals(__activeMenu, menu)) __activeMenu = null; }
+        internal static void __DismissActiveMenuForPointer(Control target) { var menu = __activeMenu; if (menu is not null && !menu.__ContainsMenuTarget(target)) menu.__CloseDropDown(); }
+        internal static bool __DispatchKeyToActiveMenu(Control sender, uint physicalKey, bool down, uint modifiers, bool repeat) { var menu = __activeMenu; if (menu is null || menu.__ContainsMenuTarget(sender)) return false; menu.__KeyboardTarget.__DeliverNativeKey(physicalKey, down, modifiers, repeat); return true; }
+        internal static void __CloseActiveMenu() { var menu = __activeMenu; __activeMenu = null; menu?.__CloseDropDown(); }
         internal static bool __Post(int ownerThreadId, global::System.Action action) { ApplicationContext? context; lock (__contextsGate) __contexts.TryGetValue(ownerThreadId, out context); var form = context?.MainForm; if (form is null) return false; try { _ = form.BeginInvoke(action); return true; } catch (global::System.Exception error) { __ReportCallbackException(error); return false; } }
         internal static void __ReportCallbackException(global::System.Exception error) { LastCallbackException = error; ++CallbackFaultCount; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_CALLBACKS") == "1") global::System.Console.Error.WriteLine("facade-callback-fault=" + error.ToString().Replace('\r', ' ').Replace('\n', ' ')); try { ThreadException?.Invoke(null, new global::System.Threading.ThreadExceptionEventArgs(error)); } catch { } }
-        private static void __RunContext(ApplicationContext context) { if (context is null) throw new global::System.ArgumentNullException(nameof(context)); if (__context is not null) throw new global::System.InvalidOperationException("A GUI.Forms application context is already running on this thread."); var form = context.MainForm ?? throw new global::System.InvalidOperationException("ApplicationContext.MainForm is required."); var ownerThreadId = global::System.Environment.CurrentManagedThreadId; LastHostTrace = string.Empty; LastCallbackException = null; CallbackFaultCount = 0; __context = context; lock (__contextsGate) __contexts.Add(ownerThreadId, context); try { _ = form.BeginInvoke((global::System.Action)form.__RaiseLoad); LastHostTrace = form.__RunNativeWindow(); } finally { lock (__contextsGate) __contexts.Remove(ownerThreadId); try { context.__NotifyThreadExit(); } catch (global::System.Exception error) { __ReportCallbackException(error); } __context = null; } }
+        private static void __RunContext(ApplicationContext context) { if (context is null) throw new global::System.ArgumentNullException(nameof(context)); if (__context is not null) throw new global::System.InvalidOperationException("A GUI.Forms application context is already running on this thread."); var form = context.MainForm ?? throw new global::System.InvalidOperationException("ApplicationContext.MainForm is required."); var ownerThreadId = global::System.Environment.CurrentManagedThreadId; LastHostTrace = string.Empty; LastCallbackException = null; CallbackFaultCount = 0; __context = context; __CurrentForm = form; lock (__contextsGate) __contexts.Add(ownerThreadId, context); try { _ = form.BeginInvoke((global::System.Action)form.__RaiseLoad); LastHostTrace = form.__RunNativeWindow(); } finally { __CloseActiveMenu(); lock (__contextsGate) __contexts.Remove(ownerThreadId); try { context.__NotifyThreadExit(); } catch (global::System.Exception error) { __ReportCallbackException(error); } __CurrentForm = null; __context = null; } }
         public static void Run(ApplicationContext context) { __RunContext(context); }
         public Application() { }
-        public static string ExecutablePath { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.Application.ExecutablePath"); } }
-        public static void DoEvents() { }
+        public static string ExecutablePath { get { return global::System.Environment.ProcessPath ?? global::System.AppContext.BaseDirectory; } }
+        public static void DoEvents() { __CurrentForm?.__DoEvents(); }
         public static void ExitThread() { __context?.ExitThread(); }
         public static void SetCompatibleTextRenderingDefault(bool defaultValue) { }
         public static void Run(global::System.Windows.Forms.Form mainForm) { if (mainForm is null) throw new global::System.ArgumentNullException(nameof(mainForm)); __RunContext(new ApplicationContext(mainForm)); }
@@ -110,27 +117,34 @@ namespace System.Windows.Forms {
         None = 0,
     }
     public partial class Button : global::System.Windows.Forms.ButtonBase {
+        internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked && __buttonDialogResult != DialogResult.None && FindForm() is Form form) form.DialogResult = __buttonDialogResult; return base.__NativeEvent(kind); }
         protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left) __NativeEvent(NativeEvent.Clicked); }
+        private DialogResult __buttonDialogResult;
         public Button() { Size = new global::System.Drawing.Size(75, 23); }
-        public virtual global::System.Windows.Forms.DialogResult DialogResult { set { } }
+        public virtual global::System.Windows.Forms.DialogResult DialogResult { set { __buttonDialogResult = value; } }
     }
     public abstract partial class ButtonBase : global::System.Windows.Forms.Control {
         private readonly FlatButtonAppearance __flatAppearance = new();
+        private FlatStyle __buttonFlatStyle = FlatStyle.Standard;
+        private global::System.Drawing.ContentAlignment __buttonTextAlign = global::System.Drawing.ContentAlignment.MiddleCenter;
+        private bool __useVisualStyleBackColor = true;
         private void __PaintButtonSurface(global::System.Drawing.Graphics graphics) { using var background = new global::System.Drawing.SolidBrush(BackColor); graphics.FillRectangle(background, ClientRectangle); using var top = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(110, global::System.Drawing.Color.White)); using var edge = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(150, global::System.Drawing.Color.Black)); if (Width > 1 && Height > 1) { graphics.DrawLine(top, 0, 0, Width - 1, 0); graphics.DrawLine(top, 0, 0, 0, Height - 1); graphics.DrawLine(edge, 0, Height - 1, Width - 1, Height - 1); graphics.DrawLine(edge, Width - 1, 0, Width - 1, Height - 1); } var image = __ProjectionBackgroundImage; if (image is not null) { var destination = __ProjectionBackgroundImageLayout switch { ImageLayout.Stretch => ClientRectangle, ImageLayout.Zoom => __ZoomImage(image), ImageLayout.Center => new global::System.Drawing.Rectangle((Width - image.Width) / 2, (Height - image.Height) / 2, image.Width, image.Height), _ => new global::System.Drawing.Rectangle(2, 2, global::System.Math.Min(image.Width, global::System.Math.Max(0, Width - 4)), global::System.Math.Min(image.Height, global::System.Math.Max(0, Height - 4))) }; if (destination.Width > 0 && destination.Height > 0) graphics.DrawImage(image, destination); } else if (!global::System.String.IsNullOrEmpty(Text)) { using var ink = new global::System.Drawing.SolidBrush(ForeColor); using var font = new global::System.Drawing.Font("Portsmouth Rapids", 10f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); var measured = graphics.MeasureString(Text, font); graphics.DrawString(Text, font, ink, global::System.Math.Max(3f, (Width - measured.Width) / 2f), global::System.Math.Max(2f, (Height - measured.Height) / 2f)); } }
         private global::System.Drawing.Rectangle __ZoomImage(global::System.Drawing.Image image) { if (image.Width <= 0 || image.Height <= 0 || Width <= 4 || Height <= 4) return global::System.Drawing.Rectangle.Empty; var scale = global::System.Math.Min((Width - 6d) / image.Width, (Height - 6d) / image.Height); var width = global::System.Math.Max(1, (int)global::System.Math.Round(image.Width * scale)); var height = global::System.Math.Max(1, (int)global::System.Math.Round(image.Height * scale)); return new global::System.Drawing.Rectangle((Width - width) / 2, (Height - height) / 2, width, height); }
         public ButtonBase() { }
         public global::System.Windows.Forms.FlatButtonAppearance FlatAppearance { get { return __flatAppearance; } }
-        public global::System.Windows.Forms.FlatStyle FlatStyle { set { } }
-        public virtual global::System.Drawing.ContentAlignment TextAlign { set { } }
-        public bool UseVisualStyleBackColor { set { } }
+        public global::System.Windows.Forms.FlatStyle FlatStyle { set { __buttonFlatStyle = value; Invalidate(); } }
+        public virtual global::System.Drawing.ContentAlignment TextAlign { set { __buttonTextAlign = value; Invalidate(); } }
+        public bool UseVisualStyleBackColor { set { __useVisualStyleBackColor = value; Invalidate(); } }
         protected override void OnPaint(global::System.Windows.Forms.PaintEventArgs pevent) { __PaintButtonSurface(pevent.Graphics); base.OnPaint(pevent); }
     }
     public partial class CheckBox : global::System.Windows.Forms.ButtonBase {
         internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) { if (__TraceInteraction) global::System.Console.Error.WriteLine("facade-interaction=checkbox-native-begin|name=" + Name); CheckState = (CheckState)__NativeCheckState; if (__TraceInteraction) global::System.Console.Error.WriteLine("facade-interaction=checkbox-native-end|name=" + Name + "|checked=" + Checked); } return base.__NativeEvent(kind); }
         private CheckState __checkState;
+        private Appearance __checkAppearance;
+        private global::System.Drawing.ContentAlignment __checkAlignment = global::System.Drawing.ContentAlignment.MiddleLeft;
         public CheckBox() { }
-        public global::System.Windows.Forms.Appearance Appearance { set { } }
-        public global::System.Drawing.ContentAlignment CheckAlign { set { } }
+        public global::System.Windows.Forms.Appearance Appearance { set { __checkAppearance = value; Invalidate(); } }
+        public global::System.Drawing.ContentAlignment CheckAlign { set { __checkAlignment = value; Invalidate(); } }
         public global::System.Windows.Forms.CheckState CheckState { set { if (__checkState == value) return; var oldChecked = __checkState != CheckState.Unchecked; __checkState = value; __NativeCheckState = (uint)value; CheckStateChanged?.Invoke(this, global::System.EventArgs.Empty); if (oldChecked != (__checkState != CheckState.Unchecked)) CheckedChanged?.Invoke(this, global::System.EventArgs.Empty); } }
         public bool Checked { get { return __checkState != CheckState.Unchecked; } set { CheckState = value ? CheckState.Checked : CheckState.Unchecked; } }
         public event global::System.EventHandler CheckStateChanged;
@@ -142,9 +156,10 @@ namespace System.Windows.Forms {
         Indeterminate = 2,
     }
     public static partial class Clipboard {
-        public static string GetText() { return default!; }
-        public static void SetText(string text) { }
-        public static void SetText(string text, global::System.Windows.Forms.TextDataFormat format) { }
+        private static string __clipboardText = string.Empty;
+        public static string GetText() { return __clipboardText; }
+        public static void SetText(string text) { if (text is null) throw new global::System.ArgumentNullException(nameof(text)); __clipboardText = text; }
+        public static void SetText(string text, global::System.Windows.Forms.TextDataFormat format) { if (text is null) throw new global::System.ArgumentNullException(nameof(text)); __clipboardText = text; }
     }
     public enum CloseReason : int {
         None = 0,
@@ -156,10 +171,13 @@ namespace System.Windows.Forms {
         ApplicationExitCall = 6,
     }
     public partial class ColorDialog : global::System.Windows.Forms.CommonDialog {
+        private bool __anyColor;
+        private global::System.Drawing.Color __dialogColor = global::System.Drawing.Color.Black;
+        private bool __fullOpen;
         public ColorDialog() { }
-        public virtual bool AnyColor { set { } }
-        public global::System.Drawing.Color Color { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ColorDialog.Color"); } set { } }
-        public virtual bool FullOpen { set { } }
+        public virtual bool AnyColor { set { __anyColor = value; } }
+        public global::System.Drawing.Color Color { get { return __dialogColor; } set { __dialogColor = value; } }
+        public virtual bool FullOpen { set { __fullOpen = value; } }
     }
     public partial class ColumnStyle : global::System.Windows.Forms.TableLayoutStyle {
         public ColumnStyle() { }
@@ -171,18 +189,34 @@ namespace System.Windows.Forms {
         private ComboBoxStyle __dropDownStyle;
         private FlatStyle __comboFlatStyle;
         private object? __selectedItem;
-        protected override void __OnSelectedIndexChanged() { Text = SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? global::System.Convert.ToString(__comboItems[SelectedIndex], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty : string.Empty; base.__OnSelectedIndexChanged(); SelectedIndexChanged?.Invoke(this, global::System.EventArgs.Empty); }
-        private void __ShowItems() { if (__dropDownStyle == ComboBoxStyle.Simple || __comboItems.Count == 0) return; using var menu = new ContextMenuStrip { Name = Name + ".DropDown" }; for (var index = 0; index < __comboItems.Count; ++index) { var selection = index; var text = global::System.Convert.ToString(__comboItems[index], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty; var item = new ToolStripMenuItem(text) { Name = "item." + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture), Checked = index == SelectedIndex }; item.Click += (_, _) => SelectedIndex = selection; menu.Items.Add(item); } menu.Show(PointToScreen(new global::System.Drawing.Point(0, Height))); }
+        private AutoCompleteMode __autoCompleteMode;
+        private AutoCompleteSource __autoCompleteSource;
+        private DrawMode __comboDrawMode;
+        private int __dropDownHeight = 106;
+        private int __dropDownWidth;
+        private bool __integralHeight = true;
+        private ContextMenuStrip? __comboDropDown;
+        private bool __comboDropDownOpen;
+        private int __comboSelectionStart = -1;
+        private int __comboSelectionLength;
+        private void __NormalizeComboSelection() { if (__comboSelectionStart < 0) __comboSelectionStart = Text.Length; __comboSelectionStart = global::System.Math.Clamp(__comboSelectionStart, 0, Text.Length); __comboSelectionLength = global::System.Math.Clamp(__comboSelectionLength, 0, Text.Length - __comboSelectionStart); }
+        private void __ReplaceComboSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeComboSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __comboSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __comboSelectionLength; Text = Text.Remove(start, length).Insert(start, value); __comboSelectionStart = start + value.Length; __comboSelectionLength = 0; }
+        internal void __ResetItemsSelection() { __SetSelectedIndexSilently(-1); Text = string.Empty; __comboSelectionStart = 0; __comboSelectionLength = 0; }
+        internal override void __NativeTextInput(string text, bool composing, int replacementStart, int replacementLength) { if (__dropDownStyle != ComboBoxStyle.DropDownList && !global::System.String.IsNullOrEmpty(text)) __ReplaceComboSelection(text, replacementStart, replacementLength); }
+        internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __dropDownStyle == ComboBoxStyle.DropDownList) return; __NormalizeComboSelection(); if ((modifiers & 2u) != 0 && physicalKey == 0x04u) { __comboSelectionStart = 0; __comboSelectionLength = Text.Length; return; } if (physicalKey == 0x2au) { if (__comboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboSelectionStart > 0) { --__comboSelectionStart; __comboSelectionLength = 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__comboSelectionLength > 0) __ReplaceComboSelection(string.Empty); else if (__comboSelectionStart < Text.Length) { __comboSelectionLength = 1; __ReplaceComboSelection(string.Empty); } } else if (physicalKey == 0x4au) { __comboSelectionStart = 0; __comboSelectionLength = 0; } else if (physicalKey == 0x4du) { __comboSelectionStart = Text.Length; __comboSelectionLength = 0; } else if (physicalKey == 0x50u) { if (__comboSelectionLength > 0) __comboSelectionLength = 0; else __comboSelectionStart = global::System.Math.Max(0, __comboSelectionStart - 1); } else if (physicalKey == 0x4fu) { if (__comboSelectionLength > 0) { __comboSelectionStart += __comboSelectionLength; __comboSelectionLength = 0; } else __comboSelectionStart = global::System.Math.Min(Text.Length, __comboSelectionStart + 1); } }
+        protected override void __OnSelectedIndexChanged() { Text = SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? global::System.Convert.ToString(__comboItems[SelectedIndex], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty : string.Empty; __comboSelectionStart = Text.Length; __comboSelectionLength = 0; base.__OnSelectedIndexChanged(); SelectedIndexChanged?.Invoke(this, global::System.EventArgs.Empty); }
+        private void __CloseItems() { if (!__comboDropDownOpen) return; __comboDropDownOpen = false; __comboDropDown?.__CloseDropDown(); DropDownClosed?.Invoke(this, global::System.EventArgs.Empty); }
+        private void __ShowItems() { if (__dropDownStyle == ComboBoxStyle.Simple || __comboItems.Count == 0 || __comboDropDownOpen) return; if (__comboDropDown is not null) { __comboDropDown.__CloseDropDown(); __comboDropDown.Dispose(); } var menu = new ContextMenuStrip { Name = Name + ".DropDown" }; __comboDropDown = menu; for (var index = 0; index < __comboItems.Count; ++index) { var selection = index; var text = global::System.Convert.ToString(__comboItems[index], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty; var item = new ToolStripMenuItem(text) { Name = "item." + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture), Checked = index == SelectedIndex }; item.Click += (_, _) => { SelectedIndex = selection; __CloseItems(); }; menu.Items.Add(item); } DropDown?.Invoke(this, global::System.EventArgs.Empty); __comboDropDownOpen = true; menu.Show(this, new global::System.Drawing.Point(0, Height)); }
         protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == global::System.Windows.Forms.MouseButtons.Left) __ShowItems(); }
         public ComboBox() { __comboItems = new ObjectCollection(this); }
-        public global::System.Windows.Forms.AutoCompleteMode AutoCompleteMode { set { } }
-        public global::System.Windows.Forms.AutoCompleteSource AutoCompleteSource { set { } }
-        public global::System.Windows.Forms.DrawMode DrawMode { set { } }
-        public int DropDownHeight { set { } }
+        public global::System.Windows.Forms.AutoCompleteMode AutoCompleteMode { set { __autoCompleteMode = value; } }
+        public global::System.Windows.Forms.AutoCompleteSource AutoCompleteSource { set { __autoCompleteSource = value; } }
+        public global::System.Windows.Forms.DrawMode DrawMode { set { __comboDrawMode = value; Invalidate(); } }
+        public int DropDownHeight { set { if (value < 1) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __dropDownHeight = value; } }
         public global::System.Windows.Forms.ComboBoxStyle DropDownStyle { get { return __dropDownStyle; } set { __dropDownStyle = value; } }
-        public int DropDownWidth { set { } }
+        public int DropDownWidth { set { if (value < 1) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __dropDownWidth = value; } }
         public global::System.Windows.Forms.FlatStyle FlatStyle { get { return __comboFlatStyle; } set { __comboFlatStyle = value; } }
-        public bool IntegralHeight { set { } }
+        public bool IntegralHeight { set { __integralHeight = value; } }
         public global::System.Windows.Forms.ComboBox.ObjectCollection Items { get { return __comboItems; } }
         public object SelectedItem { get { return SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? __comboItems[SelectedIndex] : null!; } set { __selectedItem = value; SelectedIndex = value is null ? -1 : __comboItems.IndexOf(value); } }
         public event global::System.EventHandler DropDown;
@@ -192,7 +226,7 @@ namespace System.Windows.Forms {
         protected override void OnGotFocus(global::System.EventArgs e) { }
         protected override void OnLostFocus(global::System.EventArgs e) { }
         protected override void OnResize(global::System.EventArgs e) { base.OnResize(e); }
-        protected virtual void OnTextChanged(global::System.EventArgs e) { }
+        protected override void OnTextChanged(global::System.EventArgs e) { base.OnTextChanged(e); }
         public void Select(int start, int length) { }
         protected virtual void OnDrawItem(global::System.Windows.Forms.DrawItemEventArgs e) { }
         protected override void WndProc(ref global::System.Windows.Forms.Message m) { }
@@ -206,7 +240,7 @@ namespace System.Windows.Forms {
             public global::System.Collections.IEnumerator GetEnumerator() { return __items.GetEnumerator(); }
             public int Add(object item) { if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Add(item); return __items.Count - 1; }
             public int IndexOf(object value) { return __items.IndexOf(value); }
-            public void Clear() { __items.Clear(); if (__owner is not null) __owner.SelectedIndex = -1; }
+            public void Clear() { __items.Clear(); __owner?.__ResetItemsSelection(); }
             public void RemoveAt(int index) { __items.RemoveAt(index); if (__owner is not null && __owner.SelectedIndex >= __items.Count) __owner.SelectedIndex = __items.Count - 1; }
             public void Insert(int index, object item) { if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Insert(index, item); }
             public void AddRange(object[] items) { if (items is null) throw new global::System.ArgumentNullException(nameof(items)); foreach (var item in items) Add(item); }
@@ -218,16 +252,19 @@ namespace System.Windows.Forms {
         DropDownList = 2,
     }
     public abstract partial class CommonDialog : global::System.ComponentModel.Component {
+        internal virtual DialogResult __RunDialog(IWin32Window? owner) { if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=cancel|type=" + GetType().FullName + "|reason=no-host-provider"); return DialogResult.Cancel; }
         public CommonDialog() { }
-        public global::System.Windows.Forms.DialogResult ShowDialog() { return default!; }
-        public global::System.Windows.Forms.DialogResult ShowDialog(global::System.Windows.Forms.IWin32Window owner) { return default!; }
+        public global::System.Windows.Forms.DialogResult ShowDialog() { return __RunDialog(null); }
+        public global::System.Windows.Forms.DialogResult ShowDialog(global::System.Windows.Forms.IWin32Window owner) { return __RunDialog(owner); }
     }
     public partial class ContainerControl : global::System.Windows.Forms.ScrollableControl {
+        private global::System.Drawing.SizeF __autoScaleDimensions;
+        private AutoScaleMode __autoScaleMode;
         public ContainerControl() { }
-        public global::System.Windows.Forms.Control ActiveControl { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Control>("System.Windows.Forms.ContainerControl.ActiveControl"); } }
-        public global::System.Drawing.SizeF AutoScaleDimensions { set { } }
-        public global::System.Windows.Forms.AutoScaleMode AutoScaleMode { set { } }
-        protected virtual bool ProcessCmdKey(ref global::System.Windows.Forms.Message msg, global::System.Windows.Forms.Keys keyData) { return default!; }
+        public global::System.Windows.Forms.Control ActiveControl { get { var focused = Control.__FocusedControl; return focused is not null && (global::System.Object.ReferenceEquals(focused, this) || __ContainsDescendant(focused)) ? focused : null!; } }
+        public global::System.Drawing.SizeF AutoScaleDimensions { set { __autoScaleDimensions = value; } }
+        public global::System.Windows.Forms.AutoScaleMode AutoScaleMode { set { __autoScaleMode = value; } }
+        protected virtual bool ProcessCmdKey(ref global::System.Windows.Forms.Message msg, global::System.Windows.Forms.Keys keyData) { return false; }
         protected override void Dispose(bool disposing) { base.Dispose(disposing); }
         protected override void OnParentChanged(global::System.EventArgs e) { base.OnParentChanged(e); }
         protected override void OnLayout(global::System.Windows.Forms.LayoutEventArgs e) { base.OnLayout(e); }
@@ -236,20 +273,26 @@ namespace System.Windows.Forms {
         public ContextMenuStrip() { }
         public ContextMenuStrip(global::System.ComponentModel.IContainer container) { }
     }
-    public partial class Control : global::System.ComponentModel.Component {
+    public partial class Control : global::System.ComponentModel.Component, global::System.Windows.Forms.IWin32Window {
         private NativeControlBridge __native = null!;
         protected ControlCollection __controls = null!;
-        private void __NativeChanged(NativeChange change) { if (change == NativeChange.Text) TextChanged?.Invoke(this, global::System.EventArgs.Empty); else if (change == NativeChange.Visible) VisibleChanged?.Invoke(this, global::System.EventArgs.Empty); }
+        private void __NativeChanged(NativeChange change) { if (change == NativeChange.Text) { if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_TEXT") == "1" && Text.Length != 0) global::System.Console.Error.WriteLine("facade-text=type:" + GetType().FullName + "|name:" + Name + "|text:" + Text.Replace('\r', ' ').Replace('\n', ' ')); OnTextChanged(global::System.EventArgs.Empty); if (__loadRaised) __QueueManagedPaint(); } else if (change == NativeChange.Visible) OnVisibleChanged(global::System.EventArgs.Empty); else if (change == NativeChange.Enabled) OnEnabledChanged(global::System.EventArgs.Empty); }
         internal virtual bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) Click?.Invoke(this, global::System.EventArgs.Empty); return false; }
-        private void __NativePointer(NativePointer input) { var button = input.Button switch { 1u => MouseButtons.Left, 2u => MouseButtons.Right, 3u => MouseButtons.Middle, _ => MouseButtons.None }; var e = new MouseEventArgs(button, input.Kind is 6u or 7u ? 1 : 0, (int)global::System.Math.Round(input.X), (int)global::System.Math.Round(input.Y), (int)global::System.Math.Round(input.WheelDelta)); switch (input.Kind) { case 5u: OnMouseMove(e); break; case 6u: OnMouseDown(e); break; case 7u: OnMouseUp(e); break; case 8u: OnMouseWheel(e); break; case 9u: OnMouseEnter(global::System.EventArgs.Empty); break; case 10u: OnMouseLeave(global::System.EventArgs.Empty); break; } }
+        private void __NativePointer(NativePointer input) { var button = input.Button switch { 1u => MouseButtons.Left, 2u => MouseButtons.Right, 3u => MouseButtons.Middle, _ => MouseButtons.None }; var e = new MouseEventArgs(button, input.Kind is 6u or 7u ? 1 : 0, (int)global::System.Math.Round(input.X), (int)global::System.Math.Round(input.Y), (int)global::System.Math.Round(input.WheelDelta)); switch (input.Kind) { case 5u: OnMouseMove(e); break; case 6u: Application.__DismissActiveMenuForPointer(this); OnMouseDown(e); break; case 7u: OnMouseUp(e); break; case 8u: OnMouseWheel(e); break; case 9u: OnMouseEnter(global::System.EventArgs.Empty); break; case 10u: OnMouseLeave(global::System.EventArgs.Empty); break; } }
         internal string __RunNativeWindow() { return __native.RunWindow(global::System.Environment.GetEnvironmentVariable("GUI_FORMS_AUTOMATION_CLOSE") == "1", global::System.Environment.GetEnvironmentVariable("GUI_FORMS_FORCE_HEADLESS") == "1", global::System.Environment.GetEnvironmentVariable("GUI_FORMS_AUTOMATION_ACTIVATE") == "1", false); }
         internal string __RunNativePopup() { return __native.RunWindow(false, global::System.Environment.GetEnvironmentVariable("GUI_FORMS_FORCE_HEADLESS") == "1", false, true); }
+        internal void __DoEvents() { NativeControlBridge.DoEvents(global::System.Environment.CurrentManagedThreadId); }
         internal void __RequestClose() { __native.RequestClose(); }
+        internal bool __ShowPathDialog(uint kind, string title, string initialDirectory, string suggestedName, string defaultExtension, string filter, uint flags, out string selectedPath) { return __native.ShowPathDialog(kind, title, initialDirectory, suggestedName, defaultExtension, filter, flags, out selectedPath); }
+        internal void __ShowToolTip(string text, int x, int y, int duration) { __native.ShowToolTip(text, x, y, duration); }
+        internal void __HideToolTip() { __native.HideToolTip(); }
         internal uint __NativeCheckState { get { return __native.CheckState; } set { __native.CheckState = value; } }
+        internal double __NativeRangeValue { get { return __native.RangeValue; } set { __native.RangeValue = value; } }
         private bool __loadRaised;
         internal static readonly bool __TraceLifecycle = global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_LIFECYCLE") == "1";
         internal static readonly bool __TraceInteraction = global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_INTERACTION") == "1";
         internal bool __HasRaisedLoad { get { return __loadRaised; } }
+        internal static Control? __FocusedControl { get { return __focusedControl; } }
         internal bool __BeginLoad() { if (__loadRaised) return false; __loadRaised = true; return true; }
         internal void __RaiseChildrenLoad() { foreach (Control child in Controls) child.__RaiseLoad(); }
         internal void __DumpTree(int depth) { var table = this as TableLayoutPanel; global::System.Console.Error.WriteLine("facade-tree=" + new string(' ', depth * 2) + GetType().FullName + "|name=" + Name + "|bounds=" + Bounds.X + "," + Bounds.Y + "," + Bounds.Width + "," + Bounds.Height + "|dock=" + Dock + "|visible=" + Visible + "|autosize=" + __autoSize + "|raster=" + __native.SupportsRaster + "|children=" + Controls.Count + (table is null ? string.Empty : table.__TableTrace())); foreach (Control child in Controls) child.__DumpTree(depth + 1); }
@@ -265,7 +308,6 @@ namespace System.Windows.Forms {
         private bool __autoSize;
         private bool __tabStop = true;
         private bool __allowDrop;
-        private bool __capture;
         private bool __doubleBuffered;
         private int __layoutSuspendDepth;
         private bool __performingLayout;
@@ -289,29 +331,42 @@ namespace System.Windows.Forms {
         private bool __renderingManagedPaint;
         private int __paintQueued;
         private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, byte> __paintTrace = new();
+        private static int __paintCaptureSequence;
+        internal virtual void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { if (Application.__DispatchKeyToActiveMenu(this, physicalKey, down, modifiers, repeat)) return; __DeliverNativeKey(physicalKey, down, modifiers, repeat); }
+        internal void __DeliverNativeKey(uint physicalKey, bool down, uint modifiers, bool repeat) { var key = physicalKey switch { >= 0x04u and <= 0x1du => (Keys)((int)Keys.A + (int)(physicalKey - 0x04u)), >= 0x1eu and <= 0x26u => (Keys)((int)Keys.D1 + (int)(physicalKey - 0x1eu)), 0x27u => Keys.D0, 0x28u => Keys.Enter, 0x29u => Keys.Escape, 0x2au => Keys.Back, 0x2bu => Keys.Tab, 0x2cu => Keys.Space, 0x4au => Keys.Home, 0x4bu => Keys.PageUp, 0x4du => Keys.End, 0x4eu => Keys.PageDown, 0x4fu => Keys.Right, 0x50u => Keys.Left, 0x51u => Keys.Down, 0x52u => Keys.Up, _ => Keys.None }; if ((modifiers & 1u) != 0) key |= Keys.Shift; if ((modifiers & 2u) != 0) key |= Keys.Control; if ((modifiers & 4u) != 0) key |= Keys.Alt; var e = new KeyEventArgs(key); if (down) OnKeyDown(e); else OnKeyUp(e); }
+        internal virtual void __NativeTextInput(string text, bool composing, int replacementStart, int replacementLength) { }
         internal void __RenderManagedPaint() { if (!global::System.OperatingSystem.IsWindows()) return; __RenderManagedPaintWindows(); }
         private void __RenderManagedPaintNow() { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); if (!__native.IsDisposed) __RenderManagedPaint(); }
-        private void __QueueManagedPaint() { if (__native.IsDisposed) return; if (!__loadRaised || FindForm() is null) { __RenderManagedPaint(); return; } if (global::System.Threading.Interlocked.Exchange(ref __paintQueued, 1) != 0) return; try { _ = BeginInvoke((global::System.Action)__RenderManagedPaintNow); } catch { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); throw; } }
-        private void __RenderManagedPaintWindows() { if (__native.IsDisposed || !__native.SupportsRaster || __renderingManagedPaint || Width <= 0 || Height <= 0 || Width > 4096 || Height > 4096) return; __renderingManagedPaint = true; try { using var bitmap = new global::System.Drawing.Bitmap(Width, Height, global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb); using (var graphics = global::System.Drawing.Graphics.FromImage(bitmap)) { graphics.Clear(BackColor); OnPaint(new PaintEventArgs(graphics, ClientRectangle)); } using var stream = new global::System.IO.MemoryStream(); bitmap.Save(stream, global::System.Drawing.Imaging.ImageFormat.Png); var png = stream.ToArray(); if (!__native.IsDisposed) __native.SetRaster(png); var typeName = GetType().FullName ?? GetType().Name; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_PAINT") == "1" && __paintTrace.TryAdd(typeName, 0)) global::System.Console.Error.WriteLine("facade-paint=type:" + typeName + "|size:" + Width + "x" + Height + "|png:" + png.Length); } catch (global::System.Exception error) { Application.__ReportCallbackException(error); } finally { __renderingManagedPaint = false; } }
+        private void __QueueManagedPaint() { if (__native.IsDisposed) return; var form = FindForm(); if (form is not null && !form.Visible) { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); return; } if (!__loadRaised || form is null) { __RenderManagedPaint(); return; } if (global::System.Threading.Interlocked.Exchange(ref __paintQueued, 1) != 0) return; try { _ = BeginInvoke((global::System.Action)__RenderManagedPaintNow); } catch { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); throw; } }
+        private void __RenderManagedPaintWindows() { if (__native.IsDisposed || !__native.SupportsRaster || __renderingManagedPaint || Width <= 0 || Height <= 0 || Width > 4096 || Height > 4096) return; __renderingManagedPaint = true; try { using var bitmap = new global::System.Drawing.Bitmap(Width, Height, global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb); using (var graphics = global::System.Drawing.Graphics.FromImage(bitmap)) { graphics.Clear(BackColor); OnPaint(new PaintEventArgs(graphics, ClientRectangle)); } using var stream = new global::System.IO.MemoryStream(); bitmap.Save(stream, global::System.Drawing.Imaging.ImageFormat.Png); var png = stream.ToArray(); var captureDirectory = global::System.Environment.GetEnvironmentVariable("GUI_FORMS_CAPTURE_RASTER_DIR"); if (this is ContextMenuStrip && !global::System.String.IsNullOrWhiteSpace(captureDirectory)) { global::System.IO.Directory.CreateDirectory(captureDirectory); var sequence = global::System.Threading.Interlocked.Increment(ref __paintCaptureSequence); var capturePath = global::System.IO.Path.Combine(captureDirectory, "context-menu-" + sequence.ToString("D4", global::System.Globalization.CultureInfo.InvariantCulture) + ".png"); global::System.IO.File.WriteAllBytes(capturePath, png); global::System.Console.Error.WriteLine("facade-paint-capture=" + capturePath); } if (!__native.IsDisposed) __native.SetRaster(png); var typeName = GetType().FullName ?? GetType().Name; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_PAINT") == "1" && __paintTrace.TryAdd(typeName, 0)) global::System.Console.Error.WriteLine("facade-paint=type:" + typeName + "|size:" + Width + "x" + Height + "|png:" + png.Length); } catch (global::System.Exception error) { Application.__ReportCallbackException(error); } finally { __renderingManagedPaint = false; } }
         private void __ApplyDockLayout() { var remaining = new global::System.Drawing.Rectangle(__padding.Left, __padding.Top, global::System.Math.Max(0, ClientSize.Width - __padding.Left - __padding.Right), global::System.Math.Max(0, ClientSize.Height - __padding.Top - __padding.Bottom)); for (var index = __controls.Count - 1; index >= 0; --index) { var child = __controls[index]; if (!child.Visible) continue; var bounds = child.Bounds; switch (child.Dock) { case DockStyle.Top: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Y, remaining.Width, bounds.Height); remaining.Y += bounds.Height; remaining.Height = global::System.Math.Max(0, remaining.Height - bounds.Height); break; case DockStyle.Bottom: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Bottom - bounds.Height, remaining.Width, bounds.Height); remaining.Height = global::System.Math.Max(0, remaining.Height - bounds.Height); break; case DockStyle.Left: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Y, bounds.Width, remaining.Height); remaining.X += bounds.Width; remaining.Width = global::System.Math.Max(0, remaining.Width - bounds.Width); break; case DockStyle.Right: bounds = new global::System.Drawing.Rectangle(remaining.Right - bounds.Width, remaining.Y, bounds.Width, remaining.Height); remaining.Width = global::System.Math.Max(0, remaining.Width - bounds.Width); break; case DockStyle.Fill: bounds = remaining; break; default: continue; } child.Bounds = bounds; } }
         internal void __SetParent(Control? value) { if (global::System.Object.ReferenceEquals(__parent, value)) return; if (__parent is not null) __parent.Controls.Remove(this); if (value is not null) value.Controls.Add(this); }
         internal global::System.Drawing.Point __ScreenOffset() { var point = Location; for (var current = __parent; current is not null; current = current.__parent) point.Offset(current.Location); return point; }
         internal bool __ContainsDescendant(Control candidate) { foreach (Control child in Controls) if (global::System.Object.ReferenceEquals(child, candidate) || child.__ContainsDescendant(candidate)) return true; return false; }
         internal void __SetStyle(ControlStyles style, bool enabled) { var bits = (long)style; if (enabled) __styles |= bits; else __styles &= ~bits; }
         internal Padding __LayoutMargin { get { return __margin; } }
+        internal bool __TabStop { get { return __tabStop; } }
         internal bool __LayoutAutoSize { get { return __autoSize; } }
         internal global::System.Drawing.Size __PreferredLayoutSize() { var width = global::System.Math.Max(Width, __minimumSize.Width); var height = global::System.Math.Max(Height, __minimumSize.Height); if (this is ButtonBase) { width = global::System.Math.Max(width, 75); height = global::System.Math.Max(height, 23); } if (__autoSize || width == 0 || height == 0) { var childWidth = 0; var childHeight = 0; foreach (Control child in Controls) { if (!child.Visible) continue; var preferred = child.__PreferredLayoutSize(); var margin = child.__LayoutMargin; childWidth = global::System.Math.Max(childWidth, child.Left + preferred.Width + margin.Right); childHeight = global::System.Math.Max(childHeight, child.Top + preferred.Height + margin.Bottom); } if (__autoSize || width == 0) width = global::System.Math.Max(width, childWidth + __padding.Right); if (__autoSize || height == 0) height = global::System.Math.Max(height, childHeight + __padding.Bottom); } return new global::System.Drawing.Size(width, height); }
         internal void __RefreshAutoSizeFromChildren() { if (!__autoSize) return; var preferred = __PreferredLayoutSize(); var next = Size; if ((Dock is DockStyle.Top or DockStyle.Bottom || next.Height == 0) && preferred.Height > 0) next.Height = preferred.Height; if ((Dock is DockStyle.Left or DockStyle.Right || next.Width == 0) && preferred.Width > 0) next.Width = preferred.Width; if (next != Size) Size = next; __parent?.PerformLayout(); }
-        public Control() { __native = NativeControlBridge.Create(GetType()); __native.Changed += __NativeChanged; __native.NativeEventRaised += __NativeEvent; __native.PointerRaised += __NativePointer; __controls = new ControlCollection(this); __ApplyEffectiveColors(); }
+        public event global::System.EventHandler? BackColorChanged;
+        public event global::System.EventHandler? EnabledChanged;
+        public event global::System.EventHandler? FontChanged;
+        public event global::System.EventHandler? ForeColorChanged;
+        public event global::System.EventHandler? GotFocus;
+        protected virtual void OnBackColorChanged(global::System.EventArgs e) { BackColorChanged?.Invoke(this, e); }
+        protected virtual void OnTextChanged(global::System.EventArgs e) { TextChanged?.Invoke(this, e); }
+        protected virtual void OnVisibleChanged(global::System.EventArgs e) { VisibleChanged?.Invoke(this, e); }
+        public Control() { __native = NativeControlBridge.Create(GetType()); __native.Changed += __NativeChanged; __native.NativeEventRaised += __NativeEvent; __native.PointerRaised += __NativePointer; __native.KeyRaised += input => __NativeKeyInput(input.PhysicalKey, input.Kind == 11u, input.Modifiers, input.Repeat); __native.TextRaised += __NativeTextInput; __controls = new ControlCollection(this); __ApplyEffectiveColors(); }
         public virtual bool AllowDrop { set { __allowDrop = value; } }
         public virtual global::System.Windows.Forms.AnchorStyles Anchor { get { return __anchor; } set { __anchor = value; } }
         public virtual bool AutoSize { set { if (__autoSize == value) return; __autoSize = value; if (value) __RefreshAutoSizeFromChildren(); else __parent?.PerformLayout(); } }
-        public virtual global::System.Drawing.Color BackColor { get { return !__backColor.IsEmpty ? __backColor : __parent is not null ? __parent.BackColor : global::System.Drawing.Color.FromArgb(229, 234, 239); } set { if (__backColor == value) return; __backColor = value; __ApplyEffectiveColors(); } }
+        public virtual global::System.Drawing.Color BackColor { get { return !__backColor.IsEmpty ? __backColor : __parent is not null ? __parent.BackColor : global::System.Drawing.Color.FromArgb(229, 234, 239); } set { if (__backColor == value) return; __backColor = value; __ApplyEffectiveColors(); OnBackColorChanged(global::System.EventArgs.Empty); if (__loadRaised) __QueueManagedPaint(); } }
         public virtual global::System.Drawing.Image BackgroundImage { set { __backgroundImage = value; if (__loadRaised) __RenderManagedPaint(); } }
         public virtual global::System.Windows.Forms.ImageLayout BackgroundImageLayout { set { __backgroundImageLayout = value; if (__loadRaised) __RenderManagedPaint(); } }
         public int Bottom { get { return Bounds.Bottom; } }
         public global::System.Drawing.Rectangle Bounds { get { return __native.Bounds; } set { var normalized = new global::System.Drawing.Rectangle(value.X, value.Y, global::System.Math.Max(0, value.Width), global::System.Math.Max(0, value.Height)); var previous = __native.Bounds; if (previous == normalized) return; __native.Bounds = normalized; if (previous.Location != normalized.Location) Move?.Invoke(this, global::System.EventArgs.Empty); if (previous.Size != normalized.Size) { OnSizeChanged(global::System.EventArgs.Empty); OnResize(global::System.EventArgs.Empty); ClientSizeChanged?.Invoke(this, global::System.EventArgs.Empty); if (__parent is not null || __loadRaised) PerformLayout(); __parent?.__RefreshAutoSizeFromChildren(); if (__loadRaised) __RenderManagedPaint(); } } }
-        public bool Capture { get { return __capture; } set { __capture = value; } }
+        public bool Capture { get { return __native.Capture; } set { __native.Capture = value; } }
         public static bool CheckForIllegalCrossThreadCalls { set { __checkForIllegalCrossThreadCalls = value; } }
         public global::System.Drawing.Rectangle ClientRectangle { get { return new global::System.Drawing.Rectangle(0, 0, Width, Height); } }
         public global::System.Drawing.Size ClientSize { get { return Size; } set { Size = value; } }
@@ -326,8 +381,8 @@ namespace System.Windows.Forms {
         protected virtual bool DoubleBuffered { set { __doubleBuffered = value; } }
         public bool Enabled { get { return __native.Enabled; } set { __native.Enabled = value; } }
         public virtual bool Focused { get { return global::System.Object.ReferenceEquals(__focusedControl, this); } }
-        public virtual global::System.Drawing.Font Font { get { return __font ?? global::System.Drawing.SystemFonts.DefaultFont; } set { __font = value; } }
-        public virtual global::System.Drawing.Color ForeColor { get { return !__foreColor.IsEmpty ? __foreColor : __parent is not null ? __parent.ForeColor : global::System.Drawing.Color.FromArgb(27, 39, 51); } set { if (__foreColor == value) return; __foreColor = value; __ApplyEffectiveColors(); } }
+        public virtual global::System.Drawing.Font Font { get { return __font ?? global::System.Drawing.SystemFonts.DefaultFont; } set { if (global::System.Object.ReferenceEquals(__font, value)) return; __font = value; OnFontChanged(global::System.EventArgs.Empty); if (__loadRaised) __QueueManagedPaint(); } }
+        public virtual global::System.Drawing.Color ForeColor { get { return !__foreColor.IsEmpty ? __foreColor : __parent is not null ? __parent.ForeColor : global::System.Drawing.Color.FromArgb(27, 39, 51); } set { if (__foreColor == value) return; __foreColor = value; __ApplyEffectiveColors(); OnForeColorChanged(global::System.EventArgs.Empty); if (__loadRaised) __QueueManagedPaint(); } }
         public nint Handle { get { return __native.WindowHandle; } }
         public int Height { get { return Bounds.Height; } set { var bounds = Bounds; bounds.Height = value; Bounds = bounds; } }
         public bool InvokeRequired { get { return __native.InvokeRequired; } }
@@ -379,8 +434,8 @@ namespace System.Windows.Forms {
         public event global::System.EventHandler SizeChanged;
         public event global::System.EventHandler TextChanged;
         public event global::System.EventHandler VisibleChanged;
-        public bool Focus() { if (!Enabled || !Visible || __native.IsDisposed) return false; var previous = __focusedControl; if (global::System.Object.ReferenceEquals(previous, this)) return true; __focusedControl = this; previous?.LostFocus?.Invoke(previous, global::System.EventArgs.Empty); previous?.Leave?.Invoke(previous, global::System.EventArgs.Empty); Enter?.Invoke(this, global::System.EventArgs.Empty); return true; }
-        public bool SelectNextControl(global::System.Windows.Forms.Control ctl, bool forward, bool tabStopOnly, bool nested, bool wrap) { return default!; }
+        public bool Focus() { if (!Enabled || !Visible || __native.IsDisposed) return false; var previous = __focusedControl; if (global::System.Object.ReferenceEquals(previous, this)) return true; __focusedControl = this; if (previous is not null) { previous.OnLostFocus(global::System.EventArgs.Empty); previous.Leave?.Invoke(previous, global::System.EventArgs.Empty); } Enter?.Invoke(this, global::System.EventArgs.Empty); OnGotFocus(global::System.EventArgs.Empty); return true; }
+        public bool SelectNextControl(global::System.Windows.Forms.Control ctl, bool forward, bool tabStopOnly, bool nested, bool wrap) { if (Controls.Count == 0) return false; var start = ctl is null ? (forward ? -1 : 0) : Controls.IndexOf(ctl); for (var offset = 1; offset <= Controls.Count; ++offset) { var index = forward ? start + offset : start - offset; if (wrap) index = (index % Controls.Count + Controls.Count) % Controls.Count; else if (index < 0 || index >= Controls.Count) return false; var candidate = Controls[index]; if ((!tabStopOnly || candidate.__TabStop) && candidate.Enabled && candidate.Visible && candidate.Focus()) return true; } return false; }
         protected virtual bool ProcessDialogKey(global::System.Windows.Forms.Keys keyData) { return false; }
         public global::System.Drawing.Point PointToClient(global::System.Drawing.Point p) { var offset = __ScreenOffset(); return new global::System.Drawing.Point(p.X - offset.X, p.Y - offset.Y); }
         public global::System.Drawing.Point PointToScreen(global::System.Drawing.Point p) { var offset = __ScreenOffset(); return new global::System.Drawing.Point(p.X + offset.X, p.Y + offset.Y); }
@@ -394,24 +449,24 @@ namespace System.Windows.Forms {
         public void Invalidate() { __QueueManagedPaint(); }
         public void PerformLayout() { if (__layoutSuspendDepth != 0 || __performingLayout) return; __performingLayout = true; try { OnLayout(new LayoutEventArgs()); } finally { __performingLayout = false; } }
         public virtual void Refresh() { Invalidate(); Update(); }
-        public virtual void ResetBackColor() { __backColor = global::System.Drawing.Color.Empty; __ApplyEffectiveColors(); }
+        public virtual void ResetBackColor() { if (__backColor.IsEmpty) return; __backColor = global::System.Drawing.Color.Empty; __ApplyEffectiveColors(); OnBackColorChanged(global::System.EventArgs.Empty); if (__loadRaised) __QueueManagedPaint(); }
         protected void ResetMouseEventArgs() { }
         public void ResumeLayout() { if (__layoutSuspendDepth > 0) --__layoutSuspendDepth; if (__layoutSuspendDepth == 0) PerformLayout(); }
         public void SendToBack() { __parent?.Controls.__SendToBack(this); }
         public void Show() { Visible = true; }
         public void SuspendLayout() { ++__layoutSuspendDepth; }
-        public void Update() { if (InvokeRequired) Invoke((global::System.Action)__RenderManagedPaintNow); else __RenderManagedPaintNow(); }
+        public void Update() { if (__native.IsDisposed) return; var form = FindForm(); if (form is not null && !form.Visible) return; if (InvokeRequired) Invoke((global::System.Action)__RenderManagedPaintNow); else __RenderManagedPaintNow(); }
         protected void UpdateStyles() { }
         public void Invoke(global::System.Action method) { __native.Invoke(method); }
-        protected override void Dispose(bool disposing) { if (disposing) { var children = new global::System.Collections.Generic.List<Control>(); foreach (Control child in Controls) children.Add(child); foreach (var child in children) child.Dispose(); if (global::System.Object.ReferenceEquals(__focusedControl, this)) __focusedControl = null; __parent?.Controls.Remove(this); __native.Dispose(); } base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { var children = new global::System.Collections.Generic.List<Control>(); foreach (Control child in Controls) children.Add(child); foreach (var child in children) child.Dispose(); if (global::System.Object.ReferenceEquals(__focusedControl, this)) { __focusedControl = null; OnLostFocus(global::System.EventArgs.Empty); Leave?.Invoke(this, global::System.EventArgs.Empty); } __parent?.Controls.Remove(this); __native.Dispose(); } base.Dispose(disposing); }
         public void Invalidate(bool invalidateChildren) { __QueueManagedPaint(); }
         public void ResumeLayout(bool performLayout) { if (__layoutSuspendDepth > 0) --__layoutSuspendDepth; if (__layoutSuspendDepth == 0 && performLayout) PerformLayout(); }
-        protected virtual void OnEnabledChanged(global::System.EventArgs e) { }
-        protected virtual void OnFontChanged(global::System.EventArgs e) { }
-        protected virtual void OnForeColorChanged(global::System.EventArgs e) { }
-        protected virtual void OnGotFocus(global::System.EventArgs e) { }
+        protected virtual void OnEnabledChanged(global::System.EventArgs e) { EnabledChanged?.Invoke(this, e); }
+        protected virtual void OnFontChanged(global::System.EventArgs e) { FontChanged?.Invoke(this, e); }
+        protected virtual void OnForeColorChanged(global::System.EventArgs e) { ForeColorChanged?.Invoke(this, e); }
+        protected virtual void OnGotFocus(global::System.EventArgs e) { GotFocus?.Invoke(this, e); }
         protected virtual void OnHandleDestroyed(global::System.EventArgs e) { }
-        protected virtual void OnLostFocus(global::System.EventArgs e) { }
+        protected virtual void OnLostFocus(global::System.EventArgs e) { LostFocus?.Invoke(this, e); }
         protected virtual void OnMouseEnter(global::System.EventArgs e) { MouseEnter?.Invoke(this, e); }
         protected virtual void OnMouseHover(global::System.EventArgs e) { MouseHover?.Invoke(this, e); }
         protected virtual void OnMouseLeave(global::System.EventArgs e) { MouseLeave?.Invoke(this, e); }
@@ -431,7 +486,7 @@ namespace System.Windows.Forms {
         protected virtual void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { MouseUp?.Invoke(this, e); }
         protected virtual void OnMouseWheel(global::System.Windows.Forms.MouseEventArgs e) { MouseWheel?.Invoke(this, e); }
         protected virtual void OnPaint(global::System.Windows.Forms.PaintEventArgs e) { Paint?.Invoke(this, e); }
-        public static global::System.Windows.Forms.Control FromChildHandle(nint handle) { return default!; }
+        public static global::System.Windows.Forms.Control FromChildHandle(nint handle) { return null!; }
         public global::System.Windows.Forms.Form FindForm() { for (Control? current = this; current is not null; current = current.Parent) if (current is Form form) return form; return null!; }
         public partial class ControlAccessibleObject : global::System.Windows.Forms.AccessibleObject {
             public ControlAccessibleObject() { }
@@ -457,11 +512,11 @@ namespace System.Windows.Forms {
         }
     }
     public static partial class ControlPaint {
-        public static global::System.Drawing.Color Dark(global::System.Drawing.Color baseColor) { return default!; }
-        public static global::System.Drawing.Color Light(global::System.Drawing.Color baseColor) { return default!; }
-        public static global::System.Drawing.Color LightLight(global::System.Drawing.Color baseColor) { return default!; }
-        public static global::System.Drawing.Color Dark(global::System.Drawing.Color baseColor, float percOfDarkDark) { return default!; }
-        public static global::System.Drawing.Color Light(global::System.Drawing.Color baseColor, float percOfLightLight) { return default!; }
+        public static global::System.Drawing.Color Dark(global::System.Drawing.Color baseColor) { var amount = 0.25f; return global::System.Drawing.Color.FromArgb(baseColor.A, (int)(baseColor.R * (1f - amount)), (int)(baseColor.G * (1f - amount)), (int)(baseColor.B * (1f - amount))); }
+        public static global::System.Drawing.Color Light(global::System.Drawing.Color baseColor) { var amount = 0.25f; return global::System.Drawing.Color.FromArgb(baseColor.A, baseColor.R + (int)((255 - baseColor.R) * amount), baseColor.G + (int)((255 - baseColor.G) * amount), baseColor.B + (int)((255 - baseColor.B) * amount)); }
+        public static global::System.Drawing.Color LightLight(global::System.Drawing.Color baseColor) { var amount = 0.5f; return global::System.Drawing.Color.FromArgb(baseColor.A, baseColor.R + (int)((255 - baseColor.R) * amount), baseColor.G + (int)((255 - baseColor.G) * amount), baseColor.B + (int)((255 - baseColor.B) * amount)); }
+        public static global::System.Drawing.Color Dark(global::System.Drawing.Color baseColor, float percOfDarkDark) { var amount = global::System.Math.Clamp(percOfDarkDark, 0f, 1f); return global::System.Drawing.Color.FromArgb(baseColor.A, (int)(baseColor.R * (1f - amount)), (int)(baseColor.G * (1f - amount)), (int)(baseColor.B * (1f - amount))); }
+        public static global::System.Drawing.Color Light(global::System.Drawing.Color baseColor, float percOfLightLight) { var amount = global::System.Math.Clamp(percOfLightLight, 0f, 1f); return global::System.Drawing.Color.FromArgb(baseColor.A, baseColor.R + (int)((255 - baseColor.R) * amount), baseColor.G + (int)((255 - baseColor.G) * amount), baseColor.B + (int)((255 - baseColor.B) * amount)); }
     }
     public enum ControlStyles : int {
         ContainerControl = 1,
@@ -484,31 +539,43 @@ namespace System.Windows.Forms {
         ApplyThemingImplicitly = 524288,
     }
     public partial class ConvertEventArgs : global::System.EventArgs {
+        private object? __convertedValue;
         public ConvertEventArgs() { }
-        public object Value { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<object>("System.Windows.Forms.ConvertEventArgs.Value"); } set { } }
+        public object Value { get { return __convertedValue!; } set { __convertedValue = value; } }
     }
     public partial class CreateParams : object {
+        private int __extendedStyle;
         public CreateParams() { }
-        public int ExStyle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.CreateParams.ExStyle"); } set { } }
+        public int ExStyle { get { return __extendedStyle; } set { __extendedStyle = value; } }
     }
     public partial class Cursor : object {
+        private static Cursor? __current;
+        private static global::System.Drawing.Point __position;
         public Cursor() { }
-        public static global::System.Windows.Forms.Cursor Current { set { } }
-        public static global::System.Drawing.Point Position { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Point>("System.Windows.Forms.Cursor.Position"); } set { } }
+        public static global::System.Windows.Forms.Cursor Current { set { __current = value; } }
+        public static global::System.Drawing.Point Position { get { return __position; } set { __position = value; } }
         public static bool operator !=(global::System.Windows.Forms.Cursor left, global::System.Windows.Forms.Cursor right) { return !global::System.Object.ReferenceEquals(left, right); }
         public static bool operator ==(global::System.Windows.Forms.Cursor left, global::System.Windows.Forms.Cursor right) { return global::System.Object.ReferenceEquals(left, right); }
         public override bool Equals(object? value) { return global::System.Object.ReferenceEquals(this, value); }
         public override int GetHashCode() { return global::System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this); }
     }
     public static partial class Cursors {
-        public static global::System.Windows.Forms.Cursor Cross { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.Cross"); } }
-        public static global::System.Windows.Forms.Cursor Default { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.Default"); } }
-        public static global::System.Windows.Forms.Cursor HSplit { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.HSplit"); } }
-        public static global::System.Windows.Forms.Cursor Hand { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.Hand"); } }
-        public static global::System.Windows.Forms.Cursor No { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.No"); } }
-        public static global::System.Windows.Forms.Cursor SizeWE { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.SizeWE"); } }
-        public static global::System.Windows.Forms.Cursor VSplit { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.VSplit"); } }
-        public static global::System.Windows.Forms.Cursor WaitCursor { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Cursor>("System.Windows.Forms.Cursors.WaitCursor"); } }
+        private static readonly Cursor __cross = new();
+        private static readonly Cursor __default = new();
+        private static readonly Cursor __hSplit = new();
+        private static readonly Cursor __hand = new();
+        private static readonly Cursor __no = new();
+        private static readonly Cursor __sizeWE = new();
+        private static readonly Cursor __vSplit = new();
+        private static readonly Cursor __wait = new();
+        public static global::System.Windows.Forms.Cursor Cross { get { return __cross; } }
+        public static global::System.Windows.Forms.Cursor Default { get { return __default; } }
+        public static global::System.Windows.Forms.Cursor HSplit { get { return __hSplit; } }
+        public static global::System.Windows.Forms.Cursor Hand { get { return __hand; } }
+        public static global::System.Windows.Forms.Cursor No { get { return __no; } }
+        public static global::System.Windows.Forms.Cursor SizeWE { get { return __sizeWE; } }
+        public static global::System.Windows.Forms.Cursor VSplit { get { return __vSplit; } }
+        public static global::System.Windows.Forms.Cursor WaitCursor { get { return __wait; } }
     }
     public partial class DataGridView : global::System.Windows.Forms.Control, global::System.ComponentModel.ISupportInitialize {
         private int __initializationDepth;
@@ -522,45 +589,55 @@ namespace System.Windows.Forms {
         private readonly DataGridViewRow __rowTemplate = new();
         private readonly global::System.Collections.Generic.Dictionary<(int Column, int Row), DataGridViewCell> __cells = new();
         private object? __gridDataSource;
+        private bool __allowUserToAddRows = true, __allowUserToDeleteRows = true, __allowUserToResizeColumns = true, __allowUserToResizeRows = true, __autoGenerateColumns = true;
+        private global::System.Drawing.Color __gridBackgroundColor, __gridColor;
+        private BorderStyle __gridBorderStyle;
+        private DataGridViewHeaderBorderStyle __columnHeaderBorderStyle, __rowHeaderBorderStyle;
+        private int __columnHeadersHeight = 23, __firstDisplayedRow;
+        private DataGridViewColumnHeadersHeightSizeMode __columnHeadersHeightSizeMode;
+        private bool __enableHeadersVisualStyles = true, __multiSelect = true, __gridReadOnly, __rowHeadersVisible = true;
+        private ScrollBars __gridScrollBars = ScrollBars.Both;
+        private DataGridViewSelectionMode __gridSelectionMode;
+        private bool __showCellErrors = true, __showCellToolTips = true, __showEditingIcon = true, __showRowErrors = true;
         internal int __DataRowCount { get { if (__gridDataSource is BindingSource source) return source.List.Count; if (__gridDataSource is global::System.Collections.IList list) return list.Count; return 0; } }
         private DataGridViewCell __Cell(int columnIndex, int rowIndex) { if (columnIndex < 0 || rowIndex < 0) throw new global::System.ArgumentOutOfRangeException(); var key = (columnIndex, rowIndex); if (!__cells.TryGetValue(key, out var cell)) { cell = new DataGridViewTextBoxCell { __dataGridView = this, __rowIndex = rowIndex }; __cells.Add(key, cell); } return cell; }
         public void BeginInit() { ++__initializationDepth; }
         public void EndInit() { if (__initializationDepth == 0) return; if (--__initializationDepth == 0) PerformLayout(); }
         public DataGridView() { __gridColumns = new DataGridViewColumnCollection(this); __gridRows = new DataGridViewRowCollection(this); }
-        public bool AllowUserToAddRows { set { } }
-        public bool AllowUserToDeleteRows { set { } }
-        public bool AllowUserToResizeColumns { set { } }
-        public bool AllowUserToResizeRows { set { } }
+        public bool AllowUserToAddRows { set { __allowUserToAddRows = value; } }
+        public bool AllowUserToDeleteRows { set { __allowUserToDeleteRows = value; } }
+        public bool AllowUserToResizeColumns { set { __allowUserToResizeColumns = value; } }
+        public bool AllowUserToResizeRows { set { __allowUserToResizeRows = value; } }
         public global::System.Windows.Forms.DataGridViewCellStyle AlternatingRowsDefaultCellStyle { get { return __alternatingRowsDefaultCellStyle; } }
-        public bool AutoGenerateColumns { set { } }
-        public global::System.Drawing.Color BackgroundColor { set { } }
-        public global::System.Windows.Forms.BorderStyle BorderStyle { set { } }
-        public global::System.Windows.Forms.DataGridViewHeaderBorderStyle ColumnHeadersBorderStyle { set { } }
+        public bool AutoGenerateColumns { set { __autoGenerateColumns = value; } }
+        public global::System.Drawing.Color BackgroundColor { set { __gridBackgroundColor = value; BackColor = value; } }
+        public global::System.Windows.Forms.BorderStyle BorderStyle { set { __gridBorderStyle = value; } }
+        public global::System.Windows.Forms.DataGridViewHeaderBorderStyle ColumnHeadersBorderStyle { set { __columnHeaderBorderStyle = value; } }
         public global::System.Windows.Forms.DataGridViewCellStyle ColumnHeadersDefaultCellStyle { get { return __columnHeadersDefaultCellStyle; } }
-        public int ColumnHeadersHeight { set { } }
-        public global::System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode ColumnHeadersHeightSizeMode { set { } }
+        public int ColumnHeadersHeight { set { if (value < 4) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __columnHeadersHeight = value; } }
+        public global::System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode ColumnHeadersHeightSizeMode { set { __columnHeadersHeightSizeMode = value; } }
         public global::System.Windows.Forms.DataGridViewColumnCollection Columns { get { return __gridColumns; } }
         public object DataSource { set { __gridDataSource = value; } }
         public global::System.Windows.Forms.DataGridViewCellStyle DefaultCellStyle { get { return __defaultCellStyle; } }
-        public global::System.Windows.Forms.Control EditingControl { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Control>("System.Windows.Forms.DataGridView.EditingControl"); } }
-        public bool EnableHeadersVisualStyles { set { } }
-        public int FirstDisplayedScrollingRowIndex { set { } }
-        public global::System.Drawing.Color GridColor { set { } }
+        public global::System.Windows.Forms.Control EditingControl { get { return null!; } }
+        public bool EnableHeadersVisualStyles { set { __enableHeadersVisualStyles = value; } }
+        public int FirstDisplayedScrollingRowIndex { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __firstDisplayedRow = value; } }
+        public global::System.Drawing.Color GridColor { set { __gridColor = value; } }
         public global::System.Windows.Forms.DataGridViewCell this[int columnIndex, int rowIndex] { get { return __Cell(columnIndex, rowIndex); } }
-        public bool MultiSelect { set { } }
-        public bool ReadOnly { set { } }
-        public global::System.Windows.Forms.DataGridViewHeaderBorderStyle RowHeadersBorderStyle { set { } }
-        public bool RowHeadersVisible { set { } }
+        public bool MultiSelect { set { __multiSelect = value; } }
+        public bool ReadOnly { set { __gridReadOnly = value; } }
+        public global::System.Windows.Forms.DataGridViewHeaderBorderStyle RowHeadersBorderStyle { set { __rowHeaderBorderStyle = value; } }
+        public bool RowHeadersVisible { set { __rowHeadersVisible = value; } }
         public global::System.Windows.Forms.DataGridViewRow RowTemplate { get { return __rowTemplate; } }
         public global::System.Windows.Forms.DataGridViewRowCollection Rows { get { return __gridRows; } }
-        public global::System.Windows.Forms.ScrollBars ScrollBars { set { } }
+        public global::System.Windows.Forms.ScrollBars ScrollBars { set { __gridScrollBars = value; } }
         public global::System.Windows.Forms.DataGridViewSelectedCellCollection SelectedCells { get { return __selectedCells; } }
         public global::System.Windows.Forms.DataGridViewSelectedRowCollection SelectedRows { get { return __selectedRows; } }
-        public global::System.Windows.Forms.DataGridViewSelectionMode SelectionMode { set { } }
-        public bool ShowCellErrors { set { } }
-        public bool ShowCellToolTips { set { } }
-        public bool ShowEditingIcon { set { } }
-        public bool ShowRowErrors { set { } }
+        public global::System.Windows.Forms.DataGridViewSelectionMode SelectionMode { set { __gridSelectionMode = value; } }
+        public bool ShowCellErrors { set { __showCellErrors = value; } }
+        public bool ShowCellToolTips { set { __showCellToolTips = value; } }
+        public bool ShowEditingIcon { set { __showEditingIcon = value; } }
+        public bool ShowRowErrors { set { __showRowErrors = value; } }
         public event global::System.Windows.Forms.DataGridViewCellCancelEventHandler CellBeginEdit;
         public event global::System.Windows.Forms.DataGridViewCellEventHandler CellDoubleClick;
         public event global::System.Windows.Forms.DataGridViewCellEventHandler CellEndEdit;
@@ -584,11 +661,12 @@ namespace System.Windows.Forms {
         private DataGridViewCellStyle __bandDefaultCellStyle = new();
         private bool __bandReadOnly;
         private bool __bandSelected;
+        private DataGridViewTriState __bandResizable = DataGridViewTriState.NotSet;
         public DataGridViewBand() { }
         public virtual global::System.Windows.Forms.DataGridViewCellStyle DefaultCellStyle { get { return __bandDefaultCellStyle; } set { __bandDefaultCellStyle = value ?? throw new global::System.ArgumentNullException(nameof(value)); } }
         public virtual bool Displayed { get { return true; } }
         public virtual bool ReadOnly { set { __bandReadOnly = value; } }
-        public virtual global::System.Windows.Forms.DataGridViewTriState Resizable { set { } }
+        public virtual global::System.Windows.Forms.DataGridViewTriState Resizable { set { __bandResizable = value; } }
         public virtual bool Selected { set { __bandSelected = value; } }
     }
     public abstract partial class DataGridViewCell : global::System.Windows.Forms.DataGridViewElement {
@@ -596,7 +674,7 @@ namespace System.Windows.Forms {
         internal object? __cellValue;
         internal int __rowIndex = -1;
         public DataGridViewCell() { }
-        public virtual object DefaultNewRowValue { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<object>("System.Windows.Forms.DataGridViewCell.DefaultNewRowValue"); } }
+        public virtual object DefaultNewRowValue { get { return null!; } }
         public int RowIndex { get { return __rowIndex; } }
         public global::System.Windows.Forms.DataGridViewCellStyle Style { get { return __cellStyle; } }
         public object Value { get { return __cellValue!; } }
@@ -610,9 +688,11 @@ namespace System.Windows.Forms {
     }
     public delegate void DataGridViewCellEventHandler(object sender, global::System.Windows.Forms.DataGridViewCellEventArgs e);
     public partial class DataGridViewCellFormattingEventArgs : global::System.Windows.Forms.ConvertEventArgs {
+        internal int __formattingColumnIndex = -1;
+        private bool __formattingApplied;
         public DataGridViewCellFormattingEventArgs() { }
-        public int ColumnIndex { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.DataGridViewCellFormattingEventArgs.ColumnIndex"); } }
-        public bool FormattingApplied { set { } }
+        public int ColumnIndex { get { return __formattingColumnIndex; } }
+        public bool FormattingApplied { set { __formattingApplied = value; } }
     }
     public delegate void DataGridViewCellFormattingEventHandler(object sender, global::System.Windows.Forms.DataGridViewCellFormattingEventArgs e);
     public partial class DataGridViewCellStyle : object {
@@ -636,12 +716,14 @@ namespace System.Windows.Forms {
         private string __headerText = string.Empty;
         private string __columnName = string.Empty;
         private int __columnWidth = 100;
+        private DataGridViewAutoSizeColumnMode __columnAutoSizeMode;
+        private float __fillWeight = 100f;
         public DataGridViewColumn() { }
         public DataGridViewColumn(global::System.Windows.Forms.DataGridViewCell cellTemplate) { __cellTemplate = cellTemplate ?? throw new global::System.ArgumentNullException(nameof(cellTemplate)); }
-        public global::System.Windows.Forms.DataGridViewAutoSizeColumnMode AutoSizeMode { set { } }
+        public global::System.Windows.Forms.DataGridViewAutoSizeColumnMode AutoSizeMode { set { __columnAutoSizeMode = value; } }
         public virtual global::System.Windows.Forms.DataGridViewCell CellTemplate { get { return __cellTemplate!; } set { __cellTemplate = value; } }
         public string DataPropertyName { get { return __dataPropertyName; } set { __dataPropertyName = value ?? string.Empty; } }
-        public float FillWeight { set { } }
+        public float FillWeight { set { if (value <= 0f) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __fillWeight = value; } }
         public string HeaderText { set { __headerText = value ?? string.Empty; } }
         public string Name { set { __columnName = value ?? string.Empty; } }
         public int Width { set { __columnWidth = value; } }
@@ -686,8 +768,9 @@ namespace System.Windows.Forms {
         None = 4,
     }
     public partial class DataGridViewRow : global::System.Windows.Forms.DataGridViewBand {
+        private int __rowHeight = 22;
         public DataGridViewRow() { }
-        public int Height { set { } }
+        public int Height { set { if (value < 2) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __rowHeight = value; } }
     }
     public partial class DataGridViewRowCollection : object {
         private readonly DataGridView? __owner;
@@ -727,14 +810,21 @@ namespace System.Windows.Forms {
         False = 2,
     }
     public partial class DateTimePicker : global::System.Windows.Forms.Control {
+        private global::System.Drawing.Color __calendarForeColor;
+        private global::System.Drawing.Color __calendarMonthBackground;
+        private string __customFormat = string.Empty;
+        private DateTimePickerFormat __dateTimeFormat;
+        private global::System.DateTime __minimumDate = global::System.DateTime.MinValue;
+        private global::System.DateTime __maximumDate = global::System.DateTime.MaxValue;
+        private global::System.DateTime __dateTimeValue = global::System.DateTime.Now;
         public DateTimePicker() { }
-        public global::System.Drawing.Color CalendarForeColor { set { } }
-        public global::System.Drawing.Color CalendarMonthBackground { set { } }
-        public string CustomFormat { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.DateTimePicker.CustomFormat"); } set { } }
-        public global::System.Windows.Forms.DateTimePickerFormat Format { set { } }
-        public global::System.DateTime MaxDate { set { } }
-        public global::System.DateTime MinDate { set { } }
-        public global::System.DateTime Value { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.DateTime>("System.Windows.Forms.DateTimePicker.Value"); } set { } }
+        public global::System.Drawing.Color CalendarForeColor { set { __calendarForeColor = value; } }
+        public global::System.Drawing.Color CalendarMonthBackground { set { __calendarMonthBackground = value; } }
+        public string CustomFormat { get { return __customFormat; } set { __customFormat = value ?? string.Empty; } }
+        public global::System.Windows.Forms.DateTimePickerFormat Format { set { __dateTimeFormat = value; } }
+        public global::System.DateTime MaxDate { set { if (value < __minimumDate) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __maximumDate = value; if (__dateTimeValue > value) __dateTimeValue = value; } }
+        public global::System.DateTime MinDate { set { if (value > __maximumDate) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __minimumDate = value; if (__dateTimeValue < value) __dateTimeValue = value; } }
+        public global::System.DateTime Value { get { return __dateTimeValue; } set { if (value < __minimumDate || value > __maximumDate) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __dateTimeValue = value; } }
         protected virtual void OnValueChanged(global::System.EventArgs eventargs) { }
     }
     public enum DateTimePickerFormat : int {
@@ -767,11 +857,15 @@ namespace System.Windows.Forms {
         public DragEventArgs() { }
     }
     public partial class DrawItemEventArgs : global::System.EventArgs {
+        internal global::System.Drawing.Rectangle __drawBounds;
+        internal global::System.Drawing.Graphics? __drawGraphics;
+        internal int __drawIndex = -1;
+        internal DrawItemState __drawState;
         public DrawItemEventArgs() { }
-        public global::System.Drawing.Rectangle Bounds { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.DrawItemEventArgs.Bounds"); } }
-        public global::System.Drawing.Graphics Graphics { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Graphics>("System.Windows.Forms.DrawItemEventArgs.Graphics"); } }
-        public int Index { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.DrawItemEventArgs.Index"); } }
-        public global::System.Windows.Forms.DrawItemState State { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.DrawItemState>("System.Windows.Forms.DrawItemEventArgs.State"); } }
+        public global::System.Drawing.Rectangle Bounds { get { return __drawBounds; } }
+        public global::System.Drawing.Graphics Graphics { get { return __drawGraphics!; } }
+        public int Index { get { return __drawIndex; } }
+        public global::System.Windows.Forms.DrawItemState State { get { return __drawState; } }
     }
     public delegate void DrawItemEventHandler(object sender, global::System.Windows.Forms.DrawItemEventArgs e);
     public enum DrawItemState : int {
@@ -794,16 +888,23 @@ namespace System.Windows.Forms {
         OwnerDrawVariable = 2,
     }
     public abstract partial class FileDialog : global::System.Windows.Forms.CommonDialog {
+        private string __defaultExt = string.Empty;
+        protected string __fileName = string.Empty;
+        private string __filter = string.Empty;
+        private string __initialDirectory = string.Empty;
+        private bool __restoreDirectory;
+        internal override DialogResult __RunDialog(IWin32Window? owner) { var selected = global::System.Environment.GetEnvironmentVariable("GUI_FORMS_DIALOG_FILE"); if (!global::System.String.IsNullOrWhiteSpace(selected)) { __fileName = selected; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=file|result=OK|path=" + selected); return DialogResult.OK; } var host = owner as Control ?? Application.__CurrentForm; if (host is null) return base.__RunDialog(owner); var kind = this is SaveFileDialog ? 2u : 1u; var flags = this is SaveFileDialog ? 2u : 0u; if (host.__ShowPathDialog(kind, this is SaveFileDialog ? "Save file" : "Open file", __initialDirectory, __fileName, __defaultExt, __filter, flags, out selected)) { __fileName = selected; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=file|result=OK|path=" + selected + "|provider=native"); return DialogResult.OK; } if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=file|result=Cancel|provider=native"); return DialogResult.Cancel; }
         public FileDialog() { }
-        public string DefaultExt { set { } }
-        public string FileName { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.FileDialog.FileName"); } set { } }
-        public string Filter { set { } }
-        public string InitialDirectory { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.FileDialog.InitialDirectory"); } set { } }
-        public bool RestoreDirectory { set { } }
+        public string DefaultExt { set { __defaultExt = value ?? string.Empty; } }
+        public string FileName { get { return __fileName; } set { __fileName = value ?? string.Empty; } }
+        public string Filter { set { __filter = value ?? string.Empty; } }
+        public string InitialDirectory { get { return __initialDirectory; } set { __initialDirectory = value ?? string.Empty; } }
+        public bool RestoreDirectory { set { __restoreDirectory = value; } }
     }
     public partial class FlatButtonAppearance : object {
+        private int __flatBorderSize = 1;
         public FlatButtonAppearance() { }
-        public int BorderSize { set { } }
+        public int BorderSize { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __flatBorderSize = value; } }
     }
     public enum FlatStyle : int {
         Flat = 0,
@@ -819,8 +920,10 @@ namespace System.Windows.Forms {
         public bool WrapContents { set { __wrapContents = value; PerformLayout(); } }
     }
     public partial class FolderBrowserDialog : global::System.Windows.Forms.CommonDialog {
+        private string __selectedPath = string.Empty;
+        internal override DialogResult __RunDialog(IWin32Window? owner) { var selected = global::System.Environment.GetEnvironmentVariable("GUI_FORMS_DIALOG_FOLDER"); if (!global::System.String.IsNullOrWhiteSpace(selected)) { __selectedPath = selected; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=folder|result=OK|path=" + selected); return DialogResult.OK; } var host = owner as Control ?? Application.__CurrentForm; if (host is null) return base.__RunDialog(owner); if (host.__ShowPathDialog(3u, "Select folder", __selectedPath, string.Empty, string.Empty, string.Empty, 0u, out selected)) { __selectedPath = selected; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=folder|result=OK|path=" + selected + "|provider=native"); return DialogResult.OK; } if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIALOGS") == "1") global::System.Console.Error.WriteLine("facade-dialog=folder|result=Cancel|provider=native"); return DialogResult.Cancel; }
         public FolderBrowserDialog() { }
-        public string SelectedPath { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.FolderBrowserDialog.SelectedPath"); } set { } }
+        public string SelectedPath { get { return __selectedPath; } set { __selectedPath = value ?? string.Empty; } }
     }
     public partial class Form : global::System.Windows.Forms.ContainerControl {
         internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.FormClosing) { var args = new FormClosingEventArgs(); FormClosing?.Invoke(this, args); return args.Cancel; } if (kind == NativeEvent.FormClosed) { FormClosed?.Invoke(this, new FormClosedEventArgs()); return false; } return base.__NativeEvent(kind); }
@@ -833,33 +936,48 @@ namespace System.Windows.Forms {
         private FormWindowState __windowState;
         private Form? __mdiParent;
         private MenuStrip? __mainMenuStrip;
+        private global::System.Drawing.Icon? __formIcon;
+        private IButtonControl? __acceptButton;
+        private IButtonControl? __cancelButton;
+        private readonly CreateParams __createParams = new();
+        private FormBorderStyle __formBorderStyle = FormBorderStyle.Sizable;
+        private bool __keyPreview;
+        private bool __maximizeBox = true;
+        private bool __minimizeBox = true;
+        private double __opacity = 1d;
+        private Form? __ownerForm;
+        private bool __showIcon = true;
+        private bool __showInTaskbar = true;
+        private SizeGripStyle __sizeGripStyle;
+        private FormStartPosition __startPosition;
+        private bool __topMost;
         public Form() { }
-        public global::System.Windows.Forms.IButtonControl AcceptButton { set { } }
-        public global::System.Windows.Forms.Form ActiveMdiChild { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Form>("System.Windows.Forms.Form.ActiveMdiChild"); } }
-        public global::System.Windows.Forms.IButtonControl CancelButton { set { } }
+        public global::System.Windows.Forms.IButtonControl AcceptButton { set { __acceptButton = value; } }
+        public global::System.Windows.Forms.Form ActiveMdiChild { get { return null!; } }
+        public global::System.Windows.Forms.IButtonControl CancelButton { set { __cancelButton = value; } }
         public global::System.Drawing.Size ClientSize { set { base.ClientSize = value; } }
         public bool ControlBox { get { return __controlBox; } set { __controlBox = value; } }
-        protected virtual global::System.Windows.Forms.CreateParams CreateParams { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.CreateParams>("System.Windows.Forms.Form.CreateParams"); } }
+        protected virtual global::System.Windows.Forms.CreateParams CreateParams { get { return __createParams; } }
         public global::System.Windows.Forms.DialogResult DialogResult { set { __dialogResult = value; if (value != DialogResult.None && Visible) __RequestClose(); } }
-        public global::System.Windows.Forms.FormBorderStyle FormBorderStyle { set { } }
-        public global::System.Drawing.Icon Icon { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Icon>("System.Windows.Forms.Form.Icon"); } set { } }
-        public bool KeyPreview { set { } }
+        public global::System.Windows.Forms.FormBorderStyle FormBorderStyle { set { __formBorderStyle = value; } }
+        public global::System.Drawing.Icon Icon { get { return __formIcon!; } set { __formIcon = value; } }
+        public bool KeyPreview { set { __keyPreview = value; } }
         public global::System.Drawing.Point Location { get { return base.Location; } set { base.Location = value; } }
         public global::System.Windows.Forms.MenuStrip MainMenuStrip { get { return __mainMenuStrip!; } }
         public global::System.Windows.Forms.Padding Margin { set { base.Margin = value; } }
-        public bool MaximizeBox { set { } }
+        public bool MaximizeBox { set { __maximizeBox = value; } }
         public global::System.Windows.Forms.Form MdiParent { get { return __mdiParent!; } set { __mdiParent = value; } }
-        public bool MinimizeBox { set { } }
-        public double Opacity { set { } }
-        public global::System.Windows.Forms.Form Owner { set { } }
+        public bool MinimizeBox { set { __minimizeBox = value; } }
+        public double Opacity { set { if (value < 0d || value > 1d) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __opacity = value; } }
+        public global::System.Windows.Forms.Form Owner { set { __ownerForm = value; } }
         public virtual bool RightToLeftLayout { get { return __rightToLeftLayout; } set { __rightToLeftLayout = value; } }
-        public bool ShowIcon { set { } }
-        public bool ShowInTaskbar { set { } }
+        public bool ShowIcon { set { __showIcon = value; } }
+        public bool ShowInTaskbar { set { __showInTaskbar = value; } }
         public global::System.Drawing.Size Size { get { return base.Size; } set { base.Size = value; } }
-        public global::System.Windows.Forms.SizeGripStyle SizeGripStyle { set { } }
-        public global::System.Windows.Forms.FormStartPosition StartPosition { set { } }
+        public global::System.Windows.Forms.SizeGripStyle SizeGripStyle { set { __sizeGripStyle = value; } }
+        public global::System.Windows.Forms.FormStartPosition StartPosition { set { __startPosition = value; } }
         public bool TopLevel { get { return __topLevel; } set { __topLevel = value; } }
-        public bool TopMost { set { } }
+        public bool TopMost { set { __topMost = value; } }
         public global::System.Windows.Forms.FormWindowState WindowState { get { return __windowState; } set { __windowState = value; } }
         public event global::System.Windows.Forms.FormClosedEventHandler FormClosed;
         public event global::System.Windows.Forms.FormClosingEventHandler FormClosing;
@@ -876,7 +994,7 @@ namespace System.Windows.Forms {
         protected override void OnLayout(global::System.Windows.Forms.LayoutEventArgs levent) { base.OnLayout(levent); }
         protected virtual void WndProc(ref global::System.Windows.Forms.Message m) { }
         protected override void OnPaint(global::System.Windows.Forms.PaintEventArgs e) { base.OnPaint(e); }
-        public global::System.Windows.Forms.DialogResult ShowDialog() { if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-dialog=show|type=" + GetType().FullName + "|name=" + Name + "|text=" + Text + "|size=" + Width + "x" + Height); __RaiseLoad(); Visible = true; try { _ = __RunNativeWindow(); } finally { Visible = false; if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-dialog=closed|type=" + GetType().FullName + "|result=" + __dialogResult); } return __dialogResult; }
+        public global::System.Windows.Forms.DialogResult ShowDialog() { if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-dialog=show|type=" + GetType().FullName + "|name=" + Name + "|text=" + Text + "|size=" + Width + "x" + Height); Application.__CloseActiveMenu(); var previousActiveForm = Application.__CurrentForm; Application.__CurrentForm = this; try { __RaiseLoad(); Visible = true; _ = __RunNativeWindow(); } finally { Application.__CloseActiveMenu(); Visible = false; Application.__CurrentForm = previousActiveForm; if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-dialog=closed|type=" + GetType().FullName + "|result=" + __dialogResult); } return __dialogResult; }
     }
     public enum FormBorderStyle : int {
         None = 0,
@@ -892,8 +1010,9 @@ namespace System.Windows.Forms {
     }
     public delegate void FormClosedEventHandler(object sender, global::System.Windows.Forms.FormClosedEventArgs e);
     public partial class FormClosingEventArgs : global::System.ComponentModel.CancelEventArgs {
+        private CloseReason __closeReason = CloseReason.UserClosing;
         public FormClosingEventArgs() { }
-        public global::System.Windows.Forms.CloseReason CloseReason { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.CloseReason>("System.Windows.Forms.FormClosingEventArgs.CloseReason"); } }
+        public global::System.Windows.Forms.CloseReason CloseReason { get { return __closeReason; } }
     }
     public delegate void FormClosingEventHandler(object sender, global::System.Windows.Forms.FormClosingEventArgs e);
     public enum FormStartPosition : int {
@@ -909,16 +1028,19 @@ namespace System.Windows.Forms {
         Maximized = 2,
     }
     public partial class GroupBox : global::System.Windows.Forms.Control {
+        private FlatStyle __groupFlatStyle = FlatStyle.Standard;
+        private bool __groupTabStop;
         public GroupBox() { }
-        public global::System.Windows.Forms.FlatStyle FlatStyle { set { } }
-        public bool TabStop { set { } }
+        public global::System.Windows.Forms.FlatStyle FlatStyle { set { __groupFlatStyle = value; Invalidate(); } }
+        public bool TabStop { set { __groupTabStop = value; } }
     }
     public partial class HScrollProperties : global::System.Windows.Forms.ScrollProperties {
         public HScrollProperties() { }
     }
     public partial class HandledMouseEventArgs : global::System.Windows.Forms.MouseEventArgs {
+        private bool __mouseHandled;
         public HandledMouseEventArgs() { }
-        public bool Handled { set { } }
+        public bool Handled { set { __mouseHandled = value; } }
     }
     public enum HorizontalAlignment : int {
         Left = 0,
@@ -1145,54 +1267,69 @@ namespace System.Windows.Forms {
         Alt = 262144,
     }
     public partial class Label : global::System.Windows.Forms.Control {
+        private bool __autoEllipsis;
+        private global::System.Drawing.ContentAlignment __labelTextAlign = global::System.Drawing.ContentAlignment.MiddleLeft;
         public Label() { }
-        public bool AutoEllipsis { set { } }
-        public virtual global::System.Drawing.ContentAlignment TextAlign { set { } }
+        public bool AutoEllipsis { set { __autoEllipsis = value; Invalidate(); } }
+        public virtual global::System.Drawing.ContentAlignment TextAlign { set { __labelTextAlign = value; Invalidate(); } }
     }
     public partial class LayoutEventArgs : global::System.EventArgs {
         public LayoutEventArgs() { }
     }
     public delegate void LayoutEventHandler(object sender, global::System.Windows.Forms.LayoutEventArgs e);
     public partial class LinkLabel : global::System.Windows.Forms.Label {
+        private readonly LinkCollection __links = new();
         public LinkLabel() { }
-        public global::System.Windows.Forms.LinkLabel.LinkCollection Links { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.LinkLabel.LinkCollection>("System.Windows.Forms.LinkLabel.Links"); } }
-        public virtual string Text { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.LinkLabel.Text"); } set { } }
+        public global::System.Windows.Forms.LinkLabel.LinkCollection Links { get { return __links; } }
+        public virtual string Text { get { return base.Text; } set { base.Text = value ?? string.Empty; } }
         public event global::System.Windows.Forms.LinkLabelLinkClickedEventHandler LinkClicked;
         public partial class Link : object {
+            private int __linkStart;
+            private int __linkLength;
+            private object? __linkData;
             public Link() { }
-            public int Length { set { } }
-            public object LinkData { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<object>("System.Windows.Forms.LinkLabel+Link.LinkData"); } set { } }
-            public int Start { set { } }
+            public int Length { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __linkLength = value; } }
+            public object LinkData { get { return __linkData!; } set { __linkData = value; } }
+            public int Start { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __linkStart = value; } }
         }
         public partial class LinkCollection : object {
+            private readonly global::System.Collections.Generic.List<Link> __linkItems = new();
             public LinkCollection() { }
-            public int Add(global::System.Windows.Forms.LinkLabel.Link value) { return default!; }
+            public int Add(global::System.Windows.Forms.LinkLabel.Link value) { if (value is null) throw new global::System.ArgumentNullException(nameof(value)); __linkItems.Add(value); return __linkItems.Count - 1; }
             public virtual void Clear() { }
         }
     }
     public partial class LinkLabelLinkClickedEventArgs : global::System.EventArgs {
+        internal LinkLabel.Link? __clickedLink;
         public LinkLabelLinkClickedEventArgs() { }
-        public global::System.Windows.Forms.LinkLabel.Link Link { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.LinkLabel.Link>("System.Windows.Forms.LinkLabelLinkClickedEventArgs.Link"); } }
+        public global::System.Windows.Forms.LinkLabel.Link Link { get { return __clickedLink!; } }
     }
     public delegate void LinkLabelLinkClickedEventHandler(object sender, global::System.Windows.Forms.LinkLabelLinkClickedEventArgs e);
     public partial class ListBox : global::System.Windows.Forms.ListControl {
-        public ListBox() { }
-        public virtual global::System.Windows.Forms.DrawMode DrawMode { set { } }
-        public global::System.Windows.Forms.ListBox.ObjectCollection Items { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ListBox.ObjectCollection>("System.Windows.Forms.ListBox.Items"); } }
+        private readonly ObjectCollection __listItems;
+        private DrawMode __listDrawMode;
+        protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != global::System.Windows.Forms.MouseButtons.Left || __listItems.Count == 0) return; var row = global::System.Math.Clamp(e.Y / 22, 0, __listItems.Count - 1); SelectedIndex = row; }
+        public ListBox() { __listItems = new ObjectCollection(this); }
+        public virtual global::System.Windows.Forms.DrawMode DrawMode { set { __listDrawMode = value; Invalidate(); } }
+        public global::System.Windows.Forms.ListBox.ObjectCollection Items { get { return __listItems; } }
         public event global::System.Windows.Forms.DrawItemEventHandler DrawItem;
         public partial class ObjectCollection : object {
+            private readonly global::System.Collections.Generic.List<object> __items = new();
+            private readonly ListBox? __owner;
+            internal ObjectCollection(ListBox owner) { __owner = owner; }
             public ObjectCollection() { }
-            public int Count { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ListBox+ObjectCollection.Count"); } }
-            public virtual object this[int index] { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<object>("System.Windows.Forms.ListBox+ObjectCollection.Item"); } set { } }
-            public int Add(object item) { return default!; }
-            public void RemoveAt(int index) { }
-            public void Insert(int index, object item) { }
+            public int Count { get { return __items.Count; } }
+            public virtual object this[int index] { get { return __items[index]; } set { __items[index] = value ?? throw new global::System.ArgumentNullException(nameof(value)); __owner?.Invalidate(); } }
+            public int Add(object item) { if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Add(item); __owner?.Invalidate(); return __items.Count - 1; }
+            public void RemoveAt(int index) { __items.RemoveAt(index); if (__owner is not null && __owner.SelectedIndex >= __items.Count) __owner.SelectedIndex = __items.Count - 1; __owner?.Invalidate(); }
+            public void Insert(int index, object item) { if (item is null) throw new global::System.ArgumentNullException(nameof(item)); __items.Insert(index, item); if (__owner is not null && __owner.SelectedIndex >= index) __owner.SelectedIndex += 1; __owner?.Invalidate(); }
         }
     }
     public abstract partial class ListControl : global::System.Windows.Forms.Control {
         private int __selectedIndex = -1;
         private string __displayMember = string.Empty;
         private bool __formattingEnabled;
+        internal void __SetSelectedIndexSilently(int value) { __selectedIndex = value; }
         protected virtual void __OnSelectedIndexChanged() { SelectedValueChanged?.Invoke(this, global::System.EventArgs.Empty); }
         public ListControl() { }
         public string DisplayMember { set { __displayMember = value ?? string.Empty; } }
@@ -1210,12 +1347,13 @@ namespace System.Windows.Forms {
         public MenuStrip() { }
     }
     public partial class MessageBox : object {
+        private static DialogResult __Show(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton) { using var dialog = new Form { Text = caption ?? string.Empty, ClientSize = new global::System.Drawing.Size(420, 150), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false, StartPosition = FormStartPosition.CenterScreen }; var message = new Label { Text = text ?? string.Empty, Bounds = new global::System.Drawing.Rectangle(18, 18, 384, 72) }; dialog.Controls.Add(message); var choices = buttons switch { MessageBoxButtons.OKCancel => new[] { ("OK", DialogResult.OK), ("Cancel", DialogResult.Cancel) }, MessageBoxButtons.YesNo => new[] { ("Yes", DialogResult.Yes), ("No", DialogResult.No) }, MessageBoxButtons.YesNoCancel => new[] { ("Yes", DialogResult.Yes), ("No", DialogResult.No), ("Cancel", DialogResult.Cancel) }, MessageBoxButtons.RetryCancel => new[] { ("Retry", DialogResult.Retry), ("Cancel", DialogResult.Cancel) }, MessageBoxButtons.AbortRetryIgnore => new[] { ("Abort", DialogResult.Abort), ("Retry", DialogResult.Retry), ("Ignore", DialogResult.Ignore) }, MessageBoxButtons.CancelTryContinue => new[] { ("Cancel", DialogResult.Cancel), ("Try Again", DialogResult.TryAgain), ("Continue", DialogResult.Continue) }, _ => new[] { ("OK", DialogResult.OK) } }; var totalWidth = choices.Length * 88; var left = global::System.Math.Max(12, 420 - totalWidth - 12); for (var index = 0; index < choices.Length; ++index) { var choice = choices[index]; var button = new Button { Text = choice.Item1, Bounds = new global::System.Drawing.Rectangle(left + index * 88, 106, 80, 26), DialogResult = choice.Item2 }; dialog.Controls.Add(button); } var result = dialog.ShowDialog(); return result == DialogResult.None ? DialogResult.Cancel : result; }
         public MessageBox() { }
-        public static global::System.Windows.Forms.DialogResult Show(string text) { return default!; }
-        public static global::System.Windows.Forms.DialogResult Show(string text, string caption) { return default!; }
-        public static global::System.Windows.Forms.DialogResult Show(string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon) { return default!; }
-        public static global::System.Windows.Forms.DialogResult Show(string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon, global::System.Windows.Forms.MessageBoxDefaultButton defaultButton) { return default!; }
-        public static global::System.Windows.Forms.DialogResult Show(global::System.Windows.Forms.IWin32Window owner, string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon) { return default!; }
+        public static global::System.Windows.Forms.DialogResult Show(string text) { return __Show(text, string.Empty, MessageBoxButtons.OK, MessageBoxIcon.None, MessageBoxDefaultButton.Button1); }
+        public static global::System.Windows.Forms.DialogResult Show(string text, string caption) { return __Show(text, caption, MessageBoxButtons.OK, MessageBoxIcon.None, MessageBoxDefaultButton.Button1); }
+        public static global::System.Windows.Forms.DialogResult Show(string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon) { return __Show(text, caption, buttons, icon, MessageBoxDefaultButton.Button1); }
+        public static global::System.Windows.Forms.DialogResult Show(string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon, global::System.Windows.Forms.MessageBoxDefaultButton defaultButton) { return __Show(text, caption, buttons, icon, defaultButton); }
+        public static global::System.Windows.Forms.DialogResult Show(global::System.Windows.Forms.IWin32Window owner, string text, string caption, global::System.Windows.Forms.MessageBoxButtons buttons, global::System.Windows.Forms.MessageBoxIcon icon) { return __Show(text, caption, buttons, icon, MessageBoxDefaultButton.Button1); }
     }
     public enum MessageBoxButtons : int {
         OK = 0,
@@ -1295,7 +1433,7 @@ namespace System.Windows.Forms {
     }
     public partial class OpenFileDialog : global::System.Windows.Forms.FileDialog {
         public OpenFileDialog() { }
-        public string SafeFileName { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.OpenFileDialog.SafeFileName"); } }
+        public string SafeFileName { get { return global::System.IO.Path.GetFileName(__fileName); } }
     }
     public enum Orientation : int {
         Horizontal = 0,
@@ -1311,22 +1449,29 @@ namespace System.Windows.Forms {
     }
     public delegate void PaintEventHandler(object sender, global::System.Windows.Forms.PaintEventArgs e);
     public partial class Panel : global::System.Windows.Forms.ScrollableControl {
+        private AutoSizeMode __panelAutoSizeMode;
+        private BorderStyle __panelBorderStyle;
         public Panel() { }
-        public virtual global::System.Windows.Forms.AutoSizeMode AutoSizeMode { set { } }
-        public global::System.Windows.Forms.BorderStyle BorderStyle { set { } }
+        public virtual global::System.Windows.Forms.AutoSizeMode AutoSizeMode { set { __panelAutoSizeMode = value; } }
+        public global::System.Windows.Forms.BorderStyle BorderStyle { set { __panelBorderStyle = value; Invalidate(); } }
     }
     public partial class PictureBox : global::System.Windows.Forms.Control, global::System.ComponentModel.ISupportInitialize {
         private int __initializationDepth;
+        private BorderStyle __pictureBorderStyle;
+        private global::System.Drawing.Image? __pictureImage;
+        private global::System.Drawing.Image? __errorImage;
+        private global::System.Drawing.Image? __initialImage;
+        private PictureBoxSizeMode __pictureSizeMode;
         public void BeginInit() { ++__initializationDepth; }
         public void EndInit() { if (__initializationDepth == 0) return; if (--__initializationDepth == 0) PerformLayout(); }
         public PictureBox() { }
-        public global::System.Windows.Forms.BorderStyle BorderStyle { set { } }
-        public global::System.Drawing.Image ErrorImage { set { } }
-        public global::System.Drawing.Image Image { set { } }
-        public global::System.Drawing.Image InitialImage { set { } }
-        public global::System.Windows.Forms.PictureBoxSizeMode SizeMode { set { } }
-        public int TabIndex { set { } }
-        public bool TabStop { set { } }
+        public global::System.Windows.Forms.BorderStyle BorderStyle { set { __pictureBorderStyle = value; Invalidate(); } }
+        public global::System.Drawing.Image ErrorImage { set { __errorImage = value; Invalidate(); } }
+        public global::System.Drawing.Image Image { set { __pictureImage = value; Invalidate(); } }
+        public global::System.Drawing.Image InitialImage { set { __initialImage = value; Invalidate(); } }
+        public global::System.Windows.Forms.PictureBoxSizeMode SizeMode { set { __pictureSizeMode = value; Invalidate(); } }
+        public int TabIndex { set { base.TabIndex = value; } }
+        public bool TabStop { set { base.TabStop = value; } }
     }
     public enum PictureBoxSizeMode : int {
         Normal = 0,
@@ -1336,33 +1481,37 @@ namespace System.Windows.Forms {
         Zoom = 4,
     }
     public partial class PreviewKeyDownEventArgs : global::System.EventArgs {
+        private Keys __previewKeyCode;
         public PreviewKeyDownEventArgs() { }
-        public global::System.Windows.Forms.Keys KeyCode { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Keys>("System.Windows.Forms.PreviewKeyDownEventArgs.KeyCode"); } }
+        public global::System.Windows.Forms.Keys KeyCode { get { return __previewKeyCode; } }
     }
     public delegate void PreviewKeyDownEventHandler(object sender, global::System.Windows.Forms.PreviewKeyDownEventArgs e);
     public partial class ProfessionalColorTable : object {
         public ProfessionalColorTable() { }
-        public virtual global::System.Drawing.Color ButtonCheckedGradientBegin { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonCheckedGradientBegin"); } }
-        public virtual global::System.Drawing.Color ButtonCheckedGradientEnd { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonCheckedGradientEnd"); } }
-        public virtual global::System.Drawing.Color ButtonCheckedGradientMiddle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonCheckedGradientMiddle"); } }
-        public virtual global::System.Drawing.Color ButtonPressedBorder { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonPressedBorder"); } }
-        public virtual global::System.Drawing.Color ButtonPressedGradientBegin { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonPressedGradientBegin"); } }
-        public virtual global::System.Drawing.Color ButtonPressedGradientEnd { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonPressedGradientEnd"); } }
-        public virtual global::System.Drawing.Color ButtonPressedGradientMiddle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonPressedGradientMiddle"); } }
-        public virtual global::System.Drawing.Color ButtonSelectedBorder { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonSelectedBorder"); } }
-        public virtual global::System.Drawing.Color ButtonSelectedGradientBegin { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonSelectedGradientBegin"); } }
-        public virtual global::System.Drawing.Color ButtonSelectedGradientEnd { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonSelectedGradientEnd"); } }
-        public virtual global::System.Drawing.Color ButtonSelectedGradientMiddle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.ButtonSelectedGradientMiddle"); } }
-        public virtual global::System.Drawing.Color MenuItemBorder { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.MenuItemBorder"); } }
-        public virtual global::System.Drawing.Color MenuItemSelected { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.MenuItemSelected"); } }
-        public virtual global::System.Drawing.Color MenuItemSelectedGradientBegin { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.MenuItemSelectedGradientBegin"); } }
-        public virtual global::System.Drawing.Color MenuItemSelectedGradientEnd { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Color>("System.Windows.Forms.ProfessionalColorTable.MenuItemSelectedGradientEnd"); } }
+        public virtual global::System.Drawing.Color ButtonCheckedGradientBegin { get { return global::System.Drawing.Color.FromArgb(224, 236, 249); } }
+        public virtual global::System.Drawing.Color ButtonCheckedGradientEnd { get { return global::System.Drawing.Color.FromArgb(152, 194, 233); } }
+        public virtual global::System.Drawing.Color ButtonCheckedGradientMiddle { get { return global::System.Drawing.Color.FromArgb(191, 219, 248); } }
+        public virtual global::System.Drawing.Color ButtonPressedBorder { get { return global::System.Drawing.Color.FromArgb(61, 123, 173); } }
+        public virtual global::System.Drawing.Color ButtonPressedGradientBegin { get { return global::System.Drawing.Color.FromArgb(208, 228, 247); } }
+        public virtual global::System.Drawing.Color ButtonPressedGradientEnd { get { return global::System.Drawing.Color.FromArgb(126, 175, 216); } }
+        public virtual global::System.Drawing.Color ButtonPressedGradientMiddle { get { return global::System.Drawing.Color.FromArgb(170, 204, 235); } }
+        public virtual global::System.Drawing.Color ButtonSelectedBorder { get { return global::System.Drawing.Color.FromArgb(91, 143, 185); } }
+        public virtual global::System.Drawing.Color ButtonSelectedGradientBegin { get { return global::System.Drawing.Color.FromArgb(238, 246, 254); } }
+        public virtual global::System.Drawing.Color ButtonSelectedGradientEnd { get { return global::System.Drawing.Color.FromArgb(175, 210, 241); } }
+        public virtual global::System.Drawing.Color ButtonSelectedGradientMiddle { get { return global::System.Drawing.Color.FromArgb(213, 232, 250); } }
+        public virtual global::System.Drawing.Color MenuItemBorder { get { return global::System.Drawing.Color.FromArgb(112, 153, 187); } }
+        public virtual global::System.Drawing.Color MenuItemSelected { get { return global::System.Drawing.Color.FromArgb(217, 235, 252); } }
+        public virtual global::System.Drawing.Color MenuItemSelectedGradientBegin { get { return global::System.Drawing.Color.FromArgb(236, 246, 255); } }
+        public virtual global::System.Drawing.Color MenuItemSelectedGradientEnd { get { return global::System.Drawing.Color.FromArgb(190, 220, 246); } }
     }
     public partial class ProgressBar : global::System.Windows.Forms.Control {
+        private int __progressMinimum;
+        private int __progressMaximum = 100;
+        private int __progressValue;
         public ProgressBar() { }
-        public int Maximum { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ProgressBar.Maximum"); } }
-        public int Minimum { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ProgressBar.Minimum"); } }
-        public int Value { set { } }
+        public int Maximum { get { return __progressMaximum; } }
+        public int Minimum { get { return __progressMinimum; } }
+        public int Value { set { if (value < __progressMinimum || value > __progressMaximum) throw new global::System.ArgumentOutOfRangeException(nameof(value)); if (__progressValue == value) return; __NativeRangeValue = value; __progressValue = value; Invalidate(); } }
     }
     public partial class RadioButton : global::System.Windows.Forms.ButtonBase {
         internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) { if (__TraceInteraction) global::System.Console.Error.WriteLine("facade-interaction=radio-native-begin|name=" + Name); if (Parent is not null) foreach (Control peer in Parent.Controls) if (peer is RadioButton radio && !global::System.Object.ReferenceEquals(radio, this)) radio.Checked = false; if (__TraceInteraction) global::System.Console.Error.WriteLine("facade-interaction=radio-native-peers|name=" + Name); Checked = __NativeCheckState != 0u; if (__TraceInteraction) global::System.Console.Error.WriteLine("facade-interaction=radio-native-end|name=" + Name + "|checked=" + Checked); } return base.__NativeEvent(kind); }
@@ -1388,10 +1537,11 @@ namespace System.Windows.Forms {
         public SaveFileDialog() { }
     }
     public partial class Screen : object {
+        private global::System.Drawing.Rectangle __screenBounds = new global::System.Drawing.Rectangle(0, 0, 1920, 1080);
         public Screen() { }
-        public static global::System.Windows.Forms.Screen[] AllScreens { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.Screen[]>("System.Windows.Forms.Screen.AllScreens"); } }
-        public global::System.Drawing.Rectangle Bounds { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.Screen.Bounds"); } }
-        public static global::System.Drawing.Rectangle GetWorkingArea(global::System.Drawing.Point pt) { return default!; }
+        public static global::System.Windows.Forms.Screen[] AllScreens { get { return new[] { new Screen() }; } }
+        public global::System.Drawing.Rectangle Bounds { get { return __screenBounds; } }
+        public static global::System.Drawing.Rectangle GetWorkingArea(global::System.Drawing.Point pt) { return new global::System.Drawing.Rectangle(0, 0, 1920, 1040); }
     }
     public enum ScrollBars : int {
         None = 0,
@@ -1435,16 +1585,20 @@ namespace System.Windows.Forms {
         protected bool VScroll { set { __vScroll = value; } }
         public global::System.Windows.Forms.VScrollProperties VerticalScroll { get { return __verticalScroll; } }
         protected override void OnRightToLeftChanged(global::System.EventArgs e) { }
-        protected virtual void OnVisibleChanged(global::System.EventArgs e) { }
+        protected override void OnVisibleChanged(global::System.EventArgs e) { base.OnVisibleChanged(e); }
         protected override void OnLayout(global::System.Windows.Forms.LayoutEventArgs levent) { base.OnLayout(levent); }
         protected override void OnMouseWheel(global::System.Windows.Forms.MouseEventArgs e) { }
         public partial class DockPaddingEdges : object {
+            private int __left;
+            private int __top;
+            private int __right;
+            private int __bottom;
             public DockPaddingEdges() { }
-            public int All { set { } }
-            public int Bottom { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ScrollableControl+DockPaddingEdges.Bottom"); } set { } }
-            public int Left { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ScrollableControl+DockPaddingEdges.Left"); } set { } }
-            public int Right { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ScrollableControl+DockPaddingEdges.Right"); } set { } }
-            public int Top { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.ScrollableControl+DockPaddingEdges.Top"); } set { } }
+            public int All { set { __left = __top = __right = __bottom = value; } }
+            public int Bottom { get { return __bottom; } set { __bottom = value; } }
+            public int Left { get { return __left; } set { __left = value; } }
+            public int Right { get { return __right; } set { __right = value; } }
+            public int Top { get { return __top; } set { __top = value; } }
         }
     }
     public enum SizeGripStyle : int {
@@ -1458,27 +1612,34 @@ namespace System.Windows.Forms {
         Percent = 2,
     }
     public partial class SplitContainer : global::System.Windows.Forms.ContainerControl {
-        public SplitContainer() { }
-        public global::System.Windows.Forms.SplitterPanel Panel1 { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.SplitterPanel>("System.Windows.Forms.SplitContainer.Panel1"); } }
-        public global::System.Windows.Forms.SplitterPanel Panel2 { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.SplitterPanel>("System.Windows.Forms.SplitContainer.Panel2"); } }
+        private readonly SplitterPanel __panel1 = new();
+        private readonly SplitterPanel __panel2 = new();
+        private int __splitterDistance = -1;
+        protected override void OnLayout(LayoutEventArgs levent) { var distance = __splitterDistance < 0 ? global::System.Math.Max(0, ClientSize.Width / 2 - 2) : global::System.Math.Clamp(__splitterDistance, 0, global::System.Math.Max(0, ClientSize.Width - 4)); __panel1.Bounds = new global::System.Drawing.Rectangle(0, 0, distance, ClientSize.Height); __panel2.Bounds = new global::System.Drawing.Rectangle(global::System.Math.Min(ClientSize.Width, distance + 4), 0, global::System.Math.Max(0, ClientSize.Width - distance - 4), ClientSize.Height); base.OnLayout(levent); }
+        public SplitContainer() { Controls.Add(__panel1); Controls.Add(__panel2); }
+        public global::System.Windows.Forms.SplitterPanel Panel1 { get { return __panel1; } }
+        public global::System.Windows.Forms.SplitterPanel Panel2 { get { return __panel2; } }
     }
     public partial class Splitter : global::System.Windows.Forms.Control {
+        private int __splitPosition;
+        private bool __splitterTabStop;
         public Splitter() { }
-        public int SplitPosition { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.Splitter.SplitPosition"); } set { } }
-        public bool TabStop { set { } }
+        public int SplitPosition { get { return __splitPosition; } set { __splitPosition = global::System.Math.Max(0, value); } }
+        public bool TabStop { set { __splitterTabStop = value; } }
     }
     public partial class SplitterPanel : global::System.Windows.Forms.Panel {
         public SplitterPanel() { }
     }
     public partial class StatusStrip : global::System.Windows.Forms.ToolStrip {
+        private bool __statusTabStop;
         public StatusStrip() { }
-        public global::System.Drawing.Rectangle SizeGripBounds { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.StatusStrip.SizeGripBounds"); } }
+        public global::System.Drawing.Rectangle SizeGripBounds { get { return new global::System.Drawing.Rectangle(global::System.Math.Max(0, Width - 16), global::System.Math.Max(0, Height - 16), global::System.Math.Min(16, Width), global::System.Math.Min(16, Height)); } }
     }
     public static partial class SystemInformation {
-        public static global::System.Drawing.Size DragSize { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Size>("System.Windows.Forms.SystemInformation.DragSize"); } }
-        public static int HorizontalScrollBarArrowWidth { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.SystemInformation.HorizontalScrollBarArrowWidth"); } }
-        public static int MouseHoverTime { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.SystemInformation.MouseHoverTime"); } }
-        public static global::System.Drawing.Rectangle VirtualScreen { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.SystemInformation.VirtualScreen"); } }
+        public static global::System.Drawing.Size DragSize { get { return new global::System.Drawing.Size(4, 4); } }
+        public static int HorizontalScrollBarArrowWidth { get { return 17; } }
+        public static int MouseHoverTime { get { return 400; } }
+        public static global::System.Drawing.Rectangle VirtualScreen { get { return new global::System.Drawing.Rectangle(0, 0, 1920, 1080); } }
     }
     public partial class TableLayoutColumnStyleCollection : global::System.Windows.Forms.TableLayoutStyleCollection {
         public TableLayoutColumnStyleCollection() { }
@@ -1531,15 +1692,25 @@ namespace System.Windows.Forms {
         public TableLayoutStyleCollection() { }
     }
     public partial class TextBox : global::System.Windows.Forms.TextBoxBase {
+        private HorizontalAlignment __textBoxAlignment;
         public TextBox() { }
-        public global::System.Windows.Forms.HorizontalAlignment TextAlign { set { } }
+        public global::System.Windows.Forms.HorizontalAlignment TextAlign { set { __textBoxAlignment = value; } }
         protected virtual void WndProc(ref global::System.Windows.Forms.Message m) { }
     }
     public abstract partial class TextBoxBase : global::System.Windows.Forms.Control {
+        private bool __textReadOnly;
+        private bool __textMultiline;
+        private BorderStyle __textBorderStyle = BorderStyle.Fixed3D;
+        private int __textSelectionStart = -1;
+        private int __textSelectionLength;
+        private void __NormalizeTextSelection() { if (__textSelectionStart < 0) __textSelectionStart = Text.Length; __textSelectionStart = global::System.Math.Clamp(__textSelectionStart, 0, Text.Length); __textSelectionLength = global::System.Math.Clamp(__textSelectionLength, 0, Text.Length - __textSelectionStart); }
+        private void __ReplaceTextSelection(string value, int replacementStart = -1, int replacementLength = 0) { __NormalizeTextSelection(); var start = replacementStart >= 0 ? global::System.Math.Clamp(replacementStart, 0, Text.Length) : __textSelectionStart; var length = replacementStart >= 0 ? global::System.Math.Clamp(replacementLength, 0, Text.Length - start) : __textSelectionLength; Text = Text.Remove(start, length).Insert(start, value); __textSelectionStart = start + value.Length; __textSelectionLength = 0; }
+        internal override void __NativeTextInput(string text, bool composing, int replacementStart, int replacementLength) { if (!__textReadOnly && !global::System.String.IsNullOrEmpty(text)) __ReplaceTextSelection(text, replacementStart, replacementLength); }
+        internal override void __NativeKeyInput(uint physicalKey, bool down, uint modifiers, bool repeat) { base.__NativeKeyInput(physicalKey, down, modifiers, repeat); if (!down || __textReadOnly) return; __NormalizeTextSelection(); if ((modifiers & 2u) != 0 && physicalKey == 0x04u) { __textSelectionStart = 0; __textSelectionLength = Text.Length; return; } if (physicalKey == 0x2au) { if (__textSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textSelectionStart > 0) { --__textSelectionStart; __textSelectionLength = 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4cu) { if (__textSelectionLength > 0) __ReplaceTextSelection(string.Empty); else if (__textSelectionStart < Text.Length) { __textSelectionLength = 1; __ReplaceTextSelection(string.Empty); } } else if (physicalKey == 0x4au) { __textSelectionStart = 0; __textSelectionLength = 0; } else if (physicalKey == 0x4du) { __textSelectionStart = Text.Length; __textSelectionLength = 0; } else if (physicalKey == 0x50u) { if (__textSelectionLength > 0) __textSelectionLength = 0; else __textSelectionStart = global::System.Math.Max(0, __textSelectionStart - 1); } else if (physicalKey == 0x4fu) { if (__textSelectionLength > 0) { __textSelectionStart += __textSelectionLength; __textSelectionLength = 0; } else __textSelectionStart = global::System.Math.Min(Text.Length, __textSelectionStart + 1); } }
         public TextBoxBase() { }
-        public global::System.Windows.Forms.BorderStyle BorderStyle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.BorderStyle>("System.Windows.Forms.TextBoxBase.BorderStyle"); } set { } }
-        public virtual bool Multiline { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<bool>("System.Windows.Forms.TextBoxBase.Multiline"); } set { } }
-        public bool ReadOnly { set { } }
+        public global::System.Windows.Forms.BorderStyle BorderStyle { get { return __textBorderStyle; } set { __textBorderStyle = value; } }
+        public virtual bool Multiline { get { return __textMultiline; } set { __textMultiline = value; } }
+        public bool ReadOnly { set { __textReadOnly = value; } }
     }
     public enum TextDataFormat : int {
         Text = 0,
@@ -1581,7 +1752,7 @@ namespace System.Windows.Forms {
     public static partial class TextRenderer {
         public static global::System.Drawing.Size MeasureText(string text, global::System.Drawing.Font font) { if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var height = global::System.Math.Max(1, font.Height); var padding = 8; return new global::System.Drawing.Size(global::System.Math.Max(1, (int)global::System.Math.Ceiling(text.Length * height * 0.46f) + padding), height + 4); }
         public static global::System.Drawing.Size MeasureText(string text, global::System.Drawing.Font font, global::System.Drawing.Size proposedSize, global::System.Windows.Forms.TextFormatFlags flags) { var measured = MeasureText(text, font); var width = proposedSize.Width > 0 ? global::System.Math.Min(measured.Width, proposedSize.Width) : measured.Width; var height = proposedSize.Height > 0 ? global::System.Math.Min(measured.Height, proposedSize.Height) : measured.Height; if ((flags & global::System.Windows.Forms.TextFormatFlags.WordBreak) != 0 && proposedSize.Width > 0 && measured.Width > proposedSize.Width) { var rows = global::System.Math.Max(1, (int)global::System.Math.Ceiling((double)measured.Width / proposedSize.Width)); height = proposedSize.Height > 0 ? global::System.Math.Min(proposedSize.Height, measured.Height * rows) : measured.Height * rows; } return new global::System.Drawing.Size(global::System.Math.Max(1, width), global::System.Math.Max(1, height)); }
-        public static void DrawText(global::System.Drawing.IDeviceContext dc, string text, global::System.Drawing.Font font, global::System.Drawing.Rectangle bounds, global::System.Drawing.Color foreColor, global::System.Windows.Forms.TextFormatFlags flags) { if (dc is null) throw new global::System.ArgumentNullException(nameof(dc)); if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); if (dc is not global::System.Drawing.Graphics graphics || bounds.Width <= 0 || bounds.Height <= 0 || text.Length == 0) return; var measured = graphics.MeasureString(text, font); var x = (float)bounds.X; var y = (float)bounds.Y; if ((flags & global::System.Windows.Forms.TextFormatFlags.HorizontalCenter) != 0) x += global::System.Math.Max(0f, (bounds.Width - measured.Width) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Right) != 0) x += global::System.Math.Max(0f, bounds.Width - measured.Width); if ((flags & global::System.Windows.Forms.TextFormatFlags.VerticalCenter) != 0) y += global::System.Math.Max(0f, (bounds.Height - measured.Height) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Bottom) != 0) y += global::System.Math.Max(0f, bounds.Height - measured.Height); using var brush = new global::System.Drawing.SolidBrush(foreColor); graphics.DrawString(text, font, brush, new global::System.Drawing.PointF(x, y)); }
+        public static void DrawText(global::System.Drawing.IDeviceContext dc, string text, global::System.Drawing.Font font, global::System.Drawing.Rectangle bounds, global::System.Drawing.Color foreColor, global::System.Windows.Forms.TextFormatFlags flags) { if (dc is null) throw new global::System.ArgumentNullException(nameof(dc)); if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); if (dc is not global::System.Drawing.Graphics graphics || bounds.Width <= 0 || bounds.Height <= 0 || text.Length == 0) return; if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_TEXT") == "1") global::System.Console.Error.WriteLine("facade-text-draw=text:" + text.Replace('\r', ' ').Replace('\n', ' ') + "|bounds:" + bounds.X + "," + bounds.Y + "," + bounds.Width + "," + bounds.Height + "|font-height:" + font.Height); var measured = graphics.MeasureString(text, font); var x = (float)bounds.X; var y = (float)bounds.Y; if ((flags & global::System.Windows.Forms.TextFormatFlags.HorizontalCenter) != 0) x += global::System.Math.Max(0f, (bounds.Width - measured.Width) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Right) != 0) x += global::System.Math.Max(0f, bounds.Width - measured.Width); if ((flags & global::System.Windows.Forms.TextFormatFlags.VerticalCenter) != 0) y += global::System.Math.Max(0f, (bounds.Height - measured.Height) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Bottom) != 0) y += global::System.Math.Max(0f, bounds.Height - measured.Height); using var brush = new global::System.Drawing.SolidBrush(foreColor); graphics.DrawString(text, font, brush, new global::System.Drawing.PointF(x, y)); }
     }
     public enum TickStyle : int {
         None = 0,
@@ -1615,17 +1786,32 @@ namespace System.Windows.Forms {
         private bool __toolTraceDone;
         private ToolStripItem? __hotItem;
         private readonly global::System.Collections.Generic.List<Label> __dropDownLabels = new();
+        private readonly int __menuOwnerThreadId = global::System.Environment.CurrentManagedThreadId;
+        private readonly object __menuHoverGate = new();
+        private global::System.Threading.Timer? __menuHoverTimer;
+        private int __menuHoverGeneration;
         internal void __RefreshItems() { if (__HasRaisedLoad) __RenderManagedPaint(); }
+        internal void __TraceToolItems() { if (__toolTraceDone || global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_TOOLSTRIP") != "1") return; __toolTraceDone = true; var rows = new global::System.Collections.Generic.List<string>(); foreach (ToolStripItem item in __toolItems) { var image = item.__ProjectionImage; rows.Add(item.GetType().Name + ":text=" + item.__ProjectionText + ",tip=" + item.__ProjectionToolTip + ",size=" + item.__ProjectionSize.Width + "x" + item.__ProjectionSize.Height + ",image=" + (image is null ? "none" : image.Width + "x" + image.Height)); } global::System.Console.Error.WriteLine("facade-toolstrip=name:" + Name + "|size:" + Width + "x" + Height + "|items:" + global::System.String.Join(";", rows)); }
         private static int __ItemWidth(ToolStripItem item) { var size = item.__ProjectionSize; if (size.Width > 0) return size.Width; if (item.__ProjectionImage is not null) return 34; return global::System.Math.Max(24, item.__ProjectionText.Length * 7 + 14); }
         private int __DropDownRowHeight(ToolStripItem item) { return item is ToolStripSeparator ? 9 : global::System.Math.Max(24, item.__ProjectionSize.Height); }
+        private int __DropDownItemTop(ToolStripItem sought) { var y = 4; foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; if (global::System.Object.ReferenceEquals(item, sought)) return y; y += __DropDownRowHeight(item); } return 4; }
+        private global::System.Collections.Generic.List<ToolStripItem> __SelectableItems() { var items = new global::System.Collections.Generic.List<ToolStripItem>(); foreach (ToolStripItem item in __toolItems) if (item.__ProjectionVisible && item.__ProjectionEnabled && item is not ToolStripSeparator) items.Add(item); return items; }
+        private void __CancelHoverAction() { global::System.Threading.Interlocked.Increment(ref __menuHoverGeneration); lock (__menuHoverGate) { __menuHoverTimer?.Dispose(); __menuHoverTimer = null; } }
+        private void __SetHotItem(ToolStripItem? item, bool scheduleHover) { if (global::System.Object.ReferenceEquals(item, __hotItem)) return; __hotItem = item; __CancelHoverAction(); __RenderManagedPaint(); if (!scheduleHover || this is not ToolStripDropDown dropDown || !Visible) return; var generation = __menuHoverGeneration; lock (__menuHoverGate) __menuHoverTimer = new global::System.Threading.Timer(_ => { _ = Application.__Post(__menuOwnerThreadId, () => { if (generation != __menuHoverGeneration || !Visible || !global::System.Object.ReferenceEquals(item, __hotItem)) return; if (item is ToolStripDropDownItem branch && branch.DropDownItems.Count > 0) __OpenBranch(branch, false); else dropDown.__CloseChildDropDown(); }); }, null, 400, global::System.Threading.Timeout.Infinite); }
+        private void __MoveHot(int delta, bool edge) { var items = __SelectableItems(); if (items.Count == 0) return; var index = __hotItem is null ? -1 : items.IndexOf(__hotItem); index = edge ? (delta < 0 ? 0 : items.Count - 1) : index < 0 ? (delta < 0 ? items.Count - 1 : 0) : (index + delta + items.Count) % items.Count; __SetHotItem(items[index], false); }
+        private void __OpenBranch(ToolStripDropDownItem branch, bool focusChild) { if (branch.DropDownItems.Count == 0) return; var location = PointToScreen(new global::System.Drawing.Point(global::System.Math.Max(0, Width - 2), __DropDownItemTop(branch))); if (this is ToolStripDropDown parentDropDown) parentDropDown.__ShowChildDropDown(branch.DropDown, location, focusChild); else { branch.DropDown.Show(location); if (focusChild) branch.DropDown.__FocusFirstItem(); } }
+        private void __ActivateHotItem() { var item = __hotItem; if (item is null || !item.__ProjectionEnabled) return; if (item is ToolStripDropDownItem branch && branch.DropDownItems.Count > 0) { __OpenBranch(branch, true); return; } item.__PerformClick(); if (this is ToolStripDropDown dropDown && Visible) dropDown.__CloseMenuChain(); }
+        internal void __FocusFirstItem() { var items = __SelectableItems(); if (items.Count != 0) __SetHotItem(items[0], false); Focus(); }
         internal void __PrepareDropDown(global::System.Drawing.Point screenLocation) { var width = 136; var height = 4; foreach (ToolStripItem item in __toolItems) if (item.__ProjectionVisible) { width = global::System.Math.Max(width, __ItemWidth(item) + 54); height += __DropDownRowHeight(item); } width = global::System.Math.Min(420, width); Bounds = new global::System.Drawing.Rectangle(screenLocation.X, screenLocation.Y, width, global::System.Math.Max(20, height + 4)); BackColor = global::System.Drawing.Color.FromArgb(247, 249, 252); ForeColor = global::System.Drawing.Color.FromArgb(31, 37, 44); foreach (var label in __dropDownLabels) { Controls.Remove(label); label.Dispose(); } __dropDownLabels.Clear(); }
         private void __PaintDropDownItems(global::System.Drawing.Graphics graphics) { using var background = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(247, 249, 252)); using var rail = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(230, 235, 241)); using var hot = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(218, 231, 247)); using var ink = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(31, 37, 44)); using var disabledInk = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(145, 151, 158)); using var font = new global::System.Drawing.Font("Portsmouth Rapids", 12f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); using var border = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(126, 139, 153)); using var separator = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(188, 197, 207)); graphics.FillRectangle(background, ClientRectangle); graphics.FillRectangle(rail, 1, 1, 31, global::System.Math.Max(0, Height - 2)); var y = 4; foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var rowHeight = __DropDownRowHeight(item); if (item is ToolStripSeparator) { graphics.DrawLine(separator, 34, y + rowHeight / 2, global::System.Math.Max(35, Width - 5), y + rowHeight / 2); y += rowHeight; continue; } var row = new global::System.Drawing.Rectangle(3, y, global::System.Math.Max(0, Width - 6), rowHeight); if (global::System.Object.ReferenceEquals(item, __hotItem) && item.__ProjectionEnabled) { graphics.FillRectangle(hot, row); graphics.DrawRectangle(border, row.X, row.Y, global::System.Math.Max(0, row.Width - 1), global::System.Math.Max(0, row.Height - 1)); } if (item is ToolStripMenuItem menu && menu.Checked) { graphics.DrawLine(border, 10, y + rowHeight / 2, 14, y + rowHeight / 2 + 4); graphics.DrawLine(border, 14, y + rowHeight / 2 + 4, 22, y + rowHeight / 2 - 5); } var image = item.__ProjectionImage; if (image is not null) graphics.DrawImage(image, new global::System.Drawing.Rectangle(7, y + global::System.Math.Max(2, (rowHeight - 20) / 2), 20, 20)); var text = item.__ProjectionText; if (!global::System.String.IsNullOrEmpty(text)) { var measured = graphics.MeasureString(text, font); graphics.DrawString(text, font, item.__ProjectionEnabled ? ink : disabledInk, 39f, y + global::System.Math.Max(2f, (rowHeight - measured.Height) / 2f)); } if (item is ToolStripDropDownItem child && child.DropDownItems.Count > 0) { var arrowX = Width - 14; var mid = y + rowHeight / 2; graphics.DrawLine(border, arrowX, mid - 4, arrowX + 4, mid); graphics.DrawLine(border, arrowX + 4, mid, arrowX, mid + 4); } y += rowHeight; } graphics.DrawRectangle(border, 0, 0, global::System.Math.Max(0, Width - 1), global::System.Math.Max(0, Height - 1)); }
         private void __PaintItems(global::System.Drawing.Graphics graphics) { if (this is ToolStripDropDown) { __PaintDropDownItems(graphics); return; } graphics.SmoothingMode = global::System.Drawing.Drawing2D.SmoothingMode.AntiAlias; using var background = new global::System.Drawing.SolidBrush(BackColor); graphics.FillRectangle(background, ClientRectangle); using var border = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(110, ForeColor)); using var face = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(24, ForeColor)); using var ink = new global::System.Drawing.SolidBrush(ForeColor); using var font = new global::System.Drawing.Font("Portsmouth Rapids", 10f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is ToolStripSeparator) { var separatorX = x + width / 2; graphics.DrawLine(border, separatorX, top + 4, separatorX, top + height - 4); } else { var bounds = new global::System.Drawing.Rectangle(x, top, width, height); graphics.FillRectangle(face, bounds); graphics.DrawRectangle(border, bounds.X, bounds.Y, global::System.Math.Max(0, bounds.Width - 1), global::System.Math.Max(0, bounds.Height - 1)); var image = item.__ProjectionImage; var text = item.__ProjectionText; if (image is not null) { var side = global::System.Math.Min(24, global::System.Math.Min(bounds.Width - 6, bounds.Height - 6)); if (side > 0) graphics.DrawImage(image, new global::System.Drawing.Rectangle(bounds.X + (bounds.Width - side) / 2, bounds.Y + (bounds.Height - side) / 2, side, side)); } else if (!global::System.String.IsNullOrEmpty(text)) { var measured = graphics.MeasureString(text, font); graphics.DrawString(text, font, ink, bounds.X + global::System.Math.Max(4f, (bounds.Width - measured.Width) / 2f), bounds.Y + global::System.Math.Max(2f, (bounds.Height - measured.Height) / 2f)); } } x += width + margin.Right; } if (!__toolTraceDone && global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_TOOLSTRIP") == "1") { __toolTraceDone = true; var rows = new global::System.Collections.Generic.List<string>(); foreach (ToolStripItem item in __toolItems) { var image = item.__ProjectionImage; rows.Add(item.GetType().Name + ":text=" + item.__ProjectionText + ",tip=" + item.__ProjectionToolTip + ",size=" + item.__ProjectionSize.Width + "x" + item.__ProjectionSize.Height + ",image=" + (image is null ? "none" : image.Width + "x" + image.Height)); } global::System.Console.Error.WriteLine("facade-toolstrip=name:" + Name + "|size:" + Width + "x" + Height + "|items:" + global::System.String.Join(";", rows)); } }
         private ToolStripItem? __ItemAt(int pointX, int pointY) { if (this is ToolStripDropDown) { var y = 4; foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var rowHeight = __DropDownRowHeight(item); if (item is not ToolStripSeparator && new global::System.Drawing.Rectangle(3, y, global::System.Math.Max(0, Width - 6), rowHeight).Contains(pointX, pointY)) return item; y += rowHeight; } return null; } var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is not ToolStripSeparator && new global::System.Drawing.Rectangle(x, top, width, height).Contains(pointX, pointY)) return item; x += width + margin.Right; } return null; }
         protected override void OnPaint(PaintEventArgs e) { __PaintItems(e.Graphics); base.OnPaint(e); }
-        protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); var next = __ItemAt(e.X, e.Y); if (!global::System.Object.ReferenceEquals(next, __hotItem)) { __hotItem = next; __RenderManagedPaint(); } }
-        protected override void OnMouseLeave(global::System.EventArgs e) { base.OnMouseLeave(e); if (__hotItem is not null) { __hotItem = null; __RenderManagedPaint(); } }
-        protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != MouseButtons.Left) return; var item = __ItemAt(e.X, e.Y); if (item is ToolStripDropDownItem branch && branch.DropDownItems.Count > 0) branch.DropDown.Show(new global::System.Drawing.Point(Bounds.Right - 2, Bounds.Top + e.Y - 4)); else item?.__PerformClick(); if (this is ToolStripDropDown && item is not null && Visible) __RequestClose(); }
+        protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); __SetHotItem(__ItemAt(e.X, e.Y), true); }
+        protected override void OnMouseLeave(global::System.EventArgs e) { base.OnMouseLeave(e); __CancelHoverAction(); if (this is not ToolStripDropDown dropDown || !dropDown.__HasVisibleChild) __SetHotItem(null, false); }
+        protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != MouseButtons.Left) return; var item = __ItemAt(e.X, e.Y); if (item is null || !item.__ProjectionEnabled) return; __SetHotItem(item, false); __ActivateHotItem(); }
+        protected override void OnKeyDown(KeyEventArgs e) { var handled = false; if (this is ToolStripDropDown dropDown && Visible) { switch (e.KeyCode) { case Keys.Down: __MoveHot(1, false); handled = true; break; case Keys.Up: __MoveHot(-1, false); handled = true; break; case Keys.Home: __MoveHot(-1, true); handled = true; break; case Keys.End: __MoveHot(1, true); handled = true; break; case Keys.Right: if (__hotItem is ToolStripDropDownItem branch && branch.DropDownItems.Count > 0) __OpenBranch(branch, true); handled = true; break; case Keys.Left: handled = dropDown.__CloseKeyboardLevel(); break; case Keys.Enter: case Keys.Space: __ActivateHotItem(); handled = true; break; case Keys.Escape: dropDown.__EscapeMenuLevel(); handled = true; break; } } if (handled) e.Handled = true; base.OnKeyDown(e); }
+        protected override void Dispose(bool disposing) { if (disposing) { __CancelHoverAction(); if (this is ToolStripDropDown dropDown) dropDown.__CloseDropDown(); } base.Dispose(disposing); }
         public ToolStrip() { __toolItems = new ToolStripItemCollection(this); }
         public global::System.Windows.Forms.Padding GripMargin { get { return __gripMargin; } set { __gripMargin = value; } }
         public virtual global::System.Windows.Forms.ToolStripItemCollection Items { get { return __toolItems; } }
@@ -1634,23 +1820,40 @@ namespace System.Windows.Forms {
         public global::System.Windows.Forms.ToolStripRenderer Renderer { get { return __renderer!; } set { __renderer = value; } }
     }
     public partial class ToolStripArrowRenderEventArgs : global::System.EventArgs {
+        private global::System.Drawing.Color __arrowColor;
+        internal ToolStripItem? __arrowItem;
         public ToolStripArrowRenderEventArgs() { }
-        public global::System.Drawing.Color ArrowColor { set { } }
-        public global::System.Windows.Forms.ToolStripItem Item { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStripItem>("System.Windows.Forms.ToolStripArrowRenderEventArgs.Item"); } }
+        public global::System.Drawing.Color ArrowColor { set { __arrowColor = value; } }
+        public global::System.Windows.Forms.ToolStripItem Item { get { return __arrowItem!; } }
     }
     public partial class ToolStripButton : global::System.Windows.Forms.ToolStripItem {
+        private bool __toolButtonChecked;
         public ToolStripButton() { }
-        public bool Checked { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<bool>("System.Windows.Forms.ToolStripButton.Checked"); } }
+        public bool Checked { get { return __toolButtonChecked; } }
     }
     public partial class ToolStripDropDown : global::System.Windows.Forms.ToolStrip {
         private ToolStripItem? __ownerItem;
-        internal void __ShowDropDown(global::System.Drawing.Point screenLocation) { if (Items.Count == 0) return; __PrepareDropDown(screenLocation); __RaiseLoad(); __RenderManagedPaint(); Visible = true; try { _ = __RunNativePopup(); } finally { Visible = false; } }
+        private ToolStripDropDown? __parentDropDown;
+        private ToolStripDropDown? __childDropDown;
+        private bool __nativePopupActive;
+        internal ToolStripDropDown __MenuRoot { get { var root = this; while (root.__parentDropDown is not null) root = root.__parentDropDown; return root; } }
+        internal ToolStripDropDown __KeyboardTarget { get { var target = this; while (target.__childDropDown is not null && target.__childDropDown.Visible) target = target.__childDropDown; return target; } }
+        internal bool __HasVisibleChild { get { return __childDropDown is not null && __childDropDown.Visible; } }
+        internal bool __ContainsMenuTarget(Control target) { for (Control? candidate = target; candidate is not null; candidate = candidate.Parent) for (ToolStripDropDown? menu = this; menu is not null; menu = menu.__childDropDown) if (global::System.Object.ReferenceEquals(candidate, menu)) return true; return false; }
+        private Form? __OverlayForm(Control? ownerControl) { if (Name.Length == 0) Name = ownerControl is not null && ownerControl.Name.Length != 0 ? ownerControl.Name + ".DropDown" : __ownerItem?.Owner?.Name + ".DropDown" ?? "dropDown"; __TraceToolItems(); return ownerControl?.FindForm() ?? __ownerItem?.Owner?.FindForm() ?? Application.__CurrentForm; }
+        internal void __ShowChildDropDown(ToolStripDropDown child, global::System.Drawing.Point screenLocation, bool focusChild = false) { if (global::System.Object.ReferenceEquals(__childDropDown, child) && child.Visible) { if (focusChild) child.__FocusFirstItem(); return; } __childDropDown?.__CloseDropDown(); __childDropDown = child; child.__parentDropDown = this; child.__ShowDropDown(screenLocation, this); if (focusChild) child.__FocusFirstItem(); }
+        internal void __CloseChildDropDown() { var child = __childDropDown; __childDropDown = null; child?.__CloseDropDown(); }
+        internal bool __CloseKeyboardLevel() { var parent = __parentDropDown; if (parent is null) return false; __CloseDropDown(); parent.Focus(); return true; }
+        internal void __EscapeMenuLevel() { var parent = __parentDropDown; if (parent is null) { __CloseDropDown(); return; } __CloseDropDown(); parent.Focus(); }
+        internal void __CloseDropDown() { var wasRoot = __parentDropDown is null; var child = __childDropDown; __childDropDown = null; child?.__CloseDropDown(); if (__parentDropDown is not null && global::System.Object.ReferenceEquals(__parentDropDown.__childDropDown, this)) __parentDropDown.__childDropDown = null; __parentDropDown = null; Visible = false; var parent = Parent; if (parent is not null) parent.Controls.Remove(this); if (wasRoot) Application.__MenuClosed(this); if (__nativePopupActive) __RequestClose(); }
+        internal void __CloseMenuChain() { var root = this; while (root.__parentDropDown is not null) root = root.__parentDropDown; root.__CloseDropDown(); }
+        internal void __ShowDropDown(global::System.Drawing.Point screenLocation, Control? ownerControl = null) { if (Items.Count == 0) return; var form = __OverlayForm(ownerControl); if (__parentDropDown is null) Application.__RegisterMenu(this); if (form is not null) { var clientLocation = form.PointToClient(screenLocation); __PrepareDropDown(clientLocation); var x = clientLocation.X; var y = clientLocation.Y; if (ownerControl is ToolStripDropDown parentDropDown && x + Width > form.Width) x = parentDropDown.Left - Width; x = global::System.Math.Clamp(x, 0, global::System.Math.Max(0, form.Width - Width)); y = global::System.Math.Clamp(y, 0, global::System.Math.Max(0, form.Height - Height)); Bounds = new global::System.Drawing.Rectangle(x, y, Width, Height); if (!global::System.Object.ReferenceEquals(Parent, form)) { Parent?.Controls.Remove(this); form.Controls.Add(this); } __RaiseLoad(); Visible = true; BringToFront(); __RenderManagedPaint(); return; } var work = Screen.GetWorkingArea(screenLocation); __PrepareDropDown(screenLocation); var screenX = global::System.Math.Clamp(screenLocation.X, work.Left, global::System.Math.Max(work.Left, work.Right - Width)); var screenY = global::System.Math.Clamp(screenLocation.Y, work.Top, global::System.Math.Max(work.Top, work.Bottom - Height)); Bounds = new global::System.Drawing.Rectangle(screenX, screenY, Width, Height); __RaiseLoad(); __RenderManagedPaint(); Visible = true; __nativePopupActive = true; try { _ = __RunNativePopup(); } finally { __nativePopupActive = false; Visible = false; if (__parentDropDown is null) Application.__MenuClosed(this); } }
         public ToolStripDropDown() { }
         public global::System.Windows.Forms.ToolStripItem OwnerItem { get { return __ownerItem!; } set { __ownerItem = value; } }
         public void Show(global::System.Drawing.Point screenLocation) { __ShowDropDown(screenLocation); }
         public void Show(global::System.Drawing.Point position, global::System.Windows.Forms.ToolStripDropDownDirection direction) { __ShowDropDown(position); }
-        public void Show(global::System.Windows.Forms.Control control, global::System.Drawing.Point position) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(position)); }
-        public void Show(global::System.Windows.Forms.Control control, int x, int y) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(new global::System.Drawing.Point(x, y))); }
+        public void Show(global::System.Windows.Forms.Control control, global::System.Drawing.Point position) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(position), control); }
+        public void Show(global::System.Windows.Forms.Control control, int x, int y) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(new global::System.Drawing.Point(x, y)), control); }
     }
     public enum ToolStripDropDownDirection : int {
         AboveLeft = 0,
@@ -1671,8 +1874,9 @@ namespace System.Windows.Forms {
         public ToolStripDropDownMenu() { }
     }
     public partial class ToolStripGripRenderEventArgs : global::System.Windows.Forms.ToolStripRenderEventArgs {
+        internal global::System.Drawing.Rectangle __gripBounds;
         public ToolStripGripRenderEventArgs() { }
-        public global::System.Drawing.Rectangle GripBounds { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.ToolStripGripRenderEventArgs.GripBounds"); } }
+        public global::System.Drawing.Rectangle GripBounds { get { return __gripBounds; } }
     }
     public abstract partial class ToolStripItem : global::System.Windows.Forms.BindableComponent {
         private string __itemText = string.Empty;
@@ -1727,26 +1931,37 @@ namespace System.Windows.Forms {
         public global::System.Windows.Forms.ToolStripItem Add(string text, global::System.Drawing.Image image) { var item = new ToolStripMenuItem(text) { Image = image }; Add(item); return item; }
     }
     public partial class ToolStripItemImageRenderEventArgs : global::System.Windows.Forms.ToolStripItemRenderEventArgs {
+        internal global::System.Drawing.Image? __renderImage;
+        internal global::System.Drawing.Rectangle __renderImageRectangle;
         public ToolStripItemImageRenderEventArgs() { }
-        public global::System.Drawing.Image Image { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Image>("System.Windows.Forms.ToolStripItemImageRenderEventArgs.Image"); } }
-        public global::System.Drawing.Rectangle ImageRectangle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.ToolStripItemImageRenderEventArgs.ImageRectangle"); } }
+        public global::System.Drawing.Image Image { get { return __renderImage!; } }
+        public global::System.Drawing.Rectangle ImageRectangle { get { return __renderImageRectangle; } }
     }
     public partial class ToolStripItemRenderEventArgs : global::System.EventArgs {
+        internal global::System.Drawing.Graphics? __renderGraphics;
+        internal ToolStripItem? __renderItem;
+        internal ToolStrip? __renderToolStrip;
         public ToolStripItemRenderEventArgs() { }
-        public global::System.Drawing.Graphics Graphics { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Graphics>("System.Windows.Forms.ToolStripItemRenderEventArgs.Graphics"); } }
-        public global::System.Windows.Forms.ToolStripItem Item { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStripItem>("System.Windows.Forms.ToolStripItemRenderEventArgs.Item"); } }
-        public global::System.Windows.Forms.ToolStrip ToolStrip { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStrip>("System.Windows.Forms.ToolStripItemRenderEventArgs.ToolStrip"); } }
+        public global::System.Drawing.Graphics Graphics { get { return __renderGraphics!; } }
+        public global::System.Windows.Forms.ToolStripItem Item { get { return __renderItem!; } }
+        public global::System.Windows.Forms.ToolStrip ToolStrip { get { return __renderToolStrip!; } }
     }
     public partial class ToolStripItemTextRenderEventArgs : global::System.Windows.Forms.ToolStripItemRenderEventArgs {
+        internal string __renderText = string.Empty;
+        internal global::System.Drawing.Font? __renderTextFont;
+        internal TextFormatFlags __renderTextFormat;
+        internal global::System.Drawing.Rectangle __renderTextRectangle;
         public ToolStripItemTextRenderEventArgs() { }
-        public string Text { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<string>("System.Windows.Forms.ToolStripItemTextRenderEventArgs.Text"); } }
-        public global::System.Drawing.Font TextFont { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Font>("System.Windows.Forms.ToolStripItemTextRenderEventArgs.TextFont"); } }
-        public global::System.Windows.Forms.TextFormatFlags TextFormat { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.TextFormatFlags>("System.Windows.Forms.ToolStripItemTextRenderEventArgs.TextFormat"); } }
-        public global::System.Drawing.Rectangle TextRectangle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Rectangle>("System.Windows.Forms.ToolStripItemTextRenderEventArgs.TextRectangle"); } }
+        public string Text { get { return __renderText; } }
+        public global::System.Drawing.Font TextFont { get { return __renderTextFont!; } }
+        public global::System.Windows.Forms.TextFormatFlags TextFormat { get { return __renderTextFormat; } }
+        public global::System.Drawing.Rectangle TextRectangle { get { return __renderTextRectangle; } }
     }
     public static partial class ToolStripManager {
-        public static global::System.Windows.Forms.ToolStripManagerRenderMode RenderMode { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStripManagerRenderMode>("System.Windows.Forms.ToolStripManager.RenderMode"); } set { } }
-        public static global::System.Windows.Forms.ToolStripRenderer Renderer { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStripRenderer>("System.Windows.Forms.ToolStripManager.Renderer"); } set { } }
+        private static ToolStripManagerRenderMode __managerRenderMode = ToolStripManagerRenderMode.Professional;
+        private static ToolStripRenderer __managerRenderer = new ToolStripProfessionalRenderer();
+        public static global::System.Windows.Forms.ToolStripManagerRenderMode RenderMode { get { return __managerRenderMode; } set { __managerRenderMode = value; } }
+        public static global::System.Windows.Forms.ToolStripRenderer Renderer { get { return __managerRenderer; } set { __managerRenderer = value ?? throw new global::System.ArgumentNullException(nameof(value)); __managerRenderMode = ToolStripManagerRenderMode.Custom; } }
     }
     public enum ToolStripManagerRenderMode : int {
         Custom = 0,
@@ -1761,10 +1976,11 @@ namespace System.Windows.Forms {
     }
     public partial class ToolStripProfessionalRenderer : global::System.Windows.Forms.ToolStripRenderer {
         private ProfessionalColorTable __colorTable = new();
+        private bool __roundedEdges = true;
         public ToolStripProfessionalRenderer() { }
         public ToolStripProfessionalRenderer(global::System.Windows.Forms.ProfessionalColorTable professionalColorTable) { __colorTable = professionalColorTable ?? throw new global::System.ArgumentNullException(nameof(professionalColorTable)); }
         public global::System.Windows.Forms.ProfessionalColorTable ColorTable { get { return __colorTable; } }
-        public bool RoundedEdges { set { } }
+        public bool RoundedEdges { set { __roundedEdges = value; } }
         protected virtual void OnRenderArrow(global::System.Windows.Forms.ToolStripArrowRenderEventArgs e) { }
         protected virtual void OnRenderButtonBackground(global::System.Windows.Forms.ToolStripItemRenderEventArgs e) { }
         protected virtual void OnRenderMenuItemBackground(global::System.Windows.Forms.ToolStripItemRenderEventArgs e) { }
@@ -1773,9 +1989,11 @@ namespace System.Windows.Forms {
         protected virtual void OnRenderToolStripBorder(global::System.Windows.Forms.ToolStripRenderEventArgs e) { }
     }
     public partial class ToolStripRenderEventArgs : global::System.EventArgs {
+        internal global::System.Drawing.Graphics? __stripGraphics;
+        internal ToolStrip? __strip;
         public ToolStripRenderEventArgs() { }
-        public global::System.Drawing.Graphics Graphics { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Drawing.Graphics>("System.Windows.Forms.ToolStripRenderEventArgs.Graphics"); } }
-        public global::System.Windows.Forms.ToolStrip ToolStrip { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.ToolStrip>("System.Windows.Forms.ToolStripRenderEventArgs.ToolStrip"); } }
+        public global::System.Drawing.Graphics Graphics { get { return __stripGraphics!; } }
+        public global::System.Windows.Forms.ToolStrip ToolStrip { get { return __strip!; } }
     }
     public enum ToolStripRenderMode : int {
         Custom = 0,
@@ -1791,40 +2009,57 @@ namespace System.Windows.Forms {
         public ToolStripSeparator() { }
     }
     public partial class ToolStripSeparatorRenderEventArgs : global::System.Windows.Forms.ToolStripItemRenderEventArgs {
+        internal bool __verticalSeparator;
         public ToolStripSeparatorRenderEventArgs() { }
-        public bool Vertical { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<bool>("System.Windows.Forms.ToolStripSeparatorRenderEventArgs.Vertical"); } }
+        public bool Vertical { get { return __verticalSeparator; } }
     }
     public partial class ToolTip : global::System.ComponentModel.Component {
+        private readonly global::System.Collections.Generic.Dictionary<Control, string> __toolTips = new();
+        private bool __toolTipActive = true;
+        private int __autoPopDelay = 5000;
+        private int __initialDelay = 500;
+        private int __reshowDelay = 100;
+        private bool __showAlways;
+        private IWin32Window? __shownWindow;
+        private string __shownText = string.Empty;
+        private readonly global::System.Collections.Generic.Dictionary<Control, (global::System.EventHandler Enter, global::System.EventHandler Leave)> __toolTipHandlers = new();
+        private global::System.Threading.Timer? __toolTipTimer;
+        private long __toolTipGeneration;
+        private void __CancelPending(Control? control, bool hide) { global::System.Threading.Interlocked.Increment(ref __toolTipGeneration); var timer = global::System.Threading.Interlocked.Exchange(ref __toolTipTimer, null); timer?.Dispose(); if (hide && control is not null) { try { control.__HideToolTip(); } catch (global::System.InvalidOperationException) { } } }
+        private void __Schedule(Control control, string text) { __CancelPending(control, true); if (!__toolTipActive || text.Length == 0 || (!__showAlways && !control.Enabled)) return; var generation = global::System.Threading.Interlocked.Read(ref __toolTipGeneration); __toolTipTimer = new global::System.Threading.Timer(_ => { try { _ = control.BeginInvoke((global::System.Action)(() => { if (generation != global::System.Threading.Interlocked.Read(ref __toolTipGeneration) || !__toolTipActive || control.IsDisposed) return; control.__ShowToolTip(text, 12, control.Height + 4, __autoPopDelay); __shownWindow = control; __shownText = text; })); } catch (global::System.InvalidOperationException) { } }, null, __initialDelay, global::System.Threading.Timeout.Infinite); }
         public ToolTip() { }
-        public ToolTip(global::System.ComponentModel.IContainer cont) { }
-        public bool Active { set { } }
-        public int AutoPopDelay { set { } }
-        public int AutomaticDelay { set { } }
-        public int InitialDelay { set { } }
-        public int ReshowDelay { set { } }
-        public bool ShowAlways { set { } }
-        public string GetToolTip(global::System.Windows.Forms.Control control) { return default!; }
-        public void Show(string text, global::System.Windows.Forms.IWin32Window window, int x, int y, int duration) { }
-        public void SetToolTip(global::System.Windows.Forms.Control control, string caption) { }
-        public void Hide(global::System.Windows.Forms.IWin32Window win) { }
+        public ToolTip(global::System.ComponentModel.IContainer cont) { cont?.Add(this); }
+        public bool Active { set { __toolTipActive = value; if (!value) { if (__shownWindow is Control control) __CancelPending(control, true); __shownWindow = null; __shownText = string.Empty; } } }
+        public int AutoPopDelay { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __autoPopDelay = value; } }
+        public int AutomaticDelay { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __initialDelay = value; __reshowDelay = value / 5; __autoPopDelay = checked(value * 10); } }
+        public int InitialDelay { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __initialDelay = value; } }
+        public int ReshowDelay { set { if (value < 0) throw new global::System.ArgumentOutOfRangeException(nameof(value)); __reshowDelay = value; } }
+        public bool ShowAlways { set { __showAlways = value; } }
+        public string GetToolTip(global::System.Windows.Forms.Control control) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); return __toolTips.TryGetValue(control, out var value) ? value : string.Empty; }
+        public void Show(string text, global::System.Windows.Forms.IWin32Window window, int x, int y, int duration) { if (window is null) throw new global::System.ArgumentNullException(nameof(window)); if (duration < 0) throw new global::System.ArgumentOutOfRangeException(nameof(duration)); if (!__toolTipActive) return; __shownWindow = window; __shownText = text ?? string.Empty; if (window is Control control) { __CancelPending(control, true); if (__shownText.Length != 0) { __toolTips[control] = __shownText; control.__ShowToolTip(__shownText, x, y, duration); } } if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_TOOLTIPS") == "1") global::System.Console.Error.WriteLine("facade-tooltip=show|text=" + __shownText.Replace('\r', ' ').Replace('\n', ' ') + "|x=" + x + "|y=" + y + "|duration=" + duration + "|provider=native"); }
+        public void SetToolTip(global::System.Windows.Forms.Control control, string caption) { if (control is null) throw new global::System.ArgumentNullException(nameof(control)); caption ??= string.Empty; if (caption.Length == 0) { __toolTips.Remove(control); if (__toolTipHandlers.Remove(control, out var handlers)) { control.MouseEnter -= handlers.Enter; control.MouseLeave -= handlers.Leave; } __CancelPending(control, true); return; } __toolTips[control] = caption; if (!__toolTipHandlers.ContainsKey(control)) { global::System.EventHandler enter = (_, _) => { if (__toolTips.TryGetValue(control, out var current)) __Schedule(control, current); }; global::System.EventHandler leave = (_, _) => { __CancelPending(control, true); if (global::System.Object.ReferenceEquals(__shownWindow, control)) { __shownWindow = null; __shownText = string.Empty; } }; __toolTipHandlers[control] = (enter, leave); control.MouseEnter += enter; control.MouseLeave += leave; } }
+        public void Hide(global::System.Windows.Forms.IWin32Window win) { if (win is null) throw new global::System.ArgumentNullException(nameof(win)); if (win is Control control) __CancelPending(control, true); if (global::System.Object.ReferenceEquals(__shownWindow, win)) { __shownWindow = null; __shownText = string.Empty; } }
     }
     public partial class TreeView : global::System.Windows.Forms.Control {
         public TreeView() { }
     }
     public abstract partial class UpDownBase : global::System.Windows.Forms.ContainerControl, global::System.ComponentModel.ISupportInitialize {
         private int __initializationDepth;
+        private BorderStyle __upDownBorderStyle = BorderStyle.Fixed3D;
+        private HorizontalAlignment __upDownTextAlign;
         public void BeginInit() { ++__initializationDepth; }
         public void EndInit() { if (__initializationDepth == 0) return; if (--__initializationDepth == 0) PerformLayout(); }
         public UpDownBase() { Controls.Add(new Button { Name = "upDownButtons", Visible = false }); Controls.Add(new TextBox { Name = "upDownEdit", Visible = false }); }
-        public global::System.Windows.Forms.BorderStyle BorderStyle { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.BorderStyle>("System.Windows.Forms.UpDownBase.BorderStyle"); } set { } }
-        protected virtual global::System.Windows.Forms.CreateParams CreateParams { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<global::System.Windows.Forms.CreateParams>("System.Windows.Forms.UpDownBase.CreateParams"); } }
-        public global::System.Windows.Forms.HorizontalAlignment TextAlign { set { } }
+        public global::System.Windows.Forms.BorderStyle BorderStyle { get { return __upDownBorderStyle; } set { __upDownBorderStyle = value; } }
+        protected virtual global::System.Windows.Forms.CreateParams CreateParams { get { return new CreateParams(); } }
+        public global::System.Windows.Forms.HorizontalAlignment TextAlign { set { __upDownTextAlign = value; } }
         protected override void OnPaint(global::System.Windows.Forms.PaintEventArgs e) { base.OnPaint(e); }
     }
     public partial class UserControl : global::System.Windows.Forms.ContainerControl {
         internal override void __RaiseLoad() { if (!__BeginLoad()) return; if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-load=begin|type=" + GetType().FullName); OnLoad(global::System.EventArgs.Empty); if (__TraceLifecycle) global::System.Console.Error.WriteLine("facade-load=end|type=" + GetType().FullName); __RaiseChildrenLoad(); __RenderManagedPaint(); }
+        private AutoSizeMode __userControlAutoSizeMode;
         public UserControl() { Size = new global::System.Drawing.Size(150, 150); }
-        public global::System.Windows.Forms.AutoSizeMode AutoSizeMode { set { } }
+        public global::System.Windows.Forms.AutoSizeMode AutoSizeMode { set { __userControlAutoSizeMode = value; } }
         protected virtual void OnLoad(global::System.EventArgs e) { }
         protected virtual void OnResize(global::System.EventArgs e) { base.OnResize(e); }
         protected virtual void WndProc(ref global::System.Windows.Forms.Message m) { }
@@ -1837,8 +2072,8 @@ namespace System.Windows.Forms {
 namespace System.Windows.Forms.Layout {
     public partial class ArrangedElementCollection : object {
         public ArrangedElementCollection() { }
-        public virtual int Count { get { return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.Layout.ArrangedElementCollection.Count"); } }
-        public virtual global::System.Collections.IEnumerator GetEnumerator() { return default!; }
+        public virtual int Count { get { return 0; } }
+        public virtual global::System.Collections.IEnumerator GetEnumerator() { return global::System.Array.Empty<object>().GetEnumerator(); }
     }
 }
 namespace System.Windows.Forms {

@@ -244,6 +244,33 @@ The filename/engine-support continuation is:
 7. measure physical reads, bytes, updates, candidate tails, and verification
    only after the profile and protected mutation graph freeze.
 
+E11 and T-PROTECTED-KERNEL-1 split the last projection step into three formal
+support quantities: minimum kernel-avoidance depth for named differences,
+minimum workload depth for declared candidate tails, and completion depth for a
+separate unseen-direction attack family. T-ONE-EDIT-VERIFIER-1 closes the exact
+radius-one post-candidate verifier without dynamic programming. Neither theorem
+supplies filename relevance or a production row selection.
+
+E12 adds four boundaries before an engine experiment may freeze storage:
+
+1. additive guard/coverage addresses retain recall but not common-witness
+   provenance;
+2. arbitrary occupancy masks prohibit bounded universal posting
+   precombination;
+3. immutable segment liveness gives exact deletion but not bounded dead-posting
+   amplification;
+4. typed exact evidence determines only those relevance policies that factor
+   through it.
+
+E13 corrects that target. On its evaluation workload, complete-certificate
+incompatible history contributed zero candidates; bounded schedule omission
+and projection collision were the active residuals. T-HISTORY-OCCUPANCY-1 now
+binds all coordinate cells from one complete deletion descendant into one
+tuple, T-HISTORY-SCALE-1 supplies exact nested quotient refinement, and
+T-HISTORY-INFLUENCE-1 supplies the finite-address one-mutation obstruction.
+The next theorem boundary is external-scale capacity in `(length, partition
+pool, key width)`, not relevance or another certificate row sweep.
+
 Each theorem begins on paper, is attacked by least-support obstruction search,
 and moves to `formal/` when definitions stabilize. Search output is discarded
 once a direct witness and minimality argument replace it.

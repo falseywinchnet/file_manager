@@ -32,13 +32,14 @@ type Fault struct {
 	Message string        `json:"message"`
 }
 
-type version struct {
+type legacyVersion struct {
 	Protocol string   `json:"protocol"`
 	Features []string `json:"features"`
 }
 
 type rootParams struct {
-	Roots []api.RootSpec `json:"roots"`
+	Roots                       []api.RootSpec `json:"roots"`
+	ExpectedConfigurationDigest string         `json:"expected_configuration_digest,omitempty"`
 }
 
 type reconcileParams struct {
@@ -84,14 +85,18 @@ func dispatch(ctx context.Context, engine *service.Service, incoming Request) (R
 		if engine.Persistent() {
 			features = append(features, "immutable-generation-v1")
 		}
-		result = version{Protocol: api.ProtocolVersion, Features: features}
-	case "status":
+		result = legacyVersion{Protocol: api.ProtocolVersion, Features: features}
+	case "engine.version":
+		result = engine.Version()
+	case "status", "engine.status":
 		result, err = engine.Status(ctx)
+	case "configuration.get", "engine.configuration_get":
+		result = engine.Configuration()
 	case "sandbox.root":
 		result = struct {
 			Root string `json:"root"`
 		}{Root: engine.SandboxRoot()}
-	case "root.plan":
+	case "root.plan", "engine.root_plan":
 		var params rootParams
 		if err = decodeParams(incoming.Params, &params); err == nil {
 			result, err = engine.PlanRoots(ctx, params.Roots)
@@ -101,33 +106,42 @@ func dispatch(ctx context.Context, engine *service.Service, incoming Request) (R
 		if err = decodeParams(incoming.Params, &params); err == nil {
 			result, err = engine.ApplyRoots(ctx, params.Roots)
 		}
-	case "scan.reconcile":
+	case "engine.root_apply":
+		var params rootParams
+		if err = decodeParams(incoming.Params, &params); err == nil {
+			result, err = engine.ApplyRootsExpected(ctx, params.Roots, params.ExpectedConfigurationDigest)
+		}
+	case "scan.reconcile", "engine.scan_reconcile":
 		var params reconcileParams
 		if err = decodeParams(incoming.Params, &params); err == nil {
 			result, err = engine.Reconcile(ctx, params.Root)
 		}
-	case "projection.rebuild":
+	case "projection.rebuild", "engine.projection_rebuild":
 		var params reconcileParams
 		if err = decodeParams(incoming.Params, &params); err == nil {
 			result, err = engine.Rebuild(ctx, params.Root)
 		}
-	case "query":
+	case "query", "engine.query":
 		var query api.Query
 		if err = decodeParams(incoming.Params, &query); err == nil {
 			result, err = engine.Query(ctx, query)
 		}
-	case "inspect":
+	case "inspect", "engine.inspect":
 		var ref api.ObjectRef
 		if err = decodeParams(incoming.Params, &ref); err == nil {
 			result, err = engine.Inspect(ctx, ref)
 		}
-	case "integrity.check":
+	case "integrity.check", "engine.integrity_check":
 		result, err = engine.Integrity(ctx)
 	case "shutdown":
+		_, err = engine.Shutdown(ctx)
 		result = struct {
 			Accepted bool `json:"accepted"`
-		}{Accepted: true}
-		shutdown = true
+		}{Accepted: err == nil}
+		shutdown = err == nil
+	case "engine.shutdown":
+		result, err = engine.Shutdown(ctx)
+		shutdown = err == nil
 	default:
 		err = api.NewFault(api.ErrorMethodUnavailable, "method is not implemented by this engine version")
 	}

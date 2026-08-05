@@ -15,7 +15,11 @@
 #include "include/core/SkRegion.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
+#if defined(__APPLE__)
 #include "include/ports/SkFontMgr_mac_ct.h"
+#else
+#include "include/ports/SkFontMgr_empty.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -62,7 +66,13 @@ public:
     };
 
     sk_sp<SkSurface> surface;
-    sk_sp<SkFontMgr> fonts{SkFontMgr_New_CoreText(nullptr)};
+    sk_sp<SkFontMgr> fonts{
+#if defined(__APPLE__)
+        SkFontMgr_New_CoreText(nullptr)
+#else
+        SkFontMgr_New_Custom_Empty()
+#endif
+    };
     std::unordered_map<std::uint64_t, DecodedImage> images;
     std::vector<RegisteredTypeface> registered_typefaces;
     Size logical_size{};

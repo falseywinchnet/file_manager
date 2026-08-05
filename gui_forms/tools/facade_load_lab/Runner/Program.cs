@@ -35,7 +35,7 @@ internal static class Program
                     var stack = eventArgs.Exception.StackTrace ?? string.Empty;
                     var source = eventArgs.Exception.TargetSite?.DeclaringType?.Assembly.GetName().Name ?? string.Empty;
                     var traceAll = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_FIRST_CHANCE_ALL") == "1";
-                    if (!traceAll && !stack.Contains("retired compatibility specimen.PanView", StringComparison.Ordinal) &&
+                    if (!traceAll && !stack.Contains("retired compatibility specimen.", StringComparison.Ordinal) &&
                         !stack.Contains("System.Drawing", StringComparison.Ordinal) &&
                         !source.Contains("retired compatibility specimen", StringComparison.Ordinal) &&
                         !source.Contains("System.Drawing", StringComparison.Ordinal)) return;

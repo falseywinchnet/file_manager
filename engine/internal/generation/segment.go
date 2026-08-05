@@ -361,6 +361,17 @@ func (r *Reader) Row(ordinal uint32) (catalog.Row, bool, error) {
 	}, true, nil
 }
 
+// Filename resolves only the exact binding name. Candidate builders use this
+// narrow path to avoid decoding object, parent, and path fields for records
+// that never survive candidate generation.
+func (r *Reader) Filename(ordinal uint32) (string, bool, error) {
+	if uint64(ordinal) >= r.header.bindingCount {
+		return "", false, nil
+	}
+	name, err := r.nameAt(ordinal)
+	return name, err == nil, err
+}
+
 func (r *Reader) Close() error {
 	r.closeOnce.Do(func() {
 		r.closeError = r.file.Close()
@@ -385,7 +396,12 @@ func (r *Reader) PathIndex(path string) (uint32, bool, error) {
 	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return 0, false, nil
 	}
-	target := filepath.ToSlash(relative)
+	return r.pathIndexRelative(filepath.ToSlash(relative))
+}
+
+// pathIndexRelative avoids repeating absolute-path normalization when a
+// checked wrapper has already resolved a path beneath the same root.
+func (r *Reader) pathIndexRelative(target string) (uint32, bool, error) {
 	low, high := uint64(0), r.header.bindingCount
 	for low < high {
 		middle := low + (high-low)/2

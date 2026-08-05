@@ -62,6 +62,9 @@ public:
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
     [[nodiscard]] ImageLoadResult replace_png(ImageId image,
                                                std::span<const std::byte> encoded);
+    [[nodiscard]] ImageLoadResult replace_png(ImageId image,
+                                               std::span<const std::byte> encoded,
+                                               Control& consumer);
     [[nodiscard]] bool remove_image(ImageId image);
     [[nodiscard]] const ImageRegistry& image_resources() const noexcept {
         return image_resources_;
@@ -165,6 +168,7 @@ private:
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
     Control::WeakPtr pressed_;
+    Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;
     std::uint64_t drag_session_id_{};
     std::array<DamageRegion, paint_plane_count> plane_damage_;

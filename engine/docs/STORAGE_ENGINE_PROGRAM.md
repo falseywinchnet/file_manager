@@ -133,8 +133,26 @@ distinction.
 for the next delta experiment. It streams add/update/delete records and honors
 cancellation without materializing the change set. A standalone checksummed
 delta candidate now consumes that stream and suppresses no-op files, but it is
-not referenced by the live manifest or query path. Both remain experimental;
-see `M2_DELTA_COMPACTION_SLICE.md` and `results/M2_DELTA_CANDIDATE_001.md`.
+not referenced by the live manifest or query path. A separate caller-bounded
+one-run overlay proves exact base-plus-run query semantics without changing
+that boundary. A digest-chained multi-run overlay and one-cycle net-run
+consolidator are also measured candidates. Eight runs are the strongest tested
+point; sixteen is rejected for this heap-overlay representation, not for every
+possible immutable-run representation. Repeated cumulative consolidation and
+same-trigger base replacement are rejected by multi-cycle write evidence. A
+cohort-only tiered schedule now has a checked disk-indexed exact view and a
+checkpoint-free streaming compactor. Indexed writes, retained memory, exact
+state, and the warm relative-p99 query gate pass. Isolated atomic `TIERED.*`
+publication/recovery mechanics are also observed, but live service publication
+and long-horizon levels remain red. All remain experimental; see
+`M2_DELTA_COMPACTION_SLICE.md`,
+`results/M2_DELTA_CANDIDATE_001.md`, and
+`results/M2_OVERLAY_CANDIDATE_001.md`, and
+`results/M2_MULTI_RUN_CONSOLIDATION_001.md`,
+`results/M2_REPEATED_CONSOLIDATION_002.md`, and
+`results/M2_TIERED_COHORT_COMPACTION_003.md`, and
+`results/M2_TIERED_INDEXED_COMPACTION_004.md`, and
+`results/M2_TIERED_MANIFEST_RECOVERY_005.md`.
 
 ## Root ownership
 

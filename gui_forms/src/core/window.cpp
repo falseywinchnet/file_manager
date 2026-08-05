@@ -73,6 +73,21 @@ ImageLoadResult Window::replace_png(ImageId image,
     return result;
 }
 
+ImageLoadResult Window::replace_png(ImageId image,
+                                    std::span<const std::byte> encoded,
+                                    Control& consumer) {
+    require_ui_thread("scoped PNG resource replacement");
+    if (consumer.window_ != this) {
+        throw std::invalid_argument(
+            "scoped PNG replacement requires an attached consumer");
+    }
+    ImageLoadResult result = image_resources_.replace_png(image, encoded);
+    if (result) {
+        mark_dirty(consumer, Dirty::paint | Dirty::semantics);
+    }
+    return result;
+}
+
 bool Window::remove_image(ImageId image) {
     require_ui_thread("PNG resource removal");
     if (!image_resources_.remove(image)) {
@@ -457,12 +472,52 @@ void Window::change_pointer_capture(const Control::Ptr& control,
 bool Window::dispatch_pointer(PointerEvent event) {
     require_ui_thread("pointer dispatch");
     metrics_.record_input();
+    if (event.action == PointerAction::move) {
+        Control::Ptr next_hover = hit_test(event.position);
+        Control::Ptr previous_hover = hovered_.lock();
+        if (previous_hover != next_hover) {
+            if (previous_hover && eligible(previous_hover)) {
+                PointerEvent leave = event;
+                leave.action = PointerAction::leave;
+                leave.button = PointerButton::none;
+                leave.phase = EventPhase::target;
+                leave.handled = false;
+                metrics_.record_callback_emitted();
+                previous_hover->on_pointer(leave);
+                previous_hover->pointer_observed_.emit(leave);
+            }
+            hovered_ = next_hover;
+            if (next_hover && eligible(next_hover)) {
+                PointerEvent enter = event;
+                enter.action = PointerAction::enter;
+                enter.button = PointerButton::none;
+                enter.phase = EventPhase::target;
+                enter.handled = false;
+                metrics_.record_callback_emitted();
+                next_hover->on_pointer(enter);
+                next_hover->pointer_observed_.emit(enter);
+            }
+        }
+    }
     Control::Ptr target = captured_.lock();
     if (!target) {
         target = hit_test(event.position);
     }
     if (!target) {
         return false;
+    }
+
+    // A release callback may synchronously open a modal window. Relinquish both
+    // retained and platform capture before user code runs so that the modal can
+    // receive its first pointer message. Keep strong local references for this
+    // route and for the later click qualification.
+    Control::Ptr pressed_for_release;
+    const bool primary_release = event.action == PointerAction::up &&
+        event.button == PointerButton::primary;
+    if (primary_release) {
+        pressed_for_release = pressed_.lock();
+        pressed_.reset();
+        release_pointer();
     }
 
     const auto route = route_to(target);
@@ -474,11 +529,6 @@ bool Window::dispatch_pointer(PointerEvent event) {
         metrics_.record_callback_emitted();
         control->on_pointer_preview(event);
         if (event.handled) {
-            if (event.action == PointerAction::up &&
-                event.button == PointerButton::primary) {
-                pressed_.reset();
-                release_pointer();
-            }
             return true;
         }
     }
@@ -500,6 +550,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
         event.phase = EventPhase::target;
         metrics_.record_callback_emitted();
         target->on_pointer(event);
+        target->pointer_observed_.emit(event);
     }
     if (!event.handled) {
         event.phase = EventPhase::bubble;
@@ -515,15 +566,12 @@ bool Window::dispatch_pointer(PointerEvent event) {
         }
     }
 
-    if (event.action == PointerAction::up &&
-        event.button == PointerButton::primary) {
-        Control::Ptr pressed = pressed_.lock();
-        pressed_.reset();
-        release_pointer();
+    if (primary_release) {
         Control::Ptr released_over = hit_test(event.position);
-        if (pressed && pressed == released_over && eligible(pressed)) {
+        if (pressed_for_release && pressed_for_release == released_over &&
+            eligible(pressed_for_release)) {
             metrics_.record_callback_emitted();
-            pressed->on_activate();
+            pressed_for_release->on_activate();
             metrics_.record_activation();
         }
     }
@@ -853,6 +901,9 @@ void Window::revoke_interaction_for_subtree(const Control::Ptr& control,
     if (contains_control(control, pressed_.lock())) {
         pressed_.reset();
         metrics_.record_press_revocation();
+    }
+    if (contains_control(control, hovered_.lock())) {
+        hovered_.reset();
     }
     if (contains_control(control, drag_target_.lock())) {
         cancel_drag();

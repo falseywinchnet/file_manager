@@ -87,6 +87,16 @@ they are controls and interim fallbacks rather than a decision to make the
 production Kolmogrov channel optional. Semantic interpretation remains a
 separate Orchestrator/plugin-hive concern.
 
+The first disabled native adapter is now **OBSERVED** for the sealed
+literal-only, radius-one coupled-history profile. It proposes candidates from
+three typed length plans and then invokes a separate exact one-edit verifier.
+Adjacent transposition is recognized as two cross-matching neighboring scalar
+positions; insertion/deletion use one alignment skip; neither path allocates an
+edit matrix. Hash matches retain `candidate_only=true` and no raw relevance
+score. Digit, extension, separator, structural-role, and Go-simple-fold facts
+are explanation inputs only until a judged File Manager policy admits their
+use in ordering or vetoes.
+
 ## Certainty and result motion
 
 “Certainty” is a calibrated statement about evidence, not a synonym for a larger

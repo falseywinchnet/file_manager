@@ -83,6 +83,8 @@ public:
     [[nodiscard]] bool effectively_visible() const noexcept;
     [[nodiscard]] bool effectively_enabled() const noexcept;
     [[nodiscard]] bool eligible_for_input() const noexcept;
+    void set_pointer_capture(bool captured);
+    [[nodiscard]] bool has_pointer_capture() const noexcept;
 
     [[nodiscard]] Dirty dirty() const noexcept { return dirty_; }
     [[nodiscard]] Dirty subtree_dirty() const noexcept { return subtree_dirty_; }
@@ -101,6 +103,9 @@ public:
     }
     [[nodiscard]] Event<Dirty, bool>& initialization_completed() noexcept {
         return initialization_completed_;
+    }
+    [[nodiscard]] Event<const PointerEvent&>& pointer_observed() noexcept {
+        return pointer_observed_;
     }
 
     [[nodiscard]] virtual Size measure(Size available);
@@ -156,6 +161,7 @@ private:
     bool allow_drop_{};
     std::optional<CursorKind> cursor_;
     Event<Dirty, bool> initialization_completed_;
+    Event<const PointerEvent&> pointer_observed_;
     Dirty pending_initialization_dirty_{Dirty::none};
     std::uint64_t initialization_depth_{};
     bool pending_initialization_subtree_{};

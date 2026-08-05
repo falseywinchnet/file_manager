@@ -130,13 +130,17 @@ type RootState struct {
 }
 
 type RootPlan struct {
-	Roots []RootSpec `json:"roots"`
+	Roots                       []RootSpec `json:"roots"`
+	CurrentConfigurationDigest  string     `json:"current_configuration_digest,omitempty"`
+	ProposedConfigurationDigest string     `json:"proposed_configuration_digest,omitempty"`
+	Changed                     bool       `json:"changed"`
 }
 
 type ReconcileReport struct {
 	Root       RootID     `json:"root"`
 	Generation Generation `json:"generation"`
 	Records    uint64     `json:"records"`
+	Published  bool       `json:"published"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt time.Time  `json:"finished_at"`
 }
@@ -159,13 +163,17 @@ type QueryPlan struct {
 }
 
 type Status struct {
-	Protocol   string      `json:"protocol"`
-	Generation Generation  `json:"generation"`
-	Ready      bool        `json:"ready"`
-	Sandboxed  bool        `json:"sandboxed"`
-	Roots      []RootID    `json:"roots,omitempty"`
-	RootStates []RootState `json:"root_states,omitempty"`
-	Warnings   []string    `json:"warnings,omitempty"`
+	Protocol      string                 `json:"protocol"`
+	Generation    Generation             `json:"generation"`
+	Ready         bool                   `json:"ready"`
+	Sandboxed     bool                   `json:"sandboxed"`
+	Lifecycle     LifecycleStatus        `json:"lifecycle"`
+	Work          WorkStatus             `json:"work"`
+	Configuration EffectiveConfiguration `json:"configuration"`
+	Capabilities  []CapabilityStatus     `json:"capabilities"`
+	Roots         []RootID               `json:"roots,omitempty"`
+	RootStates    []RootState            `json:"root_states,omitempty"`
+	Warnings      []string               `json:"warnings,omitempty"`
 }
 
 type IntegrityReport struct {
@@ -182,4 +190,14 @@ type Engine interface {
 	Query(context.Context, Query) (QueryResponse, error)
 	Inspect(context.Context, ObjectRef) (Result, error)
 	Integrity(context.Context) (IntegrityReport, error)
+}
+
+// ManagedEngine adds process-instance and enacted-configuration controls. A
+// supervisor constructs/starts and restarts the process; Shutdown is the
+// engine-owned draining half of that lifecycle.
+type ManagedEngine interface {
+	Engine
+	Version() VersionInfo
+	Configuration() EffectiveConfiguration
+	Shutdown(context.Context) (LifecycleStatus, error)
 }

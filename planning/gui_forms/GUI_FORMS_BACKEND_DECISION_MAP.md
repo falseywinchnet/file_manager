@@ -99,9 +99,9 @@ pipelines, multithreaded rendering, paths, text, gradients, patterns, and
 Porter-Duff blending. It is comparatively compact and well suited to a classic
 2D UI rendered only in damaged tiles.
 
-Risks: the GUI framework still owns text shaping, font discovery, platform
-bitmap presentation, and unusual effects; JIT policy may be undesirable in
-hardened/sandboxed builds.
+Risks: the GUI framework still owns text shaping, bundled font-pack selection,
+platform bitmap presentation, and unusual effects; JIT policy may be
+undesirable in hardened/sandboxed builds.
 
 ### R2 — Skia CPU reference backend
 
@@ -148,23 +148,25 @@ the loser discarded completely?
 
 ## 4. Text system
 
-HarfBuzz is the leading renderer-neutral shaping candidate. It converts Unicode
-runs, with direction/script/language, into positioned glyphs and supports cached
-shape plans. Rasterization and font discovery remain separate concerns.
+**GIVEN owner direction:** HarfBuzz is the common renderer-neutral shaper and
+FreeType is the common loader/hinter/rasterizer. HarfBuzz converts Unicode runs,
+with direction/script/language, into positioned glyphs and supports cached
+shape plans. Font-pack selection, shaping, and raster profiles remain separate
+internal services even though their implementation families are selected.
 
 Recommended split:
 
 - public ABI strings: length-delimited UTF-8;
 - text controls: UTF-8 storage plus explicit grapheme/cluster/line indices;
 - shaping: HarfBuzz behind a GUI.Forms service interface;
-- font discovery/fallback: platform adapter;
-- glyph rasterization: selected renderer or FreeType-compatible adapter;
+- font selection/fallback: bounded bundled role/script packs;
+- glyph rasterization: FreeType behind the renderer-neutral glyph-run seam;
 - IME: platform adapter addressing stable text ranges in the custom editor;
 - no invisible native text control overlay.
 
-**GF004:** Is minor cross-platform text-metric drift acceptable when the same
-font is unavailable, or must GUI.Forms bundle a house UI font for deterministic
-layout?
+**GF004 — resolved:** bundle control, body, and required fallback fonts and
+target exact layout geometry for a pinned font-pack/shaping/raster profile.
+Missing coverage is an explicit pack fault, not silent host-font substitution.
 
 **GF005:** Must the first text editor support bidirectional text, grapheme-safe
 selection, dead keys, and multi-stage CJK composition before any dogfood demo is

@@ -11,3 +11,7 @@ semantic scope, and unresolved fields.
 
 - `orc_kol_001/lab_profile_001.json` — binary deletion-certificate laboratory
   profile from `docs/ORC_KOL_LAB_PROFILE_001.md`.
+- `orc_kol_001/history_hash_usage_guidance_001.json` — sealed candidate
+  defaults and mandatory constraints for disabled filename-history dogfooding;
+  it is guidance from `docs/HISTORY_HASH_ENGINE_CONTRACT_001.md`, not an
+  accepted transfer profile or architecture decision.

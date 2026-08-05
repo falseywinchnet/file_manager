@@ -8,6 +8,7 @@
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
 #include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
@@ -25,6 +26,8 @@
 #include "include/encode/SkPngEncoder.h"
 #if defined(__APPLE__)
 #include "include/ports/SkFontMgr_mac_ct.h"
+#else
+#include "include/ports/SkFontMgr_empty.h"
 #endif
 
 #include <algorithm>
@@ -358,14 +361,16 @@ public:
 #if defined(__APPLE__)
         SkFontMgr_New_CoreText(nullptr)
 #else
-        SkFontMgr::RefEmpty()
+        SkFontMgr_New_Custom_Empty()
 #endif
     };
     std::unordered_map<std::string, sk_sp<SkTypeface>> typefaces;
 
     [[nodiscard]] sk_sp<SkTypeface> typeface(std::string_view family) const {
         const auto found = typefaces.find(std::string(family));
-        return found == typefaces.end() ? SkTypeface::MakeEmpty() : found->second;
+        if (found != typefaces.end()) return found->second;
+        const auto fallback = typefaces.find("Portsmouth Rapids");
+        return fallback == typefaces.end() ? SkTypeface::MakeEmpty() : fallback->second;
     }
 };
 
@@ -444,6 +449,10 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 SkFont font(impl_->typeface(command.font.family),
                             static_cast<SkScalar>(command.font.size));
                 SkScalar x = static_cast<SkScalar>(command.first.x);
+                SkFontMetrics metrics;
+                font.getMetrics(&metrics);
+                const SkScalar baseline = static_cast<SkScalar>(command.first.y) -
+                    metrics.fAscent;
                 if (command.format.alignment != StringAlignment::near) {
                     const SkScalar width = font.measureText(
                         command.text.data(), command.text.size(),
@@ -453,7 +462,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 }
                 canvas->drawSimpleText(command.text.data(), command.text.size(),
                                        SkTextEncoding::kUTF8, x,
-                                       static_cast<SkScalar>(command.first.y),
+                                       baseline,
                                        font, paint);
                 break;
             }

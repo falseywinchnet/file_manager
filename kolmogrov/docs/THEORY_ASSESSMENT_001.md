@@ -225,6 +225,77 @@ cheap. These results make an experimental filename system definable, but the
 active row compiler, length plan, protected labels, and index costs still need
 disjoint evidence.
 
+### E11 update: protected support, exact-length retrieval, and resource cost
+
+**High confidence in the minimum-support object and typed query shape; medium
+confidence in generated candidate behavior; low confidence in projection
+selection and real relevance.** T-PROTECTED-KERNEL-1 identifies protected row
+selection with finite kernel avoidance and gives a least two-row obstruction.
+E11 attained that exact minimum on every development view, then demonstrated
+that semantic protection is much weaker than useful retrieval support: its
+candidate gate required four rows and the disjoint difference attack required
+six.
+
+The strongest negative is decisive. Four protected-coset rows lost to the
+four-row balanced control on evaluation candidate tails. The compiler did what
+it promised; the promise was not a sufficient objective. I no longer expect a
+single development obstruction graph to select the perceptual projection.
+
+The constructive survivor is the multi-address instinct in a sharper form:
+retain a minimum guard address for named failures and a separate ambient/minimax
+coverage address for unseen deformation. Do not conceal both roles in one coset
+representative. The exact `n-1,n,n+1` query plan and one-scan verifier are ready
+for a controlled hash experiment. A consented relevance split is not a
+Kolmogrov K1 requirement; native segment/cache/update measurements and a
+bounded hash-capacity contract are.
+
+### E12 update: multi-address provenance and certificate support
+
+**High confidence in the newly exposed boundaries; reduced confidence in guard
+storage; increased confidence that certificate/history support is the next
+lever.** A separate guard/coverage layout retained recall but mixed witnesses on
+46 of 216 evaluation queries and nearly doubled posting bytes at equal dense
+mask support. The multi-address instinct survives only with honest roles:
+coverage generates, guard audits/ranks, and coupled evidence alone claims a
+common witness.
+
+The 64-cell coupled projection barely changed p95 candidates relative to the
+16-cell split/guard controls. Meanwhile two and four affine certificates were
+grossly underselective, and the selected eight-certificate schedule still
+failed its evaluation tail threshold. I would now spend support on
+obstruction-selected certificate directions and common-history coherence, not
+more projection rows.
+
+Typed exact evidence and immutable liveness are credible support mechanisms,
+not relevance/storage selections. The first cannot choose policy without owner
+labels; the second leaves dead posting mass until measured compaction.
+
+### E13 update: whole-history tuple capacity
+
+**High confidence in the recurrence, recall, coupling requirement, and scale
+quotient; medium confidence in the small generated capacity crossing; low
+confidence at engine scale and under adversarial hashing.** The E12 tail now
+has an exact nonrelevance decomposition: 696 evaluation candidates came from
+bounded schedule omission, 323 from projection collision, and zero from the
+complete-certificate incompatible-history class.
+
+The decisive construction is one coupled coordinate tuple per complete
+deletion descendant. It computes all histories in linear rolling work and
+stores about one posting per distinct history per semantic view. Keeping the
+coordinates separate is not coherent; each can borrow a different history.
+
+At two 8-bit coordinates E13 retained one false candidate across the three
+splits. Two 9-bit coordinates retained none, with about 45--48 memberships per
+record. This does not make 18 bits universal. The capacity theorem also needs
+maximum history length and same-partition record count, and its collision law
+assumes a suitable coordinate family. The explicit `ldfioia/kbmedfa` false
+candidate already breaks the present 18-bit tuple on shorter all-letter input.
+
+K1 should now be read as a hash-instrument gate: declared relation and recall,
+length/pool/key-width envelope, mutation influence/overflow behavior,
+configuration identity, and native index resources. Ranking, ngrams, and
+transposition policy belong to the parent engine.
+
 ## Historical low-confidence list
 
 This was the pre-Round-003 list. It is retained as the originating uncertainty

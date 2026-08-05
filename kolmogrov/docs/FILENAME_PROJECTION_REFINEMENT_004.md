@@ -116,8 +116,14 @@ least exact-history obstructions, so neither path is promoted to exact hashing.
 
 The remaining objects are:
 
-1. Protected filename mutation graph and disjoint generator families.
-2. Obstruction-selected row compiler over the exact filename atom lanes.
-3. Concrete posting codec bytes, physical reads, updates, and verification work.
-4. Bounded exact-length query plan and length-band rebuild behavior.
-5. Held-out ranking/candidate evidence against engine controls.
+1. A minimax guard/coverage compiler; E11 rejects single-graph protection as a
+   sufficient held-out objective.
+2. Consented filename/path relevance beyond E11's disjoint synthetic families.
+3. Native posting dictionaries, cache traces, durable updates/deletes, and
+   compaction; E11 supplies payload controls only.
+4. Real length histograms, wider edit budgets, and length-band rebuild behavior;
+   E11 closes only the exact radius-one `n-1,n,n+1` plan.
+5. Hard-decoy rank policy and numeric-jet fusion at equal total support.
+
+The continuation and changed confidence are recorded in
+`FILENAME_RETRIEVAL_REFINEMENT_005.md`.

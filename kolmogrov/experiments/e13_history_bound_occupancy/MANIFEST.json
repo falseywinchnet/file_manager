@@ -1,0 +1,29 @@
+{
+  "experiment_id": "E13",
+  "title": "Whole-history occupancy, coupled tuple capacity, and candidate attribution",
+  "status": "three-way generated measurement",
+  "profile_id": "org.filemanager.kolmogrov.filename-observation@0.1.0-research.1",
+  "claims_under_test": [
+    "The E12 candidate tail can be partitioned without a relevance judgment.",
+    "Rolling whole-descendant fingerprints remove bounded certificate schedule omission in linear work.",
+    "Separately accepted address overlaps saturate and can borrow incompatible histories.",
+    "Coupling all address coordinates by history reduces excess at the same key-bit scale.",
+    "A nested cell tower exposes a measurable length and candidate-pool capacity boundary.",
+    "The generated zero-excess width still admits a short explicit deterministic collision."
+  ],
+  "splits": {
+    "development": {"records": 288, "queries": 216},
+    "tuning": {"records": 288, "queries": 216},
+    "evaluation": {"records": 288, "queries": 216}
+  },
+  "certificate_control": {
+    "layout": "coverage-4",
+    "degree": 2,
+    "certificate_count": 8,
+    "cells_per_certificate_view": 16
+  },
+  "coupled_key_sweep_bits_per_semantic_view": [8, 9, 10, 11, 12, 13, 14, 15, 16, 18],
+  "selection": "none; the first all-split zero-excess crossing is reported retrospectively as measured, not frozen",
+  "privacy": "frozen in-tree synthetic generators only",
+  "entrypoint": "run.py"
+}

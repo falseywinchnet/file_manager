@@ -24,7 +24,8 @@ import (
 type Service struct {
 	guard            *sandbox.Guard
 	store            *catalog.Store
-	scanner          scan.Scanner
+	scanner          metadataScanner
+	lifecycle        serviceLifecycle
 	admin            sync.Mutex
 	durable          *generation.Store
 	durableDirectory string
@@ -35,15 +36,25 @@ type Service struct {
 	generationFloor  api.Generation
 	quarantined      int
 	quarantineError  string
+	background       backgroundObservation
+}
+
+type metadataScanner interface {
+	Scan(context.Context, api.RootSpec, scan.OwnsFunc) (*catalog.Shard, error)
 }
 
 var _ api.Engine = (*Service)(nil)
+var _ api.ManagedEngine = (*Service)(nil)
 
 func New(guard *sandbox.Guard) (*Service, error) {
 	if guard == nil {
 		return nil, errors.New("sandbox guard is required")
 	}
-	return &Service{guard: guard, store: catalog.NewStore()}, nil
+	lifecycle, err := newServiceLifecycle()
+	if err != nil {
+		return nil, err
+	}
+	return &Service{guard: guard, store: catalog.NewStore(), scanner: scan.Scanner{}, lifecycle: lifecycle}, nil
 }
 
 // NewPersistent opens the one-root M2 durable service. The store directory
@@ -110,19 +121,25 @@ func NewPersistent(guard *sandbox.Guard, directory string) (*Service, error) {
 func (s *Service) Persistent() bool { return s.durable != nil }
 
 func (s *Service) Close() error {
-	s.readerMu.Lock()
-	defer s.readerMu.Unlock()
-	if s.reader == nil {
-		return nil
-	}
-	err := s.reader.Close()
-	s.reader = nil
+	_, err := s.Shutdown(context.Background())
 	return err
 }
 
 func (s *Service) SandboxRoot() string { return s.guard.Root() }
 
-func (s *Service) PlanRoots(_ context.Context, roots []api.RootSpec) (api.RootPlan, error) {
+func (s *Service) PlanRoots(ctx context.Context, roots []api.RootSpec) (api.RootPlan, error) {
+	ctx, finish, err := s.beginOperation(ctx, operationAdministrative, api.WorkPlanning)
+	if err != nil {
+		return api.RootPlan{}, err
+	}
+	defer finish()
+	if err := ctx.Err(); err != nil {
+		return api.RootPlan{}, err
+	}
+	return s.planRoots(roots)
+}
+
+func (s *Service) planRoots(roots []api.RootSpec) (api.RootPlan, error) {
 	if s.durable != nil && len(roots) > 1 {
 		return api.RootPlan{}, api.NewFault(api.ErrorInvalidRequest, "the M2 durable service currently admits exactly one root")
 	}
@@ -150,22 +167,52 @@ func (s *Service) PlanRoots(_ context.Context, roots []api.RootSpec) (api.RootPl
 	if _, _, err := validation.ApplyRoots(canonical); err != nil {
 		return api.RootPlan{}, api.WrapFault(api.ErrorInvalidRequest, "root plan is invalid", err)
 	}
-	return api.RootPlan{Roots: canonical}, nil
+	current := s.Configuration()
+	proposed := s.effectiveConfiguration(canonical, false)
+	return api.RootPlan{
+		Roots: canonical, CurrentConfigurationDigest: current.Digest,
+		ProposedConfigurationDigest: proposed.Digest, Changed: current.Digest != proposed.Digest,
+	}, nil
 }
 
 func (s *Service) ApplyRoots(ctx context.Context, roots []api.RootSpec) (api.RootPlan, error) {
+	return s.applyRoots(ctx, roots, "")
+}
+
+// ApplyRootsExpected prevents a stale administrative controller from
+// overwriting a root policy planned against another effective configuration.
+func (s *Service) ApplyRootsExpected(ctx context.Context, roots []api.RootSpec, expectedConfigurationDigest string) (api.RootPlan, error) {
+	if expectedConfigurationDigest == "" {
+		return api.RootPlan{}, api.NewFault(api.ErrorInvalidRequest, "expected configuration digest is required")
+	}
+	return s.applyRoots(ctx, roots, expectedConfigurationDigest)
+}
+
+func (s *Service) applyRoots(ctx context.Context, roots []api.RootSpec, expectedConfigurationDigest string) (api.RootPlan, error) {
+	ctx, finish, err := s.beginOperation(ctx, operationAdministrative, api.WorkPlanning)
+	if err != nil {
+		return api.RootPlan{}, err
+	}
+	defer finish()
 	s.admin.Lock()
 	defer s.admin.Unlock()
 	if err := ctx.Err(); err != nil {
 		return api.RootPlan{}, err
 	}
-	plan, err := s.PlanRoots(ctx, roots)
+	if expectedConfigurationDigest != "" {
+		current := s.Configuration().Digest
+		if current != expectedConfigurationDigest {
+			return api.RootPlan{}, api.NewFault(api.ErrorStaleConfiguration, "root policy was planned against a different effective configuration")
+		}
+	}
+	plan, err := s.planRoots(roots)
 	if err != nil {
 		return api.RootPlan{}, err
 	}
 	if _, _, err := s.store.ApplyRoots(plan.Roots); err != nil {
 		return api.RootPlan{}, api.WrapFault(api.ErrorInvalidRequest, "apply root plan", err)
 	}
+	s.invalidateBackground("approved root policy changed")
 	if s.durable != nil {
 		s.readerMu.Lock()
 		keep := len(plan.Roots) == 1 && s.reader != nil && s.reader.Root() == plan.Roots[0]
@@ -179,6 +226,15 @@ func (s *Service) ApplyRoots(ctx context.Context, roots []api.RootSpec) (api.Roo
 }
 
 func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.ReconcileReport, error) {
+	ctx, finish, err := s.beginOperation(ctx, operationAdministrative, api.WorkReconciling)
+	if err != nil {
+		return api.ReconcileReport{}, err
+	}
+	defer finish()
+	return s.reconcile(ctx, rootID, false)
+}
+
+func (s *Service) reconcile(ctx context.Context, rootID api.RootID, forcePublication bool) (api.ReconcileReport, error) {
 	s.admin.Lock()
 	defer s.admin.Unlock()
 	started := time.Now().UTC()
@@ -189,10 +245,30 @@ func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.Reconci
 	}
 	shard, err := s.scanner.Scan(ctx, projection.Spec, snapshot.OwnsProjected)
 	if err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return api.ReconcileReport{}, contextErr
+		}
 		_, _ = s.store.MarkStale(rootID, "last reconciliation failed")
 		return api.ReconcileReport{}, api.WrapFault(api.ErrorInternal, "reconcile approved root", err)
 	}
 	if s.durable != nil {
+		// A complete authoritative scan may discover no exact-state change. Do
+		// not turn that into a generation, manifest, sync, or cleanup write.
+		// Pending recovery evidence is excluded because its preservation work
+		// must still run through the existing checked-publication path.
+		if !forcePublication && len(s.pendingRecovery) == 0 && s.quarantineError == "" {
+			s.readerMu.RLock()
+			current := s.reader
+			if current != nil && current.Root() == projection.Spec && current.Digest() == shard.Digest() {
+				generationID := current.Metadata().Generation
+				s.readerMu.RUnlock()
+				return api.ReconcileReport{
+					Root: rootID, Generation: generationID, Records: uint64(shard.Len()), Published: false,
+					StartedAt: started, FinishedAt: time.Now().UTC(),
+				}, nil
+			}
+			s.readerMu.RUnlock()
+		}
 		nextGeneration := s.generationFloor + 1
 		if nextGeneration == 0 {
 			return api.ReconcileReport{}, api.NewFault(api.ErrorIntegrity, "durable generation counter is exhausted")
@@ -234,7 +310,7 @@ func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.Reconci
 		}
 		s.readerMu.Unlock()
 		return api.ReconcileReport{
-			Root: rootID, Generation: nextGeneration, Records: uint64(shard.Len()),
+			Root: rootID, Generation: nextGeneration, Records: uint64(shard.Len()), Published: true,
 			StartedAt: started, FinishedAt: time.Now().UTC(),
 		}, nil
 	}
@@ -243,7 +319,7 @@ func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.Reconci
 		return api.ReconcileReport{}, api.WrapFault(api.ErrorInternal, "publish catalogue generation", err)
 	}
 	return api.ReconcileReport{
-		Root: rootID, Generation: committed.Generation, Records: uint64(shard.Len()),
+		Root: rootID, Generation: committed.Generation, Records: uint64(shard.Len()), Published: true,
 		StartedAt: started, FinishedAt: time.Now().UTC(),
 	}, nil
 }
@@ -252,12 +328,17 @@ func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.Reconci
 // immutable commit path as reconciliation. The last valid reader remains
 // available until publication succeeds.
 func (s *Service) Rebuild(ctx context.Context, rootID api.RootID) (api.ReconcileReport, error) {
-	return s.Reconcile(ctx, rootID)
+	ctx, finish, err := s.beginOperation(ctx, operationAdministrative, api.WorkRebuilding)
+	if err != nil {
+		return api.ReconcileReport{}, err
+	}
+	defer finish()
+	return s.reconcile(ctx, rootID, true)
 }
 
 func (s *Service) Status(_ context.Context) (api.Status, error) {
 	if s.durable != nil {
-		return s.persistentStatus(), nil
+		return s.decorateStatus(s.persistentStatus()), nil
 	}
 	snapshot := s.store.Snapshot()
 	status := api.Status{
@@ -292,7 +373,7 @@ func (s *Service) Status(_ context.Context) (api.Status, error) {
 	if len(snapshot.Roots) == 0 {
 		status.Warnings = append(status.Warnings, "no approved sandbox roots configured")
 	}
-	return status, nil
+	return s.decorateStatus(status), nil
 }
 
 func (s *Service) persistentStatus() api.Status {
@@ -351,6 +432,11 @@ func (s *Service) persistentStatus() api.Status {
 }
 
 func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse, error) {
+	ctx, finish, err := s.beginOperation(ctx, operationQuery, "")
+	if err != nil {
+		return api.QueryResponse{}, err
+	}
+	defer finish()
 	started := time.Now()
 	if err := ctx.Err(); err != nil {
 		return api.QueryResponse{}, err
@@ -359,7 +445,7 @@ func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse
 	var matches []exact.Match
 	var cursor string
 	var generationID api.Generation
-	var err error
+	var queryErr error
 	if s.durable != nil {
 		s.readerMu.RLock()
 		defer s.readerMu.RUnlock()
@@ -367,13 +453,13 @@ func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse
 			return api.QueryResponse{}, api.NewFault(api.ErrorMethodUnavailable, "query scope has no checked durable generation")
 		}
 		generationID = s.reader.Metadata().Generation
-		matches, cursor, err = exact.QueryIndex(ctx, snapshot, generationID, s.reader.Root().ID, s.reader, query)
+		matches, cursor, queryErr = exact.QueryIndex(ctx, snapshot, generationID, s.reader.Root().ID, s.reader, query)
 	} else {
 		generationID = snapshot.Generation
-		matches, cursor, err = exact.Query(ctx, snapshot, query)
+		matches, cursor, queryErr = exact.Query(ctx, snapshot, query)
 	}
-	if err != nil {
-		return api.QueryResponse{}, err
+	if queryErr != nil {
+		return api.QueryResponse{}, queryErr
 	}
 	if err := ctx.Err(); err != nil {
 		return api.QueryResponse{}, err
@@ -391,10 +477,21 @@ func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse
 		response.Plan.StaleRoot = []api.RootID{query.Scope.Root}
 		response.Warnings = append(response.Warnings, "query used a stale catalogue generation")
 	}
+	if s.backgroundStale() {
+		if len(response.Plan.StaleRoot) == 0 {
+			response.Plan.StaleRoot = []api.RootID{query.Scope.Root}
+		}
+		response.Warnings = append(response.Warnings, "query used a generation not reconciled through the active observation stream")
+	}
 	return response, nil
 }
 
 func (s *Service) Inspect(ctx context.Context, ref api.ObjectRef) (api.Result, error) {
+	ctx, finish, operationErr := s.beginOperation(ctx, operationQuery, "")
+	if operationErr != nil {
+		return api.Result{}, operationErr
+	}
+	defer finish()
 	if err := ctx.Err(); err != nil {
 		return api.Result{}, err
 	}
@@ -422,6 +519,11 @@ func (s *Service) Inspect(ctx context.Context, ref api.ObjectRef) (api.Result, e
 }
 
 func (s *Service) Integrity(ctx context.Context) (api.IntegrityReport, error) {
+	ctx, finish, operationErr := s.beginOperation(ctx, operationAdministrative, api.WorkIntegrityCheck)
+	if operationErr != nil {
+		return api.IntegrityReport{}, operationErr
+	}
+	defer finish()
 	if err := ctx.Err(); err != nil {
 		return api.IntegrityReport{}, err
 	}

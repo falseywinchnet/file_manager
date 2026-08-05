@@ -108,20 +108,22 @@ The retired compatibility specimen catalogue is a floor, not the ceiling of GUI.
 **GIVEN** needs for small/icon views, high-color object icons, custom title bars,
 selection/depth materials, an optional command shelf, indexed-location
 thumbnails, isolated preview surfaces, and consistent rendering across macOS,
-Windows, and Linux. The following are **CANDIDATE** oversight families until a
-named File Manager workload or decision record promotes individual operations:
+Windows, and Linux. These began as **CANDIDATE** oversight families. The named
+workloads in `FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md` now promote the
+listed minimums; exact operation spelling, limits, and renderer realization
+remain gated:
 
 | ID | Candidate family | Likely operations to keep visible | File Manager evidence/workload |
 |---|---|---|---|
-| FMD0 | Complete vector/path construction | cubic Beziers, arcs/pies, polygons, closed/open curves, rounded shapes, fill rules, flatten/reverse/widen, path iteration/data | scalable high-color object icons, focus/selection geometry, title fresco and unusual chrome |
-| FMD1 | Complete transform/clip/region algebra | rotate/scale/multiply/reset, point transforms, intersect/exclude/union/xor/complement, nonrectangular clip, device/logical conversion | nested scrolling, clipped previews, transformed icon assets, damage correctness |
-| FMD2 | Stroke and paint vocabulary | joins, caps, miters, dash offset/pattern, alignment, texture/image paints, multi-stop gradients, repeat/mirror, opacity masks | crisp small icons, bevels, selection/focus, ceremonial materials without backend-specific styling |
-| FMD3 | Compositing and effects | declared blend modes, isolated layers, masks, shadows, bounded blur/color filters | depth grammar, selection glow, preview polish; every effect needs a damaged-area and CPU budget |
+| FMD0 | **PROMOTED minimum** vector/path construction | cubic/quadratic curves, arcs, polygons, closed/open paths, rounded shapes, fill rules; flatten/widen/iteration only when a hit/asset workload proves them | scalable high-color object icons, focus/selection geometry, title fresco and unusual chrome |
+| FMD1 | **PROMOTED minimum** transform/clip/region algebra | affine transforms, point conversion, rectangular/nonrectangular clip and required intersect/exclude operations; broader xor/complement remains gated | nested scrolling, clipped previews, transformed icon assets, damage correctness |
+| FMD2 | **PROMOTED** stroke and paint vocabulary | joins, caps, miters, dash offset/pattern, alignment, texture/image paints, multi-stop gradients, repeat/mirror, opacity masks | crisp small icons, bevels, selection/focus, ceremonial materials without backend-specific styling |
+| FMD3 | **PROMOTED bounded minimum** compositing and effects | Porter-Duff modes, isolated alpha layers, masks, shadows, bounded blur/color filters | depth grammar and preview polish; every effect needs a damaged-area and CPU budget |
 | FMD4 | Image formats and metadata | secure decode/encode registry, ICO/ICNS and SVG/vector assets, PNG/JPEG/WebP candidates, EXIF orientation, ICC profile, alpha/premultiplication, multi-frame policy | handler/icon registry, thumbnails, preview surfaces, cross-platform icon variants |
-| FMD5 | Thumbnail pipeline primitives | aspect-fit/fill, crop, high-quality sampling, orientation/color normalization, deterministic cache keys, cancellation and bounded incremental decode | thumbnails only for admitted indexed roots; drawing is a service, not thumbnail authority or storage policy |
-| FMD6 | Text/glyph drawing integration | positioned glyph runs, outlines, fallback spans, cluster-safe hit geometry, decoration, ellipsis and baseline metrics | filenames, breadcrumbs, fields, list/icon views; shaping remains owned by the shared text subsystem |
-| FMD7 | Pixel/surface operations | mapped pixel spans, format conversion, row copy, masks, readback, immutable snapshots, tiled/partial updates | icons, isolated previews, waterfall/active surfaces, renderer diagnostics |
-| FMD8 | Recording, inspection and export | stable command trace, bounds/cost inspection, semantic pixel probes, PNG diagnostic export, optional vector debug export | deterministic automation, crash triage, theme QA and renderer comparison |
+| FMD5 | **PROMOTED** thumbnail pipeline primitives | aspect-fit/fill, crop, high-quality sampling, orientation/color normalization, deterministic cache keys, cancellation and bounded incremental decode | thumbnails only for admitted indexed roots; drawing is a service, not thumbnail authority or storage policy |
+| FMD6 | **PROMOTED** text/glyph drawing integration | positioned glyph runs, outlines, fallback spans, cluster-safe hit geometry, decoration, ellipsis and baseline metrics | filenames, breadcrumbs, fields, list/icon views; HarfBuzz remains owned by the shared text subsystem |
+| FMD7 | **PROMOTED** pixel/surface operations | mapped pixel spans, format conversion, row copy, masks, readback, immutable snapshots, tiled/partial updates | icons, isolated previews, waterfall/active surfaces, renderer diagnostics |
+| FMD8 | **PROMOTED** recording, inspection and export | stable command trace, bounds/cost inspection, semantic pixel probes, PNG diagnostic export, optional vector debug export | deterministic automation, crash triage, theme QA and renderer comparison |
 
 Likely useful `System.Drawing` compatibility calls not present in the retired compatibility specimen floor
 remain visible within those families: `DrawArc`, `DrawBezier(s)`, `DrawCurve`,
@@ -134,8 +136,10 @@ not an implicit promise to reproduce all of GDI+.
 
 Printing, metafile/EMF playback, arbitrary desktop capture, device-context
 escape behavior, and design-time drawing editors stay excluded or require a
-separate admission record. SVG/ICNS, color management, effects, and thumbnail
-helpers are GUI.Drawing-native candidates even though they are not naturally
+separate admission record. Runtime SVG/ICNS parsing remains gated. File Manager
+prefers trusted SVG-to-path compilation at build/pack time, with precompiled
+path or PNG assets at runtime. Color management, bounded effects, and thumbnail
+helpers are GUI.Drawing-native requirements even though they are not naturally
 modeled as `System.Drawing` calls.
 
 ## 3. Portable semantic shape

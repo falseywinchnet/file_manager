@@ -54,6 +54,20 @@ struct RasterPointerSample final {
     std::uint32_t button{};
 };
 
+struct RasterKeySample final {
+    std::uint32_t event_kind{};
+    std::uint32_t physical_key{};
+    std::uint32_t modifiers{};
+    bool repeat{};
+};
+
+struct RasterTextSample final {
+    std::string text;
+    bool composing{};
+    std::int32_t replacement_start{-1};
+    std::int32_t replacement_length{};
+};
+
 // Some compatibility widgets participate in retained layout and painting order
 // but are not interactive surfaces. In particular, DockPanelSuite creates an
 // empty auto-hide strip covering its entire client area. Keeping this policy in
@@ -84,6 +98,16 @@ public:
         set_border_style(kind_ == FieldControlKind::tool_strip
                              ? gui_forms::BorderStyle::none
                              : gui_forms::BorderStyle::sunken);
+        if (kind_ == FieldControlKind::text_box ||
+            kind_ == FieldControlKind::combo_box ||
+            kind_ == FieldControlKind::list_box ||
+            kind_ == FieldControlKind::data_grid ||
+            kind_ == FieldControlKind::numeric_up_down) {
+            set_focusable(true);
+        }
+        if (kind_ == FieldControlKind::text_box) {
+            set_cursor(gui_forms::CursorKind::text);
+        }
     }
 
     void set_colors(gui_forms::Color foreground, gui_forms::Color background) {
@@ -152,6 +176,14 @@ public:
         return pointer_input_;
     }
 
+    [[nodiscard]] gui_forms::Event<const RasterKeySample&>& key_input() noexcept {
+        return key_input_;
+    }
+
+    [[nodiscard]] gui_forms::Event<const RasterTextSample&>& text_input() noexcept {
+        return text_input_;
+    }
+
     void on_pointer(gui_forms::PointerEvent& event) override {
         const Rect absolute = absolute_bounds();
         std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
@@ -171,11 +203,28 @@ public:
         event.handled = true;
     }
 
+    void on_key(gui_forms::KeyEvent& event) override {
+        key_input_.emit({event.action == gui_forms::KeyAction::down
+                             ? GF_EVENT_KEY_DOWN : GF_EVENT_KEY_UP,
+                         event.physical_key,
+                         static_cast<std::uint32_t>(event.modifiers),
+                         event.repeat});
+        event.handled = true;
+    }
+
+    void on_text_input(gui_forms::TextInputEvent& event) override {
+        text_input_.emit({event.text_utf8, event.composing,
+                          event.replacement_start, event.replacement_length});
+        event.handled = true;
+    }
+
 private:
     std::string text_;
     FieldControlKind kind_;
     gui_forms::BasicControlStyle style_;
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
+    gui_forms::Event<const RasterKeySample&> key_input_;
+    gui_forms::Event<const RasterTextSample&> text_input_;
 };
 
 [[nodiscard]] gui_forms::Color color_from_argb(std::uint32_t argb) noexcept {
@@ -189,7 +238,9 @@ private:
 class RasterControl final : public Control {
 public:
     explicit RasterControl(StableId stable_id, bool input_transparent = false)
-        : Control(std::move(stable_id)), input_transparent_(input_transparent) {}
+        : Control(std::move(stable_id)), input_transparent_(input_transparent) {
+        set_focusable(!input_transparent_);
+    }
 
     [[nodiscard]] bool hit_test_local(gui_forms::Point point) const override {
         return !input_transparent_ && Control::hit_test_local(point);
@@ -197,6 +248,10 @@ public:
 
     [[nodiscard]] gui_forms::Event<const RasterPointerSample&>& pointer_input() noexcept {
         return pointer_input_;
+    }
+
+    [[nodiscard]] gui_forms::Event<const RasterKeySample&>& key_input() noexcept {
+        return key_input_;
     }
 
     bool set_png(std::span<const std::byte> encoded) {
@@ -215,16 +270,21 @@ public:
             return false;
         }
         encoded_.assign(encoded.begin(), encoded.end());
+        bool replacement_invalidated = false;
         if (window() != nullptr) {
-            const auto loaded = image_.value == 0
-                ? window()->load_png(encoded_)
-                : window()->replace_png(image_, encoded_);
+            const bool replacing = image_.value != 0;
+            const auto loaded = replacing
+                ? window()->replace_png(image_, encoded_, *this)
+                : window()->load_png(encoded_);
             if (!loaded) {
                 return false;
             }
             image_ = loaded.image;
+            replacement_invalidated = replacing;
         }
-        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+        if (!replacement_invalidated) {
+            invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+        }
         return true;
     }
 
@@ -256,6 +316,15 @@ public:
         });
     }
 
+    void on_key(gui_forms::KeyEvent& event) override {
+        key_input_.emit({event.action == gui_forms::KeyAction::down
+                             ? GF_EVENT_KEY_DOWN : GF_EVENT_KEY_UP,
+                         event.physical_key,
+                         static_cast<std::uint32_t>(event.modifiers),
+                         event.repeat});
+        event.handled = true;
+    }
+
 protected:
     void on_attached_to_window() override {
         Control::on_attached_to_window();
@@ -280,6 +349,7 @@ private:
     std::vector<std::byte> encoded_;
     gui_forms::ImageId image_{};
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
+    gui_forms::Event<const RasterKeySample&> key_input_;
 };
 
 thread_local gf_result last_error_code = GF_OK;
@@ -322,6 +392,8 @@ struct SubscriptionRecord final {
     gf_event_callback callback{};
     gf_event_callback_v2 callback_v2{};
     gf_pointer_callback pointer_callback{};
+    gf_key_callback key_callback{};
+    gf_text_callback text_callback{};
     void* context{};
     std::thread::id ui_thread;
     gui_forms::SubscriptionToken native_subscription;
@@ -342,8 +414,16 @@ struct ControlRecord final {
     std::string text;
     std::string host_trace;
     std::deque<DispatchRecord> dispatch_queue;
+    std::uint32_t dispatch_depth{};
+    std::uint32_t managed_callback_depth{};
     std::function<void()> host_wake;
     std::function<void()> host_close;
+    std::function<gui_forms::HostDialogResult(
+        const gui_forms::HostDialogRequest&)> host_dialog;
+    std::function<gui_forms::HostServiceStatus(
+        const gui_forms::HostTooltipRequest&)> host_tooltip_show;
+    std::function<void()> host_tooltip_hide;
+    std::string last_dialog_path;
     std::uint64_t callback_faults{};
     std::uint64_t dispatches{};
     bool close_requested{};
@@ -687,6 +767,291 @@ public:
                     "check state requires a checkbox or radio button");
     }
 
+    gf_result set_range(gf_handle handle, double minimum, double maximum) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto range =
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(record->control);
+        if (!range) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "range state requires a track bar or progress bar");
+        }
+        range->set_range(minimum, maximum);
+        return GF_OK;
+    }
+
+    gf_result get_range(gf_handle handle, double* minimum, double* maximum) {
+        if (minimum == nullptr || maximum == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_range requires minimum and maximum outputs");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto range =
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(record->control);
+        if (!range) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "range state requires a track bar or progress bar");
+        }
+        *minimum = range->minimum();
+        *maximum = range->maximum();
+        return GF_OK;
+    }
+
+    gf_result set_range_value(gf_handle handle, double value) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto range =
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(record->control);
+        if (!range) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "range value requires a track bar or progress bar");
+        }
+        range->set_value(value);
+        return GF_OK;
+    }
+
+    gf_result get_range_value(gf_handle handle, double* value) {
+        if (value == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_range_value requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto range =
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(record->control);
+        if (!range) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "range value requires a track bar or progress bar");
+        }
+        *value = range->value();
+        return GF_OK;
+    }
+
+    gf_result set_pointer_capture(gf_handle handle, std::uint32_t captured) {
+        if (captured > 1U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "pointer capture must be zero or one");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        record->control->set_pointer_capture(captured != 0U);
+        return GF_OK;
+    }
+
+    gf_result get_pointer_capture(gf_handle handle, std::uint32_t* captured) {
+        if (captured == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_pointer_capture requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        *captured = record->control->has_pointer_capture() ? 1U : 0U;
+        return GF_OK;
+    }
+
+    gf_result show_path_dialog(gf_handle owner_handle, std::uint32_t kind,
+                               gf_string_view title,
+                               gf_string_view initial_directory,
+                               gf_string_view suggested_name,
+                               gf_string_view default_extension,
+                               gf_string_view filter,
+                               std::uint32_t flags,
+                               std::uint32_t* accepted) {
+        constexpr std::uint32_t known_flags =
+            GF_PATH_DIALOG_ALLOW_MULTIPLE | GF_PATH_DIALOG_CONFIRM_OVERWRITE;
+        if (accepted == nullptr ||
+            (kind != GF_PATH_DIALOG_OPEN_FILE &&
+             kind != GF_PATH_DIALOG_SAVE_FILE &&
+             kind != GF_PATH_DIALOG_SELECT_FOLDER) ||
+            (flags & ~known_flags) != 0U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "show_path_dialog received an invalid kind, flag, or output");
+        }
+        std::string title_value;
+        std::string directory_value;
+        std::string suggested_value;
+        std::string extension_value;
+        std::string filter_value;
+        if (!copy_view(title, title_value) ||
+            !copy_view(initial_directory, directory_value) ||
+            !copy_view(suggested_name, suggested_value) ||
+            !copy_view(default_extension, extension_value) ||
+            !copy_view(filter, filter_value)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "path-dialog strings must be bounded UTF-8 views without NUL");
+        }
+
+        std::shared_ptr<ControlRecord> owner;
+        std::shared_ptr<ControlRecord> root;
+        std::function<gui_forms::HostDialogResult(
+            const gui_forms::HostDialogRequest&)> provider;
+        {
+            std::scoped_lock lock(mutex_);
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            root = root_record_locked(owner);
+            if (!root) {
+                return fail(GF_ERROR_INVALID_ARGUMENT,
+                            "path-dialog owner has no retained root");
+            }
+            root->last_dialog_path.clear();
+            provider = root->host_dialog;
+        }
+
+        gui_forms::HostDialogRequest request;
+        request.request_id = next_dialog_request_++;
+        request.owner_id = std::string(root->control->stable_id().value());
+        if (kind == GF_PATH_DIALOG_OPEN_FILE) {
+            gui_forms::HostOpenFileDialogRequest payload;
+            payload.title = std::move(title_value);
+            payload.initial_directory = std::move(directory_value);
+            payload.suggested_name = std::move(suggested_value);
+            payload.filters = parse_filters(filter_value);
+            payload.allow_multiple =
+                (flags & GF_PATH_DIALOG_ALLOW_MULTIPLE) != 0U;
+            request.payload = std::move(payload);
+        } else if (kind == GF_PATH_DIALOG_SAVE_FILE) {
+            gui_forms::HostSaveFileDialogRequest payload;
+            payload.title = std::move(title_value);
+            payload.initial_directory = std::move(directory_value);
+            payload.suggested_name = std::move(suggested_value);
+            payload.default_extension = std::move(extension_value);
+            payload.filters = parse_filters(filter_value);
+            payload.confirm_overwrite =
+                (flags & GF_PATH_DIALOG_CONFIRM_OVERWRITE) != 0U;
+            request.payload = std::move(payload);
+        } else {
+            request.payload = gui_forms::HostFolderDialogRequest{
+                std::move(title_value), std::move(directory_value)};
+        }
+
+        *accepted = 0U;
+        if (!provider) return GF_OK;
+        const gui_forms::HostDialogResult result = provider(request);
+        if (!result.status.accepted()) {
+            return fail(GF_ERROR_INTERNAL,
+                        std::string("path-dialog host failed: ") +
+                        gui_forms::host_service_error_name(result.status.error));
+        }
+        const auto* paths =
+            std::get_if<gui_forms::HostPathDialogResult>(&result.payload);
+        if (paths == nullptr) {
+            return fail(GF_ERROR_INTERNAL,
+                        "path-dialog host returned the wrong result payload");
+        }
+        if (paths->outcome == gui_forms::HostDialogOutcome::accepted &&
+            !paths->paths.empty()) {
+            std::scoped_lock lock(mutex_);
+            root->last_dialog_path = paths->paths.front();
+            *accepted = 1U;
+        }
+        return GF_OK;
+    }
+
+    gf_result last_dialog_path(gf_handle owner_handle, char* buffer,
+                               std::uint64_t capacity,
+                               std::uint64_t* required_size) {
+        if (required_size == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "last_dialog_path requires a size output");
+        }
+        std::shared_ptr<ControlRecord> owner;
+        std::string value;
+        {
+            std::scoped_lock lock(mutex_);
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            const auto root = root_record_locked(owner);
+            if (!root) return fail(GF_ERROR_INVALID_ARGUMENT,
+                                   "dialog owner has no retained root");
+            value = root->last_dialog_path;
+        }
+        *required_size = value.size();
+        if (capacity < value.size() || (value.size() != 0U && buffer == nullptr)) {
+            return fail(GF_ERROR_BUFFER_TOO_SMALL,
+                        "dialog path buffer is smaller than the required UTF-8 size");
+        }
+        if (!value.empty()) std::memcpy(buffer, value.data(), value.size());
+        return GF_OK;
+    }
+
+    gf_result show_tooltip(gf_handle owner_handle, gf_string_view text,
+                           double x, double y,
+                           std::uint32_t duration_milliseconds) {
+        if (!std::isfinite(x) || !std::isfinite(y)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "tooltip anchor must be finite");
+        }
+        std::string text_value;
+        if (!copy_view(text, text_value)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "tooltip text must be a bounded UTF-8 view without NUL");
+        }
+        std::shared_ptr<ControlRecord> owner;
+        std::function<gui_forms::HostServiceStatus(
+            const gui_forms::HostTooltipRequest&)> provider;
+        gui_forms::Point anchor;
+        {
+            std::scoped_lock lock(mutex_);
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            const auto root = root_record_locked(owner);
+            if (!root) return fail(GF_ERROR_INVALID_ARGUMENT,
+                                   "tooltip owner has no retained root");
+            provider = root->host_tooltip_show;
+            const Rect bounds = owner->control->absolute_bounds();
+            anchor = {bounds.x + x, bounds.y + y};
+        }
+        if (!provider) return GF_OK;
+        const gui_forms::HostServiceStatus result = provider(
+            {std::move(text_value), anchor, duration_milliseconds});
+        return result.accepted() ? GF_OK :
+            fail(GF_ERROR_INTERNAL,
+                 std::string("tooltip host failed: ") +
+                 gui_forms::host_service_error_name(result.error));
+    }
+
+    gf_result hide_tooltip(gf_handle owner_handle) {
+        std::function<void()> hide;
+        {
+            std::scoped_lock lock(mutex_);
+            std::shared_ptr<ControlRecord> owner;
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            const auto root = root_record_locked(owner);
+            if (!root) return fail(GF_ERROR_INVALID_ARGUMENT,
+                                   "tooltip owner has no retained root");
+            hide = root->host_tooltip_hide;
+        }
+        if (hide) hide();
+        return GF_OK;
+    }
+
     gf_result run_window(gf_handle handle, std::uint32_t flags) {
         constexpr std::uint32_t known_flags =
             GF_WINDOW_RUN_AUTOMATION_CLOSE | GF_WINDOW_RUN_FORCE_HEADLESS |
@@ -750,9 +1115,17 @@ public:
                 request.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
                                  GF_EVENT_CALLBACK_CANCEL;
             };
-            options.host_ready = [this, record](std::function<void()> wake,
-                                                std::function<void()> close) {
-                publish_host(record, std::move(wake), std::move(close));
+            options.host_ready = [this, record](
+                std::function<void()> wake,
+                std::function<void()> close,
+                std::function<gui_forms::HostDialogResult(
+                    const gui_forms::HostDialogRequest&)> dialog,
+                std::function<gui_forms::HostServiceStatus(
+                    const gui_forms::HostTooltipRequest&)> tooltip_show,
+                std::function<void()> tooltip_hide) {
+                publish_host(record, std::move(wake), std::move(close),
+                             std::move(dialog), std::move(tooltip_show),
+                             std::move(tooltip_hide));
             };
             options.dispatch_pending = [this, record, automation_controls] {
                 pump_pending(record);
@@ -782,9 +1155,17 @@ public:
                 request.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
                                  GF_EVENT_CALLBACK_CANCEL;
             };
-            options.host_ready = [this, record](std::function<void()> wake,
-                                                std::function<void()> close) {
-                publish_host(record, std::move(wake), std::move(close));
+            options.host_ready = [this, record](
+                std::function<void()> wake,
+                std::function<void()> close,
+                std::function<gui_forms::HostDialogResult(
+                    const gui_forms::HostDialogRequest&)> dialog,
+                std::function<gui_forms::HostServiceStatus(
+                    const gui_forms::HostTooltipRequest&)> tooltip_show,
+                std::function<void()> tooltip_hide) {
+                publish_host(record, std::move(wake), std::move(close),
+                             std::move(dialog), std::move(tooltip_show),
+                             std::move(tooltip_hide));
             };
             options.dispatch_pending = [this, record] { pump_pending(record); };
             options.closed = [this, handle] {
@@ -1123,7 +1504,9 @@ public:
                            gf_event_token* output) {
         if ((event_kind != GF_EVENT_CLICKED &&
              event_kind != GF_EVENT_FORM_CLOSING &&
-             event_kind != GF_EVENT_FORM_CLOSED) ||
+             event_kind != GF_EVENT_FORM_CLOSED &&
+             event_kind != GF_EVENT_RANGE_VALUE_CHANGED &&
+             event_kind != GF_EVENT_RANGE_SCROLL) ||
             callback == nullptr || output == nullptr) {
             return fail(GF_ERROR_INVALID_ARGUMENT,
                         "subscribe_v2 requires a supported typed event, callback, and output");
@@ -1146,6 +1529,13 @@ public:
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
                         "form lifecycle subscriptions require a form control");
         }
+        const auto range =
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(sender->control);
+        if ((event_kind == GF_EVENT_RANGE_VALUE_CHANGED ||
+             event_kind == GF_EVENT_RANGE_SCROLL) && !range) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "range subscriptions require a track bar or progress bar");
+        }
         auto record = std::make_shared<SubscriptionRecord>();
         record->callback_v2 = callback;
         record->context = context;
@@ -1158,6 +1548,17 @@ public:
             record->native_subscription = button->clicked().subscribe(
                 [this, sender_handle](gui_forms::ButtonBase&) {
                     static_cast<void>(emit_v2(sender_handle, GF_EVENT_CLICKED));
+                });
+        } else if (event_kind == GF_EVENT_RANGE_VALUE_CHANGED) {
+            record->native_subscription = range->value_changed().subscribe(
+                [this, sender_handle](double) {
+                    static_cast<void>(emit_v2(
+                        sender_handle, GF_EVENT_RANGE_VALUE_CHANGED));
+                });
+        } else if (event_kind == GF_EVENT_RANGE_SCROLL) {
+            record->native_subscription = range->scroll().subscribe(
+                [this, sender_handle](const gui_forms::RangeScrollEvent&) {
+                    static_cast<void>(emit_v2(sender_handle, GF_EVENT_RANGE_SCROLL));
                 });
         }
         return GF_OK;
@@ -1181,10 +1582,6 @@ public:
         }
         const auto raster = std::dynamic_pointer_cast<RasterControl>(sender->control);
         const auto field = std::dynamic_pointer_cast<FieldControl>(sender->control);
-        if (!raster && !field) {
-            return fail(GF_ERROR_WRONG_HANDLE_KIND,
-                        "pointer subscriptions require a field or custom raster control");
-        }
         auto record = std::make_shared<SubscriptionRecord>();
         record->pointer_callback = callback;
         record->context = context;
@@ -1199,9 +1596,104 @@ public:
                     sender_handle, sample.event_kind, sample.x, sample.y,
                     sample.wheel_delta, sample.button, record->context));
             };
-        record->native_subscription = raster
-            ? raster->pointer_input().subscribe(connect)
-            : field->pointer_input().subscribe(connect);
+        if (raster) {
+            record->native_subscription = raster->pointer_input().subscribe(connect);
+        } else if (field) {
+            record->native_subscription = field->pointer_input().subscribe(connect);
+        } else {
+            const std::weak_ptr<Control> weak_control = sender->control;
+            record->native_subscription = sender->control->pointer_observed().subscribe(
+                [record, sender_handle, weak_control](const gui_forms::PointerEvent& event) {
+                    if (!record->connected || record->pointer_callback == nullptr) return;
+                    const auto control = weak_control.lock();
+                    if (!control) return;
+                    const Rect bounds = control->absolute_bounds();
+                    std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
+                    switch (event.action) {
+                    case gui_forms::PointerAction::down: kind = GF_EVENT_MOUSE_DOWN; break;
+                    case gui_forms::PointerAction::up: kind = GF_EVENT_MOUSE_UP; break;
+                    case gui_forms::PointerAction::wheel: kind = GF_EVENT_MOUSE_WHEEL; break;
+                    case gui_forms::PointerAction::enter: kind = GF_EVENT_MOUSE_ENTER; break;
+                    case gui_forms::PointerAction::leave: kind = GF_EVENT_MOUSE_LEAVE; break;
+                    case gui_forms::PointerAction::move: break;
+                    }
+                    static_cast<void>(record->pointer_callback(
+                        sender_handle, kind, event.position.x - bounds.x,
+                        event.position.y - bounds.y,
+                        event.wheel_delta.y,
+                        static_cast<std::uint32_t>(event.button), record->context));
+                });
+        }
+        return GF_OK;
+    }
+
+    gf_result subscribe_key(gf_handle sender_handle,
+                            gf_key_callback callback, void* context,
+                            gf_event_token* output) {
+        if (callback == nullptr || output == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "subscribe_key requires a callback and output");
+        }
+        std::scoped_lock lock(mutex_);
+        std::shared_ptr<ControlRecord> sender;
+        if (const gf_result result = control_locked(sender_handle, sender);
+            result != GF_OK) return result;
+        if (const gf_result result = require_thread(*sender); result != GF_OK) return result;
+        const auto field = std::dynamic_pointer_cast<FieldControl>(sender->control);
+        const auto raster = std::dynamic_pointer_cast<RasterControl>(sender->control);
+        if (!field && !raster) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "key subscriptions require an interactive retained control");
+        }
+        auto record = std::make_shared<SubscriptionRecord>();
+        record->key_callback = callback;
+        record->context = context;
+        record->ui_thread = sender->ui_thread;
+        *output = allocate_locked(SlotKind::subscription, {}, record);
+        sender->subscriptions.push_back(*output);
+        auto& key_input = field ? field->key_input() : raster->key_input();
+        record->native_subscription = key_input.subscribe(
+            [record, sender_handle](const RasterKeySample& sample) {
+                if (!record->connected || record->key_callback == nullptr) return;
+                static_cast<void>(record->key_callback(
+                    sender_handle, sample.event_kind, sample.physical_key,
+                    sample.modifiers, sample.repeat ? 1U : 0U, record->context));
+            });
+        return GF_OK;
+    }
+
+    gf_result subscribe_text(gf_handle sender_handle,
+                             gf_text_callback callback, void* context,
+                             gf_event_token* output) {
+        if (callback == nullptr || output == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "subscribe_text requires a callback and output");
+        }
+        std::scoped_lock lock(mutex_);
+        std::shared_ptr<ControlRecord> sender;
+        if (const gf_result result = control_locked(sender_handle, sender);
+            result != GF_OK) return result;
+        if (const gf_result result = require_thread(*sender); result != GF_OK) return result;
+        const auto field = std::dynamic_pointer_cast<FieldControl>(sender->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "text subscriptions require a retained field control");
+        }
+        auto record = std::make_shared<SubscriptionRecord>();
+        record->text_callback = callback;
+        record->context = context;
+        record->ui_thread = sender->ui_thread;
+        *output = allocate_locked(SlotKind::subscription, {}, record);
+        sender->subscriptions.push_back(*output);
+        record->native_subscription = field->text_input().subscribe(
+            [record, sender_handle](const RasterTextSample& sample) {
+                if (!record->connected || record->text_callback == nullptr) return;
+                const gf_string_view text{sample.text.data(), sample.text.size()};
+                static_cast<void>(record->text_callback(
+                    sender_handle, text, sample.composing ? 1U : 0U,
+                    sample.replacement_start, sample.replacement_length,
+                    record->context));
+            });
         return GF_OK;
     }
 
@@ -1306,6 +1798,25 @@ private:
                 }
             }
         }
+        {
+            std::scoped_lock lock(mutex_);
+            ++root->managed_callback_depth;
+        }
+        auto callback_guard = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
+            root.get(), [this, root](ControlRecord*) {
+                std::function<void()> wake;
+                {
+                    std::scoped_lock lock(mutex_);
+                    if (root->managed_callback_depth > 0U) {
+                        --root->managed_callback_depth;
+                    }
+                    if (root->managed_callback_depth == 0U &&
+                        !root->dispatch_queue.empty()) {
+                        wake = root->host_wake;
+                    }
+                }
+                if (wake) wake();
+            });
         std::uint32_t aggregate = GF_EVENT_CALLBACK_CONTINUE;
         for (const auto& subscription : snapshot) {
             if (!subscription->connected) continue;
@@ -1323,6 +1834,18 @@ private:
     }
 
     void pump_pending(const std::shared_ptr<ControlRecord>& root) {
+        {
+            std::scoped_lock lock(mutex_);
+            if (root->dispatch_depth != 0U || root->managed_callback_depth != 0U) {
+                return;
+            }
+            ++root->dispatch_depth;
+        }
+        auto dispatch_guard = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
+            root.get(), [this, root](ControlRecord*) {
+                std::scoped_lock lock(mutex_);
+                if (root->dispatch_depth > 0U) --root->dispatch_depth;
+            });
         for (;;) {
             std::deque<DispatchRecord> pending;
             {
@@ -1358,7 +1881,12 @@ private:
 
     void publish_host(const std::shared_ptr<ControlRecord>& root,
                       std::function<void()> wake,
-                      std::function<void()> request_close) {
+                      std::function<void()> request_close,
+                      std::function<gui_forms::HostDialogResult(
+                          const gui_forms::HostDialogRequest&)> dialog = {},
+                      std::function<gui_forms::HostServiceStatus(
+                          const gui_forms::HostTooltipRequest&)> tooltip_show = {},
+                      std::function<void()> tooltip_hide = {}) {
         bool should_wake{};
         bool should_close{};
         std::function<void()> published_wake;
@@ -1367,6 +1895,9 @@ private:
             std::scoped_lock lock(mutex_);
             root->host_wake = std::move(wake);
             root->host_close = std::move(request_close);
+            root->host_dialog = std::move(dialog);
+            root->host_tooltip_show = std::move(tooltip_show);
+            root->host_tooltip_hide = std::move(tooltip_hide);
             should_wake = !root->dispatch_queue.empty();
             should_close = root->close_requested;
             published_wake = root->host_wake;
@@ -1381,7 +1912,60 @@ private:
         std::scoped_lock lock(mutex_);
         root->host_wake = {};
         root->host_close = {};
+        root->host_dialog = {};
+        root->host_tooltip_show = {};
+        root->host_tooltip_hide = {};
         root->host_running = false;
+    }
+
+    static bool copy_view(gf_string_view input, std::string& output) {
+        if ((input.size != 0U && input.data == nullptr) ||
+            input.size > static_cast<std::uint64_t>(
+                std::numeric_limits<std::size_t>::max())) return false;
+        output.assign(input.size == 0U ? "" : input.data,
+                      static_cast<std::size_t>(input.size));
+        return output.find('\0') == std::string::npos;
+    }
+
+    static std::vector<gui_forms::HostFileDialogFilter>
+    parse_filters(std::string_view serialized) {
+        std::vector<std::string> parts;
+        std::size_t begin = 0;
+        while (begin <= serialized.size()) {
+            const std::size_t end = serialized.find('|', begin);
+            parts.emplace_back(serialized.substr(
+                begin, end == std::string_view::npos
+                    ? serialized.size() - begin : end - begin));
+            if (end == std::string_view::npos) break;
+            begin = end + 1U;
+        }
+        std::vector<gui_forms::HostFileDialogFilter> result;
+        for (std::size_t index = 0; index + 1U < parts.size() &&
+             result.size() < gui_forms::HostServices::maximum_dialog_filters;
+             index += 2U) {
+            gui_forms::HostFileDialogFilter item;
+            item.label = std::move(parts[index]);
+            std::string_view patterns = parts[index + 1U];
+            std::size_t pattern_begin = 0;
+            while (pattern_begin <= patterns.size() &&
+                   item.extensions.size() <
+                       gui_forms::HostServices::maximum_dialog_extensions) {
+                const std::size_t pattern_end = patterns.find(';', pattern_begin);
+                std::string extension(patterns.substr(
+                    pattern_begin, pattern_end == std::string_view::npos
+                        ? patterns.size() - pattern_begin
+                        : pattern_end - pattern_begin));
+                while (!extension.empty() &&
+                       (extension.front() == '*' || extension.front() == '.')) {
+                    extension.erase(extension.begin());
+                }
+                if (!extension.empty()) item.extensions.push_back(std::move(extension));
+                if (pattern_end == std::string_view::npos) break;
+                pattern_begin = pattern_end + 1U;
+            }
+            result.push_back(std::move(item));
+        }
+        return result;
     }
 
     std::string managed_trace(const std::shared_ptr<ControlRecord>& root) {
@@ -1407,7 +1991,8 @@ private:
     static std::shared_ptr<Control> first_pointer_control(
         const std::shared_ptr<Control>& root) {
         if (std::dynamic_pointer_cast<RasterControl>(root) ||
-            std::dynamic_pointer_cast<FieldControl>(root)) {
+            std::dynamic_pointer_cast<FieldControl>(root) ||
+            std::dynamic_pointer_cast<gui_forms::RangeControl>(root)) {
             return root;
         }
         for (const auto& child : root->children()) {
@@ -1579,6 +2164,7 @@ private:
 
     std::mutex mutex_;
     std::vector<Slot> slots_;
+    std::uint64_t next_dialog_request_{1};
 };
 
 Registry& registry() {
@@ -1726,6 +2312,65 @@ gf_result api_set_check_state(gf_handle control, std::uint32_t check_state) noex
 gf_result api_get_check_state(gf_handle control, std::uint32_t* check_state) noexcept {
     return translate([&] { return registry().get_check_state(control, check_state); });
 }
+gf_result api_subscribe_key(gf_handle sender, gf_key_callback callback,
+                            void* context, gf_event_token* token) noexcept {
+    return translate([&] { return registry().subscribe_key(sender, callback, context, token); });
+}
+gf_result api_subscribe_text(gf_handle sender, gf_text_callback callback,
+                             void* context, gf_event_token* token) noexcept {
+    return translate([&] { return registry().subscribe_text(sender, callback, context, token); });
+}
+gf_result api_set_range(gf_handle control, double minimum, double maximum) noexcept {
+    return translate([&] { return registry().set_range(control, minimum, maximum); });
+}
+gf_result api_get_range(gf_handle control, double* minimum, double* maximum) noexcept {
+    return translate([&] { return registry().get_range(control, minimum, maximum); });
+}
+gf_result api_set_range_value(gf_handle control, double value) noexcept {
+    return translate([&] { return registry().set_range_value(control, value); });
+}
+gf_result api_get_range_value(gf_handle control, double* value) noexcept {
+    return translate([&] { return registry().get_range_value(control, value); });
+}
+gf_result api_set_pointer_capture(gf_handle control, std::uint32_t captured) noexcept {
+    return translate([&] { return registry().set_pointer_capture(control, captured); });
+}
+gf_result api_get_pointer_capture(gf_handle control, std::uint32_t* captured) noexcept {
+    return translate([&] { return registry().get_pointer_capture(control, captured); });
+}
+gf_result api_show_path_dialog(gf_handle owner, std::uint32_t kind,
+                               gf_string_view title,
+                               gf_string_view initial_directory,
+                               gf_string_view suggested_name,
+                               gf_string_view default_extension,
+                               gf_string_view filter,
+                               std::uint32_t flags,
+                               std::uint32_t* accepted) noexcept {
+    return translate([&] {
+        return registry().show_path_dialog(owner, kind, title,
+                                           initial_directory, suggested_name,
+                                           default_extension, filter, flags,
+                                           accepted);
+    });
+}
+gf_result api_last_dialog_path(gf_handle owner, char* buffer,
+                               std::uint64_t capacity,
+                               std::uint64_t* required) noexcept {
+    return translate([&] {
+        return registry().last_dialog_path(owner, buffer, capacity, required);
+    });
+}
+gf_result api_show_tooltip(gf_handle owner, gf_string_view text, double x,
+                           double y,
+                           std::uint32_t duration_milliseconds) noexcept {
+    return translate([&] {
+        return registry().show_tooltip(owner, text, x, y,
+                                       duration_milliseconds);
+    });
+}
+gf_result api_hide_tooltip(gf_handle owner) noexcept {
+    return translate([&] { return registry().hide_tooltip(owner); });
+}
 
 } // namespace
 
@@ -1741,7 +2386,10 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_4 &&
         requested_version != GF_ABI_VERSION_0_5 &&
         requested_version != GF_ABI_VERSION_0_6 &&
-        requested_version != GF_ABI_VERSION_0_7) {
+        requested_version != GF_ABI_VERSION_0_7 &&
+        requested_version != GF_ABI_VERSION_0_8 &&
+        requested_version != GF_ABI_VERSION_0_9 &&
+        requested_version != GF_ABI_VERSION_0_10) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -1783,6 +2431,18 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_subscribe_pointer,
         &api_set_check_state,
         &api_get_check_state,
+        &api_subscribe_key,
+        &api_subscribe_text,
+        &api_set_range,
+        &api_get_range,
+        &api_set_range_value,
+        &api_get_range_value,
+        &api_set_pointer_capture,
+        &api_get_pointer_capture,
+        &api_show_path_dialog,
+        &api_last_dialog_path,
+        &api_show_tooltip,
+        &api_hide_tooltip,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

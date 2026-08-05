@@ -175,3 +175,44 @@ purpose before use. Reimplementation from a document remains marked as such.
   with complete degree-`t+1` certificate sets. No external algorithm, corpus,
   or network source was used. The posting-union front index remains
   **UNVERIFIED** for novelty and held-out File Manager utility.
+- T-PROTECTED-KERNEL-1, T-ONE-EDIT-VERIFIER-1,
+  `docs/FILENAME_RETRIEVAL_REFINEMENT_005.md`, the protected-row compiler, and
+  E11 were derived in the following low-confidence round from the architect's
+  minimum-support, Jacobian, scale-breakdown, exact-length, and performance
+  questions. Kernel avoidance, binary rank, the probabilistic union bound,
+  graph coloring, varint lists, bitmaps, and one-skip edit verification are
+  elementary controls and are not claimed as individually novel. E11 reads no
+  private or network corpus: both 288-record splits and all typed queries are
+  generated from frozen in-tree lexicons. The guard/ambient multi-address
+  integration is **UNVERIFIED** for novelty and real File Manager utility.
+- T-GUARD-COVERAGE-1, T-OCCUPANCY-QUERY-1, T-SEGMENT-LIVENESS-1,
+  T-TYPED-FILENAME-EVIDENCE-1, `docs/FILENAME_SYSTEM_REFINEMENT_006.md`, and E12
+  were derived in the next internal systems round. Their proofs use elementary
+  finite-set, Boolean-predicate, linear-support, and distributive laws. Varint,
+  bitmap, bit-sliced, liveness, and exact edit-evidence mechanisms are controls
+  and are not claimed as novel individually. E12 uses three frozen in-tree
+  synthetic generators and reads no private or network corpus. The integrated
+  guard/coverage/certificate-direction program remains **UNVERIFIED** for
+  novelty, consented relevance, and engine-scale performance.
+- T-CANDIDATE-BREAKDOWN-1, T-HISTORY-OCCUPANCY-1,
+  T-HISTORY-SCALE-1, T-HISTORY-INFLUENCE-1,
+  `src/kolmogrov/history_occupancy.py`,
+  `docs/HISTORY_BOUND_HASH_REFINEMENT_007.md`, and E13 were derived in the
+  subsequent hash-boundary round after the architect explicitly removed
+  ranking relevance from Kolmogrov's responsibility. The candidate-set
+  telescoping, rolling deletion-fingerprint recurrence, coupled tuple support
+  law, nested interval quotient, and mutation-influence obstruction are
+  internal paper derivations using elementary polynomial arithmetic, union
+  bounds, occupancy, and finite-set laws. E13 reuses only the frozen in-tree
+  E12 synthetic generators and reads no private or network corpus. The coupled
+  history tuple remains **UNVERIFIED** for novelty, external-scale capacity,
+  and engine-native performance. The in-tree alphabet obstruction audit found
+  the retained `ldfioi/kbmedf` deterministic collision; it is negative evidence
+  about the current coordinate family, not an imported corpus result.
+- `docs/HISTORY_HASH_ENGINE_CONTRACT_001.md`,
+  `docs/HISTORY_HASH_OPEN_CONCERNS_001.md`, and the machine-readable usage
+  guidance were derived entirely from T-HISTORY-OCCUPANCY-1,
+  T-HISTORY-SCALE-1, T-HISTORY-INFLUENCE-1, E13, the retained collision, and
+  the architect's explicit hash-not-ranking boundary. The 40-bit/64-atom/
+  65,536-record option is a reasoned **CANDIDATE** default, not a measured or
+  imported constant. No external source, corpus, or implementation was used.

@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <wincodec.h>
+#include <commdlg.h>
+#include <shlobj.h>
 
 #include <algorithm>
 #include <chrono>
@@ -25,6 +27,7 @@ namespace gui_forms::host {
 namespace {
 
 constexpr wchar_t window_class_name[] = L"GUIForms.Window.v1";
+constexpr wchar_t tooltip_class_name[] = L"GUIForms.ToolTip.v1";
 constexpr UINT_PTR scheduler_timer = 1;
 constexpr UINT managed_dispatch_message = WM_APP + 0x41U;
 constexpr std::size_t maximum_automation_command = 4096;
@@ -72,6 +75,213 @@ std::string utf8_from_wide(std::wstring_view text) {
     return result;
 }
 
+std::wstring native_filter(const std::vector<HostFileDialogFilter>& filters) {
+    std::wstring result;
+    for (const auto& filter : filters) {
+        std::wstring label = wide_from_utf8(filter.label);
+        if (label.empty()) label = L"Files";
+        std::wstring pattern;
+        for (const auto& extension_utf8 : filter.extensions) {
+            std::wstring extension = wide_from_utf8(extension_utf8);
+            while (!extension.empty() && (extension.front() == L'.' ||
+                                           extension.front() == L'*')) {
+                extension.erase(extension.begin());
+            }
+            if (extension.empty()) continue;
+            if (!pattern.empty()) pattern.push_back(L';');
+            pattern.append(L"*.").append(extension);
+        }
+        if (pattern.empty()) pattern = L"*.*";
+        result.append(label).push_back(L'\0');
+        result.append(pattern).push_back(L'\0');
+    }
+    if (result.empty()) {
+        result.append(L"All files").push_back(L'\0');
+        result.append(L"*.*").push_back(L'\0');
+    }
+    result.push_back(L'\0');
+    return result;
+}
+
+HostDialogResult path_dialog_failure(std::uint64_t request_id,
+                                     HostServiceError error) {
+    return {{error}, request_id, HostPathDialogResult{}};
+}
+
+HostDialogResult native_open_dialog(HWND owner, std::uint64_t request_id,
+                                    const HostOpenFileDialogRequest& request) {
+    std::vector<wchar_t> path(65536, L'\0');
+    const std::wstring title = wide_from_utf8(request.title);
+    const std::wstring directory = wide_from_utf8(request.initial_directory);
+    const std::wstring suggested = wide_from_utf8(request.suggested_name);
+    const std::wstring filter = native_filter(request.filters);
+    if (!suggested.empty()) {
+        const std::size_t count = std::min(suggested.size(), path.size() - 2U);
+        std::copy_n(suggested.data(), count, path.data());
+    }
+    OPENFILENAMEW native{};
+    native.lStructSize = sizeof(native);
+    native.hwndOwner = owner;
+    native.lpstrFilter = filter.c_str();
+    native.lpstrFile = path.data();
+    native.nMaxFile = static_cast<DWORD>(path.size());
+    native.lpstrInitialDir = directory.empty() ? nullptr : directory.c_str();
+    native.lpstrTitle = title.empty() ? nullptr : title.c_str();
+    native.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST |
+                   OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+    if (request.allow_multiple) native.Flags |= OFN_ALLOWMULTISELECT;
+    if (!GetOpenFileNameW(&native)) {
+        const DWORD error = CommDlgExtendedError();
+        return error == 0 ? HostDialogResult{{}, request_id,
+                    HostPathDialogResult{HostDialogOutcome::cancelled, {}}}
+            : path_dialog_failure(request_id, HostServiceError::backend_failure);
+    }
+    HostPathDialogResult value;
+    value.outcome = HostDialogOutcome::accepted;
+    const std::wstring first(path.data());
+    const wchar_t* cursor = path.data() + first.size() + 1U;
+    if (*cursor == L'\0') {
+        value.paths.push_back(utf8_from_wide(first));
+    } else {
+        for (std::size_t count = 0; *cursor != L'\0' &&
+             count < HostServices::maximum_dialog_paths; ++count) {
+            const std::wstring name(cursor);
+            std::wstring combined = first;
+            if (!combined.empty() && combined.back() != L'\\' &&
+                combined.back() != L'/') combined.push_back(L'\\');
+            combined.append(name);
+            value.paths.push_back(utf8_from_wide(combined));
+            cursor += name.size() + 1U;
+        }
+    }
+    return {{}, request_id, std::move(value)};
+}
+
+HostDialogResult native_save_dialog(HWND owner, std::uint64_t request_id,
+                                    const HostSaveFileDialogRequest& request) {
+    std::vector<wchar_t> path(32768, L'\0');
+    const std::wstring title = wide_from_utf8(request.title);
+    const std::wstring directory = wide_from_utf8(request.initial_directory);
+    const std::wstring suggested = wide_from_utf8(request.suggested_name);
+    const std::wstring extension = wide_from_utf8(request.default_extension);
+    const std::wstring filter = native_filter(request.filters);
+    if (!suggested.empty()) {
+        const std::size_t count = std::min(suggested.size(), path.size() - 2U);
+        std::copy_n(suggested.data(), count, path.data());
+    }
+    OPENFILENAMEW native{};
+    native.lStructSize = sizeof(native);
+    native.hwndOwner = owner;
+    native.lpstrFilter = filter.c_str();
+    native.lpstrFile = path.data();
+    native.nMaxFile = static_cast<DWORD>(path.size());
+    native.lpstrInitialDir = directory.empty() ? nullptr : directory.c_str();
+    native.lpstrTitle = title.empty() ? nullptr : title.c_str();
+    native.lpstrDefExt = extension.empty() ? nullptr : extension.c_str();
+    native.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY |
+                   OFN_NOCHANGEDIR;
+    if (request.confirm_overwrite) native.Flags |= OFN_OVERWRITEPROMPT;
+    if (!GetSaveFileNameW(&native)) {
+        const DWORD error = CommDlgExtendedError();
+        return error == 0 ? HostDialogResult{{}, request_id,
+                    HostPathDialogResult{HostDialogOutcome::cancelled, {}}}
+            : path_dialog_failure(request_id, HostServiceError::backend_failure);
+    }
+    HostPathDialogResult value;
+    value.outcome = HostDialogOutcome::accepted;
+    value.paths.push_back(utf8_from_wide(path.data()));
+    return {{}, request_id, std::move(value)};
+}
+
+int CALLBACK select_initial_folder(HWND dialog, UINT message, LPARAM,
+                                   LPARAM context) {
+    if (message == BFFM_INITIALIZED && context != 0) {
+        SendMessageW(dialog, BFFM_SETSELECTIONW, TRUE, context);
+    }
+    return 0;
+}
+
+HostDialogResult native_folder_dialog(HWND owner, std::uint64_t request_id,
+                                      const HostFolderDialogRequest& request) {
+    const std::wstring title = wide_from_utf8(request.title);
+    const std::wstring directory = wide_from_utf8(request.initial_directory);
+    BROWSEINFOW native{};
+    native.hwndOwner = owner;
+    native.lpszTitle = title.empty() ? nullptr : title.c_str();
+    native.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE |
+                     BIF_EDITBOX | BIF_VALIDATE;
+    native.lpfn = select_initial_folder;
+    native.lParam = directory.empty() ? 0 :
+        reinterpret_cast<LPARAM>(directory.c_str());
+    PIDLIST_ABSOLUTE selected = SHBrowseForFolderW(&native);
+    if (selected == nullptr) {
+        return {{}, request_id,
+                HostPathDialogResult{HostDialogOutcome::cancelled, {}}};
+    }
+    std::vector<wchar_t> path(32768, L'\0');
+    const bool converted = SHGetPathFromIDListW(selected, path.data()) != FALSE;
+    CoTaskMemFree(selected);
+    if (!converted) {
+        return path_dialog_failure(request_id, HostServiceError::backend_failure);
+    }
+    HostPathDialogResult value;
+    value.outcome = HostDialogOutcome::accepted;
+    value.paths.push_back(utf8_from_wide(path.data()));
+    return {{}, request_id, std::move(value)};
+}
+
+struct TooltipPopup final {
+    HWND window{};
+    std::wstring text;
+    HFONT font{};
+};
+
+LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
+                                          WPARAM wparam, LPARAM lparam) {
+    auto* state = reinterpret_cast<TooltipPopup*>(
+        GetWindowLongPtrW(window, GWLP_USERDATA));
+    if (message == WM_NCCREATE) {
+        const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+        state = static_cast<TooltipPopup*>(create->lpCreateParams);
+        SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+        state->window = window;
+    }
+    switch (message) {
+    case WM_ERASEBKGND: return 1;
+    case WM_TIMER: DestroyWindow(window); return 0;
+    case WM_PAINT: {
+        PAINTSTRUCT paint{};
+        HDC dc = BeginPaint(window, &paint);
+        RECT bounds{};
+        GetClientRect(window, &bounds);
+        HBRUSH face = CreateSolidBrush(RGB(255, 255, 240));
+        FillRect(dc, &bounds, face);
+        DeleteObject(face);
+        HPEN border = CreatePen(PS_SOLID, 1, RGB(105, 116, 128));
+        HGDIOBJ old_pen = SelectObject(dc, border);
+        HGDIOBJ old_brush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+        Rectangle(dc, bounds.left, bounds.top, bounds.right, bounds.bottom);
+        SelectObject(dc, old_brush);
+        SelectObject(dc, old_pen);
+        DeleteObject(border);
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, RGB(31, 37, 44));
+        HGDIOBJ old_font = state && state->font ? SelectObject(dc, state->font) : nullptr;
+        RECT text_bounds{8, 5, std::max(8L, bounds.right - 8),
+                         std::max(5L, bounds.bottom - 5)};
+        if (state) DrawTextW(dc, state->text.c_str(), -1, &text_bounds,
+                             DT_WORDBREAK | DT_NOPREFIX | DT_LEFT);
+        if (old_font) SelectObject(dc, old_font);
+        EndPaint(window, &paint);
+        return 0;
+    }
+    case WM_NCDESTROY:
+        if (state) state->window = nullptr;
+        return 0;
+    default: return DefWindowProcW(window, message, wparam, lparam);
+    }
+}
+
 Modifier modifiers() noexcept {
     Modifier result = Modifier::none;
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) result = result | Modifier::shift;
@@ -82,7 +292,7 @@ Modifier modifiers() noexcept {
     return result;
 }
 
-PointerButton pointer_button(UINT message) noexcept {
+PointerButton pointer_button(UINT message, WPARAM state) noexcept {
     switch (message) {
     case WM_LBUTTONDOWN:
     case WM_LBUTTONUP: return PointerButton::primary;
@@ -90,7 +300,14 @@ PointerButton pointer_button(UINT message) noexcept {
     case WM_RBUTTONUP: return PointerButton::secondary;
     case WM_MBUTTONDOWN:
     case WM_MBUTTONUP: return PointerButton::middle;
-    default: return PointerButton::none;
+    default:
+        // WM_MOUSEMOVE identifies held buttons through wParam rather than the
+        // message number. Preserve that state so WinForms-compatible custom
+        // sliders can continue a drag by checking MouseEventArgs.Button.
+        if ((state & MK_LBUTTON) != 0U) return PointerButton::primary;
+        if ((state & MK_RBUTTON) != 0U) return PointerButton::secondary;
+        if ((state & MK_MBUTTON) != 0U) return PointerButton::middle;
+        return PointerButton::none;
     }
 }
 
@@ -509,6 +726,8 @@ public:
           session_(*model_, windows_capabilities()) {}
 
     ~WindowsHostState() {
+        hide_tooltip();
+        if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
         session_.shutdown();
         if (!font_regular_path_.empty()) RemoveFontResourceExW(font_regular_path_.c_str(), FR_PRIVATE, nullptr);
         if (!font_bold_path_.empty()) RemoveFontResourceExW(font_bold_path_.c_str(), FR_PRIVATE, nullptr);
@@ -532,7 +751,14 @@ public:
         if (options_.host_ready) {
             options_.host_ready(
                 [this] { PostMessageW(hwnd_, managed_dispatch_message, 0, 0); },
-                [this] { PostMessageW(hwnd_, WM_CLOSE, 0, 0); });
+                [this] { PostMessageW(hwnd_, WM_CLOSE, 0, 0); },
+                [this](const HostDialogRequest& request) {
+                    return show_dialog(request);
+                },
+                [this](const HostTooltipRequest& request) {
+                    return show_tooltip(request);
+                },
+                [this] { hide_tooltip(); });
         }
         collect_damage();
         return true;
@@ -606,6 +832,99 @@ private:
         return session_.dispatch(std::move(event));
     }
 
+    HostDialogResult show_dialog(const HostDialogRequest& request) {
+        model_->release_pointer();
+        synchronize_capture();
+        hide_tooltip();
+        return std::visit([this, &request](const auto& payload) -> HostDialogResult {
+            using Payload = std::decay_t<decltype(payload)>;
+            if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
+                return native_open_dialog(hwnd_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
+                return native_save_dialog(hwnd_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
+                return native_folder_dialog(hwnd_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostColorDialogRequest>) {
+                return {{HostServiceError::unsupported}, request.request_id,
+                        HostColorDialogResult{}};
+            } else {
+                return {{HostServiceError::unsupported}, request.request_id,
+                        HostMessageDialogResult{}};
+            }
+        }, request.payload);
+    }
+
+    HostServiceStatus show_tooltip(const HostTooltipRequest& request) {
+        hide_tooltip();
+        if (request.text.empty()) return {};
+        tooltip_.text = wide_from_utf8(request.text);
+        if (tooltip_.text.empty()) return {HostServiceError::invalid_utf8};
+
+        WNDCLASSEXW native_class{};
+        native_class.cbSize = sizeof(native_class);
+        native_class.lpfnWndProc = tooltip_window_procedure;
+        native_class.hInstance = GetModuleHandleW(nullptr);
+        native_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+        native_class.lpszClassName = tooltip_class_name;
+        if (RegisterClassExW(&native_class) == 0 &&
+            GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+            return {HostServiceError::backend_failure};
+        }
+
+        if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
+        const int font_height = -std::max(12, static_cast<int>(std::lround(13.0 * scale_)));
+        tooltip_.font = CreateFontW(font_height, 0, 0, 0, FW_NORMAL, FALSE, FALSE,
+                                    FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                    CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                                    DEFAULT_PITCH | FF_SWISS, L"Lucida Grande");
+        HDC dc = GetDC(hwnd_);
+        HGDIOBJ old_font = tooltip_.font ? SelectObject(dc, tooltip_.font) : nullptr;
+        RECT measured{0, 0, static_cast<LONG>(std::lround(360.0 * scale_)), 0};
+        DrawTextW(dc, tooltip_.text.c_str(), -1, &measured,
+                  DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX | DT_LEFT);
+        if (old_font) SelectObject(dc, old_font);
+        ReleaseDC(hwnd_, dc);
+        const int width = std::clamp<int>(measured.right - measured.left + 16,
+                                          40, static_cast<int>(std::lround(376.0 * scale_)));
+        const int height = std::max(24L, measured.bottom - measured.top + 10);
+
+        POINT anchor{static_cast<LONG>(std::lround(request.anchor.x * scale_)),
+                     static_cast<LONG>(std::lround(request.anchor.y * scale_))};
+        ClientToScreen(hwnd_, &anchor);
+        RECT work{};
+        MONITORINFO monitor{sizeof(monitor)};
+        if (GetMonitorInfoW(MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST),
+                            &monitor)) {
+            work = monitor.rcWork;
+        } else {
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+        }
+        const int x = std::clamp<int>(anchor.x, work.left,
+                                      std::max(work.left, work.right - width));
+        const int y = std::clamp<int>(anchor.y, work.top,
+                                      std::max(work.top, work.bottom - height));
+        tooltip_.window = CreateWindowExW(
+            WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+            tooltip_class_name, tooltip_.text.c_str(), WS_POPUP,
+            x, y, width, height, hwnd_, nullptr, GetModuleHandleW(nullptr), &tooltip_);
+        if (tooltip_.window == nullptr) return {HostServiceError::backend_failure};
+        ShowWindow(tooltip_.window, SW_SHOWNOACTIVATE);
+        UpdateWindow(tooltip_.window);
+        if (request.duration_milliseconds != 0U) {
+            SetTimer(tooltip_.window, 1,
+                     std::max<UINT>(1U, request.duration_milliseconds), nullptr);
+        }
+        return {};
+    }
+
+    void hide_tooltip() noexcept {
+        if (tooltip_.window != nullptr && IsWindow(tooltip_.window)) {
+            DestroyWindow(tooltip_.window);
+        }
+        tooltip_.window = nullptr;
+        tooltip_.text.clear();
+    }
+
     void resize() {
         RECT client{};
         GetClientRect(hwnd_, &client);
@@ -669,10 +988,10 @@ private:
         return {GET_X_LPARAM(lparam) / scale_, GET_Y_LPARAM(lparam) / scale_};
     }
 
-    void pointer(UINT message, PointerAction action, WPARAM, LPARAM lparam) {
+    void pointer(UINT message, PointerAction action, WPARAM wparam, LPARAM lparam) {
         PointerEvent event;
         event.action = action;
-        event.button = pointer_button(message);
+        event.button = pointer_button(message, wparam);
         event.position = client_point(lparam);
         event.modifiers = modifiers();
         event.pointer_id = 1;
@@ -798,12 +1117,100 @@ private:
             return saved ? TRUE : FALSE;
         }
         if (command == "close") { PostMessageW(hwnd_, WM_CLOSE, 0, 0); return TRUE; }
+        constexpr std::string_view move_at = "move ";
+        if (command.starts_with(move_at)) {
+            std::istringstream input(command.substr(move_at.size()));
+            std::string id;
+            double local_x{};
+            double local_y{};
+            if (!(input >> id >> local_x >> local_y) || !std::isfinite(local_x) ||
+                !std::isfinite(local_y)) return FALSE;
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input()) return FALSE;
+            const Rect bounds = control->absolute_bounds();
+            const Point point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
+                              bounds.y + std::clamp(local_y, 0.0, bounds.height)};
+            const bool handled = dispatch(PointerEvent{
+                PointerAction::move, PointerButton::none, point, {},
+                Modifier::none, 1}).handled;
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"move\",\"id\":\"%s\",\"handled\":%s}\n",
+                         id.c_str(), handled ? "true" : "false");
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view focus = "focus ";
+        if (command.starts_with(focus)) {
+            const std::string id = command.substr(focus.size());
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input() ||
+                !model_->request_focus(control)) return FALSE;
+            std::fprintf(stdout, "{\"automation\":\"focus\",\"id\":\"%s\"}\n",
+                         id.c_str());
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view text_input = "text ";
+        if (command.starts_with(text_input)) {
+            const std::string payload = command.substr(text_input.size());
+            const std::size_t separator = payload.find(' ');
+            if (separator == std::string::npos) return FALSE;
+            const std::string id = payload.substr(0, separator);
+            const std::string text = payload.substr(separator + 1U);
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input() ||
+                !model_->request_focus(control)) return FALSE;
+            const bool handled = dispatch(TextInputEvent{text}).handled;
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"text\",\"id\":\"%s\",\"bytes\":%zu,\"handled\":%s}\n",
+                         id.c_str(), text.size(), handled ? "true" : "false");
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view key_input = "key ";
+        if (command.starts_with(key_input)) {
+            std::istringstream input(command.substr(key_input.size()));
+            std::string id;
+            std::uint32_t physical{};
+            std::string action;
+            std::uint32_t modifiers{};
+            if (!(input >> id >> physical >> action) ||
+                (action != "down" && action != "up")) return FALSE;
+            if (!(input >> modifiers)) modifiers = 0;
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input() ||
+                !model_->request_focus(control)) return FALSE;
+            KeyEvent event;
+            event.action = action == "down" ? KeyAction::down : KeyAction::up;
+            event.physical_key = physical;
+            event.modifiers = static_cast<Modifier>(modifiers);
+            const bool handled = dispatch(std::move(event)).handled;
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"key\",\"id\":\"%s\",\"physical\":%u,\"action\":\"%s\",\"modifiers\":%u,\"handled\":%s}\n",
+                         id.c_str(), physical, action.c_str(), modifiers,
+                         handled ? "true" : "false");
+            std::fflush(stdout);
+            return TRUE;
+        }
         constexpr std::string_view activate = "activate ";
         if (command.starts_with(activate)) {
             const std::string id = command.substr(activate.size());
             const auto control = options_.automation_resolve
                 ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) return FALSE;
+            if (!control || !control->eligible_for_input()) {
+                std::fprintf(stdout,
+                             "{\"automation\":\"activate\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
+                             id.c_str(), !control ? "not-found" : "ineligible");
+                std::fflush(stdout);
+                return FALSE;
+            }
             control->on_activate();
             collect_damage();
             std::fprintf(stdout,
@@ -822,7 +1229,13 @@ private:
                 !std::isfinite(local_y)) return FALSE;
             const auto control = options_.automation_resolve
                 ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) return FALSE;
+            if (!control || !control->eligible_for_input()) {
+                std::fprintf(stdout,
+                             "{\"automation\":\"click-at\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
+                             id.c_str(), !control ? "not-found" : "ineligible");
+                std::fflush(stdout);
+                return FALSE;
+            }
             const Rect bounds = control->absolute_bounds();
             const Point point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
                               bounds.y + std::clamp(local_y, 0.0, bounds.height)};
@@ -838,6 +1251,59 @@ private:
                          "{\"automation\":\"click-at\",\"id\":\"%s\",\"local_x\":%.3f,\"local_y\":%.3f,\"handled\":%s}\n",
                          id.c_str(), local_x, local_y,
                          (handled_down || handled_up) ? "true" : "false");
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view drag = "drag ";
+        if (command.starts_with(drag)) {
+            std::istringstream input(command.substr(drag.size()));
+            std::string id;
+            double start_x{};
+            double start_y{};
+            double end_x{};
+            double end_y{};
+            unsigned requested_steps{8U};
+            if (!(input >> id >> start_x >> start_y >> end_x >> end_y) ||
+                !std::isfinite(start_x) || !std::isfinite(start_y) ||
+                !std::isfinite(end_x) || !std::isfinite(end_y)) return FALSE;
+            if (!(input >> requested_steps)) requested_steps = 8U;
+            const unsigned steps = std::clamp(requested_steps, 1U, 256U);
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input()) {
+                std::fprintf(stdout,
+                             "{\"automation\":\"drag\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
+                             id.c_str(), !control ? "not-found" : "ineligible");
+                std::fflush(stdout);
+                return FALSE;
+            }
+            const Rect bounds = control->absolute_bounds();
+            const auto point_at = [&](double local_x, double local_y) {
+                return Point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
+                             bounds.y + std::clamp(local_y, 0.0, bounds.height)};
+            };
+            const Point start = point_at(start_x, start_y);
+            const Point end = point_at(end_x, end_y);
+            bool handled = dispatch(PointerEvent{
+                PointerAction::down, PointerButton::primary, start, {},
+                Modifier::none, 1}).handled;
+            for (unsigned index = 1; index <= steps; ++index) {
+                const double ratio = static_cast<double>(index) /
+                                     static_cast<double>(steps);
+                const Point position{start.x + (end.x - start.x) * ratio,
+                                     start.y + (end.y - start.y) * ratio};
+                handled = dispatch(PointerEvent{
+                    PointerAction::move, PointerButton::primary, position, {},
+                    Modifier::none, 1}).handled || handled;
+            }
+            handled = dispatch(PointerEvent{
+                PointerAction::up, PointerButton::primary, end, {},
+                Modifier::none, 1}).handled || handled;
+            synchronize_capture();
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"drag\",\"id\":\"%s\",\"steps\":%u,\"handled\":%s}\n",
+                         id.c_str(), steps, handled ? "true" : "false");
             std::fflush(stdout);
             return TRUE;
         }
@@ -915,6 +1381,7 @@ private:
     bool closed_{};
     std::wstring font_regular_path_;
     std::wstring font_bold_path_;
+    TooltipPopup tooltip_;
 };
 
 LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {

@@ -20,6 +20,14 @@ using (var graphics = Graphics.FromImage(bitmap))
 }
 
 Require(bitmap.GetPixel(3, 3).B > 240, "native fill pixel");
+var textPixels = 0;
+for (var y = 7; y < bitmap.Height; ++y)
+    for (var x = 16; x < bitmap.Width; ++x)
+    {
+        var pixel = bitmap.GetPixel(x, y);
+        if (pixel.B > 160 && pixel.B > pixel.R + 40) ++textPixels;
+    }
+Require(textPixels >= 3, "native packaged-font glyph raster");
 using var stream = new MemoryStream();
 bitmap.Save(stream, ImageFormat.Png);
 Require(stream.Length > 64, "native PNG encode");
@@ -85,7 +93,7 @@ using var region = new Region(new Rectangle(0, 0, 16, 16));
 region.Exclude(new Rectangle(4, 4, 4, 4));
 region.Union(path);
 
-Console.WriteLine($"drawing-facade=pass|png:{stream.Length}|size:{decoded.Width}x{decoded.Height}");
+Console.WriteLine($"drawing-facade=pass|png:{stream.Length}|size:{decoded.Width}x{decoded.Height}|text-pixels:{textPixels}");
 return 0;
 
 static void Require(bool condition, string name)

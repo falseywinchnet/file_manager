@@ -44,12 +44,17 @@ This is a control gallery, not File Manager and not a file browser.
 - Win32, COM, WIC, MSAA, and UIA types remain inside `src/host/windows/`.
 - The core is retained; do not introduce an immediate-mode control API or a
   perpetual redraw loop.
-- Accessibility/help metadata is optional secondary hook data, not required to
-  instantiate a control.
-- Portsmouth Rapids 1.0 evaluation faces are supplied for the Gallery. Use
-  them only for titles and control chrome; retain Lucida Grande for editable,
-  collection, metric, and other field content. This demo role split does not
-  settle M4 shaping/fallback or M9 production typography and packaging.
+- Authored accessibility/help metadata is optional secondary hook data and is
+  not required to instantiate a control. Supported stock controls still supply
+  default semantic adapters; File Manager requires native accessibility
+  publication and does not treat it as a user-disabled product mode.
+- Portsmouth Rapids 1.0 evaluation faces are supplied for the current Gallery.
+  That bounded historical proving slice retains Lucida Grande for editable,
+  collection, metric, and field content until its fixture is deliberately
+  migrated. **GIVEN forward direction:** M4/M9 use HarfBuzz, FreeType, bundled
+  Portsmouth control faces, a selected bundled Tahoma/Calibri-like body face,
+  and bounded bundled fallback packs. Production Portsmouth rights and exact
+  body/coverage assets remain gates; do not silently use arbitrary host fonts.
 - Preserve user files and unrelated working-tree changes.
 
 ## Public seam

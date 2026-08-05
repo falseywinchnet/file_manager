@@ -1,7 +1,7 @@
 # Orchestrator ↔ Kolmogrov interface negotiation
 
-Status: **round 001 Kolmogrov reply recorded; awaiting Orchestrator
-reconciliation**.
+Status: **round 001 reply and framework usage-guidance supplement sealed;
+awaiting Orchestrator reconciliation**.
 
 Participants: Kolmogrov research program, Go engine production consumer, and
 Orchestrator integration authority. Canonical family: `ORC-KOL-001`.
@@ -129,13 +129,24 @@ common contract vocabulary. No checksum is mathematical evidence.
 - source mutation, typed edit, and logical index support:
   T-SYMBOL-JACOBIAN-1, T-TYPED-EDIT-SEAM-1, T-POSTING-SUPPORT-1, and
   T-SYMMETRIC-CERTIFICATE-1;
+- protected binary support and exact radius-one verification:
+  T-PROTECTED-KERNEL-1 and T-ONE-EDIT-VERIFIER-1;
+- guard/coverage provenance, occupancy query work, segment liveness, and exact
+  typed filename evidence: T-GUARD-COVERAGE-1, T-OCCUPANCY-QUERY-1,
+  T-SEGMENT-LIVENESS-1, and T-TYPED-FILENAME-EVIDENCE-1;
 - finite candidate-load and specialization evidence:
   `experiments/e8_quotient_retrieval_specialization/RESULT.md`;
-- finite rich-projection and filename mutation evidence: E9 and E10 results;
+- finite rich-projection, filename mutation, generated retrieval/resource, and
+  coupled history-capacity evidence: E9, E10, E11, E12, and E13 results;
 - reference implementation: `src/kolmogrov/certificates.py` and
-  `src/kolmogrov/deformation.py`;
+  `src/kolmogrov/deformation.py`, plus the candidate
+  `src/kolmogrov/history_occupancy.py`;
 - claim, proof, assumption, and negative-result ledgers at repository root and
   under `docs/`.
+- sealed engine dogfood defaults and uncertainty handoff:
+  `docs/HISTORY_HASH_ENGINE_CONTRACT_001.md`,
+  `docs/HISTORY_HASH_OPEN_CONCERNS_001.md`, and
+  `conformance/orc_kol_001/history_hash_usage_guidance_001.json`.
 
 ### Private implementation boundary
 
@@ -148,8 +159,9 @@ configuration identity cross the seam; the generating implementation does not.
 ### Errors, bounds, cancellation, and migration
 
 Kolmogrov proposes the terminal details `unavailable`, `unsupported_input`,
-`configuration_mismatch`, `rebuild_required`, `budget_exceeded`, `cancelled`,
-`corrupt_projection`, and `internal_failure`, mapped under ORC-COM-001.
+`over_capacity`, `configuration_mismatch`, `rebuild_required`,
+`budget_exceeded`, `cancelled`, `corrupt_projection`, and `internal_failure`,
+mapped under ORC-COM-001.
 Candidate count, posting work, elapsed work, and response bytes are bounded by
 the stricter engine/session policy. Cancellation inherits the engine request
 context. Continuations bind to engine generation, configuration identity, and
@@ -166,11 +178,32 @@ register the lab profile and implement a fake provider. The engine may implement
 an experimental/reference adapter and exact-verification path, disabled from
 production feature advertisement.
 
-**K1 — engine experiment: not yet ready.** Requires a frozen filename/path
-feature policy, held-out selection of the candidate rich-content projection,
-an explicit length-conditioned configuration, and engine posting/resource
-measurements. Filename Profile 001 and E10 are development inputs, not the
-held-out acceptance evidence.
+**K1 — bounded engine hash experiment: object ready, capacity gate still
+open.** K1 concerns a candidate hash instrument, not ranking relevance. It
+requires a frozen observation profile and transformation relation, an explicit
+length and same-partition pool envelope, coupled coordinate configuration,
+overflow/invisibility semantics, and engine posting/resource measurements.
+Parent ngram decomposition, transposition/edit adjudication, and rank policy do
+not belong in this gate.
+
+E12 further rejects separate stored guard/coverage addresses as an automatic
+improvement and shows that the tuning-selected eight-certificate schedule does
+not retain its candidate-tail gate. It supplies exact liveness and typed
+evidence semantics, but no production projection/schedule selection. E12 is
+also a research input and does not open K1.
+
+E13 supplies the next experimental object: rolling complete-descendant
+fingerprints coupled into one coordinate tuple per deletion history. Two 9-bit
+coordinates/view produced zero excess candidates on all three generated splits
+with about 45--48 memberships/record, while two 8-bit coordinates retained one
+least obstruction. The recurrence and recall are paper-complete, but the
+18-bit crossing is only generated evidence. A disabled engine adapter may now
+exercise this object under the E13 envelope. K1 remains closed as a production
+or general-scale claim until pool/length capacity, coordinate collision audit,
+native key/dictionary cost, deterministic vectors, and update behavior close.
+The retained `ldfioia/kbmedfa` false-candidate obstruction already proves that
+the current 18-bit tuple is not collision-free even for shorter all-letter
+inputs.
 
 **K2 — production candidate: not yet ready.** Requires held-out equal-bit wins,
 hard-negative/ambiguity gates, deterministic cross-platform vectors, migration,
@@ -180,3 +213,33 @@ and end-to-end engine performance under the accepted workload constitution.
 
 Status: **pending Orchestrator action; Kolmogrov reply 001 and its conformance
 fixture are available**.
+
+## Framework ledger request 002 — sealed
+
+Status: **SEALED by Kolmogrov on 2026-08-05; no further framework input is
+required before a disabled engine dogfood adapter begins**.
+
+The framework asked for default options, usage constraints, efficient query and
+build directives, and durable disclosure of low-confidence concerns. Kolmogrov
+returns:
+
+1. `HISTORY_HASH_ENGINE_CONTRACT_001.md` as the normative experimental-use
+   guidance;
+2. `history_hash_usage_guidance_001.json` as its machine-readable candidate
+   projection;
+3. `HISTORY_HASH_OPEN_CONCERNS_001.md` as required sibling context;
+4. E13 and the formal history occupancy/scale/influence objects as evidence and
+   limits.
+
+The returned default is literal-only radius one, two coupled 20-bit coordinates
+in a sparse 40-bit key, 2--64 atoms, at most 65,536 live records per queried
+plan partition, and a 4,096-candidate return cap. Exact anchors, explicit
+configuration identity, liveness, rebuild-on-mismatch, overflow/fallback, and
+candidate-only semantics are mandatory. Optional fold/structural views do not
+filter in this profile.
+
+This seal closes the documentation/ledger request, not K1 production admission.
+Orchestrator may reconcile the vocabulary and the engine may dogfood the
+candidate behind experimental availability. The request reopens only on the
+triggers listed in `HISTORY_HASH_OPEN_CONCERNS_001.md` or an explicit new
+framework question.

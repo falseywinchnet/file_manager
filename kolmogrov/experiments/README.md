@@ -38,6 +38,15 @@ corpus, split, seed policy, or metric creates a new run identity.
   private-witness breakdown, and cross-view provenance obstructions.
 - `e10_filename_jacobian` — source-anchored Unicode filename views, exact
   mutation flow, low-bit projection failure, and logical posting charge.
+- `e11_filename_retrieval_cost` — protected-kernel row compilation, disjoint
+  generated retrieval, exact `n-1/n/n+1` plans, concrete posting payloads, and
+  matrix-free radius-one verification.
+- `e12_guard_coverage_specialization` — three-way guard/coverage composition,
+  certificate-count specialization, genuine policy negatives, provenance
+  residual, and immutable-segment liveness.
+- `e13_history_bound_occupancy` — exact candidate attribution, rolling
+  whole-descendant fingerprints, separable saturation, coupled history tuples,
+  nested capacity, and mutation contribution energy.
 
 `make research` remains a diagnostic replay of the historical Phase A sequence.
 Its successful execution does not promote any claim.

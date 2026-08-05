@@ -188,7 +188,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_7, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_10, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -199,15 +199,190 @@ static void test_version_negotiation(void) {
                 api.set_control_png != NULL && api.set_child_index != NULL &&
                 api.set_control_colors != NULL && api.subscribe_pointer != NULL &&
                 api.set_check_state != NULL && api.get_check_state != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_7,
+                api.subscribe_key != NULL && api.subscribe_text != NULL &&
+                api.set_range != NULL && api.get_range != NULL &&
+                api.set_range_value != NULL && api.get_range_value != NULL &&
+                api.set_pointer_capture != NULL &&
+                api.get_pointer_capture != NULL &&
+                api.show_path_dialog != NULL &&
+                api.last_dialog_path != NULL &&
+                api.show_tooltip != NULL && api.hide_tooltip != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_10,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000008), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x0000000b), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_10_dialog_and_tooltip_contract(void) {
+    gf_handle form = {0U, 0U};
+    uint32_t accepted = 99U;
+    uint64_t required = 99U;
+    require(api.control_create_kind(GF_CONTROL_FORM,
+                                    text("abi.host.adapters"), &form) == GF_OK,
+            "0.10 host-adapter fixture creation failed");
+    require(api.show_path_dialog(form, GF_PATH_DIALOG_OPEN_FILE,
+                                 text("Open fixture"), text(""), text(""),
+                                 text(""), text("Images|*.png"),
+                                 GF_PATH_DIALOG_DEFAULT, &accepted) == GF_OK &&
+                accepted == 0U,
+            "provider-free path dialog did not deterministically cancel");
+    require(api.last_dialog_path(form, NULL, 0U, &required) == GF_OK &&
+                required == 0U,
+            "cancelled path dialog retained a stale result");
+    require(api.show_tooltip(form, text("Retained tooltip"), 8.0, 12.0,
+                             250U) == GF_OK &&
+                api.hide_tooltip(form) == GF_OK,
+            "provider-free tooltip contract was not safely stateful");
+    require(api.show_path_dialog(form, 99U, text(""), text(""), text(""),
+                                 text(""), text(""), 0U, &accepted) ==
+                GF_ERROR_INVALID_ARGUMENT,
+            "invalid path-dialog kind was accepted");
+    require(api.dispose(form) == GF_OK,
+            "0.10 host-adapter fixture disposal failed");
+}
+
+struct range_context {
+    gf_handle range;
+    unsigned sequence[4];
+    unsigned count;
+    uint32_t captured_during_scroll;
+};
+
+static uint32_t range_event(gf_handle sender, uint32_t event_kind,
+                            void* opaque) {
+    struct range_context* context = (struct range_context*)opaque;
+    require(sender.slot == context->range.slot,
+            "range callback sender changed");
+    require(context->count < 4U, "range callback sequence overflowed");
+    context->sequence[context->count++] = event_kind;
+    if (event_kind == GF_EVENT_RANGE_SCROLL) {
+        require(api.set_pointer_capture(sender, 1U) == GF_OK,
+                "attached range could not acquire explicit capture");
+        require(api.get_pointer_capture(sender,
+                                        &context->captured_during_scroll) == GF_OK,
+                "range capture could not be queried");
+    }
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
+static void test_abi_0_9_range_and_capture(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle track = {0U, 0U};
+    gf_handle progress = {0U, 0U};
+    gf_event_token scroll = {0U, 0U};
+    gf_event_token changed = {0U, 0U};
+    struct range_context context;
+    double minimum = 0.0;
+    double maximum = 0.0;
+    double value = 0.0;
+    uint32_t captured = 99U;
+    memset(&context, 0, sizeof(context));
+
+    require(api.control_create_kind(GF_CONTROL_FORM,
+                                    text("abi.range.form"), &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_TRACK_BAR,
+                                        text("abi.range.track"), &track) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PROGRESS_BAR,
+                                        text("abi.range.progress"), &progress) == GF_OK,
+            "0.9 range fixtures failed");
+    context.range = track;
+    require(api.set_bounds(form, (gf_rect){0.0, 0.0, 320.0, 200.0}) == GF_OK &&
+                api.set_bounds(track,
+                               (gf_rect){20.0, 30.0, 200.0, 28.0}) == GF_OK &&
+                api.add_child(form, track) == GF_OK,
+            "0.9 range fixture tree failed");
+    require(api.set_range(track, -10.0, 10.0) == GF_OK &&
+                api.set_range_value(track, -5.0) == GF_OK &&
+                api.get_range(track, &minimum, &maximum) == GF_OK &&
+                api.get_range_value(track, &value) == GF_OK &&
+                minimum == -10.0 && maximum == 10.0 && value == -5.0,
+            "0.9 track range did not round-trip");
+    require(api.set_range(progress, 0.0, 100.0) == GF_OK &&
+                api.set_range_value(progress, 63.0) == GF_OK &&
+                api.get_range_value(progress, &value) == GF_OK && value == 63.0,
+            "0.9 progress value did not project");
+    require(api.set_range_value(track, 11.0) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_range(progress, 5.0, 5.0) == GF_ERROR_INVALID_ARGUMENT &&
+                api.get_range(form, &minimum, &maximum) ==
+                    GF_ERROR_WRONG_HANDLE_KIND,
+            "0.9 invalid range access was accepted");
+    require(api.get_pointer_capture(track, &captured) == GF_OK && captured == 0U &&
+                api.set_pointer_capture(track, 1U) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_pointer_capture(track, 2U) == GF_ERROR_INVALID_ARGUMENT,
+            "0.9 unattached/invalid capture semantics changed");
+    require(api.subscribe_v2(track, GF_EVENT_RANGE_SCROLL,
+                             range_event, &context, &scroll) == GF_OK &&
+                api.subscribe_v2(track, GF_EVENT_RANGE_VALUE_CHANGED,
+                                 range_event, &context, &changed) == GF_OK,
+            "0.9 range subscriptions failed");
+    context.count = 0U;
+    require(api.run_window(form,
+                           GF_WINDOW_RUN_FORCE_HEADLESS |
+                               GF_WINDOW_RUN_AUTOMATION_ACTIVATE) == GF_OK,
+            "0.9 headless range run failed");
+    require(context.count == 2U &&
+                context.sequence[0] == GF_EVENT_RANGE_SCROLL &&
+                context.sequence[1] == GF_EVENT_RANGE_VALUE_CHANGED &&
+                context.captured_during_scroll == 1U,
+            "0.9 input range ordering/capture changed");
+    require(api.get_pointer_capture(track, &captured) == GF_OK && captured == 0U,
+            "0.9 capture survived host shutdown");
+    require(api.disconnect(scroll) == GF_OK && api.disconnect(changed) == GF_OK &&
+                api.dispose(form) == GF_OK && api.dispose(progress) == GF_OK,
+            "0.9 range fixture cleanup failed");
+}
+
+static uint32_t ignored_key(gf_handle sender, uint32_t event_kind,
+                            uint32_t physical_key, uint32_t modifiers,
+                            uint32_t repeat, void* opaque) {
+    (void)sender; (void)event_kind; (void)physical_key;
+    (void)modifiers; (void)repeat; (void)opaque;
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
+static uint32_t ignored_text(gf_handle sender, gf_string_view input,
+                             uint32_t composing, int32_t replacement_start,
+                             int32_t replacement_length, void* opaque) {
+    (void)sender; (void)input; (void)composing;
+    (void)replacement_start; (void)replacement_length; (void)opaque;
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
+static void test_abi_0_8_field_keyboard_subscriptions(void) {
+    gf_handle field = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    gf_handle custom = {0U, 0U};
+    gf_event_token key = {0U, 0U};
+    gf_event_token custom_key = {0U, 0U};
+    gf_event_token input = {0U, 0U};
+    require(api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                    text("abi.keyboard.field"), &field) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.keyboard.panel"), &panel) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_CUSTOM,
+                                        text("abi.keyboard.custom"), &custom) == GF_OK,
+            "0.8 keyboard fixtures failed");
+    require(api.subscribe_key(field, ignored_key, NULL, &key) == GF_OK &&
+                api.subscribe_text(field, ignored_text, NULL, &input) == GF_OK,
+            "0.8 field keyboard subscriptions failed");
+    require(api.subscribe_key(custom, ignored_key, NULL, &custom_key) == GF_OK,
+            "interactive custom control rejected key subscription");
+    require(api.subscribe_key(panel, ignored_key, NULL, &key) ==
+                GF_ERROR_WRONG_HANDLE_KIND &&
+                api.subscribe_text(panel, ignored_text, NULL, &input) ==
+                GF_ERROR_WRONG_HANDLE_KIND,
+            "0.8 non-field accepted keyboard subscriptions");
+    require(api.disconnect(key) == GF_OK && api.disconnect(custom_key) == GF_OK &&
+                api.disconnect(input) == GF_OK,
+            "0.8 keyboard subscription disconnect failed");
+    require(api.dispose(field) == GF_OK && api.dispose(panel) == GF_OK &&
+                api.dispose(custom) == GF_OK,
+            "0.8 keyboard fixture disposal failed");
 }
 
 static void test_abi_0_7_checked_state_and_transparent_input(void) {
@@ -580,6 +755,9 @@ int main(void) {
     test_abi_0_4_close_cancellation();
     test_abi_0_6_pointer_delivery();
     test_abi_0_7_checked_state_and_transparent_input();
+    test_abi_0_8_field_keyboard_subscriptions();
+    test_abi_0_9_range_and_capture();
+    test_abi_0_10_dialog_and_tooltip_contract();
     test_retain_release_and_thread_affinity();
     test_event_tokens_and_callback_disposal();
     puts("gui_forms_c_api_c11_tests: all tests passed");

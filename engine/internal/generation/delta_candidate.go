@@ -23,7 +23,7 @@ import (
 
 const (
 	deltaCandidateMajor      uint16 = 1
-	deltaCandidateMinor      uint16 = 0
+	deltaCandidateMinor      uint16 = 1
 	deltaCandidateHeaderSize        = 256
 	deltaCandidateChecksumAt        = 224
 	deltaRecordHeaderSize           = 128
@@ -36,14 +36,15 @@ var (
 )
 
 type DeltaMetadata struct {
-	BaseGeneration api.Generation
-	Generation     api.Generation
-	Added          uint64
-	Updated        uint64
-	Deleted        uint64
-	Size           uint64
-	PayloadDigest  [sha256.Size]byte
-	CatalogDigest  [sha256.Size]byte
+	BaseGeneration    api.Generation
+	Generation        api.Generation
+	Added             uint64
+	Updated           uint64
+	Deleted           uint64
+	Size              uint64
+	PayloadDigest     [sha256.Size]byte
+	CatalogDigest     [sha256.Size]byte
+	BaseCatalogDigest [sha256.Size]byte
 }
 
 func (m DeltaMetadata) Changes() uint64 { return m.Added + m.Updated + m.Deleted }
@@ -72,6 +73,7 @@ func encodeDeltaCandidateHeader(header deltaCandidateHeader) []byte {
 	binary.LittleEndian.PutUint32(encoded[76:80], header.rootPathLength)
 	copy(encoded[80:112], header.metadata.PayloadDigest[:])
 	copy(encoded[112:144], header.metadata.CatalogDigest[:])
+	copy(encoded[144:176], header.metadata.BaseCatalogDigest[:])
 	checksum := sha256.Sum256(encoded[:deltaCandidateChecksumAt])
 	copy(encoded[deltaCandidateChecksumAt:], checksum[:])
 	return encoded
@@ -93,8 +95,12 @@ func decodeDeltaCandidateHeader(encoded []byte, size int64) (deltaCandidateHeade
 	if major != deltaCandidateMajor || minor > deltaCandidateMinor {
 		return deltaCandidateHeader{}, fmt.Errorf("unsupported delta candidate version %d.%d", major, minor)
 	}
+	reservedAt := 144
+	if minor >= 1 {
+		reservedAt = 176
+	}
 	if binary.LittleEndian.Uint32(encoded[12:16]) != deltaCandidateHeaderSize ||
-		hasNonzero(encoded[144:deltaCandidateChecksumAt]) {
+		hasNonzero(encoded[reservedAt:deltaCandidateChecksumAt]) {
 		return deltaCandidateHeader{}, errors.New("invalid delta candidate header dimensions")
 	}
 	header := deltaCandidateHeader{
@@ -111,6 +117,9 @@ func decodeDeltaCandidateHeader(encoded []byte, size int64) (deltaCandidateHeade
 	}
 	copy(header.metadata.PayloadDigest[:], encoded[80:112])
 	copy(header.metadata.CatalogDigest[:], encoded[112:144])
+	if minor >= 1 {
+		copy(header.metadata.BaseCatalogDigest[:], encoded[144:176])
+	}
 	declaredChanges := binary.LittleEndian.Uint64(encoded[56:64])
 	if header.metadata.BaseGeneration == 0 || header.metadata.Generation <= header.metadata.BaseGeneration ||
 		header.metadata.Changes() == 0 || declaredChanges != header.metadata.Changes() ||
@@ -141,7 +150,48 @@ func WriteDeltaCandidate(ctx context.Context, path string, generation api.Genera
 	if err := ctx.Err(); err != nil {
 		return DeltaMetadata{}, err
 	}
-	root := after.Root()
+	return writeDeltaCandidate(ctx, path, after.Root(), before.Metadata().Generation, before.Digest(), generation, after.Digest(),
+		func(emit func(Change) error) (DiffSummary, error) {
+			return Diff(ctx, before, after, emit)
+		})
+}
+
+// WriteDeltaFromOverlayCandidate streams the next run from a checked composite
+// generation. It is an experiment only and does not publish a live manifest.
+func WriteDeltaFromOverlayCandidate(ctx context.Context, path string, generation api.Generation, before *OverlayCandidate, after *catalog.Shard) (DeltaMetadata, error) {
+	if before == nil || after == nil {
+		return DeltaMetadata{}, errors.New("checked overlay and replacement shard are required")
+	}
+	if before.Root() != after.Root() {
+		return DeltaMetadata{}, errors.New("delta generations must describe the same root")
+	}
+	if generation <= before.Generation() {
+		return DeltaMetadata{}, errors.New("delta generation must advance the checked overlay")
+	}
+	if err := ctx.Err(); err != nil {
+		return DeltaMetadata{}, err
+	}
+	return writeDeltaCandidate(ctx, path, after.Root(), before.Generation(), before.Digest(), generation, after.Digest(),
+		func(emit func(Change) error) (DiffSummary, error) {
+			return diffOverlayCandidate(ctx, before, after, emit)
+		})
+}
+
+type deltaChangeStream func(func(Change) error) (DiffSummary, error)
+
+func writeDeltaCandidate(
+	ctx context.Context,
+	path string,
+	root api.RootSpec,
+	baseGeneration api.Generation,
+	baseDigest [sha256.Size]byte,
+	generation api.Generation,
+	targetDigest [sha256.Size]byte,
+	stream deltaChangeStream,
+) (DeltaMetadata, error) {
+	if baseGeneration == 0 || generation <= baseGeneration || stream == nil {
+		return DeltaMetadata{}, errors.New("invalid delta candidate generation source")
+	}
 	rootID := []byte(root.ID)
 	rootPath := []byte(root.Path)
 	if len(rootID) == 0 || len(rootPath) == 0 || len(rootID) > maximumStoredString || len(rootPath) > maximumStoredString {
@@ -183,7 +233,7 @@ func WriteDeltaCandidate(ctx context.Context, path string, generation api.Genera
 		return nil
 	}
 	var previousPath string
-	summary, err := Diff(ctx, before, after, func(change Change) error {
+	summary, err := stream(func(change Change) error {
 		if err := openOnFirstChange(); err != nil {
 			return err
 		}
@@ -210,13 +260,14 @@ func WriteDeltaCandidate(ctx context.Context, path string, generation api.Genera
 		return DeltaMetadata{}, fmt.Errorf("locate delta candidate end: %w", err)
 	}
 	metadata := DeltaMetadata{
-		BaseGeneration: before.Metadata().Generation,
-		Generation:     generation,
-		Added:          summary.Added,
-		Updated:        summary.Updated,
-		Deleted:        summary.Deleted,
-		Size:           uint64(end),
-		CatalogDigest:  after.Digest(),
+		BaseGeneration:    baseGeneration,
+		Generation:        generation,
+		Added:             summary.Added,
+		Updated:           summary.Updated,
+		Deleted:           summary.Deleted,
+		Size:              uint64(end),
+		CatalogDigest:     targetDigest,
+		BaseCatalogDigest: baseDigest,
 	}
 	copy(metadata.PayloadDigest[:], payloadHash.Sum(nil))
 	header := encodeDeltaCandidateHeader(deltaCandidateHeader{
@@ -356,6 +407,15 @@ func (r *DeltaReader) Check() error {
 }
 
 func (r *DeltaReader) Iterate(ctx context.Context, emit func(ChangeKind, catalog.Row) error) error {
+	return r.iterateRecords(ctx, func(kind ChangeKind, row catalog.Row, _ uint64, _ int64) error {
+		if emit == nil {
+			return nil
+		}
+		return emit(kind, row)
+	})
+}
+
+func (r *DeltaReader) iterateRecords(ctx context.Context, emit func(ChangeKind, catalog.Row, uint64, int64) error) error {
 	offset := r.recordsOffset
 	end := int64(r.header.metadata.Size)
 	var previousPath string
@@ -366,26 +426,8 @@ func (r *DeltaReader) Iterate(ctx context.Context, emit func(ChangeKind, catalog
 				return err
 			}
 		}
-		if offset > end-deltaRecordHeaderSize {
-			return errors.New("truncated delta candidate record header")
-		}
-		header := make([]byte, deltaRecordHeaderSize)
-		if _, err := r.file.ReadAt(header, offset); err != nil {
-			return fmt.Errorf("read delta candidate record header: %w", err)
-		}
-		recordSize := uint64(binary.LittleEndian.Uint32(header[8:12]))
-		pathLength := uint64(binary.LittleEndian.Uint32(header[12:16]))
-		nameLength := uint64(binary.LittleEndian.Uint32(header[16:20]))
-		if recordSize < deltaRecordHeaderSize || recordSize > deltaMaximumRecordSize ||
-			pathLength == 0 || nameLength == 0 || pathLength > maximumStoredString || nameLength > maximumStoredString ||
-			uint64(deltaRecordHeaderSize)+pathLength+nameLength != recordSize || uint64(offset)+recordSize > uint64(end) {
-			return errors.New("invalid delta candidate record dimensions")
-		}
-		strings := make([]byte, int(pathLength+nameLength))
-		if _, err := r.file.ReadAt(strings, offset+deltaRecordHeaderSize); err != nil {
-			return fmt.Errorf("read delta candidate record strings: %w", err)
-		}
-		kind, row, err := decodeDeltaRecord(header, strings[:pathLength], strings[pathLength:])
+		recordOffset := offset
+		kind, row, next, err := r.readRecordAt(offset)
 		if err != nil {
 			return err
 		}
@@ -402,16 +444,44 @@ func (r *DeltaReader) Iterate(ctx context.Context, emit func(ChangeKind, catalog
 			deleted++
 		}
 		if emit != nil {
-			if err := emit(kind, row); err != nil {
+			if err := emit(kind, row, index, recordOffset); err != nil {
 				return err
 			}
 		}
-		offset += int64(recordSize)
+		offset = next
 	}
 	if offset != end || added != r.header.metadata.Added || updated != r.header.metadata.Updated || deleted != r.header.metadata.Deleted {
 		return errors.New("delta candidate record counts do not match header")
 	}
 	return nil
+}
+
+func (r *DeltaReader) readRecordAt(offset int64) (ChangeKind, catalog.Row, int64, error) {
+	end := int64(r.header.metadata.Size)
+	if offset < r.recordsOffset || offset > end-deltaRecordHeaderSize {
+		return 0, catalog.Row{}, offset, errors.New("truncated delta candidate record header")
+	}
+	header := make([]byte, deltaRecordHeaderSize)
+	if _, err := r.file.ReadAt(header, offset); err != nil {
+		return 0, catalog.Row{}, offset, fmt.Errorf("read delta candidate record header: %w", err)
+	}
+	recordSize := uint64(binary.LittleEndian.Uint32(header[8:12]))
+	pathLength := uint64(binary.LittleEndian.Uint32(header[12:16]))
+	nameLength := uint64(binary.LittleEndian.Uint32(header[16:20]))
+	if recordSize < deltaRecordHeaderSize || recordSize > deltaMaximumRecordSize ||
+		pathLength == 0 || nameLength == 0 || pathLength > maximumStoredString || nameLength > maximumStoredString ||
+		uint64(deltaRecordHeaderSize)+pathLength+nameLength != recordSize || uint64(offset)+recordSize > uint64(end) {
+		return 0, catalog.Row{}, offset, errors.New("invalid delta candidate record dimensions")
+	}
+	strings := make([]byte, int(pathLength+nameLength))
+	if _, err := r.file.ReadAt(strings, offset+deltaRecordHeaderSize); err != nil {
+		return 0, catalog.Row{}, offset, fmt.Errorf("read delta candidate record strings: %w", err)
+	}
+	kind, row, err := decodeDeltaRecord(header, strings[:pathLength], strings[pathLength:])
+	if err != nil {
+		return 0, catalog.Row{}, offset, err
+	}
+	return kind, row, offset + int64(recordSize), nil
 }
 
 func decodeDeltaRecord(header, pathBytes, nameBytes []byte) (ChangeKind, catalog.Row, error) {

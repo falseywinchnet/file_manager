@@ -194,6 +194,54 @@ This retains every common deletion descendant without enumerating descendants.
 The `aaba/babb` obstruction proves that exact verification remains necessary
 even with the complete degree-`t+1` schedule.
 
+E11 instantiates the complete radius-one exact-length plan. Stored records one
+scalar longer use descendant masks against exact query keys; same-length records
+use occupied-cell overlap; stored records one scalar shorter publish exact
+target-position keys against descendant masks built from the longer query.
+T-ONE-EDIT-VERIFIER-1 then classifies equality, substitution, adjacent
+transposition, insertion, or deletion in one scan with no edit matrix.
+
+T-PROTECTED-KERNEL-1 turns row compilation into finite kernel avoidance. E11
+shows why that guard cannot select the projection alone: the exact two-row
+development minimum had unusable candidate tails, and four protected-coset rows
+lost to four balanced rows on the disjoint generator. The next candidate keeps
+the minimum guard address independently addressable from an ambient/minimax
+coverage address instead of concealing both objectives in one row family.
+
+E12 restricts that proposal. T-GUARD-COVERAGE-1 proves that separate guard and
+coverage intersections may borrow different exact pattern witnesses. The split
+layout manifested this residual and doubled posting charge at equal dense mask
+support. Coverage therefore owns candidate production; guard masks remain
+audit/post-candidate evidence unless a separate measured gate earns their
+storage. Only a coupled cell may claim one common projected witness.
+
+T-OCCUPANCY-QUERY-1 also closes the main same-length iterative shortcut: exact
+precombination for every `B`-cell query mask needs `2^B-1` predicates. The fast
+survivor is a cardinality-ordered mix of sparse lists and contiguous bit-sliced
+blocks with explicit wordwise OR, early intersection exit, and one final
+segment-liveness AND from T-SEGMENT-LIVENESS-1.
+
+E13 changes the primary radius-one hash candidate. Complete descendant
+fingerprints advance by
+
+```text
+D_(h+1) = D_h + (a_h-a_(h+1)) b^h mod P.
+```
+
+Couple all `q` coordinate cells for history `h` into one sparse tuple key.
+Construction uses one initial atom scan, `n` history emissions, and `q(n-1)`
+rolling updates per semantic stream; it has no position-subset or descendant-
+copy loop. Same-length lookup probes at most `n` tuple postings per stream,
+while the shorter directional seam uses one full-key tuple probe. Do not split
+the tuple into independently accepted masks: that permits different histories
+to satisfy different coordinates.
+
+Certificate postings remain the frozen control. E13 found their measured tail
+was schedule omission plus projection collision, while the coupled history
+tuple reached the exact declared relation on all generated splits at the first
+tested 18-bit/view crossing. External-scale pool capacity, key/dictionary cost,
+and native latency remain open.
+
 ## Phase F — optimization
 
 Freeze reference outputs first. Then investigate:

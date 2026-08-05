@@ -48,8 +48,9 @@ it does not dogfood GUI.Forms and contains no image-generated material.
 - **GIVEN:** ordinary resizing is content-aware before panes and command groups
   collapse by priority. The window may not shrink below 150 × 150 logical units.
 - **GIVEN:** Portsmouth Rapids is restricted to titles and control chrome.
-  Content and explanatory text use the platform system UI face with a
-  Tahoma-like fallback.
+  Content and explanatory text use a bundled Tahoma/Calibri-like humanist body
+  face selected through the GUI.Forms font-pack gate. Uncovered clusters use
+  bounded bundled fallback packs rather than arbitrary host fonts.
 - **GIVEN:** selection is single-click and opening is double-click.
 - **GIVEN:** the file surface remains useful without the engine or Orchestrator.
 - **GIVEN:** search never silently widens beyond the displayed folder subtree.
@@ -86,8 +87,9 @@ it does not dogfood GUI.Forms and contains no image-generated material.
   icons would need pinned PNG derivatives and source/license provenance.
 - **OBSERVED:** GUI.Forms currently proves basic retained controls, physical
   panel styles, input routing, damage, and experimental ABIs, but lacks the
-  production text editor, shaping backend, IME, scrolling, tree/list/menu,
-  accessibility publisher, and layout families required by File Manager.
+  production text editor, selected HarfBuzz/FreeType integration, IME,
+  scrolling, tree/list/menu, accessibility publisher, and layout families
+  required by File Manager.
 - **DECIDED:** the old Gate F0 is superseded by ADR-004. Frontend 001 source may
   begin only after the named GUI.Forms go-ahead and explicit architect start
   direction.

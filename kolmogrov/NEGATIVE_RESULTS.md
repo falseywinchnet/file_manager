@@ -525,3 +525,174 @@ Status: **REJECTED** as a converse for same-length common descendants.
 - Restricted survivor: certificate overlap has exact common-descendant recall
   and supports a bounded posting-union front index; exact verification rejects
   incompatible histories.
+
+## K-N031 — development kernel avoidance does not imply unseen mutation support
+
+Status: **REJECTED** as a generalization claim.
+
+- Attempt: compile the shortest binary prefix whose kernel avoids every
+  literal, folded, and structural pattern difference induced by one generated
+  filename mutation graph, then lift its rows into support-balanced ambient
+  cosets.
+- Strongest result: E11 proved that two rows are the exact minimum for all three
+  development graphs and erased none of their 51 literal, 45 folded, or nine
+  structural differences.
+- Failure: the disjoint graph still had 13 of 48 literal and nine of 42 folded
+  differences erased at two rows. At the development-selected four rows it had
+  four and eight erased respectively, and worse candidate tails than the
+  equal-depth balanced control. Tested unseen differences reached zero only at
+  six rows.
+- Least mechanism: one unseen nonzero difference outside the declared graph may
+  lie in the selected kernel. The protection theorem constrains no such
+  direction, so one unseen edge is the smallest possible failure.
+- Restricted survivor: protected rows are a guard, not a sufficient selection
+  objective. Reopening requires independent-graph minimax or an explicit
+  ambient-coverage reserve without retuning E11.
+
+## K-N032 — semantic minimum row support is not useful retrieval support
+
+Status: **REJECTED** as an unqualified minimum-hash claim.
+
+- Attempt: treat the first prefix protecting every named development
+  difference as the minimum adequate filename projection.
+- Failure: E11's exact semantic minimum was two rows in every view, yet p95
+  candidate fraction was 55.56% and p95 false candidates were 159 of 288
+  records. The predeclared candidate-tail gate first passed at four rows.
+- Least mechanism: `L(delta)!=0` protects a named pattern edge before
+  idempotent occupancy. It does not stop an unprotected pair from colliding or
+  incompatible histories from satisfying different certificates. One such
+  collapsed pair is sufficient.
+- Restricted survivor: report semantic protection depth, candidate-tail depth,
+  and unseen-direction completion depth separately. None alone is “the minimum
+  hash size.”
+
+## K-N033 — separate guard and coverage overlap is not joint witness evidence
+
+Status: **REJECTED** as a provenance claim.
+
+- Claim attacked: if guard masks overlap and coverage masks overlap, one common
+  exact pattern supplied both matches.
+- Least obstruction: two left patterns and two right patterns, with the guard
+  equality witnessed by the first pair and coverage equality by the second,
+  while every coupled `(guard,coverage)` code differs.
+- E12 result: the separate split admitted candidates rejected by the coupled
+  pair-cell control on 46 of 216 evaluation queries, with p95 four and maximum
+  nine split-only candidates.
+- Restricted survivor: separate overlap remains recall-safe and additive in
+  dense support, but must expose provenance mixing and exactly verify.
+
+## K-N034 — equal dense occupancy support is not equal posting support
+
+Status: **REJECTED** as a resource equivalence.
+
+- Claim attacked: two three-bit addresses costing `8+8=16` mask cells have the
+  same practical index support as one four-bit/16-cell address.
+- E12 result: the split guard3/coverage3 layout used 106.44 hybrid payload
+  bytes/record on tuning versus 61.40 for coverage4, because independently
+  addressable masks and reverse keys duplicate memberships and dictionaries.
+- Least mechanism: one record occupying one cell in each of two address
+  families creates two posting memberships, while one coupled address creates
+  one. A singleton pattern is sufficient.
+- Restricted survivor: equal-support comparisons must name dense mask bits,
+  posting memberships, address dictionaries, and query predicates separately.
+
+## K-N035 — policy-sensitive filename evidence is not a universal veto
+
+Status: **REJECTED** without a transformation-conditioned relevance policy.
+
+- Claim attacked: every digit, extension, or boundary-affecting one-edit pair
+  should be rejected after verification.
+- E12 result: typed evidence marked every genuine verified digit/extension hard
+  decoy, but it also marked every intended separator-deletion source.
+- Least mechanism: one declared-positive boundary deletion and one declared-
+  negative boundary deletion can share the same evidence class. No classifier
+  over that class can separate their labels.
+- Restricted survivor: typed evidence may drive an owner-labelled conditional
+  rank policy; it is not itself the policy.
+
+## K-N036 — a tuning candidate-tail threshold need not transfer
+
+Status: **REJECTED** as a frozen-distribution guarantee.
+
+- Claim attacked: the first certificate schedule passing p95 eight candidates
+  on a disjoint tuning generator will retain that tail on another generator.
+- E12 result: eight certificates first passed the tuning gate, then produced
+  p95 sixteen candidates on evaluation while retaining perfect recall.
+- Least mechanism: one evaluation query with a larger compatible collision
+  class is sufficient to violate a tail threshold; recall theorems do not bound
+  that class.
+- Restricted survivor: candidate-tail gates are empirical distribution claims
+  and require representative consented data or a direct worst-case bound.
+
+## K-N037 — universal exact posting precombination is exponential in cell count
+
+Status: **REJECTED** as a general removal of occupied-cell iteration.
+
+- Claim attacked: precompute a bounded family of posting unions that answers
+  every nonempty `B`-cell query mask with one lookup.
+- Obstruction: distinct query masks define distinct predicates; a singleton
+  stored mask in their symmetric difference separates them. There are `2^B-1`
+  nonempty masks.
+- Restricted survivor: store `B` bit-sliced postings contiguously and perform
+  explicit wordwise ORs for selected cells, or prove a smaller closed query-mask
+  language.
+
+## K-N038 — equal dense-cell support does not support a fixed history count
+
+Status: **REJECTED** for small separable history addresses.
+
+- Claim attacked: redistributing 384 dense cells among more independent history
+  occupancy addresses should improve radius-one selectivity.
+- E13 result: evaluation p95 candidates worsened from 174 at `1 x 128` cells
+  per semantic view to 193 at `4 x 32`; recall stayed exact.
+- Least mechanism: two length-`n` history sets expose `n^2` collision pairs.
+  When `n^2/B>=1`, each coordinate's union-bound premise is saturated; making
+  `B` smaller cannot rescue it.
+- Restricted survivor: increase address cardinality past the history-pair load
+  or couple coordinates into one history key.
+
+## K-N039 — separate coordinate agreement is not whole-history coherence
+
+Status: **REJECTED** as a coherence claim.
+
+- Claim attacked: requiring overlap in every independent fingerprint coordinate
+  proves that one common deletion history generated all overlaps.
+- Least mechanism: coordinate one may collide on history pair `(h1,g1)` while
+  coordinate two collides on `(h2,g2)`. Both occupancy intersections are
+  nonempty although no tuple key is shared.
+- E13 result: coupling coordinates cut memberships roughly in half and reached
+  zero measured excess at two 9-bit coordinates across all three generated
+  splits.
+- Restricted survivor: independent masks remain a recall-safe fuzzy control;
+  they are not provenance-bound evidence.
+
+## K-N040 — E12's tail did not establish complete-certificate history mixing
+
+Status: **REJECTED** as the causal explanation for that workload.
+
+- Claim attacked: the E12 candidate plateau was materially caused by
+  incompatible histories in the complete degree-two certificate relation.
+- E13 result: `C minus T` contained zero evaluation pairs. Bounded-schedule omission
+  contributed 696 candidates and projection collision contributed 323.
+- Restricted survivor: complete certificates can mix histories in general, as
+  the formal obstruction shows, but that mechanism must be measured before it
+  is blamed for a particular tail.
+
+## K-N041 — an 18-bit generated crossing is not collision freedom
+
+Status: **REJECTED** as a deterministic or length-only guarantee.
+
+- Claim attacked: because two 9-bit coupled coordinates produced zero excess
+  on all E13 generated queries, they support arbitrary names of similar or
+  shorter length.
+- Obstruction: descendants `ldfioi` and `kbmedf` share literal tuple
+  `(258,216)`, fold tuple `(100,319)`, and the all-letter structural tuple.
+  Sources `ldfioia` and `kbmedfa` have no common exact deletion descendant but
+  the full three-view hash accepts them.
+- Minimality boundary: exhaustive direct combined literal/fold key enumeration
+  over `abcdefghijklmnop` found no collision through descendant length five;
+  the retained direct collision has length six. This does not prove minimality
+  among all cross-view borrowed-history candidate failures.
+- Restricted survivor: 18 bits is an E13 workload point. Production support
+  requires a declared pool/failure envelope, wider or keyed coordinates, and
+  exact external authority.

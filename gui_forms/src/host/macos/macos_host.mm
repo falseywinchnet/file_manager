@@ -56,6 +56,7 @@ using gui_forms::HostServiceStatus;
 using gui_forms::HostServices;
 using gui_forms::HostSession;
 using gui_forms::HostShutdownEvent;
+using gui_forms::HostTooltipRequest;
 using gui_forms::KeyAction;
 using gui_forms::KeyEvent;
 using gui_forms::Modifier;
@@ -685,6 +686,8 @@ private:
     NSRange _selectedRange;
     NSTrackingArea* _trackingArea;
     NSTimer* _wakeTimer;
+    NSPanel* _tooltipPanel;
+    NSTimer* _tooltipTimer;
 }
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
@@ -701,6 +704,9 @@ private:
 - (void)armWakeTimer;
 - (void)scheduledWake:(NSTimer*)timer;
 - (void)prepareForShutdown;
+- (HostDialogResult)showHostDialog:(const HostDialogRequest&)request;
+- (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request;
+- (void)hideHostTooltip;
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action;
 - (std::string)metricsJSON;
 - (std::string)hostJSON;
@@ -849,6 +855,7 @@ private:
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_wakeTimer invalidate];
+    [self hideHostTooltip];
     if (_hostSession != nullptr) {
         _hostSession->shutdown();
         _hostSession.reset();
@@ -858,6 +865,87 @@ private:
         _hostServices.reset();
     }
     _model.reset();
+}
+
+- (HostDialogResult)showHostDialog:(const HostDialogRequest&)request {
+    if (_hostServices == nullptr) {
+        return {{HostServiceError::after_shutdown}, request.request_id,
+                HostPathDialogResult{}};
+    }
+    [self hideHostTooltip];
+    return _hostServices->show_dialog(request);
+}
+
+- (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request {
+    [self hideHostTooltip];
+    if (request.text.empty()) return {};
+    NSString* text = native_string(request.text);
+    if (text == nil) return {HostServiceError::invalid_utf8};
+    NSFont* font = [NSFont fontWithName:@"Lucida Grande" size:12.0];
+    if (font == nil) font = [NSFont systemFontOfSize:12.0];
+    NSDictionary* attributes = @{NSFontAttributeName: font};
+    const NSRect measured = [text boundingRectWithSize:NSMakeSize(360.0, CGFLOAT_MAX)
+                                               options:NSStringDrawingUsesLineFragmentOrigin |
+                                                       NSStringDrawingUsesFontLeading
+                                            attributes:attributes];
+    const CGFloat width = std::clamp(std::ceil(measured.size.width) + 16.0,
+                                     40.0, 376.0);
+    const CGFloat height = std::max(24.0, std::ceil(measured.size.height) + 10.0);
+    NSTextField* label = [[NSTextField alloc]
+        initWithFrame:NSMakeRect(8.0, 5.0, width - 16.0, height - 10.0)];
+    label.stringValue = text;
+    label.font = font;
+    label.textColor = [NSColor colorWithSRGBRed:31.0 / 255.0
+                                          green:37.0 / 255.0
+                                           blue:44.0 / 255.0 alpha:1.0];
+    label.bordered = NO;
+    label.editable = NO;
+    label.selectable = NO;
+    label.drawsBackground = NO;
+    label.lineBreakMode = NSLineBreakByWordWrapping;
+    label.usesSingleLineMode = NO;
+    NSPanel* panel = [[NSPanel alloc]
+        initWithContentRect:NSMakeRect(0.0, 0.0, width, height)
+                  styleMask:NSWindowStyleMaskBorderless |
+                            NSWindowStyleMaskNonactivatingPanel
+                    backing:NSBackingStoreBuffered defer:NO];
+    panel.releasedWhenClosed = NO;
+    panel.opaque = YES;
+    panel.backgroundColor = [NSColor colorWithSRGBRed:1.0 green:1.0
+                                                 blue:240.0 / 255.0 alpha:1.0];
+    panel.hasShadow = YES;
+    panel.level = NSStatusWindowLevel;
+    panel.ignoresMouseEvents = YES;
+    panel.contentView = label;
+    NSPoint anchor = [self convertPoint:NSMakePoint(request.anchor.x,
+                                                    request.anchor.y)
+                                  toView:nil];
+    anchor = [self.window convertPointToScreen:anchor];
+    NSRect work = self.window.screen.visibleFrame;
+    CGFloat x = std::clamp(anchor.x, NSMinX(work),
+                           std::max(NSMinX(work), NSMaxX(work) - width));
+    CGFloat y = std::clamp(anchor.y - height, NSMinY(work),
+                           std::max(NSMinY(work), NSMaxY(work) - height));
+    [panel setFrameOrigin:NSMakePoint(x, y)];
+    [self.window addChildWindow:panel ordered:NSWindowAbove];
+    [panel orderFrontRegardless];
+    _tooltipPanel = panel;
+    if (request.duration_milliseconds != 0U) {
+        _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:
+            request.duration_milliseconds / 1000.0 repeats:NO
+            block:^(NSTimer*) { [self hideHostTooltip]; }];
+    }
+    return {};
+}
+
+- (void)hideHostTooltip {
+    [_tooltipTimer invalidate];
+    _tooltipTimer = nil;
+    if (_tooltipPanel != nil) {
+        [self.window removeChildWindow:_tooltipPanel];
+        [_tooltipPanel orderOut:nil];
+        _tooltipPanel = nil;
+    }
 }
 
 - (void)setFrameSize:(NSSize)newSize {
@@ -1381,6 +1469,15 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         [nativeWindow performClose:nil];
                     });
+                },
+                [view](const HostDialogRequest& request) {
+                    return [view showHostDialog:request];
+                },
+                [view](const HostTooltipRequest& request) {
+                    return [view showHostTooltip:request];
+                },
+                [view] {
+                    [view hideHostTooltip];
                 });
         }
         if (options.close_after_launch_for_testing) {
