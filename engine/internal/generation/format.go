@@ -33,7 +33,11 @@ const (
 	maximumStoredString            = 1 << 20
 )
 
-var segmentMagic = [8]byte{'F', 'M', 'S', 'E', 'G', '0', '0', '1'}
+var (
+	segmentMagic         = [8]byte{'F', 'M', 'S', 'E', 'G', '0', '0', '1'}
+	ErrNewerFormat       = errors.New("store format is newer than this engine")
+	ErrMigrationRequired = errors.New("store format requires migration")
+)
 
 type componentID uint32
 
@@ -95,21 +99,21 @@ func decodeSegmentHeader(encoded []byte, fileSize int64) (segmentHeader, error) 
 	if string(encoded[:8]) != string(segmentMagic[:]) {
 		return segmentHeader{}, errors.New("unknown segment magic")
 	}
+	wantChecksum := sha256.Sum256(encoded[:segmentHeaderChecksumAt])
+	if !equalDigest(wantChecksum, encoded[segmentHeaderChecksumAt:]) {
+		return segmentHeader{}, errors.New("segment header checksum mismatch")
+	}
 	major := binary.LittleEndian.Uint16(encoded[8:10])
 	minor := binary.LittleEndian.Uint16(encoded[10:12])
-	if major != formatMajor {
-		return segmentHeader{}, fmt.Errorf("segment major %d is not readable by major %d", major, formatMajor)
+	if major > formatMajor || (major == formatMajor && minor > formatMinor) {
+		return segmentHeader{}, fmt.Errorf("%w: segment version %d.%d exceeds %d.%d", ErrNewerFormat, major, minor, formatMajor, formatMinor)
 	}
-	if minor > formatMinor {
-		return segmentHeader{}, fmt.Errorf("segment minor %d is newer than %d", minor, formatMinor)
+	if major < formatMajor {
+		return segmentHeader{}, fmt.Errorf("%w: segment major %d precedes %d", ErrMigrationRequired, major, formatMajor)
 	}
 	if binary.LittleEndian.Uint32(encoded[12:16]) != segmentHeaderSize ||
 		binary.LittleEndian.Uint32(encoded[88:92]) != segmentDescriptorCount {
 		return segmentHeader{}, errors.New("invalid segment header dimensions")
-	}
-	wantChecksum := sha256.Sum256(encoded[:segmentHeaderChecksumAt])
-	if !equalDigest(wantChecksum, encoded[segmentHeaderChecksumAt:]) {
-		return segmentHeader{}, errors.New("segment header checksum mismatch")
 	}
 	header := segmentHeader{
 		generation:       api.Generation(binary.LittleEndian.Uint64(encoded[16:24])),

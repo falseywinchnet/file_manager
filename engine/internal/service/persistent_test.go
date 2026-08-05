@@ -2,12 +2,17 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"filemanager/engine/api"
+	"filemanager/engine/internal/generation"
 	"filemanager/engine/internal/sandbox"
 )
 
@@ -178,6 +183,13 @@ func TestPersistentServiceReportsFallbackFromCorruptManifest(t *testing.T) {
 	if !status.Ready || status.Generation != 1 || len(status.Warnings) != 1 {
 		t.Fatalf("fallback status=%+v", status)
 	}
+	report, err := reopened.Reconcile(ctx, "docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Generation != 3 {
+		t.Fatalf("post-quarantine generation=%d, want authenticated high-water mark + 1", report.Generation)
+	}
 }
 
 func TestPersistentServiceStartsDegradedAndRebuildsWhenNoSegmentIsValid(t *testing.T) {
@@ -250,10 +262,163 @@ func TestPersistentServiceStartsDegradedAndRebuildsWhenNoSegmentIsValid(t *testi
 		t.Fatalf("rebuilt generation=%d, want 2", report.Generation)
 	}
 	rebuiltStatus, err := degraded.Status(ctx)
-	if err != nil || !rebuiltStatus.Ready || len(rebuiltStatus.Warnings) != 0 {
+	if err != nil || !rebuiltStatus.Ready || len(rebuiltStatus.Warnings) != 1 {
 		t.Fatalf("rebuilt status=%+v err=%v", rebuiltStatus, err)
+	}
+	if count := quarantineEvidenceCount(t, storePath); count != 2 {
+		t.Fatalf("quarantine evidence count=%d, want corrupt segment and manifest", count)
 	}
 	if err := degraded.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestPersistentServiceRejectsAuthenticatedNewerStoreFormat(t *testing.T) {
+	sandboxPath := t.TempDir()
+	source := filepath.Join(sandboxPath, "source")
+	storePath := filepath.Join(sandboxPath, "engine-store")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(storePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "record"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := sandbox.New(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := NewPersistent(guard, storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := engine.ApplyRoots(ctx, []api.RootSpec{{ID: "docs", Path: source}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.Reconcile(ctx, "docs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.Close(); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(storePath, "MANIFEST.1")
+	encoded, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary.LittleEndian.PutUint16(encoded[8:10], 2)
+	checksum := sha256.Sum256(encoded[:len(encoded)-sha256.Size])
+	copy(encoded[len(encoded)-sha256.Size:], checksum[:])
+	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if opened, err := NewPersistent(guard, storePath); err == nil {
+		opened.Close()
+		t.Fatal("newer store format was opened")
+	} else if !errors.Is(err, generation.ErrNewerFormat) {
+		t.Fatalf("open error=%v, want ErrNewerFormat", err)
+	}
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Fatalf("newer manifest was modified or quarantined: %v", err)
+	}
+}
+
+func TestPersistentServiceRebuildsAfterBothManifestsAreDamaged(t *testing.T) {
+	sandboxPath := t.TempDir()
+	source := filepath.Join(sandboxPath, "source")
+	storePath := filepath.Join(sandboxPath, "engine-store")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(storePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "one"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := sandbox.New(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := NewPersistent(guard, storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := engine.ApplyRoots(ctx, []api.RootSpec{{ID: "docs", Path: source}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.Reconcile(ctx, "docs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "two"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.Reconcile(ctx, "docs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for slot := 0; slot < 2; slot++ {
+		path := filepath.Join(storePath, fmt.Sprintf("MANIFEST.%d", slot))
+		encoded, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded[56] ^= 1
+		if err := os.WriteFile(path, encoded, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	degraded, err := NewPersistent(guard, storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := degraded.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ready || len(status.Roots) != 0 || len(status.Warnings) != 2 {
+		t.Fatalf("damaged-manifest status=%+v", status)
+	}
+	if _, err := degraded.ApplyRoots(ctx, []api.RootSpec{{ID: "docs", Path: source}}); err != nil {
+		t.Fatal(err)
+	}
+	rebuilt, err := degraded.Rebuild(ctx, "docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebuilt.Generation != 3 {
+		t.Fatalf("rebuilt generation=%d, want high-water generation 3", rebuilt.Generation)
+	}
+	status, err = degraded.Status(ctx)
+	if err != nil || !status.Ready || status.Generation != 3 || len(status.Warnings) != 1 {
+		t.Fatalf("rebuilt status=%+v err=%v", status, err)
+	}
+	if count := quarantineEvidenceCount(t, storePath); count != 4 {
+		t.Fatalf("quarantine evidence count=%d, want two manifests and two segments", count)
+	}
+	if err := degraded.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func quarantineEvidenceCount(t *testing.T, storePath string) int {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join(storePath, "quarantine"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, entry := range entries {
+		if entry.Name() != "PENDING" && entry.Name() != "HIGHWATER" && !strings.HasPrefix(entry.Name(), ".") {
+			count++
+		}
+	}
+	return count
 }

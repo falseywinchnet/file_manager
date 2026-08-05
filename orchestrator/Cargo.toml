@@ -1,0 +1,23 @@
+[package]
+name = "fileman-orchestrator"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+description = "File Manager integration-authority bootstrap kernel"
+license = "UNLICENSED"
+publish = false
+
+[[bin]]
+name = "orchestrator"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"
+pedantic = "deny"

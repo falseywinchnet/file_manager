@@ -148,10 +148,10 @@ Subsequent direction narrows that open item:
   fuzzy/structural candidate mechanism. Exact and lexical milestones may ship
   first, and conventional structures remain controls and interim fallbacks.
 - **GIVEN:** semantic search and semantic ambiguity are deferred to AI/plugin
-  interpretation backed by Oracle-managed hives. The Go engine does not own
+  interpretation backed by Orchestrator-managed hives. The Go engine does not own
   sense registries, competing interpretations, or a personal semantic graph.
 - **GIVEN:** a future semantic provider returns file objects plus evidence and
-  uncertainty through an Oracle-owned read-oriented boundary. Its reasoning
+  uncertainty through an Orchestrator-owned read-oriented boundary. Its reasoning
   never changes exact file identity or filesystem facts.
 - **GIVEN:** ConeDAG's successor work now lives in the independent
   `../../kolmogrov/` program. That program is authorized to pursue formal
@@ -173,4 +173,4 @@ Subsequent direction narrows that open item:
    arrival time.
 5. Kolmogrov transfer remains an independent research/conformance workstream
    feeding the core fuzzy channel; semantic providers and hives remain a
-   separate Oracle workstream.
+   separate Orchestrator workstream.

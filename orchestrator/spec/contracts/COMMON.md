@@ -1,10 +1,15 @@
 # ORC-COM-001: common contract vocabulary
 
-Status: **paper outline**.
+Status: **fixture-draft bootstrap subset; full shared vocabulary remains open**.
 
-This contract will define canonical identifier equality, generation and snapshot
-semantics, availability/staleness, provenance chains, typed errors, deadlines,
-cancellation, streaming sequence numbers, quotas, and partial results.
+The executable bootstrap defines terminal status, typed errors, a bounded JSONL
+request/reply shape, optional contract/version reference, deadline,
+cancellation identity, and response budget. Canonical cross-project identifiers,
+generation/snapshot semantics, provenance chains, capability contexts, stream
+sequence numbers, and partial-result detail remain negotiated work.
+
+Current source projection: `../../src/common.rs`.
+Current fixtures: `../../conformance/fixtures/bootstrap/`.
 
 Requirements:
 
@@ -18,6 +23,12 @@ Requirements:
 - all collections are bounded, paged, streamed with backpressure, or explicitly
   rejected.
 
-Open paper work: binary/text normalization, timestamp vocabulary, capability
-context encoding, field-presence rules, canonical fixture notation, and the
-complete error taxonomy.
+The bootstrap terminal vocabulary is `success`, `partial`, `invalid`, `denied`,
+`unsupported`, `unavailable`, `stale`, `version_mismatch`, `budget_exceeded`,
+`timeout`, `cancelled`, `quarantined`, and `internal_fault`. The JSONL laboratory
+caps one frame at 1 MiB. This is a fixture projection, not the production local
+daemon codec.
+
+Open work: identifier equality/lifetime, binary/text normalization, timestamp
+vocabulary, capability context encoding, field-presence rules, provenance,
+stream backpressure, and the complete cross-provider error detail taxonomy.

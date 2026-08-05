@@ -1,4 +1,4 @@
-# Architect handoff 002 — Kolmogrov core and Oracle boundary
+# Architect handoff 002 — Kolmogrov core and Orchestrator boundary
 
 Status: **DECIDED direction; implementation details remain gated**.
 
@@ -32,25 +32,26 @@ interpretation and remembered context. That semantic-memory system is not part
 of the Go catalogue engine and is not supplied by Kolmogrov hashing.
 
 Semantic facts, plugin-derived annotations, model provenance, and personal
-memory belong beyond the critical engine boundary in Oracle-managed hives. The
+memory belong beyond the critical engine boundary in Orchestrator-managed hives. The
 engine may expose exact records and query primitives and may accept explicitly
-versioned read-only candidate/evidence inputs through an Oracle-owned contract.
+versioned read-only candidate/evidence inputs through an Orchestrator-owned contract.
 It must not absorb an unbounded semantic document store or allow plugin writers
 to mutate its authoritative catalogue.
 
-## ENG-K03 — The Oracle owns the cross-project contract registry
+## ENG-K03 — Orchestrator owns the cross-project contract registry
 
 **DECIDED:** cross-project API and ABI semantics are registered under
 `../orchestrator/spec/CONTRACT_REGISTRY.md`. The engine owns its implementation
-and may keep transport-neutral local types, but any surface consumed by Oracle,
+and may keep transport-neutral local types, but any surface consumed by Orchestrator,
 the File Manager frontend, plugins, or generated bindings must map to a registry
 contract and version.
 
-Engine work that needs a new cross-project call must submit a proposal under
-`../orchestrator/proposals/`; it must not make an implementation accident into a
-program-wide ABI. Oracle contract ownership does not require hot query traffic
-to be proxied through the Oracle process. Routing and process placement remain
-explicit contract decisions.
+Engine work answers Orchestrator proposals and records counterproposals in
+`ORCHESTRATOR_INTERFACE_NEGOTIATION.md`; engine-originated additions may begin
+under `../orchestrator/proposals/`. It must not make an implementation accident
+into program-wide ABI. ADR-003 selects Orchestrator as the normal integration
+route and retains a registered direct-engine path for degraded fallback. A
+later measured routing ADR may change the hot path without changing semantics.
 
 ## Required delivery effect
 
@@ -60,5 +61,6 @@ explicit contract decisions.
    optional plugin enhancement.
 4. Keep semantic interpretation, hives, handlers, settings, and plugin lifecycle
    out of this engine.
-5. Publish conformance fixtures and versioned contracts for every exported
-   engine interaction before Oracle integration begins.
+5. Publish conformance fixtures and versioned contracts for each exported
+   engine interaction before that adapter freezes; the provider-independent
+   Orchestrator kernel does not wait for every engine edge.

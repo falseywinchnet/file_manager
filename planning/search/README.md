@@ -24,7 +24,7 @@ Read in order:
 5. `../../engine/docs/ARCHITECT_HANDOFF_001.md` — mandatory worker-local shim of
    that accepted direction.
 6. `../../engine/docs/ARCHITECT_HANDOFF_002.md` — mandatory distinction between
-   core Kolmogrov candidates and Oracle-managed semantic memory.
+   core Kolmogrov candidates and Orchestrator-managed semantic memory.
 7. `../../orchestrator/spec/CONTRACT_REGISTRY.md` — canonical cross-project
    engine, provider, hive, and interrogation contract inventory.
 8. `SEARCH_ARCHITECT_INTERVIEW.md` — numbered decisions with gains, losses,

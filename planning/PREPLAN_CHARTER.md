@@ -115,7 +115,7 @@ The project plan may be written when all are true:
 - identity, mutation, recovery, and index-consistency semantics are explicit;
 - the CLI/API grammar is sketched from real tasks;
 - plugin capabilities and denials are modeled;
-- semantic interpretation has a staged Oracle/provider path that cannot corrupt
+- semantic interpretation has a staged Orchestrator/provider path that cannot corrupt
   exact search, while Kolmogrov similarity remains a separately gated engine
   candidate channel;
 - at least one packaging path per target OS is demonstrated;
@@ -125,12 +125,17 @@ The project plan may be written when all are true:
 
 Subsequent grand-architect direction has resolved the Go engine's language,
 custom-backend mandate, reference model, and target storage spine in ADR-001,
-and the Oracle contract authority, repository topology, and delivery order in
-ADR-002. The historical candidate list below remains accurate only for choices
-not superseded by an accepted decision record.
+and the historical contract-authority topology in ADR-002. ADR-003 supersedes
+that component name and global gate with Orchestrator integration authority,
+project-local interface negotiation, and an active provider-independent kernel.
+ADR-004 relocates application work to `frontend/`, selects Design DNA 006 for
+Frontend 001, and replaces the old frontend-wide dependency gate with a
+GUI.Forms go-ahead plus explicit architect start direction.
+The historical candidate list below remains accurate only for choices not
+superseded by an accepted decision record.
 
 - private implementation details and exact process routing inside the accepted
-  C++ GUI/frontend, Go engine, and Rust Oracle boundaries;
+  C++ GUI/frontend, Go engine, and Rust Orchestrator boundaries;
 - the implementation of the native retained renderer and whether Modern.Forms
   becomes a compatibility/API frontend over it;
 - SQLite/FTS, a purpose-built store, or a hybrid;

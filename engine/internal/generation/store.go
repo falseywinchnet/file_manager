@@ -17,13 +17,20 @@ import (
 )
 
 const (
-	manifestPrefixSize = 160
-	manifestMaximum    = 64 << 10
+	manifestPrefixSize             = 160
+	manifestMaximum                = 64 << 10
+	pendingEvidence                = "PENDING"
+	pendingEvidenceV1              = "fileman-quarantine-pending-v1\n"
+	quarantineHighWater            = "HIGHWATER"
+	quarantineHighWaterSize        = 64
+	quarantineMetadataV1    uint16 = 1
 )
 
 var (
-	manifestMagic   = [8]byte{'F', 'M', 'M', 'A', 'N', '0', '0', '1'}
-	ErrNoGeneration = errors.New("no committed generation")
+	manifestMagic            = [8]byte{'F', 'M', 'M', 'A', 'N', '0', '0', '1'}
+	quarantineHighWaterMagic = [8]byte{'F', 'M', 'Q', 'H', 'W', '0', '0', '1'}
+	ErrNoGeneration          = errors.New("no committed generation")
+	errInjectedWriteLimit    = errors.New("injected write limit reached")
 )
 
 type Boundary string
@@ -35,11 +42,13 @@ const (
 	AfterManifestSync          Boundary = "after_manifest_sync"
 	AfterManifestRename        Boundary = "after_manifest_rename"
 	AfterManifestDirectorySync Boundary = "after_manifest_directory_sync"
+	AfterQuarantineMove        Boundary = "after_quarantine_move"
 )
 
 type FaultHook func(Boundary) error
 
 type manifest struct {
+	slot     int
 	sequence uint64
 	root     api.RootSpec
 	segment  string
@@ -90,14 +99,20 @@ func decodeManifest(encoded []byte) (manifest, error) {
 	if string(encoded[:8]) != string(manifestMagic[:]) {
 		return manifest{}, errors.New("unknown manifest magic")
 	}
-	major := binary.LittleEndian.Uint16(encoded[8:10])
-	minor := binary.LittleEndian.Uint16(encoded[10:12])
-	if major != formatMajor || minor > formatMinor || binary.LittleEndian.Uint32(encoded[12:16]) != uint32(len(encoded)) {
-		return manifest{}, errors.New("unsupported or inconsistent manifest version")
-	}
 	want := sha256.Sum256(encoded[:len(encoded)-sha256.Size])
 	if !equalDigest(want, encoded[len(encoded)-sha256.Size:]) {
 		return manifest{}, errors.New("manifest checksum mismatch")
+	}
+	major := binary.LittleEndian.Uint16(encoded[8:10])
+	minor := binary.LittleEndian.Uint16(encoded[10:12])
+	if major > formatMajor || (major == formatMajor && minor > formatMinor) {
+		return manifest{}, fmt.Errorf("%w: manifest version %d.%d exceeds %d.%d", ErrNewerFormat, major, minor, formatMajor, formatMinor)
+	}
+	if major < formatMajor {
+		return manifest{}, fmt.Errorf("%w: manifest major %d precedes %d", ErrMigrationRequired, major, formatMajor)
+	}
+	if binary.LittleEndian.Uint32(encoded[12:16]) != uint32(len(encoded)) {
+		return manifest{}, errors.New("inconsistent manifest dimensions")
 	}
 	rootIDLength := uint64(binary.LittleEndian.Uint32(encoded[120:124]))
 	rootPathLength := uint64(binary.LittleEndian.Uint32(encoded[124:128]))
@@ -138,10 +153,15 @@ func safeSegmentName(name string) bool {
 }
 
 type Store struct {
-	directory string
-	hook      FaultHook
-	mu        sync.Mutex
-	pins      map[string]uint64
+	directory          string
+	hook               FaultHook
+	mu                 sync.Mutex
+	pins               map[string]uint64
+	segmentWriteLimit  int64
+	manifestWriteLimit int64
+	preserveEvidence   bool
+	preservedCopies    []Quarantined
+	quarantineFloor    api.Generation
 }
 
 type Head struct {
@@ -157,11 +177,20 @@ type RecoveryProblem struct {
 	Generation api.Generation
 	Stage      string
 	Err        error
+	segment    string
 }
 
 type RecoveryReport struct {
 	SelectedGeneration api.Generation
 	Problems           []RecoveryProblem
+}
+
+type Quarantined struct {
+	Kind       string
+	Slot       int
+	Sequence   uint64
+	Generation api.Generation
+	Name       string
 }
 
 func OpenStore(directory string, hook FaultHook) (*Store, error) {
@@ -183,10 +212,30 @@ func OpenStore(directory string, hook FaultHook) (*Store, error) {
 	if !stat.IsDir() {
 		return nil, errors.New("store path is not a directory")
 	}
-	return &Store{directory: absolute, hook: hook, pins: make(map[string]uint64)}, nil
+	pending, err := hasPendingEvidence(absolute)
+	if err != nil {
+		return nil, err
+	}
+	quarantineFloor, err := readQuarantineHighWater(absolute)
+	if err != nil {
+		return nil, err
+	}
+	return &Store{
+		directory: absolute, hook: hook, pins: make(map[string]uint64), preserveEvidence: pending,
+		quarantineFloor: quarantineFloor,
+	}, nil
 }
 
 func (s *Store) Directory() string { return s.directory }
+
+// GenerationFloor returns the highest generation authenticated by either a
+// checksummed manifest or a checksummed segment header. Directory iteration is
+// batched so crash debris cannot force a directory-sized allocation here.
+func (s *Store) GenerationFloor() (api.Generation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.generationFloorLocked()
+}
 
 func (s *Store) Publish(generation api.Generation, shard *catalog.Shard) (*Reader, error) {
 	if shard == nil || generation == 0 {
@@ -205,13 +254,24 @@ func (s *Store) Publish(generation api.Generation, shard *catalog.Shard) (*Reade
 	if err == nil && generation <= current.metadata.Generation {
 		return nil, fmt.Errorf("generation %d does not advance committed generation %d", generation, current.metadata.Generation)
 	}
+	floor, err := s.generationFloorLocked()
+	if err != nil {
+		return nil, err
+	}
+	if generation <= floor {
+		return nil, fmt.Errorf("generation %d does not advance authenticated store high-water mark %d", generation, floor)
+	}
 
 	temporary, err := os.CreateTemp(s.directory, ".segment-")
 	if err != nil {
 		return nil, fmt.Errorf("create temporary segment: %w", err)
 	}
 	temporaryName := temporary.Name()
-	metadata, writeErr := writeSegment(temporary, generation, shard)
+	var segmentOutput segmentFile = temporary
+	if s.segmentWriteLimit > 0 {
+		segmentOutput = &writeLimitedFile{File: temporary, remaining: s.segmentWriteLimit}
+	}
+	metadata, writeErr := writeSegment(segmentOutput, generation, shard)
 	closeErr := temporary.Close()
 	if writeErr != nil {
 		return nil, writeErr
@@ -257,7 +317,11 @@ func (s *Store) Publish(generation api.Generation, shard *catalog.Shard) (*Reade
 	if err != nil {
 		return nil, fmt.Errorf("create temporary manifest: %w", err)
 	}
-	if _, err := manifestTemporary.Write(encoded); err != nil {
+	var manifestOutput io.Writer = manifestTemporary
+	if s.manifestWriteLimit > 0 {
+		manifestOutput = &writeLimitedFile{File: manifestTemporary, remaining: s.manifestWriteLimit}
+	}
+	if err := writeFull(manifestOutput, encoded); err != nil {
 		_ = manifestTemporary.Close()
 		return nil, fmt.Errorf("write temporary manifest: %w", err)
 	}
@@ -273,6 +337,28 @@ func (s *Store) Publish(generation api.Generation, shard *catalog.Shard) (*Reade
 		return nil, err
 	}
 	slotPath := filepath.Join(s.directory, fmt.Sprintf("MANIFEST.%d", sequence%2))
+	if s.preserveEvidence {
+		if previous, readErr := readAllBounded(slotPath); readErr == nil {
+			if _, decodeErr := decodeManifest(previous); decodeErr != nil {
+				if errors.Is(decodeErr, ErrNewerFormat) || errors.Is(decodeErr, ErrMigrationRequired) {
+					return nil, decodeErr
+				}
+				copyItem, copyErr := s.quarantineCopyLocked(
+					slotPath, fmt.Sprintf("manifest-slot%d-prepublication-invalid.bin", sequence%2),
+					Quarantined{Kind: "manifest-copy", Slot: int(sequence % 2)},
+				)
+				if copyErr != nil {
+					return nil, copyErr
+				}
+				if err := s.markEvidencePendingLocked(); err != nil {
+					return nil, err
+				}
+				s.preservedCopies = append(s.preservedCopies, copyItem)
+			}
+		} else if !errors.Is(readErr, os.ErrNotExist) {
+			return nil, fmt.Errorf("inspect replaced manifest for evidence preservation: %w", readErr)
+		}
+	}
 	if err := publishRename(manifestTemporaryName, slotPath); err != nil {
 		return nil, fmt.Errorf("publish manifest slot: %w", err)
 	}
@@ -291,7 +377,9 @@ func (s *Store) Publish(generation api.Generation, shard *catalog.Shard) (*Reade
 		return nil, fmt.Errorf("reopen published generation: %w", err)
 	}
 	s.pinLocked(segmentName, reader)
-	_ = s.reclaimLocked()
+	if !s.preserveEvidence {
+		_ = s.reclaimLocked()
+	}
 	return reader, nil
 }
 
@@ -321,35 +409,59 @@ func (s *Store) RecoverDetailed() (*Reader, RecoveryReport, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	value, reader, problems, err := s.recoverCandidateLocked()
+	if s.preserveEvidence {
+		problems = append(problems, RecoveryProblem{
+			Slot: -1, Stage: "orphan-evidence", Err: errors.New("prepublication recovery evidence remains pending"),
+		})
+	}
+	if len(problems) != 0 {
+		s.preserveEvidence = true
+	}
 	if err != nil {
 		return nil, RecoveryReport{Problems: problems}, err
 	}
 	s.pinLocked(value.segment, reader)
-	_ = s.reclaimLocked()
+	// A failed candidate is evidence. Leave unreferenced generation artifacts
+	// untouched until Quarantine has moved them out of the live namespace.
+	if len(problems) == 0 {
+		_ = s.reclaimLocked()
+	}
 	return reader, RecoveryReport{SelectedGeneration: value.metadata.Generation, Problems: problems}, nil
 }
 
 func (s *Store) recoverCandidateLocked() (manifest, *Reader, []RecoveryProblem, error) {
 	candidates, problems := s.manifestCandidatesLocked()
+	if err := incompatibleProblem(problems); err != nil {
+		return manifest{}, nil, problems, err
+	}
 	for _, candidate := range candidates {
 		reader, err := s.openManifest(candidate)
 		if err == nil {
 			return candidate, reader, problems, nil
 		}
 		problems = append(problems, RecoveryProblem{
-			Sequence: candidate.sequence, Generation: candidate.metadata.Generation,
-			Stage: "segment", Err: err,
+			Slot: candidate.slot, Sequence: candidate.sequence, Generation: candidate.metadata.Generation,
+			Stage: "segment", Err: err, segment: candidate.segment,
 		})
+		if errors.Is(err, ErrNewerFormat) || errors.Is(err, ErrMigrationRequired) {
+			return manifest{}, nil, problems, err
+		}
 	}
 	return manifest{}, nil, problems, ErrNoGeneration
 }
 
 func (s *Store) probeCandidateLocked() (manifest, *Reader, error) {
-	candidates, _ := s.manifestCandidatesLocked()
+	candidates, problems := s.manifestCandidatesLocked()
+	if err := incompatibleProblem(problems); err != nil {
+		return manifest{}, nil, err
+	}
 	for _, candidate := range candidates {
 		reader, err := s.openManifestHeader(candidate)
 		if err == nil {
 			return candidate, reader, nil
+		}
+		if errors.Is(err, ErrNewerFormat) || errors.Is(err, ErrMigrationRequired) {
+			return manifest{}, nil, err
 		}
 	}
 	return manifest{}, nil, ErrNoGeneration
@@ -372,10 +484,89 @@ func (s *Store) manifestCandidatesLocked() ([]manifest, []RecoveryProblem) {
 			problems = append(problems, RecoveryProblem{Slot: slot, Stage: "manifest-decode", Err: decodeErr})
 			continue
 		}
+		value.slot = slot
 		candidates = append(candidates, value)
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].sequence > candidates[j].sequence })
 	return candidates, problems
+}
+
+func incompatibleProblem(problems []RecoveryProblem) error {
+	for _, problem := range problems {
+		if errors.Is(problem.Err, ErrNewerFormat) || errors.Is(problem.Err, ErrMigrationRequired) {
+			return problem.Err
+		}
+	}
+	return nil
+}
+
+func (s *Store) generationFloorLocked() (api.Generation, error) {
+	candidates, problems := s.manifestCandidatesLocked()
+	if err := incompatibleProblem(problems); err != nil {
+		return 0, err
+	}
+	floor := s.quarantineFloor
+	for _, candidate := range candidates {
+		if candidate.metadata.Generation > floor {
+			floor = candidate.metadata.Generation
+		}
+	}
+	return scanSegmentGenerationFloor(s.directory, floor)
+}
+
+func scanSegmentGenerationFloor(directoryPath string, floor api.Generation) (api.Generation, error) {
+	directory, err := os.Open(directoryPath)
+	if err != nil {
+		return 0, fmt.Errorf("open generation high-water directory: %w", err)
+	}
+	defer directory.Close()
+	for {
+		entries, readErr := directory.ReadDir(128)
+		for _, entry := range entries {
+			if entry.IsDir() || !safeSegmentName(entry.Name()) {
+				continue
+			}
+			info, infoErr := entry.Info()
+			if infoErr != nil || !info.Mode().IsRegular() {
+				continue
+			}
+			generation, headerErr := readSegmentGeneration(filepath.Join(directoryPath, entry.Name()))
+			if errors.Is(headerErr, ErrNewerFormat) || errors.Is(headerErr, ErrMigrationRequired) {
+				return 0, headerErr
+			}
+			if headerErr == nil && generation > floor {
+				floor = generation
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return 0, fmt.Errorf("scan generation high-water directory: %w", readErr)
+		}
+	}
+	return floor, nil
+}
+
+func readSegmentGeneration(path string) (api.Generation, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		return 0, err
+	}
+	var encoded [segmentHeaderSize]byte
+	if _, err := io.ReadFull(io.NewSectionReader(file, 0, segmentHeaderSize), encoded[:]); err != nil {
+		return 0, err
+	}
+	header, err := decodeSegmentHeader(encoded[:], stat.Size())
+	if err != nil {
+		return 0, err
+	}
+	return header.generation, nil
 }
 
 func (s *Store) openManifest(value manifest) (*Reader, error) {
@@ -413,7 +604,7 @@ func (s *Store) at(boundary Boundary) error {
 		return nil
 	}
 	if err := s.hook(boundary); err != nil {
-		return fmt.Errorf("publication interrupted %s: %w", boundary, err)
+		return fmt.Errorf("engine operation interrupted %s: %w", boundary, err)
 	}
 	return nil
 }
@@ -431,7 +622,440 @@ func (s *Store) release(segment string) {
 	} else {
 		s.pins[segment]--
 	}
-	_ = s.reclaimLocked()
+	if !s.preserveEvidence {
+		_ = s.reclaimLocked()
+	}
+}
+
+// Quarantine moves rejected, engine-owned artifacts into a durable evidence
+// directory. It refuses to act unless a fully checked generation is currently
+// recoverable, so it cannot remove the only manifest that still carries the
+// approved root needed for a rebuild.
+func (s *Store) Quarantine(problems []RecoveryProblem) ([]Quarantined, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(problems) == 0 {
+		return nil, nil
+	}
+	_, valid, _, err := s.recoverCandidateLocked()
+	if err != nil {
+		return nil, fmt.Errorf("quarantine requires a checked replacement generation: %w", err)
+	}
+	if err := valid.Close(); err != nil {
+		return nil, fmt.Errorf("close quarantine safety reader: %w", err)
+	}
+	for _, problem := range problems {
+		if errors.Is(problem.Err, ErrNewerFormat) || errors.Is(problem.Err, ErrMigrationRequired) {
+			return nil, fmt.Errorf("refuse to quarantine an incompatible store format: %w", problem.Err)
+		}
+	}
+
+	moved := append([]Quarantined(nil), s.preservedCopies...)
+	s.preservedCopies = nil
+	handledSlots := make(map[int]struct{}, 2)
+	for _, problem := range problems {
+		if problem.Slot < 0 || problem.Slot > 1 {
+			continue
+		}
+		if _, exists := handledSlots[problem.Slot]; exists {
+			continue
+		}
+		slotPath := filepath.Join(s.directory, fmt.Sprintf("MANIFEST.%d", problem.Slot))
+		encoded, readErr := readAllBounded(slotPath)
+		if readErr != nil {
+			continue
+		}
+		switch problem.Stage {
+		case "segment":
+			current, decodeErr := decodeManifest(encoded)
+			if decodeErr != nil || current.sequence != problem.Sequence ||
+				current.metadata.Generation != problem.Generation || current.segment != problem.segment {
+				continue
+			}
+			if safeSegmentName(problem.segment) {
+				item, moveErr := s.quarantineMoveLocked(
+					filepath.Join(s.directory, problem.segment),
+					fmt.Sprintf("segment-s%020d-g%020d-%s", problem.Sequence, problem.Generation, problem.segment),
+					Quarantined{Kind: "segment", Slot: problem.Slot, Sequence: problem.Sequence, Generation: problem.Generation},
+				)
+				if item.Name != "" {
+					moved = append(moved, item)
+				}
+				if moveErr != nil {
+					return moved, moveErr
+				}
+			}
+			item, moveErr := s.quarantineMoveLocked(
+				slotPath,
+				fmt.Sprintf("manifest-slot%d-s%020d-g%020d.bin", problem.Slot, problem.Sequence, problem.Generation),
+				Quarantined{Kind: "manifest", Slot: problem.Slot, Sequence: problem.Sequence, Generation: problem.Generation},
+			)
+			if item.Name != "" {
+				moved = append(moved, item)
+			}
+			if moveErr != nil {
+				return moved, moveErr
+			}
+			handledSlots[problem.Slot] = struct{}{}
+		case "manifest-decode":
+			if _, decodeErr := decodeManifest(encoded); decodeErr == nil {
+				continue
+			}
+			// Preserve unreferenced runs before removing the corrupt manifest.
+			// If the process stops between these moves, the next recovery still
+			// sees the manifest problem and cannot reclaim its evidence first.
+			orphans, sweepErr := s.quarantineUnreferencedLocked()
+			moved = append(moved, orphans...)
+			if sweepErr != nil {
+				return moved, sweepErr
+			}
+			item, moveErr := s.quarantineMoveLocked(
+				slotPath,
+				fmt.Sprintf("manifest-slot%d-invalid.bin", problem.Slot),
+				Quarantined{Kind: "manifest", Slot: problem.Slot},
+			)
+			if item.Name != "" {
+				moved = append(moved, item)
+			}
+			if moveErr != nil {
+				return moved, moveErr
+			}
+			handledSlots[problem.Slot] = struct{}{}
+		}
+	}
+	orphans, err := s.quarantineUnreferencedLocked()
+	moved = append(moved, orphans...)
+	if err != nil {
+		return moved, err
+	}
+	if err := s.clearEvidencePendingLocked(); err != nil {
+		return moved, err
+	}
+	s.preserveEvidence = false
+	return moved, nil
+}
+
+func (s *Store) quarantineUnreferencedLocked() ([]Quarantined, error) {
+	protected := make(map[string]struct{}, len(s.pins)+2)
+	for name := range s.pins {
+		protected[name] = struct{}{}
+	}
+	for slot := 0; slot < 2; slot++ {
+		encoded, err := readAllBounded(filepath.Join(s.directory, fmt.Sprintf("MANIFEST.%d", slot)))
+		if err != nil {
+			continue
+		}
+		if current, err := decodeManifest(encoded); err == nil {
+			protected[current.segment] = struct{}{}
+		}
+	}
+	entries, err := os.ReadDir(s.directory)
+	if err != nil {
+		return nil, fmt.Errorf("list store for quarantine: %w", err)
+	}
+	var moved []Quarantined
+	for _, entry := range entries {
+		name := entry.Name()
+		_, keep := protected[name]
+		ownedTemporary := strings.HasPrefix(name, ".segment-") || strings.HasPrefix(name, ".manifest-")
+		if entry.IsDir() || keep || (!safeSegmentName(name) && !ownedTemporary) {
+			continue
+		}
+		item, moveErr := s.quarantineMoveLocked(
+			filepath.Join(s.directory, name), "orphan-"+name, Quarantined{Kind: "orphan"},
+		)
+		if item.Name != "" {
+			moved = append(moved, item)
+		}
+		if moveErr != nil {
+			return moved, moveErr
+		}
+	}
+	return moved, nil
+}
+
+func (s *Store) quarantineMoveLocked(source, targetName string, item Quarantined) (Quarantined, error) {
+	if _, err := os.Lstat(source); errors.Is(err, os.ErrNotExist) {
+		return Quarantined{}, nil
+	} else if err != nil {
+		return Quarantined{}, fmt.Errorf("inspect quarantine source: %w", err)
+	}
+	generation := item.Generation
+	if observed, err := readSegmentGeneration(source); err == nil {
+		if observed > generation {
+			generation = observed
+		}
+		item.Generation = observed
+	} else if errors.Is(err, ErrNewerFormat) || errors.Is(err, ErrMigrationRequired) {
+		return Quarantined{}, err
+	}
+	if generation != 0 {
+		if err := s.markQuarantineHighWaterLocked(generation); err != nil {
+			return Quarantined{}, err
+		}
+	}
+	quarantineDirectory := filepath.Join(s.directory, "quarantine")
+	if err := ensureQuarantineDirectory(quarantineDirectory); err != nil {
+		return Quarantined{}, err
+	}
+	target, err := unusedQuarantinePath(quarantineDirectory, targetName)
+	if err != nil {
+		return Quarantined{}, err
+	}
+	if err := publishRename(source, target); err != nil {
+		return Quarantined{}, fmt.Errorf("move %q to quarantine: %w", filepath.Base(source), err)
+	}
+	item.Name = filepath.Base(target)
+	if err := syncDirectory(quarantineDirectory); err != nil {
+		return item, fmt.Errorf("sync quarantine evidence: %w", err)
+	}
+	if err := syncDirectory(s.directory); err != nil {
+		return item, fmt.Errorf("sync live store after quarantine: %w", err)
+	}
+	if err := s.at(AfterQuarantineMove); err != nil {
+		return item, err
+	}
+	return item, nil
+}
+
+func (s *Store) quarantineCopyLocked(source, targetName string, item Quarantined) (Quarantined, error) {
+	evidence, err := readAllBounded(source)
+	if err != nil {
+		return Quarantined{}, fmt.Errorf("read quarantine evidence copy: %w", err)
+	}
+	quarantineDirectory := filepath.Join(s.directory, "quarantine")
+	if err := ensureQuarantineDirectory(quarantineDirectory); err != nil {
+		return Quarantined{}, err
+	}
+	target, err := unusedQuarantinePath(quarantineDirectory, targetName)
+	if err != nil {
+		return Quarantined{}, err
+	}
+	temporary, err := os.CreateTemp(quarantineDirectory, ".evidence-")
+	if err != nil {
+		return Quarantined{}, fmt.Errorf("create quarantine evidence copy: %w", err)
+	}
+	temporaryName := temporary.Name()
+	writeErr := writeFull(temporary, evidence)
+	if writeErr == nil {
+		writeErr = temporary.Sync()
+	}
+	closeErr := temporary.Close()
+	if writeErr != nil {
+		_ = os.Remove(temporaryName)
+		return Quarantined{}, fmt.Errorf("write quarantine evidence copy: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(temporaryName)
+		return Quarantined{}, fmt.Errorf("close quarantine evidence copy: %w", closeErr)
+	}
+	if err := publishRename(temporaryName, target); err != nil {
+		_ = os.Remove(temporaryName)
+		return Quarantined{}, fmt.Errorf("publish quarantine evidence copy: %w", err)
+	}
+	if err := syncDirectory(quarantineDirectory); err != nil {
+		return Quarantined{}, fmt.Errorf("sync quarantine evidence copy: %w", err)
+	}
+	item.Name = filepath.Base(target)
+	return item, nil
+}
+
+func ensureQuarantineDirectory(path string) error {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.Mkdir(path, 0o700); err != nil {
+			return fmt.Errorf("create quarantine directory: %w", err)
+		}
+		return syncDirectory(filepath.Dir(path))
+	}
+	if err != nil {
+		return fmt.Errorf("inspect quarantine directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("quarantine path is not an engine-owned directory")
+	}
+	return nil
+}
+
+func hasPendingEvidence(directory string) (bool, error) {
+	quarantineDirectory := filepath.Join(directory, "quarantine")
+	info, err := os.Lstat(quarantineDirectory)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect quarantine directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return false, errors.New("quarantine path is not an engine-owned directory")
+	}
+	encoded, err := readFileAtMost(filepath.Join(quarantineDirectory, pendingEvidence), int64(len(pendingEvidenceV1)))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read pending quarantine marker: %w", err)
+	}
+	if string(encoded) != pendingEvidenceV1 {
+		return false, errors.New("pending quarantine marker has an unsupported format")
+	}
+	return true, nil
+}
+
+func readQuarantineHighWater(directory string) (api.Generation, error) {
+	path := filepath.Join(directory, "quarantine", quarantineHighWater)
+	encoded, err := readFileAtMost(path, quarantineHighWaterSize)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read quarantine high-water mark: %w", err)
+	}
+	if len(encoded) != quarantineHighWaterSize {
+		return 0, errors.New("quarantine high-water mark has an invalid length")
+	}
+	want := sha256.Sum256(encoded[:32])
+	if !equalDigest(want, encoded[32:]) {
+		return 0, errors.New("quarantine high-water checksum mismatch")
+	}
+	if string(encoded[:8]) != string(quarantineHighWaterMagic[:]) {
+		return 0, errors.New("unknown quarantine high-water magic")
+	}
+	version := binary.LittleEndian.Uint16(encoded[8:10])
+	if version > quarantineMetadataV1 {
+		return 0, fmt.Errorf("%w: quarantine metadata version %d exceeds %d", ErrNewerFormat, version, quarantineMetadataV1)
+	}
+	if version < quarantineMetadataV1 {
+		return 0, fmt.Errorf("%w: quarantine metadata version %d precedes %d", ErrMigrationRequired, version, quarantineMetadataV1)
+	}
+	if hasNonzero(encoded[10:16]) || hasNonzero(encoded[24:32]) {
+		return 0, errors.New("quarantine high-water reserved bytes are nonzero")
+	}
+	generation := api.Generation(binary.LittleEndian.Uint64(encoded[16:24]))
+	if generation == 0 {
+		return 0, errors.New("quarantine high-water generation is zero")
+	}
+	return generation, nil
+}
+
+func (s *Store) markQuarantineHighWaterLocked(generation api.Generation) error {
+	if generation <= s.quarantineFloor {
+		return nil
+	}
+	quarantineDirectory := filepath.Join(s.directory, "quarantine")
+	if err := ensureQuarantineDirectory(quarantineDirectory); err != nil {
+		return err
+	}
+	encoded := make([]byte, quarantineHighWaterSize)
+	copy(encoded[:8], quarantineHighWaterMagic[:])
+	binary.LittleEndian.PutUint16(encoded[8:10], quarantineMetadataV1)
+	binary.LittleEndian.PutUint64(encoded[16:24], uint64(generation))
+	checksum := sha256.Sum256(encoded[:32])
+	copy(encoded[32:], checksum[:])
+	temporary, err := os.CreateTemp(quarantineDirectory, ".highwater-")
+	if err != nil {
+		return fmt.Errorf("create temporary quarantine high-water mark: %w", err)
+	}
+	temporaryName := temporary.Name()
+	writeErr := writeFull(temporary, encoded)
+	if writeErr == nil {
+		writeErr = temporary.Sync()
+	}
+	closeErr := temporary.Close()
+	if writeErr != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("write quarantine high-water mark: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("close quarantine high-water mark: %w", closeErr)
+	}
+	path := filepath.Join(quarantineDirectory, quarantineHighWater)
+	if err := publishRename(temporaryName, path); err != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("publish quarantine high-water mark: %w", err)
+	}
+	if err := syncDirectory(quarantineDirectory); err != nil {
+		return fmt.Errorf("sync quarantine high-water mark: %w", err)
+	}
+	s.quarantineFloor = generation
+	return nil
+}
+
+func (s *Store) markEvidencePendingLocked() error {
+	quarantineDirectory := filepath.Join(s.directory, "quarantine")
+	if err := ensureQuarantineDirectory(quarantineDirectory); err != nil {
+		return err
+	}
+	path := filepath.Join(quarantineDirectory, pendingEvidence)
+	if _, err := os.Lstat(path); err == nil {
+		pending, checkErr := hasPendingEvidence(s.directory)
+		if checkErr != nil {
+			return checkErr
+		}
+		if pending {
+			return nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect pending quarantine marker: %w", err)
+	}
+	file, err := os.CreateTemp(quarantineDirectory, ".pending-")
+	if err != nil {
+		return fmt.Errorf("create temporary quarantine marker: %w", err)
+	}
+	temporaryName := file.Name()
+	writeErr := writeFull(file, []byte(pendingEvidenceV1))
+	if writeErr == nil {
+		writeErr = file.Sync()
+	}
+	closeErr := file.Close()
+	if writeErr != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("write pending quarantine marker: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("close pending quarantine marker: %w", closeErr)
+	}
+	if err := publishRename(temporaryName, path); err != nil {
+		_ = os.Remove(temporaryName)
+		return fmt.Errorf("publish pending quarantine marker: %w", err)
+	}
+	if err := syncDirectory(quarantineDirectory); err != nil {
+		return fmt.Errorf("sync pending quarantine marker: %w", err)
+	}
+	s.preserveEvidence = true
+	return nil
+}
+
+func (s *Store) clearEvidencePendingLocked() error {
+	quarantineDirectory := filepath.Join(s.directory, "quarantine")
+	path := filepath.Join(quarantineDirectory, pendingEvidence)
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove pending quarantine marker: %w", err)
+	}
+	if _, err := os.Stat(quarantineDirectory); err == nil {
+		if err := syncDirectory(quarantineDirectory); err != nil {
+			return fmt.Errorf("sync cleared quarantine marker: %w", err)
+		}
+	}
+	return nil
+}
+
+func unusedQuarantinePath(directory, name string) (string, error) {
+	for suffix := 0; suffix < 10_000; suffix++ {
+		candidateName := name
+		if suffix != 0 {
+			candidateName = fmt.Sprintf("%s-%d", name, suffix)
+		}
+		candidate := filepath.Join(directory, candidateName)
+		if _, err := os.Lstat(candidate); errors.Is(err, os.ErrNotExist) {
+			return candidate, nil
+		} else if err != nil {
+			return "", fmt.Errorf("inspect quarantine destination: %w", err)
+		}
+	}
+	return "", errors.New("quarantine destination namespace exhausted")
 }
 
 // Reclaim removes only engine-owned temporary and segment files that are not
@@ -439,6 +1063,9 @@ func (s *Store) release(segment string) {
 func (s *Store) Reclaim() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.preserveEvidence {
+		return errors.New("reclamation is disabled while recovery evidence is pending")
+	}
 	return s.reclaimLocked()
 }
 
@@ -480,10 +1107,69 @@ func (s *Store) reclaimLocked() error {
 }
 
 func readAllBounded(path string) ([]byte, error) {
+	return readFileAtMost(path, manifestMaximum)
+}
+
+func readFileAtMost(path string, maximum int64) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
-	return io.ReadAll(io.LimitReader(file, manifestMaximum+1))
+	return io.ReadAll(io.LimitReader(file, maximum+1))
+}
+
+type writeLimitedFile struct {
+	*os.File
+	remaining int64
+}
+
+func (f *writeLimitedFile) Write(buffer []byte) (int, error) {
+	allowed := f.allowed(len(buffer))
+	if allowed == 0 {
+		return 0, errInjectedWriteLimit
+	}
+	written, err := f.File.Write(buffer[:allowed])
+	f.remaining -= int64(written)
+	if err == nil && written < len(buffer) {
+		err = errInjectedWriteLimit
+	}
+	return written, err
+}
+
+func (f *writeLimitedFile) WriteAt(buffer []byte, offset int64) (int, error) {
+	allowed := f.allowed(len(buffer))
+	if allowed == 0 {
+		return 0, errInjectedWriteLimit
+	}
+	written, err := f.File.WriteAt(buffer[:allowed], offset)
+	f.remaining -= int64(written)
+	if err == nil && written < len(buffer) {
+		err = errInjectedWriteLimit
+	}
+	return written, err
+}
+
+func (f *writeLimitedFile) allowed(length int) int {
+	if f.remaining <= 0 {
+		return 0
+	}
+	if int64(length) > f.remaining {
+		return int(f.remaining)
+	}
+	return length
+}
+
+func writeFull(output io.Writer, buffer []byte) error {
+	for len(buffer) != 0 {
+		written, err := output.Write(buffer)
+		buffer = buffer[written:]
+		if err != nil {
+			return err
+		}
+		if written == 0 {
+			return io.ErrShortWrite
+		}
+	}
+	return nil
 }

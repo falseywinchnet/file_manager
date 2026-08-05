@@ -1,40 +1,65 @@
-# The Oracle
+# Orchestrator
 
-Status: **paper specification; implementation deliberately gated**.
+Status: **bootstrap kernel opened; provider contracts negotiated incrementally**.
 
-The Oracle is File Manager's Rust control plane and master interoperability
-authority. It specifies and will eventually coordinate the APIs and ABIs among:
+Orchestrator is File Manager's user-scoped Rust integration authority. It owns
+the required/available capability map and the canonical interoperability
+contracts among:
 
-- the C++ File Manager frontend;
-- GUI.Forms;
-- the standalone Go file/search engine;
-- the Kolmogrov core fuzzy-candidate implementation;
-- plugin supervisors and sandboxed workers;
-- semantic-memory and provider hives;
-- settings, handler, command, CLI, AI, and platform-integration clients.
+- the C++ File Manager frontend and GUI.Forms;
+- the systemwide Go file/search engine;
+- the Kolmogrov core candidate channel;
+- future plugin supervisors and sandboxed workers;
+- future semantic/provider hives;
+- settings, handlers, commands, CLI, audit, and platform integrations.
 
-The File Manager application is a program built on GUI.Forms, the Go engine, and
-The Oracle. The Oracle does not absorb those projects. It owns the clean contract
-map that allows them to interoperate without private-layout coupling.
+File Manager normally consumes Orchestrator for integration and policy.
+GUI.Forms remains its direct in-process UI dependency, and a registered direct
+engine path remains available for degraded fallback. Orchestrator has no GUI;
+File Manager renders its settings and service controls.
 
-## Paper-phase output
+## Current executable slice
 
-- [`spec/CONTRACT_REGISTRY.md`](spec/CONTRACT_REGISTRY.md) — master inventory of
-  every cross-boundary contract and call direction.
-- [`planning/MASTER_SPECIFICATION.md`](planning/MASTER_SPECIFICATION.md) — how
-  semantic contracts, ABI projections, generated bindings, and project proposals
-  relate.
+The Rust bootstrap contains only provider-independent competence:
+
+- common status/error and request/reply vocabulary;
+- deterministic lifecycle;
+- contract and availability catalogues;
+- human and JSON CLI output;
+- JSONL-over-stdio conformance service;
+- explicit plugin and semantic-fact stubs.
+
+It does not yet contain a real engine client, database, plugin worker, semantic
+fact API, platform adapter, GUI, or durable user settings.
+
+## Negotiated integration
+
+[`negotiations/README.md`](negotiations/README.md) defines the ping-pong process.
+Orchestrator places an interface note inside every affected project, the project
+records its reply there, and Orchestrator reconciles accepted semantics into
+[`spec/`](spec/). This resolves circular dependencies without turning unfinished
+producer code into ABI.
+
+## Governing material
+
+- [`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md)
+  records the current authority and sequencing decision.
+- [`spec/CONTRACT_REGISTRY.md`](spec/CONTRACT_REGISTRY.md) is the master
+  inventory.
+- [`planning/MASTER_SPECIFICATION.md`](planning/MASTER_SPECIFICATION.md) defines
+  semantic contract and projection doctrine.
 - [`planning/AUTHORITY_AND_PROCESS_MODEL.md`](planning/AUTHORITY_AND_PROCESS_MODEL.md)
-  — trusted processes, failure containment, authority, and restart behavior.
-- [`planning/HIVE_AND_SETTINGS_MODEL.md`](planning/HIVE_AND_SETTINGS_MODEL.md) —
-  durable memory, disposable provider data, registries, quotas, and erasure.
+  defines runtime boundaries.
 - [`planning/CONFORMANCE_AND_VERSIONING.md`](planning/CONFORMANCE_AND_VERSIONING.md)
-  — version namespaces, fixtures, compatibility, and differential testing.
-- [`planning/DELIVERY_SEQUENCE.md`](planning/DELIVERY_SEQUENCE.md) — why Oracle
-  code waits and what unlocks each implementation stage.
-- [`planning/FUTURE_THREAD_HANDOFF.md`](planning/FUTURE_THREAD_HANDOFF.md) — exact
-  instructions for the later Oracle implementation task.
+  defines fixtures and compatibility.
+- [`planning/DELIVERY_SEQUENCE.md`](planning/DELIVERY_SEQUENCE.md) defines the
+  incremental bootstrap and adapter gates.
 
-The existing [`../plugin_runtime/`](../plugin_runtime/) plan is retained as
-research input for the sandbox supervisor, guest protocol, package lifecycle,
-and hostile fixtures. It is not the project authority after this recharter.
+## Build
+
+```sh
+cargo fmt --check --manifest-path orchestrator/Cargo.toml
+cargo test --manifest-path orchestrator/Cargo.toml
+cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-features -- -D warnings
+cargo run --manifest-path orchestrator/Cargo.toml -- status
+```

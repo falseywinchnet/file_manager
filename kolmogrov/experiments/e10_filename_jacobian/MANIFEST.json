@@ -1,0 +1,18 @@
+{
+  "experiment": "E10-filename-jacobian-001",
+  "status": "finite research-profile audit",
+  "input_profile": "org.filemanager.kolmogrov.filename-observation@0.1.0-research.1",
+  "certificate": {
+    "source_length": 7,
+    "deletion_radius": 2,
+    "degree": 3,
+    "family": "complete"
+  },
+  "projection_controls": [
+    {"family": "affine low-bit residue", "radix": 2, "depth": 4, "coefficients": [1, 3, 5]},
+    {"family": "balanced binary Jacobian", "radix": 2, "depth": 4, "zero_input_columns": 0}
+  ],
+  "private_data": false,
+  "command": "python3 experiments/e10_filename_jacobian/run.py",
+  "inference_boundary": "named synthetic substitutions only; no production relevance, Unicode-version portability, or latency claim"
+}

@@ -27,6 +27,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint RunWindow, LastHostTrace;
         internal nint SubscribeV2, BeginInvoke, RequestClose, CallbackFaultCount;
         internal nint SetControlPng, SetChildIndex, SetControlColors, SubscribePointer;
+        internal nint SetCheckState, GetCheckState;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -79,7 +80,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         this.handle = handle;
         this.stableId = stableId;
         this.managedTypeName = managedTypeName;
-        supportsRaster = kind == 0x7fffffffu;
+        supportsRaster = kind is 20u or 0x7fffffffu;
         ownerThreadId = Environment.CurrentManagedThreadId;
         callbackRoot = GCHandle.Alloc(this, GCHandleType.Weak);
         Handle token;
@@ -88,7 +89,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         subscriptions.Add(token);
         if (kind is 4u or 5u or 11u or 14u) SubscribeTyped(NativeEvent.Clicked);
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); }
-        if (supportsRaster) SubscribePointer();
+        if (kind is 6u or 18u or 0x7fffffffu) SubscribePointer();
     }
 
     internal static NativeControlBridge Create(Type managedType)
@@ -103,11 +104,14 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             typeof(TextBoxBase).IsAssignableFrom(managedType);
         var toolStripSurface = typeof(ToolStrip).IsAssignableFrom(managedType);
         var buttonSurface = typeof(Button).IsAssignableFrom(managedType);
+        var transparentPaintSurface = typeof(Label).IsAssignableFrom(managedType) &&
+            !typeof(LinkLabel).IsAssignableFrom(managedType);
         var customPaint = global::System.OperatingSystem.IsWindows() &&
             (toolStripSurface || buttonSurface || (!retainedField && !typeof(Form).IsAssignableFrom(managedType) &&
             !managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal) &&
             paintMethod?.DeclaringType?.Assembly != typeof(Control).Assembly));
-        var kind = customPaint ? 0x7fffffffu : 0u;
+        var kind = managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal)
+            ? 19u : customPaint && transparentPaintSurface ? 20u : customPaint ? 0x7fffffffu : 0u;
         for (var current = managedType; current is not null && kind == 0u; current = current.BaseType)
         {
             kind = current.Name switch
@@ -143,12 +147,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
     internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
     internal void SetColors(global::System.Drawing.Color foreground, global::System.Drawing.Color background) { Check(((delegate* unmanaged[Cdecl]<Handle, uint, uint, int>)api.SetControlColors)(handle.Value, unchecked((uint)foreground.ToArgb()), unchecked((uint)background.ToArgb()))); }
+    internal uint CheckState
+    {
+        get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetCheckState)(handle.Value, &value)); return value; }
+        set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetCheckState)(handle.Value, value)); }
+    }
     internal bool InvokeRequired => Environment.CurrentManagedThreadId != ownerThreadId;
     internal bool SupportsRaster { get { return supportsRaster && api.SetControlPng != 0; } }
     internal void SetRaster(byte[] encodedPng) { if (!SupportsRaster) return; fixed (byte* data = encodedPng) Check(((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, int>)api.SetControlPng)(handle.Value, data, (ulong)encodedPng.Length)); }
-    internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate)
+    internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate, bool popup)
     {
-        var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u);
+        var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u) | (popup ? 8u : 0u);
         Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.RunWindow)(handle.Value, flags));
         return GetString(api.LastHostTrace);
     }
@@ -307,8 +316,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(6, ref value));
-        if (value.AbiVersion != 6 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0) throw new InvalidOperationException("GUI.Forms ABI 0.6 table is incomplete.");
+        Check(GetApi(7, ref value));
+        if (value.AbiVersion != 7 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0) throw new InvalidOperationException("GUI.Forms ABI 0.7 table is incomplete.");
         return value;
     }
     private static void Check(int result)

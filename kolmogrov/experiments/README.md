@@ -29,6 +29,15 @@ corpus, split, seed policy, or metric creates a new run identity.
   quantized-scale boundary arithmetic.
 - `e6_cybernetic_support` — exact minimum-support partition census under
   position-resolved versus averaged binary edit controls.
+- `e7_deformation_coherence` — common-history coherence, selected-character
+  interference, and combinatorial-to-streaming algorithm collapse.
+- `e8_quotient_retrieval_specialization` — exact interaction order, safe and
+  unsafe history quotients, affine certificate retrieval, and fixed-support
+  specialization.
+- `e9_rich_projection` — coupled rich-alphabet projection, nested refinement,
+  private-witness breakdown, and cross-view provenance obstructions.
+- `e10_filename_jacobian` — source-anchored Unicode filename views, exact
+  mutation flow, low-bit projection failure, and logical posting charge.
 
 `make research` remains a diagnostic replay of the historical Phase A sequence.
 Its successful execution does not promote any claim.

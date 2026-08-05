@@ -92,6 +92,10 @@ struct ObjectRecord final {
     std::thread::id owner_thread;
     std::uint32_t kind{};
     std::uint64_t external_references{1};
+    // Drawing facade objects may be handed between framework threads. This
+    // lock makes the selected operation order the order in which ABI calls
+    // acquire each object. Concurrent access is deliberately serialized.
+    std::recursive_mutex operation_mutex;
 };
 
 struct Slot final {
@@ -139,6 +143,11 @@ public:
         std::scoped_lock lock(mutex_);
         Slot* slot = find_locked(handle);
         if (slot == nullptr) return stale("retain");
+        std::scoped_lock operation_lock(slot->record->operation_mutex);
+        if (slot->record->owner_thread != std::this_thread::get_id()) {
+            slot->record->object->handoff_to_current_thread();
+            slot->record->owner_thread = std::this_thread::get_id();
+        }
         if (slot->record->owner_thread != std::this_thread::get_id()) {
             return wrong_thread("retain");
         }
@@ -154,6 +163,11 @@ public:
         std::scoped_lock lock(mutex_);
         Slot* slot = find_locked(handle);
         if (slot == nullptr) return stale("release");
+        std::scoped_lock operation_lock(slot->record->operation_mutex);
+        if (slot->record->owner_thread != std::this_thread::get_id()) {
+            slot->record->object->handoff_to_current_thread();
+            slot->record->owner_thread = std::this_thread::get_id();
+        }
         if (slot->record->owner_thread != std::this_thread::get_id()) {
             return wrong_thread("release");
         }
@@ -204,8 +218,18 @@ public:
     template <typename Object, typename Operation>
     gd_result with(gd_handle handle, std::uint32_t kind, Operation&& operation) {
         std::shared_ptr<ObjectRecord> record;
-        if (const gd_result result = get(handle, kind, record, false); result != GD_OK) {
+        constexpr bool serialized_handoff = true;
+        if (const gd_result result = get(handle, kind, record, false,
+                                         serialized_handoff); result != GD_OK) {
             return result;
+        }
+        std::scoped_lock operation_lock(record->operation_mutex);
+        if (record->owner_thread != std::this_thread::get_id()) {
+            record->object->handoff_to_current_thread();
+            record->owner_thread = std::this_thread::get_id();
+        }
+        if (record->object->is_disposed()) {
+            return fail(GD_ERROR_DISPOSED, "drawing object is disposed");
         }
         auto object = kind == 0U ? std::dynamic_pointer_cast<Object>(record->object) :
                                   std::static_pointer_cast<Object>(record->object);
@@ -218,11 +242,27 @@ public:
                        gd_handle right_handle, std::uint32_t right_kind,
                        Operation&& operation) {
         std::shared_ptr<ObjectRecord> left_record;
-        if (const gd_result result = get(left_handle, left_kind, left_record, false);
+        if (const gd_result result = get(left_handle, left_kind, left_record, false,
+                                         true);
             result != GD_OK) return result;
         std::shared_ptr<ObjectRecord> right_record;
-        if (const gd_result result = get(right_handle, right_kind, right_record, false);
+        if (const gd_result result = get(right_handle, right_kind, right_record, false,
+                                         true);
             result != GD_OK) return result;
+        std::scoped_lock operation_lock(left_record->operation_mutex,
+                                        right_record->operation_mutex);
+        if (left_record->owner_thread != std::this_thread::get_id()) {
+            left_record->object->handoff_to_current_thread();
+            left_record->owner_thread = std::this_thread::get_id();
+        }
+        if (right_record->owner_thread != std::this_thread::get_id()) {
+            right_record->object->handoff_to_current_thread();
+            right_record->owner_thread = std::this_thread::get_id();
+        }
+        if (left_record->object->is_disposed() ||
+            right_record->object->is_disposed()) {
+            return fail(GD_ERROR_DISPOSED, "drawing object is disposed");
+        }
         auto left = left_kind == 0U ? std::dynamic_pointer_cast<Left>(left_record->object) :
                                      std::static_pointer_cast<Left>(left_record->object);
         auto right = right_kind == 0U ? std::dynamic_pointer_cast<Right>(right_record->object) :
@@ -244,13 +284,28 @@ public:
         std::shared_ptr<ObjectRecord> brush_record;
         std::shared_ptr<ObjectRecord> format_record;
         if (const auto result = get(recorder_handle, GD_OBJECT_RECORDER,
-                                    recorder_record, false); result != GD_OK) return result;
+                                    recorder_record, false, true); result != GD_OK) return result;
         if (const auto result = get(font_handle, GD_OBJECT_FONT,
-                                    font_record, false); result != GD_OK) return result;
+                                    font_record, false, true); result != GD_OK) return result;
         if (const auto result = get(brush_handle, GD_OBJECT_SOLID_BRUSH,
-                                    brush_record, false); result != GD_OK) return result;
+                                    brush_record, false, true); result != GD_OK) return result;
         if (const auto result = get(format_handle, GD_OBJECT_STRING_FORMAT,
-                                    format_record, false); result != GD_OK) return result;
+                                    format_record, false, true); result != GD_OK) return result;
+        std::scoped_lock operation_lock(recorder_record->operation_mutex,
+                                        font_record->operation_mutex,
+                                        brush_record->operation_mutex,
+                                        format_record->operation_mutex);
+        const auto current_thread = std::this_thread::get_id();
+        for (ObjectRecord* record : {recorder_record.get(), font_record.get(),
+                                     brush_record.get(), format_record.get()}) {
+            if (record->owner_thread != current_thread) {
+                record->object->handoff_to_current_thread();
+                record->owner_thread = current_thread;
+            }
+            if (record->object->is_disposed()) {
+                return fail(GD_ERROR_DISPOSED, "drawing object is disposed");
+            }
+        }
         auto recorder = std::dynamic_pointer_cast<gui_drawing::GraphicsRecorder>(recorder_record->object);
         auto font = std::dynamic_pointer_cast<gui_drawing::Font>(font_record->object);
         auto brush = std::dynamic_pointer_cast<gui_drawing::SolidBrush>(brush_record->object);
@@ -264,21 +319,29 @@ public:
 private:
     gd_result get(gd_handle handle, std::uint32_t expected_kind,
                   std::shared_ptr<ObjectRecord>& record,
-                  bool permit_disposed) {
+                  bool permit_disposed,
+                  bool permit_serialized_handoff = false) {
         {
             std::scoped_lock lock(mutex_);
             Slot* slot = find_locked(handle);
             if (slot == nullptr) return stale("operation");
             record = slot->record;
         }
-        if (record->owner_thread != std::this_thread::get_id()) {
+        std::scoped_lock operation_lock(record->operation_mutex);
+        if (!permit_serialized_handoff &&
+            record->owner_thread != std::this_thread::get_id()) {
             return wrong_thread("operation");
         }
         if (expected_kind != 0U && record->kind != expected_kind) {
             return fail(GD_ERROR_WRONG_HANDLE_KIND,
                         "drawing handle has the wrong object kind");
         }
-        if (!permit_disposed && record->object->is_disposed()) {
+        // A recorder's disposed check is performed by handoff_to_current_thread
+        // after the serialized ownership transfer. Calling is_disposed here
+        // would itself violate the old owner's affinity.
+        if (!permit_disposed &&
+            !permit_serialized_handoff &&
+            record->object->is_disposed()) {
             return fail(GD_ERROR_DISPOSED, "drawing object is disposed");
         }
         return GD_OK;

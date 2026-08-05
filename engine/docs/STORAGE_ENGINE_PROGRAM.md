@@ -103,13 +103,38 @@ whole-file digest, reports rejected newer candidates, and falls back to the
 last valid generation. A bounded lazy direct-mapped cache retains at most 8 MiB
 per pinned reader and is bypassed by streaming integrity checks.
 
-Known gaps remain release-blocking: there is no quarantine policy, no per-block
-lazy checksum for queries before whole-store validation,
-no disk-full/process-kill compaction campaign, no schema migration, no bounded
-delta/compaction implementation, and no hardware power-loss result. The
+Rejected candidates are moved into an engine-owned `quarantine/` directory only
+after a fully checked generation exists. If no generation validates, the
+root-bearing manifest and segment remain live until rebuild commits a
+replacement. A checksummed manifest or segment header contributes to a
+monotonic generation high-water mark, so quarantine cannot cause ID reuse.
+Corrupt manifest evidence in a slot about to be replaced is copied durably
+before publication. A small atomic `quarantine/PENDING` marker prevents restart
+from treating the associated orphan segment as ordinary debris if publication
+finishes but quarantine does not. Before any authenticated generation artifact
+moves, a checksummed 64-byte `quarantine/HIGHWATER` record advances; publication
+reads that bounded record rather than scanning retained evidence. Quarantine
+never treats authenticated newer/older formats as corruption: newer formats
+are refused and older majors return an explicit migration-required error.
+
+Deterministic write-limit tests cover partial segment header/component writes
+and partial manifest prefix/body writes. They prove logical fallback and debris
+reclamation, not physical ENOSPC or power-loss behavior.
+
+Known gaps remain release-blocking: there is no per-block lazy checksum for
+queries before whole-store validation, no physical disk-full/process-kill
+compaction campaign, no schema migration implementation, no live bounded
+delta/compaction publication, and no hardware power-loss result. The
 checked-recovery scan misses the one-million <100 ms target while the bounded
 manifest/header probe meets it; service readiness semantics must retain that
 distinction.
+
+`internal/generation.Diff` is the bounded-memory path-ordered merge primitive
+for the next delta experiment. It streams add/update/delete records and honors
+cancellation without materializing the change set. A standalone checksummed
+delta candidate now consumes that stream and suppresses no-op files, but it is
+not referenced by the live manifest or query path. Both remain experimental;
+see `M2_DELTA_COMPACTION_SLICE.md` and `results/M2_DELTA_CANDIDATE_001.md`.
 
 ## Root ownership
 

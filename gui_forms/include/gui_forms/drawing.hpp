@@ -209,6 +209,9 @@ public:
     [[nodiscard]] bool is_disposed() const;
     [[nodiscard]] std::thread::id owner_thread() const noexcept { return owner_thread_; }
     void verify_access() const;
+    // ABI/frontends may transfer a drawing value between serialized calls.
+    // This is never an authorization for concurrent access.
+    void handoff_to_current_thread();
 
 protected:
     void require_alive() const;

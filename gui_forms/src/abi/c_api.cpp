@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -43,6 +44,28 @@ enum class FieldControlKind {
     data_grid,
     tool_strip,
     numeric_up_down,
+};
+
+struct RasterPointerSample final {
+    std::uint32_t event_kind{};
+    double x{};
+    double y{};
+    double wheel_delta{};
+    std::uint32_t button{};
+};
+
+// Some compatibility widgets participate in retained layout and painting order
+// but are not interactive surfaces. In particular, DockPanelSuite creates an
+// empty auto-hide strip covering its entire client area. Keeping this policy in
+// a dedicated ABI kind avoids encoding third-party names in the portable core.
+class InputTransparentControl final : public Control {
+public:
+    explicit InputTransparentControl(StableId stable_id)
+        : Control(std::move(stable_id)) {}
+
+    [[nodiscard]] bool hit_test_local(gui_forms::Point) const override {
+        return false;
+    }
 };
 
 // ABI-facing field controls are deliberately small retained visuals. They keep
@@ -84,6 +107,8 @@ public:
         Panel::on_paint(painter, damage);
         const Rect bounds = local_bounds();
         const auto style = style_;
+        const double button_width = kind_ == FieldControlKind::numeric_up_down
+            ? std::min(18.0, std::max(0.0, bounds.width)) : 0.0;
         if (!text_.empty()) {
             painter.draw_text_utf8({5.0, std::max(14.0, bounds.height * 0.5 + 4.0)},
                                    text_,
@@ -100,13 +125,57 @@ public:
                               style.face);
             painter.draw_line({1.0, 22.0}, {std::max(1.0, bounds.width - 1.0), 22.0},
                               style.border, 1.0);
+        } else if (kind_ == FieldControlKind::numeric_up_down &&
+                   button_width > 0.0 && bounds.height >= 12.0) {
+            const double left = bounds.width - button_width;
+            const double middle = std::floor(bounds.height * 0.5);
+            painter.fill_rect({left, 1.0, button_width - 1.0,
+                               std::max(0.0, bounds.height - 2.0)}, style.face);
+            painter.draw_line({left, 1.0}, {left, bounds.height - 1.0},
+                              style.border, 1.0);
+            painter.draw_line({left, middle}, {bounds.width - 1.0, middle},
+                              style.border, 1.0);
+            const double center = left + button_width * 0.5;
+            painter.draw_line({center - 3.0, middle - 3.0},
+                              {center, middle - 6.0}, style.dark_border, 1.0);
+            painter.draw_line({center, middle - 6.0},
+                              {center + 3.0, middle - 3.0}, style.dark_border, 1.0);
+            painter.draw_line({center - 3.0, middle + 4.0},
+                              {center, middle + 7.0}, style.dark_border, 1.0);
+            painter.draw_line({center, middle + 7.0},
+                              {center + 3.0, middle + 4.0}, style.dark_border, 1.0);
         }
+    }
+
+    [[nodiscard]] gui_forms::Event<const RasterPointerSample&>&
+    pointer_input() noexcept {
+        return pointer_input_;
+    }
+
+    void on_pointer(gui_forms::PointerEvent& event) override {
+        const Rect absolute = absolute_bounds();
+        std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
+        switch (event.action) {
+        case gui_forms::PointerAction::down: kind = GF_EVENT_MOUSE_DOWN; break;
+        case gui_forms::PointerAction::up: kind = GF_EVENT_MOUSE_UP; break;
+        case gui_forms::PointerAction::wheel: kind = GF_EVENT_MOUSE_WHEEL; break;
+        case gui_forms::PointerAction::enter: kind = GF_EVENT_MOUSE_ENTER; break;
+        case gui_forms::PointerAction::leave: kind = GF_EVENT_MOUSE_LEAVE; break;
+        case gui_forms::PointerAction::move: break;
+        }
+        pointer_input_.emit({kind,
+                             event.position.x - absolute.x,
+                             event.position.y - absolute.y,
+                             event.wheel_delta.y,
+                             static_cast<std::uint32_t>(event.button)});
+        event.handled = true;
     }
 
 private:
     std::string text_;
     FieldControlKind kind_;
     gui_forms::BasicControlStyle style_;
+    gui_forms::Event<const RasterPointerSample&> pointer_input_;
 };
 
 [[nodiscard]] gui_forms::Color color_from_argb(std::uint32_t argb) noexcept {
@@ -117,17 +186,14 @@ private:
         static_cast<std::uint8_t>((argb >> 24U) & 0xffU));
 }
 
-struct RasterPointerSample final {
-    std::uint32_t event_kind{};
-    double x{};
-    double y{};
-    double wheel_delta{};
-    std::uint32_t button{};
-};
-
 class RasterControl final : public Control {
 public:
-    explicit RasterControl(StableId stable_id) : Control(std::move(stable_id)) {}
+    explicit RasterControl(StableId stable_id, bool input_transparent = false)
+        : Control(std::move(stable_id)), input_transparent_(input_transparent) {}
+
+    [[nodiscard]] bool hit_test_local(gui_forms::Point point) const override {
+        return !input_transparent_ && Control::hit_test_local(point);
+    }
 
     [[nodiscard]] gui_forms::Event<const RasterPointerSample&>& pointer_input() noexcept {
         return pointer_input_;
@@ -210,6 +276,7 @@ protected:
     }
 
 private:
+    bool input_transparent_{};
     std::vector<std::byte> encoded_;
     gui_forms::ImageId image_{};
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
@@ -369,6 +436,14 @@ public:
         case GF_CONTROL_NUMERIC_UP_DOWN:
             record->control = std::make_shared<FieldControl>(
                 std::move(native_id), FieldControlKind::numeric_up_down);
+            break;
+        case GF_CONTROL_INPUT_TRANSPARENT:
+            record->control =
+                std::make_shared<InputTransparentControl>(std::move(native_id));
+            break;
+        case GF_CONTROL_INPUT_TRANSPARENT_CUSTOM:
+            record->control =
+                std::make_shared<RasterControl>(std::move(native_id), true);
             break;
         case GF_CONTROL_CUSTOM:
             record->control = std::make_shared<RasterControl>(std::move(native_id));
@@ -557,10 +632,65 @@ public:
         return GF_OK;
     }
 
+    gf_result set_check_state(gf_handle handle, std::uint32_t check_state) {
+        if (check_state > static_cast<std::uint32_t>(gui_forms::CheckState::indeterminate)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "check state must be unchecked, checked, or indeterminate");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        if (const auto check_box =
+                std::dynamic_pointer_cast<gui_forms::CheckBox>(record->control)) {
+            check_box->set_check_state(
+                static_cast<gui_forms::CheckState>(check_state));
+            return GF_OK;
+        }
+        if (const auto radio =
+                std::dynamic_pointer_cast<gui_forms::RadioButton>(record->control)) {
+            if (check_state ==
+                static_cast<std::uint32_t>(gui_forms::CheckState::indeterminate)) {
+                return fail(GF_ERROR_INVALID_ARGUMENT,
+                            "radio buttons do not support indeterminate state");
+            }
+            radio->set_checked(
+                check_state == static_cast<std::uint32_t>(gui_forms::CheckState::checked));
+            return GF_OK;
+        }
+        return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                    "check state requires a checkbox or radio button");
+    }
+
+    gf_result get_check_state(gf_handle handle, std::uint32_t* check_state) {
+        if (check_state == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_check_state requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        if (const auto check_box =
+                std::dynamic_pointer_cast<gui_forms::CheckBox>(record->control)) {
+            *check_state = static_cast<std::uint32_t>(check_box->check_state());
+            return GF_OK;
+        }
+        if (const auto radio =
+                std::dynamic_pointer_cast<gui_forms::RadioButton>(record->control)) {
+            *check_state = radio->checked()
+                ? static_cast<std::uint32_t>(gui_forms::CheckState::checked)
+                : static_cast<std::uint32_t>(gui_forms::CheckState::unchecked);
+            return GF_OK;
+        }
+        return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                    "check state requires a checkbox or radio button");
+    }
+
     gf_result run_window(gf_handle handle, std::uint32_t flags) {
         constexpr std::uint32_t known_flags =
             GF_WINDOW_RUN_AUTOMATION_CLOSE | GF_WINDOW_RUN_FORCE_HEADLESS |
-            GF_WINDOW_RUN_AUTOMATION_ACTIVATE;
+            GF_WINDOW_RUN_AUTOMATION_ACTIVATE | GF_WINDOW_RUN_POPUP;
         if ((flags & ~known_flags) != 0U) {
             return fail(GF_ERROR_INVALID_ARGUMENT, "run_window received unknown flags");
         }
@@ -570,10 +700,13 @@ public:
         }
         {
             std::scoped_lock lock(mutex_);
+            const bool popup = (flags & GF_WINDOW_RUN_POPUP) != 0U;
+            const bool valid_root = record->kind == GF_CONTROL_FORM ||
+                (popup && record->kind == GF_CONTROL_CUSTOM);
             if (record->host_running || record->control->attached() ||
-                record->control->parent() || record->kind != GF_CONTROL_FORM) {
+                record->control->parent() || !valid_root) {
                 return fail(GF_ERROR_INVALID_ARGUMENT,
-                            "run_window requires an unattached top-level form");
+                            "run_window requires an unattached form or custom popup");
             }
             record->host_running = true;
             record->close_requested = false;
@@ -591,6 +724,7 @@ public:
         const bool force_headless = (flags & GF_WINDOW_RUN_FORCE_HEADLESS) != 0U;
         const bool auto_activate =
             (flags & GF_WINDOW_RUN_AUTOMATION_ACTIVATE) != 0U;
+        const bool popup = (flags & GF_WINDOW_RUN_POPUP) != 0U;
         const std::string title = record->text.empty()
             ? std::string("GUI.Forms Managed Surface") : record->text;
 
@@ -599,12 +733,18 @@ public:
             gui_forms::host::WindowsHostOptions options;
             options.title = title;
             options.initial_size = client_size;
-            options.minimum_size = {320.0, 200.0};
+            options.minimum_size = popup ? Size{40.0, 20.0} : Size{320.0, 200.0};
+            options.popup_window = popup;
+            options.quit_thread_on_close = !popup;
+            options.initial_position = {requested.x, requested.y};
             options.print_metrics_on_close = false;
             options.automation_enabled = true;
             options.close_after_launch_for_testing = auto_close;
-            options.automation_resolve = [this, record](std::string_view name) {
-                return named_control(record, name);
+            const auto automation_controls = named_controls_snapshot(record);
+            options.automation_resolve = [automation_controls](std::string_view name) {
+                const auto found = automation_controls->find(std::string(name));
+                return found == automation_controls->end()
+                    ? std::shared_ptr<Control>{} : found->second;
             };
             options.close_request = [this, handle](gui_forms::HostCloseRequest& request) {
                 request.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
@@ -614,7 +754,10 @@ public:
                                                 std::function<void()> close) {
                 publish_host(record, std::move(wake), std::move(close));
             };
-            options.dispatch_pending = [this, record] { pump_pending(record); };
+            options.dispatch_pending = [this, record, automation_controls] {
+                pump_pending(record);
+                refresh_named_controls(record, *automation_controls);
+            };
             options.closed = [this, handle] {
                 static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
             };
@@ -667,7 +810,7 @@ public:
         std::uint64_t timestamp = 3;
         if (auto_activate) {
             std::shared_ptr<Control> target = first_button(record->control);
-            if (!target) target = first_raster(record->control);
+            if (!target) target = first_pointer_control(record->control);
             if (target) {
                 const Rect bounds = target->absolute_bounds();
                 const gui_forms::Point center{
@@ -1037,9 +1180,10 @@ public:
             return result;
         }
         const auto raster = std::dynamic_pointer_cast<RasterControl>(sender->control);
-        if (!raster) {
+        const auto field = std::dynamic_pointer_cast<FieldControl>(sender->control);
+        if (!raster && !field) {
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
-                        "pointer subscriptions require a custom raster control");
+                        "pointer subscriptions require a field or custom raster control");
         }
         auto record = std::make_shared<SubscriptionRecord>();
         record->pointer_callback = callback;
@@ -1047,15 +1191,17 @@ public:
         record->ui_thread = sender->ui_thread;
         *output = allocate_locked(SlotKind::subscription, {}, record);
         sender->subscriptions.push_back(*output);
-        record->native_subscription = raster->pointer_input().subscribe(
-            [record, sender_handle](const RasterPointerSample& sample) {
+        const auto connect = [record, sender_handle](const RasterPointerSample& sample) {
                 if (!record->connected || record->pointer_callback == nullptr) {
                     return;
                 }
                 static_cast<void>(record->pointer_callback(
                     sender_handle, sample.event_kind, sample.x, sample.y,
                     sample.wheel_delta, sample.button, record->context));
-            });
+            };
+        record->native_subscription = raster
+            ? raster->pointer_input().subscribe(connect)
+            : field->pointer_input().subscribe(connect);
         return GF_OK;
     }
 
@@ -1095,9 +1241,11 @@ public:
                 result != GF_OK) {
                 return result;
             }
-            if (form->kind != GF_CONTROL_FORM || form->control->parent()) {
+            const bool closable_root = form->kind == GF_CONTROL_FORM ||
+                (form->kind == GF_CONTROL_CUSTOM && form->host_running);
+            if (!closable_root || form->control->parent()) {
                 return fail(GF_ERROR_WRONG_HANDLE_KIND,
-                            "request_close requires a top-level form");
+                            "request_close requires a running top-level form or popup");
             }
             form->close_requested = true;
             request = form->host_close;
@@ -1256,29 +1404,39 @@ private:
         return {};
     }
 
-    static std::shared_ptr<RasterControl> first_raster(
+    static std::shared_ptr<Control> first_pointer_control(
         const std::shared_ptr<Control>& root) {
-        if (const auto raster = std::dynamic_pointer_cast<RasterControl>(root)) {
-            return raster;
+        if (std::dynamic_pointer_cast<RasterControl>(root) ||
+            std::dynamic_pointer_cast<FieldControl>(root)) {
+            return root;
         }
         for (const auto& child : root->children()) {
-            if (auto raster = first_raster(child)) return raster;
+            if (auto target = first_pointer_control(child)) return target;
         }
         return {};
     }
 
-    std::shared_ptr<Control> named_control(
+    std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<Control>>>
+    named_controls_snapshot(const std::shared_ptr<ControlRecord>& root) {
+        auto result = std::make_shared<
+            std::unordered_map<std::string, std::shared_ptr<Control>>>();
+        refresh_named_controls(root, *result);
+        return result;
+    }
+
+    void refresh_named_controls(
         const std::shared_ptr<ControlRecord>& root,
-        std::string_view name) {
+        std::unordered_map<std::string, std::shared_ptr<Control>>& result) {
         std::scoped_lock lock(mutex_);
+        result.clear();
         for (const Slot& candidate : slots_) {
             if (candidate.kind == SlotKind::control && candidate.control &&
-                candidate.control->name == name &&
+                !candidate.control->name.empty() &&
                 contains_control(root->control, candidate.control->control)) {
-                return candidate.control->control;
+                result.insert_or_assign(candidate.control->name,
+                                        candidate.control->control);
             }
         }
-        return {};
     }
 
     static bool contains_control(const std::shared_ptr<Control>& root,
@@ -1562,6 +1720,12 @@ gf_result api_subscribe_pointer(gf_handle sender, gf_pointer_callback callback,
         return registry().subscribe_pointer(sender, callback, context, token);
     });
 }
+gf_result api_set_check_state(gf_handle control, std::uint32_t check_state) noexcept {
+    return translate([&] { return registry().set_check_state(control, check_state); });
+}
+gf_result api_get_check_state(gf_handle control, std::uint32_t* check_state) noexcept {
+    return translate([&] { return registry().get_check_state(control, check_state); });
+}
 
 } // namespace
 
@@ -1576,7 +1740,8 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_3 &&
         requested_version != GF_ABI_VERSION_0_4 &&
         requested_version != GF_ABI_VERSION_0_5 &&
-        requested_version != GF_ABI_VERSION_0_6) {
+        requested_version != GF_ABI_VERSION_0_6 &&
+        requested_version != GF_ABI_VERSION_0_7) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -1616,6 +1781,8 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_set_child_index,
         &api_set_control_colors,
         &api_subscribe_pointer,
+        &api_set_check_state,
+        &api_get_check_state,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

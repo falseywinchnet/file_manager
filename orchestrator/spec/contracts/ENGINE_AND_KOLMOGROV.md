@@ -1,6 +1,6 @@
 # ORC-ENG / ORC-KOL: engine and Kolmogrov contracts
 
-Status: **engine v0 import plus accepted direction**.
+Status: **negotiation round 001 over engine v0 plus accepted direction**.
 
 The Go engine remains the provider of exact file-object catalogue, root-scoped
 query, intrinsic metadata, lexical retrieval, and core fuzzy candidates.
@@ -22,9 +22,12 @@ edit verification controls while Kolmogrov is formalized. The storage and query
 planner must not encode assumptions that make later Kolmogrov integration an
 external provider or schema-breaking retrofit.
 
-The Oracle registers both query and administrative engine contracts. Query
+Orchestrator registers both query and administrative engine contracts. Query
 consumers cannot gain root admission, integrity repair, or rebuild authority by
 changing method names or transport.
+
+The active proposal and reserved engine reply are in
+`../../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`.
 
 Source imports:
 

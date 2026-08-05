@@ -73,8 +73,8 @@ purpose before use. Reimplementation from a document remains marked as such.
 - Strong lumpability, probabilistic bisimulation-style refinement, tensor
   coarse/detail decomposition, and Hamming-weight edit chains are not claimed
   as novel mathematics. Their integration with the gap-simplex occurrence
-  measure and Kolmogrov support program has not received a prior-art audit and
-  remains **UNVERIFIED** for novelty and practical utility.
+  measure and Kolmogrov support program remained **UNVERIFIED** for novelty and
+  practical utility before the scoped audit recorded below.
 - `docs/MINIMAL_OBSTRUCTION_PROTOCOL.md`,
   `docs/FALSIFIABLE_WORK_ROUND_002.md`, and theorem objects T-JOINT-FLOW-1,
   T-INTERACTION-MIN-1, T-APPROX-CLOSURE-1, T-PATH-ORDER-1, and
@@ -93,6 +93,85 @@ purpose before use. Reimplementation from a document remains marked as such.
   inherited ConeDAG claims named earlier in this file. They are independently
   reconstructed here and are not claimed as new mathematics.
 - The exact gap-simplex/residue organization and sparse coupling-certificate
-  direction have not received a prior-art audit. Their novelty status is
-  deliberately **UNVERIFIED**; no publication or architecture claim may call
-  them novel until a scoped literature review is authorized and pinned here.
+  direction were the narrow novelty questions carried into the scoped audit
+  below. That audit did not verify them as novel; no publication or architecture
+  claim may call them novel without the deeper construction-specific review.
+
+## Scoped prior-art audit, 2026-08-05
+
+- The architect explicitly authorized work on the low-confidence items,
+  including novelty. `docs/PRIOR_ART_BOUNDARY_001.md` records the resulting
+  scoped primary-source audit and its search boundary.
+- The audit covered minimal predictive state, information bottlenecks,
+  bisimulation metrics, functional compression by graph coloring,
+  multiresolution/successive refinement, ordered embeddings, tensor/ANOVA
+  interaction decomposition, contingency-table cycle moves, string kernels,
+  edit sketches, and locality-sensitive-hashing lower bounds.
+- **OBSERVED:** the broad constituent ideas already have substantial prior art.
+  Claims of novelty for minimal task-relative state, progressive refinement,
+  graph-relative collision protection, interaction contrasts, or generic
+  edit-tolerant sketches are therefore **REJECTED**.
+- **UNVERIFIED:** the narrower integrations listed in
+  `docs/PRIOR_ART_BOUNDARY_001.md` have not yet received construction-specific
+  forward/backward citation searches. They are research questions, not novelty
+  claims.
+- No external implementation, corpus, or formula was copied during the audit.
+
+## Deformation-jet invention round, 2026-08-05
+
+- `docs/DEFORMATION_JET_SUPERPOSITION_HASH.md`,
+  `docs/INVENTION_ROUND_004.md`, T-DELETION-ORBIT-1,
+  T-HISTORY-COUPLING-1, T-HISTORY-MOMENTS-1,
+  T-HISTORY-COHERENCE-1, and T-SAMPLED-HISTORY-1 were derived after the
+  architect redirected the program toward evolving a qualitatively better
+  perceptual hash rather than surveying established solution catalogues.
+- The generating-polynomial object follows directly from the existing
+  gap-simplex occurrence coordinates. The deletion derivative, translation,
+  history product, and least marginal-coupling witnesses were derived inside
+  this worktree. Newton's identities are an elementary control and are not
+  claimed as novel.
+- No external source, implementation, corpus, or network search was consulted
+  for this invention round. The integrated deformation-jet/history-phase hash
+  remains **UNVERIFIED** for novelty and practical superiority.
+- `src/kolmogrov/deformation.py`, T-STREAMING-JET-1,
+  T-PAIRWISE-HISTORY-1, `docs/DEFORMATION_ALGORITHM_REFINEMENT_001.md`, and E7
+  were derived in the subsequent performance refinement. The three-role
+  recurrence follows by distributing each source position among retain, delete,
+  and select roles. No external algorithm or implementation was imported.
+- T-DELETION-CLOSURE-1, T-HISTORY-QUOTIENT-1,
+  `docs/RETRIEVAL_REFINEMENT_002.md`, `src/kolmogrov/certificates.py`, the
+  run-block/radius-two specializations, and E8 were derived in the following
+  quotient/retrieval round from monotone deletion offsets, constant-run
+  multiplicities, and the architect's affine-direction/minimum-support
+  guidance. No external source, algorithm catalogue, implementation, corpus,
+  or network search was consulted. The finite-interaction closure proof and
+  `a^t b a` product-phase obstruction are internal paper arguments; the affine
+  schedule and combined two-algebra retrieval design remain **UNVERIFIED** for
+  novelty and general-file superiority.
+- `docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`,
+  `docs/ORC_KOL_LAB_PROFILE_001.md`, and the machine-readable ORC-KOL-001 lab
+  vector project the already-derived certificate semantics into the accepted
+  ADR-003 negotiation process. They introduce no external algorithm or corpus
+  and do not promote the laboratory profile to production architecture.
+- `docs/RICH_CONTENT_PROJECTION_003.md`, T-PROJECTION-REFINEMENT-1,
+  `src/kolmogrov/projection.py`, and E9 were derived inside this worktree from
+  the architect's nested `k^d` support, Banach contraction, atomic influence,
+  SNR-breakdown, affine-direction, and least-support requirements. The finite
+  proofs use elementary residue projection, binary linear algebra, occupancy,
+  pigeonhole counting, and direct minimal obstructions. No external source,
+  implementation, corpus, or network search was used. The coupled projection
+  integration remains **UNVERIFIED** for novelty and File Manager superiority.
+- Filename Observation Profile 001, `src/kolmogrov/filename.py`,
+  T-SYMBOL-JACOBIAN-1, T-TYPED-EDIT-SEAM-1, T-POSTING-SUPPORT-1, E10, and
+  `docs/FILENAME_PROJECTION_REFINEMENT_004.md` were derived inside this worktree
+  from the source-anchoring, typed-flow, granular-support, and engine-resource
+  questions. The Unicode normalization database is Python's declared Unicode
+  16.0.0 data; no external corpus or network source was used. The generated
+  names in E10 are synthetic fixtures, not private filesystem data. Elementary
+  finite-set counting, binary linear algebra, and Unicode's versioned
+  normalization operations are controls, not novelty claims.
+- T-SYMMETRIC-CERTIFICATE-1 and its `aaba/babb` obstruction were derived in the
+  same internal filename round by intersecting exact deletion descendant sets
+  with complete degree-`t+1` certificate sets. No external algorithm, corpus,
+  or network source was used. The posting-union front index remains
+  **UNVERIFIED** for novelty and held-out File Manager utility.

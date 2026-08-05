@@ -2,10 +2,10 @@
 
 Status: **SUPERSEDED — DO NOT DISPATCH**.
 
-The grand architect has moved production plugin supervision into the Oracle
+The grand architect has moved production plugin supervision into the Orchestrator
 repository at `../../orchestrator/`, where it can be specified with every other
 cross-project API and ABI. This prompt is retained only as historical research
-input. Use `../../orchestrator/planning/FUTURE_THREAD_HANDOFF.md` after Oracle's
+input. Use `../../orchestrator/planning/FUTURE_THREAD_HANDOFF.md` after Orchestrator's
 implementation gate opens.
 
 The superseded prompt follows verbatim for provenance:

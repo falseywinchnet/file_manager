@@ -58,6 +58,8 @@ one million and may be lowered only for an explicitly labeled scale point:
 ```sh
 FILEMAN_ENGINE_M2_MEASURE=1 FILEMAN_ENGINE_RECORDS=1000000 \
   go test -v -run '^TestImmutableGenerationDistribution$' -count=1 ./benchmarks
+FILEMAN_ENGINE_M2_MEASURE=1 FILEMAN_ENGINE_RECORDS=1000000 \
+  go test -v -run '^TestDeltaCandidateBatchDistribution$' -count=1 ./benchmarks
 FILEMAN_ENGINE_SQLITE_CONTROL=1 \
   go test -v -run '^TestSQLiteCorrectnessV1Control$' -count=1 ./benchmarks
 ```
@@ -68,3 +70,16 @@ not imported by Go packages or shipped as an engine dependency. Compare the
 full-record query transcript, storage bytes, build mode, cache policy, and
 process boundary; do not compare a weaker ID-only SQL projection with a complete
 engine result.
+
+The immutable-generation measurement also changes one object's timestamp,
+streams the exact base-to-replacement diff, and then publishes the full snapshot
+control. Its `write_lower_bound` includes segment bytes, the fixed header
+rewrite, and manifest bytes but excludes filesystem metadata. The reported
+amplification denominator is the 64-byte canonical changed object record. This
+control demonstrates the cost that a candidate delta run must beat; it is not a
+delta-format result.
+
+The standalone delta batch measurement uses an encoding-independent logical
+operation denominator and reports 4,096/10,000-update run amplification. It
+excludes production manifest publication and amortized compaction, so it cannot
+promote the format by itself.

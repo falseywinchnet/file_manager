@@ -16,9 +16,10 @@ Before changing code, read in order:
 7. `docs/QUERY_AND_RANKING.md`
 8. `docs/TEST_AND_BENCHMARK_PROTOCOL.md`
 9. `docs/DELIVERY_PLAN.md`
+10. `docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for any cross-project edge
 
 The architect handoffs are accepted direction. Handoff 002 supplements handoff
-001 and controls the Kolmogrov, semantic-memory, and Oracle-contract boundaries.
+001 and controls the Kolmogrov, semantic-memory, and Orchestrator-contract boundaries.
 Where an older document still presents one of their decisions as an unresolved
 candidate, the handoffs control. Controls and falsification gates remain
 mandatory.
@@ -40,7 +41,7 @@ mandatory.
 - **GIVEN:** the public interrogation/plugin API is read-oriented and exposes no
   file mutation primitive. Shell-originated mutations are external observations.
 - **GIVEN:** AI semantic interpretation and personal memory are deferred to
-  Oracle-managed providers and hives. The engine remains complete without
+  Orchestrator-managed providers and hives. The engine remains complete without
   models or embeddings. Its production fuzzy-candidate design nevertheless has
   a first-class Kolmogrov transfer target subject to proof and benchmark gates.
 - **GIVEN:** no web search, web store, cloud discovery, or bundled web engine.
@@ -98,5 +99,6 @@ integration happens later through the versioned API. Do not add GUI code or
 couple the engine to File Manager process internals.
 
 Cross-project API and ABI semantics are registered in
-`../orchestrator/spec/CONTRACT_REGISTRY.md`. Propose additions there; do not
-silently export a storage layout or Go representation as the program ABI.
+`../orchestrator/spec/CONTRACT_REGISTRY.md`. Record replies and counterproposals
+in `docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`; do not silently export a
+storage layout or Go representation as the program ABI.

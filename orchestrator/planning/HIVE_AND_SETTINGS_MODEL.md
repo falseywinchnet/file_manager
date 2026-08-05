@@ -1,12 +1,18 @@
-# Oracle hives, registries, and settings
+# Orchestrator hives, registries, and settings
 
 Status: **authority classes accepted; physical stores unresolved**.
 
 ## Do not build one universal database
 
-The Oracle coordinates several stores because their authority and lifecycle
+Orchestrator coordinates several stores because their authority and lifecycle
 differ. They may share a storage library after measurement; they do not share an
 undifferentiated schema or corruption boundary by convenience.
+
+Microsoft's Registry is a comparison for independent logical hives with backing
+and recovery files, not a format candidate. See
+[`STORAGE_REFERENCE_WINDOWS_REGISTRY.md`](STORAGE_REFERENCE_WINDOWS_REGISTRY.md).
+SQLite is admitted for measurement as a possible low-volume transactional store;
+bulk provider generations remain a separate workload.
 
 ## Semantic-memory hive
 
@@ -62,7 +68,7 @@ These are backed up/migrated as operational configuration, not semantic memory.
 
 Core and plugin settings use declarative schemas with stable field IDs, types,
 bounds, defaults, localization keys, sensitivity, restart effect, and migration.
-Values are namespace-owned by the Oracle; File Manager and CLI render/edit them
+Values are namespace-owned by the Orchestrator; File Manager and CLI render/edit them
 through the same transactions.
 
 - no arbitrary settings file access for plugins;
@@ -79,7 +85,7 @@ fields, ingestion rate, publication frequency, query CPU/wall time, result count
 and retained generations. Global and per-root ceilings prevent many individually
 legal providers from exhausting the machine.
 
-The Oracle exposes usage and rejection counters. A plugin crossing a hard limit
+Orchestrator exposes usage and rejection counters. A plugin crossing a hard limit
 loses the current generation or job, not the integrity of a shared critical
 store.
 

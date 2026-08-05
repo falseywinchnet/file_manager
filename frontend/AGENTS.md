@@ -1,0 +1,56 @@
+# File Manager frontend operating instructions
+
+This nested directory is the future C++ File Manager application—not the parent
+multi-project workspace. It consumes Orchestrator as the normal integration
+authority, GUI.Forms in-process, and the systemwide Go engine through
+Orchestrator or the registered degraded fallback.
+
+## Current phase: Frontend 001 waiting on GUI.Forms
+
+Do not create application source, CMake/build files, generated bindings, product
+assets, packages, or prototypes until GUI.Forms gives the named Frontend 001
+consumption go-ahead and the grand architect explicitly directs this project to
+begin. Engine, Orchestrator, plugin, semantic-fact, and Kolmogrov readiness are
+not part of this opening predicate; use the fixture boundaries specified by
+`planning/FRONTEND_001.md`.
+
+Permitted work before that start direction:
+
+- product-flow and anti-model documentation;
+- frontend-owned state and responsibility definitions;
+- dependency/contract review;
+- fake-service scenario design on paper;
+- dogfood workflows and acceptance gates;
+- visual grammar references owned by the parent planning project.
+
+Before editing, read:
+
+1. `README.md`
+2. `planning/FRONTEND_CHARTER.md`
+3. `planning/DEPENDENCY_GATES.md`
+4. `planning/FRONTEND_001.md`
+5. `planning/visual/DESIGN_DNA_006.md`
+6. `planning/visual/FRONTEND_DESIGN_BRIEF_001.md`
+7. `planning/visual/ICON_AUDIT_MIT_002.md`
+8. `planning/DOGFOOD_SEQUENCE.md`
+9. `../orchestrator/spec/CONTRACT_REGISTRY.md`
+10. the accepted root ADRs and relevant parent planning records.
+11. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the frontend client edge.
+
+## Boundary rules
+
+- This project owns application interaction and composition and renders
+  Orchestrator's settings/service controls. It does not own GUI.Forms internals,
+  Go engine storage, Orchestrator policy/hives, or plugin execution.
+- Do not duplicate a dependency to work around an unfinished contract. File an
+  Orchestrator proposal instead.
+- Do not let plugins supply controls, styles, callbacks, or native windows.
+- Do not bypass Orchestrator capability policy or call plugin workers directly.
+- Do not expose private engine/GUI.Forms/Orchestrator implementation types through the
+  frontend.
+- Fixture payloads are frontend test data, not proposed provider contracts. Mark
+  simulated capability state explicitly.
+- Design DNA 006 governs Frontend 001, but its CANDIDATE and HYPOTHESIS entries
+  remain unresolved unless a later verdict or ADR promotes them.
+- Core navigation and file operations remain usable when Orchestrator augmentation is
+  unavailable; reduced behavior must be explicit.

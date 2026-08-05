@@ -3,6 +3,7 @@ package generation
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -170,6 +171,97 @@ func TestSegmentRejectsTruncationAndUnexpectedDigest(t *testing.T) {
 	if reader, err := Open(path, root); err == nil {
 		reader.Close()
 		t.Fatal("truncated segment was opened")
+	}
+}
+
+func TestFormatVersionErrorsDistinguishUpgradeFromMigration(t *testing.T) {
+	root := api.RootSpec{ID: "fixture", Path: filepath.Join(t.TempDir(), "fixture")}
+	encodedManifest, err := encodeManifest(manifest{
+		sequence: 1, root: root, segment: "gen-00000000000000000001-0000000000000000.seg",
+		metadata: Metadata{Generation: 1, Size: 512, ObjectCount: 1, SegmentDigest: sha256.Sum256([]byte("segment"))},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []struct {
+		name  string
+		major uint16
+		minor uint16
+		want  error
+	}{
+		{name: "newer-major", major: formatMajor + 1, want: ErrNewerFormat},
+		{name: "newer-minor", major: formatMajor, minor: formatMinor + 1, want: ErrNewerFormat},
+		{name: "older-major", major: formatMajor - 1, want: ErrMigrationRequired},
+	} {
+		t.Run("manifest-"+candidate.name, func(t *testing.T) {
+			mutated := append([]byte(nil), encodedManifest...)
+			binary.LittleEndian.PutUint16(mutated[8:10], candidate.major)
+			binary.LittleEndian.PutUint16(mutated[10:12], candidate.minor)
+			checksum := sha256.Sum256(mutated[:len(mutated)-sha256.Size])
+			copy(mutated[len(mutated)-sha256.Size:], checksum[:])
+			if _, err := decodeManifest(mutated); !errors.Is(err, candidate.want) {
+				t.Fatalf("decode error=%v, want %v", err, candidate.want)
+			}
+		})
+	}
+
+	shard, err := workload.CorrectnessV1().ReferenceShard(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "version.seg")
+	metadata, err := Write(path, 1, shard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encodedHeader [segmentHeaderSize]byte
+	if _, err := file.Read(encodedHeader[:]); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []struct {
+		name  string
+		major uint16
+		minor uint16
+		want  error
+	}{
+		{name: "newer-major", major: formatMajor + 1, want: ErrNewerFormat},
+		{name: "newer-minor", major: formatMajor, minor: formatMinor + 1, want: ErrNewerFormat},
+		{name: "older-major", major: formatMajor - 1, want: ErrMigrationRequired},
+	} {
+		t.Run("segment-"+candidate.name, func(t *testing.T) {
+			mutated := encodedHeader
+			binary.LittleEndian.PutUint16(mutated[8:10], candidate.major)
+			binary.LittleEndian.PutUint16(mutated[10:12], candidate.minor)
+			checksum := sha256.Sum256(mutated[:segmentHeaderChecksumAt])
+			copy(mutated[segmentHeaderChecksumAt:], checksum[:])
+			if _, err := decodeSegmentHeader(mutated[:], int64(metadata.Size)); !errors.Is(err, candidate.want) {
+				t.Fatalf("decode error=%v, want %v", err, candidate.want)
+			}
+		})
+	}
+}
+
+func TestUnauthenticatedVersionBitsRemainCorruption(t *testing.T) {
+	root := api.RootSpec{ID: "fixture", Path: filepath.Join(string(filepath.Separator), "fixture")}
+	encoded, err := encodeManifest(manifest{
+		sequence: 1, root: root, segment: "gen-00000000000000000001-0000000000000000.seg",
+		metadata: Metadata{Generation: 1, Size: 512, ObjectCount: 1, SegmentDigest: sha256.Sum256([]byte("segment"))},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary.LittleEndian.PutUint16(encoded[8:10], formatMajor+1)
+	_, err = decodeManifest(encoded)
+	if err == nil || errors.Is(err, ErrNewerFormat) || errors.Is(err, ErrMigrationRequired) {
+		t.Fatalf("unauthenticated version mutation error=%v, want ordinary corruption", err)
 	}
 }
 

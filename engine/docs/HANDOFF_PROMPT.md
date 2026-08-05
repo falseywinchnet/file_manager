@@ -21,7 +21,7 @@ Give the following instructions to a sibling task assigned to this directory:
 > addresses; hashes are duplicate/similarity relations. The most-specific
 > approved root exclusively owns each object. Public query/plugin methods never
 > mutate source files. Navigation must survive total engine absence. Semantic
-> models and semantic memory are optional future Oracle-managed providers and
+> models and semantic memory are optional future Orchestrator-managed providers and
 > may not block exact or lexical delivery. Kolmogrov is different: it is the
 > gated production target for the engine's core fuzzy/structural candidate
 > channel. Read `docs/ARCHITECT_HANDOFF_002.md`; interim controls do not silently

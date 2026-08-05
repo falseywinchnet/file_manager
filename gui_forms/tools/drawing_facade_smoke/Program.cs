@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -26,6 +27,10 @@ stream.Position = 0;
 using var decoded = (Bitmap)Image.FromStream(stream);
 Require(decoded.Width == 32 && decoded.Height == 24, "native PNG dimensions");
 Require(decoded.GetPixel(3, 3).B > 240, "native PNG round trip");
+using var converted = (Bitmap?)TypeDescriptor.GetConverter(typeof(Bitmap))
+    .ConvertFrom(stream.ToArray());
+Require(converted is not null && converted.Width == 32 && converted.Height == 24,
+        "resource TypeConverter byte-array PNG");
 
 var data = decoded.LockBits(new Rectangle(0, 0, decoded.Width, decoded.Height),
                             ImageLockMode.ReadOnly,

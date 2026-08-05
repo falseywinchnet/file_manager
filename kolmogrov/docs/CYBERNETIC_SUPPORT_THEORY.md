@@ -16,6 +16,12 @@ A compressed state is sufficient only relative to:
 Changing the action alphabet changes minimum support even when the object set
 and observation do not change.
 
+Changing the task observation changes it as well. T-UNIVERSAL-SUPPORT-1 proves
+that the coarsest state sufficient for several simultaneous task observations
+is their joint observation partition. Separate modality/task states may share
+operators and certificate formats, but a single state serving all tasks pays
+exactly for every distinction in that joint refinement.
+
 ## 2. Exact minimum support
 
 On a finite oracle, the coarsest observation-preserving strongly lumpable
@@ -66,6 +72,13 @@ coordinates without gap transport according to T-EDIT-1.
 
 This measure, rather than one already-fused vector, is the proposed fundamental
 algorithmic support object.
+
+The active construction now packages each pattern/degree slice of that measure
+as a gap polynomial. T-DELETION-ORBIT-1 shows that its deletion neighborhood is
+an exact differential jet. T-HISTORY-COUPLING-1 then restores the deformation
+history axis that an unlabelled derivative marginal discards. The pre-hash state
+is therefore occurrence flow together with history binding, not occurrence
+mass alone.
 
 ## 5. Multi-axis scale lattice
 
@@ -119,6 +132,13 @@ be arbitrarily small while a rare protected state fails completely. Every
 approximate merger therefore needs a statewise tail or protected-hard-negative
 gate in addition to its average.
 
+For a finite protected set, T-OBSTRUCTION-CODE-1 converts that gate into an
+exact capacity certificate. Put an edge between every pair forbidden to
+collide. A `B`-bit code exists exactly when the resulting graph is colorable
+with at most `2^B` colors; margin requirements strengthen this to a Hamming
+separation labeling problem. This is the theorem-bounded width object. It does
+not yield a content-length capacity law without a task-generated graph.
+
 T-JOINT-FLOW-1 also shows that observation refinement is not dynamically
 monotone. Degree-one content is closed under averaged binary edits, while the
 first degree-two collision at length four is not. Support must be closed after
@@ -137,17 +157,32 @@ better compressed state.
   every breakdown.
 - Averaged/equivalence-class deformation controls for perceptual candidate
   generation; exact position-resolved controls only in the authoritative layer.
-- Least four-cell interaction cycles rather than an unexamined full tensor.
+- Least four-cell interaction cycles for named obstructions or a declared
+  relevant span; universal interaction fidelity still pays the full
+  `(p-1)(q-1)` dimension by T-INTERACTION-SPARSITY-1.
 - Protected-state residual gates rather than average commutation error alone.
-- Direction-conditioned progressive paths rather than one universal axis order.
+- Independently addressable detail blocks when task needs are incomparable;
+  T-NESTED-SCHEDULE-1 permits one zero-overhead prefix only for nested needs.
 - Interval-certified coarse quantization with an explicit uncertified outcome.
+- Deformation-jet addresses whose radius components are exact averaged
+  descendants before quantization.
+- History-moment phase channels whose coherent term means “the same edit
+  history supports both pieces of evidence.”
+- Safe run-count blocks for additive history quotienting, paired with
+  idempotent degree-`t+1` observable certificates when retrieval needs to
+  discard history multiplicity.
 
 ## 8. What remains conjectural
 
 - the semantic partition trees that minimize task loss at fixed support;
 - the smallest interaction blocks preserving collision rescue;
 - an approximate lumpability theorem tied to retrieval recall and SNR;
-- whether one route generalizes across modalities;
+- whether concrete modality observations overlap enough to share partitions,
+  rather than only an algebra and verification seam;
 - a quantizer/margin code preserving the projective flow economically;
-- a bridge from geometric contribution energy to relevant information or
-  practical description complexity.
+- a declared probabilistic observation/noise model under which geometric
+  contribution energy bounds relevant information or task loss.
+- whether rich-content projections of affine observable certificates retain the
+  binary E8 candidate-load advantage at equal bytes;
+- whether selected history characters add enough graded fuzzy rescue beyond the
+  idempotent front index to justify their separate support.

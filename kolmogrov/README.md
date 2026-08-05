@@ -41,6 +41,7 @@ theorem-bearing transformations of that oracle.
 - `tests/` — reference and invariant tests.
 - `formal/` — proof-assistant boundary.
 - `experiments/` — replayable experiment packages and manifests.
+- `conformance/` — candidate cross-project reference vectors and lab profiles.
 - `results/` — summaries, least-support obstructions, and rejected candidates.
 
 ## Bootstrap
@@ -91,5 +92,53 @@ The first five-step application is
 [FALSIFIABLE_WORK_ROUND_002.md](docs/FALSIFIABLE_WORK_ROUND_002.md), covering
 joint edit-flow closure, minimum interaction cycles, protected approximate
 closure, progressive path order, and quantization certificates.
+
+The next five least-support results close the previously named low-confidence
+claims in [LOW_CONFIDENCE_ROUND_003.md](docs/LOW_CONFIDENCE_ROUND_003.md).
+The scoped novelty boundary is in
+[PRIOR_ART_BOUNDARY_001.md](docs/PRIOR_ART_BOUNDARY_001.md). Earlier candidate
+contract implications are retained in
+[ORC_KOL_RESEARCH_IMPLICATIONS_001.md](docs/ORC_KOL_RESEARCH_IMPLICATIONS_001.md);
+the active reply and canonical-authority boundary are recorded in
+[ORCHESTRATOR_INTERFACE_NEGOTIATION.md](docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md).
+
+The active invention direction is now the
+[deformation-jet superposition hash](docs/DEFORMATION_JET_SUPERPOSITION_HASH.md).
+[INVENTION_ROUND_004.md](docs/INVENTION_ROUND_004.md) derives its exact
+deletion-orbit, history-coupling, and bounded-radius history-moment objects. The
+goal is explicitly a qualitatively better perceptual hash for search and
+exact-anchored memory retrieval; the new construction remains a candidate until
+it wins at equal serialized support.
+
+Its active build algorithm and highlighted iteration structure are in
+[DEFORMATION_ALGORITHM_REFINEMENT_001.md](docs/DEFORMATION_ALGORITHM_REFINEMENT_001.md).
+E7 measures common-history coherence and the collapse from descendant and
+occurrence enumeration to one streaming degree/radius ladder.
+
+The next retrieval result is
+[RETRIEVAL_REFINEMENT_002.md](docs/RETRIEVAL_REFINEMENT_002.md). It proves the
+radius-`t` semantic degree floor `t+1`, separates safe run-count quotienting
+from impossible full product-phase outcome quotienting, introduces indexable
+affine observable certificates, and records E8 candidate-load and fixed-radius
+specialization measurements.
+
+The rich-alphabet refinement is
+[RICH_CONTENT_PROJECTION_003.md](docs/RICH_CONTENT_PROJECTION_003.md). It
+replaces exact `A^m` masks with coupled nested occupancy cells, proves a
+private-witness support/breakdown law, rejects independent-view membership as
+exact rescue, and records the E9 obstruction-selected projection curve.
+
+The first filename instantiation is
+[FILENAME_PROJECTION_REFINEMENT_004.md](docs/FILENAME_PROJECTION_REFINEMENT_004.md),
+grounded by [Filename Observation Profile 001](docs/FILENAME_OBSERVATION_PROFILE_001.md).
+It freezes exact source-anchored atom lanes, derives the source-symbol
+certificate Jacobian, rejects low-bit atom projection, separates same-length
+rewrites from cross-length edit spans, and begins the logical posting ledger.
+
+The first cross-project conformance seam is the **CANDIDATE**
+[ORC-KOL laboratory profile 001](docs/ORC_KOL_LAB_PROFILE_001.md), with a
+[machine-readable fixture](conformance/orc_kol_001/lab_profile_001.json). It is
+sufficient for an Orchestrator fake provider and an engine experimental adapter;
+it does not advertise production similarity availability.
 
 Start a dedicated worker with [HANDOFF_PROMPT.md](docs/HANDOFF_PROMPT.md).

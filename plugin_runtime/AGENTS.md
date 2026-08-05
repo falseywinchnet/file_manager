@@ -4,14 +4,17 @@ Status: **FROZEN LEGACY RESEARCH INPUT**.
 
 This subtree preserves the earlier repo-shaped study of the hostile plugin
 boundary. Do not begin or continue production implementation here. The active
-authority and future Rust implementation home are `../orchestrator/`; its Oracle
+authority and future Rust implementation home are `../orchestrator/`; its Orchestrator
 plugin-supervisor subsystem must import useful threat, capability, protocol, and
 validation work through the contract proposal process.
 
 Edits here are limited to provenance, factual correction, negative-result
-retention, and explicit export into Oracle unless the grand architect reopens
-the subtree. The repository root `AGENTS.md` and Oracle planning governance
+retention, and explicit export into Orchestrator unless the grand architect reopens
+the subtree. The repository root `AGENTS.md` and Orchestrator planning governance
 remain authoritative.
+
+`planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` is the explicit frozen-research
+import ledger. It may receive factual corrections, not production API or code.
 
 ## Status discipline
 
@@ -56,7 +59,7 @@ plugin_runtime/
 ```
 
 Do not create that workspace here. Future libraries, helpers, tests, fixtures,
-and SDK artifacts belong under Oracle after its implementation gate opens.
+and SDK artifacts belong under Orchestrator after its implementation gate opens.
 
 ## Security engineering
 

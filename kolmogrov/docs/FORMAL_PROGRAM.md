@@ -88,6 +88,20 @@ an address family
 where channels, resolutions, and seeds remain independently retrievable. Fusion
 acts on evidence returned by these addresses.
 
+The active construction instantiates these addresses from a deformation jet,
+not only from the terminal object. For gap-simplex occurrence polynomial `G_x`,
+selected addresses probe:
+
+```text
+base evidence:          G_x
+radius-t orbit:         D^t G_x / n^(underline t)
+history-bound orbit:    sum_(|R|=t) chi_q(R) G_(x\R).
+```
+
+T-DELETION-ORBIT-1 makes the radial family one exact contraction orbit.
+T-HISTORY-COUPLING-1 supplies multiplicative projections that keep features
+from the same edit history phase-bound before superposition.
+
 T-SUPER-1 should compare a multi-address family against an equal-total-bit fused
 projection. Desired results:
 
@@ -190,6 +204,45 @@ projection is selected:
 5. state what quantization destroys and what margin support restores;
 6. instantiate the abstract `Phi_m` from canonical gap-simplex evidence and
    measure projective residuals before choosing widths.
+
+The deformation-jet subprogram now supplies a concrete dependency chain:
+
+1. package gap-simplex occurrences as homogeneous polynomials;
+2. derive exact edit-orbit generators from the occurrence action;
+3. retain deformation-history coupling before taking orbit marginals;
+4. choose structurally derived history phases and gap/content probes;
+5. quantify coherent signal, incompatible-history interference, jet tail, and
+   quantizer breakdown separately;
+6. compare the fixed-width result against terminal, unbound multi-address, and
+   exact-oracle controls at equal serialized support.
+
+The rich-pattern projection subprogram adds:
+
+1. freeze a canonical experimental atom stream and bounded atom code;
+2. retain whole-pattern coupling through each certificate projection;
+3. prove nested count/occupancy contraction and monotone candidate recall;
+4. measure private-witness loss and apply `B>=cH` before selecting depth;
+5. compile prefix order against protected mutation directions and candidate
+   tails, with a full-rank finest completion;
+6. freeze on development data and evaluate on a disjoint File Manager workload;
+7. lift pattern visibility to a per-source-symbol Jacobian before claiming
+   atomic SNR support.
+
+The filename/engine-support continuation is:
+
+1. version source-anchored literal, folded, and structural atom lanes;
+2. localize each same-length rewrite to affected offset states and projected
+   occupancy crossings;
+3. treat adjacent transposition as a joint two-position secant, not the sum of
+   independent responses;
+4. represent insertion/deletion as typed cross-configuration spans unless an
+   edit-lineage transport is declared;
+5. charge index support by logical posting memberships and per-list exact-set
+   information before selecting a codec;
+6. retrieve same-length common-descendant candidates by occupied-cell posting
+   unions while retaining the incompatible-history residual;
+7. measure physical reads, bytes, updates, candidate tails, and verification
+   only after the profile and protected mutation graph freeze.
 
 Each theorem begins on paper, is attacked by least-support obstruction search,
 and moves to `formal/` when definitions stabilize. Search output is discarded

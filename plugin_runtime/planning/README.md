@@ -1,6 +1,6 @@
 # Plugin Runtime planning index
 
-Status: **frozen research program, retained as Oracle input**.
+Status: **frozen research program, retained as Orchestrator input**.
 
 Do not dispatch implementation from this directory. The active specification,
 proposal, and future implementation path is [`../../orchestrator/`](../../orchestrator/).

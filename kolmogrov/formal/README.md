@@ -33,6 +33,26 @@ experiment until its definitions stabilize.
 - `T-APPROX-CLOSURE-1.md` — weighted residual and rare-state obstruction.
 - `T-PATH-ORDER-1.md` — least progressive path-order obstruction.
 - `T-QUANT-CERT-1.md` — sharp interval certificate after quantization.
+- `T-UNIVERSAL-SUPPORT-1.md` — minimum shared multi-task observation support.
+- `T-OBSTRUCTION-CODE-1.md` — protected graph coloring and exact bit width.
+- `T-ENERGY-INFORMATION-1.md` — least energy/relevance separation.
+- `T-NESTED-SCHEDULE-1.md` — exact criterion for a zero-overhead prefix order.
+- `T-INTERACTION-SPARSITY-1.md` — full-dimensional universal interaction bound.
+- `T-DELETION-ORBIT-1.md` — exact differential deletion orbit and jet shift.
+- `T-HISTORY-COUPLING-1.md` — deformation-history lift and least marginal failure.
+- `T-HISTORY-MOMENTS-1.md` — bounded-radius multiplicative history codes.
+- `T-HISTORY-COHERENCE-1.md` — exact common-history character correlation.
+- `T-SAMPLED-HISTORY-1.md` — selected-phase signal/interference certificate.
+- `T-STREAMING-JET-1.md` — linear degree/radius streaming recurrence.
+- `T-PAIRWISE-HISTORY-1.md` — pair closure at radius one and least radius-two failure.
+- `T-DELETION-CLOSURE-1.md` — exact radius-`t` interaction order and support bound.
+- `T-HISTORY-QUOTIENT-1.md` — safe run quotient and full-outcome phase obstruction.
+- `T-PROJECTION-REFINEMENT-1.md` — nested rich-pattern projection, private
+  witnesses, and provenance-mixing obstructions.
+- `T-SYMBOL-JACOBIAN-1.md` — exact source-symbol flow into certificate cells.
+- `T-TYPED-EDIT-SEAM-1.md` — same-length secants and cross-length edit spans.
+- `T-POSTING-SUPPORT-1.md` — logical posting membership and information charge.
+- `T-SYMMETRIC-CERTIFICATE-1.md` — same-length common-descendant front index.
 
 All are **HYPOTHESIS** pending independent review. “Complete paper proof” in
 `PROOF_LEDGER.md` means the definitions, quantifiers, proof, exclusions, and

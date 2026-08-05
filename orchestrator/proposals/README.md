@@ -1,8 +1,9 @@
 # Cross-project contract proposals
 
-Subprojects place paper proposals under a directory named for the source project,
-for example `engine/`, `gui_forms/`, `file_manager/`, `kolmogrov/`, or
-`plugin_supervisor/`.
+Subprojects may place unsolicited proposals under a directory named for the
+source project. Orchestrator then routes the proposal into the affected
+project-local `ORCHESTRATOR_INTERFACE_NEGOTIATION.md` round. Orchestrator-originated
+requirements begin directly in that project-local note.
 
 A proposal must state:
 
@@ -17,5 +18,6 @@ A proposal must state:
 - alternatives and reversal path;
 - required golden and hostile fixtures.
 
-Proposal acceptance is not automatic. The canonical result is integrated into
-`../spec/` and receives a contract ID/status update.
+Proposal acceptance is not automatic. The project replies in its local ledger;
+Orchestrator records the reconciliation. Only the integrated result under
+`../spec/` is canonical and receives a contract ID/status update.

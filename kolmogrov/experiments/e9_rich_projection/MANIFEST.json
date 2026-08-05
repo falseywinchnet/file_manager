@@ -1,0 +1,18 @@
+{
+  "experiment": "E9-rich-projection-001",
+  "status": "candidate finite comparison",
+  "domain": {
+    "alphabet": ["a", "b", "c", "d"],
+    "source_length": 7,
+    "deletion_radius": 2,
+    "query_length": 5,
+    "certificate_degree": 3,
+    "certificate_family": "complete"
+  },
+  "controls": [
+    "exact 64-cell whole-pattern mask per certificate",
+    "equal 16-bit projected layouts"
+  ],
+  "command": "python3 experiments/e9_rich_projection/run.py",
+  "inference_boundary": "synthetic exhaustive symbolic domain only; no production quality or latency claim"
+}

@@ -108,5 +108,31 @@ int main() {
     foreign.join();
     CHECK(foreign_result == GD_ERROR_WRONG_THREAD);
     CHECK(api.release(brush) == GD_OK);
+
+    gd_handle handed_off_recorder{};
+    CHECK(api.recorder_create(&handed_off_recorder) == GD_OK);
+    std::thread recorder_worker([&] {
+        foreign_result = api.recorder_set_quality(
+            handed_off_recorder, 4, 5, 4, 0, 2);
+    });
+    recorder_worker.join();
+    CHECK(foreign_result == GD_OK);
+    // A later call deterministically hands the recorder back to this thread.
+    std::uint64_t command_count{};
+    CHECK(api.recorder_command_count(handed_off_recorder, &command_count) == GD_OK);
+    CHECK(command_count == 1U);
+    CHECK(api.release(handed_off_recorder) == GD_OK);
+
+    gd_handle shared_brush{};
+    CHECK(api.solid_brush_create({UINT32_C(0xff00ff00), 0}, &shared_brush) == GD_OK);
+    CHECK(api.recorder_create(&handed_off_recorder) == GD_OK);
+    std::thread resource_worker([&] {
+        foreign_result = api.recorder_fill_rectangle(
+            handed_off_recorder, shared_brush, {0, 0, 4, 4});
+    });
+    resource_worker.join();
+    CHECK(foreign_result == GD_OK);
+    CHECK(api.release(handed_off_recorder) == GD_OK);
+    CHECK(api.release(shared_brush) == GD_OK);
     return 0;
 }

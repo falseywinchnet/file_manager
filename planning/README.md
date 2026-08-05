@@ -22,19 +22,7 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `SURFACE_PIPELINE.md` | Native stateful retained UI hypothesis and open design axes |
 | `INTERVIEW_ROUND_002.md` | Concrete Finder/Explorer anti-model and richness questions |
 | `QUESTION_ATLAS.md` | Numbered questions, beginning with what the product must not become |
-| `visual/VISUAL_CUE_INVENTORY.md` | Atomic 2000–2012 accept/adapt/reject visual ledger |
-| `visual/VERDICT_ROUND_001.md` | First atomic structure/material verdict batch |
-| `visual/VERDICTS_001.md` | Architect's first visual verdicts and constrained synthesis |
-| `visual/visual-atlas.html` | Visible, interactive reference atlas with locally saved verdicts |
-| `visual/CEREMONIAL_SOFTWARE_ROUND_001.md` | Scope and guardrails for installer, OOBE, and professional-tool aesthetics |
-| `visual/ceremonial-software-atlas.html` | 17-object, 68-cue interactive installer/motion/Visual Studio verdict board |
-| `visual/CEREMONIAL_VERDICTS_001.md` | Architect's installer, OOBE, progress, and professional-tool verdict synthesis |
-| `visual/MATERIAL_DEPTH_ROUND_001.md` | Depth loci and scope for skeuomorphic/material/pattern research |
-| `visual/material-depth-atlas.html` | Static, visible accept/distill/reject board for 3D structure and pattern families |
-| `visual/MATERIAL_VERDICTS_001.md` | Architect's material, depth, configuration, and frozen-pattern synthesis |
-| `visual/COLOR_RELATION_MODEL.md` | OKLCH foreground/background pair doctrine and Office-derived seed palette |
-| `visual/FRONTEND_DESIGN_BRIEF_001.md` | Pooled frontend/dependency knowledge, first coherent daily-work visual grammar, icon shortlist, and open design questions |
-| `visual/frontend-concept-atlas.html` | Deterministic HTML program mockups for folder, search, criteria, theme, and icon-direction review |
+| `../frontend/planning/visual/` | Frontend-owned design evidence, verdicts, atlases, Design DNA 006, palette/style direction, and asset audits |
 | `gui_forms/WINFORMS_CONTROL_INVENTORY.md` | Exhaustive compatibility catalogue (research in progress) |
 | `gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md` | Observed serious-consumer compatibility envelope (research in progress) |
 | `gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md` | Renderer, host, text, state, event, DML, ABI, and demonstration choices |
@@ -42,11 +30,13 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` | Theme/language assemblies, PNG boundary, safe fallback, and retired compatibility specimen-informed mutable configuration candidates |
 | `search/SEARCH_RECONCILIATION_001.md` | Search identity, root ownership, offline-catalogue, result-motion, mutation-boundary, ConeDAG, and semantic-deferral constraints from the first completed board export |
 | `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
-| `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Accepted Oracle contract authority, repository topology, and phased GUI.Forms → engine → Oracle → frontend program sequence |
+| `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Superseded historical Oracle name and global dependency gate |
+| `../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md` | Accepted Orchestrator name, integration authority, project-local ABI negotiation, and active bootstrap kernel |
+| `../decisions/ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md` | Accepted frontend location, Design DNA authority, Frontend 001 scope, and GUI.Forms-only technical opening gate |
 | `../engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
 | `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
-| `../orchestrator/` | Paper-first Oracle specification repository and canonical cross-project contract registry |
-| `../file_manager/` | Waiting end-user frontend repository; implementation is gated on GUI.Forms, engine, and Oracle snapshots |
+| `../orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
+| `../frontend/` | End-user frontend repository; Frontend 001 waits for GUI.Forms go-ahead and architect start direction, with service fixtures permitted |
 
 The following parent-level artifacts remain deliberately absent until the
 interview supplies their inputs:
@@ -73,7 +63,7 @@ not imply that the complete parent plan or every component choice is closed.
 - File handlers, icons, previews, sorting, and plugins require explicit product
   models rather than uncontrolled inheritance from host-shell behavior.
 - File Manager itself will not rely on .NET, Java, Godot, or a bundled browser
-  engine. GUI.Forms and the end-user surface are disciplined C++; Oracle and
+  engine. GUI.Forms and the end-user surface are disciplined C++; Orchestrator and
   hostile plugin supervision are Rust; the opt-in indexing/search service is a
   standalone Go engine with purpose-built storage and retrieval machinery.
   Mature databases remain mandatory measurement controls rather than its

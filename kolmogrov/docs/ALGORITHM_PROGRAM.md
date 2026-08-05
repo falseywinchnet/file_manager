@@ -116,6 +116,34 @@ Candidate organizations:
 - error-correcting or redundant channel layouts;
 - adaptive bit allocation frozen by object class, never per-query magic.
 
+### Active deformation-jet build candidate
+
+T-STREAMING-JET-1 replaces descendant and occurrence enumeration with one
+retain/delete/select recurrence. For frozen maximum degree `K`, radius `T`, and
+probe count `Q`, it visits `O(nKTQ)` state/probe cells, uses two `O(KTQ)` slabs,
+and emits all degree rows in the same pass. The intended native form batches
+probe channels in the SIMD dimension, precomputes history phases, specializes
+small `K,T`, and allocates nothing on the hot path.
+
+Query coherence order follows T-PAIRWISE-HISTORY-1: pairwise history evidence is
+structurally complete for one deletion; radius two first needs triple binding or
+higher-degree occurrence atoms. Do not evaluate the exhaustive all-feature
+character product in the active path.
+
+T-DELETION-CLOSURE-1 completes this order law: exact radius-`t` positional
+deletion support requires and suffices at degree `t+1`. T-HISTORY-QUOTIENT-1
+then separates a safe run-count block recurrence from full outcome
+deduplication, which cannot remain an exact cancellative product phase from
+radius two.
+
+The active retrieval candidate therefore adds an idempotent certificate layer.
+A frozen affine schedule selects degree-`t+1` target-position subsets. Each
+source certificate stores the patterns obtainable over only `C(2t+1,t+1)`
+monotone offset states, and each query performs one posting lookup per retained
+certificate. This layer proposes candidates; the numeric jet remains an
+independent graded-energy/rescue address. See `RETRIEVAL_REFINEMENT_002.md` and
+E8. Neither layer is selected for release.
+
 The hash configuration includes every seed, feature version, prevalence
 generation, normalization, weight, quantizer, width, and byte order.
 
@@ -134,6 +162,37 @@ declared latency gate:
 No index may hide a candidate that the hash theorem says must be returned under
 its assumptions. Every approximate index exposes its miss rate separately from
 hash-quality error.
+
+The current concrete front-index candidate is the affine observable-certificate
+posting family from E8. Its mandatory metrics are ideal payload bits, posting
+entries/source, lookup count, candidate-load distribution, exact descendant
+recall, and post-verification precision. Complete degree-`t+1` schedules are the
+exact semantic control; bounded schedules must report their surviving false
+candidates.
+
+For rich atom alphabets, the active pattern-axis candidate is the coupled nested
+occupancy projection in `RICH_CONTENT_PROJECTION_003.md`. One whole pattern maps
+to one cell per view; slot marginals and independently intersected narrow views
+are not substitutes for common-witness membership. Build work remains
+`O(Q C(t+m,m) m S)` with no `A^m` or deletion-history loop. Configuration must
+freeze the atom-code width, ordered projection rows/weights, radix, depth, and
+private-witness failure gate. E9's selected rows are development evidence only.
+
+Filename Profile 001 now supplies exact pre-projection lanes. The active
+development compiler consumes protected atom-difference and source-Jacobian
+columns rather than truncating low bits. `compile_balanced_binary_rows` is only
+a zero-column control. E10 shows why: low-bit folded projection collapsed to
+roughly one posting cell/certificate, while balanced rows restored named
+mutation energy. Same-length rewrites reuse the mutation-flow audit;
+insertion/deletion query exact-length source schedules admitted by the typed
+length budget until a lineage-conditioned transport is justified.
+
+Same-length fuzzy retrieval uses T-SYMMETRIC-CERTIFICATE-1. Build the query's
+projected masks with the same fixed offset-state loop; union postings for its
+occupied cells within each certificate/view, then intersect those unions.
+This retains every common deletion descendant without enumerating descendants.
+The `aaba/babb` obstruction proves that exact verification remains necessary
+even with the complete degree-`t+1` schedule.
 
 ## Phase F — optimization
 

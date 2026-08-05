@@ -137,7 +137,12 @@ endif()
 
 if(GUI_FORMS_ENABLE_SKIA)
     set(GUI_FORMS_SKIA_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia)
-    set(GUI_FORMS_SKIA_OUT ${GUI_FORMS_SKIA_ROOT}/out/gui_forms-cpu-release)
+    set(GUI_FORMS_SKIA_OUT
+        "${GUI_FORMS_SKIA_ROOT}/out/gui_forms-cpu-release"
+        CACHE PATH "Directory containing the pinned CPU-only Skia archives")
+    option(GUI_FORMS_SKIA_PREBUILT
+           "Use already-built Skia archives instead of invoking the host build"
+           OFF)
     set(GUI_FORMS_SKIA_ARCHIVES
         ${GUI_FORMS_SKIA_OUT}/libskia.a
         ${GUI_FORMS_SKIA_OUT}/libskcms.a
@@ -145,18 +150,26 @@ if(GUI_FORMS_ENABLE_SKIA)
         ${GUI_FORMS_SKIA_OUT}/libzlib.a
     )
 
-    add_custom_command(
-        OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
-        DEPENDS
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
-            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
-        COMMENT "Building pinned CPU-only, PNG-only Skia"
-        VERBATIM
-    )
+    if(GUI_FORMS_SKIA_PREBUILT)
+        foreach(archive_path IN LISTS GUI_FORMS_SKIA_ARCHIVES)
+            if(NOT EXISTS "${archive_path}")
+                message(FATAL_ERROR "Missing prebuilt Skia archive: ${archive_path}")
+            endif()
+        endforeach()
+    else()
+        add_custom_command(
+            OUTPUT ${GUI_FORMS_SKIA_ARCHIVES}
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh ${GUI_FORMS_SKIA_OUT}
+            DEPENDS
+                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fetch_skia_cpu.sh
+                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/build_skia_cpu.sh
+                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_cpu_args.gn
+                ${CMAKE_CURRENT_SOURCE_DIR}/third_party/skia_png_only.patch
+            COMMENT "Building pinned CPU-only, PNG-only Skia"
+            VERBATIM
+        )
+    endif()
     add_custom_target(gui_forms_skia_dependency DEPENDS ${GUI_FORMS_SKIA_ARCHIVES})
 
     foreach(archive IN ITEMS skia skcms png zlib)
@@ -254,6 +267,16 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
     if(WIN32)
         set_target_properties(gui_drawing_raster_c_api PROPERTIES PREFIX "")
+        add_custom_command(TARGET gui_drawing_raster_c_api POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
+                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids.ttf"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
+                "$<TARGET_FILE_DIR:gui_drawing_raster_c_api>/fonts/PortsmouthRapids-Bold.ttf"
+        )
     endif()
 endif()
 

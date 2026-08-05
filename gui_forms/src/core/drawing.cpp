@@ -757,6 +757,10 @@ void DrawingObject::require_alive() const {
     }
 }
 
+void DrawingObject::handoff_to_current_thread() {
+    owner_thread_ = std::this_thread::get_id();
+}
+
 void DrawingObject::on_dispose() noexcept {}
 
 SolidBrush::SolidBrush(Color color) : color_(color) {}

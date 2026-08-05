@@ -93,6 +93,24 @@ selected[imageType].Add(imageType.GetMethods(BindingFlags.Public | BindingFlags.
                       parameters[0].ParameterType.FullName == "System.IO.Stream" &&
                       parameters[1].ParameterType.FullName == "System.Drawing.Imaging.ImageFormat"));
 
+// .resources stores legacy Bitmap values with the ActivatorStream encoding.
+// This constructor is reached reflectively by System.Resources.Extensions and
+// therefore cannot appear as a static IL operand in the specimen catalogue.
+var bitmapType = assemblies["System.Drawing.Common"].GetType(
+    "System.Drawing.Bitmap", throwOnError: true)!;
+AddType(bitmapType);
+selected[bitmapType].Add(bitmapType.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+    .Single(constructor => constructor.GetParameters() is var parameters &&
+                           parameters.Length == 1 &&
+                           parameters[0].ParameterType.FullName == "System.IO.Stream"));
+var iconType = assemblies["System.Drawing.Common"].GetType(
+    "System.Drawing.Icon", throwOnError: true)!;
+AddType(iconType);
+selected[iconType].Add(iconType.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+    .Single(constructor => constructor.GetParameters() is var parameters &&
+                           parameters.Length == 1 &&
+                           parameters[0].ParameterType.FullName == "System.IO.Stream"));
+
 void AddSignatureType(Type type)
 {
     while (type.HasElementType) type = type.GetElementType()!;
@@ -238,6 +256,10 @@ static string EmitAssembly(string assemblyName, HashSet<Type> owned, Dictionary<
         result.AppendLine("        private static readonly bool Trace = global::System.Environment.GetEnvironmentVariable(\"GUI_DRAWING_TRACE_STUBS\") == \"1\";");
         result.AppendLine("        internal static T Value<T>(string member) { if (Trace) global::System.Console.Error.WriteLine(\"drawing-facade-stub=\" + member); return default!; }");
         result.AppendLine("    }");
+        result.AppendLine("    public sealed class ImageConverter : global::System.ComponentModel.TypeConverter {");
+        result.AppendLine("        public override bool CanConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Type sourceType) => sourceType == typeof(byte[]) || base.CanConvertFrom(context, sourceType);");
+        result.AppendLine("        public override object? ConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Globalization.CultureInfo? culture, object value) { if (value is byte[] bytes) return NativeDrawingBridge.DecodePng(bytes); return base.ConvertFrom(context, culture, value); }");
+        result.AppendLine("    }");
         result.AppendLine("}");
     }
     return result.ToString();
@@ -264,6 +286,8 @@ static void EmitType(StringBuilder output, Type type, HashSet<Type> owned,
     }
     var isStatic = type.IsAbstract && type.IsSealed;
     var kind = type.IsInterface ? "interface" : type.IsValueType ? "struct" : "class";
+    if (type.FullName is "System.Drawing.Image" or "System.Drawing.Bitmap")
+        output.Append(pad).AppendLine("[global::System.ComponentModel.TypeConverter(typeof(global::System.Drawing.ImageConverter))]");
     output.Append(pad).Append("public ");
     if (isStatic) output.Append("static "); else if (type.IsAbstract && !type.IsInterface) output.Append("abstract ");
     output.Append("partial ").Append(kind).Append(' ').Append(CleanName(type));
@@ -274,6 +298,8 @@ static void EmitType(StringBuilder output, Type type, HashSet<Type> owned,
         type.Assembly.GetName().Name == "System.Drawing.Common" &&
         type.GetInterfaces().Any(value => value.FullName == "System.IDisposable"))
         output.Append(hasBase ? ", " : " : ").Append("global::System.IDisposable");
+    if (type.FullName == "System.Drawing.Graphics")
+        output.Append(", global::System.Drawing.IDeviceContext");
     if (type.FullName is "System.Windows.Forms.UpDownBase" or
         "System.Windows.Forms.PictureBox" or
         "System.Windows.Forms.DataGridView" or
@@ -288,14 +314,17 @@ static void EmitType(StringBuilder output, Type type, HashSet<Type> owned,
         output.Append(pad).AppendLine("    private void __NativeChanged(NativeChange change) { if (change == NativeChange.Text) TextChanged?.Invoke(this, global::System.EventArgs.Empty); else if (change == NativeChange.Visible) VisibleChanged?.Invoke(this, global::System.EventArgs.Empty); }");
         output.Append(pad).AppendLine("    internal virtual bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) Click?.Invoke(this, global::System.EventArgs.Empty); return false; }");
         output.Append(pad).AppendLine("    private void __NativePointer(NativePointer input) { var button = input.Button switch { 1u => MouseButtons.Left, 2u => MouseButtons.Right, 3u => MouseButtons.Middle, _ => MouseButtons.None }; var e = new MouseEventArgs(button, input.Kind is 6u or 7u ? 1 : 0, (int)global::System.Math.Round(input.X), (int)global::System.Math.Round(input.Y), (int)global::System.Math.Round(input.WheelDelta)); switch (input.Kind) { case 5u: OnMouseMove(e); break; case 6u: OnMouseDown(e); break; case 7u: OnMouseUp(e); break; case 8u: OnMouseWheel(e); break; case 9u: OnMouseEnter(global::System.EventArgs.Empty); break; case 10u: OnMouseLeave(global::System.EventArgs.Empty); break; } }");
-        output.Append(pad).AppendLine("    internal string __RunNativeWindow() { return __native.RunWindow(global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_AUTOMATION_CLOSE\") == \"1\", global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_FORCE_HEADLESS\") == \"1\", global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_AUTOMATION_ACTIVATE\") == \"1\"); }");
+        output.Append(pad).AppendLine("    internal string __RunNativeWindow() { return __native.RunWindow(global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_AUTOMATION_CLOSE\") == \"1\", global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_FORCE_HEADLESS\") == \"1\", global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_AUTOMATION_ACTIVATE\") == \"1\", false); }");
+        output.Append(pad).AppendLine("    internal string __RunNativePopup() { return __native.RunWindow(false, global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_FORCE_HEADLESS\") == \"1\", false, true); }");
         output.Append(pad).AppendLine("    internal void __RequestClose() { __native.RequestClose(); }");
+        output.Append(pad).AppendLine("    internal uint __NativeCheckState { get { return __native.CheckState; } set { __native.CheckState = value; } }");
         output.Append(pad).AppendLine("    private bool __loadRaised;");
         output.Append(pad).AppendLine("    internal static readonly bool __TraceLifecycle = global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_LIFECYCLE\") == \"1\";");
+        output.Append(pad).AppendLine("    internal static readonly bool __TraceInteraction = global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_INTERACTION\") == \"1\";");
         output.Append(pad).AppendLine("    internal bool __HasRaisedLoad { get { return __loadRaised; } }");
         output.Append(pad).AppendLine("    internal bool __BeginLoad() { if (__loadRaised) return false; __loadRaised = true; return true; }");
         output.Append(pad).AppendLine("    internal void __RaiseChildrenLoad() { foreach (Control child in Controls) child.__RaiseLoad(); }");
-        output.Append(pad).AppendLine("    internal void __DumpTree(int depth) { global::System.Console.Error.WriteLine(\"facade-tree=\" + new string(' ', depth * 2) + GetType().FullName + \"|name=\" + Name + \"|bounds=\" + Bounds.X + \",\" + Bounds.Y + \",\" + Bounds.Width + \",\" + Bounds.Height + \"|dock=\" + Dock + \"|visible=\" + Visible + \"|raster=\" + __native.SupportsRaster + \"|children=\" + Controls.Count); foreach (Control child in Controls) child.__DumpTree(depth + 1); }");
+        output.Append(pad).AppendLine("    internal void __DumpTree(int depth) { var table = this as TableLayoutPanel; global::System.Console.Error.WriteLine(\"facade-tree=\" + new string(' ', depth * 2) + GetType().FullName + \"|name=\" + Name + \"|bounds=\" + Bounds.X + \",\" + Bounds.Y + \",\" + Bounds.Width + \",\" + Bounds.Height + \"|dock=\" + Dock + \"|visible=\" + Visible + \"|autosize=\" + __autoSize + \"|raster=\" + __native.SupportsRaster + \"|children=\" + Controls.Count + (table is null ? string.Empty : table.__TableTrace())); foreach (Control child in Controls) child.__DumpTree(depth + 1); }");
         output.Append(pad).AppendLine("    internal virtual void __RaiseLoad() { if (!__BeginLoad()) return; __RaiseChildrenLoad(); __RenderManagedPaint(); }");
     }
     if (type.FullName == "System.Windows.Forms.Application")
@@ -320,7 +349,7 @@ static void EmitType(StringBuilder output, Type type, HashSet<Type> owned,
     }
     if (type.FullName == "System.Windows.Forms.CheckBox")
     {
-        output.Append(pad).AppendLine("    internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) CheckState = Checked ? CheckState.Unchecked : CheckState.Checked; return base.__NativeEvent(kind); }");
+        output.Append(pad).AppendLine("    internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) { if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=checkbox-native-begin|name=\" + Name); CheckState = (CheckState)__NativeCheckState; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=checkbox-native-end|name=\" + Name + \"|checked=\" + Checked); } return base.__NativeEvent(kind); }");
     }
     if (type.FullName == "System.Windows.Forms.Button")
     {
@@ -328,7 +357,7 @@ static void EmitType(StringBuilder output, Type type, HashSet<Type> owned,
     }
     if (type.FullName == "System.Windows.Forms.RadioButton")
     {
-        output.Append(pad).AppendLine("    internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) { if (Parent is not null) foreach (Control peer in Parent.Controls) if (peer is RadioButton radio && !global::System.Object.ReferenceEquals(radio, this)) radio.Checked = false; Checked = true; } return base.__NativeEvent(kind); }");
+        output.Append(pad).AppendLine("    internal override bool __NativeEvent(NativeEvent kind) { if (kind == NativeEvent.Clicked) { if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-native-begin|name=\" + Name); if (Parent is not null) foreach (Control peer in Parent.Controls) if (peer is RadioButton radio && !global::System.Object.ReferenceEquals(radio, this)) radio.Checked = false; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-native-peers|name=\" + Name); Checked = __NativeCheckState != 0u; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-native-end|name=\" + Name + \"|checked=\" + Checked); } return base.__NativeEvent(kind); }");
     }
     if (type.FullName == "System.Windows.Forms.UserControl")
     {
@@ -437,6 +466,10 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("internal bool __imageDisposed;");
             Add("internal NativeDrawingBridge.Handle __BitmapHandle { get { return __bitmap; } }");
             break;
+        case "System.Drawing.Icon":
+            Add("internal byte[] __iconData = global::System.Array.Empty<byte>();");
+            Add("internal bool __iconDisposed;");
+            break;
         case "System.Drawing.Brush":
             Add("internal NativeDrawingBridge.Handle __handle;");
             Add("internal global::System.Drawing.Color __color;");
@@ -467,6 +500,7 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             break;
         case "System.Drawing.Graphics":
             Add("internal NativeDrawingBridge.Handle __recorder;");
+            Add("internal void __EnsureRecorder() { if (__recorder.IsNull) __recorder = NativeDrawingBridge.RecorderCreate(); }");
             Add("internal global::System.Drawing.Image? __target;");
             Add("internal nint __nativeSurface;");
             Add("internal uint __nativeSurfaceKind;");
@@ -555,8 +589,11 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("internal ImageLayout __ProjectionBackgroundImageLayout { get { return __backgroundImageLayout; } }");
             Add("private void __ApplyEffectiveColors() { __native.SetColors(ForeColor, BackColor); foreach (Control child in Controls) if (child.__InheritsColors) child.__ApplyEffectiveColors(); }");
             Add("private bool __renderingManagedPaint;");
+            Add("private int __paintQueued;");
             Add("private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, byte> __paintTrace = new();");
             Add("internal void __RenderManagedPaint() { if (!global::System.OperatingSystem.IsWindows()) return; __RenderManagedPaintWindows(); }");
+            Add("private void __RenderManagedPaintNow() { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); if (!__native.IsDisposed) __RenderManagedPaint(); }");
+            Add("private void __QueueManagedPaint() { if (__native.IsDisposed) return; if (!__loadRaised || FindForm() is null) { __RenderManagedPaint(); return; } if (global::System.Threading.Interlocked.Exchange(ref __paintQueued, 1) != 0) return; try { _ = BeginInvoke((global::System.Action)__RenderManagedPaintNow); } catch { global::System.Threading.Interlocked.Exchange(ref __paintQueued, 0); throw; } }");
             Add("private void __RenderManagedPaintWindows() { if (__native.IsDisposed || !__native.SupportsRaster || __renderingManagedPaint || Width <= 0 || Height <= 0 || Width > 4096 || Height > 4096) return; __renderingManagedPaint = true; try { using var bitmap = new global::System.Drawing.Bitmap(Width, Height, global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb); using (var graphics = global::System.Drawing.Graphics.FromImage(bitmap)) { graphics.Clear(BackColor); OnPaint(new PaintEventArgs(graphics, ClientRectangle)); } using var stream = new global::System.IO.MemoryStream(); bitmap.Save(stream, global::System.Drawing.Imaging.ImageFormat.Png); var png = stream.ToArray(); if (!__native.IsDisposed) __native.SetRaster(png); var typeName = GetType().FullName ?? GetType().Name; if (global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_PAINT\") == \"1\" && __paintTrace.TryAdd(typeName, 0)) global::System.Console.Error.WriteLine(\"facade-paint=type:\" + typeName + \"|size:\" + Width + \"x\" + Height + \"|png:\" + png.Length); } catch (global::System.Exception error) { Application.__ReportCallbackException(error); } finally { __renderingManagedPaint = false; } }");
             Add("private void __ApplyDockLayout() { var remaining = new global::System.Drawing.Rectangle(__padding.Left, __padding.Top, global::System.Math.Max(0, ClientSize.Width - __padding.Left - __padding.Right), global::System.Math.Max(0, ClientSize.Height - __padding.Top - __padding.Bottom)); for (var index = __controls.Count - 1; index >= 0; --index) { var child = __controls[index]; if (!child.Visible) continue; var bounds = child.Bounds; switch (child.Dock) { case DockStyle.Top: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Y, remaining.Width, bounds.Height); remaining.Y += bounds.Height; remaining.Height = global::System.Math.Max(0, remaining.Height - bounds.Height); break; case DockStyle.Bottom: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Bottom - bounds.Height, remaining.Width, bounds.Height); remaining.Height = global::System.Math.Max(0, remaining.Height - bounds.Height); break; case DockStyle.Left: bounds = new global::System.Drawing.Rectangle(remaining.X, remaining.Y, bounds.Width, remaining.Height); remaining.X += bounds.Width; remaining.Width = global::System.Math.Max(0, remaining.Width - bounds.Width); break; case DockStyle.Right: bounds = new global::System.Drawing.Rectangle(remaining.Right - bounds.Width, remaining.Y, bounds.Width, remaining.Height); remaining.Width = global::System.Math.Max(0, remaining.Width - bounds.Width); break; case DockStyle.Fill: bounds = remaining; break; default: continue; } child.Bounds = bounds; } }");
             Add("internal void __SetParent(Control? value) { if (global::System.Object.ReferenceEquals(__parent, value)) return; if (__parent is not null) __parent.Controls.Remove(this); if (value is not null) value.Controls.Add(this); }");
@@ -564,6 +601,9 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("internal bool __ContainsDescendant(Control candidate) { foreach (Control child in Controls) if (global::System.Object.ReferenceEquals(child, candidate) || child.__ContainsDescendant(candidate)) return true; return false; }");
             Add("internal void __SetStyle(ControlStyles style, bool enabled) { var bits = (long)style; if (enabled) __styles |= bits; else __styles &= ~bits; }");
             Add("internal Padding __LayoutMargin { get { return __margin; } }");
+            Add("internal bool __LayoutAutoSize { get { return __autoSize; } }");
+            Add("internal global::System.Drawing.Size __PreferredLayoutSize() { var width = global::System.Math.Max(Width, __minimumSize.Width); var height = global::System.Math.Max(Height, __minimumSize.Height); if (this is ButtonBase) { width = global::System.Math.Max(width, 75); height = global::System.Math.Max(height, 23); } if (__autoSize || width == 0 || height == 0) { var childWidth = 0; var childHeight = 0; foreach (Control child in Controls) { if (!child.Visible) continue; var preferred = child.__PreferredLayoutSize(); var margin = child.__LayoutMargin; childWidth = global::System.Math.Max(childWidth, child.Left + preferred.Width + margin.Right); childHeight = global::System.Math.Max(childHeight, child.Top + preferred.Height + margin.Bottom); } if (__autoSize || width == 0) width = global::System.Math.Max(width, childWidth + __padding.Right); if (__autoSize || height == 0) height = global::System.Math.Max(height, childHeight + __padding.Bottom); } return new global::System.Drawing.Size(width, height); }");
+            Add("internal void __RefreshAutoSizeFromChildren() { if (!__autoSize) return; var preferred = __PreferredLayoutSize(); var next = Size; if ((Dock is DockStyle.Top or DockStyle.Bottom || next.Height == 0) && preferred.Height > 0) next.Height = preferred.Height; if ((Dock is DockStyle.Left or DockStyle.Right || next.Width == 0) && preferred.Width > 0) next.Width = preferred.Width; if (next != Size) Size = next; __parent?.PerformLayout(); }");
             break;
         case "System.Windows.Forms.TableLayoutStyle":
             Add("protected SizeType __sizeType;");
@@ -585,8 +625,9 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private int __rowCount;");
             Add("private readonly global::System.Collections.Generic.Dictionary<Control, (int Column, int Row)> __cells = new();");
             Add("internal void __SetCell(Control control, int column, int row) { if (column < -1) throw new global::System.ArgumentOutOfRangeException(nameof(column)); if (row < -1) throw new global::System.ArgumentOutOfRangeException(nameof(row)); __cells[control] = (column, row); }");
-            Add("private static int[] __TableAxis(int total, int count, global::System.Collections.Generic.IReadOnlyList<TableLayoutStyle> styles, bool columns, TableLayoutPanel owner) { count = global::System.Math.Max(1, count); total = global::System.Math.Max(0, total); var sizes = new int[count]; var remaining = total; var percent = 0f; var percentCells = 0; for (var i = 0; i < count; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType == SizeType.Absolute) { sizes[i] = global::System.Math.Min(remaining, global::System.Math.Max(0, (int)global::System.Math.Round(style.__LayoutSize))); remaining -= sizes[i]; } else if (style?.__LayoutSizeType == SizeType.Percent) { percent += global::System.Math.Max(0f, style.__LayoutSize); ++percentCells; } } for (var i = 0; i < count && remaining > 0; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType == SizeType.Absolute || style?.__LayoutSizeType == SizeType.Percent) continue; var desired = 0; foreach (Control child in owner.Controls) if (owner.__cells.TryGetValue(child, out var cell) && (columns ? cell.Column : cell.Row) == i && (columns ? (!owner.__columnSpans.TryGetValue(child, out var columnSpan) || columnSpan == 1) : (!owner.__rowSpans.TryGetValue(child, out var rowSpan) || rowSpan == 1))) { var margin = child.__LayoutMargin; desired = global::System.Math.Max(desired, columns ? child.Width + margin.Left + margin.Right : child.Height + margin.Top + margin.Bottom); } sizes[i] = global::System.Math.Min(remaining, global::System.Math.Max(0, desired)); remaining -= sizes[i]; } var percentRemaining = remaining; var lastPercent = -1; for (var i = 0; i < count; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType != SizeType.Percent) continue; lastPercent = i; var share = percent <= 0f ? (percentCells == 0 ? 0 : percentRemaining / percentCells) : (int)global::System.Math.Floor(percentRemaining * global::System.Math.Max(0f, style.__LayoutSize) / percent); share = global::System.Math.Min(remaining, global::System.Math.Max(0, share)); sizes[i] = share; remaining -= share; } if (remaining > 0) sizes[lastPercent >= 0 ? lastPercent : count - 1] += remaining; return sizes; }");
-            Add("private void __ApplyTableLayout() { var columns = global::System.Math.Max(1, __columnCount); var rows = global::System.Math.Max(1, __rowCount); var widths = __TableAxis(ClientSize.Width - Padding.Left - Padding.Right, columns, __columnStyles.__LayoutStyles, true, this); var heights = __TableAxis(ClientSize.Height - Padding.Top - Padding.Bottom, rows, __rowStyles.__LayoutStyles, false, this); var next = 0; foreach (Control child in Controls) { if (!child.Visible) continue; var cell = __cells.TryGetValue(child, out var assigned) ? assigned : (Column: -1, Row: -1); var column = cell.Column < 0 ? next % columns : global::System.Math.Min(cell.Column, columns - 1); var row = cell.Row < 0 ? next / columns : global::System.Math.Min(cell.Row, rows - 1); ++next; row = global::System.Math.Min(row, rows - 1); var columnSpan = global::System.Math.Min(__columnSpans.TryGetValue(child, out var cs) ? cs : 1, columns - column); var rowSpan = global::System.Math.Min(__rowSpans.TryGetValue(child, out var rs) ? rs : 1, rows - row); var x = Padding.Left; for (var i = 0; i < column; ++i) x += widths[i]; var y = Padding.Top; for (var i = 0; i < row; ++i) y += heights[i]; var width = 0; for (var i = column; i < column + columnSpan; ++i) width += widths[i]; var height = 0; for (var i = row; i < row + rowSpan; ++i) height += heights[i]; var margin = child.__LayoutMargin; var cellBounds = new global::System.Drawing.Rectangle(x + margin.Left, y + margin.Top, global::System.Math.Max(0, width - margin.Left - margin.Right), global::System.Math.Max(0, height - margin.Top - margin.Bottom)); var bounds = child.Bounds; if (child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Bottom || (child.Anchor & (AnchorStyles.Left | AnchorStyles.Right)) == (AnchorStyles.Left | AnchorStyles.Right)) bounds.Width = cellBounds.Width; if (child.Dock is DockStyle.Fill or DockStyle.Left or DockStyle.Right || (child.Anchor & (AnchorStyles.Top | AnchorStyles.Bottom)) == (AnchorStyles.Top | AnchorStyles.Bottom)) bounds.Height = cellBounds.Height; bounds.Width = global::System.Math.Min(bounds.Width, cellBounds.Width); bounds.Height = global::System.Math.Min(bounds.Height, cellBounds.Height); bounds.X = child.Dock == DockStyle.Right || ((child.Anchor & AnchorStyles.Right) != 0 && (child.Anchor & AnchorStyles.Left) == 0) ? cellBounds.Right - bounds.Width : child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Bottom or DockStyle.Left || (child.Anchor & AnchorStyles.Left) != 0 ? cellBounds.Left : cellBounds.Left + (cellBounds.Width - bounds.Width) / 2; bounds.Y = child.Dock == DockStyle.Bottom || ((child.Anchor & AnchorStyles.Bottom) != 0 && (child.Anchor & AnchorStyles.Top) == 0) ? cellBounds.Bottom - bounds.Height : child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Left or DockStyle.Right || (child.Anchor & AnchorStyles.Top) != 0 ? cellBounds.Top : cellBounds.Top + (cellBounds.Height - bounds.Height) / 2; child.Bounds = bounds; } }");
+            Add("internal string __TableTrace() { var columns = global::System.String.Join(',', global::System.Linq.Enumerable.Select(__columnStyles.__LayoutStyles, style => style.__LayoutSizeType + \":\" + style.__LayoutSize)); var rows = global::System.String.Join(',', global::System.Linq.Enumerable.Select(__rowStyles.__LayoutStyles, style => style.__LayoutSizeType + \":\" + style.__LayoutSize)); var cells = global::System.String.Join(',', global::System.Linq.Enumerable.Select(__cells, pair => pair.Key.Name + \":\" + pair.Value.Column + \":\" + pair.Value.Row)); return \"|table-columns=\" + columns + \"|table-rows=\" + rows + \"|table-cells=\" + cells; }");
+            Add("private static int[] __TableAxis(int total, int count, global::System.Collections.Generic.IReadOnlyList<TableLayoutStyle> styles, bool columns, TableLayoutPanel owner) { count = global::System.Math.Max(1, count); total = global::System.Math.Max(0, total); var sizes = new int[count]; var remaining = total; var percent = 0f; var percentCells = 0; for (var i = 0; i < count; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType == SizeType.Absolute) { sizes[i] = global::System.Math.Min(remaining, global::System.Math.Max(0, (int)global::System.Math.Round(style.__LayoutSize))); remaining -= sizes[i]; } else if (style?.__LayoutSizeType == SizeType.Percent) { percent += global::System.Math.Max(0f, style.__LayoutSize); ++percentCells; } } for (var i = 0; i < count && remaining > 0; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType == SizeType.Absolute || style?.__LayoutSizeType == SizeType.Percent) continue; var desired = 0; foreach (Control child in owner.Controls) if (owner.__cells.TryGetValue(child, out var cell) && (columns ? cell.Column : cell.Row) == i && (columns ? (!owner.__columnSpans.TryGetValue(child, out var columnSpan) || columnSpan == 1) : (!owner.__rowSpans.TryGetValue(child, out var rowSpan) || rowSpan == 1))) { var margin = child.__LayoutMargin; var preferred = child.__PreferredLayoutSize(); desired = global::System.Math.Max(desired, columns ? preferred.Width + margin.Left + margin.Right : preferred.Height + margin.Top + margin.Bottom); } sizes[i] = global::System.Math.Min(remaining, global::System.Math.Max(0, desired)); remaining -= sizes[i]; } var percentRemaining = remaining; var lastPercent = -1; for (var i = 0; i < count; ++i) { var style = i < styles.Count ? styles[i] : null; if (style?.__LayoutSizeType != SizeType.Percent) continue; lastPercent = i; var share = percent <= 0f ? (percentCells == 0 ? 0 : percentRemaining / percentCells) : (int)global::System.Math.Floor(percentRemaining * global::System.Math.Max(0f, style.__LayoutSize) / percent); share = global::System.Math.Min(remaining, global::System.Math.Max(0, share)); sizes[i] = share; remaining -= share; } if (remaining > 0) sizes[lastPercent >= 0 ? lastPercent : count - 1] += remaining; return sizes; }");
+            Add("private void __ApplyTableLayout() { var columns = global::System.Math.Max(1, __columnCount); var rows = global::System.Math.Max(1, __rowCount); var widths = __TableAxis(ClientSize.Width - Padding.Left - Padding.Right, columns, __columnStyles.__LayoutStyles, true, this); var heights = __TableAxis(ClientSize.Height - Padding.Top - Padding.Bottom, rows, __rowStyles.__LayoutStyles, false, this); var next = 0; foreach (Control child in Controls) { if (!child.Visible) continue; var cell = __cells.TryGetValue(child, out var assigned) ? assigned : (Column: -1, Row: -1); var column = cell.Column < 0 ? next % columns : global::System.Math.Min(cell.Column, columns - 1); var row = cell.Row < 0 ? next / columns : global::System.Math.Min(cell.Row, rows - 1); ++next; row = global::System.Math.Min(row, rows - 1); var columnSpan = global::System.Math.Min(__columnSpans.TryGetValue(child, out var cs) ? cs : 1, columns - column); var rowSpan = global::System.Math.Min(__rowSpans.TryGetValue(child, out var rs) ? rs : 1, rows - row); var x = Padding.Left; for (var i = 0; i < column; ++i) x += widths[i]; var y = Padding.Top; for (var i = 0; i < row; ++i) y += heights[i]; var width = 0; for (var i = column; i < column + columnSpan; ++i) width += widths[i]; var height = 0; for (var i = row; i < row + rowSpan; ++i) height += heights[i]; var margin = child.__LayoutMargin; var cellBounds = new global::System.Drawing.Rectangle(x + margin.Left, y + margin.Top, global::System.Math.Max(0, width - margin.Left - margin.Right), global::System.Math.Max(0, height - margin.Top - margin.Bottom)); var bounds = child.Bounds; var preferred = child.__PreferredLayoutSize(); if (child.__LayoutAutoSize || bounds.Width == 0) bounds.Width = preferred.Width; if (child.__LayoutAutoSize || bounds.Height == 0) bounds.Height = preferred.Height; if (child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Bottom || (child.Anchor & (AnchorStyles.Left | AnchorStyles.Right)) == (AnchorStyles.Left | AnchorStyles.Right)) bounds.Width = cellBounds.Width; if (child.Dock is DockStyle.Fill or DockStyle.Left or DockStyle.Right || (child.Anchor & (AnchorStyles.Top | AnchorStyles.Bottom)) == (AnchorStyles.Top | AnchorStyles.Bottom)) bounds.Height = cellBounds.Height; bounds.Width = global::System.Math.Min(bounds.Width, cellBounds.Width); bounds.Height = global::System.Math.Min(bounds.Height, cellBounds.Height); bounds.X = child.Dock == DockStyle.Right || ((child.Anchor & AnchorStyles.Right) != 0 && (child.Anchor & AnchorStyles.Left) == 0) ? cellBounds.Right - bounds.Width : child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Bottom or DockStyle.Left || (child.Anchor & AnchorStyles.Left) != 0 ? cellBounds.Left : cellBounds.Left + (cellBounds.Width - bounds.Width) / 2; bounds.Y = child.Dock == DockStyle.Bottom || ((child.Anchor & AnchorStyles.Bottom) != 0 && (child.Anchor & AnchorStyles.Top) == 0) ? cellBounds.Bottom - bounds.Height : child.Dock is DockStyle.Fill or DockStyle.Top or DockStyle.Left or DockStyle.Right || (child.Anchor & AnchorStyles.Top) != 0 ? cellBounds.Top : cellBounds.Top + (cellBounds.Height - bounds.Height) / 2; child.Bounds = bounds; } }");
             Add("protected override void OnLayout(LayoutEventArgs levent) { __ApplyTableLayout(); }");
             break;
         case "System.Windows.Forms.TableLayoutControlCollection":
@@ -609,6 +650,7 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
         case "System.Windows.Forms.RadioButton":
             Add("private bool __checked;");
             Add("private bool __radioTabStop;");
+            Add("private void __RaiseCheckedChanged() { var handlers = CheckedChanged; if (handlers is null) return; foreach (global::System.EventHandler handler in handlers.GetInvocationList()) { if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-handler-begin|name=\" + Name + \"|owner=\" + (handler.Method.DeclaringType?.FullName ?? \"<unknown>\") + \"|method=\" + handler.Method.Name); handler.Invoke(this, global::System.EventArgs.Empty); if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-handler-end|name=\" + Name + \"|method=\" + handler.Method.Name); } }");
             break;
         case "System.Windows.Forms.ScrollProperties":
             Add("private bool __scrollEnabled = true;");
@@ -633,6 +675,8 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private FlatStyle __comboFlatStyle;");
             Add("private object? __selectedItem;");
             Add("protected override void __OnSelectedIndexChanged() { Text = SelectedIndex >= 0 && SelectedIndex < __comboItems.Count ? global::System.Convert.ToString(__comboItems[SelectedIndex], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty : string.Empty; base.__OnSelectedIndexChanged(); SelectedIndexChanged?.Invoke(this, global::System.EventArgs.Empty); }");
+            Add("private void __ShowItems() { if (__dropDownStyle == ComboBoxStyle.Simple || __comboItems.Count == 0) return; using var menu = new ContextMenuStrip { Name = Name + \".DropDown\" }; for (var index = 0; index < __comboItems.Count; ++index) { var selection = index; var text = global::System.Convert.ToString(__comboItems[index], global::System.Globalization.CultureInfo.CurrentCulture) ?? string.Empty; var item = new ToolStripMenuItem(text) { Name = \"item.\" + index.ToString(global::System.Globalization.CultureInfo.InvariantCulture), Checked = index == SelectedIndex }; item.Click += (_, _) => SelectedIndex = selection; menu.Items.Add(item); } menu.Show(PointToScreen(new global::System.Drawing.Point(0, Height))); }");
+            Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == global::System.Windows.Forms.MouseButtons.Left) __ShowItems(); }");
             break;
         case "System.Windows.Forms.ComboBox+ObjectCollection":
             Add("private readonly global::System.Collections.Generic.List<object> __items = new();");
@@ -647,6 +691,9 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private int __decimalPlaces;");
             Add("private bool __thousandsSeparator;");
             Add("private void __UpdateNumericText() { var format = (__thousandsSeparator ? \"N\" : \"F\") + __decimalPlaces.ToString(global::System.Globalization.CultureInfo.InvariantCulture); Text = __value.ToString(format, global::System.Globalization.CultureInfo.CurrentCulture); }");
+            Add("private void __Spin(bool increase) { var candidate = __value + (increase ? __increment : -__increment); Value = candidate < __minimum ? __minimum : candidate > __maximum ? __maximum : candidate; }");
+            Add("protected override void OnMouseUp(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == global::System.Windows.Forms.MouseButtons.Left && e.X >= global::System.Math.Max(0, Width - 18)) __Spin(e.Y < Height / 2); }");
+            Add("protected override void OnMouseWheel(global::System.Windows.Forms.MouseEventArgs e) { base.OnMouseWheel(e); if (e.Delta != 0) __Spin(e.Delta > 0); }");
             break;
         case "System.Windows.Forms.UpDownBase":
         case "System.Windows.Forms.PictureBox":
@@ -732,7 +779,8 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private int __interval = 100;");
             Add("private volatile bool __timerEnabled;");
             Add("private int __tickPending;");
-            Add("private void __Schedule() { lock (__timerGate) { __timer?.Dispose(); global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); __timer = __timerEnabled ? new global::System.Threading.Timer(_ => { if (!__timerEnabled || global::System.Threading.Interlocked.Exchange(ref __tickPending, 1) != 0) return; if (!Application.__Post(__ownerThreadId, () => { global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); if (__timerEnabled) Tick?.Invoke(this, global::System.EventArgs.Empty); })) global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); }, null, __interval, __interval) : null; } }");
+            Add("private void __RaiseTick() { var handlers = Tick; if (handlers is null) return; if (global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_TIMERS\") != \"1\") { handlers.Invoke(this, global::System.EventArgs.Empty); return; } foreach (global::System.EventHandler handler in handlers.GetInvocationList()) { var method = handler.Method; var owner = method.DeclaringType?.FullName ?? \"<unknown>\"; var started = global::System.Diagnostics.Stopwatch.GetTimestamp(); global::System.Console.Error.WriteLine(\"facade-timer=begin|owner:\" + owner + \"|method:\" + method.Name + \"|interval:\" + __interval); try { handler.Invoke(this, global::System.EventArgs.Empty); } finally { global::System.Console.Error.WriteLine(\"facade-timer=end|owner:\" + owner + \"|method:\" + method.Name + \"|elapsed-ms:\" + global::System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds.ToString(\"F3\", global::System.Globalization.CultureInfo.InvariantCulture)); } } }");
+            Add("private void __Schedule() { lock (__timerGate) { __timer?.Dispose(); global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); __timer = __timerEnabled ? new global::System.Threading.Timer(_ => { if (!__timerEnabled || global::System.Threading.Interlocked.Exchange(ref __tickPending, 1) != 0) return; if (!Application.__Post(__ownerThreadId, () => { global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); if (__timerEnabled) __RaiseTick(); })) global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); }, null, __interval, __interval) : null; } }");
             Add("protected override void Dispose(bool disposing) { if (disposing) { __timerEnabled = false; global::System.Threading.Interlocked.Exchange(ref __tickPending, 0); lock (__timerGate) { __timer?.Dispose(); __timer = null; } } base.Dispose(disposing); }");
             break;
         case "System.Windows.Forms.ToolStrip":
@@ -741,12 +789,19 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private ToolStripRenderMode __renderMode;");
             Add("private ToolStripRenderer? __renderer;");
             Add("private bool __toolTraceDone;");
+            Add("private ToolStripItem? __hotItem;");
+            Add("private readonly global::System.Collections.Generic.List<Label> __dropDownLabels = new();");
             Add("internal void __RefreshItems() { if (__HasRaisedLoad) __RenderManagedPaint(); }");
             Add("private static int __ItemWidth(ToolStripItem item) { var size = item.__ProjectionSize; if (size.Width > 0) return size.Width; if (item.__ProjectionImage is not null) return 34; return global::System.Math.Max(24, item.__ProjectionText.Length * 7 + 14); }");
-            Add("private void __PaintItems(global::System.Drawing.Graphics graphics) { graphics.SmoothingMode = global::System.Drawing.Drawing2D.SmoothingMode.AntiAlias; using var background = new global::System.Drawing.SolidBrush(BackColor); graphics.FillRectangle(background, ClientRectangle); using var border = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(110, ForeColor)); using var face = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(24, ForeColor)); using var ink = new global::System.Drawing.SolidBrush(ForeColor); using var font = new global::System.Drawing.Font(\"Portsmouth Rapids\", 10f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is ToolStripSeparator) { var separatorX = x + width / 2; graphics.DrawLine(border, separatorX, top + 4, separatorX, top + height - 4); } else { var bounds = new global::System.Drawing.Rectangle(x, top, width, height); graphics.FillRectangle(face, bounds); graphics.DrawRectangle(border, bounds.X, bounds.Y, global::System.Math.Max(0, bounds.Width - 1), global::System.Math.Max(0, bounds.Height - 1)); var image = item.__ProjectionImage; var text = item.__ProjectionText; if (image is not null) { var side = global::System.Math.Min(24, global::System.Math.Min(bounds.Width - 6, bounds.Height - 6)); if (side > 0) graphics.DrawImage(image, new global::System.Drawing.Rectangle(bounds.X + (bounds.Width - side) / 2, bounds.Y + (bounds.Height - side) / 2, side, side)); } else if (!global::System.String.IsNullOrEmpty(text)) { var measured = graphics.MeasureString(text, font); graphics.DrawString(text, font, ink, bounds.X + global::System.Math.Max(4f, (bounds.Width - measured.Width) / 2f), bounds.Y + global::System.Math.Max(2f, (bounds.Height - measured.Height) / 2f)); } } x += width + margin.Right; } if (!__toolTraceDone && global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_TOOLSTRIP\") == \"1\") { __toolTraceDone = true; var rows = new global::System.Collections.Generic.List<string>(); foreach (ToolStripItem item in __toolItems) { var image = item.__ProjectionImage; rows.Add(item.GetType().Name + \":text=\" + item.__ProjectionText + \",tip=\" + item.__ProjectionToolTip + \",size=\" + item.__ProjectionSize.Width + \"x\" + item.__ProjectionSize.Height + \",image=\" + (image is null ? \"none\" : image.Width + \"x\" + image.Height)); } global::System.Console.Error.WriteLine(\"facade-toolstrip=name:\" + Name + \"|size:\" + Width + \"x\" + Height + \"|items:\" + global::System.String.Join(\";\", rows)); } }");
-            Add("private ToolStripItem? __ItemAt(int pointX, int pointY) { var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is not ToolStripSeparator && new global::System.Drawing.Rectangle(x, top, width, height).Contains(pointX, pointY)) return item; x += width + margin.Right; } return null; }");
+            Add("private int __DropDownRowHeight(ToolStripItem item) { return item is ToolStripSeparator ? 9 : global::System.Math.Max(24, item.__ProjectionSize.Height); }");
+            Add("internal void __PrepareDropDown(global::System.Drawing.Point screenLocation) { var width = 136; var height = 4; foreach (ToolStripItem item in __toolItems) if (item.__ProjectionVisible) { width = global::System.Math.Max(width, __ItemWidth(item) + 54); height += __DropDownRowHeight(item); } width = global::System.Math.Min(420, width); Bounds = new global::System.Drawing.Rectangle(screenLocation.X, screenLocation.Y, width, global::System.Math.Max(20, height + 4)); BackColor = global::System.Drawing.Color.FromArgb(247, 249, 252); ForeColor = global::System.Drawing.Color.FromArgb(31, 37, 44); foreach (var label in __dropDownLabels) { Controls.Remove(label); label.Dispose(); } __dropDownLabels.Clear(); }");
+            Add("private void __PaintDropDownItems(global::System.Drawing.Graphics graphics) { using var background = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(247, 249, 252)); using var rail = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(230, 235, 241)); using var hot = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(218, 231, 247)); using var ink = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(31, 37, 44)); using var disabledInk = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(145, 151, 158)); using var font = new global::System.Drawing.Font(\"Portsmouth Rapids\", 12f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); using var border = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(126, 139, 153)); using var separator = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(188, 197, 207)); graphics.FillRectangle(background, ClientRectangle); graphics.FillRectangle(rail, 1, 1, 31, global::System.Math.Max(0, Height - 2)); var y = 4; foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var rowHeight = __DropDownRowHeight(item); if (item is ToolStripSeparator) { graphics.DrawLine(separator, 34, y + rowHeight / 2, global::System.Math.Max(35, Width - 5), y + rowHeight / 2); y += rowHeight; continue; } var row = new global::System.Drawing.Rectangle(3, y, global::System.Math.Max(0, Width - 6), rowHeight); if (global::System.Object.ReferenceEquals(item, __hotItem) && item.__ProjectionEnabled) { graphics.FillRectangle(hot, row); graphics.DrawRectangle(border, row.X, row.Y, global::System.Math.Max(0, row.Width - 1), global::System.Math.Max(0, row.Height - 1)); } if (item is ToolStripMenuItem menu && menu.Checked) { graphics.DrawLine(border, 10, y + rowHeight / 2, 14, y + rowHeight / 2 + 4); graphics.DrawLine(border, 14, y + rowHeight / 2 + 4, 22, y + rowHeight / 2 - 5); } var image = item.__ProjectionImage; if (image is not null) graphics.DrawImage(image, new global::System.Drawing.Rectangle(7, y + global::System.Math.Max(2, (rowHeight - 20) / 2), 20, 20)); var text = item.__ProjectionText; if (!global::System.String.IsNullOrEmpty(text)) { var measured = graphics.MeasureString(text, font); graphics.DrawString(text, font, item.__ProjectionEnabled ? ink : disabledInk, 39f, y + global::System.Math.Max(2f, (rowHeight - measured.Height) / 2f)); } if (item is ToolStripDropDownItem child && child.DropDownItems.Count > 0) { var arrowX = Width - 14; var mid = y + rowHeight / 2; graphics.DrawLine(border, arrowX, mid - 4, arrowX + 4, mid); graphics.DrawLine(border, arrowX + 4, mid, arrowX, mid + 4); } y += rowHeight; } graphics.DrawRectangle(border, 0, 0, global::System.Math.Max(0, Width - 1), global::System.Math.Max(0, Height - 1)); }");
+            Add("private void __PaintItems(global::System.Drawing.Graphics graphics) { if (this is ToolStripDropDown) { __PaintDropDownItems(graphics); return; } graphics.SmoothingMode = global::System.Drawing.Drawing2D.SmoothingMode.AntiAlias; using var background = new global::System.Drawing.SolidBrush(BackColor); graphics.FillRectangle(background, ClientRectangle); using var border = new global::System.Drawing.Pen(global::System.Drawing.Color.FromArgb(110, ForeColor)); using var face = new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromArgb(24, ForeColor)); using var ink = new global::System.Drawing.SolidBrush(ForeColor); using var font = new global::System.Drawing.Font(\"Portsmouth Rapids\", 10f, global::System.Drawing.FontStyle.Regular, global::System.Drawing.GraphicsUnit.Pixel, 1); var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is ToolStripSeparator) { var separatorX = x + width / 2; graphics.DrawLine(border, separatorX, top + 4, separatorX, top + height - 4); } else { var bounds = new global::System.Drawing.Rectangle(x, top, width, height); graphics.FillRectangle(face, bounds); graphics.DrawRectangle(border, bounds.X, bounds.Y, global::System.Math.Max(0, bounds.Width - 1), global::System.Math.Max(0, bounds.Height - 1)); var image = item.__ProjectionImage; var text = item.__ProjectionText; if (image is not null) { var side = global::System.Math.Min(24, global::System.Math.Min(bounds.Width - 6, bounds.Height - 6)); if (side > 0) graphics.DrawImage(image, new global::System.Drawing.Rectangle(bounds.X + (bounds.Width - side) / 2, bounds.Y + (bounds.Height - side) / 2, side, side)); } else if (!global::System.String.IsNullOrEmpty(text)) { var measured = graphics.MeasureString(text, font); graphics.DrawString(text, font, ink, bounds.X + global::System.Math.Max(4f, (bounds.Width - measured.Width) / 2f), bounds.Y + global::System.Math.Max(2f, (bounds.Height - measured.Height) / 2f)); } } x += width + margin.Right; } if (!__toolTraceDone && global::System.Environment.GetEnvironmentVariable(\"GUI_FORMS_TRACE_TOOLSTRIP\") == \"1\") { __toolTraceDone = true; var rows = new global::System.Collections.Generic.List<string>(); foreach (ToolStripItem item in __toolItems) { var image = item.__ProjectionImage; rows.Add(item.GetType().Name + \":text=\" + item.__ProjectionText + \",tip=\" + item.__ProjectionToolTip + \",size=\" + item.__ProjectionSize.Width + \"x\" + item.__ProjectionSize.Height + \",image=\" + (image is null ? \"none\" : image.Width + \"x\" + image.Height)); } global::System.Console.Error.WriteLine(\"facade-toolstrip=name:\" + Name + \"|size:\" + Width + \"x\" + Height + \"|items:\" + global::System.String.Join(\";\", rows)); } }");
+            Add("private ToolStripItem? __ItemAt(int pointX, int pointY) { if (this is ToolStripDropDown) { var y = 4; foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var rowHeight = __DropDownRowHeight(item); if (item is not ToolStripSeparator && new global::System.Drawing.Rectangle(3, y, global::System.Math.Max(0, Width - 6), rowHeight).Contains(pointX, pointY)) return item; y += rowHeight; } return null; } var x = global::System.Math.Max(2, __gripMargin.Left); foreach (ToolStripItem item in __toolItems) { if (!item.__ProjectionVisible) continue; var margin = item.__ProjectionMargin; x += margin.Left; var width = __ItemWidth(item); var height = item.__ProjectionSize.Height > 0 ? global::System.Math.Min(Height - 2, item.__ProjectionSize.Height) : global::System.Math.Max(1, Height - 6); var top = global::System.Math.Max(1, (Height - height) / 2); if (item is not ToolStripSeparator && new global::System.Drawing.Rectangle(x, top, width, height).Contains(pointX, pointY)) return item; x += width + margin.Right; } return null; }");
             Add("protected override void OnPaint(PaintEventArgs e) { __PaintItems(e.Graphics); base.OnPaint(e); }");
-            Add("protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button == MouseButtons.Left) __ItemAt(e.X, e.Y)?.__PerformClick(); }");
+            Add("protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); var next = __ItemAt(e.X, e.Y); if (!global::System.Object.ReferenceEquals(next, __hotItem)) { __hotItem = next; __RenderManagedPaint(); } }");
+            Add("protected override void OnMouseLeave(global::System.EventArgs e) { base.OnMouseLeave(e); if (__hotItem is not null) { __hotItem = null; __RenderManagedPaint(); } }");
+            Add("protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); if (e.Button != MouseButtons.Left) return; var item = __ItemAt(e.X, e.Y); if (item is ToolStripDropDownItem branch && branch.DropDownItems.Count > 0) branch.DropDown.Show(new global::System.Drawing.Point(Bounds.Right - 2, Bounds.Top + e.Y - 4)); else item?.__PerformClick(); if (this is ToolStripDropDown && item is not null && Visible) __RequestClose(); }");
             break;
         case "System.Windows.Forms.ToolStripItem":
             Add("private string __itemText = string.Empty;");
@@ -760,10 +815,12 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private bool __itemEnabled = true;");
             Add("internal ToolStrip? __owner;");
             Add("internal string __ProjectionText { get { return __itemText; } }");
+            Add("internal string __ProjectionName { get { return __itemName; } }");
             Add("internal global::System.Drawing.Image? __ProjectionImage { get { return __itemImage; } }");
             Add("internal global::System.Drawing.Size __ProjectionSize { get { return __itemSize; } }");
             Add("internal Padding __ProjectionMargin { get { return __itemMargin; } }");
             Add("internal bool __ProjectionVisible { get { return __itemVisible; } }");
+            Add("internal bool __ProjectionEnabled { get { return __itemEnabled; } }");
             Add("internal string __ProjectionToolTip { get { return __toolTipText; } }");
             Add("private void __RefreshOwner() { __owner?.__RefreshItems(); }");
             Add("internal void __PerformClick() { if (__itemEnabled && __itemVisible) Click?.Invoke(this, global::System.EventArgs.Empty); }");
@@ -773,6 +830,7 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             break;
         case "System.Windows.Forms.ToolStripDropDown":
             Add("private ToolStripItem? __ownerItem;");
+            Add("internal void __ShowDropDown(global::System.Drawing.Point screenLocation) { if (Items.Count == 0) return; __PrepareDropDown(screenLocation); __RaiseLoad(); __RenderManagedPaint(); Visible = true; try { _ = __RunNativePopup(); } finally { Visible = false; } }");
             break;
         case "System.Windows.Forms.ToolStripProfessionalRenderer":
             Add("private ProfessionalColorTable __colorTable = new();");
@@ -810,6 +868,7 @@ static void EmitBehaviorMembers(StringBuilder output, Type type, string pad)
             Add("private bool __handled;");
             break;
         case "System.Windows.Forms.Form":
+            Add("private DialogResult __dialogResult;");
             Add("private bool __controlBox = true;");
             Add("private bool __topLevel = true;");
             Add("private bool __rightToLeftLayout;");
@@ -826,7 +885,9 @@ static string ConstructorBody(Type type, ConstructorInfo? constructor)
     return type.FullName switch
     {
         "System.Drawing.Bitmap" when count is 2 or 3 => "{ if (width <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(width)); if (height <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(height)); __width = width; __height = height; __pixelFormat = " + (count == 3 ? "format" : "global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb") + "; __bitmap = NativeDrawingBridge.BitmapCreate(width, height); }",
+        "System.Drawing.Bitmap" when count == 1 && constructor!.GetParameters()[0].ParameterType.FullName == "System.IO.Stream" => "{ if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); using var copy = new global::System.IO.MemoryStream(); stream.CopyTo(copy); var decoded = NativeDrawingBridge.DecodePng(copy.ToArray()); __width = decoded.__width; __height = decoded.__height; __pixelFormat = decoded.__pixelFormat; __bitmap = decoded.__bitmap; decoded.__bitmap = default; decoded.Dispose(); }",
         "System.Drawing.Bitmap" when count == 1 => "{ if (original is null) throw new global::System.ArgumentNullException(nameof(original)); __width = original.Width; __height = original.Height; __pixelFormat = original.PixelFormat; __bitmap = NativeDrawingBridge.BitmapClone(original.__BitmapHandle, 0, 0, __width, __height); }",
+        "System.Drawing.Icon" when count == 1 => "{ if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); __iconData = NativeDrawingBridge.ReadBounded(stream, \"ICO\"); }",
         "System.Drawing.SolidBrush" when count == 1 => "{ __color = color; __handle = NativeDrawingBridge.SolidBrushCreate(color); }",
         "System.Drawing.Pen" when count is 1 or 2 && constructor!.GetParameters()[0].ParameterType.FullName == "System.Drawing.Color" => "{ __handle = NativeDrawingBridge.PenCreate(color, " + (count == 2 ? "width" : "1f") + "); }",
         "System.Drawing.Pen" when count is 1 or 2 => "{ if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); __handle = NativeDrawingBridge.PenCreate(brush.__color, " + (count == 2 ? "width" : "1f") + "); }",
@@ -837,7 +898,10 @@ static string ConstructorBody(Type type, ConstructorInfo? constructor)
         "System.Drawing.StringFormat" when count == 0 => "{ __handle = NativeDrawingBridge.StringFormatCreate(0); }",
         "System.Drawing.StringFormat" when count == 1 && constructor!.GetParameters()[0].ParameterType.FullName == "System.Drawing.StringFormatFlags" => "{ __flags = options; __handle = NativeDrawingBridge.StringFormatCreate((uint)options); }",
         "System.Drawing.StringFormat" when count == 1 => "{ if (format is null) throw new global::System.ArgumentNullException(nameof(format)); __alignment = format.__alignment; __lineAlignment = format.__lineAlignment; __trimming = format.__trimming; __flags = format.__flags; __handle = NativeDrawingBridge.StringFormatCreate((uint)__flags); NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); }",
-        "System.Drawing.Graphics" => "{ __recorder = NativeDrawingBridge.RecorderCreate(); }",
+        // Bind an empty recorder to the thread that first uses Graphics. retired compatibility specimen
+        // constructs some Graphics instances before handing them to its paint
+        // thread; post-first-use operations remain owner-thread enforced.
+        "System.Drawing.Graphics" => "{ }",
         "System.Drawing.Drawing2D.GraphicsPath" => "{ __handle = global::System.Drawing.NativeDrawingBridge.GraphicsPathCreate(); }",
         "System.Drawing.Drawing2D.Matrix" when count == 2 => "{ if (rect.Width == 0 || rect.Height == 0) throw new global::System.ArgumentException(\"Matrix source rectangle is empty.\", nameof(rect)); if (plgpts is null || plgpts.Length != 3) throw new global::System.ArgumentException(\"Matrix parallelogram requires three points.\", nameof(plgpts)); __m11 = (plgpts[1].X - plgpts[0].X) / (float)rect.Width; __m12 = (plgpts[1].Y - plgpts[0].Y) / (float)rect.Width; __m21 = (plgpts[2].X - plgpts[0].X) / (float)rect.Height; __m22 = (plgpts[2].Y - plgpts[0].Y) / (float)rect.Height; __dx = plgpts[0].X - rect.X * __m11 - rect.Y * __m21; __dy = plgpts[0].Y - rect.X * __m12 - rect.Y * __m22; }",
         "System.Drawing.Drawing2D.HatchBrush" when count == 3 => "{ __color = foreColor; __handle = global::System.Drawing.NativeDrawingBridge.HatchBrushCreate((uint)hatchstyle, foreColor, backColor); }",
@@ -849,8 +913,9 @@ static string ConstructorBody(Type type, ConstructorInfo? constructor)
         "System.Drawing.Region" when count == 1 => "{ if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = NativeDrawingBridge.RegionCreate(path.__handle); }",
         "System.Windows.Forms.Control" => "{ __native = NativeControlBridge.Create(GetType()); __native.Changed += __NativeChanged; __native.NativeEventRaised += __NativeEvent; __native.PointerRaised += __NativePointer; __controls = new ControlCollection(this); __ApplyEffectiveColors(); }",
         "System.Windows.Forms.UserControl" => "{ Size = new global::System.Drawing.Size(150, 150); }",
+        "System.Windows.Forms.Button" => "{ Size = new global::System.Drawing.Size(75, 23); }",
         "System.Windows.Forms.TableLayoutPanel" => "{ __tableControls = new TableLayoutControlCollection(this); __controls = __tableControls; }",
-        "System.Windows.Forms.UpDownBase" => "{ Controls.Add(new Button { Name = \"upDownButtons\" }); Controls.Add(new TextBox { Name = \"upDownEdit\" }); }",
+        "System.Windows.Forms.UpDownBase" => "{ Controls.Add(new Button { Name = \"upDownButtons\", Visible = false }); Controls.Add(new TextBox { Name = \"upDownEdit\", Visible = false }); }",
         "System.Windows.Forms.NumericUpDown" => "{ __UpdateNumericText(); }",
         "System.Windows.Forms.ComboBox" => "{ __comboItems = new ObjectCollection(this); }",
         "System.Windows.Forms.DataGridView" => "{ __gridColumns = new DataGridViewColumnCollection(this); __gridRows = new DataGridViewRowCollection(this); }",
@@ -921,12 +986,12 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         return property.Name switch
         {
             "ClipBounds" => "{ get { return __target is null ? global::System.Drawing.RectangleF.Empty : new global::System.Drawing.RectangleF(0, 0, __target.Width, __target.Height); } }",
-            "SmoothingMode" => "{ get { return __smoothing; } set { __smoothing = value; NativeDrawingBridge.RecorderQuality(this); } }",
-            "InterpolationMode" => "{ get { return __interpolation; } set { __interpolation = value; NativeDrawingBridge.RecorderQuality(this); } }",
-            "PixelOffsetMode" => "{ set { __pixelOffset = value; NativeDrawingBridge.RecorderQuality(this); } }",
-            "CompositingMode" => "{ set { __compositing = value; NativeDrawingBridge.RecorderQuality(this); } }",
-            "CompositingQuality" => "{ set { __compositingQuality = value; NativeDrawingBridge.RecorderQuality(this); } }",
-            "Transform" => "{ get { return __transform; } set { __transform = value ?? throw new global::System.ArgumentNullException(nameof(value)); NativeDrawingBridge.RecorderSetTransform(__recorder, __transform); } }",
+            "SmoothingMode" => "{ get { return __smoothing; } set { __smoothing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }",
+            "InterpolationMode" => "{ get { return __interpolation; } set { __interpolation = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }",
+            "PixelOffsetMode" => "{ set { __pixelOffset = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }",
+            "CompositingMode" => "{ set { __compositing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }",
+            "CompositingQuality" => "{ set { __compositingQuality = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }",
+            "Transform" => "{ get { return __transform; } set { __transform = value ?? throw new global::System.ArgumentNullException(nameof(value)); __EnsureRecorder(); NativeDrawingBridge.RecorderSetTransform(__recorder, __transform); } }",
             _ => Stub(),
         };
     if (type.FullName == "System.Drawing.Drawing2D.GraphicsPath" && property.Name == "PathPoints")
@@ -985,7 +1050,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         {
             "AllowDrop" => "{ set { __allowDrop = value; } }",
             "Anchor" => "{ get { return __anchor; } set { __anchor = value; } }",
-            "AutoSize" => "{ set { __autoSize = value; } }",
+            "AutoSize" => "{ set { if (__autoSize == value) return; __autoSize = value; if (value) __RefreshAutoSizeFromChildren(); else __parent?.PerformLayout(); } }",
             "BackColor" => "{ get { return !__backColor.IsEmpty ? __backColor : __parent is not null ? __parent.BackColor : global::System.Drawing.Color.FromArgb(229, 234, 239); } set { if (__backColor == value) return; __backColor = value; __ApplyEffectiveColors(); } }",
             "BackgroundImage" => "{ set { __backgroundImage = value; if (__loadRaised) __RenderManagedPaint(); } }",
             "BackgroundImageLayout" => "{ set { __backgroundImageLayout = value; if (__loadRaised) __RenderManagedPaint(); } }",
@@ -994,7 +1059,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
             "Text" => "{ get { return __native.Text; } set { __native.Text = value ?? string.Empty; } }",
             "Visible" => "{ get { return __native.Visible; } set { if (value) __RaiseLoad(); __native.Visible = value; } }",
             "Enabled" => "{ get { return __native.Enabled; } set { __native.Enabled = value; } }",
-            "Bounds" => "{ get { return __native.Bounds; } set { var normalized = new global::System.Drawing.Rectangle(value.X, value.Y, global::System.Math.Max(0, value.Width), global::System.Math.Max(0, value.Height)); var previous = __native.Bounds; if (previous == normalized) return; __native.Bounds = normalized; if (previous.Location != normalized.Location) Move?.Invoke(this, global::System.EventArgs.Empty); if (previous.Size != normalized.Size) { OnSizeChanged(global::System.EventArgs.Empty); OnResize(global::System.EventArgs.Empty); ClientSizeChanged?.Invoke(this, global::System.EventArgs.Empty); if (__parent is not null || __loadRaised) PerformLayout(); if (__loadRaised) __RenderManagedPaint(); } } }",
+            "Bounds" => "{ get { return __native.Bounds; } set { var normalized = new global::System.Drawing.Rectangle(value.X, value.Y, global::System.Math.Max(0, value.Width), global::System.Math.Max(0, value.Height)); var previous = __native.Bounds; if (previous == normalized) return; __native.Bounds = normalized; if (previous.Location != normalized.Location) Move?.Invoke(this, global::System.EventArgs.Empty); if (previous.Size != normalized.Size) { OnSizeChanged(global::System.EventArgs.Empty); OnResize(global::System.EventArgs.Empty); ClientSizeChanged?.Invoke(this, global::System.EventArgs.Empty); if (__parent is not null || __loadRaised) PerformLayout(); __parent?.__RefreshAutoSizeFromChildren(); if (__loadRaised) __RenderManagedPaint(); } } }",
             "Capture" => "{ get { return __capture; } set { __capture = value; } }",
             "CheckForIllegalCrossThreadCalls" => "{ set { __checkForIllegalCrossThreadCalls = value; } }",
             "ClientRectangle" => "{ get { return new global::System.Drawing.Rectangle(0, 0, Width, Height); } }",
@@ -1136,7 +1201,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         return property.Name switch
         {
             "Checked" => "{ get { return __checkState != CheckState.Unchecked; } set { CheckState = value ? CheckState.Checked : CheckState.Unchecked; } }",
-            "CheckState" => "{ set { if (__checkState == value) return; var oldChecked = __checkState != CheckState.Unchecked; __checkState = value; CheckStateChanged?.Invoke(this, global::System.EventArgs.Empty); if (oldChecked != (__checkState != CheckState.Unchecked)) CheckedChanged?.Invoke(this, global::System.EventArgs.Empty); } }",
+            "CheckState" => "{ set { if (__checkState == value) return; var oldChecked = __checkState != CheckState.Unchecked; __checkState = value; __NativeCheckState = (uint)value; CheckStateChanged?.Invoke(this, global::System.EventArgs.Empty); if (oldChecked != (__checkState != CheckState.Unchecked)) CheckedChanged?.Invoke(this, global::System.EventArgs.Empty); } }",
             _ => Stub(),
         };
     if (type.FullName == "System.Windows.Forms.ButtonBase" && property.Name == "FlatAppearance")
@@ -1144,7 +1209,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
     if (type.FullName == "System.Windows.Forms.RadioButton")
         return property.Name switch
         {
-            "Checked" => "{ get { return __checked; } set { if (__checked == value) return; __checked = value; CheckedChanged?.Invoke(this, global::System.EventArgs.Empty); } }",
+            "Checked" => "{ get { return __checked; } set { if (__checked == value) return; __checked = value; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-native-write-begin|name=\" + Name + \"|checked=\" + value); __NativeCheckState = value ? 1u : 0u; if (__TraceInteraction) global::System.Console.Error.WriteLine(\"facade-interaction=radio-native-write-end|name=\" + Name); __RaiseCheckedChanged(); } }",
             "TabStop" => "{ set { __radioTabStop = value; } }",
             _ => Stub(),
         };
@@ -1275,6 +1340,7 @@ static string PropertyBody(Type type, PropertyInfo property, HashSet<MethodInfo>
         {
             "ClientSize" => "{ set { base.ClientSize = value; } }",
             "ControlBox" => "{ get { return __controlBox; } set { __controlBox = value; } }",
+            "DialogResult" => "{ set { __dialogResult = value; if (value != DialogResult.None && Visible) __RequestClose(); } }",
             "Location" => "{ get { return base.Location; } set { base.Location = value; } }",
             "MainMenuStrip" => "{ get { return __mainMenuStrip!; } }",
             "Margin" => "{ set { base.Margin = value; } }",
@@ -1296,20 +1362,45 @@ static string DrawingImageBody(MethodInfo method)
 {
     var parameters = method.GetParameters();
     if (parameters.Length == 2)
-        return "{ NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
+        return "{ __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
     if (parameters.Length == 3)
-        return "{ NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
+        return "{ __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
     if (parameters.Length == 5)
-        return "{ NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, width, height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
+        return "{ __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, width, height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }";
     if (parameters.Length == 4 && parameters[1].ParameterType.FullName == "System.Drawing.Rectangle")
-        return "{ NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height), null); }";
+        return "{ __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height), null); }";
     var attributeName = parameters.Last().ParameterType.FullName == "System.Drawing.Imaging.ImageAttributes" ?
         parameters.Last().Name : "null";
-    return "{ NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), " + attributeName + "); }";
+    return "{ __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), " + attributeName + "); }";
 }
 
 static string MethodBody(Type type, MethodInfo method)
 {
+    if (type.FullName == "System.Windows.Forms.TextRenderer")
+    {
+        if (method.Name == "MeasureText" && method.GetParameters().Length == 2)
+            return "{ if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var height = global::System.Math.Max(1, font.Height); var padding = 8; return new global::System.Drawing.Size(global::System.Math.Max(1, (int)global::System.Math.Ceiling(text.Length * height * 0.46f) + padding), height + 4); }";
+        if (method.Name == "MeasureText")
+            return "{ var measured = MeasureText(text, font); var width = proposedSize.Width > 0 ? global::System.Math.Min(measured.Width, proposedSize.Width) : measured.Width; var height = proposedSize.Height > 0 ? global::System.Math.Min(measured.Height, proposedSize.Height) : measured.Height; if ((flags & global::System.Windows.Forms.TextFormatFlags.WordBreak) != 0 && proposedSize.Width > 0 && measured.Width > proposedSize.Width) { var rows = global::System.Math.Max(1, (int)global::System.Math.Ceiling((double)measured.Width / proposedSize.Width)); height = proposedSize.Height > 0 ? global::System.Math.Min(proposedSize.Height, measured.Height * rows) : measured.Height * rows; } return new global::System.Drawing.Size(global::System.Math.Max(1, width), global::System.Math.Max(1, height)); }";
+        if (method.Name == "DrawText")
+            return "{ if (dc is null) throw new global::System.ArgumentNullException(nameof(dc)); if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); if (dc is not global::System.Drawing.Graphics graphics || bounds.Width <= 0 || bounds.Height <= 0 || text.Length == 0) return; var measured = graphics.MeasureString(text, font); var x = (float)bounds.X; var y = (float)bounds.Y; if ((flags & global::System.Windows.Forms.TextFormatFlags.HorizontalCenter) != 0) x += global::System.Math.Max(0f, (bounds.Width - measured.Width) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Right) != 0) x += global::System.Math.Max(0f, bounds.Width - measured.Width); if ((flags & global::System.Windows.Forms.TextFormatFlags.VerticalCenter) != 0) y += global::System.Math.Max(0f, (bounds.Height - measured.Height) / 2f); else if ((flags & global::System.Windows.Forms.TextFormatFlags.Bottom) != 0) y += global::System.Math.Max(0f, bounds.Height - measured.Height); using var brush = new global::System.Drawing.SolidBrush(foreColor); graphics.DrawString(text, font, brush, new global::System.Drawing.PointF(x, y)); }";
+    }
+    if (type.FullName == "System.Windows.Forms.ToolStripDropDown" && method.Name == "Show")
+    {
+        var parameters = method.GetParameters();
+        if (parameters.Length == 1)
+            return "{ __ShowDropDown(screenLocation); }";
+        if (parameters.Length == 2 && parameters[0].ParameterType.FullName == "System.Drawing.Point")
+            return "{ __ShowDropDown(position); }";
+        if (parameters.Length == 2)
+            return "{ if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(position)); }";
+        return "{ if (control is null) throw new global::System.ArgumentNullException(nameof(control)); __ShowDropDown(control.PointToScreen(new global::System.Drawing.Point(x, y))); }";
+    }
+    if (type.FullName == "System.Drawing.Icon")
+    {
+        if (method.Name == "ToBitmap") return "{ if (__iconDisposed) throw new global::System.ObjectDisposedException(nameof(Icon)); return NativeDrawingBridge.DecodeIcon(__iconData); }";
+        if (method.Name == "Dispose") return "{ if (__iconDisposed) return; __iconDisposed = true; __iconData = global::System.Array.Empty<byte>(); global::System.GC.SuppressFinalize(this); }";
+    }
     if (type.FullName == "System.Drawing.Brush" && method.Name == "Dispose")
         return "{ if (__brushDisposed) return; __brushDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }";
     if (type.FullName == "System.Drawing.Pen" && method.Name == "Dispose")
@@ -1343,49 +1434,50 @@ static string MethodBody(Type type, MethodInfo method)
         if (method.Name == "FromImage") return "{ if (image is null) throw new global::System.ArgumentNullException(nameof(image)); if (image.__BitmapHandle.IsNull) throw new global::System.ArgumentException(\"Image has no native bitmap.\", nameof(image)); return new global::System.Drawing.Graphics { __target = image }; }";
         if (method.Name is "FromHdc" or "FromHdcInternal") return "{ return NativeDrawingBridge.GraphicsFromNativeSurface(" + method.GetParameters()[0].Name + ", 0); }";
         if (method.Name == "FromHwnd") return "{ return NativeDrawingBridge.GraphicsFromNativeSurface(" + method.GetParameters()[0].Name + ", 1); }";
-        if (method.Name == "Dispose") return "{ if (__graphicsDisposed) return; __graphicsDisposed = true; try { if (__hdcLeaseToken != 0) NativeDrawingBridge.ReleaseHdc(this, __leasedHdc); if (__target is not null) { NativeDrawingBridge.Execute(__recorder, __target.__BitmapHandle); if (__nativeSurface != 0) NativeDrawingBridge.PresentNativeSurface(this); } } finally { NativeDrawingBridge.Release(ref __recorder); if (__nativeSurface != 0) __target?.Dispose(); __target = null; __nativeSurface = 0; global::System.GC.SuppressFinalize(this); } }";
-        if (method.Name == "Clear") return "{ NativeDrawingBridge.RecorderClear(__recorder, color); }";
+        if (method.Name == "Dispose") return "{ if (__graphicsDisposed) return; __graphicsDisposed = true; try { if (__hdcLeaseToken != 0) NativeDrawingBridge.ReleaseHdc(this, __leasedHdc); if (__target is not null && !__recorder.IsNull) { NativeDrawingBridge.Execute(__recorder, __target.__BitmapHandle); if (__nativeSurface != 0) NativeDrawingBridge.PresentNativeSurface(this); } } finally { NativeDrawingBridge.Release(ref __recorder); if (__nativeSurface != 0) __target?.Dispose(); __target = null; __nativeSurface = 0; global::System.GC.SuppressFinalize(this); } }";
+        if (method.Name == "Clear") return "{ __EnsureRecorder(); NativeDrawingBridge.RecorderClear(__recorder, color); }";
         if (method.Name == "FillRectangle")
         {
             var first = method.GetParameters()[1].ParameterType.FullName;
-            if (first == "System.Drawing.Rectangle") return "{ NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
-            if (first == "System.Drawing.RectangleF") return "{ NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, rect); }";
-            return "{ NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
+            if (first == "System.Drawing.Rectangle") return "{ __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
+            if (first == "System.Drawing.RectangleF") return "{ __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, rect); }";
+            return "{ __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
         }
-        if (method.Name == "FillRectangles") return "{ if (rects is null) throw new global::System.ArgumentNullException(nameof(rects)); foreach (var rect in rects) NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
+        if (method.Name == "FillRectangles") return "{ if (rects is null) throw new global::System.ArgumentNullException(nameof(rects)); __EnsureRecorder(); foreach (var rect in rects) NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
         if (method.Name == "DrawRectangle")
         {
-            if (count == 2) return "{ NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
-            return "{ NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
+            if (count == 2) return "{ __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
+            return "{ __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
         }
         if (method.Name == "DrawLine")
         {
-            if (count == 3) return "{ NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }";
-            return "{ NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }";
+            if (count == 3) return "{ __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }";
+            return "{ __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }";
         }
-        if (method.Name == "DrawLines") return "{ if (points is null) throw new global::System.ArgumentNullException(nameof(points)); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }";
-        if (method.Name == "DrawEllipse") return "{ NativeDrawingBridge.DrawEllipse(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
-        if (method.Name == "FillEllipse") return "{ NativeDrawingBridge.FillEllipse(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
-        if (method.Name == "MeasureString") return "{ if (text is null) throw new global::System.ArgumentNullException(nameof(text)); if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var measured = new global::System.Drawing.SizeF(text.Length * font.__size * 0.55f, font.Height); return " + (count == 4 ? "new global::System.Drawing.SizeF(global::System.Math.Min(width, measured.Width), measured.Height)" : "measured") + "; }";
+        if (method.Name == "DrawLines") return "{ if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }";
+        if (method.Name == "DrawEllipse") return "{ __EnsureRecorder(); NativeDrawingBridge.DrawEllipse(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
+        if (method.Name == "FillEllipse") return "{ __EnsureRecorder(); NativeDrawingBridge.FillEllipse(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }";
+        if (method.Name == "MeasureString") return "{ if (global::System.String.IsNullOrEmpty(text)) return global::System.Drawing.SizeF.Empty; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var measured = new global::System.Drawing.SizeF(text.Length * font.__size * 0.55f, font.Height); return " + (count == 4 ? "new global::System.Drawing.SizeF(global::System.Math.Min(width, measured.Width), measured.Height)" : "measured") + "; }";
         if (method.Name == "DrawString")
         {
-            if (count == 4 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.PointF") return "{ NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, null); }";
-            if (count == 5 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.PointF") return "{ NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, format); }";
-            if (count >= 4 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.RectangleF") return "{ NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, " + (count == 5 ? "format" : "null") + "); }";
-            return "{ NativeDrawingBridge.DrawString(__recorder, s, font, brush, new global::System.Drawing.PointF(x, y), null); }";
+            const string validate = "if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); ";
+            if (count == 4 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.PointF") return "{ " + validate + "__EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, null); }";
+            if (count == 5 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.PointF") return "{ " + validate + "__EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, format); }";
+            if (count >= 4 && method.GetParameters()[3].ParameterType.FullName == "System.Drawing.RectangleF") return "{ " + validate + "__EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, " + (count == 5 ? "format" : "null") + "); }";
+            return "{ " + validate + "__EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, new global::System.Drawing.PointF(x, y), null); }";
         }
         if (method.Name == "DrawImage" || method.Name == "DrawImageUnscaled") return DrawingImageBody(method);
-        if (method.Name == "DrawPath") return "{ if (path is null) throw new global::System.ArgumentNullException(nameof(path)); NativeDrawingBridge.DrawPath(__recorder, pen.__handle, path.__handle); }";
-        if (method.Name == "FillPath") return "{ if (path is null) throw new global::System.ArgumentNullException(nameof(path)); NativeDrawingBridge.FillPath(__recorder, brush.__handle, path.__handle); }";
-        if (method.Name == "FillPolygon") return "{ if (points is null) throw new global::System.ArgumentNullException(nameof(points)); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }";
-        if (method.Name == "Save") return "{ return new global::System.Drawing.Drawing2D.GraphicsState { __token = NativeDrawingBridge.RecorderSave(__recorder) }; }";
-        if (method.Name == "Restore") return "{ if (gstate is null) throw new global::System.ArgumentNullException(nameof(gstate)); NativeDrawingBridge.RecorderRestore(__recorder, gstate.__token); }";
-        if (method.Name == "TranslateTransform") return "{ __transform.Translate(dx, dy); NativeDrawingBridge.RecorderTranslate(__recorder, dx, dy); }";
-        if (method.Name == "SetClip") return "{ NativeDrawingBridge.RecorderSetClip(__recorder, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
+        if (method.Name == "DrawPath") return "{ if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __EnsureRecorder(); NativeDrawingBridge.DrawPath(__recorder, pen.__handle, path.__handle); }";
+        if (method.Name == "FillPath") return "{ if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __EnsureRecorder(); NativeDrawingBridge.FillPath(__recorder, brush.__handle, path.__handle); }";
+        if (method.Name == "FillPolygon") return "{ if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }";
+        if (method.Name == "Save") return "{ __EnsureRecorder(); return new global::System.Drawing.Drawing2D.GraphicsState { __token = NativeDrawingBridge.RecorderSave(__recorder) }; }";
+        if (method.Name == "Restore") return "{ if (gstate is null) throw new global::System.ArgumentNullException(nameof(gstate)); __EnsureRecorder(); NativeDrawingBridge.RecorderRestore(__recorder, gstate.__token); }";
+        if (method.Name == "TranslateTransform") return "{ __transform.Translate(dx, dy); __EnsureRecorder(); NativeDrawingBridge.RecorderTranslate(__recorder, dx, dy); }";
+        if (method.Name == "SetClip") return "{ __EnsureRecorder(); NativeDrawingBridge.RecorderSetClip(__recorder, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }";
         if (method.Name == "Flush") return "{ }";
         if (method.Name == "ReleaseHdc") return "{ NativeDrawingBridge.ReleaseHdc(this, hdc); }";
         if (method.Name == "GetHdc") return "{ return NativeDrawingBridge.GetHdc(this); }";
-        if (method.Name == "IsVisible") return "{ return NativeDrawingBridge.RecorderIsVisible(__recorder, point); }";
+        if (method.Name == "IsVisible") return "{ __EnsureRecorder(); return NativeDrawingBridge.RecorderIsVisible(__recorder, point); }";
         if (method.Name == "DrawIcon") return "{ if (icon is null) throw new global::System.ArgumentNullException(nameof(icon)); using var image = icon.ToBitmap(); DrawImage(image, targetRect); }";
     }
     if (type.FullName == "System.Drawing.Drawing2D.GraphicsPath")
@@ -1469,7 +1561,8 @@ static string MethodBody(Type type, MethodInfo method)
         if (method.Name == "ResumeLayout" && method.GetParameters().Length == 0) return "{ if (__layoutSuspendDepth > 0) --__layoutSuspendDepth; if (__layoutSuspendDepth == 0) PerformLayout(); }";
         if (method.Name == "ResumeLayout" && method.GetParameters().Length == 1) return "{ if (__layoutSuspendDepth > 0) --__layoutSuspendDepth; if (__layoutSuspendDepth == 0 && performLayout) PerformLayout(); }";
         if (method.Name == "PerformLayout") return "{ if (__layoutSuspendDepth != 0 || __performingLayout) return; __performingLayout = true; try { OnLayout(new LayoutEventArgs()); } finally { __performingLayout = false; } }";
-        if (method.Name is "Invalidate" or "Update") return "{ __RenderManagedPaint(); }";
+        if (method.Name == "Invalidate") return "{ __QueueManagedPaint(); }";
+        if (method.Name == "Update") return "{ if (InvokeRequired) Invoke((global::System.Action)__RenderManagedPaintNow); else __RenderManagedPaintNow(); }";
         if (method.Name == "UpdateStyles") return "{ }";
         if (method.Name == "Refresh") return "{ Invalidate(); Update(); }";
         if (method.Name == "SetStyle") return "{ __SetStyle(flag, value); }";
@@ -1499,6 +1592,7 @@ static string MethodBody(Type type, MethodInfo method)
     if (type.FullName == "System.Windows.Forms.Form")
     {
         if (method.Name == "Close") return "{ __RequestClose(); }";
+        if (method.Name == "ShowDialog") return "{ if (__TraceLifecycle) global::System.Console.Error.WriteLine(\"facade-dialog=show|type=\" + GetType().FullName + \"|name=\" + Name + \"|text=\" + Text + \"|size=\" + Width + \"x\" + Height); __RaiseLoad(); Visible = true; try { _ = __RunNativeWindow(); } finally { Visible = false; if (__TraceLifecycle) global::System.Console.Error.WriteLine(\"facade-dialog=closed|type=\" + GetType().FullName + \"|result=\" + __dialogResult); } return __dialogResult; }";
         if (method.Name == "SetBoundsCore") return "{ Bounds = new global::System.Drawing.Rectangle(x, y, width, height); }";
         if (method.Name == "OnFormClosing") return "{ FormClosing?.Invoke(this, e); }";
         if (method.Name == "OnActivated") return "{ }";
@@ -1508,7 +1602,7 @@ static string MethodBody(Type type, MethodInfo method)
     {
         return method.Name switch
         {
-            "Add" => "{ if (value is null) throw new global::System.ArgumentNullException(nameof(value)); if (global::System.Object.ReferenceEquals(value, __owner)) throw new global::System.ArgumentException(\"A control cannot parent itself.\", nameof(value)); if (global::System.Object.ReferenceEquals(value.__parent, __owner)) return; value.__parent?.Controls.Remove(value); __owner.__native.AddChild(value.__native); __items.Add(value); value.__parent = __owner; value.__ApplyEffectiveColors(); value.OnParentChanged(global::System.EventArgs.Empty); __owner.PerformLayout(); if (__owner.__HasRaisedLoad) value.__RaiseLoad(); }",
+            "Add" => "{ if (value is null) throw new global::System.ArgumentNullException(nameof(value)); if (global::System.Object.ReferenceEquals(value, __owner)) throw new global::System.ArgumentException(\"A control cannot parent itself.\", nameof(value)); if (global::System.Object.ReferenceEquals(value.__parent, __owner)) return; value.__parent?.Controls.Remove(value); __owner.__native.AddChild(value.__native); __items.Add(value); value.__parent = __owner; value.__ApplyEffectiveColors(); value.OnParentChanged(global::System.EventArgs.Empty); if (__owner is Panel && __owner is not TableLayoutPanel && __owner.Height == 0 && value.Visible && value.Dock is DockStyle.Top or DockStyle.Bottom) { var preferred = value.__PreferredLayoutSize(); if (preferred.Height > 0) __owner.Height = preferred.Height + __owner.Padding.Top + __owner.Padding.Bottom; } __owner.PerformLayout(); if (__owner.__HasRaisedLoad) value.__RaiseLoad(); }",
             "AddRange" => "{ foreach (var child in controls) Add(child); }",
             "Remove" => "{ if (__items.Remove(value)) { __owner.__native.RemoveChild(value.__native); value.__parent = null; value.OnParentChanged(global::System.EventArgs.Empty); } }",
             "Clear" => "{ foreach (var child in __items.ToArray()) Remove(child); }",
@@ -1931,7 +2025,7 @@ internal static unsafe class NativeDrawingBridge
                                     global::System.Drawing.PointF origin,
                                     global::System.Drawing.StringFormat? format)
     {
-        if (text is null) throw new ArgumentNullException(nameof(text));
+        if (string.IsNullOrEmpty(text)) return;
         var temporary = format is null;
         format ??= new global::System.Drawing.StringFormat();
         try
@@ -1947,6 +2041,7 @@ internal static unsafe class NativeDrawingBridge
     }
     internal static void RecorderQuality(global::System.Drawing.Graphics graphics)
     {
+        graphics.__EnsureRecorder();
         static uint Interpolation(global::System.Drawing.Drawing2D.InterpolationMode value) => value switch
         {
             global::System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor => 3,
@@ -2260,8 +2355,65 @@ internal static unsafe class NativeDrawingBridge
             Check(((delegate* unmanaged[Cdecl]<void*, ulong, Handle*, int>)Entry(88))(
                 pointer, (ulong)bytes.Length, &handle));
             Dimensions(handle, out var width, out var height);
-            return WrapBitmap(handle, width, height);
+            var bitmap = WrapBitmap(handle, width, height);
+            // PNG exposes straight-alpha ARGB semantics even though the owned
+            // raster store normalizes its internal bytes to premultiplied BGRA.
+            bitmap.__pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppArgb;
+            return bitmap;
         }
+    }
+    internal static byte[] ReadBounded(global::System.IO.Stream stream, string format)
+    {
+        const int maximumBytes = 64 * 1024 * 1024;
+        using var copy = new global::System.IO.MemoryStream();
+        var buffer = new byte[81920];
+        while (true)
+        {
+            var read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0) break;
+            if (copy.Length + read > maximumBytes)
+                throw new ArgumentException(format + " data exceeds the 64 MiB compatibility limit.", nameof(stream));
+            copy.Write(buffer, 0, read);
+        }
+        return copy.ToArray();
+    }
+    internal static global::System.Drawing.Bitmap DecodeIcon(byte[] bytes)
+    {
+        if (bytes is null || bytes.Length < 22 || bytes[0] != 0 || bytes[1] != 0 ||
+            bytes[2] != 1 || bytes[3] != 0)
+            throw new ArgumentException("ICO directory is invalid.", nameof(bytes));
+        static ushort U16(byte[] data, int offset) =>
+            (ushort)(data[offset] | data[offset + 1] << 8);
+        static uint U32(byte[] data, int offset) =>
+            (uint)(data[offset] | data[offset + 1] << 8 | data[offset + 2] << 16 |
+                   data[offset + 3] << 24);
+        var count = U16(bytes, 4);
+        if (count == 0 || 6 + count * 16 > bytes.Length)
+            throw new ArgumentException("ICO directory is truncated.", nameof(bytes));
+        var selectedOffset = -1;
+        var selectedSize = 0;
+        var selectedScore = -1L;
+        for (var index = 0; index < count; ++index)
+        {
+            var entry = 6 + index * 16;
+            var size = checked((int)U32(bytes, entry + 8));
+            var offset = checked((int)U32(bytes, entry + 12));
+            if (size < 8 || offset < 0 || offset > bytes.Length - size) continue;
+            if (bytes[offset] != 0x89 || bytes[offset + 1] != 0x50 ||
+                bytes[offset + 2] != 0x4e || bytes[offset + 3] != 0x47 ||
+                bytes[offset + 4] != 0x0d || bytes[offset + 5] != 0x0a ||
+                bytes[offset + 6] != 0x1a || bytes[offset + 7] != 0x0a) continue;
+            var width = bytes[entry] == 0 ? 256 : bytes[entry];
+            var height = bytes[entry + 1] == 0 ? 256 : bytes[entry + 1];
+            var score = (long)width * height * 65536 + U16(bytes, entry + 6);
+            if (score <= selectedScore) continue;
+            selectedScore = score;
+            selectedOffset = offset;
+            selectedSize = size;
+        }
+        if (selectedOffset < 0)
+            throw new NotSupportedException("GUI.Drawing currently admits PNG-backed ICO frames; this ICO is DIB-only.");
+        return DecodePng(bytes.AsSpan(selectedOffset, selectedSize).ToArray());
     }
     private static global::System.Drawing.Bitmap WrapBitmap(Handle handle, int width, int height)
     {
@@ -2291,6 +2443,7 @@ internal static unsafe class NativeDrawingBridge
             __nativeSurface = surface,
             __nativeSurfaceKind = kind,
         };
+        graphics.__EnsureRecorder();
         if (bounds.X != 0 || bounds.Y != 0)
             RecorderTranslate(graphics.__recorder, (float)-bounds.X, (float)-bounds.Y);
         return graphics;
@@ -2311,6 +2464,7 @@ internal static unsafe class NativeDrawingBridge
     {
         if (graphics.__target is null)
             throw new InvalidOperationException("Graphics has no bitmap-backed target.");
+        graphics.__EnsureRecorder();
         if (graphics.__hdcLeaseToken != 0)
             throw new InvalidOperationException("An HDC lease is already active.");
         Execute(graphics.__recorder, graphics.__target.__BitmapHandle);
@@ -2397,6 +2551,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint RunWindow, LastHostTrace;
         internal nint SubscribeV2, BeginInvoke, RequestClose, CallbackFaultCount;
         internal nint SetControlPng, SetChildIndex, SetControlColors, SubscribePointer;
+        internal nint SetCheckState, GetCheckState;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -2449,7 +2604,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         this.handle = handle;
         this.stableId = stableId;
         this.managedTypeName = managedTypeName;
-        supportsRaster = kind == 0x7fffffffu;
+        supportsRaster = kind is 20u or 0x7fffffffu;
         ownerThreadId = Environment.CurrentManagedThreadId;
         callbackRoot = GCHandle.Alloc(this, GCHandleType.Weak);
         Handle token;
@@ -2458,7 +2613,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         subscriptions.Add(token);
         if (kind is 4u or 5u or 11u or 14u) SubscribeTyped(NativeEvent.Clicked);
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); }
-        if (supportsRaster) SubscribePointer();
+        if (kind is 6u or 18u or 0x7fffffffu) SubscribePointer();
     }
 
     internal static NativeControlBridge Create(Type managedType)
@@ -2473,11 +2628,14 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             typeof(TextBoxBase).IsAssignableFrom(managedType);
         var toolStripSurface = typeof(ToolStrip).IsAssignableFrom(managedType);
         var buttonSurface = typeof(Button).IsAssignableFrom(managedType);
+        var transparentPaintSurface = typeof(Label).IsAssignableFrom(managedType) &&
+            !typeof(LinkLabel).IsAssignableFrom(managedType);
         var customPaint = global::System.OperatingSystem.IsWindows() &&
             (toolStripSurface || buttonSurface || (!retainedField && !typeof(Form).IsAssignableFrom(managedType) &&
             !managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal) &&
             paintMethod?.DeclaringType?.Assembly != typeof(Control).Assembly));
-        var kind = customPaint ? 0x7fffffffu : 0u;
+        var kind = managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal)
+            ? 19u : customPaint && transparentPaintSurface ? 20u : customPaint ? 0x7fffffffu : 0u;
         for (var current = managedType; current is not null && kind == 0u; current = current.BaseType)
         {
             kind = current.Name switch
@@ -2513,12 +2671,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
     internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
     internal void SetColors(global::System.Drawing.Color foreground, global::System.Drawing.Color background) { Check(((delegate* unmanaged[Cdecl]<Handle, uint, uint, int>)api.SetControlColors)(handle.Value, unchecked((uint)foreground.ToArgb()), unchecked((uint)background.ToArgb()))); }
+    internal uint CheckState
+    {
+        get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetCheckState)(handle.Value, &value)); return value; }
+        set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetCheckState)(handle.Value, value)); }
+    }
     internal bool InvokeRequired => Environment.CurrentManagedThreadId != ownerThreadId;
     internal bool SupportsRaster { get { return supportsRaster && api.SetControlPng != 0; } }
     internal void SetRaster(byte[] encodedPng) { if (!SupportsRaster) return; fixed (byte* data = encodedPng) Check(((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, int>)api.SetControlPng)(handle.Value, data, (ulong)encodedPng.Length)); }
-    internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate)
+    internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate, bool popup)
     {
-        var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u);
+        var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u) | (popup ? 8u : 0u);
         Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.RunWindow)(handle.Value, flags));
         return GetString(api.LastHostTrace);
     }
@@ -2677,8 +2840,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(6, ref value));
-        if (value.AbiVersion != 6 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0) throw new InvalidOperationException("GUI.Forms ABI 0.6 table is incomplete.");
+        Check(GetApi(7, ref value));
+        if (value.AbiVersion != 7 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0) throw new InvalidOperationException("GUI.Forms ABI 0.7 table is incomplete.");
         return value;
     }
     private static void Check(int result)

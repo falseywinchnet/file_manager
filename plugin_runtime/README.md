@@ -5,7 +5,7 @@ Status: **frozen legacy research source; superseded as an implementation home**.
 This subtree records the earlier Rust containment, capability, and
 interoperability study for File Manager extensions. Its valuable threat model,
 capability analysis, hostile fixtures, and protocol questions are retained.
-Production implementation now belongs to the Oracle plugin-supervisor subsystem
+Production implementation now belongs to the Orchestrator plugin-supervisor subsystem
 under [`../orchestrator/`](../orchestrator/), whose contract registry reconciles
 the engine, frontend, plugin, hive, CLI, and platform boundaries together.
 

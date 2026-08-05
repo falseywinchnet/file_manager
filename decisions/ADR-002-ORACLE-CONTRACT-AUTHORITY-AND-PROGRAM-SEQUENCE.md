@@ -1,6 +1,11 @@
 # ADR-002: Oracle contract authority and program sequence
 
-Status: **accepted**.
+Status: **superseded by
+[`ADR-003`](ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md)**.
+
+The repository topology, Rust boundary, and contract-authority findings remain
+historical inputs. The component name, integration authority, negotiation
+workflow, and implementation sequencing are replaced by ADR-003.
 
 Date: 2026-08-05.
 

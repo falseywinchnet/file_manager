@@ -37,7 +37,9 @@ the implementation.
   evidence-preserving results.
 - `internal/generation/` — versioned immutable object/binding/name/path/identity
   components, dual manifest slots, checksums, pinned readers, bounded lazy read
-  cache, last-valid fallback, and cross-platform publication primitives.
+  cache, last-valid fallback, evidence-preserving quarantine, bounded streaming
+  generation diff, a standalone checksummed delta-run experiment, and
+  cross-platform publication primitives.
 - `internal/service/` and `internal/transport/` — root planning/application,
   reconciliation, status, query, inspect, integrity, JSONL projection, and an
   opt-in one-root persistent mode.
@@ -87,8 +89,11 @@ reference and persistent candidate expose `version`, `status`, `root.plan`, `roo
 `scan.reconcile`, bounded exact `query`, `inspect`, `integrity.check`, and
 `shutdown`. Persistent reconciliation publishes a checked off-heap generation
 and restart selects the last valid manifest/segment pair. It does not yet
-implement quarantine, incremental event ingestion, lexical text, fuzzy
-search, framed production IPC, or live-plus-committed merging.
+implement delta-run publication/compaction, incremental event ingestion,
+lexical text, fuzzy search, framed production IPC, or live-plus-committed
+merging. A standalone delta writer/reader is measured but is not referenced by
+the live manifest or query path. Recovery quarantine is internal and
+status-visible; it is not yet a public administrative API.
 
 ## Definition of standalone completion
 

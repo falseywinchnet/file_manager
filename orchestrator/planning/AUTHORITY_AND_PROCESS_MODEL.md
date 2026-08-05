@@ -1,4 +1,4 @@
-# Oracle authority and process model
+# Orchestrator authority and process model
 
 Status: **accepted topology; exact transports and sandbox mechanisms remain
 measured**.
@@ -9,18 +9,21 @@ measured**.
 |---|---|---|---|
 | File Manager frontend | disciplined C++ | user interaction and private file-operation orchestration | host OS remains usable |
 | GUI.Forms | disciplined C++ | retained UI mechanics only | frontend may fail to render, no data authority lost |
-| Go engine | Go | exact catalogue and core retrieval projection | folder navigation and live reduced search |
-| Oracle daemon | Rust | public API, policy, registries, hives, routing, supervision | core navigation/file operations; cached declarations may display read-only |
+| Go engine | Go | systemwide exact catalogue and core retrieval projection | folder navigation and live reduced search |
+| Orchestrator daemon | Rust | public API, policy, registries, hives, routing, supervision | core navigation/file operations; cached declarations may display read-only |
 | Plugin worker | arbitrary behind boundary | one granted job only | everything trusted |
 | Platform adapter/helper | native/Rust/C++ as justified | one explicit OS integration operation | all portable core behavior |
-| External AI/CLI | external client | only issued API/shell authority | File Manager and stored facts |
+| Local human/AI/developer CLI caller | external client | the local user's authority for each admitted CLI operation | File Manager and stored facts |
+| Future plugin AI | sandboxed application capability | only explicit plugin grants | all trusted components |
 
-## Oracle topology target
+## Orchestrator topology target
 
-The initial target is one per-user Oracle daemon plus killable workers and
-on-demand first-party platform helpers. The daemon may lazy-start with File
-Manager or an API client and may remain available for configured background
-providers. It is restartable and owns no GUI thread or third-party stack frame.
+The initial target is one lazy per-user Orchestrator daemon plus killable workers
+and on-demand first-party platform helpers. The engine is separately systemwide.
+The daemon may start with File Manager or a CLI/API client and may remain only
+for explicit background leases. It is restartable and owns no GUI thread,
+window, or third-party stack frame. File Manager renders all Orchestrator
+settings and service controls.
 
 The daemon contains separable modules for:
 
@@ -43,11 +46,11 @@ proliferation.
 ## Authority rules
 
 - The frontend owns interaction state and asks trusted operation machinery to
-  mutate files. Oracle search/hive/plugin contracts do not become a generic file
+  mutate files. Orchestrator search/hive/plugin contracts do not become a generic file
   write API.
 - The Go engine owns exact catalogue facts and core Kolmogrov candidate evidence.
-  The Oracle may route or merge but not rewrite those facts.
-- The Oracle owns registry/hive publication, grants, quotas, and public contract
+  Orchestrator may route or merge but not rewrite those facts.
+- Orchestrator owns registry/hive publication, grants, quotas, and public contract
   enforcement.
 - A plugin owns only its code and proposed outputs. It does not decide whether
   those outputs are accepted, retained, ranked, rendered, or executable.
@@ -58,13 +61,13 @@ proliferation.
 
 ## Failure behavior
 
-### Oracle unavailable
+### Orchestrator unavailable
 
 - existing folder navigation and private file operations continue;
 - frontend may use cached read-only handler/command descriptions, but cannot
-  invoke a plugin without an authenticated Oracle session;
-- core search may use the registered private engine contract or report Oracle
-  augmentation unavailable according to the final integration choice;
+  invoke a plugin without an authenticated Orchestrator session;
+- core search may use the registered direct-engine degraded fallback while
+  Orchestrator integration/augmentation is visibly unavailable;
 - semantic/provider results and settings mutations are unavailable;
 - unknown types fall back to the native chooser;
 - restart invalidates plugin workers, leases, subscriptions, and uncommitted hive
@@ -73,7 +76,7 @@ proliferation.
 ### Engine unavailable
 
 - navigation continues;
-- Oracle reports exact/core search unavailable or reduced live-name behavior;
+- Orchestrator reports exact/core search unavailable or reduced live-name behavior;
 - semantic/provider records never impersonate currently verified local files.
 
 ### Plugin unavailable
@@ -90,7 +93,7 @@ proliferation.
 
 ## Performance containment
 
-Oracle routing must not make plugins participants in the core latency critical
+Orchestrator routing must not make plugins participants in the core latency critical
 path. Core engine results are independently bounded; provider/semantic lanes use
 deadlines, concurrency caps, result quotas, circuit breakers, and late-result
 revision semantics. Registries expose immutable reader snapshots so menu and

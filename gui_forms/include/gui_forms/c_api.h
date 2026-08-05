@@ -27,6 +27,7 @@ extern "C" {
 #define GF_ABI_VERSION_0_4 UINT32_C(0x00000004)
 #define GF_ABI_VERSION_0_5 UINT32_C(0x00000005)
 #define GF_ABI_VERSION_0_6 UINT32_C(0x00000006)
+#define GF_ABI_VERSION_0_7 UINT32_C(0x00000007)
 
 typedef struct gf_handle {
     uint32_t slot;
@@ -104,6 +105,10 @@ typedef enum gf_control_kind {
     GF_CONTROL_DATA_GRID_VIEW = 16,
     GF_CONTROL_TOOL_STRIP = 17,
     GF_CONTROL_NUMERIC_UP_DOWN = 18,
+    /* Retained layout participant which never becomes a pointer target. */
+    GF_CONTROL_INPUT_TRANSPARENT = 19,
+    /* Owner-painted retained surface which remains pointer transparent. */
+    GF_CONTROL_INPUT_TRANSPARENT_CUSTOM = 20,
     GF_CONTROL_CUSTOM = 0x7fffffff
 } gf_control_kind;
 
@@ -111,7 +116,9 @@ typedef enum gf_window_run_flag {
     GF_WINDOW_RUN_DEFAULT = 0,
     GF_WINDOW_RUN_AUTOMATION_CLOSE = 1 << 0,
     GF_WINDOW_RUN_FORCE_HEADLESS = 1 << 1,
-    GF_WINDOW_RUN_AUTOMATION_ACTIVATE = 1 << 2
+    GF_WINDOW_RUN_AUTOMATION_ACTIVATE = 1 << 2,
+    /* Run an unattached custom surface as a transient retained popup. */
+    GF_WINDOW_RUN_POPUP = 1 << 3
 } gf_window_run_flag;
 
 typedef void (*gf_event_callback)(gf_handle sender, uint32_t event_kind, void* context);
@@ -211,6 +218,10 @@ typedef struct gf_api_v0 {
                                    gf_pointer_callback callback,
                                    void* context,
                                    gf_event_token* token);
+
+    /* ABI 0.7 additions: native/managed checked-state projection. */
+    gf_result (*set_check_state)(gf_handle control, uint32_t check_state);
+    gf_result (*get_check_state)(gf_handle control, uint32_t* check_state);
 } gf_api_v0;
 
 /*

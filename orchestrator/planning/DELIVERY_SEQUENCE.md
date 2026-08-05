@@ -1,84 +1,82 @@
-# Oracle and File Manager delivery sequence
+# Orchestrator and File Manager delivery sequence
 
-Status: **DECIDED dependency order; implementation gates remain evidence-based**.
+Status: **DECIDED negotiated bootstrap and frontend opening order under ADR-003
+and ADR-004**.
 
-## Present phase — paper Oracle, active foundations
+## B0 — integration kernel (open)
 
-Parallel work permitted now:
+Orchestrator may implement provider-independent common types, lifecycle,
+availability, contract enumeration, CLI/structured output, stdio fixtures, fake
+peers, cancellation, quotas, and explicit stubs.
 
-- GUI.Forms proceeds toward semicomplete retained controls, host/rendering, text,
-  event, resource, and C ABI behavior.
-- Go engine proceeds through exact catalogue and useful query generations while
-  preserving its Kolmogrov-ready core fuzzy seam.
-- Kolmogrov proceeds independently toward formal/reference/optimized artifacts.
-- Oracle work is specifications, contract imports, ownership, fixtures on paper,
-  threat analysis, and proposals only.
-- File Manager frontend remains paper-only and waits.
+Exit:
 
-## Gate O0 — foundation snapshots
+- deterministic Rust tests and JSON fixtures pass;
+- required and available capabilities are distinct;
+- absent engine/plugin/fact services cannot be mistaken for empty success;
+- every proposed provider edge has a project-local negotiation note.
 
-Oracle implementation may be planned in executable milestones when:
+## N1 — per-interface negotiation
 
-- GUI.Forms publishes a named experimental ABI snapshot with lifecycle,
-  threading, text/input, invalidation, and core-control conformance;
-- engine publishes a named query/admin API snapshot, object identity model,
-  immutable reader generation, sandbox scan, exact query, and status/integrity
-  semantics;
-- each project exports golden messages/traces without requiring its private
-  implementation;
-- the master registry has no unknown call edge for the first Oracle slice.
+GUI.Forms, engine, and Kolmogrov work in parallel with the bootstrap.
+Orchestrator proposes an edge in the affected project's note; that project
+accepts or counterproposes; Orchestrator reconciles the canonical contract and
+fixtures. File Manager's real Orchestrator client reply is deferred until that
+adapter follows Frontend 001.
 
-Kolmogrov need not be mathematically complete for O0, but its configuration and
-candidate-interface shape must be reserved without classifying it as a plugin.
+An individual adapter may begin when its edge has:
 
-## Gate O1 — Oracle contract laboratory
+- named provider and consumers;
+- identities, versions, lifecycle, errors, bounds, cancellation, and authority;
+- minimal and hostile fixture drafts;
+- a recorded provider/consumer reply;
+- no unresolved call edge required for that adapter's first slice.
 
-Implement common semantic types, service lifecycle, fake engine/frontend/plugin
-peers, deterministic traces, cancellation, quotas, and capability denial. No
-real plugins, hive database, or platform integration.
+There is no longer one global O0 prohibition on all Rust implementation.
 
-Exit: C++/Go/Rust test peers exchange the same fixtures and hostile state-machine
-cases terminate correctly.
+## I1 — engine integration
 
-## Gate O2 — Oracle core services
+Implement user-scoped discovery/authentication of the systemwide engine,
+availability monitoring, exact query/status routing, normal Orchestrator query
+broker behavior, and registered degraded direct-engine fallback.
 
-Implement authenticated local sessions, engine client, immutable registry
-snapshots, settings transactions, hive generation reference store, audit, and
-CLI over the same semantic API.
+Exit: normal broker and fallback return semantically equivalent core results on
+the same fixture, and provider absence is explicit.
 
-Exit: engine, settings, provider deposit, semantic fact, handler resolution, and
-structured CLI vertical slices pass without the frontend.
+## C1 — core user services
 
-## Gate O3 — reef and platform realization
+Implement immutable registry snapshots, settings transactions, audit, handler
+and declarative-command registries, and structured CLI operations over the same
+semantic API. Orchestrator remains headless; File Manager owns all UI.
 
-Integrate OS-sandboxed plugin workers, package/grant lifecycle, declarative
-commands, first-party platform adapters, resource enforcement, quarantine, and
-restart recovery.
+Exit: CLI and fake File Manager clients perform the same settings/handler/
+command operations and receive the same failures.
 
-Exit: hostile suites pass on named macOS/Windows/Linux versions; no plugin code
-or ambient authority enters a trusted process.
+## P1 — plugin and semantic placeholders remain closed
 
-## Gate F0 — frontend implementation permission
+Plugin lifecycle, plugin AI, provider deposits, and semantic facts remain stubs
+until their own contracts are opened. Storage experiments may establish
+controls, but no guessed fact model becomes an API.
 
-The nested `../file_manager/` implementation may begin when:
+## P2 — reef and platform realization
 
-- GUI.Forms and engine satisfy their published consumption snapshots;
-- Oracle O2 is conformant and O3 has at least the macOS first-dogfood slice;
-- handler, command, settings, query, hive, lifecycle, and failure contracts used
-  by the first frontend slice are `frozen-v0`;
-- a mock/fake service set exists for deterministic frontend testing;
-- the grand architect explicitly opens frontend implementation.
+After explicit plugin decisions, integrate OS-sandboxed workers, package/grant
+lifecycle, provider generations, first-party platform adapters, quotas,
+quarantine, and recovery. Semantic facts advance on their separate architect
+design.
 
-## Frontend and dogfood order
+Exit: hostile suites pass on named macOS, Windows, and Linux versions; no
+third-party code or ambient authority enters a trusted process.
 
-1. Static window and navigation over fake services.
-2. Real filesystem navigation and file operations in a sandbox root.
-3. Real engine exact/Kolmogrov-ready search and folder metadata.
-4. Oracle settings, handler, command, preview, and hive integration.
-5. Packaging and first macOS dogfood replacement workflow.
-6. Daily use, failure ledger, performance/aesthetic refinement.
-7. Windows and Linux integration against the same contracts.
+## Frontend 001 opening
 
-The frontend does not wait for every future semantic model, remote provider,
-plugin ecosystem, or final Kolmogrov theorem. It waits for stable seams, not the
-end of research.
+The old global Gate F0 is superseded by ADR-004. Frontend 001 begins after:
+
+1. GUI.Forms gives a named go-ahead for the Frontend 001 consumption surface;
+2. the grand architect explicitly directs frontend implementation to begin.
+
+Frontend 001 uses deterministic frontend-owned ports for Engine and
+Orchestrator states. It does not wait for Engine, Orchestrator adapters, plugin
+AI, semantic facts, federation, or Kolmogrov transfer. Replacing a fake port
+with a real adapter remains gated by that individual negotiation and fixture
+snapshot.

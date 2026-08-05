@@ -85,7 +85,7 @@ Early exact and lexical delivery does not wait for Kolmogrov. Character grams,
 edit-distance structures, and exact flat-scan controls remain available, but
 they are controls and interim fallbacks rather than a decision to make the
 production Kolmogrov channel optional. Semantic interpretation remains a
-separate Oracle/plugin-hive concern.
+separate Orchestrator/plugin-hive concern.
 
 ## Certainty and result motion
 

@@ -2,11 +2,11 @@
 
 The pre-architecture workspace for a fast, local-first, cross-platform file
 manager: visually descended from classic Windows Explorer, NeXTSTEP, and
-Watercolor, with a command surface and a deliberately simple AI-facing API.
+Watercolor, with a local CLI surface and future capability-scoped plugin AI.
 
 The parent product remains in **pre-plan** where decisions are unresolved, but
-its repository topology, engine spine, Oracle contract authority, and delivery
-order are now accepted. The work in [`planning/`](planning/) defines the
+its repository topology, engine spine, Orchestrator integration authority, and
+negotiated delivery order are now accepted. The work in [`planning/`](planning/) defines the
 remaining decisions, evidence, exclusions, and component gates.
 
 Start with:
@@ -24,10 +24,10 @@ Start with:
   UI pipeline hypothesis, including a possible Modern.Forms compatibility layer;
 - [`planning/QUESTION_ATLAS.md`](planning/QUESTION_ATLAS.md) — numbered
   anti-requirement and architecture questions.
-- [`planning/visual/ceremonial-software-atlas.html`](planning/visual/ceremonial-software-atlas.html)
+- [`frontend/planning/visual/ceremonial-software-atlas.html`](frontend/planning/visual/ceremonial-software-atlas.html)
   — visible accept/distill/reject board for installer animation, OOBE, and
   Visual Studio/professional-software aesthetics from 2000–2012.
-- [`planning/visual/material-depth-atlas.html`](planning/visual/material-depth-atlas.html)
+- [`frontend/planning/visual/material-depth-atlas.html`](frontend/planning/visual/material-depth-atlas.html)
   — visible static board for relief, instruments, object icons, illustrated
   utility surfaces, and frozen screensaver-pattern families.
 - [`planning/gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md`](planning/gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md)
@@ -53,13 +53,15 @@ The fetched Modern.Forms reference is pinned in
   ConeDAG successors, practical algorithmic-information measures, exhaustive
   breakdown, and fixed-width multi-channel perceptual hashes. It pursues proof
   closure and adversarial measurement before production promotion.
-- [`orchestrator/`](orchestrator/) — the paper-first Rust Oracle: canonical
-  cross-project contract registry and future owner of hives, settings, handlers,
-  CLI/commands, platform policy, and hostile plugin supervision.
-- [`file_manager/`](file_manager/) — the waiting C++ end-user frontend. It begins
-  only after GUI.Forms, engine, and Oracle dependency gates open.
+- [`orchestrator/`](orchestrator/) — the active user-scoped Rust Orchestrator:
+  canonical integration authority, contract and availability registry, CLI,
+  and future owner of hives, settings, handlers, commands, platform policy, and
+  hostile plugin supervision.
+- [`frontend/`](frontend/) — the C++ end-user application. Frontend 001 begins
+  after the named GUI.Forms go-ahead and explicit architect direction, using
+  deterministic fixtures until real Engine and Orchestrator adapters open.
 - [`plugin_runtime/`](plugin_runtime/) — frozen earlier plugin-containment
-  research retained as input to Oracle, not a parallel runtime implementation.
+  research retained as input to Orchestrator, not a parallel runtime implementation.
 
 Each directory contains its own `AGENTS.md`, build boundary, ledgers, acceptance
 gates, and a handoff prompt suitable for a dedicated Codex task.

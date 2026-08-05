@@ -3,6 +3,11 @@
 Status: **CANDIDATE construction derived from the support program; no routing
 schedule, channel norm, width, or quantizer selected**.
 
+The active concrete instantiation is now the deformation-jet superposition hash
+in `DEFORMATION_JET_SUPERPOSITION_HASH.md`. The semantic-cylinder basis remains
+a general coordinate-routing candidate; it does not supersede the exact
+occurrence-derived deletion contraction.
+
 ## 1. Support atom
 
 The exhaustive oracle supplies canonical atoms whose fields remain separately
@@ -15,6 +20,12 @@ u = (channel, family, pattern, occurrence order, gap position,
 
 Exact source anchors are not compressed into perceptual identity. The support
 basis groups observable atoms for candidate geometry.
+
+There is no support-neutral universal observation basis. T-UNIVERSAL-SUPPORT-1
+proves that each task or modality has its own coarsest observation partition;
+support for simultaneous tasks is their joint refinement. Cross-modality reuse
+should therefore target the algebra, contraction law, certificate schema, and
+exact-verification seam—not silently charge every task for the joint partition.
 
 ## 2. Infinite semantic route
 
@@ -52,6 +63,13 @@ direction that the other partly retains, with the preference reversed for a
 content direction. Schedule selection must therefore cite the required affine
 direction family and each progressive support budget.
 
+T-NESTED-SCHEDULE-1 gives the exact static-prefix boundary. When detail blocks
+are independently addressable and each task has a unique least sufficient block
+set, one prefix order realizes every task without overhead if and only if those
+sets are totally ordered by inclusion. Two tasks needing distinct singleton
+blocks are the least obstruction. Incomparable task supports require direct
+addressing, multiple schedules, or declared overhead.
+
 ## 3. Coordinate state
 
 At each level, aggregate atom mass separately by primary channel and explicit
@@ -75,6 +93,12 @@ d_m in ker(A_m).
 
 The fine support is therefore coarse support plus new orthogonal detail—not a
 replacement hash unrelated to the previous scale.
+
+For symbolic deletion, T-DELETION-ORBIT-1 now supplies a stronger intrinsic
+scale object than generic block contraction. The normalized occurrence
+derivatives are the actual averaged descendant states, and a truncated jet's
+entire flow defect is its next derivative component. Generic Hilbert detail
+remains an accounting control for probes and quantization around that object.
 
 Choose an orthonormal basis for each detail space. Through level `M`, the number
 of scalar coefficients is exactly
@@ -107,6 +131,13 @@ obstruction set, select the minimum rectangle coordinates hitting every required
 collision difference. Retaining the full interaction tensor is not the default
 repair, and success on the frozen hitting set is not evidence of held-out
 generalization.
+
+T-INTERACTION-SPARSITY-1 prevents a stronger claim. For a `p` by `q` product,
+the marginal-invisible interaction space has dimension `(p-1)(q-1)`, and no
+smaller linear certificate is universally faithful. Sparse interaction support
+is defensible only relative to a declared relevant subspace, finite protected
+obstruction set, or accepted ambiguity. The `2` by `3` table is the least case
+where one interaction scalar necessarily misses a direction.
 
 The route is good only if those merges match the transformation and retrieval
 loss. The generic tree supplies bookkeeping, not relevance.
@@ -161,6 +192,18 @@ Every candidate support round reports:
 
 No scalar “support score” replaces this vector until a task loss proves the
 reduction valid.
+
+For finite protected collision requirements, T-OBSTRUCTION-CODE-1 supplies an
+exact serialized-width floor: build the forbidden-collision graph `G`; then
+`B_min=ceil(log2 chi(G))` bits are necessary and sufficient at zero Hamming
+margin. The triangle is the least one-bit obstruction. Thus width is relative
+to a protected task graph and margin, not content length alone.
+
+T-ENERGY-INFORMATION-1 also keeps two breakdown ledgers separate. A binary
+observation can have the same marginal energy and either one bit or zero bits of
+target information; conversely, rescaling can make energy arbitrarily small
+without changing information. Any bridge from SNR/contribution energy to
+information requires an explicit conditional observation/noise model.
 
 ## 8. Immediate construction questions
 

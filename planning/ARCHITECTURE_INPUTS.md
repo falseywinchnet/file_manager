@@ -148,26 +148,29 @@ implementations are a last resort, not the first architecture.
   comparisons are retained. No unmeasured result is promoted into exact file
   identity or production ranking.
 
-## Oracle and program topology
+## Orchestrator and program topology
 
-- The Rust component is named **Oracle** and lives under `../orchestrator/`.
-- Oracle owns the canonical specification, version, capability, and conformance
-  record for every cross-project API and ABI. Producers retain their private
-  implementations; registry ownership does not require every hot call to be
-  proxied through Oracle.
-- Oracle is the trusted control plane for hives, settings, handler association,
+- The Rust component is named **Orchestrator** and lives under `../orchestrator/`.
+- Orchestrator is the integration authority and owns the canonical requirement,
+  specification, version, capability, availability, and conformance record for
+  every cross-project API and ABI. It proposes interfaces in each affected
+  project's notes; that project replies and Orchestrator reconciles the result.
+  Producers retain their private implementations.
+- Orchestrator is the trusted control plane for hives, settings, handler association,
   command/CLI authority, plugin lifecycle and containment, and platform policy.
-- Semantic/provider memory lives in Oracle-managed hives outside both the Go
+- Semantic/provider memory lives in Orchestrator-managed hives outside both the Go
   engine's authoritative catalogue and untrusted plugin processes.
-- The C++ File Manager frontend lives under `../file_manager/` and is a client
-  of GUI.Forms, the engine, and Oracle. It does not become their hidden state
-  authority.
-- Delivery order is GUI.Forms semicompletion, a mostly-running standalone
-  engine with continuing Kolmogrov transfer, paper specification of Oracle,
-  Oracle construction and conformance, then frontend construction and macOS
-  dogfood.
+- The C++ File Manager frontend lives under `../frontend/`, consumes
+  Orchestrator as its normal integration/policy surface, and uses GUI.Forms
+  in-process. A registered direct-engine route is degraded fallback. File
+  Manager is also the GUI for Orchestrator settings and service controls.
+- Orchestrator's provider-independent Rust kernel advances alongside GUI.Forms,
+  the systemwide engine, and Kolmogrov. Frontend 001 opens after GUI.Forms gives
+  its named consumption go-ahead and the architect explicitly starts it, using
+  deterministic Engine and Orchestrator fixtures. Each real adapter opens after
+  its own negotiation/fixture gate.
 - The earlier `../plugin_runtime/` plan is preserved as research input but is
-  not a second runtime implementation beside Oracle.
+  not a second runtime implementation beside Orchestrator.
 
 ## Accepted engine implementation direction
 
@@ -191,18 +194,23 @@ The full authoritative record is
 - The accepted performance constitution supplies experiment rejection gates and
   becomes a measured claim only after its named workloads run.
 
-## Search and external AI
+## Search, CLI, and future plugin AI
 
 - One search box initially.
 - Match explanations should be concise.
-- AI-facing API begins read-only and returns file objects plus condensed,
-  interrogatable index information.
-- Personal assistants live elsewhere and call Oracle's read-oriented
-  interrogation boundary, which may query the engine and permitted hives.
+- The initial Orchestrator API is a local CLI with human and structured output.
+  A human, local AI tool, or developer agent invoking it has the same local-user
+  authority for the admitted operation; Orchestrator does not classify the
+  author of CLI input.
+- “Plugin AI” is a future application capability designed alongside the plugin
+  API. It does not describe agents developing the repository. Plugin AI and
+  semantic facts are currently stubbed.
+- The semantic fact engine remains under architect design; no fact operation is
+  inferred in advance.
 - Model execution location is user policy and not an initial feature.
 - OCR, captions, people/places/dates/topics/summaries, temporal language, and
   assistant-style answers are later work.
-- Oracle owns the path to secure, synchronizable information hives and
+- Orchestrator owns the path to secure, synchronizable information hives and
   multi-machine search/copy. Remote federation is a future mission, not
   permission for the local core to search the web.
 

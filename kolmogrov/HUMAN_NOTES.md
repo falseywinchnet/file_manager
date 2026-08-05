@@ -9,15 +9,43 @@ survey. Formal documents translate each statement into definitions and gates.
 
 ## The practical obstruction to defeat
 
-The target is the practical conclusion drawn from the claim that arbitrary
-truth cannot be compressed into one fixed-size hash location. We are not asking
-one location to carry the entire object. Content, position, and combination turn
-“in one location” into two or more complementary locations: a classical
-superposition of measurements whose surviving intersections retrieve the exact
-external anchor.
+The product goal is a **better perceptual hash**: qualitatively better candidate
+recall, deformation behavior, inspectability, and collision rescue at fixed
+serialized support. The research must evolve that hash into existence rather
+than choose the least inadequate member of an established catalogue.
+
+The target obstruction is the practical conclusion drawn from the claim that
+arbitrary truth must be compressed into one fixed-size hash location. We are
+not asking one location to carry the entire object. Content, position, and
+combination turn “in one location” into two or more complementary locations: a
+classical superposition of measurements whose surviving intersections retrieve
+the exact external anchor.
 
 The practical goal is comprehensive retrieval over all needs of the system, not
 a declaration about every theoretical model of general computation.
+
+The search-engine use is not secondary. The resulting hash should support a
+high-quality local retrieval engine and, through exact anchored records, the
+construction of inspectable AI memory systems. Kolmogrov supplies structural
+candidate evidence; any interpretation or personal semantic memory remains in
+the Oracle-managed layer outside the engine's critical identity boundary.
+
+## Concealed-state invention heuristic
+
+When a scalar distance or fixed vector does not evolve compositionally under a
+deformation, do not immediately bound the scalar. Look for the state it erased.
+The current candidate is the full deformation profile of observable evidence:
+
+```text
+what evidence exists
+  x where it exists
+  x how it is combined
+  x which edit histories preserve, move, alter, or destroy it.
+```
+
+A useful new hash should be a compact, multi-address observation of that
+profile. Its coordinates should inherit an edit/scale law from the profile,
+not acquire perceptual meaning only after a benchmark.
 
 ## Content, position, combination
 

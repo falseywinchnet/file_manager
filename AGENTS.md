@@ -27,7 +27,7 @@ Before planning or implementation, read:
   from measured results.
 - File Manager may not rely on .NET, Java, Godot, or a bundled web engine.
   GUI.Forms and the frontend are disciplined C++; the indexing/search engine is
-  Go; Oracle and hostile plugin supervision are Rust. C# bindings may target a
+  Go; Orchestrator and hostile plugin supervision are Rust. C# bindings may target a
   native UI engine without making .NET part of File Manager.
 - Modern.Forms is fetched source material and a possible compatibility/API
   frontend over a new native retained engine. Its present .NET implementation is
@@ -37,18 +37,21 @@ Before planning or implementation, read:
 
 ## Program boundaries
 
-- `orchestrator/` is the paper-first Oracle repository and canonical authority
-  for cross-project API/ABI semantics. New cross-project contracts enter its
-  registry and proposal process.
-- `file_manager/` is the waiting end-user frontend. Do not implement it before
-  its dependency gate opens.
+- `orchestrator/` is the active Rust Orchestrator repository and canonical
+  integration authority for cross-project API/ABI semantics, capability needs,
+  and availability. New edges enter its registry and project-local negotiation
+  process before adapters freeze.
+- `frontend/` is the end-user application project and Orchestrator's GUI for
+  settings/service controls. Frontend 001 opens only after the named GUI.Forms
+  go-ahead and explicit architect direction; other services remain fixtures in
+  that slice.
 - `engine/`, `gui_forms/`, and `kolmogrov/` remain independently buildable and
   own their private implementations.
 - `plugin_runtime/` is frozen legacy research input. New runtime implementation
-  belongs to Oracle's plugin-supervisor subsystem after its gate opens.
+  belongs to Orchestrator's plugin-supervisor subsystem after its gate opens.
 - Kolmogrov similarity is a gated core engine candidate channel. It is distinct
   from AI interpretation and personal semantic memory, which belong in
-  Oracle-managed hives beyond the engine's critical boundary.
+  Orchestrator-managed hives beyond the engine's critical boundary.
 
 ## Epistemic labels
 

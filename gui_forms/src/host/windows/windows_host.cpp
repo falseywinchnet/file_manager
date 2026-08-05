@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -27,6 +28,14 @@ constexpr wchar_t window_class_name[] = L"GUIForms.Window.v1";
 constexpr UINT_PTR scheduler_timer = 1;
 constexpr UINT managed_dispatch_message = WM_APP + 0x41U;
 constexpr std::size_t maximum_automation_command = 4096;
+
+bool trace_win32_input() noexcept {
+    static const bool enabled = [] {
+        const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_INPUT");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
 
 std::uint64_t now_nanoseconds() noexcept {
     return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -534,8 +543,23 @@ public:
         case WM_SIZE: resize(); return 0;
         case WM_DPICHANGED: dpi_changed(wparam, lparam); return 0;
         case WM_ACTIVATE:
+            if (trace_win32_input()) {
+                std::fprintf(stderr, "win32-input=activate|state:%u|active:%d|focus:%d\n",
+                             static_cast<unsigned>(LOWORD(wparam)),
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_);
+                std::fflush(stderr);
+            }
             dispatch(HostActivationEvent{LOWORD(wparam) != WA_INACTIVE});
             collect_damage(); return 0;
+        case WM_MOUSEACTIVATE:
+            if (trace_win32_input()) {
+                std::fprintf(stderr, "win32-input=mouse-activate|hit:%u|message:%u|active:%d|focus:%d\n",
+                             static_cast<unsigned>(LOWORD(lparam)),
+                             static_cast<unsigned>(HIWORD(lparam)),
+                             GetActiveWindow() == hwnd_, GetFocus() == hwnd_);
+                std::fflush(stderr);
+            }
+            break;
         case WM_PAINT: paint(); return 0;
         case managed_dispatch_message:
             if (options_.dispatch_pending) options_.dispatch_pending();
@@ -562,7 +586,8 @@ public:
                 if (options_.closed) options_.closed();
             }
             session_.shutdown();
-            PostQuitMessage(0); return 0;
+            if (options_.quit_thread_on_close) PostQuitMessage(0);
+            return 0;
         default: break;
         }
         return DefWindowProcW(hwnd_, message, wparam, lparam);
@@ -651,6 +676,17 @@ private:
         event.position = client_point(lparam);
         event.modifiers = modifiers();
         event.pointer_id = 1;
+        if (trace_win32_input()) {
+            const auto target = model_->hit_test(event.position);
+            const auto target_id = target ? target->stable_id().value() : std::string_view{"<none>"};
+            std::fprintf(stderr,
+                         "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
+                         static_cast<unsigned>(message), static_cast<unsigned>(action),
+                         event.position.x, event.position.y,
+                         static_cast<int>(target_id.size()), target_id.data(),
+                         GetActiveWindow() == hwnd_, GetFocus() == hwnd_, GetCapture() == hwnd_);
+            std::fflush(stderr);
+        }
         dispatch(std::move(event));
         synchronize_capture();
         update_cursor(client_point(lparam));
@@ -762,20 +798,82 @@ private:
             return saved ? TRUE : FALSE;
         }
         if (command == "close") { PostMessageW(hwnd_, WM_CLOSE, 0, 0); return TRUE; }
-        constexpr std::string_view click = "click ";
-        if (command.starts_with(click)) {
-            const std::string id = command.substr(click.size());
+        constexpr std::string_view activate = "activate ";
+        if (command.starts_with(activate)) {
+            const std::string id = command.substr(activate.size());
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input()) return FALSE;
+            control->on_activate();
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"activate\",\"id\":\"%s\",\"stable_id\":\"%s\"}\n",
+                         id.c_str(), control->stable_id().value().data());
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view click_at = "click-at ";
+        if (command.starts_with(click_at)) {
+            std::istringstream input(command.substr(click_at.size()));
+            std::string id;
+            double local_x{};
+            double local_y{};
+            if (!(input >> id >> local_x >> local_y) || !std::isfinite(local_x) ||
+                !std::isfinite(local_y)) return FALSE;
             const auto control = options_.automation_resolve
                 ? options_.automation_resolve(id) : model_->find(id);
             if (!control || !control->eligible_for_input()) return FALSE;
             const Rect bounds = control->absolute_bounds();
+            const Point point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
+                              bounds.y + std::clamp(local_y, 0.0, bounds.height)};
+            const bool handled_down = dispatch(PointerEvent{
+                PointerAction::down, PointerButton::primary, point, {},
+                Modifier::none, 1}).handled;
+            const bool handled_up = dispatch(PointerEvent{
+                PointerAction::up, PointerButton::primary, point, {},
+                Modifier::none, 1}).handled;
+            synchronize_capture();
+            collect_damage();
+            std::fprintf(stdout,
+                         "{\"automation\":\"click-at\",\"id\":\"%s\",\"local_x\":%.3f,\"local_y\":%.3f,\"handled\":%s}\n",
+                         id.c_str(), local_x, local_y,
+                         (handled_down || handled_up) ? "true" : "false");
+            std::fflush(stdout);
+            return TRUE;
+        }
+        constexpr std::string_view click = "click ";
+        if (command.starts_with(click)) {
+            const std::string id = command.substr(click.size());
+            std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"request\"}\n",
+                         id.c_str());
+            std::fflush(stdout);
+            const auto control = options_.automation_resolve
+                ? options_.automation_resolve(id) : model_->find(id);
+            if (!control || !control->eligible_for_input()) return FALSE;
+            std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"resolved\"}\n",
+                         id.c_str());
+            std::fflush(stdout);
+            const Rect bounds = control->absolute_bounds();
             const Point center{bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0};
+            const auto hit = model_->hit_test(center);
+            std::fprintf(stdout,
+                         "{\"automation\":\"click-target\",\"id\":\"%s\",\"resolved\":\"%s\",\"hit\":\"%s\",\"x\":%.3f,\"y\":%.3f}\n",
+                         id.c_str(), control->stable_id().value().data(),
+                         hit ? hit->stable_id().value().data() : "", center.x,
+                         center.y);
+            std::fflush(stdout);
             PointerEvent down{PointerAction::down, PointerButton::primary, center,
                               {}, Modifier::none, 1};
             PointerEvent up{PointerAction::up, PointerButton::primary, center,
                             {}, Modifier::none, 1};
             const bool handled_down = dispatch(std::move(down)).handled;
+            std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"down\"}\n",
+                         id.c_str());
+            std::fflush(stdout);
             const bool handled_up = dispatch(std::move(up)).handled;
+            std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"up\"}\n",
+                         id.c_str());
+            std::fflush(stdout);
             synchronize_capture();
             collect_damage();
             std::fprintf(stdout, "{\"automation\":\"click\",\"id\":\"%s\",\"handled\":%s}\n",
@@ -866,12 +964,17 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     }
 
     WindowsHostState state(std::move(model), options);
+    const DWORD style = options.popup_window ? (WS_POPUP | WS_BORDER) : WS_OVERLAPPEDWINDOW;
     RECT frame{0, 0, static_cast<LONG>(std::ceil(options.initial_size.width)),
                static_cast<LONG>(std::ceil(options.initial_size.height))};
-    AdjustWindowRectEx(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0);
+    AdjustWindowRectEx(&frame, style, FALSE, 0);
     const std::wstring title = wide_from_utf8(options.title);
+    const int initial_x = options.popup_window
+        ? static_cast<int>(std::lround(options.initial_position.x)) : CW_USEDEFAULT;
+    const int initial_y = options.popup_window
+        ? static_cast<int>(std::lround(options.initial_position.y)) : CW_USEDEFAULT;
     HWND window = CreateWindowExW(0, window_class_name, title.c_str(),
-                                  WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                                  style, initial_x, initial_y,
                                   frame.right - frame.left, frame.bottom - frame.top,
                                   nullptr, nullptr, instance, &state);
     if (window == nullptr) {
@@ -893,6 +996,7 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     while (GetMessageW(&message, nullptr, 0, 0) > 0) {
         TranslateMessage(&message);
         DispatchMessageW(&message);
+        if (!options.quit_thread_on_close && !IsWindow(window)) break;
     }
     const std::string metrics = state.metrics_json();
     const std::string host = state.host_json();

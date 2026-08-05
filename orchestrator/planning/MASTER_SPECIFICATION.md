@@ -1,4 +1,4 @@
-# Oracle master API/ABI specification
+# Orchestrator master API/ABI specification
 
 Status: **GIVEN contract authority; individual entries range from outline to
 DECIDED**.
@@ -6,7 +6,7 @@ DECIDED**.
 ## Purpose
 
 The repository must make every boundary legible before the frontend depends on
-it. “The Oracle has all the APIs” means:
+it. “Orchestrator has all the APIs” means:
 
 1. every cross-project operation has one canonical semantic definition here;
 2. every provider and consumer is named;
@@ -16,11 +16,10 @@ it. “The Oracle has all the APIs” means:
 5. conformance fixtures can prove reciprocal interoperability without running
    the entire File Manager.
 
-It does not mean every call traverses one runtime process. The C++ frontend may
-use GUI.Forms in-process and may query the Go engine over its private service
-protocol. The Oracle registers those contracts and coordinates cross-system
-work, while avoiding an unnecessary bottleneck on pure rendering or exact
-engine operations.
+It does not mean every call traverses one runtime process. The C++ frontend uses
+GUI.Forms in-process. File Manager normally consumes Orchestrator for
+integration/policy and combined search; a registered direct engine path is an
+explicit degraded fallback. Orchestrator never proxies pure rendering.
 
 ## Boundary taxonomy
 
@@ -53,17 +52,19 @@ semantic operation and error vocabulary as other clients.
 
 ## Canonical contribution flow
 
-1. A subproject discovers a missing or inadequate boundary.
-2. It adds a proposal under `proposals/<project>/` stating the user operation,
-   provider, consumers, authority, payload, performance need, cancellation,
-   failures, version effect, and alternatives.
-3. The Oracle specification task reconciles the proposal with existing types and
-   assigns or revises contract IDs.
-4. The grand architect resolves product authority or capability expansions.
-5. The accepted semantic contract moves under `spec/contracts/`.
-6. Golden fixtures are added before generated bindings.
-7. Provider and consumer projects implement independently against the fixtures.
-8. Cross-language and cross-version conformance runs before integration.
+1. Orchestrator or a subproject identifies a missing or inadequate edge.
+2. Orchestrator opens a numbered proposal round in the affected project's
+   `ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. Subproject-originated proposals may
+   also begin under `proposals/<project>/` and are routed into that ledger.
+3. The project records an accept/reject/counterproposal reply beside its own
+   implementation evidence.
+4. Orchestrator reconciles the round with existing types and assigns or revises
+   contract IDs.
+5. The grand architect resolves product authority or capability expansions.
+6. Accepted semantics move under `spec/contracts/`.
+7. Golden and hostile fixtures are added before generated bindings.
+8. Provider and consumer projects implement independently against the fixtures.
+9. Cross-language and cross-version conformance runs before integration freeze.
 
 No subproject edits another subproject's private implementation to make an
 unspecified boundary “work.”

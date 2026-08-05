@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 
 namespace GuiForms.CompatCapture;
@@ -16,6 +17,8 @@ internal static class Program
         "System.Private.Windows.Core",
         "System.Resources.Extensions",
     ];
+
+    internal static Assembly? DrawingFacade { get; private set; }
 
     public static int Main(string[] args)
     {
@@ -76,7 +79,7 @@ internal static class Program
         // start in the default context rather than the specimen's collectible
         // context. Share the bounded drawing/resource support closure so the facade
         // and the resource decoder also see one Bitmap identity.
-        PreloadDrawingFacade(Path.GetFullPath(args[4]));
+        PreloadDrawingFacade(Path.GetFullPath(args[4]), Path.GetFullPath(args[7]));
         PreloadDefaultRuntimeSupport(Path.GetFullPath(args[6]));
 
         var probe = Environment.GetEnvironmentVariable("GUI_FORMS_LOAD_PROBE_METHOD");
@@ -95,13 +98,30 @@ internal static class Program
             context.Unload();
             return 0;
         }
-        var entryPoint = assembly.EntryPoint ??
-            throw new MissingMethodException("Extracted retired compatibility specimen assembly has no entry point.");
-        object?[]? parameters = entryPoint.GetParameters().Length == 0
-            ? null : [Array.Empty<string>()];
-        var result = entryPoint.Invoke(null, parameters);
-        if (result is Task task) task.GetAwaiter().GetResult();
-        Console.WriteLine("entry=returned");
+        var runWorkingDirectory = Environment.GetEnvironmentVariable(
+            "GUI_FORMS_RUN_WORKING_DIRECTORY");
+        var previousWorkingDirectory = Environment.CurrentDirectory;
+        if (!string.IsNullOrWhiteSpace(runWorkingDirectory))
+        {
+            runWorkingDirectory = Path.GetFullPath(runWorkingDirectory);
+            Directory.CreateDirectory(runWorkingDirectory);
+            Environment.CurrentDirectory = runWorkingDirectory;
+            Console.WriteLine($"working-directory={runWorkingDirectory}|source=GUI_FORMS_RUN_WORKING_DIRECTORY");
+        }
+        try
+        {
+            var entryPoint = assembly.EntryPoint ??
+                throw new MissingMethodException("Extracted retired compatibility specimen assembly has no entry point.");
+            object?[]? parameters = entryPoint.GetParameters().Length == 0
+                ? null : [Array.Empty<string>()];
+            var result = entryPoint.Invoke(null, parameters);
+            if (result is Task task) task.GetAwaiter().GetResult();
+            Console.WriteLine("entry=returned");
+        }
+        finally
+        {
+            Environment.CurrentDirectory = previousWorkingDirectory;
+        }
         if (context.IsCollectible) context.Unload();
         return 0;
     }
@@ -121,9 +141,21 @@ internal static class Program
         }
     }
 
-    private static void PreloadDrawingFacade(string drawingPath)
+    private static void PreloadDrawingFacade(string drawingPath, string nativeDirectory)
     {
         var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(drawingPath);
+        NativeLibrary.SetDllImportResolver(assembly, (libraryName, _, _) =>
+        {
+            if (!libraryName.Equals("gui_drawing_abi0", StringComparison.OrdinalIgnoreCase) &&
+                !libraryName.Equals("gui_drawing_raster0", StringComparison.OrdinalIgnoreCase))
+                return 0;
+            var fileName = Path.HasExtension(libraryName) ? libraryName : libraryName + ".dll";
+            var path = Path.Combine(nativeDirectory, fileName);
+            if (!File.Exists(path)) return 0;
+            Console.WriteLine($"native-default={fileName}");
+            return NativeLibrary.Load(path);
+        });
+        DrawingFacade = assembly;
         var bitmap = assembly.GetType("System.Drawing.Bitmap", throwOnError: true)!;
         var token = assembly.GetName().GetPublicKeyToken();
         var tokenText = token is null || token.Length == 0 ? "null" :
@@ -181,8 +213,9 @@ internal sealed class FacadeLoadContext : AssemblyLoadContext
         var name = assemblyName.Name ?? string.Empty;
         if (name.Equals("System.Drawing.Common", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine("resolve=System.Drawing.Common|source=drawing-facade-default-shared");
-            return null;
+            Console.WriteLine("resolve=System.Drawing.Common|source=drawing-facade-default-explicit");
+            return Program.DrawingFacade ??
+                throw new InvalidOperationException("Drawing facade was not preloaded.");
         }
         if (Program.DefaultRuntimeSupport.Contains(name, StringComparer.OrdinalIgnoreCase))
         {

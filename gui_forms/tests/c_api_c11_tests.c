@@ -41,6 +41,15 @@ static void count_callback(gf_handle sender, uint32_t event_kind, void* opaque) 
     ++*calls;
 }
 
+static uint32_t count_click_callback(gf_handle sender, uint32_t event_kind,
+                                     void* opaque) {
+    unsigned* calls = (unsigned*)opaque;
+    (void)sender;
+    require(event_kind == GF_EVENT_CLICKED, "click callback event kind changed");
+    ++*calls;
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
 struct worker_context {
     gf_handle control;
     gf_result result;
@@ -179,7 +188,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_6, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_7, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -189,15 +198,78 @@ static void test_version_negotiation(void) {
                 api.callback_fault_count != NULL &&
                 api.set_control_png != NULL && api.set_child_index != NULL &&
                 api.set_control_colors != NULL && api.subscribe_pointer != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_6,
+                api.set_check_state != NULL && api.get_check_state != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_7,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000007), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000008), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_7_checked_state_and_transparent_input(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle check = {0U, 0U};
+    gf_handle overlay = {0U, 0U};
+    gf_handle painted_overlay = {0U, 0U};
+    gf_event_token clicked = {0U, 0U};
+    unsigned click_count = 0U;
+    uint32_t state = 99U;
+    require(api.control_create_kind(GF_CONTROL_FORM,
+                                    text("abi.checked.form"), &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_CHECK_BOX,
+                                        text("abi.checked.check"), &check) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_INPUT_TRANSPARENT,
+                                        text("abi.checked.overlay"), &overlay) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_INPUT_TRANSPARENT_CUSTOM,
+                                        text("abi.checked.painted-overlay"),
+                                        &painted_overlay) == GF_OK,
+            "0.7 checked-state fixtures failed");
+    require(api.set_bounds(form, (gf_rect){0.0, 0.0, 320.0, 200.0}) == GF_OK,
+            "0.7 form bounds failed");
+    require(api.set_bounds(check, (gf_rect){24.0, 30.0, 140.0, 24.0}) == GF_OK,
+            "0.7 checkbox bounds failed");
+    require(api.set_bounds(overlay, (gf_rect){0.0, 0.0, 320.0, 200.0}) == GF_OK,
+            "0.7 overlay bounds failed");
+    require(api.set_bounds(painted_overlay,
+                           (gf_rect){0.0, 0.0, 320.0, 200.0}) == GF_OK,
+            "0.7 painted overlay bounds failed");
+    require(api.add_child(form, check) == GF_OK,
+            "0.7 checkbox parenting failed");
+    require(api.add_child(form, overlay) == GF_OK,
+            "0.7 overlay parenting failed");
+    require(api.add_child(form, painted_overlay) == GF_OK,
+            "0.7 painted overlay parenting failed");
+    require(api.subscribe_v2(check, GF_EVENT_CLICKED, count_click_callback,
+                             &click_count, &clicked) == GF_OK,
+            "0.7 checkbox subscription failed");
+    require(api.run_window(form,
+                           GF_WINDOW_RUN_FORCE_HEADLESS |
+                               GF_WINDOW_RUN_AUTOMATION_ACTIVATE) == GF_OK &&
+                click_count == 1U &&
+                api.get_check_state(check, &state) == GF_OK && state == 1U,
+            "input-transparent overlay intercepted checkbox activation");
+    require(api.set_check_state(check, 0U) == GF_OK &&
+                api.get_check_state(check, &state) == GF_OK && state == 0U,
+            "checkbox state did not round-trip");
+    require(api.set_check_state(check, 3U) == GF_ERROR_INVALID_ARGUMENT,
+            "invalid checkbox state was accepted");
+    require(api.get_check_state(form, &state) == GF_ERROR_WRONG_HANDLE_KIND,
+            "non-check control accepted checked-state access");
+    require(api.dispose(form) == GF_OK, "0.7 checked form disposal failed");
+
+    gf_handle radio = {0U, 0U};
+    require(api.control_create_kind(GF_CONTROL_RADIO_BUTTON,
+                                    text("abi.checked.radio"), &radio) == GF_OK &&
+                api.set_check_state(radio, 1U) == GF_OK &&
+                api.get_check_state(radio, &state) == GF_OK && state == 1U,
+            "radio state did not round-trip");
+    require(api.set_check_state(radio, 2U) == GF_ERROR_INVALID_ARGUMENT,
+            "radio accepted indeterminate state");
+    require(api.dispose(radio) == GF_OK, "0.7 radio disposal failed");
 }
 
 static void test_abi_0_6_pointer_delivery(void) {
@@ -234,6 +306,29 @@ static void test_abi_0_6_pointer_delivery(void) {
             "0.6 pointer disconnect failed");
     require(api.dispose(form) == GF_OK,
             "0.6 pointer form disposal failed");
+
+    memset(&context, 0, sizeof(context));
+    form = (gf_handle){0U, 0U};
+    gf_handle numeric = {0U, 0U};
+    pointer = (gf_event_token){0U, 0U};
+    require(api.control_create_kind(GF_CONTROL_FORM, text("abi.pointer.field-form"),
+                                    &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_NUMERIC_UP_DOWN,
+                                        text("abi.pointer.numeric"),
+                                        &numeric) == GF_OK &&
+                api.set_bounds(form, (gf_rect){0.0, 0.0, 240.0, 120.0}) == GF_OK &&
+                api.set_bounds(numeric, (gf_rect){20.0, 24.0, 120.0, 24.0}) == GF_OK &&
+                api.add_child(form, numeric) == GF_OK &&
+                api.subscribe_pointer(numeric, pointer_event, &context,
+                                      &pointer) == GF_OK,
+            "field pointer fixtures failed");
+    require(api.run_window(form,
+                           GF_WINDOW_RUN_FORCE_HEADLESS |
+                               GF_WINDOW_RUN_AUTOMATION_ACTIVATE) == GF_OK &&
+                context.downs == 1U && context.ups == 1U,
+            "numeric field did not publish retained pointer input");
+    require(api.dispose(form) == GF_OK,
+            "numeric field form disposal failed");
 }
 
 static void test_properties_tree_and_errors(void) {
@@ -484,6 +579,7 @@ int main(void) {
     test_abi_0_4_prehost_dispatch_and_disposal_cancellation();
     test_abi_0_4_close_cancellation();
     test_abi_0_6_pointer_delivery();
+    test_abi_0_7_checked_state_and_transparent_input();
     test_retain_release_and_thread_affinity();
     test_event_tokens_and_callback_disposal();
     puts("gui_forms_c_api_c11_tests: all tests passed");

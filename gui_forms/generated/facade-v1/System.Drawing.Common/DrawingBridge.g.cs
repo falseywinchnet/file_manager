@@ -248,7 +248,7 @@ internal static unsafe class NativeDrawingBridge
                                     global::System.Drawing.PointF origin,
                                     global::System.Drawing.StringFormat? format)
     {
-        if (text is null) throw new ArgumentNullException(nameof(text));
+        if (string.IsNullOrEmpty(text)) return;
         var temporary = format is null;
         format ??= new global::System.Drawing.StringFormat();
         try
@@ -264,6 +264,7 @@ internal static unsafe class NativeDrawingBridge
     }
     internal static void RecorderQuality(global::System.Drawing.Graphics graphics)
     {
+        graphics.__EnsureRecorder();
         static uint Interpolation(global::System.Drawing.Drawing2D.InterpolationMode value) => value switch
         {
             global::System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor => 3,
@@ -577,8 +578,65 @@ internal static unsafe class NativeDrawingBridge
             Check(((delegate* unmanaged[Cdecl]<void*, ulong, Handle*, int>)Entry(88))(
                 pointer, (ulong)bytes.Length, &handle));
             Dimensions(handle, out var width, out var height);
-            return WrapBitmap(handle, width, height);
+            var bitmap = WrapBitmap(handle, width, height);
+            // PNG exposes straight-alpha ARGB semantics even though the owned
+            // raster store normalizes its internal bytes to premultiplied BGRA.
+            bitmap.__pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppArgb;
+            return bitmap;
         }
+    }
+    internal static byte[] ReadBounded(global::System.IO.Stream stream, string format)
+    {
+        const int maximumBytes = 64 * 1024 * 1024;
+        using var copy = new global::System.IO.MemoryStream();
+        var buffer = new byte[81920];
+        while (true)
+        {
+            var read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0) break;
+            if (copy.Length + read > maximumBytes)
+                throw new ArgumentException(format + " data exceeds the 64 MiB compatibility limit.", nameof(stream));
+            copy.Write(buffer, 0, read);
+        }
+        return copy.ToArray();
+    }
+    internal static global::System.Drawing.Bitmap DecodeIcon(byte[] bytes)
+    {
+        if (bytes is null || bytes.Length < 22 || bytes[0] != 0 || bytes[1] != 0 ||
+            bytes[2] != 1 || bytes[3] != 0)
+            throw new ArgumentException("ICO directory is invalid.", nameof(bytes));
+        static ushort U16(byte[] data, int offset) =>
+            (ushort)(data[offset] | data[offset + 1] << 8);
+        static uint U32(byte[] data, int offset) =>
+            (uint)(data[offset] | data[offset + 1] << 8 | data[offset + 2] << 16 |
+                   data[offset + 3] << 24);
+        var count = U16(bytes, 4);
+        if (count == 0 || 6 + count * 16 > bytes.Length)
+            throw new ArgumentException("ICO directory is truncated.", nameof(bytes));
+        var selectedOffset = -1;
+        var selectedSize = 0;
+        var selectedScore = -1L;
+        for (var index = 0; index < count; ++index)
+        {
+            var entry = 6 + index * 16;
+            var size = checked((int)U32(bytes, entry + 8));
+            var offset = checked((int)U32(bytes, entry + 12));
+            if (size < 8 || offset < 0 || offset > bytes.Length - size) continue;
+            if (bytes[offset] != 0x89 || bytes[offset + 1] != 0x50 ||
+                bytes[offset + 2] != 0x4e || bytes[offset + 3] != 0x47 ||
+                bytes[offset + 4] != 0x0d || bytes[offset + 5] != 0x0a ||
+                bytes[offset + 6] != 0x1a || bytes[offset + 7] != 0x0a) continue;
+            var width = bytes[entry] == 0 ? 256 : bytes[entry];
+            var height = bytes[entry + 1] == 0 ? 256 : bytes[entry + 1];
+            var score = (long)width * height * 65536 + U16(bytes, entry + 6);
+            if (score <= selectedScore) continue;
+            selectedScore = score;
+            selectedOffset = offset;
+            selectedSize = size;
+        }
+        if (selectedOffset < 0)
+            throw new NotSupportedException("GUI.Drawing currently admits PNG-backed ICO frames; this ICO is DIB-only.");
+        return DecodePng(bytes.AsSpan(selectedOffset, selectedSize).ToArray());
     }
     private static global::System.Drawing.Bitmap WrapBitmap(Handle handle, int width, int height)
     {
@@ -608,6 +666,7 @@ internal static unsafe class NativeDrawingBridge
             __nativeSurface = surface,
             __nativeSurfaceKind = kind,
         };
+        graphics.__EnsureRecorder();
         if (bounds.X != 0 || bounds.Y != 0)
             RecorderTranslate(graphics.__recorder, (float)-bounds.X, (float)-bounds.Y);
         return graphics;
@@ -628,6 +687,7 @@ internal static unsafe class NativeDrawingBridge
     {
         if (graphics.__target is null)
             throw new InvalidOperationException("Graphics has no bitmap-backed target.");
+        graphics.__EnsureRecorder();
         if (graphics.__hdcLeaseToken != 0)
             throw new InvalidOperationException("An HDC lease is already active.");
         Execute(graphics.__recorder, graphics.__target.__BitmapHandle);

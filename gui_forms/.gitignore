@@ -6,3 +6,5 @@
 
 # Keep retired compatibility specimen-derived demo and compatibility artifacts local because the specimen is proprietary.
 /compatibility/retired compatibility specimen/
+/experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md
+/experiments/retired compatibility specimen-private/

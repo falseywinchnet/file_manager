@@ -1,6 +1,6 @@
-# Oracle conformance and versioning constitution
+# Orchestrator conformance and versioning constitution
 
-Status: **paper requirements; codec/IDL unresolved**.
+Status: **bootstrap fixtures active; codec/IDL and cross-language peers unresolved**.
 
 ## Independent version namespaces
 
@@ -23,7 +23,7 @@ Never use one global “File Manager API version.” Track independently:
 Compatibility negotiates the intersection. A newer endpoint never unilaterally
 selects semantics unknown to the peer.
 
-## Paper artifact ladder
+## Contract artifact ladder
 
 Every contract advances through:
 
@@ -36,6 +36,11 @@ Every contract advances through:
 7. `stable` — explicit compatibility horizon accepted.
 
 Code existence cannot skip a stage.
+
+A `fixture-draft` may have a deliberately disposable executable laboratory
+projection, as the bootstrap does. That does not promote the contract to
+`implemented`; that stage still requires an independently built provider and
+consumer against the accepted fixtures.
 
 ## Required conformance corpus
 
@@ -69,7 +74,7 @@ than bytes is tested and signing/digest rules use a separately canonical form.
 
 ## Dependency locks
 
-When implementation opens, every generator, schema compiler, and runtime codec
-is version-locked and reproducible offline. Checked-in generated artifacts name
+Every generator, schema compiler, and runtime codec is version-locked and
+reproducible offline. Checked-in generated artifacts name
 their source contract revision and generator digest. Hand-edited generated files
 fail CI.

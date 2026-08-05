@@ -195,7 +195,8 @@ generator.
 
 Detailed backend and behavior choices have moved to
 `gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md`. The relational style/color
-contract is recorded in `visual/COLOR_RELATION_MODEL.md`.
+contract is recorded in
+`../frontend/planning/visual/COLOR_RELATION_MODEL.md`.
 
 - **UI001:** Is “PTP” the exact historical name? Do you have any original schema,
   binary, SDK, DML, manual, or screenshot artifacts?

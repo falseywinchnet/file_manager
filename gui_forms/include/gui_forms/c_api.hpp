@@ -2,6 +2,7 @@
 
 #include "gui_forms/c_api.h"
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>

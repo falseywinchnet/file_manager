@@ -904,32 +904,44 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   native configuration passes 24/24. Pixel
   storage, raster execution, facade mapping, and the M11d passthrough cutover
   remain open. Evidence: `experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md`.
-- **MEASURED M11f continuation:** GUI.Drawing now owns bounded COW CPU bitmaps,
+- **MEASURED M11f:** GUI.Drawing now owns bounded COW CPU bitmaps,
   tokenized locks, PNG, paths/regions/gradients, a private CPU-only Skia raster
   service, and a generated 307/307 Drawing facade. The combined verifier reports
   1,104/1,104. PE64 C and generated .NET 10 probes pass HBITMAP, HDC, HWND,
   capture/present, and tokenized GetHdc/ReleaseHdc behavior under Wine while the
-  renderer-free boundary remains clean. **OPEN:** only a macOS arm64 private
-  Skia archive is currently packaged; Windows x64 `gui_drawing_raster0.dll`, a
-  nonempty Wine surface-raster round trip, and the unchanged zero-passthrough
-  specimen run remain gates. Evidence:
+  renderer-free boundary remains clean. A Win64-GNU CPU-only Skia archive now
+  links `gui_drawing_raster0.dll`; the PE64 command/PNG round trip and Windows
+  surface adapter probe pass under Wine. The unchanged zero-passthrough
+  specimen run remains M11g. Evidence:
   `experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`.
 
 Next bounded M11 rounds:
 
-1. **M11f closure:** package the Windows x64 private CPU-only Skia raster
-   module and pass a nonempty Wine native-surface raster round trip.
-2. **M11g:** differential .NET/Wine oracle, unchanged-specimen dynamic call
+1. **M11g:** differential .NET/Wine oracle, unchanged-specimen dynamic call
    trace, elimination of the managed bitmap/PNG paint round trip, and a visible
    zero-passthrough retired compatibility specimen run.
-3. **M11h:** secondary windows/popups/modal focus, editing/source selection,
+2. **M11h:** secondary windows/popups/modal focus, editing/source selection,
    then active spectrum/waterfall streaming and sustained paint measurement.
 
-M11f closure is next because the remaining Windows raster packaging gate still
-obscures whether a missing Wine visual is Forms behavior, drawing behavior, or
-the temporary raster bridge.
-Multi-window work remains the next application blocker, but it cannot close the
-owned-toolkit claim while owner paint still executes in `System.Drawing.Common`.
+M11g is next: the Windows raster packaging gate is closed, so unchanged-specimen
+instrumentation can now distinguish missing Forms behavior from owned drawing
+behavior without the temporary Microsoft drawing implementation.
+
+**MEASURED PARTIAL M11g:** the pinned unchanged specimen now passes bitmap/icon
+resource hydration, audio/device discovery, plugin loading, and main-window
+construction using the owned Drawing facade. Its live tree contains 204 controls
+and 204 stable IDs. ABI 0.7 now projects checkbox/radio state, DockPanelSuite's
+empty full-client auto-hide strip is input-transparent, and an exact routed
+`useSquelchCheckBox` click visibly toggles state and drives retired compatibility specimen's numeric-field
+enablement while the host stays responsive. Per-call counters, remaining
+radio/field families, direct retained paint cutover, differential fixtures,
+close/reopen, and active-source soak remain the M11g exit gates. Retained popup
+menus now have owned vertical geometry, nested submenu lifetime, checked/hot
+painting, native Portsmouth label projection, and close without terminating the
+main loop. Custom-painted labels are input-transparent, and preferred-size /
+AutoSize table propagation now exposes retired compatibility specimen's previously zero-height source
+URI row and action buttons inside DockPanelSuite. Evidence:
+`experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
 
 Exit: two independent native consumers plus the C# gallery pass lifetime,
 callback, thread, error, and packaging tests. Freeze 1.0 only after the breaking-

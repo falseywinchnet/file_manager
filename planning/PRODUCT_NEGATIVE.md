@@ -37,7 +37,7 @@ for clarification.
 - Java would be a fundamental betrayal of the project.
 - Godot is not an acceptable delivery shortcut.
 - The native GUI engine is disciplined C++.
-- Rust owns Oracle's trusted control plane and hostile plugin supervision; it is
+- Rust owns Orchestrator's trusted control plane and hostile plugin supervision; it is
   not the GUI rendering language.
 - Go owns the persistent indexing/search backend.
 - C# interoperability is allowed as a binding to a native engine, not as a File
@@ -45,8 +45,10 @@ for clarification.
 
 ## Core feature exclusions
 
-- No writable AI API. AI-facing commands condense and expose information; they
-  return file objects. Mutations use the ordinary local CLI environment.
+- No hidden assistant-specific authority tier. Humans, local AI tools, and
+  developer agents use the same local CLI operations and their declared
+  authority. Future plugin AI is separately sandboxed; no fact or plugin-AI API
+  is inferred before its contract exists.
 - No personal-assistant AI inside File Manager.
 - No core web search or web-store search.
 - No automatic indexing of removable or network volumes. New-drive consent
@@ -77,7 +79,7 @@ Plugin classes admitted for later design:
 - search providers.
 
 Other plugin powers are not admitted merely by analogy with extensible shells.
-Oracle may expose separately specified handler, icon, metadata, command-menu,
+Orchestrator may expose separately specified handler, icon, metadata, command-menu,
 and semantic-hive contracts only after capability review; this does not grant a
 plugin GUI control injection or direct engine-catalogue mutation. Whether an
 in-application plugin catalogue is permitted remains unresolved, including its

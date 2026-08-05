@@ -227,10 +227,9 @@ remains 797/797 and passes its host-.NET/Wine managed-loop smoke.
 
 ### M11f — rendering, raster storage and compatibility facade
 
-Status: **MEASURED IN PROGRESS.** D3–D7, owned bitmaps/PNG, the 307/307
-generated facade, and D8 handle/lease semantics are implemented. The Windows
-x64 private Skia raster module and nonempty Wine surface-raster round trip
-remain the exit gate. See
+Status: **MEASURED.** D3–D8, owned bitmaps/PNG, the 307/307 generated facade,
+and the private macOS/PE64 CPU-only Skia raster modules are implemented. The
+PE64 raster and native-surface round trips pass under Wine. See
 `../experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`.
 
 1. Implement D3–D7 through the selected private raster adapter.
@@ -251,10 +250,10 @@ path loads Microsoft's drawing implementation or GDI+ backend.
 (797 Forms plus 307 Drawing). Host native-raster/facade smokes, 28/28
 Skia-enabled native tests, and 24/24 renderer-free tests pass. PE64 C and .NET
 10 facade probes pass HBITMAP, HDC, HWND, presentation, tokenized release, and
-stale-token behavior under Wine. **OPEN:** the unchanged Wine specimen cannot
-use the new raster path until `gui_drawing_raster0.dll` is linked against a
-Windows x64 CPU-only Skia build; therefore M11f is not marked complete and the
-zero-passthrough counter is not claimed.
+stale-token behavior under Wine. The Win64-GNU CPU-only Skia archive links
+`gui_drawing_raster0.dll`; its PE64 command/PNG test and Windows HBITMAP probe
+pass under Wine. The unchanged-specimen zero-passthrough counter remains M11g
+and is not claimed by this substrate result.
 
 ### M11g — differential closure and retired compatibility specimen cutover
 
@@ -271,6 +270,14 @@ zero-passthrough counter is not claimed.
 Exit: the unchanged specimen visibly populates and stays open with zero drawing
 passthrough calls; all exercised operations pass their behavior/raster oracle or
 carry a reviewed deviation; sustained paint has a recorded baseline.
+
+**MEASURED PARTIAL:** the unchanged specimen visibly publishes a 204-control
+tree and remains open through owned GUI.Drawing. Sequential cross-thread Drawing
+use is serialized at the ABI; reflected PNG bitmap and PNG-backed ICO resources
+hydrate without Microsoft Drawing/GDI+. Input/callback/repaint traversal is
+measured. Dynamic member counters, direct retained paint, differential review,
+and active-source performance remain open; see
+`../experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
 
 ### M11h and later — application closure
 

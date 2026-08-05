@@ -20,6 +20,14 @@ if (args.Length == 1 && args[0] == "button")
 {
     return RunRasterButtonHost();
 }
+if (args.Length == 1 && args[0] == "dialog")
+{
+    return RunDialogHost();
+}
+if (args.Length == 1 && args[0] == "menu")
+{
+    return RunMenuHost();
+}
 
 var form = new Form { Name = "behaviorForm", Text = "M11d behavior", Size = new Size(640, 420) };
 using var userControl = new UserControl();
@@ -138,6 +146,34 @@ Require(gain.Value == 12.5m && gain.Minimum == -20m && gain.Maximum == 80m, "num
 Require(mode.Text == "NFM" && gain.Text == "12.5", "field text projection");
 Require(gain.Controls.Count == 2 && gain.Controls[0] is Button && gain.Controls[1] is TextBox,
     "numeric composite children");
+using (var spin = new NumericProbe { Minimum = 0m, Maximum = 10m, Increment = 2m, Value = 5m, Size = new Size(120, 24) })
+{
+    spin.SpinAt(115, 4);
+    Require(spin.Value == 7m && spin.Text == "7", "numeric upper spin");
+    spin.SpinAt(115, 20);
+    spin.WheelBy(120);
+    Require(spin.Value == 7m, "numeric lower spin and wheel");
+}
+using (var textFont = new Font("Lucida Grande", 12f))
+using (var textBitmap = new Bitmap(140, 30))
+using (var textGraphics = Graphics.FromImage(textBitmap))
+{
+    var measured = TextRenderer.MeasureText("Radio", textFont);
+    Require(measured.Width > 8 && measured.Height >= textFont.Height, "text renderer measurement");
+    Require(textGraphics.MeasureString(null!, textFont, 120, new StringFormat()) == SizeF.Empty,
+        "drawing null text matches System.Drawing empty-span semantics");
+    using var nullTextBrush = new SolidBrush(Color.Black);
+    textGraphics.DrawString(null!, null!, nullTextBrush, PointF.Empty);
+    textGraphics.DrawString(string.Empty, null!, nullTextBrush, PointF.Empty);
+    textGraphics.Clear(Color.White);
+    TextRenderer.DrawText(textGraphics, "Radio", textFont, new Rectangle(0, 0, 140, 30),
+        Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+    var inkFound = false;
+    for (var y = 0; y < textBitmap.Height && !inkFound; ++y)
+        for (var x = 0; x < textBitmap.Width; ++x)
+            if (textBitmap.GetPixel(x, y).ToArgb() != Color.White.ToArgb()) { inkFound = true; break; }
+    Require(inkFound, "text renderer drawing");
+}
 Require(enabled.Checked && radio.Checked, "check state");
 Require(checkEvents == 1 && selectionEvents == 1 && valueEvents == 1 && radioEvents == 1, "state events");
 Require(moveEvents == 1 && sizeEvents == 1 && table.ClientRectangle.Size == table.Size, "geometry events");
@@ -203,6 +239,29 @@ static int RunTimerHost()
     return 0;
 }
 
+static int RunMenuHost()
+{
+    var menu = new MenuProbe { Name = "contextMenu" };
+    var connect = new ToolStripMenuItem("Connect");
+    var clicked = 0;
+    connect.Click += (_, _) => ++clicked;
+    var source = new ToolStripMenuItem("Source");
+    source.DropDownItems.Add(new ToolStripMenuItem("AIRSPY Server Network"));
+    menu.Items.Add(connect);
+    menu.Items.Add(new ToolStripSeparator());
+    menu.Items.Add(source);
+    menu.Show(new Point(24, 36));
+    menu.ReleaseAt(50, 12);
+    Require(menu.Bounds.X == 24 && menu.Bounds.Y == 36, "menu screen position");
+    Require(menu.Width >= 136 && menu.Height >= 61, "menu retained vertical extent");
+    Require(source.DropDown.OwnerItem == source && source.DropDownItems.Count == 1,
+        "nested menu ownership");
+    Require(clicked == 1, "menu row click-through");
+    Console.WriteLine($"menu=bounds:{menu.Bounds.X},{menu.Bounds.Y},{menu.Width},{menu.Height}|items:{menu.Items.Count}|nested:{source.DropDownItems.Count}|clicked:{clicked}");
+    menu.Dispose();
+    return 0;
+}
+
 static int RunLoadLifecycle()
 {
     var form = new Form { Name = "loadForm", Size = new Size(360, 180) };
@@ -261,6 +320,19 @@ static int RunRasterButtonHost()
     return 0;
 }
 
+static int RunDialogHost()
+{
+    var dialog = new Form { Name = "dialogForm", Text = "M11g dialog", Size = new Size(360, 180) };
+    var loads = 0;
+    dialog.Load += (_, _) => ++loads;
+    var result = dialog.ShowDialog();
+    Require(loads == 1, "dialog load once");
+    Require(!dialog.Visible && result == DialogResult.None, "dialog close result");
+    Console.WriteLine($"dialog=loads:{loads}|result:{result}|visible:{dialog.Visible}");
+    dialog.Dispose();
+    return 0;
+}
+
 static void Require(bool condition, string name)
 {
     if (!condition) throw new InvalidOperationException($"M11d behavior check failed: {name}");
@@ -284,6 +356,12 @@ sealed class LayoutProbe : Panel
         ++Layouts;
         base.OnLayout(e);
     }
+}
+
+sealed class MenuProbe : ContextMenuStrip
+{
+    internal void ReleaseAt(int x, int y) =>
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, x, y, 0));
 }
 
 sealed class PaintInputProbe : Control
@@ -312,4 +390,12 @@ sealed class PaintInputProbe : Control
         LastPoint = new Point(e.X, e.Y);
         base.OnMouseUp(e);
     }
+}
+
+sealed class NumericProbe : NumericUpDown
+{
+    internal void SpinAt(int x, int y) =>
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, x, y, 0));
+    internal void WheelBy(int delta) =>
+        OnMouseWheel(new MouseEventArgs(MouseButtons.None, 0, Width / 2, Height / 2, delta));
 }

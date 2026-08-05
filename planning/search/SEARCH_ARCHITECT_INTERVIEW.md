@@ -21,8 +21,9 @@ automatic ADRs**. Date: 2026-08-03.
 - **GIVEN:** search begins in the folder the user navigated to and applies below
   that folder; one search field is sufficient initially.
 - **GIVEN:** thumbnails exist only for indexed locations.
-- **GIVEN:** AI-facing search is read-only enhanced transparency. Mutation uses
-  native command facilities elsewhere.
+- **GIVEN, clarified by ADR-003:** search does not smuggle file mutation.
+  Humans, local AI tools, and developer agents use the same admitted local CLI
+  operations; future plugin AI is a separately sandboxed capability surface.
 - **GIVEN:** the core has no web search, store, or remote discovery.
 - **GIVEN:** semantic/personal-assistant components are optional. File Manager
   exposes file objects and a future secure, synchronizable knowledge hive.

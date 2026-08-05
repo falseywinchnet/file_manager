@@ -1,9 +1,11 @@
 # ORC-PLG: plugin, worker, and capability contracts
 
-Status: **paper import from legacy plugin-runtime research**.
+Status: **stubbed; legacy plugin-runtime research retained for later import**.
 
-The Rust Oracle supervises killable workers. Third-party/native code never runs
-inside the Oracle, frontend, GUI.Forms, or Go engine.
+The future Rust Orchestrator supervisor will own killable workers. No worker,
+package, grant, plugin AI, or extension operation exists in the bootstrap.
+Third-party/native code never runs inside Orchestrator, the frontend, GUI.Forms,
+or the Go engine.
 
 Retained requirements:
 
@@ -16,10 +18,11 @@ Retained requirements:
 - worker death contains descendants and revokes handles;
 - plugins return data or declarative registrations, never GUI objects.
 
-Expanded Oracle-era extension classes include bounded preview, thumbnail,
-virtual-system, search, extracted-field, semantic-memory proposal, handler
-evidence, and declarative command contracts. Expansion does not imply file
-mutation, network, UI injection, or OS-association authority.
+Candidate later extension classes include bounded preview, thumbnail,
+virtual-system, search, extracted-field, plugin AI, handler evidence, and
+declarative commands. Semantic-fact operations wait for the architect's
+separate design. Candidate retention does not admit file mutation, network, UI
+injection, or OS-association authority.
 
 The detailed sandbox/codec/package candidates remain in
 `../../../plugin_runtime/planning/` until integrated here through decisions.

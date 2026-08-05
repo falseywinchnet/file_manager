@@ -32,9 +32,14 @@ Status: **implementation sequence; each milestone has a rejection gate**.
 Current status: **IN PROGRESS**. Immutable publication, dual-slot recovery,
 pinned readers, degraded-start projection rebuild, one-root persistent service,
 schema fixture, abrupt-exit tests, and SQLite correctness/performance controls
-are observed. Quarantine,
-disk-full and physical power-loss campaigns, deltas/compaction, migration, and
-the copy-on-write-tree control remain open promotion gates.
+are observed. Evidence-preserving quarantine, deterministic partial-write
+campaigns, damaged-both-manifests rebuild, authenticated schema rejection, and
+a bounded streaming generation diff are also observed. A standalone
+checksummed delta writer/reader has component measurements for one, 4,096, and
+10,000 metadata updates without changing the live manifest. Physical disk-full
+and power-loss campaigns, live delta-run publication/query merge/compaction,
+migration execution, and the copy-on-write-tree control remain open promotion
+gates.
 
 ## M3 — lexical engine
 

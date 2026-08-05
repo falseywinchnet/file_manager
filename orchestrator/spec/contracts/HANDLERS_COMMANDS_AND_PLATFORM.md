@@ -1,8 +1,8 @@
 # ORC-HND / ORC-CMD / ORC-INT contracts
 
-Status: **paper outline**.
+Status: **outline; no bootstrap operation implemented**.
 
-The Oracle owns File Manager's internal handler/type registry and declarative
+Orchestrator owns File Manager's internal handler/type registry and declarative
 context-command registry. Plugins may propose bounded declarations; the
 frontend renders all UI with house controls.
 

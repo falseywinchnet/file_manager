@@ -1,74 +1,91 @@
-# The Oracle operating instructions
+# Orchestrator operating instructions
 
-This directory is the paper-first Rust control-plane project for File Manager.
-The component is named **The Oracle**; `orchestrator/` is its repository path.
+This directory is the Rust integration-authority project for File Manager. The
+component and executable are named **Orchestrator**.
 
 ## Current phase
 
-The Oracle is specification-only until the dependency gates in
-`planning/DELIVERY_SEQUENCE.md` are satisfied and the grand architect explicitly
-opens implementation. Do not create `Cargo.toml`, Rust sources, generated
-bindings, executable fixtures, or package artifacts during the paper phase.
+The grand architect opened the provider-independent bootstrap kernel in
+[`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md).
+Rust implementation is permitted for common contracts, lifecycle,
+availability/capability state, CLI projections, deterministic fixtures, fake
+peers, and conformance work.
+
+Real provider adapters advance only after their project-local negotiation note
+records a reply and the relevant semantic contract/fixtures are sufficiently
+complete. Plugin execution, plugin AI, and semantic-fact operations are stubs
+until separately opened. Do not infer those APIs from older candidate plans.
 
 Before editing, read in order:
 
 1. `README.md`
-2. `planning/MASTER_SPECIFICATION.md`
-3. `spec/CONTRACT_REGISTRY.md`
-4. `planning/AUTHORITY_AND_PROCESS_MODEL.md`
-5. `planning/HIVE_AND_SETTINGS_MODEL.md`
-6. `planning/CONFORMANCE_AND_VERSIONING.md`
-7. `planning/DELIVERY_SEQUENCE.md`
-8. the relevant contract under `spec/contracts/`
+2. `../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md`
+3. `planning/MASTER_SPECIFICATION.md`
+4. `spec/CONTRACT_REGISTRY.md`
+5. `planning/AUTHORITY_AND_PROCESS_MODEL.md`
+6. `planning/HIVE_AND_SETTINGS_MODEL.md`
+7. `planning/CONFORMANCE_AND_VERSIONING.md`
+8. `planning/DELIVERY_SEQUENCE.md`
+9. `negotiations/README.md`
+10. the relevant contract and project-local negotiation note
 
 The root `AGENTS.md`, decision protocol, accepted ADRs, and negative product
 definition remain authoritative.
 
-## Contract authority
+## Integration authority
 
-- This repository owns the canonical registry of every cross-project API, ABI,
-  wire protocol, event stream, capability, and version namespace.
-- Owning the registry does not mean implementing every endpoint. The registry
-  names the semantic owner, provider, consumers, transport, authority, version,
-  failure behavior, and conformance artifacts.
+- Orchestrator owns the canonical requirement, semantic meaning, version,
+  capability, availability, and conformance map for every cross-project edge.
+- Orchestrator states what it needs in the affected project's
+  `ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. The project records its reply there;
+  Orchestrator reconciles the next round and canonical contract.
+- A project-local negotiation note is dialogue, not a second specification.
+  Accepted semantics live under `spec/` and executable projections identify
+  their source revision.
 - GUI.Forms, the Go engine, the C++ frontend, platform adapters, and plugin SDKs
-  may propose or implement their side of a contract. They may not invent an
-  unregistered cross-boundary call in local code.
-- During the paper phase, subprojects contribute proposed changes under
-  `proposals/`; accepted changes are integrated into `spec/` with an explicit
-  decision/provenance entry.
+  may counterpropose and implement their sides. They may not create an
+  unregistered cross-boundary call.
 - No Rust, Go, or C++ native layout crosses a language or process boundary.
   Cross-process contracts use versioned messages. In-process language-neutral
-  seams use an explicit C ABI with fixed-width types and ownership rules.
-- Bidirectional cooperation uses requests, replies, and event streams. Do not
-  implement foreign-thread callbacks or reciprocal raw function-pointer webs.
+  seams use explicit C ABIs with fixed-width types and ownership rules.
+- Bidirectional cooperation uses requests, replies, and bounded event streams;
+  never foreign-thread callbacks or reciprocal raw function-pointer webs.
+
+## Runtime boundary
+
+- The engine is systemwide; Orchestrator is user-scoped, lazy, and restartable.
+- File Manager consumes Orchestrator as its normal integration/policy surface.
+  A registered direct engine route is degraded fallback only.
+- Orchestrator has no GUI. File Manager renders Orchestrator settings, service
+  state, grants, and controls using GUI.Forms.
+- The initial public API is the CLI. Human users, local AI tools, and developer
+  agents invoking it share the local user's authority. Future plugin-AI
+  authority is a different, currently stubbed capability surface.
+- Orchestrator owns capability and availability truth. Required but absent
+  functionality is reported as unavailable or stubbed, never silently faked.
 
 ## Reef boundary
 
-The trusted Oracle may own policy, registries, hives, routing, validation,
+The trusted Orchestrator may own policy, registries, hives, routing, validation,
 quotas, and worker supervision. It may not:
 
-- render File Manager controls;
+- render File Manager controls or own a GUI;
 - own filesystem bytes or become the file-mutation authority;
 - absorb the Go catalogue/index store;
 - run third-party native code or AI models in its trusted process;
 - expose plugin workers directly to GUI.Forms or engine internals;
 - make web discovery, a plugin store, or remote content a core ambient service;
-- let a provider's derived records overwrite exact filesystem facts or explicit
+- let provider records overwrite exact filesystem facts or explicit
   user-authored memory.
-
-## Naming discipline
-
-“The Oracle” means this runtime component. Use `reference model`, `identity
-fixture`, `conformance evaluator`, or a qualified term such as `filesystem
-oracle` for tests; do not use an unqualified `oracle` for a test helper.
 
 ## Change discipline
 
 - Keep every contract entry small enough to test independently.
-- Mark unknown fields, missing services, timeouts, stale generations, partial
-  results, and capability denial explicitly.
-- A call is not specified until cancellation, backpressure, ownership, resource
-  bounds, and version mismatch behavior are specified.
-- Preserve alternatives and rejected proposals. Do not let a generated binding
-  become the source of truth over the semantic contract.
+- Mark missing services, timeouts, stale generations, partial results,
+  capability denial, stubs, and version mismatch explicitly.
+- A call is incomplete until cancellation, backpressure, ownership, bounds, and
+  version mismatch are specified.
+- Preserve alternatives and rejected proposals. Generated bindings never become
+  semantic authority.
+- Use `cargo fmt --check`, `cargo test`, and `cargo clippy --all-targets
+  --all-features -- -D warnings` before handoff.

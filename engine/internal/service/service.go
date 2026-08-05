@@ -31,6 +31,10 @@ type Service struct {
 	readerMu         sync.RWMutex
 	reader           *generation.Reader
 	recoveryProblems int
+	pendingRecovery  []generation.RecoveryProblem
+	generationFloor  api.Generation
+	quarantined      int
+	quarantineError  string
 }
 
 var _ api.Engine = (*Service)(nil)
@@ -55,8 +59,19 @@ func NewPersistent(guard *sandbox.Guard, directory string) (*Service, error) {
 	}
 	engine.durable = durable
 	engine.durableDirectory = durable.Directory()
+	floor, err := durable.GenerationFloor()
+	if err != nil {
+		return nil, fmt.Errorf("read durable generation high-water mark: %w", err)
+	}
+	engine.generationFloor = floor
 	head, err := durable.Probe()
 	if errors.Is(err, generation.ErrNoGeneration) {
+		_, recovery, recoveryErr := durable.RecoverDetailed()
+		engine.recoveryProblems = len(recovery.Problems)
+		engine.pendingRecovery = append([]generation.RecoveryProblem(nil), recovery.Problems...)
+		if recoveryErr != nil && !errors.Is(recoveryErr, generation.ErrNoGeneration) {
+			return nil, fmt.Errorf("inspect damaged durable generation: %w", recoveryErr)
+		}
 		return engine, nil
 	}
 	if err != nil {
@@ -72,12 +87,23 @@ func NewPersistent(guard *sandbox.Guard, directory string) (*Service, error) {
 	reader, recovery, err := durable.RecoverDetailed()
 	engine.recoveryProblems = len(recovery.Problems)
 	if errors.Is(err, generation.ErrNoGeneration) {
+		engine.pendingRecovery = append([]generation.RecoveryProblem(nil), recovery.Problems...)
 		return engine, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("recover durable generation: %w", err)
 	}
 	engine.reader = reader
+	if len(recovery.Problems) != 0 {
+		moved, quarantineErr := durable.Quarantine(recovery.Problems)
+		engine.quarantined = len(moved)
+		if quarantineErr != nil {
+			engine.quarantineError = quarantineErr.Error()
+			engine.pendingRecovery = append([]generation.RecoveryProblem(nil), recovery.Problems...)
+		} else {
+			engine.recoveryProblems = 0
+		}
+	}
 	return engine, nil
 }
 
@@ -167,20 +193,42 @@ func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.Reconci
 		return api.ReconcileReport{}, api.WrapFault(api.ErrorInternal, "reconcile approved root", err)
 	}
 	if s.durable != nil {
-		nextGeneration := api.Generation(1)
+		nextGeneration := s.generationFloor + 1
+		if nextGeneration == 0 {
+			return api.ReconcileReport{}, api.NewFault(api.ErrorIntegrity, "durable generation counter is exhausted")
+		}
 		if head, err := s.durable.Probe(); err == nil {
-			nextGeneration = head.Metadata.Generation + 1
+			if head.Metadata.Generation > s.generationFloor {
+				s.generationFloor = head.Metadata.Generation
+				nextGeneration = s.generationFloor + 1
+			}
 		} else if !errors.Is(err, generation.ErrNoGeneration) {
 			return api.ReconcileReport{}, api.WrapFault(api.ErrorIntegrity, "probe durable generation", err)
+		}
+		if nextGeneration == 0 {
+			return api.ReconcileReport{}, api.NewFault(api.ErrorIntegrity, "durable generation counter is exhausted")
 		}
 		reader, err := s.durable.Publish(nextGeneration, shard)
 		if err != nil {
 			return api.ReconcileReport{}, api.WrapFault(api.ErrorInternal, "publish durable catalogue generation", err)
 		}
+		moved := []generation.Quarantined(nil)
+		var quarantineErr error
+		if len(s.pendingRecovery) != 0 {
+			moved, quarantineErr = s.durable.Quarantine(s.pendingRecovery)
+		}
 		s.readerMu.Lock()
 		old := s.reader
 		s.reader = reader
-		s.recoveryProblems = 0
+		s.generationFloor = nextGeneration
+		s.quarantined += len(moved)
+		if quarantineErr == nil {
+			s.recoveryProblems = 0
+			s.pendingRecovery = nil
+			s.quarantineError = ""
+		} else {
+			s.quarantineError = quarantineErr.Error()
+		}
 		if old != nil {
 			_ = old.Close()
 		}
@@ -283,10 +331,21 @@ func (s *Service) persistentStatus() api.Status {
 		status.Warnings = append(status.Warnings, "no approved sandbox root configured")
 	}
 	if s.recoveryProblems != 0 {
+		detail := "a full rebuild is required before quarantine"
+		if s.reader != nil {
+			detail = "serving the last valid generation"
+		}
 		status.Warnings = append(status.Warnings, fmt.Sprintf(
-			"%d durable recovery candidate(s) failed validation; serving the last valid generation",
-			s.recoveryProblems,
+			"%d durable recovery candidate(s) failed validation; %s", s.recoveryProblems, detail,
 		))
+	}
+	if s.quarantined != 0 {
+		status.Warnings = append(status.Warnings, fmt.Sprintf(
+			"%d rejected durable artifact(s) were preserved in the engine quarantine", s.quarantined,
+		))
+	}
+	if s.quarantineError != "" {
+		status.Warnings = append(status.Warnings, "durable evidence quarantine is incomplete: "+s.quarantineError)
 	}
 	return status
 }

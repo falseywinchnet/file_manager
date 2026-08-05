@@ -18,6 +18,9 @@ struct WindowsHostOptions final {
     bool print_metrics_on_close{true};
     bool automation_enabled{};
     bool close_after_launch_for_testing{};
+    bool quit_thread_on_close{true};
+    bool popup_window{};
+    Point initial_position{};
     std::function<std::shared_ptr<Control>(std::string_view)> automation_resolve;
     std::function<void(HostCloseRequest&)> close_request;
     std::function<void(std::function<void()> wake,

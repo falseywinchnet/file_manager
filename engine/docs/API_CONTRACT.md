@@ -120,9 +120,14 @@ Status: **OBSERVED candidate behavior; API v0 remains unfrozen**.
 
 `projection.rebuild` performs a full authoritative scan through the same atomic
 publication path and remains reachable when startup has no valid segment but a
-safe manifest/header retains the approved root. The candidate does not yet
-expose quarantine, migration, background validation state, or production framed
-IPC. Its storage layout is never a public API or Oracle ABI.
+safe manifest/header retains the approved root. Recovery now quarantines
+rejected engine-owned artifacts after a valid fallback or replacement exists;
+`status` reports the preserved-artifact count or an incomplete-quarantine
+warning. When both manifests are unreadable, no root is inferred: an approved
+root must be reapplied before `projection.rebuild` can run. The candidate does
+not yet expose a quarantine administration method, migration execution,
+background validation state, or production framed IPC. Its storage layout is
+never a public API or Orchestrator ABI.
 
 ## Pagination and motion
 

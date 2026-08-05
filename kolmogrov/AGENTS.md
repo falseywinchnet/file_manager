@@ -17,6 +17,7 @@ Before working, read in order:
 6. `docs/EXPERIMENT_PROGRAM.md`
 7. `CLAIM_REGISTER.md`
 8. `docs/HANDOFF_PROMPT.md`
+9. `docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` before proposing a transfer seam
 
 ## Mission posture
 
@@ -64,6 +65,9 @@ minimality in the declared model, and the theorem it rejects or restricts.
 - Do not modify `engine/` or make File Manager depend on an unfinished result.
 - The engine may later consume a versioned release artifact through a narrow
   similarity-channel API.
+- Record interface replies and counterproposals in
+  `docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`; Orchestrator owns the reconciled
+  program contract and Kolmogrov retains its private research representations.
 - Do not add private files, home-directory corpora, or network-fetched material
   without an explicit provenance and consent record.
 

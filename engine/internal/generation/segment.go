@@ -51,7 +51,16 @@ func Write(path string, generation api.Generation, shard *catalog.Shard) (Metada
 	return metadata, nil
 }
 
-func writeSegment(file *os.File, generation api.Generation, shard *catalog.Shard) (Metadata, error) {
+type segmentFile interface {
+	io.Writer
+	io.ReaderAt
+	io.Seeker
+	WriteAt([]byte, int64) (int, error)
+	Sync() error
+	Stat() (os.FileInfo, error)
+}
+
+func writeSegment(file segmentFile, generation api.Generation, shard *catalog.Shard) (Metadata, error) {
 	if _, err := file.Write(make([]byte, segmentHeaderSize)); err != nil {
 		return Metadata{}, fmt.Errorf("reserve segment header: %w", err)
 	}
@@ -224,7 +233,7 @@ func writeSegment(file *os.File, generation api.Generation, shard *catalog.Shard
 	}, nil
 }
 
-func writeComponent(file *os.File, id componentID, count uint64, write func(io.Writer) error) (descriptor, error) {
+func writeComponent(file segmentFile, id componentID, count uint64, write func(io.Writer) error) (descriptor, error) {
 	start, err := file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return descriptor{}, fmt.Errorf("locate component %d: %w", id, err)
@@ -330,6 +339,10 @@ func (r *Reader) Row(ordinal uint32) (catalog.Row, bool, error) {
 	if err != nil {
 		return catalog.Row{}, false, err
 	}
+	parent, err := r.objectAt(binding.parent)
+	if err != nil {
+		return catalog.Row{}, false, err
+	}
 	name, err := r.readString(componentNames, binding.nameOffset, binding.nameLength)
 	if err != nil {
 		return catalog.Row{}, false, err
@@ -343,7 +356,8 @@ func (r *Reader) Row(ordinal uint32) (catalog.Row, bool, error) {
 	}
 	return catalog.Row{
 		RelativePath: filepath.FromSlash(path), Name: name, Kind: object.Kind, Size: object.Size,
-		ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity,
+		Mode: object.Mode, ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity,
+		Parent: parent.Identity,
 	}, true, nil
 }
 

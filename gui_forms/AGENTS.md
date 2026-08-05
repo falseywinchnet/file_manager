@@ -68,6 +68,11 @@ This is a control gallery, not File Manager and not a file browser.
 The public ABI may begin as disciplined portable C++ for the spike, but no
 compiler-specific type may be assumed to be the eventual stable C ABI.
 
+Cross-project consumption is negotiated through
+`docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. GUI.Forms records its reply and
+evidence there; Orchestrator reconciles the canonical program contract. Do not
+freeze an ABI merely because the current frontend experiment calls it.
+
 ## Agent ownership during the initial parallel build
 
 - Core agent: `include/gui_forms/`, `src/core/`, core instrumentation, and core

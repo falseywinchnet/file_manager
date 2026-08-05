@@ -68,8 +68,10 @@ type Row struct {
 	Name             string
 	Kind             api.ObjectKind
 	Size             int64
+	Mode             uint32
 	ModifiedUnixNano int64
 	Identity         identity.Observation
+	Parent           identity.Observation
 }
 
 func (r Record) ObjectID() api.ObjectID { return api.ObjectID(r.Identity.ObjectID()) }
@@ -283,7 +285,8 @@ func (s *Shard) Row(index uint32) (Row, bool) {
 	object := s.objects[binding.Object]
 	return Row{
 		RelativePath: s.relativePaths[index], Name: binding.Name, Kind: object.Kind,
-		Size: object.Size, ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity,
+		Size: object.Size, Mode: object.Mode, ModifiedUnixNano: object.ModifiedUnixNano, Identity: object.Identity,
+		Parent: s.objects[binding.Parent].Identity,
 	}, true
 }
 

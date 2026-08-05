@@ -161,7 +161,76 @@ collisions, and progressive detail. I expect some routes to work, but confidence
 is only moderate-to-low because no route has yet been instantiated and compared
 against random, residue, lexical, and task-trained controls at equal support.
 
-## Low confidence or deliberately open
+### Deformation-jet superposition
+
+**CANDIDATE with strong exact symbolic support and unmeasured compact quality**.
+The deletion orbit is an intrinsic derivative/translation of gap occurrence
+polynomials, and history-character coherence has an exact common-history
+meaning before character selection and quantization. This is now the most
+promising qualitatively new hash direction in the tree. Confidence drops at the
+fixed-width boundary: no selected phase/probe family has yet shown that its
+coherent signal survives history multiplicity and quantizer uncertainty at
+useful lengths.
+
+### E8 update: deletion closure and two-algebra retrieval
+
+**Strong confidence in the symbolic boundary; moderate confidence in the
+bounded index.** T-DELETION-CLOSURE-1 fixes exact radius-`t` interaction degree
+at `t+1`. T-HISTORY-QUOTIENT-1 rules out full identical-descendant
+deduplication inside a cancellative product phase from radius two, while
+preserving a safe run-count block quotient. E8 then showed that idempotent
+degree-`t+1` affine certificates can retain exact deletion recall with candidate
+load close to truth at modest binary support.
+
+I would now pursue the deformation jet and observable certificate as separate
+addresses: the jet for graded fuzzy energy and the certificate for indexable
+history membership. Confidence remains moderate because the result uses exact
+binary symbols and ideal posting masks. Rich-content projection, mixed edits,
+index bytes, and native end-to-end latency remain open.
+
+### E9 update: coupled rich-pattern projection
+
+**Strong confidence in the projection failure law; moderate confidence in the
+obstruction-compiled tower; low confidence in the unchosen File Manager atom
+policy.** T-PROJECTION-REFINEMENT-1 gives exact nested count/occupancy
+contraction and shows that deletion of one observed pattern changes the compact
+mask exactly in its private cells. The necessary dense support law `B>=cH`
+makes atomic breakdown reviewable rather than statistical folklore.
+
+E9 rejected two tempting shortcuts. Independent narrow views can lose witness
+provenance even when their combined code identifies each individual pattern,
+and an exact finest code need not have useful prefixes. One coupled 16-cell
+view was far stronger than equal-support decomposed views; a private-witness-
+selected binary route reduced invisible mass and candidate tails and refined to
+the exact 64-cell endpoint. Because the row selection and evaluation used the
+same finite domain, the route is a development candidate only. The decisive
+next objects are a frozen experimental filename atom stream, a symbol-level
+Jacobian, and a disjoint evaluation.
+
+### E10 update: filename atoms and typed edit flow
+
+**High confidence in the observation/Jacobian boundary; medium confidence in
+protected row compilation; low confidence in retrieval superiority.** Filename
+Profile 001 now freezes source-anchored literal, compatibility-fold, and
+structural atom lanes without a preliminary digest. T-SYMBOL-JACOBIAN-1 makes
+each substitution response exact at the offset-state, pattern-event, and bit-
+crossing levels. T-TYPED-EDIT-SEAM-1 prevents insertion/deletion from being
+misreported as a Hamming vector across length-conditioned configurations.
+
+E10 rejected direct low-bit projection of the exact atom integers and showed
+that a balanced-bit control restored total response for every named
+observation-changing case. It also exposed the tradeoff between posting
+memberships and support: catastrophic folded collapse looked artificially
+cheap. These results make an experimental filename system definable, but the
+active row compiler, length plan, protected labels, and index costs still need
+disjoint evidence.
+
+## Historical low-confidence list
+
+This was the pre-Round-003 list. It is retained as the originating uncertainty
+register. `LOW_CONFIDENCE_ROUND_003.md` now supplies exact obstructions or
+conditional criteria for all six items; it does not convert the surviving
+construction choices into architecture decisions.
 
 - **Universal cross-modality basis:** no evidence says one content/position
   route serves text, images, audio, and arbitrary files at comparable quality.

@@ -113,8 +113,20 @@ internal static class IlSiteProbe
                 }
                 return string.Join(',', targets);
             case OperandType.InlineString:
+                var stringToken = BinaryPrimitives.ReadInt32LittleEndian(
+                    span.Slice(offset, 4));
                 offset += 4;
-                return "<string>";
+                try
+                {
+                    return method.Module.ResolveString(stringToken)
+                        .Replace("\\", "\\\\", StringComparison.Ordinal)
+                        .Replace("\r", "\\r", StringComparison.Ordinal)
+                        .Replace("\n", "\\n", StringComparison.Ordinal);
+                }
+                catch (ArgumentException)
+                {
+                    return $"string-token:0x{stringToken:x8}";
+                }
             case OperandType.InlineSig:
                 offset += 4;
                 return "<signature>";
