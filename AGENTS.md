@@ -42,9 +42,9 @@ Before planning or implementation, read:
   and availability. New edges enter its registry and project-local negotiation
   process before adapters freeze.
 - `frontend/` is the end-user application project and Orchestrator's GUI for
-  settings/service controls. Frontend 001 opens only after the named GUI.Forms
-  go-ahead and explicit architect direction; other services remain fixtures in
-  that slice.
+  settings/service controls. Frontend 001 opens only after Orchestrator Core 1.0
+  is available, the named GUI.Forms go-ahead is recorded, and the architect
+  explicitly directs implementation to begin.
 - `engine/`, `gui_forms/`, and `kolmogrov/` remain independently buildable and
   own their private implementations.
 - `plugin_runtime/` is frozen legacy research input. New runtime implementation

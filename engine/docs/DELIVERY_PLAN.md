@@ -26,6 +26,22 @@ crash-loop/update policy, and bounded status subscription remain release gates.
 - exact query, metadata ordering, inspect, and status;
 - identity/mutation oracle on macOS first.
 
+### M1L — required catalogue-independent live query
+
+- implement `ORC-ENG-004` bounded name/path traversal without creating or
+  requiring a catalogue;
+- stream progressive pages with expiring query-bound cursors and exact live
+  source evidence;
+- preserve authorized-root containment, do not traverse directory links, and
+  report permission/mutation gaps as partial rather than empty success;
+- cap visited entries, metadata calls, wall time, open directories, result
+  count, response bytes, and retained continuation state;
+- prove prompt cancellation and zero durable Engine writes;
+- measure first-result/page latency, CPU, RSS, descriptors, and bytes read on
+  the guard workloads and native APFS/NTFS/ext4 fixtures.
+
+Status: **REQUIRED under ADR-008; not implemented; Engine reply 006 pending**.
+
 ## M2 — custom durable generation
 
 - implement bounded immutable root generations with atomic manifest

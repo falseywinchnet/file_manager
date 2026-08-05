@@ -90,9 +90,9 @@ it does not dogfood GUI.Forms and contains no image-generated material.
   production text editor, selected HarfBuzz/FreeType integration, IME,
   scrolling, tree/list/menu, accessibility publisher, and layout families
   required by File Manager.
-- **DECIDED:** the old Gate F0 is superseded by ADR-004. Frontend 001 source may
-  begin only after the named GUI.Forms go-ahead and explicit architect start
-  direction.
+- **DECIDED:** the old Gate F0 is superseded by ADR-004 and ADR-006. Frontend
+  001 source may begin only after Orchestrator Core 1.0 is live, the named
+  GUI.Forms go-ahead is recorded, and the architect explicitly starts it.
 
 ## Visual grammar
 

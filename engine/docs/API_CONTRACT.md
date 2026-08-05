@@ -1,26 +1,27 @@
 # Engine API contract
 
-Status: **v0 scaffold; dual JSON transport direction DECIDED; development
-lifecycle/configuration projection OBSERVED**.
+Status: **ORC-ENG semantic v0 frozen for experimental implementation;
+development JSONL projection OBSERVED; installed transport ABI gated**.
 
-The canonical contract is the Go package `api`. Transport encodings project that
-model; they do not define storage.
+The Go package `api` is the provider projection. Canonical cross-project meaning
+lives in `../../orchestrator/spec/contracts/ENGINE_AND_KOLMOGROV.md`; neither side
+defines storage through the contract.
 
 ## Transport
 
 The conformance/CLI/AI transport is newline-delimited JSON over standard
 input/output. It is deliberately easy to sandbox, record, replay, fuzz, and call
-from any language. Production GUI/service IPC uses explicitly length-framed JSON
-over the platform-local transport while retaining the same semantic messages:
+from any language. Production GUI/service IPC will project the same semantic
+messages over a bounded authenticated platform-local transport. Its framing is
+not frozen:
 
 - Unix domain socket on macOS/Linux;
 - named pipe or local authenticated transport on Windows;
 - inherited stdio for supervised workers and test sandboxes.
 
-A binary payload is not part of the initial architecture. It may project the
-same semantic API only after framed JSON violates an accepted budget. Query and
-administrative capabilities use distinct authority even if a development
-launcher exposes both in one process.
+A binary payload or length-framed JSON remains a transport candidate rather
+than semantic authority. Query and administrative capabilities use distinct
+authority even if a development launcher exposes both in one process.
 
 Every request contains `id`, `method`, and optional `params`. Every response
 contains the same `id` and exactly one of `result` or `error`. Unknown fields are
@@ -44,6 +45,10 @@ cross-project names use the `engine.*` family.
 ### Query surface
 
 - `query` — scoped exact/lexical/fuzzy query with filters, limit, and cursor.
+- `engine.query_live` — **required by ADR-008 but not implemented**; bounded
+  filename/path traversal over an authorized filesystem scope without building,
+  persisting, or requiring a catalogue. Its draft semantics are `ORC-ENG-004`
+  and Engine negotiation round 006.
 - `inspect` — exact record and all stored evidence/provenance.
 - `explain` — concise ordinary evidence, exclusions, staleness, and unavailable
   shards; complete query plans and internal candidate diagnostics require the

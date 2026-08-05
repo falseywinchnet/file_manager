@@ -3,6 +3,7 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/range_controls.hpp"
+#include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 #include "headless_host.hpp"
 #if defined(GF_C_API_HAS_WINDOWS_HOST)
@@ -82,9 +83,10 @@ public:
     }
 };
 
-// ABI-facing field controls are deliberately small retained visuals. They keep
-// the platform host renderer-neutral while the corresponding managed facade
-// owns editing, selection, item, and binding behavior.
+// ABI-facing fields retain the platform-neutral text editor state. The managed
+// compatibility facade projects WinForms properties and events, while this
+// object owns Unicode mutation, directional selection, history, glyph geometry,
+// hit testing, clipping, and the horizontal viewport.
 class FieldControl final : public gui_forms::Panel {
 public:
     FieldControl(StableId stable_id, FieldControlKind kind)
@@ -105,7 +107,9 @@ public:
             kind_ == FieldControlKind::numeric_up_down) {
             set_focusable(true);
         }
-        if (kind_ == FieldControlKind::text_box) {
+        if (kind_ == FieldControlKind::text_box ||
+            kind_ == FieldControlKind::combo_box ||
+            kind_ == FieldControlKind::numeric_up_down) {
             set_cursor(gui_forms::CursorKind::text);
         }
     }
@@ -124,7 +128,143 @@ public:
             return;
         }
         text_ = std::move(text);
+        text_store_.set_text(text_);
+        anchor_ = std::min(anchor_, static_cast<std::uint64_t>(text_.size()));
+        caret_ = std::min(caret_, static_cast<std::uint64_t>(text_.size()));
+        if (!text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(anchor_))) {
+            anchor_ = text_store_.utf8_offset(
+                text_store_.grapheme_index(gui_forms::Utf8Offset(anchor_))).value();
+        }
+        if (!text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(caret_))) {
+            caret_ = text_store_.utf8_offset(
+                text_store_.grapheme_index(gui_forms::Utf8Offset(caret_))).value();
+        }
+        layout_positions_.clear();
+        layout_offsets_.clear();
+        clear_history();
         invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+    }
+
+    [[nodiscard]] bool replace(std::uint64_t start, std::uint64_t length,
+                               std::string_view replacement,
+                               gf_field_edit_result& result) {
+        require_mutable();
+        if (start > text_.size() || length > text_.size() - start ||
+            !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(start)) ||
+            !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(start + length)) ||
+            !gui_forms::validate_utf8(replacement).valid()) {
+            return false;
+        }
+        const bool text_changes =
+            std::string_view(text_).substr(static_cast<std::size_t>(start),
+                                           static_cast<std::size_t>(length)) !=
+            replacement;
+        if (text_changes) {
+            push_undo(snapshot());
+            clear_redo();
+            static_cast<void>(text_store_.replace(
+                {gui_forms::Utf8Offset(start),
+                 gui_forms::Utf8Offset(start + length)}, replacement));
+            text_.assign(text_store_.utf8());
+            layout_positions_.clear();
+            layout_offsets_.clear();
+        }
+        const std::uint64_t next = start + replacement.size();
+        const bool state_changes = anchor_ != next || caret_ != next;
+        anchor_ = next;
+        caret_ = next;
+        caret_visible_ = true;
+        if (text_changes || state_changes) {
+            invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+        }
+        result = edit_result(text_changes);
+        return true;
+    }
+
+    [[nodiscard]] bool history(std::int32_t direction,
+                               gf_field_edit_result& result) {
+        require_mutable();
+        if (direction != -1 && direction != 1) return false;
+        auto& source = direction < 0 ? undo_ : redo_;
+        auto& destination = direction < 0 ? redo_ : undo_;
+        if (source.empty()) {
+            result = edit_result(false);
+            return true;
+        }
+        FieldSnapshot target = std::move(source.back());
+        history_bytes_ -= target.text.size();
+        source.pop_back();
+        push_history(destination, snapshot());
+        apply_snapshot(std::move(target));
+        result = edit_result(true);
+        return true;
+    }
+
+    void clear_history() noexcept {
+        undo_.clear();
+        redo_.clear();
+        history_bytes_ = 0;
+    }
+
+    [[nodiscard]] std::string_view text() const noexcept { return text_; }
+
+    bool set_selection(std::uint64_t start, std::uint64_t length,
+                       bool caret_visible) {
+        if (start > text_.size() || length > text_.size() - start) return false;
+        return set_edit_state(start, start + length, caret_visible);
+    }
+
+    bool set_edit_state(std::uint64_t anchor, std::uint64_t caret,
+                        bool caret_visible) {
+        require_mutable();
+        if (anchor > text_.size() || caret > text_.size() ||
+            !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(anchor)) ||
+            !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(caret))) {
+            return false;
+        }
+        if (anchor_ == anchor && caret_ == caret &&
+            caret_visible_ == caret_visible) {
+            return true;
+        }
+        anchor_ = anchor;
+        caret_ = caret;
+        caret_visible_ = caret_visible;
+        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+        return true;
+    }
+
+    [[nodiscard]] std::uint64_t position_at(double local_x) const noexcept {
+        if (layout_positions_.size() != layout_offsets_.size() ||
+            layout_positions_.empty()) {
+            const double guessed = std::max(0.0, local_x - text_left_ + horizontal_offset_);
+            const std::size_t index = std::min<std::size_t>(
+                static_cast<std::size_t>(std::lround(guessed / 7.0)),
+                text_store_.grapheme_count().value());
+            return text_store_.utf8_offset(gui_forms::GraphemeIndex(index)).value();
+        }
+        const double content_x = std::max(0.0, local_x - text_left_ + horizontal_offset_);
+        const auto right = std::lower_bound(layout_positions_.begin(),
+                                            layout_positions_.end(), content_x);
+        if (right == layout_positions_.begin()) return layout_offsets_.front();
+        if (right == layout_positions_.end()) return layout_offsets_.back();
+        const std::size_t right_index = static_cast<std::size_t>(
+            std::distance(layout_positions_.begin(), right));
+        const double left_distance = content_x - layout_positions_[right_index - 1U];
+        const double right_distance = layout_positions_[right_index] - content_x;
+        return layout_offsets_[left_distance < right_distance
+            ? right_index - 1U : right_index];
+    }
+
+    [[nodiscard]] bool navigate(std::uint64_t position, std::int32_t direction,
+                                std::uint64_t& result) const noexcept {
+        if (position > text_.size() ||
+            !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(position)) ||
+            (direction != -1 && direction != 1)) return false;
+        const auto source = gui_forms::Utf8Offset(position);
+        result = (direction < 0
+            ? text_store_.previous_grapheme_boundary(source)
+            : text_store_.next_grapheme_boundary(source)).value();
+        return true;
     }
 
     void on_paint(gui_forms::Painter& painter, Rect damage) override {
@@ -133,12 +273,73 @@ public:
         const auto style = style_;
         const double button_width = kind_ == FieldControlKind::numeric_up_down
             ? std::min(18.0, std::max(0.0, bounds.width)) : 0.0;
-        if (!text_.empty()) {
-            painter.draw_text_utf8({5.0, std::max(14.0, bounds.height * 0.5 + 4.0)},
-                                   text_,
-                                   {gui_forms::FontRole::content, 12.0, 400, false},
-                                   enabled() ? style.text : style.disabled_text);
+        const double text_right = std::max(5.0, bounds.width - button_width -
+                                                (kind_ == FieldControlKind::combo_box ? 18.0 : 3.0));
+        const gui_forms::FontSpec font{gui_forms::FontRole::content, 12.0, 400, false};
+        layout_positions_.clear();
+        layout_offsets_.clear();
+        const std::size_t graphemes = text_store_.grapheme_count().value();
+        layout_positions_.reserve(graphemes + 1U);
+        layout_offsets_.reserve(graphemes + 1U);
+        for (std::size_t index = 0; index <= graphemes; ++index) {
+            const std::uint64_t offset = text_store_.utf8_offset(
+                gui_forms::GraphemeIndex(index)).value();
+            layout_offsets_.push_back(offset);
+            layout_positions_.push_back(painter.measure_text_utf8(
+                std::string_view(text_).substr(0, static_cast<std::size_t>(offset)),
+                font).width);
         }
+        const auto boundary_x = [&](std::uint64_t offset) {
+            const std::size_t index = text_store_.grapheme_index(
+                gui_forms::Utf8Offset(offset)).value();
+            return layout_positions_[std::min(index, layout_positions_.size() - 1U)];
+        };
+        const double viewport_width = std::max(0.0, text_right - text_left_);
+        const double caret_content_x = boundary_x(caret_);
+        if (caret_content_x < horizontal_offset_) {
+            horizontal_offset_ = caret_content_x;
+        } else if (caret_content_x > horizontal_offset_ + viewport_width) {
+            horizontal_offset_ = caret_content_x - viewport_width;
+        }
+        const double maximum_offset = std::max(
+            0.0, layout_positions_.back() - viewport_width);
+        horizontal_offset_ = std::clamp(horizontal_offset_, 0.0, maximum_offset);
+
+        const std::uint64_t selection_start = std::min(anchor_, caret_);
+        const std::uint64_t selection_end = std::max(anchor_, caret_);
+        const double text_origin_x = text_left_ - horizontal_offset_;
+        const double selection_x = text_origin_x + boundary_x(selection_start);
+        const double selection_end_x = text_origin_x + boundary_x(selection_end);
+        const double baseline = std::max(14.0, bounds.height * 0.5 + 4.0);
+        painter.save();
+        painter.clip_rect({text_left_, 2.0, viewport_width,
+                           std::max(0.0, bounds.height - 4.0)});
+        if (focused_ && selection_end > selection_start &&
+            selection_end_x > selection_x) {
+            painter.fill_rect({selection_x, 3.0, selection_end_x - selection_x,
+                               std::max(0.0, bounds.height - 6.0)}, style.accent);
+        }
+        if (!text_.empty()) {
+            painter.draw_text_utf8({text_origin_x, baseline}, text_, font,
+                                   enabled() ? style.text : style.disabled_text);
+            if (focused_ && selection_end > selection_start &&
+                selection_end_x > selection_x) {
+                painter.save();
+                painter.clip_rect({selection_x, 3.0,
+                                   selection_end_x - selection_x,
+                                   std::max(0.0, bounds.height - 6.0)});
+                painter.draw_text_utf8({text_origin_x, baseline}, text_, font,
+                                       style.highlight);
+                painter.restore();
+            }
+        }
+        if (focused_ && caret_visible_ && anchor_ == caret_) {
+            const double caret_x = text_origin_x + caret_content_x;
+            painter.draw_line({caret_x, 4.0},
+                              {caret_x, std::max(4.0, bounds.height - 4.0)},
+                              enabled() ? style.text : style.disabled_text, 1.0);
+        }
+        painter.restore();
         if (kind_ == FieldControlKind::combo_box && bounds.width >= 18.0) {
             const double x = bounds.width - 14.0;
             const double y = bounds.height * 0.5 - 1.0;
@@ -169,6 +370,20 @@ public:
             painter.draw_line({center, middle + 7.0},
                               {center + 3.0, middle + 4.0}, style.dark_border, 1.0);
         }
+        if (focused_ && bounds.width > 2.0 && bounds.height > 2.0) {
+            const auto focus = style.accent;
+            painter.draw_line({1.0, 1.0}, {bounds.width - 1.0, 1.0}, focus, 1.0);
+            painter.draw_line({1.0, 1.0}, {1.0, bounds.height - 1.0}, focus, 1.0);
+            painter.draw_line({1.0, bounds.height - 1.0},
+                              {bounds.width - 1.0, bounds.height - 1.0}, focus, 1.0);
+            painter.draw_line({bounds.width - 1.0, 1.0},
+                              {bounds.width - 1.0, bounds.height - 1.0}, focus, 1.0);
+        }
+    }
+
+    void on_focus_changed(bool focused) override {
+        focused_ = focused;
+        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
     }
 
     [[nodiscard]] gui_forms::Event<const RasterPointerSample&>&
@@ -219,9 +434,76 @@ public:
     }
 
 private:
+    struct FieldSnapshot final {
+        std::string text;
+        std::uint64_t anchor{};
+        std::uint64_t caret{};
+    };
+
+    [[nodiscard]] FieldSnapshot snapshot() const {
+        return {text_, anchor_, caret_};
+    }
+
+    void apply_snapshot(FieldSnapshot snapshot) {
+        text_ = std::move(snapshot.text);
+        text_store_.set_text(text_);
+        anchor_ = snapshot.anchor;
+        caret_ = snapshot.caret;
+        caret_visible_ = true;
+        layout_positions_.clear();
+        layout_offsets_.clear();
+        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+    }
+
+    void push_history(std::deque<FieldSnapshot>& history,
+                      FieldSnapshot snapshot) {
+        history_bytes_ += snapshot.text.size();
+        history.push_back(std::move(snapshot));
+        while (history_bytes_ > maximum_history_bytes_ ||
+               undo_.size() + redo_.size() > maximum_history_entries_) {
+            if (!undo_.empty()) {
+                history_bytes_ -= undo_.front().text.size();
+                undo_.pop_front();
+            } else if (!redo_.empty()) {
+                history_bytes_ -= redo_.front().text.size();
+                redo_.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+
+    void push_undo(FieldSnapshot snapshot) {
+        push_history(undo_, std::move(snapshot));
+    }
+
+    void clear_redo() noexcept {
+        for (const auto& snapshot : redo_) history_bytes_ -= snapshot.text.size();
+        redo_.clear();
+    }
+
+    [[nodiscard]] gf_field_edit_result edit_result(bool changed) const noexcept {
+        return {anchor_, caret_, text_store_.revision(), changed ? 1U : 0U,
+                undo_.empty() ? 0U : 1U, redo_.empty() ? 0U : 1U};
+    }
+
     std::string text_;
+    gui_forms::TextStore text_store_;
     FieldControlKind kind_;
     gui_forms::BasicControlStyle style_;
+    std::uint64_t anchor_{};
+    std::uint64_t caret_{};
+    std::vector<double> layout_positions_;
+    std::vector<std::uint64_t> layout_offsets_;
+    double horizontal_offset_{};
+    static constexpr double text_left_{5.0};
+    bool caret_visible_{true};
+    bool focused_{};
+    std::deque<FieldSnapshot> undo_;
+    std::deque<FieldSnapshot> redo_;
+    std::size_t history_bytes_{};
+    static constexpr std::size_t maximum_history_entries_{128U};
+    static constexpr std::size_t maximum_history_bytes_{8U * 1024U * 1024U};
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
     gui_forms::Event<const RasterKeySample&> key_input_;
     gui_forms::Event<const RasterTextSample&> text_input_;
@@ -423,6 +705,8 @@ struct ControlRecord final {
     std::function<gui_forms::HostServiceStatus(
         const gui_forms::HostTooltipRequest&)> host_tooltip_show;
     std::function<void()> host_tooltip_hide;
+    std::function<gui_forms::HostClipboardTextResult()> host_clipboard_read;
+    std::function<gui_forms::HostServiceStatus(std::string_view)> host_clipboard_write;
     std::string last_dialog_path;
     std::uint64_t callback_faults{};
     std::uint64_t dispatches{};
@@ -550,6 +834,10 @@ public:
         }
         if (value.find('\0') != std::string::npos) {
             return fail(GF_ERROR_INVALID_ARGUMENT, "string input may not contain NUL bytes");
+        }
+        if (!gui_forms::validate_utf8(value).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "string input must contain valid UTF-8");
         }
         std::shared_ptr<ControlRecord> record;
         if (const gf_result result = get_control(handle, record); result != GF_OK) {
@@ -709,6 +997,244 @@ public:
         }
         // Style projection does not mutate a WinForms-observable property. The
         // managed side already owns and has raised the corresponding change.
+        return GF_OK;
+    }
+
+    gf_result set_field_selection(gf_handle handle, std::uint64_t start,
+                                  std::uint64_t length,
+                                  std::uint32_t caret_visible) {
+        if (caret_visible > 1U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "caret visibility must be zero or one");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field selection requires a retained field control");
+        }
+        if (!field->set_selection(start, length, caret_visible != 0U)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field selection exceeds the UTF-8 text extent");
+        }
+        return GF_OK;
+    }
+
+    gf_result set_field_edit_state(gf_handle handle, std::uint64_t anchor,
+                                   std::uint64_t caret,
+                                   std::uint32_t caret_visible) {
+        if (caret_visible > 1U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "caret visibility must be zero or one");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field edit state requires a retained field control");
+        }
+        if (!field->set_edit_state(anchor, caret, caret_visible != 0U)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field anchor and caret must be UTF-8 grapheme boundaries");
+        }
+        return GF_OK;
+    }
+
+    gf_result field_position_from_point(gf_handle handle, double local_x,
+                                        std::uint64_t* position) {
+        if (position == nullptr || !std::isfinite(local_x)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field hit test requires a finite point and output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field hit test requires a retained field control");
+        }
+        *position = field->position_at(local_x);
+        return GF_OK;
+    }
+
+    gf_result write_clipboard_text(gf_handle owner_handle, gf_string_view input) {
+        std::string value;
+        if (!copy_view(input, value) ||
+            value.size() > gui_forms::HostServices::maximum_clipboard_text_bytes ||
+            !gui_forms::validate_utf8(value).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "clipboard text must be bounded valid UTF-8 without NUL");
+        }
+        std::function<gui_forms::HostServiceStatus(std::string_view)> provider;
+        {
+            std::scoped_lock lock(mutex_);
+            std::shared_ptr<ControlRecord> owner;
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            const auto root = root_record_locked(owner);
+            if (!root) return fail(GF_ERROR_INVALID_ARGUMENT,
+                                   "clipboard owner has no retained root");
+            provider = root->host_clipboard_write;
+            if (!provider) {
+                clipboard_text_ = value;
+                ++clipboard_generation_;
+                return GF_OK;
+            }
+        }
+        const auto status = provider(value);
+        if (!status.accepted()) {
+            return fail(GF_ERROR_INTERNAL,
+                        std::string("clipboard host write failed: ") +
+                        gui_forms::host_service_error_name(status.error));
+        }
+        return GF_OK;
+    }
+
+    gf_result read_clipboard_text(gf_handle owner_handle, char* buffer,
+                                  std::uint64_t capacity,
+                                  std::uint64_t* required_size,
+                                  std::uint32_t* has_text) {
+        if (required_size == nullptr || has_text == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "clipboard read requires size and presence outputs");
+        }
+        std::function<gui_forms::HostClipboardTextResult()> provider;
+        std::string value;
+        bool present{};
+        {
+            std::scoped_lock lock(mutex_);
+            std::shared_ptr<ControlRecord> owner;
+            if (const gf_result result = control_locked(owner_handle, owner);
+                result != GF_OK) return result;
+            if (const gf_result result = require_thread(*owner); result != GF_OK) {
+                return result;
+            }
+            const auto root = root_record_locked(owner);
+            if (!root) return fail(GF_ERROR_INVALID_ARGUMENT,
+                                   "clipboard owner has no retained root");
+            provider = root->host_clipboard_read;
+            if (!provider) {
+                value = clipboard_text_;
+                present = clipboard_generation_ != 0U;
+            }
+        }
+        if (provider) {
+            const auto result = provider();
+            if (!result.status.accepted()) {
+                return fail(GF_ERROR_INTERNAL,
+                            std::string("clipboard host read failed: ") +
+                            gui_forms::host_service_error_name(result.status.error));
+            }
+            value = result.text_utf8;
+            present = result.has_text;
+        }
+        *required_size = value.size();
+        *has_text = present ? 1U : 0U;
+        if (capacity < value.size() || (value.size() != 0U && buffer == nullptr)) {
+            return fail(GF_ERROR_BUFFER_TOO_SMALL,
+                        "clipboard buffer is smaller than the required UTF-8 size");
+        }
+        if (!value.empty()) std::memcpy(buffer, value.data(), value.size());
+        return GF_OK;
+    }
+
+    gf_result field_navigate(gf_handle handle, std::uint64_t position,
+                             std::int32_t direction, std::uint64_t* result) {
+        if (result == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field navigation requires an output position");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result status = get_control(handle, record); status != GF_OK) {
+            return status;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field navigation requires a retained field control");
+        }
+        if (!field->navigate(position, direction, *result)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field navigation requires a grapheme boundary and -1/+1");
+        }
+        return GF_OK;
+    }
+
+    gf_result field_replace(gf_handle handle, std::uint64_t start,
+                            std::uint64_t length, gf_string_view input,
+                            gf_field_edit_result* result) {
+        if (result == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field replacement requires an edit result output");
+        }
+        std::string replacement;
+        if (!copy_view(input, replacement) ||
+            !gui_forms::validate_utf8(replacement).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field replacement must be bounded valid UTF-8 without NUL");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result status = get_control(handle, record); status != GF_OK) {
+            return status;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field replacement requires a retained field control");
+        }
+        if (!field->replace(start, length, replacement, *result)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field replacement range must use UTF-8 grapheme boundaries");
+        }
+        record->text.assign(field->text());
+        return GF_OK;
+    }
+
+    gf_result field_history(gf_handle handle, std::int32_t direction,
+                            gf_field_edit_result* result) {
+        if (result == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field history requires an edit result output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result status = get_control(handle, record); status != GF_OK) {
+            return status;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field history requires a retained field control");
+        }
+        if (!field->history(direction, *result)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "field history direction must be -1 (undo) or +1 (redo)");
+        }
+        record->text.assign(field->text());
+        return GF_OK;
+    }
+
+    gf_result field_clear_history(gf_handle handle) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result status = get_control(handle, record); status != GF_OK) {
+            return status;
+        }
+        const auto field = std::dynamic_pointer_cast<FieldControl>(record->control);
+        if (!field) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "field history reset requires a retained field control");
+        }
+        field->clear_history();
         return GF_OK;
     }
 
@@ -1122,10 +1648,14 @@ public:
                     const gui_forms::HostDialogRequest&)> dialog,
                 std::function<gui_forms::HostServiceStatus(
                     const gui_forms::HostTooltipRequest&)> tooltip_show,
-                std::function<void()> tooltip_hide) {
+                std::function<void()> tooltip_hide,
+                std::function<gui_forms::HostClipboardTextResult()> clipboard_read,
+                std::function<gui_forms::HostServiceStatus(
+                    std::string_view)> clipboard_write) {
                 publish_host(record, std::move(wake), std::move(close),
                              std::move(dialog), std::move(tooltip_show),
-                             std::move(tooltip_hide));
+                             std::move(tooltip_hide), std::move(clipboard_read),
+                             std::move(clipboard_write));
             };
             options.dispatch_pending = [this, record, automation_controls] {
                 pump_pending(record);
@@ -1162,10 +1692,14 @@ public:
                     const gui_forms::HostDialogRequest&)> dialog,
                 std::function<gui_forms::HostServiceStatus(
                     const gui_forms::HostTooltipRequest&)> tooltip_show,
-                std::function<void()> tooltip_hide) {
+                std::function<void()> tooltip_hide,
+                std::function<gui_forms::HostClipboardTextResult()> clipboard_read,
+                std::function<gui_forms::HostServiceStatus(
+                    std::string_view)> clipboard_write) {
                 publish_host(record, std::move(wake), std::move(close),
                              std::move(dialog), std::move(tooltip_show),
-                             std::move(tooltip_hide));
+                             std::move(tooltip_hide), std::move(clipboard_read),
+                             std::move(clipboard_write));
             };
             options.dispatch_pending = [this, record] { pump_pending(record); };
             options.closed = [this, handle] {
@@ -1886,7 +2420,11 @@ private:
                           const gui_forms::HostDialogRequest&)> dialog = {},
                       std::function<gui_forms::HostServiceStatus(
                           const gui_forms::HostTooltipRequest&)> tooltip_show = {},
-                      std::function<void()> tooltip_hide = {}) {
+                      std::function<void()> tooltip_hide = {},
+                      std::function<gui_forms::HostClipboardTextResult()>
+                          clipboard_read = {},
+                      std::function<gui_forms::HostServiceStatus(std::string_view)>
+                          clipboard_write = {}) {
         bool should_wake{};
         bool should_close{};
         std::function<void()> published_wake;
@@ -1898,6 +2436,8 @@ private:
             root->host_dialog = std::move(dialog);
             root->host_tooltip_show = std::move(tooltip_show);
             root->host_tooltip_hide = std::move(tooltip_hide);
+            root->host_clipboard_read = std::move(clipboard_read);
+            root->host_clipboard_write = std::move(clipboard_write);
             should_wake = !root->dispatch_queue.empty();
             should_close = root->close_requested;
             published_wake = root->host_wake;
@@ -1915,6 +2455,8 @@ private:
         root->host_dialog = {};
         root->host_tooltip_show = {};
         root->host_tooltip_hide = {};
+        root->host_clipboard_read = {};
+        root->host_clipboard_write = {};
         root->host_running = false;
     }
 
@@ -2165,6 +2707,8 @@ private:
     std::mutex mutex_;
     std::vector<Slot> slots_;
     std::uint64_t next_dialog_request_{1};
+    std::string clipboard_text_;
+    std::uint64_t clipboard_generation_{};
 };
 
 Registry& registry() {
@@ -2372,6 +2916,71 @@ gf_result api_hide_tooltip(gf_handle owner) noexcept {
     return translate([&] { return registry().hide_tooltip(owner); });
 }
 
+gf_result api_set_field_selection(gf_handle control,
+                                  std::uint64_t selection_start_utf8,
+                                  std::uint64_t selection_length_utf8,
+                                  std::uint32_t caret_visible) noexcept {
+    return translate([&] {
+        return registry().set_field_selection(control, selection_start_utf8,
+                                              selection_length_utf8,
+                                              caret_visible);
+    });
+}
+gf_result api_set_field_edit_state(gf_handle control,
+                                   std::uint64_t anchor_utf8,
+                                   std::uint64_t caret_utf8,
+                                   std::uint32_t caret_visible) noexcept {
+    return translate([&] {
+        return registry().set_field_edit_state(control, anchor_utf8, caret_utf8,
+                                               caret_visible);
+    });
+}
+gf_result api_field_position_from_point(gf_handle control, double local_x,
+                                        std::uint64_t* position_utf8) noexcept {
+    return translate([&] {
+        return registry().field_position_from_point(control, local_x,
+                                                    position_utf8);
+    });
+}
+gf_result api_write_clipboard_text(gf_handle owner, gf_string_view text) noexcept {
+    return translate([&] { return registry().write_clipboard_text(owner, text); });
+}
+gf_result api_read_clipboard_text(gf_handle owner, char* buffer,
+                                  std::uint64_t capacity,
+                                  std::uint64_t* required_size,
+                                  std::uint32_t* has_text) noexcept {
+    return translate([&] {
+        return registry().read_clipboard_text(owner, buffer, capacity,
+                                              required_size, has_text);
+    });
+}
+gf_result api_field_navigate(gf_handle control, std::uint64_t position_utf8,
+                             std::int32_t direction,
+                             std::uint64_t* result_utf8) noexcept {
+    return translate([&] {
+        return registry().field_navigate(control, position_utf8, direction,
+                                         result_utf8);
+    });
+}
+gf_result api_field_replace(gf_handle control, std::uint64_t start_utf8,
+                            std::uint64_t length_utf8,
+                            gf_string_view replacement,
+                            gf_field_edit_result* result) noexcept {
+    return translate([&] {
+        return registry().field_replace(control, start_utf8, length_utf8,
+                                        replacement, result);
+    });
+}
+gf_result api_field_history(gf_handle control, std::int32_t direction,
+                            gf_field_edit_result* result) noexcept {
+    return translate([&] {
+        return registry().field_history(control, direction, result);
+    });
+}
+gf_result api_field_clear_history(gf_handle control) noexcept {
+    return translate([&] { return registry().field_clear_history(control); });
+}
+
 } // namespace
 
 extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_version,
@@ -2389,7 +2998,12 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_7 &&
         requested_version != GF_ABI_VERSION_0_8 &&
         requested_version != GF_ABI_VERSION_0_9 &&
-        requested_version != GF_ABI_VERSION_0_10) {
+        requested_version != GF_ABI_VERSION_0_10 &&
+        requested_version != GF_ABI_VERSION_0_11 &&
+        requested_version != GF_ABI_VERSION_0_12 &&
+        requested_version != GF_ABI_VERSION_0_13 &&
+        requested_version != GF_ABI_VERSION_0_14 &&
+        requested_version != GF_ABI_VERSION_0_15) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -2443,6 +3057,15 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_last_dialog_path,
         &api_show_tooltip,
         &api_hide_tooltip,
+        &api_set_field_selection,
+        &api_set_field_edit_state,
+        &api_field_position_from_point,
+        &api_write_clipboard_text,
+        &api_read_clipboard_text,
+        &api_field_navigate,
+        &api_field_replace,
+        &api_field_history,
+        &api_field_clear_history,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

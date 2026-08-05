@@ -1,7 +1,7 @@
 # ORC-GUI / ORC-FE: frontend and GUI.Forms contracts
 
-Status: **GUI.Forms negotiation active; real frontend client reply deferred
-until the post-Frontend-001 adapter slice**.
+Status: **GUI.Forms negotiation active; live Orchestrator Core 1.0 frontend
+bootstrap semantics accepted, production transport/authentication pending**.
 
 GUI.Forms owns retained control/rendering semantics and its C ABI implementation.
 Orchestrator registry records the version consumed by the frontend; it does not
@@ -31,5 +31,6 @@ Active dialogue:
 - `../../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`;
 - `../../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`.
 
-Frontend 001 uses an application-owned simulated port for these states. Its
-fixture schema is neither a provider ABI nor an accepted ORC-FE snapshot.
+Frontend 001 product startup uses the live Core 1.0 Orchestrator edge. Tests may
+replay canonical Orchestrator fixtures; application-owned fixture schemas do not
+become an ORC-FE contract.

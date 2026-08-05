@@ -1,7 +1,7 @@
 # Frontend 001 specification
 
-Status: **DECIDED scope; waiting for GUI.Forms go-ahead and explicit architect
-start direction under ADR-004**.
+Status: **DECIDED scope; waiting for Orchestrator Core 1.0, GUI.Forms go-ahead,
+and explicit architect start direction under ADR-004 and ADR-006**.
 
 Frontend 001 is the first executable File Manager application slice. It is a
 GUI.Forms consumer and a deterministic composition laboratory, not the first
@@ -9,14 +9,30 @@ fully integrated product build.
 
 ## Opening predicate
 
-Implementation begins only after both are recorded:
+Implementation begins only after all three are recorded:
 
-1. GUI.Forms gives a named go-ahead for the consumption surface below.
-2. The grand architect explicitly directs File Manager frontend work to begin.
+1. Orchestrator Core 1.0 is available through the real frontend bootstrap edge.
+2. GUI.Forms gives a named go-ahead for the consumption surface below.
+3. The grand architect explicitly directs File Manager frontend work to begin.
 
-Engine, Orchestrator, plugin, semantic-fact, and Kolmogrov readiness are not
-part of this predicate. Their 001-facing states are supplied by deterministic
-frontend fixtures until their individual contracts are ready.
+Engine, plugin execution, semantic facts, and Kolmogrov readiness are not part
+of this predicate. Their actual states are supplied by the live Orchestrator as
+available, degraded, unavailable, deferred, or stubbed.
+
+## Orchestrator bootstrap surface
+
+Frontend 001 starts and negotiates a user-scoped Orchestrator Core 1.0 session
+before constructing provider-dependent application state. It consumes:
+
+- release and compatible-contract discovery;
+- lifecycle generation and restart/shutdown state;
+- immutable capability/availability snapshots;
+- explicit unavailable/stubbed provider reasons;
+- the registered direct-Engine fallback declaration;
+- bounded version mismatch, deadline, cancellation, and disconnect behavior.
+
+Tests may replay the exact Core 1.0 fixtures. Product startup does not replace
+this authority with a frontend-owned schema.
 
 ## GUI.Forms consumption surface
 
@@ -61,7 +77,8 @@ frontend does not implement a shadow widget framework.
   direction, using only locally generated or provenance-cleared 001 assets;
 - deterministic keyboard, pointer, resize, pane-collapse, activation, and
   shutdown scenarios;
-- explicit frontend ports for filesystem, Engine, and Orchestrator data.
+- explicit frontend ports for filesystem and Engine data, plus the real
+  Orchestrator Core 1.0 bootstrap client.
 
 The path matrix, path editor, search-result expansion, direct property editing,
 drag/drop, motion, sound, and other debt-ledger objects enter 001 only to the
@@ -87,7 +104,7 @@ GUI.Forms, Engine, or Orchestrator contract ownership.
 
 ## Fixture boundary
 
-Frontend-owned ports present fake capabilities as `simulated`. Fixtures cover:
+Frontend test ports present replayed capabilities as `simulated`. Fixtures cover:
 
 1. ordinary folder with mixed objects;
 2. empty folder;
@@ -98,7 +115,8 @@ Frontend-owned ports present fake capabilities as `simulated`. Fixtures cover:
 6. plugins and semantic facts explicitly `stubbed`;
 7. long names, deep paths, dense content, narrow windows, and 125–200% scale.
 
-Fixture schemas are application test data. They do not freeze a provider ABI.
+The Orchestrator scenarios replay its canonical Core 1.0 fixtures; other fixture
+schemas are application test data and do not freeze a provider ABI.
 
 ## Exit gate
 
@@ -106,7 +124,9 @@ Frontend 001 is complete when:
 
 - it builds from a clean tree against only the named GUI.Forms snapshot and
   declared ordinary build dependencies;
-- all service scenarios run without Engine or Orchestrator processes;
+- all Engine/provider-absence scenarios run without an Engine process;
+- product bootstrap negotiates successfully with the live Core 1.0 daemon,
+  while deterministic tests pass against its canonical replay fixtures;
 - headless traces for construction, focus, navigation intent, pane collapse,
   resize, activation, and shutdown are deterministic;
 - no frontend code includes GUI.Forms private headers or provider-private
@@ -123,7 +143,7 @@ Frontend 001 is complete when:
 
 ## Explicit exclusions
 
-001 does not require real filesystem mutation, real indexed search, a live
-Orchestrator daemon, settings writes, handler invocation, plugin workers,
-semantic facts, installer/signing, or daily-use replacement. It must not claim
-those capabilities from fixtures.
+001 does not require real filesystem mutation, real indexed search, settings
+writes, handler invocation, plugin workers, semantic facts, installer/signing,
+or daily-use replacement. It does require the live Orchestrator Core 1.0
+bootstrap surface and must not claim later capabilities from fixtures.

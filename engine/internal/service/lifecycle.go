@@ -264,6 +264,7 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "engine.configuration.inspect", State: api.CapabilityAvailable, Revision: "0.1"},
 		{ID: "engine.exact.catalogue", State: api.CapabilityAvailable, Revision: "reference-v1"},
 		{ID: "engine.exact.query", State: api.CapabilityAvailable, Revision: "engine.v0"},
+		{ID: "engine.live.query", State: api.CapabilityUnavailable, Reason: "required by ADR-008 and ORC-ENG-004 but not implemented; manual reconcile plus exact query does not satisfy catalogue-independent search"},
 		{ID: "engine.ordered_metadata", State: api.CapabilityAvailable, Revision: "reference-v1"},
 		{ID: "engine.root_policy", State: api.CapabilityAvailable, Revision: "development-sandbox-v0"},
 		{ID: "engine.scan.reconcile", State: api.CapabilityAvailable, Revision: "metadata-full-scan-v0"},
@@ -276,10 +277,11 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "engine.background.observation", State: api.CapabilityExperimental, Revision: "portable-coalescer-0.2+macos-fsevents-0.2+windows-rdcw-0.1", Reason: "bounded macOS and Windows native adapters exist, but coverage is incomplete, the watermark is volatile, Linux is absent, and Windows has compatibility-only validation"},
 		{ID: "engine.status.subscribe", State: api.CapabilityNegotiating, Reason: "bounded replay and overflow fixtures remain red"},
 		{ID: "engine.transport.framed_local", State: api.CapabilityDeferred, Reason: "production authentication and framed transport are not implemented"},
-		{ID: "contract.ORC-LIF-001", State: api.CapabilityNegotiating, Reason: "engine lifecycle projection awaits Orchestrator reconciliation"},
-		{ID: "contract.ORC-ENG-001", State: api.CapabilityNegotiating, Reason: "exact subset exists; envelope and conformance are not frozen"},
-		{ID: "contract.ORC-ENG-002", State: api.CapabilityNegotiating, Reason: "development admin subset exists; production authorization is not frozen"},
-		{ID: "contract.ORC-ENG-003", State: api.CapabilityUnavailable, Reason: "status event stream is not implemented"},
+		{ID: "contract.ORC-LIF-001", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
+		{ID: "contract.ORC-ENG-001", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
+		{ID: "contract.ORC-ENG-002", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
+		{ID: "contract.ORC-ENG-003", State: api.CapabilityAvailable, Revision: "snapshot-v0.1"},
+		{ID: "contract.ORC-ENG-004", State: api.CapabilityNegotiating, Reason: "required catalogue-independent live-query proposal awaits Engine reply and implementation"},
 	}
 }
 

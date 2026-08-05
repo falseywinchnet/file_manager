@@ -146,6 +146,14 @@ explicit gates; see
 The current integration-readiness rubric is
 [`docs/INTEGRATED_DOGFOOD_READINESS.md`](docs/INTEGRATED_DOGFOOD_READINESS.md).
 
+ADR-008 now requires `ORC-ENG-004`: bounded filename/path search directly over
+an authorized filesystem scope when no catalogue is available. The current
+`scan.reconcile`-then-query path does not satisfy that requirement. Engine
+negotiation round 006 specifies progressive pages, containment, cancellation,
+work ceilings, zero durable writes, and native measurement gates. The provider
+continues to report `engine.live.query` unavailable until that operation and
+its conformance evidence exist.
+
 The first Kolmogrov history-tuple transfer is internally dogfooded against a
 pinned persistent-service generation but remains unavailable to service
 clients. Its projection is disposable, random-parameterized per generation,
@@ -170,6 +178,8 @@ The engine is ready for parent integration only when:
 9. packaging requires no network access and no runtime database service;
 10. a versioned release artifact, schema manifest, and migration/rebuild policy
     exist.
+11. bounded catalogue-independent live name/path search passes the
+    `ORC-ENG-004` native conformance and resource gates.
 
 Start a worker with [HANDOFF_PROMPT.md](docs/HANDOFF_PROMPT.md), then apply the
 mandatory accepted direction in

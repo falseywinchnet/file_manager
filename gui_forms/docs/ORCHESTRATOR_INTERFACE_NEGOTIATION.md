@@ -6,10 +6,10 @@ Participants: Orchestrator integration authority, GUI.Forms provider, and File
 Manager consumer. Canonical families: `ORC-COM-001`, `ORC-GUI-001`,
 `ORC-FE-001`.
 
-ADR-004 makes GUI.Forms the sole technical predecessor for starting Frontend
-001. Engine and Orchestrator remain simulated ports in that slice. The grand
-architect starts the frontend after GUI.Forms records the go-ahead; this note is
-the provider-owned place for that reply.
+ADR-006 makes GUI.Forms one of two independent technical predecessors for
+Frontend 001. Orchestrator advances headlessly to Core 1.0 while GUI.Forms
+advances to FM0. The grand architect starts the frontend after both are ready;
+this note is the provider-owned place for the GUI.Forms reply.
 
 Orchestrator has no GUI and does not call controls remotely. This negotiation
 registers the ABI File Manager consumes and the capability facts Orchestrator

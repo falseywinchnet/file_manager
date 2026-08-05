@@ -6,7 +6,16 @@ use std::path::Path;
 
 #[test]
 fn bootstrap_golden_fixtures_match() {
-    for fixture in ["version", "status", "semantic_facts_stub", "unknown_method"] {
+    for fixture in [
+        "version",
+        "release",
+        "status",
+        "expired_deadline",
+        "response_budget",
+        "version_mismatch",
+        "semantic_facts_stub",
+        "unknown_method",
+    ] {
         assert_fixture(fixture);
     }
 }

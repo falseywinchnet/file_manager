@@ -111,6 +111,18 @@ public:
                                 std::string_view text,
                                 FontSpec font,
                                 Color color) = 0;
+    // Text controls need the same metrics used by the painter for caret hit
+    // testing, selection geometry, and horizontal viewport maintenance.  The
+    // renderer owns those metrics; controls must not guess a fixed glyph width.
+    [[nodiscard]] virtual Size measure_text_utf8(std::string_view text,
+                                                 FontSpec font) {
+        std::size_t scalars{};
+        for (const unsigned char byte : text) {
+            if ((byte & 0xc0U) != 0x80U) ++scalars;
+        }
+        return {static_cast<double>(scalars) * font.size * 0.55,
+                font.size * 1.2};
+    }
     virtual void draw_image(ImageId image,
                             Rect destination,
                             double opacity = 1.0) = 0;

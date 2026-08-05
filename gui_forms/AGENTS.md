@@ -23,6 +23,14 @@ Build a native macOS control-gallery demonstration and automated tests proving:
 
 This is a control gallery, not File Manager and not a file browser.
 
+The separately specified `file_manager_demoboard/` is an admitted first-party
+consumer exception to the gallery's visual subject: it reproduces the File
+Manager interface using deterministic in-memory fixtures and only public
+GUI.Forms seams. It is still not the shipping frontend, may not read the real
+filesystem or parent sources at runtime, and may not implement missing reusable
+GUI.Forms capabilities inside the consumer project. Its local `AGENTS.md` is
+mandatory for work in that directory.
+
 ## Hard boundaries
 
 - C++20 is admitted. Objective-C++ is admitted only in the macOS host adapter.
@@ -66,6 +74,8 @@ This is a control gallery, not File Manager and not a file browser.
 - Native macOS code lives under `src/host/macos/`.
 - Native Windows code lives under `src/host/windows/`.
 - Demonstrations and their static/DML descriptions live under `demo/`.
+- The standalone fixture-backed File Manager consumer specification and its
+  eventual installed-package consumer live under `file_manager_demoboard/`.
 - Tests live under `tests/`.
 - Instrumentation must be queryable as structured counters/snapshots, not only
   prose logs.

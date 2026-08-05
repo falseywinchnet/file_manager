@@ -14,9 +14,10 @@ Read, in order, before changing code or specifications:
 5. `INTERACTION_CONTRACT.md`
 6. `FIXTURE_CATALOGUE.md`
 7. `IMPLEMENTATION_SEQUENCE.md`
-8. `ACCEPTANCE_GATES.md`
-9. `reference/README.md`
-10. parent `../AGENTS.md`
+8. `STATUS.md`
+9. `ACCEPTANCE_GATES.md`
+10. `reference/README.md`
+11. parent `../AGENTS.md`
 
 ## Mission
 

@@ -10,7 +10,9 @@ source/store directories. Command:
 
 ```sh
 FILEMAN_ENGINE_MEASURE=1 go test ./benchmarks \
-  -run '^TestM4FSEventsBackgroundCurrentnessDogfood$' -count=1 -v
+  -run '^TestM4FSEventsBackgroundCurrentnessDogfood$' -count=2 -v
+FILEMAN_ENGINE_MEASURE_HARDLINK=1 go test ./internal/observation/fsevents \
+  -run '^TestMeasureFSEventsFinalHardLinkRemoval$' -count=3 -v
 FILEMAN_ENGINE_LONG_MEASURE=1 go test ./benchmarks \
   -run '^TestM4FSEventsTenMinuteIdle$' -count=1 -v -timeout=12m
 ```
@@ -159,10 +161,11 @@ Still open:
 - **PASS:** `go vet ./...`;
 - **PASS build:** Linux/amd64 and Windows/amd64 with `CGO_ENABLED=0`; the
   FSEvents constructor returns explicit unavailable on those targets.
-- **PASS compatibility oracle:** the Windows/amd64 `ReadDirectoryChangesW`
-  disposable-root create/cancel fixture and portable observation/service tests
-  under Wine 11.10, plus Linux/arm64 portable tests in the Lima guest with
-  temporary files on guest `/var/tmp`.
+- **PASS compatibility oracle:** all 14 test-bearing Windows/amd64 packages
+  under Wine 11.10, including direct `ReadDirectoryChangesW` create/cancel and
+  service-level notification/reconcile/query fixtures; all 14 test-bearing
+  Linux/arm64 packages in the Lima guest with temporary files on guest
+  `/var/tmp`.
 
 Wine and Lima remain compatibility environments only and are not native
 Windows/Linux observation, durability, or power evidence.

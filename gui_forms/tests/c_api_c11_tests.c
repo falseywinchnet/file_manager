@@ -188,7 +188,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_10, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_15, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -207,15 +207,194 @@ static void test_version_negotiation(void) {
                 api.show_path_dialog != NULL &&
                 api.last_dialog_path != NULL &&
                 api.show_tooltip != NULL && api.hide_tooltip != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_10,
+                api.set_field_selection != NULL &&
+                api.set_field_edit_state != NULL &&
+                api.field_position_from_point != NULL &&
+                api.write_clipboard_text != NULL &&
+                api.read_clipboard_text != NULL &&
+                api.field_navigate != NULL &&
+                api.field_replace != NULL &&
+                api.field_history != NULL &&
+                api.field_clear_history != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_15,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x0000000b), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000010), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_11_field_selection_contract(void) {
+    gf_handle field = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    require(api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                    text("abi.field.selection"), &field) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.field.panel"), &panel) == GF_OK,
+            "0.11 field-selection fixtures failed");
+    require(api.set_text(field, text("field")) == GF_OK &&
+                api.set_field_selection(field, 1U, 3U, 1U) == GF_OK &&
+                api.set_field_selection(field, 5U, 0U, 1U) == GF_OK,
+            "0.11 valid field selection was rejected");
+    require(api.set_field_selection(field, 4U, 2U, 1U) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.set_field_selection(field, 0U, 0U, 2U) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.set_field_selection(panel, 0U, 0U, 1U) ==
+                GF_ERROR_WRONG_HANDLE_KIND,
+            "0.11 invalid field selection was accepted");
+    require(api.dispose(field) == GF_OK && api.dispose(panel) == GF_OK,
+            "0.11 field-selection fixture disposal failed");
+}
+
+static void test_abi_0_12_field_edit_geometry_contract(void) {
+    gf_handle field = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    uint64_t position = UINT64_MAX;
+    require(api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                    text("abi.field.edit-state"), &field) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.field.edit-panel"), &panel) == GF_OK,
+            "0.12 field-edit fixtures failed");
+    require(api.set_text(field, text("a\xCC\x81" "bc")) == GF_OK &&
+                api.set_field_edit_state(field, 4U, 0U, 1U) == GF_OK &&
+                api.set_field_edit_state(field, 0U, 4U, 1U) == GF_OK,
+            "0.12 directional grapheme selection was rejected");
+    require(api.set_field_edit_state(field, 1U, 4U, 1U) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.set_field_edit_state(field, 0U, 4U, 2U) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.set_field_edit_state(panel, 0U, 0U, 1U) ==
+                GF_ERROR_WRONG_HANDLE_KIND,
+            "0.12 invalid field edit state was accepted");
+    require(api.field_position_from_point(field, 0.0, &position) == GF_OK &&
+                position == 0U &&
+                api.field_position_from_point(field, 10.0, NULL) ==
+                    GF_ERROR_INVALID_ARGUMENT &&
+                api.field_position_from_point(panel, 10.0, &position) ==
+                    GF_ERROR_WRONG_HANDLE_KIND,
+            "0.12 retained field hit testing contract failed");
+    require(api.dispose(field) == GF_OK && api.dispose(panel) == GF_OK,
+            "0.12 field-edit fixture disposal failed");
+}
+
+static void test_abi_0_13_clipboard_contract(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle field = {0U, 0U};
+    uint64_t required = 99U;
+    uint32_t has_text = 99U;
+    char buffer[32] = {0};
+    require(api.control_create_kind(GF_CONTROL_FORM,
+                                    text("abi.clipboard.form"), &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                        text("abi.clipboard.field"), &field) == GF_OK &&
+                api.add_child(form, field) == GF_OK,
+            "0.13 clipboard fixtures failed");
+    require(api.write_clipboard_text(field, text("host \xCE\xA9")) == GF_OK,
+            "0.13 clipboard write failed");
+    require(api.read_clipboard_text(field, NULL, 0U, &required, &has_text) ==
+                GF_ERROR_BUFFER_TOO_SMALL &&
+                required == 7U && has_text == 1U,
+            "0.13 clipboard sizing contract failed");
+    require(api.read_clipboard_text(field, buffer, sizeof(buffer), &required,
+                                    &has_text) == GF_OK &&
+                required == 7U && has_text == 1U &&
+                memcmp(buffer, "host \xCE\xA9", 7U) == 0,
+            "0.13 clipboard round trip failed");
+    require(api.read_clipboard_text(field, buffer, sizeof(buffer), NULL,
+                                    &has_text) == GF_ERROR_INVALID_ARGUMENT &&
+                api.read_clipboard_text(field, buffer, sizeof(buffer), &required,
+                                        NULL) == GF_ERROR_INVALID_ARGUMENT,
+            "0.13 clipboard accepted missing outputs");
+    require(api.dispose(form) == GF_OK,
+            "0.13 clipboard fixture disposal failed");
+}
+
+static void test_abi_0_14_grapheme_navigation_contract(void) {
+    gf_handle field = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    uint64_t position = UINT64_MAX;
+    require(api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                    text("abi.field.navigation"), &field) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.field.navigation-panel"), &panel) == GF_OK &&
+                api.set_text(field, text("a\xCC\x81" "bc")) == GF_OK,
+            "0.14 navigation fixtures failed");
+    require(api.field_navigate(field, 3U, -1, &position) == GF_OK &&
+                position == 0U &&
+                api.field_navigate(field, 3U, 1, &position) == GF_OK &&
+                position == 4U &&
+                api.field_navigate(field, 0U, -1, &position) == GF_OK &&
+                position == 0U &&
+                api.field_navigate(field, 5U, 1, &position) == GF_OK &&
+                position == 5U,
+            "0.14 grapheme navigation returned the wrong boundary");
+    require(api.field_navigate(field, 1U, 1, &position) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.field_navigate(field, 3U, 0, &position) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.field_navigate(panel, 0U, 1, &position) ==
+                GF_ERROR_WRONG_HANDLE_KIND &&
+                api.field_navigate(field, 0U, 1, NULL) ==
+                GF_ERROR_INVALID_ARGUMENT,
+            "0.14 invalid navigation was accepted");
+    require(api.dispose(field) == GF_OK && api.dispose(panel) == GF_OK,
+            "0.14 navigation fixture disposal failed");
+}
+
+static void test_abi_0_15_field_mutation_history_contract(void) {
+    gf_handle field = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    gf_field_edit_result edit = {0};
+    char buffer[32] = {0};
+    uint64_t required = 0U;
+    require(api.control_create_kind(GF_CONTROL_TEXT_BOX,
+                                    text("abi.field.history"), &field) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.field.history-panel"), &panel) == GF_OK &&
+                api.set_text(field, text("a\xCC\x81" "bc")) == GF_OK &&
+                api.set_field_edit_state(field, 3U, 4U, 1U) == GF_OK,
+            "0.15 field-history fixtures failed");
+    require(api.field_replace(field, 3U, 1U, text("\xCE\xA9"), &edit) == GF_OK &&
+                edit.changed == 1U && edit.anchor_utf8 == 5U &&
+                edit.caret_utf8 == 5U && edit.can_undo == 1U &&
+                edit.can_redo == 0U,
+            "0.15 selection-aware field replacement failed");
+    require(api.get_text(field, buffer, sizeof(buffer), &required) == GF_OK &&
+                required == 6U && memcmp(buffer, "a\xCC\x81\xCE\xA9" "c", 6U) == 0,
+            "0.15 native field text did not become authoritative");
+    require(api.field_history(field, -1, &edit) == GF_OK &&
+                edit.changed == 1U && edit.anchor_utf8 == 3U &&
+                edit.caret_utf8 == 4U && edit.can_undo == 0U &&
+                edit.can_redo == 1U,
+            "0.15 undo did not restore text and directional selection");
+    memset(buffer, 0, sizeof(buffer));
+    require(api.get_text(field, buffer, sizeof(buffer), &required) == GF_OK &&
+                required == 5U && memcmp(buffer, "a\xCC\x81" "bc", 5U) == 0,
+            "0.15 undo did not restore native text");
+    require(api.field_history(field, 1, &edit) == GF_OK &&
+                edit.changed == 1U && edit.anchor_utf8 == 5U &&
+                edit.caret_utf8 == 5U && edit.can_undo == 1U &&
+                edit.can_redo == 0U,
+            "0.15 redo did not restore the replacement");
+    require(api.field_clear_history(field) == GF_OK &&
+                api.field_history(field, -1, &edit) == GF_OK &&
+                edit.changed == 0U && edit.can_undo == 0U &&
+                edit.can_redo == 0U,
+            "0.15 history reset was not deterministic");
+    require(api.field_replace(field, 1U, 1U, text("x"), &edit) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.field_replace(panel, 0U, 0U, text("x"), &edit) ==
+                GF_ERROR_WRONG_HANDLE_KIND &&
+                api.field_history(field, 0, &edit) == GF_ERROR_INVALID_ARGUMENT &&
+                api.field_history(field, -1, NULL) == GF_ERROR_INVALID_ARGUMENT &&
+                api.field_clear_history(panel) == GF_ERROR_WRONG_HANDLE_KIND,
+            "0.15 invalid mutation or history operation was accepted");
+    require(api.dispose(field) == GF_OK && api.dispose(panel) == GF_OK,
+            "0.15 field-history fixture disposal failed");
 }
 
 static void test_abi_0_10_dialog_and_tooltip_contract(void) {
@@ -747,6 +926,11 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_11_field_selection_contract();
+    test_abi_0_12_field_edit_geometry_contract();
+    test_abi_0_13_clipboard_contract();
+    test_abi_0_14_grapheme_navigation_contract();
+    test_abi_0_15_field_mutation_history_contract();
     test_properties_tree_and_errors();
     test_abi_0_2_control_surface();
     test_abi_0_3_headless_window();

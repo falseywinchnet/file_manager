@@ -1,0 +1,12 @@
+{
+  "contract": {"id": "ORC-ENG-001", "major": 0, "minor": 1},
+  "terminal": "denied",
+  "results": [],
+  "stale_roots": [],
+  "unavailable_channels": [],
+  "warnings": [],
+  "error": {
+    "code": "ENGINE_QUERY_DENIED",
+    "message": "caller lacks query authority for the requested root"
+  }
+}

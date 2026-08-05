@@ -1,6 +1,7 @@
 # Orchestrator conformance and versioning constitution
 
-Status: **bootstrap fixtures active; codec/IDL and cross-language peers unresolved**.
+Status: **bootstrap and Engine semantic-v0 fixtures active; codec/IDL and
+cross-language runtime peers unresolved**.
 
 ## Independent version namespaces
 
@@ -23,6 +24,11 @@ Never use one global “File Manager API version.” Track independently:
 Compatibility negotiates the intersection. A newer endpoint never unilaterally
 selects semantics unknown to the peer.
 
+Orchestrator Core 1.0 is a release/readiness profile over named compatible
+contract versions, not an exception to this rule. Its executable release
+manifest remains `development` until every requirement in
+[`CORE_1_0_RELEASE.md`](CORE_1_0_RELEASE.md) passes.
+
 ## Contract artifact ladder
 
 Every contract advances through:
@@ -41,6 +47,21 @@ A `fixture-draft` may have a deliberately disposable executable laboratory
 projection, as the bootstrap does. That does not promote the contract to
 `implemented`; that stage still requires an independently built provider and
 consumer against the accepted fixtures.
+
+ADR-007 freezes the transport-neutral `ORC-ENG-001/002` semantic-v0 subset for
+experimental implementation. Its Rust fixture projection proves that
+Orchestrator preserves cached-stale, authoritative no-match, provider-absent,
+and currently unsupported-live-query outcomes as distinct states. ADR-008 now
+requires that missing lane through the separate `ORC-ENG-004` negotiation. Its
+draft fixtures prove source-explicit progressive pages, partial traversal, and
+non-bypass of authority errors.
+
+**OBSERVED:** the Rust development JSONL adapter now performs a real
+cross-process exact query against a separately built Go Engine after canonical
+root plan/apply and reconciliation. This is implementation evidence for
+`ORC-ENG-001`; it does not promote JSONL to the production wire or close the
+installed discovery/authentication gate. `ORC-ENG-004` still lacks its Engine
+provider implementation and remains negotiating.
 
 ## Required conformance corpus
 

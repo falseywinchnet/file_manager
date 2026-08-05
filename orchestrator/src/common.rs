@@ -30,6 +30,7 @@ pub enum ApiErrorCode {
     InvalidRequest,
     MethodUnavailable,
     VersionMismatch,
+    DeadlineExceeded,
     ResourceBudgetExceeded,
     Unavailable,
     Internal,

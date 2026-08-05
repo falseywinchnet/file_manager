@@ -1,0 +1,8 @@
+{
+  "family": "orchestrator.local",
+  "major": 0,
+  "minor": 1,
+  "instance_id": "00112233445566778899aabbccddeeff",
+  "lifecycle_generation": 1,
+  "max_frame_bytes": 1048576
+}

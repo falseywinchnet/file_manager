@@ -12,6 +12,7 @@ internal enum NativeChange { None, Name, Text, Visible, Enabled, Bounds, Tree }
 internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4, RangeValueChanged = 14, RangeScroll = 15 }
 internal readonly record struct NativePointer(uint Kind, double X, double Y, double WheelDelta, uint Button);
 internal readonly record struct NativeKey(uint Kind, uint PhysicalKey, uint Modifiers, bool Repeat);
+internal readonly record struct NativeFieldEdit(string Text, int Anchor, int Caret, bool Changed, bool CanUndo, bool CanRedo);
 
 internal sealed unsafe class NativeControlBridge : IDisposable
 {
@@ -23,6 +24,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct StringView { internal byte* Data; internal ulong Size; }
     [StructLayout(LayoutKind.Sequential)] private struct ErrorView { internal uint Code; internal StringView Message; }
     [StructLayout(LayoutKind.Sequential)] private struct Rect { internal double X, Y, Width, Height; }
+    [StructLayout(LayoutKind.Sequential)] private struct FieldEditResult { internal ulong Anchor, Caret, Revision; internal uint Changed, CanUndo, CanRedo; }
     [StructLayout(LayoutKind.Sequential)] private struct Api
     {
         internal uint StructSize, AbiVersion;
@@ -37,6 +39,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint SetRange, GetRange, SetRangeValue, GetRangeValue;
         internal nint SetPointerCapture, GetPointerCapture;
         internal nint ShowPathDialog, LastDialogPath, ShowTooltip, HideTooltip;
+        internal nint SetFieldSelection, SetFieldEditState, FieldPositionFromPoint;
+        internal nint WriteClipboardText, ReadClipboardText;
+        internal nint FieldNavigate;
+        internal nint FieldReplace, FieldHistory, FieldClearHistory;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -164,6 +170,16 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
     internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
     internal void SetColors(global::System.Drawing.Color foreground, global::System.Drawing.Color background) { Check(((delegate* unmanaged[Cdecl]<Handle, uint, uint, int>)api.SetControlColors)(handle.Value, unchecked((uint)foreground.ToArgb()), unchecked((uint)background.ToArgb()))); }
+    internal void SetFieldSelection(int start, int length, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; start = global::System.Math.Clamp(start, 0, text.Length); length = global::System.Math.Clamp(length, 0, text.Length - start); var startBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, start)); var lengthBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(start, length)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldSelection)(handle.Value, (ulong)startBytes, (ulong)lengthBytes, caretVisible ? 1u : 0u)); }
+    internal void SetFieldEditState(int anchor, int caret, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; anchor = global::System.Math.Clamp(anchor, 0, text.Length); caret = global::System.Math.Clamp(caret, 0, text.Length); var anchorBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, anchor)); var caretBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, caret)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldEditState)(handle.Value, (ulong)anchorBytes, (ulong)caretBytes, caretVisible ? 1u : 0u)); }
+    internal int FieldPositionFromPoint(double x) { EnsureAlive(); ulong bytePosition; Check(((delegate* unmanaged[Cdecl]<Handle, double, ulong*, int>)api.FieldPositionFromPoint)(handle.Value, x, &bytePosition)); string text; lock (stateGate) text = cachedText; var bytes = global::System.Text.Encoding.UTF8.GetBytes(text); var bounded = global::System.Math.Min(bytePosition, (ulong)bytes.Length); return global::System.Text.Encoding.UTF8.GetCharCount(bytes.AsSpan(0, checked((int)bounded))); }
+    internal void WriteClipboardText(string text) { EnsureAlive(); var bytes = global::System.Text.Encoding.UTF8.GetBytes(text ?? string.Empty); fixed (byte* data = bytes) Check(((delegate* unmanaged[Cdecl]<Handle, StringView, int>)api.WriteClipboardText)(handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length })); }
+    internal string ReadClipboardText() { EnsureAlive(); ulong required; uint hasText; var result = ((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, ulong*, uint*, int>)api.ReadClipboardText)(handle.Value, null, 0, &required, &hasText); if (result != 0 && result != 6) Check(result); if (hasText == 0 || required == 0) return string.Empty; if (required > 16UL * 1024UL * 1024UL) throw new global::System.InvalidOperationException("GUI.Forms clipboard text exceeds the managed boundary."); var bytes = new byte[checked((int)required)]; fixed (byte* data = bytes) Check(((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, ulong*, uint*, int>)api.ReadClipboardText)(handle.Value, data, (ulong)bytes.Length, &required, &hasText)); return hasText == 0 ? string.Empty : global::System.Text.Encoding.UTF8.GetString(bytes); }
+    internal int NavigateFieldPosition(int position, int direction) { EnsureAlive(); string text; lock (stateGate) text = cachedText; position = global::System.Math.Clamp(position, 0, text.Length); var positionBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, position)); ulong resultBytes; Check(((delegate* unmanaged[Cdecl]<Handle, ulong, int, ulong*, int>)api.FieldNavigate)(handle.Value, (ulong)positionBytes, direction, &resultBytes)); var bytes = global::System.Text.Encoding.UTF8.GetBytes(text); var bounded = global::System.Math.Min(resultBytes, (ulong)bytes.Length); return global::System.Text.Encoding.UTF8.GetCharCount(bytes.AsSpan(0, checked((int)bounded))); }
+    private static int ManagedFieldPosition(string text, ulong bytePosition) { var bytes = global::System.Text.Encoding.UTF8.GetBytes(text); var bounded = global::System.Math.Min(bytePosition, (ulong)bytes.Length); return global::System.Text.Encoding.UTF8.GetCharCount(bytes.AsSpan(0, checked((int)bounded))); }
+    internal NativeFieldEdit ReplaceField(int start, int length, string replacement) { EnsureAlive(); string before; lock (stateGate) before = cachedText; start = global::System.Math.Clamp(start, 0, before.Length); length = global::System.Math.Clamp(length, 0, before.Length - start); var startBytes = global::System.Text.Encoding.UTF8.GetByteCount(before.AsSpan(0, start)); var lengthBytes = global::System.Text.Encoding.UTF8.GetByteCount(before.AsSpan(start, length)); var replacementBytes = global::System.Text.Encoding.UTF8.GetBytes(replacement ?? string.Empty); FieldEditResult result; fixed (byte* data = replacementBytes) Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, StringView, FieldEditResult*, int>)api.FieldReplace)(handle.Value, (ulong)startBytes, (ulong)lengthBytes, new StringView { Data = data, Size = (ulong)replacementBytes.Length }, &result)); var after = GetString(api.GetText); lock (stateGate) cachedText = after; return new NativeFieldEdit(after, ManagedFieldPosition(after, result.Anchor), ManagedFieldPosition(after, result.Caret), result.Changed != 0, result.CanUndo != 0, result.CanRedo != 0); }
+    internal NativeFieldEdit FieldHistory(int direction) { EnsureAlive(); FieldEditResult result; Check(((delegate* unmanaged[Cdecl]<Handle, int, FieldEditResult*, int>)api.FieldHistory)(handle.Value, direction, &result)); var after = GetString(api.GetText); lock (stateGate) cachedText = after; return new NativeFieldEdit(after, ManagedFieldPosition(after, result.Anchor), ManagedFieldPosition(after, result.Caret), result.Changed != 0, result.CanUndo != 0, result.CanRedo != 0); }
+    internal void ClearFieldHistory() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.FieldClearHistory)(handle.Value)); }
     internal uint CheckState
     {
         get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetCheckState)(handle.Value, &value)); return value; }
@@ -453,8 +469,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(10, ref value));
-        if (value.AbiVersion != 10 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0) throw new InvalidOperationException("GUI.Forms ABI 0.10 table is incomplete.");
+        Check(GetApi(15, ref value));
+        if (value.AbiVersion != 15 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0) throw new InvalidOperationException("GUI.Forms ABI 0.15 table is incomplete.");
         return value;
     }
     private static void Check(int result)

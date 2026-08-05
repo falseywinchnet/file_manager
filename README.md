@@ -56,10 +56,11 @@ The fetched Modern.Forms reference is pinned in
 - [`orchestrator/`](orchestrator/) — the active user-scoped Rust Orchestrator:
   canonical integration authority, contract and availability registry, CLI,
   and future owner of hives, settings, handlers, commands, platform policy, and
-  hostile plugin supervision.
+  hostile plugin supervision. It advances headlessly toward Core 1.0 without a
+  GUI.Forms dependency.
 - [`frontend/`](frontend/) — the C++ end-user application. Frontend 001 begins
-  after the named GUI.Forms go-ahead and explicit architect direction, using
-  deterministic fixtures until real Engine and Orchestrator adapters open.
+  after Orchestrator Core 1.0, the named GUI.Forms go-ahead, and explicit
+  architect direction. Engine and later providers retain separate gates.
 - [`plugin_runtime/`](plugin_runtime/) — frozen earlier plugin-containment
   research retained as input to Orchestrator, not a parallel runtime implementation.
 

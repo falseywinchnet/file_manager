@@ -492,6 +492,40 @@ void CoreGraphicsRaster::draw_text_utf8(Point origin,
     CFRelease(string);
 }
 
+Size CoreGraphicsRaster::measure_text_utf8(std::string_view text,
+                                           FontSpec font_spec) {
+    if (text.empty()) return {0.0, font_spec.size};
+    CFStringRef string = CFStringCreateWithBytes(
+        kCFAllocatorDefault, reinterpret_cast<const UInt8*>(text.data()),
+        static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
+    CTFontRef font = impl_->typeface(font_spec);
+    if (string == nullptr || font == nullptr) {
+        if (string != nullptr) CFRelease(string);
+        if (font != nullptr) CFRelease(font);
+        return {};
+    }
+    const void* keys[]{kCTFontAttributeName};
+    const void* values[]{font};
+    CFDictionaryRef attributes = CFDictionaryCreate(
+        kCFAllocatorDefault, keys, values, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFAttributedStringRef attributed = attributes == nullptr
+        ? nullptr
+        : CFAttributedStringCreate(kCFAllocatorDefault, string, attributes);
+    CTLineRef line = attributed == nullptr
+        ? nullptr : CTLineCreateWithAttributedString(attributed);
+    CGFloat ascent{}, descent{}, leading{};
+    const double width = line == nullptr ? 0.0
+        : CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+    if (line != nullptr) CFRelease(line);
+    if (attributed != nullptr) CFRelease(attributed);
+    if (attributes != nullptr) CFRelease(attributes);
+    CFRelease(font);
+    CFRelease(string);
+    return {std::max(0.0, width),
+            std::max(0.0, static_cast<double>(ascent + descent + leading))};
+}
+
 void CoreGraphicsRaster::draw_image(ImageId image, Rect destination, double opacity) {
     const auto found = impl_->images.find(image.value);
     if (impl_->context == nullptr || found == impl_->images.end() || opacity <= 0.0) {

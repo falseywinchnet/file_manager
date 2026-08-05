@@ -164,11 +164,12 @@ implementations are a last resort, not the first architecture.
   Orchestrator as its normal integration/policy surface, and uses GUI.Forms
   in-process. A registered direct-engine route is degraded fallback. File
   Manager is also the GUI for Orchestrator settings and service controls.
-- Orchestrator's provider-independent Rust kernel advances alongside GUI.Forms,
-  the systemwide engine, and Kolmogrov. Frontend 001 opens after GUI.Forms gives
-  its named consumption go-ahead and the architect explicitly starts it, using
-  deterministic Engine and Orchestrator fixtures. Each real adapter opens after
-  its own negotiation/fixture gate.
+- Orchestrator's headless Rust core advances alongside and independently of
+  GUI.Forms, the systemwide engine, and Kolmogrov. Frontend 001 opens only after
+  Orchestrator Core 1.0 is live, GUI.Forms gives its named FM0 consumption
+  go-ahead, and the architect explicitly starts it. Engine and later providers
+  retain their own negotiation/fixture gates; Orchestrator reports their actual
+  state.
 - The earlier `../plugin_runtime/` plan is preserved as research input but is
   not a second runtime implementation beside Orchestrator.
 

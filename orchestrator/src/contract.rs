@@ -8,7 +8,9 @@ pub enum ContractStage {
     Negotiating,
     Stubbed,
     FixtureDraft,
+    FrozenV0,
     AcceptedProcess,
+    Stable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -18,6 +20,35 @@ pub struct ContractDescriptor {
     pub provider: &'static str,
     pub stage: ContractStage,
     pub executable: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SupportedContract {
+    pub id: &'static str,
+    pub major: u16,
+    pub minor: u16,
+}
+
+#[must_use]
+pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract> {
+    match method {
+        "orchestrator.version"
+        | "orchestrator.release"
+        | "orchestrator.status"
+        | "orchestrator.shutdown" => Some(SupportedContract {
+            id: "ORC-LIF-001",
+            major: 0,
+            minor: 1,
+        }),
+        "orchestrator.contracts.list" | "orchestrator.availability.list" => {
+            Some(SupportedContract {
+                id: "ORC-COM-001",
+                major: 0,
+                minor: 1,
+            })
+        }
+        _ => None,
+    }
 }
 
 pub const CONTRACTS: &[ContractDescriptor] = &[
@@ -46,19 +77,26 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-ENG-001",
         name: "Exact/file query, inspect, evidence, and pagination",
         provider: "engine",
-        stage: ContractStage::Negotiating,
-        executable: false,
+        stage: ContractStage::FrozenV0,
+        executable: true,
     },
     ContractDescriptor {
         id: "ORC-ENG-002",
         name: "Root policy, scan, integrity, and rebuild administration",
         provider: "engine",
-        stage: ContractStage::Negotiating,
+        stage: ContractStage::FrozenV0,
         executable: false,
     },
     ContractDescriptor {
         id: "ORC-ENG-003",
-        name: "Engine availability, generation, and backlog events",
+        name: "Engine status and currentness snapshot",
+        provider: "engine",
+        stage: ContractStage::FrozenV0,
+        executable: false,
+    },
+    ContractDescriptor {
+        id: "ORC-ENG-004",
+        name: "Catalogue-independent bounded live filesystem search",
         provider: "engine",
         stage: ContractStage::Negotiating,
         executable: false,
@@ -79,8 +117,8 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
     },
     ContractDescriptor {
         id: "ORC-FE-001",
-        name: "File Manager session, integration, and degraded fallback",
-        provider: "file-manager",
+        name: "File Manager bootstrap session, availability, and degraded fallback",
+        provider: "orchestrator",
         stage: ContractStage::Negotiating,
         executable: false,
     },

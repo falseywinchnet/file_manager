@@ -1,8 +1,11 @@
 # File Manager program map
 
 Status: **DECIDED repository topology and negotiated integration order** under
-[`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md)
-and [`ADR-004`](../decisions/ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md).
+[`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md),
+[`ADR-004`](../decisions/ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md), and
+[`ADR-006`](../decisions/ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md),
+with Engine search readiness corrected by
+[`ADR-008`](../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md).
 This is the parent routing document; component details remain governed by each
 subproject's records and evidence gates.
 
@@ -11,10 +14,10 @@ subproject's records and evidence gates.
 | Component | Path | Role | Current permission |
 |---|---|---|---|
 | GUI.Forms | `../gui_forms/` | Retained custom-rendered C++ UI framework and bindings | Active implementation toward a semicomplete, inspectable framework release |
-| Engine | `../engine/` | Go exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service |
+| Engine | `../engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
 | Kolmogrov | `../kolmogrov/` | Formal and empirical fixed-width perceptual-similarity program | Active independent research and conformance work |
-| Orchestrator | `../orchestrator/` | Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Provider-independent bootstrap kernel open under ADR-003; adapters negotiated per edge |
-| File Manager frontend | `../frontend/` | C++ end-user program built on GUI.Forms with negotiated Engine and Orchestrator adapters | Frontend 001 specified; waits only for GUI.Forms go-ahead and explicit architect start direction |
+| Orchestrator | `../orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |
+| File Manager frontend | `../frontend/` | Visual C++ end-user program built on GUI.Forms and bootstrapped by Orchestrator | Frontend 001 waits for Orchestrator Core 1.0, GUI.Forms FM0 go-ahead, and explicit architect start direction |
 | Plugin Runtime research | `../plugin_runtime/` | Earlier containment and capability study | Frozen source material; implementation moves into Orchestrator's plugin-supervisor work |
 
 `orchestrator/` is both the product component's repository path and the home of
@@ -23,7 +26,8 @@ the canonical cross-project contract registry.
 ## Authority map
 
 - The filesystem and platform file identity remain authoritative for files.
-- The Go engine owns exact catalogue observations and retrieval mechanics.
+- The Go engine owns exact catalogue observations, retrieval mechanics, and the
+  required bounded catalogue-independent traversal provision in ADR-008.
 - The Kolmogrov channel proposes fuzzy/structural candidates; it does not own
   file identity or personal semantic memory.
 - Orchestrator owns the meaning, version, capability, and conformance record for every
@@ -45,11 +49,13 @@ the canonical cross-project contract registry.
 3. Producers reply and Orchestrator reconciles each edge; adapters, hives,
    settings, handlers, command/CLI services, plugin supervision, and platform
    policy open behind their own fixture-backed gates.
-4. GUI.Forms gives the named Frontend 001 consumption go-ahead; after explicit
-   architect direction, File Manager begins a fixture-backed application slice.
-5. Kolmogrov yields admitted work to Engine independently. Real Engine and
-   Orchestrator frontend adapters replace fixtures after their own negotiated
-   snapshots, then combined-system macOS dogfood begins.
+4. Orchestrator advances independently to the Core 1.0 bootstrap profile while
+   GUI.Forms advances independently to its FM0 consumption snapshot.
+5. After both are available and the architect explicitly directs work to begin,
+   File Manager Frontend 001 bootstraps against the live Orchestrator and
+   consumes GUI.Forms in-process.
+6. Kolmogrov yields admitted work to Engine independently. Real Engine and
+   other provider capabilities join through their own negotiated snapshots.
 
 The exact gates and artifacts are in
 [`orchestrator/planning/DELIVERY_SEQUENCE.md`](../orchestrator/planning/DELIVERY_SEQUENCE.md)

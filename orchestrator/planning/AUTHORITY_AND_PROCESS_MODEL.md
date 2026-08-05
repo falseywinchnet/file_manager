@@ -25,6 +25,10 @@ for explicit background leases. It is restartable and owns no GUI thread,
 window, or third-party stack frame. File Manager renders all Orchestrator
 settings and service controls.
 
+The headless daemon advances to Core 1.0 independently of GUI.Forms. Frontend
+001 requires that live bootstrap authority and a separate GUI.Forms FM0
+snapshot; neither project is an implementation dependency of the other.
+
 The daemon contains separable modules for:
 
 - caller/session authentication;

@@ -31,6 +31,11 @@ extern "C" {
 #define GF_ABI_VERSION_0_8 UINT32_C(0x00000008)
 #define GF_ABI_VERSION_0_9 UINT32_C(0x00000009)
 #define GF_ABI_VERSION_0_10 UINT32_C(0x0000000a)
+#define GF_ABI_VERSION_0_11 UINT32_C(0x0000000b)
+#define GF_ABI_VERSION_0_12 UINT32_C(0x0000000c)
+#define GF_ABI_VERSION_0_13 UINT32_C(0x0000000d)
+#define GF_ABI_VERSION_0_14 UINT32_C(0x0000000e)
+#define GF_ABI_VERSION_0_15 UINT32_C(0x0000000f)
 
 typedef struct gf_handle {
     uint32_t slot;
@@ -50,6 +55,15 @@ typedef struct gf_rect {
     double width;
     double height;
 } gf_rect;
+
+typedef struct gf_field_edit_result {
+    uint64_t anchor_utf8;
+    uint64_t caret_utf8;
+    uint64_t revision;
+    uint32_t changed;
+    uint32_t can_undo;
+    uint32_t can_redo;
+} gf_field_edit_result;
 
 typedef enum gf_result {
     GF_OK = 0,
@@ -293,6 +307,46 @@ typedef struct gf_api_v0 {
                               double y,
                               uint32_t duration_milliseconds);
     gf_result (*hide_tooltip)(gf_handle owner);
+
+    /* ABI 0.11 addition: retained field selection and caret projection. */
+    gf_result (*set_field_selection)(gf_handle control,
+                                     uint64_t selection_start_utf8,
+                                     uint64_t selection_length_utf8,
+                                     uint32_t caret_visible);
+
+    /* ABI 0.12 additions: directional edit state and renderer-owned hit test. */
+    gf_result (*set_field_edit_state)(gf_handle control,
+                                      uint64_t anchor_utf8,
+                                      uint64_t caret_utf8,
+                                      uint32_t caret_visible);
+    gf_result (*field_position_from_point)(gf_handle control,
+                                           double local_x,
+                                           uint64_t* position_utf8);
+
+    /* ABI 0.13 additions: bounded host clipboard text transport. */
+    gf_result (*write_clipboard_text)(gf_handle owner, gf_string_view text);
+    gf_result (*read_clipboard_text)(gf_handle owner,
+                                     char* buffer,
+                                     uint64_t capacity,
+                                     uint64_t* required_size,
+                                     uint32_t* has_text);
+
+    /* ABI 0.14 addition: grapheme-safe field navigation. Direction is -1/+1. */
+    gf_result (*field_navigate)(gf_handle control,
+                                uint64_t position_utf8,
+                                int32_t direction,
+                                uint64_t* result_utf8);
+
+    /* ABI 0.15 additions: native field mutation and deterministic history. */
+    gf_result (*field_replace)(gf_handle control,
+                               uint64_t start_utf8,
+                               uint64_t length_utf8,
+                               gf_string_view replacement,
+                               gf_field_edit_result* result);
+    gf_result (*field_history)(gf_handle control,
+                               int32_t direction,
+                               gf_field_edit_result* result);
+    gf_result (*field_clear_history)(gf_handle control);
 } gf_api_v0;
 
 /*

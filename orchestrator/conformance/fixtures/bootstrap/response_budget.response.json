@@ -1,0 +1,1 @@
+{"id":"fixture-budget","status":"budget_exceeded","error":{"code":"RESOURCE_BUDGET_EXCEEDED","status":"budget_exceeded","message":"successful response exceeds requested byte budget"}}

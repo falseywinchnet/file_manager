@@ -56,6 +56,26 @@ if (args.Length == 1 && args[0] == "font-thread")
 {
     return RunCrossThreadFontHost();
 }
+if (args.Length == 1 && args[0] == "thread-mutation")
+{
+    return RunThreadMutationHost();
+}
+if (args.Length == 1 && args[0] == "secondary-form")
+{
+    return RunSecondaryFormHost();
+}
+if (args.Length == 1 && args[0] == "scroll-panel")
+{
+    return RunScrollablePanelHost();
+}
+if (args.Length == 1 && args[0] == "numeric-edit")
+{
+    return RunNumericEditHost();
+}
+if (args.Length == 1 && args[0] == "text-edit")
+{
+    return RunTextEditHost();
+}
 if (args.Length == 1 && args[0] == "slider-live")
 {
     return RunSliderLiveHost();
@@ -391,6 +411,188 @@ static int RunDoEventsHost()
     return 0;
 }
 
+static int RunThreadMutationHost()
+{
+    var form = new Form { Name = "threadMutationForm", Text = "Posted mutation", Size = new Size(360, 180) };
+    var target = new Button { Name = "threadMutationTarget", Text = "Target", Enabled = true };
+    form.Controls.Add(target);
+    Thread? worker = null;
+    form.Load += (_, _) =>
+    {
+        worker = new Thread(() =>
+        {
+            target.Enabled = false;
+            form.BeginInvoke((Action)form.Close);
+        });
+        worker.Start();
+    };
+    Application.Run(form);
+    worker?.Join();
+    Require(!target.Enabled, "cross-thread compatibility mutation is posted before later BeginInvoke work");
+    Console.WriteLine("thread-mutation=posted:true|ordered:true|enabled:false");
+    form.Dispose();
+    return 0;
+}
+
+static int RunSecondaryFormHost()
+{
+    var main = new Form { Name = "secondaryMain", Text = "Secondary owner", Size = new Size(640, 480) };
+    var secondary = new Form
+    {
+        Name = "secondaryPanel",
+        Text = "Audio",
+        Location = new Point(520, 410),
+        Size = new Size(300, 260)
+    };
+    secondary.Controls.Add(new Button { Name = "secondaryAction", Text = "Apply", Bounds = new Rectangle(16, 36, 96, 26) });
+    var loads = 0;
+    var closes = 0;
+    secondary.Load += (_, _) => ++loads;
+    secondary.FormClosed += (_, _) => ++closes;
+    main.Load += (_, _) =>
+    {
+        secondary.Show();
+        Require(ReferenceEquals(secondary.Parent, main) && secondary.Visible,
+            "non-modal form attaches to the active retained host");
+        Require(secondary.Right <= main.Width && secondary.Bottom <= main.Height,
+            "non-modal form remains inside host bounds");
+        secondary.Hide();
+        secondary.Show();
+        Require(loads == 1 && secondary.Visible, "non-modal form reopens without duplicate load");
+        secondary.Close();
+        Require(secondary.Parent is null && !secondary.Visible && closes == 1,
+            "non-modal form closes and detaches deterministically");
+        main.BeginInvoke((Action)main.Close);
+    };
+    Application.Run(main);
+    Console.WriteLine("secondary-form=attached:true|clamped:true|reopened:true|detached:true|loads:1|closed:1");
+    secondary.Dispose();
+    main.Dispose();
+    return 0;
+}
+
+static int RunScrollablePanelHost()
+{
+    var panel = new ScrollProbe { Name = "scrollViewport", AutoScroll = true, Size = new Size(240, 120) };
+    var upper = new Button { Name = "upperSetting", Text = "Upper", Bounds = new Rectangle(8, 8, 100, 24) };
+    var lower = new Button { Name = "lowerSetting", Text = "Lower", Bounds = new Rectangle(8, 260, 100, 24) };
+    panel.Controls.Add(upper);
+    panel.Controls.Add(lower);
+    Require(lower.Top == 260, "scroll fixture begins below viewport");
+    panel.Wheel(-120);
+    Require(lower.Top == 212 && upper.Top == -40, "scroll wheel translates retained child content");
+    for (var index = 0; index < 12; ++index) panel.Wheel(-120);
+    Require(lower.Bottom <= panel.Height, "scroll wheel reaches final retained setting");
+    panel.Wheel(120);
+    Require(lower.Top < 212, "scroll wheel reverses deterministically");
+    Console.WriteLine("scroll-panel=hidden:260|step:48|reached:true|reverse:true");
+    panel.Dispose();
+    return 0;
+}
+
+static int RunNumericEditHost()
+{
+    var numeric = new NumericProbe
+    {
+        Name = "editableNumeric",
+        Minimum = -100m,
+        Maximum = 100m,
+        DecimalPlaces = 1,
+        Value = 12m,
+        Size = new Size(120, 24)
+    };
+    var changes = 0;
+    numeric.ValueChanged += (_, _) => ++changes;
+    var keyInput = typeof(NumericUpDown).GetMethod("__NativeKeyInput",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
+    var textInput = typeof(NumericUpDown).GetMethod("__NativeTextInput",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
+    keyInput.Invoke(numeric, [0x04u, true, 2u, false]);
+    textInput.Invoke(numeric, ["45.5", false, -1, 0]);
+    Require(numeric.Value == 45.5m && numeric.Text == "45.5", "numeric control-a replacement");
+    keyInput.Invoke(numeric, [0x2au, true, 0u, false]);
+    Require(numeric.Value == 45m && numeric.Text == "45.", "numeric backspace preserves editable decimal state");
+    keyInput.Invoke(numeric, [0x04u, true, 2u, false]);
+    textInput.Invoke(numeric, ["-7.5", false, -1, 0]);
+    Require(numeric.Value == -7.5m && numeric.Text == "-7.5", "numeric signed text replacement");
+    keyInput.Invoke(numeric, [0x28u, true, 0u, false]);
+    Require(numeric.Text == "-7.5", "numeric enter commit formats deterministically");
+    Require(changes == 3, "numeric text edits raise value changes only for parsed changes");
+    numeric.Value = 12m;
+    numeric.DragSelect(5, 19);
+    textInput.Invoke(numeric, ["7", false, -1, 0]);
+    Require(numeric.Value == 7m && numeric.Text == "7.0", "numeric mouse drag replacement");
+    Console.WriteLine("numeric-edit=select-all:true|replace:true|backspace:true|signed:true|commit:true|drag:true|changes:5");
+    numeric.Dispose();
+    return 0;
+}
+
+static int RunTextEditHost()
+{
+    var field = new TextBox { Name = "clipboardField", Text = "alpha beta" };
+    var keyInput = typeof(TextBoxBase).GetMethod("__NativeKeyInput",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic)!;
+    var setSelection = typeof(TextBoxBase).GetMethod("__SetTextSelection",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic)!;
+    var textInput = typeof(TextBoxBase).GetMethod("__NativeTextInput",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic)!;
+    var selectionStart = typeof(TextBoxBase).GetProperty("__TextSelectionStart",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic)!;
+    var selectionLength = typeof(TextBoxBase).GetProperty("__TextSelectionLength",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic)!;
+    setSelection.Invoke(field, [0, 5]);
+    keyInput.Invoke(field, [0x06u, true, 2u, false]);
+    Require(Clipboard.GetText() == "alpha", "text copy command");
+    setSelection.Invoke(field, [6, 4]);
+    keyInput.Invoke(field, [0x1bu, true, 2u, false]);
+    Require(field.Text == "alpha " && Clipboard.GetText() == "beta",
+        "text cut command");
+    setSelection.Invoke(field, [field.Text.Length, 0]);
+    keyInput.Invoke(field, [0x19u, true, 2u, false]);
+    Require(field.Text == "alpha beta", "text paste command");
+    setSelection.Invoke(field, [0, 5]);
+    field.ReadOnly = true;
+    keyInput.Invoke(field, [0x06u, true, 2u, false]);
+    Require(Clipboard.GetText() == "alpha", "read-only copy command");
+    keyInput.Invoke(field, [0x1bu, true, 2u, false]);
+    Require(field.Text == "alpha beta", "read-only cut rejected");
+    field.ReadOnly = false;
+    field.Text = "a\u0301b";
+    setSelection.Invoke(field, [2, 0]);
+    keyInput.Invoke(field, [0x2au, true, 0u, false]);
+    Require(field.Text == "b", "combining grapheme backspace");
+    field.Text = "😀z";
+    setSelection.Invoke(field, [2, 0]);
+    keyInput.Invoke(field, [0x50u, true, 1u, false]);
+    keyInput.Invoke(field, [0x4cu, true, 0u, false]);
+    Require(field.Text == "z", "surrogate grapheme selection delete");
+    field.Text = "start";
+    setSelection.Invoke(field, [1, 3]);
+    var textChanges = 0;
+    field.TextChanged += (_, _) => ++textChanges;
+    textInput.Invoke(field, ["X", false, -1, 0]);
+    Require(field.Text == "sXt" && (int)selectionStart.GetValue(field)! == 2 &&
+        (int)selectionLength.GetValue(field)! == 0,
+        "native edit transaction projects text and caret");
+    keyInput.Invoke(field, [0x1du, true, 2u, false]);
+    Require(field.Text == "start" && (int)selectionStart.GetValue(field)! == 1 &&
+        (int)selectionLength.GetValue(field)! == 3,
+        "native undo restores text and selection");
+    keyInput.Invoke(field, [0x1cu, true, 2u, false]);
+    Require(field.Text == "sXt" && (int)selectionStart.GetValue(field)! == 2 &&
+        (int)selectionLength.GetValue(field)! == 0,
+        "native redo restores text and caret");
+    Require(textChanges == 3, "native edit, undo, and redo each raise one text change");
+    Console.WriteLine("text-edit=copy:true|cut:true|paste:true|readonly-copy:true|grapheme:true|native-edit:true|undo:true|redo:true|events:3");
+    field.Dispose();
+    return 0;
+}
+
 static int RunMenuHost()
 {
     var form = new Form { Name = "menuForm", Size = new Size(700, 220) };
@@ -528,7 +730,7 @@ static int RunComboHost()
     combo.DropDownClosed += (_, _) => ++closed;
     form.Controls.Add(combo);
 
-    var editable = new ComboBox { Text = "sdr://old.example:5555" };
+    var editable = new ComboProbe { Text = "sdr://old.example:5555", Size = new Size(240, 24) };
     var comboKeyInput = typeof(ComboBox).GetMethod("__NativeKeyInput",
         global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
     var comboTextInput = typeof(ComboBox).GetMethod("__NativeTextInput",
@@ -550,8 +752,16 @@ static int RunComboHost()
     comboKeyInput.Invoke(editable, [0x50u, true, 1u, false]);
     comboTextInput.Invoke(editable, ["x", false, -1, 0]);
     Require(editable.Text == "dr://192.168.1.96:5555x", "editable combo shift selection replacement");
+    editable.Text = "abcdef";
+    editable.DragSelect(12, 33);
+    var comboSelectionStart = (int)typeof(ComboBox).GetProperty("__ComboSelectionStart",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!.GetValue(editable)!;
+    var comboSelectionLength = (int)typeof(ComboBox).GetProperty("__ComboSelectionLength",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!.GetValue(editable)!;
+    Require(comboSelectionStart == 1 && comboSelectionLength == 3,
+        "editable combo mouse drag preserves an anchor and live range");
 
-    var textBox = new TextBox { Text = "field" };
+    var textBox = new TextProbe { Text = "field", Size = new Size(240, 24) };
     var textKeyInput = typeof(TextBox).GetMethod("__NativeKeyInput",
         global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!;
     var textInput = typeof(TextBox).GetMethod("__NativeTextInput",
@@ -562,6 +772,14 @@ static int RunComboHost()
     textKeyInput.Invoke(textBox, [0x4fu, true, 0u, false]);
     textKeyInput.Invoke(textBox, [0x2au, true, 0u, false]);
     Require(textBox.Text == "eplacement", "text box select-all, replace, navigation, and backspace");
+    textBox.Text = "abcdef";
+    textBox.DragSelect(12, 33);
+    var textSelectionStart = (int)typeof(TextBoxBase).GetProperty("__TextSelectionStart",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!.GetValue(textBox)!;
+    var textSelectionLength = (int)typeof(TextBoxBase).GetProperty("__TextSelectionLength",
+        global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!.GetValue(textBox)!;
+    Require(textSelectionStart == 1 && textSelectionLength == 3,
+        "text box mouse drag preserves an anchor and live range");
 
     combo.ReleaseAt(combo.Width - 6, combo.Height / 2);
     ContextMenuStrip? dropDown = null;
@@ -592,7 +810,7 @@ static int RunFieldLiveHost()
     {
         Name = "fieldForm",
         Text = "GUI.Forms field input",
-        Size = new Size(520, 180),
+        Size = new Size(520, 220),
     };
     var editable = new ComboBox
     {
@@ -608,10 +826,20 @@ static int RunFieldLiveHost()
         Text = "replace me",
         Bounds = new Rectangle(20, 70, 440, 26),
     };
+    var numeric = new NumericUpDown
+    {
+        Name = "editableNumeric",
+        Minimum = -100m,
+        Maximum = 100m,
+        DecimalPlaces = 1,
+        Value = 12m,
+        Bounds = new Rectangle(20, 116, 180, 26),
+    };
     form.Controls.Add(editable);
     form.Controls.Add(field);
+    form.Controls.Add(numeric);
     Application.Run(form);
-    Console.WriteLine($"field-live=combo:{editable.Text}|text:{field.Text}");
+    Console.WriteLine($"field-live=combo:{editable.Text}|text:{field.Text}|numeric:{numeric.Text}|value:{numeric.Value}");
     return 0;
 }
 
@@ -1038,6 +1266,22 @@ sealed class ComboProbe : ComboBox
 {
     internal void ReleaseAt(int x, int y) =>
         OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, x, y, 0));
+    internal void DragSelect(int startX, int endX)
+    {
+        OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, startX, Height / 2, 0));
+        OnMouseMove(new MouseEventArgs(MouseButtons.Left, 0, endX, Height / 2, 0));
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, endX, Height / 2, 0));
+    }
+}
+
+sealed class TextProbe : TextBox
+{
+    internal void DragSelect(int startX, int endX)
+    {
+        OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, startX, Height / 2, 0));
+        OnMouseMove(new MouseEventArgs(MouseButtons.Left, 0, endX, Height / 2, 0));
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, endX, Height / 2, 0));
+    }
 }
 
 sealed class PaintInputProbe : Control
@@ -1073,6 +1317,18 @@ sealed class NumericProbe : NumericUpDown
     internal void SpinAt(int x, int y) =>
         OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, x, y, 0));
     internal void WheelBy(int delta) =>
+        OnMouseWheel(new MouseEventArgs(MouseButtons.None, 0, Width / 2, Height / 2, delta));
+    internal void DragSelect(int startX, int endX)
+    {
+        OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, startX, Height / 2, 0));
+        OnMouseMove(new MouseEventArgs(MouseButtons.Left, 0, endX, Height / 2, 0));
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, endX, Height / 2, 0));
+    }
+}
+
+sealed class ScrollProbe : Panel
+{
+    internal void Wheel(int delta) =>
         OnMouseWheel(new MouseEventArgs(MouseButtons.None, 0, Width / 2, Height / 2, delta));
 }
 

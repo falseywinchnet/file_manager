@@ -574,6 +574,28 @@ public:
         DeleteObject(native_font);
     }
 
+    Size measure_text_utf8(std::string_view text, FontSpec font) override {
+        const std::wstring wide = wide_from_utf8(text);
+        if (wide.empty() || memory_dc_ == nullptr) return {0.0, font.size};
+        const wchar_t* family = font.role == FontRole::control
+            ? L"Portsmouth Rapids"
+            : font.role == FontRole::monospace ? L"Consolas" : L"Lucida Grande";
+        HFONT native_font = CreateFontW(
+            -std::max(1, static_cast<int>(std::lround(font.size * scale_))), 0, 0, 0,
+            font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE, family);
+        if (native_font == nullptr) return {};
+        HGDIOBJ old = SelectObject(memory_dc_, native_font);
+        SIZE measured{};
+        const BOOL accepted = GetTextExtentPoint32W(
+            memory_dc_, wide.data(), static_cast<int>(wide.size()), &measured);
+        SelectObject(memory_dc_, old);
+        DeleteObject(native_font);
+        if (!accepted) return {};
+        return {measured.cx / scale_, measured.cy / scale_};
+    }
+
     void draw_image(ImageId image, Rect destination, double opacity) override {
         const auto found = images_.find(image.value);
         const PixelRect area = pixel_rect(destination);
@@ -758,7 +780,9 @@ public:
                 [this](const HostTooltipRequest& request) {
                     return show_tooltip(request);
                 },
-                [this] { hide_tooltip(); });
+                [this] { hide_tooltip(); },
+                [this] { return read_clipboard_text(); },
+                [this](std::string_view text) { return write_clipboard_text(text); });
         }
         collect_damage();
         return true;
@@ -914,6 +938,64 @@ private:
             SetTimer(tooltip_.window, 1,
                      std::max<UINT>(1U, request.duration_milliseconds), nullptr);
         }
+        return {};
+    }
+
+    HostClipboardTextResult read_clipboard_text() {
+        HostClipboardTextResult result;
+        result.generation = static_cast<std::uint64_t>(GetClipboardSequenceNumber());
+        if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return result;
+        if (!OpenClipboard(hwnd_)) {
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        HANDLE data = GetClipboardData(CF_UNICODETEXT);
+        const wchar_t* locked = data == nullptr
+            ? nullptr : static_cast<const wchar_t*>(GlobalLock(data));
+        if (locked == nullptr) {
+            CloseClipboard();
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        result.text_utf8 = utf8_from_wide(locked);
+        result.has_text = true;
+        GlobalUnlock(data);
+        CloseClipboard();
+        return result;
+    }
+
+    HostServiceStatus write_clipboard_text(std::string_view text) {
+        if (text.size() > HostServices::maximum_clipboard_text_bytes) {
+            return {HostServiceError::too_large};
+        }
+        const std::wstring wide = wide_from_utf8(text);
+        if (!text.empty() && wide.empty()) return {HostServiceError::invalid_utf8};
+        if (!OpenClipboard(hwnd_)) return {HostServiceError::backend_failure};
+        if (!EmptyClipboard()) {
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        const std::size_t bytes = (wide.size() + 1U) * sizeof(wchar_t);
+        HGLOBAL storage = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (storage == nullptr) {
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        void* destination = GlobalLock(storage);
+        if (destination == nullptr) {
+            GlobalFree(storage);
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        std::memcpy(destination, wide.c_str(), bytes);
+        GlobalUnlock(storage);
+        if (SetClipboardData(CF_UNICODETEXT, storage) == nullptr) {
+            GlobalFree(storage);
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        // Ownership transfers to the system after SetClipboardData succeeds.
+        CloseClipboard();
         return {};
     }
 
@@ -1108,11 +1190,17 @@ private:
             std::fflush(stdout);
             return TRUE;
         }
-        if (command == "capture") {
-            const std::wstring path = executable_directory() + L"gallery-automation.bmp";
+        constexpr std::string_view capture = "capture";
+        if (command == capture || command.starts_with("capture ")) {
+            const std::wstring path = command.size() == capture.size()
+                ? executable_directory() + L"gallery-automation.bmp"
+                : wide_from_utf8(command.substr(capture.size() + 1U));
+            if (path.empty()) return FALSE;
             const bool saved = raster_.save_bmp(path);
-            std::fprintf(stdout, "{\"automation\":\"capture\",\"saved\":%s}\n",
-                         saved ? "true" : "false");
+            std::fprintf(stdout,
+                         "{\"automation\":\"capture\",\"saved\":%s,\"explicit\":%s}\n",
+                         saved ? "true" : "false",
+                         command.size() == capture.size() ? "false" : "true");
             std::fflush(stdout);
             return saved ? TRUE : FALSE;
         }

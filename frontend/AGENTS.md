@@ -5,14 +5,14 @@ multi-project workspace. It consumes Orchestrator as the normal integration
 authority, GUI.Forms in-process, and the systemwide Go engine through
 Orchestrator or the registered degraded fallback.
 
-## Current phase: Frontend 001 waiting on GUI.Forms
+## Current phase: Frontend 001 waiting on Core 1.0 and GUI.Forms
 
 Do not create application source, CMake/build files, generated bindings, product
-assets, packages, or prototypes until GUI.Forms gives the named Frontend 001
-consumption go-ahead and the grand architect explicitly directs this project to
-begin. Engine, Orchestrator, plugin, semantic-fact, and Kolmogrov readiness are
-not part of this opening predicate; use the fixture boundaries specified by
-`planning/FRONTEND_001.md`.
+assets, packages, or prototypes until Orchestrator Core 1.0 is available through
+the real frontend bootstrap edge, GUI.Forms gives the named FM0/Frontend 001
+consumption go-ahead, and the grand architect explicitly directs this project to
+begin. Engine, Kolmogrov, plugin execution, and semantic facts retain separate
+gates; their actual states come from Orchestrator.
 
 Permitted work before that start direction:
 
@@ -50,6 +50,8 @@ Before editing, read:
   frontend.
 - Fixture payloads are frontend test data, not proposed provider contracts. Mark
   simulated capability state explicitly.
+- Frontend tests may replay Orchestrator Core 1.0 fixtures, but product startup
+  must negotiate with the live Orchestrator authority.
 - Design DNA 006 governs Frontend 001, but its CANDIDATE and HYPOTHESIS entries
   remain unresolved unless a later verdict or ADR promotes them.
 - Core navigation and file operations remain usable when Orchestrator augmentation is

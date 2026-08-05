@@ -1,0 +1,7 @@
+{
+  "family": "orchestrator.local",
+  "major": 0,
+  "minor": 1,
+  "client": "fixture-client",
+  "credential": "0000000000000000000000000000000000000000000000000000000000000000"
+}

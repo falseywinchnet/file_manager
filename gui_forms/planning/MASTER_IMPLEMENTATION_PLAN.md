@@ -673,10 +673,25 @@ Progress through the M4b grapheme/shaping-seam slice:
 - **GIVEN owner direction:** `TextShaper` and `FontFallbackResolver` will be
   backed by HarfBuzz, FreeType, and bundled font packs; exact adapters, cache,
   subset/coverage, and antialias profiles remain implementation gates.
-- **OPEN:** actual shaping/fallback implementation, script/bidi analysis, line layout, glyph
-  cache, selection/clipboard/undo, IME, accessible text ranges, editor controls,
-  and the M4 exit gate. Evidence: `experiments/M4A_UNICODE_TEXT_STORE.md` and
-  `experiments/M4B_GRAPHEME_SHAPING_SEAM.md`.
+- **MEASURED PARTIAL:** experimental ABI 0.15 retained fields preserve distinct
+  UTF-8 anchor/caret positions, validate grapheme boundaries through
+  `TextStore`, use renderer-supplied text metrics for pointer hit-testing and a
+  horizontally maintained viewport, clip selection/caret paint, navigate and
+  delete combining/emoji graphemes atomically, and route bounded UTF-8
+  clipboard text through headless, AppKit, and Win32/Wine host adapters. Native
+  selection-aware replacement is now the authoritative mutation path and owns
+  bounded undo/redo snapshots that restore text and directional selection.
+  TextBox, editable ComboBox, and accepted NumericUpDown edits project through
+  the same transaction contract. The C11 ABI contract, 28 native tests,
+  generated facade build, and managed behavior probes pass on arm64 macOS and
+  Wine.
+- **OPEN:** history coalescing and public command/query coverage,
+  HarfBuzz/FreeType shaping and fallback, word/line navigation, multiline
+  layout, password policy, bidi, multi-stage IME, caret timing, accessible text
+  ranges, and the M4 exit gate remain open. Evidence:
+  `experiments/M4A_UNICODE_TEXT_STORE.md`,
+  `experiments/M4B_GRAPHEME_SHAPING_SEAM.md`, and the ABI 0.11–0.15 C/managed
+  field contracts.
 
 Exit: text/IME corpus passes on each supported host and no renderer-specific
 text object appears in public controls or ABI.

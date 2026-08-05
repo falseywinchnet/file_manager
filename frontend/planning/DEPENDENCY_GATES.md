@@ -1,9 +1,33 @@
 # Frontend gates
 
-Status: **DECIDED split gates under ADR-004**.
+Status: **DECIDED split gates under ADR-004 and ADR-006**.
 
-The earlier global Gate F0 is superseded. Frontend 001 has one foundation gate;
-each real service adapter has its own later integration gate.
+The earlier global Gate F0 is superseded. Frontend 001 has two independent
+foundation gates—Orchestrator Core 1.0 and GUI.Forms FM0—plus explicit architect
+start direction. Other provider adapters retain their own later gates.
+
+## Orchestrator Core 1.0 bootstrap gate
+
+Required before Frontend 001 product implementation:
+
+- a named Core 1.0 release manifest reports the bootstrap profile ready;
+- `ORC-COM-001`, `ORC-LIF-001`, `ORC-FE-001`, and `ORC-CLI-001` have the
+  accepted Core 1.0 compatibility horizon;
+- user-scoped discovery, authentication, session, restart, and shutdown are
+  available on the first target platform;
+- the C++-suitable client projection passes independent conformance fixtures;
+- contract and availability snapshots truthfully distinguish available,
+  degraded, unavailable, deferred, and stubbed providers;
+- malformed, oversized, incompatible, timed-out, and cancelled requests have
+  bounded terminal behavior.
+
+Engine, Kolmogrov, plugin execution, and semantic facts need not be functional
+for this gate. The live Orchestrator must report their real state.
+
+ADR-008's catalogue-independent Engine fallback therefore does not block the
+Frontend 001 start gate. It does block a claim that File Manager search is
+ready: until `ORC-ENG-004` is available, the frontend presents search as
+provider-limited while retaining live folder navigation.
 
 ## GUI.Forms consumption snapshot
 
@@ -31,10 +55,10 @@ it does not mean every WinForms-compatible control is finished.
 
 ## Owner start direction
 
-Passing the GUI.Forms snapshot does not start implementation automatically. The
-grand architect explicitly directs File Manager frontend work to begin. Once
-both events are recorded, Engine, Orchestrator, plugin, semantic-fact, and
-Kolmogrov readiness cannot veto Frontend 001.
+Passing Core 1.0 and the GUI.Forms snapshot does not start implementation
+automatically. The grand architect explicitly directs File Manager frontend
+work to begin. Engine, Kolmogrov, plugin execution, and semantic facts cannot
+veto Frontend 001 when the live Orchestrator reports their reduced state.
 
 ## Engine consumption snapshot
 
@@ -45,30 +69,24 @@ Required before replacing the Frontend 001 Engine fixture port:
 - exact name/path/basic-metadata query, inspect, pagination and status;
 - JSONL golden fixtures and registered private local protocol direction;
 - integrity/staleness/unavailable behavior;
+- bounded `ORC-ENG-004` catalogue-independent name/path fallback, with explicit
+  live source, partial state, containment, budgets, cancellation, and no hidden
+  catalogue side effect;
 - representative query/resource baseline;
 - Kolmogrov configuration/candidate seam reserved as a core contract, with
   conventional controls permitted during research completion;
 - no frontend dependency on engine private Go packages or store layout.
 
-“Mostly running” means useful exact search and stable consumption semantics, not
-final compaction, federation, semantic providers, or every performance target.
+“Mostly running” means useful exact search, the required reduced live fallback,
+and stable consumption semantics, not final compaction, federation, semantic
+providers, or every performance target.
 
-## Orchestrator integration gate
+## Later Orchestrator capability gates
 
-Required before replacing the Frontend 001 Orchestrator fixture port:
-
-- master registry entries used by the first frontend are `frozen-v0`;
-- authenticated session/lifecycle client;
-- immutable handler and context-command snapshots;
-- settings schema/value transaction;
-- engine query broker or registered direct-engine relationship;
-- semantic/provider and plugin systems explicitly report `stubbed` or
-  `unavailable`; empty success is forbidden;
-- real plugin preview/thumbnail and semantic-fact operations are not required by
-  the first frontend slice unless a later approved workflow adds them;
-- CLI and structured output over the same semantic operations;
-- fake Orchestrator/engine/plugin peers for deterministic frontend testing;
-- restart, timeout, cancellation and partial-failure fixtures.
+Settings transactions, immutable handler/context-command snapshots, the Engine
+query broker, plugin supervision, hives, and semantic facts enter when their own
+contract families pass. They are not silently included in Core 1.0 merely
+because the daemon itself is available.
 
 ## Kolmogrov transfer gate
 
@@ -78,6 +96,6 @@ or directly bind Kolmogrov during 001.
 
 ## Fixture law
 
-Before a real adapter gate passes, the frontend uses deterministic ports and
-marks their data `simulated`. A fixture may exercise UI state but may not be
-cited as evidence that a provider contract exists or works.
+Frontend tests may use deterministic ports and Core 1.0 fixture replay. Product
+bootstrap uses the live Orchestrator. Other simulated provider data is marked
+`simulated` and may not be cited as evidence that its provider works.

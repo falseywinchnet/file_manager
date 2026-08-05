@@ -24,10 +24,10 @@ are appended with provenance.
 
 | Project | Note | Round | State |
 |---|---|---:|---|
-| Engine | [`../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | awaiting engine reply |
+| Engine | [`../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001-006 | semantic v0 reconciled; required catalogue-independent fallback round 006 awaiting Engine reply |
 | GUI.Forms | [`../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | awaiting GUI.Forms reply |
 | Kolmogrov | [`../../kolmogrov/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../kolmogrov/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | awaiting Kolmogrov reply |
-| File Manager | [`../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | reply deferred until real adapter after Frontend 001 |
+| File Manager | [`../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 002 | Core 1.0 bootstrap direction accepted; transport/auth fixtures pending |
 | Plugin Runtime research | [`../../plugin_runtime/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../plugin_runtime/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | import 001 | frozen input; factual corrections only |
 
 ## Ownership

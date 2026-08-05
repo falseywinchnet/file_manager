@@ -6,6 +6,7 @@
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
 #include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkFontStyle.h"
 #include "include/core/SkImage.h"
@@ -384,6 +385,19 @@ void SkiaRaster::draw_text_utf8(Point origin,
                                static_cast<SkScalar>(origin.x),
                                static_cast<SkScalar>(origin.y), font, make_paint(color));
     }
+}
+
+Size SkiaRaster::measure_text_utf8(std::string_view text,
+                                   FontSpec font_spec) {
+    if (text.empty()) return {0.0, font_spec.size};
+    SkFont font(impl_->typeface(font_spec), static_cast<SkScalar>(font_spec.size));
+    SkRect bounds{};
+    const SkScalar width = font.measureText(text.data(), text.size(),
+                                            SkTextEncoding::kUTF8, &bounds);
+    SkFontMetrics metrics{};
+    font.getMetrics(&metrics);
+    return {std::max(0.0, static_cast<double>(width)),
+            std::max(0.0, static_cast<double>(metrics.fDescent - metrics.fAscent))};
 }
 
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {

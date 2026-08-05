@@ -1,6 +1,7 @@
 # ADR-004: Frontend 001 location and opening gate
 
-Status: **accepted**.
+Status: **accepted for frontend location and Design DNA; opening predicate and
+fake-Orchestrator product bootstrap superseded by ADR-006**.
 
 Date: 2026-08-05.
 
@@ -9,6 +10,10 @@ visual design records move into `frontend/`; selected Design DNA 006 as the
 design constitution for the first slice; and authorized Frontend 001 to begin
 as soon as GUI.Forms gives its consumption go-ahead and the architect directs
 the frontend to proceed.
+
+Supersession note: ADR-006 later requires a live Orchestrator Core 1.0 before
+frontend bootstrap. The `frontend/` location, Design DNA 006 authority, and
+GUI.Forms consumption requirement remain accepted.
 
 ## Question
 

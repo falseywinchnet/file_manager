@@ -130,7 +130,9 @@ that component name and global gate with Orchestrator integration authority,
 project-local interface negotiation, and an active provider-independent kernel.
 ADR-004 relocates application work to `frontend/`, selects Design DNA 006 for
 Frontend 001, and replaces the old frontend-wide dependency gate with a
-GUI.Forms go-ahead plus explicit architect start direction.
+GUI.Forms go-ahead plus explicit architect start direction. ADR-006 supersedes
+that GUI.Forms-only opening predicate: headless Orchestrator Core 1.0 advances
+independently and must also be available before frontend bootstrap.
 The historical candidate list below remains accurate only for choices not
 superseded by an accepted decision record.
 

@@ -1,10 +1,12 @@
 # Orchestrator ↔ Engine interface negotiation
 
-Status: **round 001 Engine reply recorded; awaiting Orchestrator reconciliation**.
+Status: **ORC-ENG round 001 reconciled under ADR-007; semantic v0 frozen for
+experimental implementation; required catalogue-independent fallback round 006
+awaits Engine reply under ADR-008**.
 
 Participants: Orchestrator integration authority and the systemwide Go engine.
 Canonical families: `ORC-COM-001`, `ORC-LIF-001`, `ORC-ENG-001`,
-`ORC-ENG-002`, `ORC-ENG-003`.
+`ORC-ENG-002`, `ORC-ENG-003`, `ORC-ENG-004`.
 
 Do not rewrite the proposal after replying. Append answers under “Engine reply
 001” with source/test locators and counterproposals.
@@ -222,7 +224,45 @@ accidents as a permanent ABI.
 
 ## Orchestrator reconciliation 001
 
-Status: **not started; waits for engine reply 001**.
+Status: **reconciled 2026-08-05 under accepted ADR-007**.
+
+Orchestrator accepts the engine's reply and counterproposals with the following
+disposition:
+
+- `ORC-ENG-001` freezes `engine.version`, `engine.status`, bounded exact
+  `engine.query`, and `engine.inspect` semantics for experimental implementation.
+- `ORC-ENG-002` freezes configuration inspection, root plan/apply, manual
+  reconcile, integrity check, projection rebuild, and shutdown meanings.
+  Administrative semantics do not grant authority; authenticated query/admin
+  separation remains a deployment-adapter gate.
+- `ORC-ENG-003` freezes the status snapshot vocabulary, including explicit
+  manual, volatile-current, coverage-incomplete, and unavailable states. The
+  sequenced subscription/replay operation remains an optional negotiating
+  extension and is not an I1 prerequisite.
+- Caller identity and capability are session-derived. `source_generation` is an
+  optional method-specific precondition, not a universal envelope field.
+- JSONL remains the canonical fixture laboratory. Production framing,
+  discovery, peer verification, and binary/C ABI are independently versioned
+  and not frozen by this reconciliation.
+- A checked stale generation remains queryable with explicit stale provenance.
+  Provider absence, strict-current failure, and unsupported channels do not map
+  to empty success.
+- Background observation, committed watermarks, lexical/fuzzy/content lanes,
+  native supervisors, and platform promotion advance through capability state;
+  none changes the major-zero exact query meaning.
+- `manual_reconcile` is not renamed or advertised as live unindexed search. A
+  true zero-catalogue filesystem traversal method is currently unavailable and
+  requires its own optional proposal if frontend workflow evidence demands it.
+
+Canonical semantics:
+`../../orchestrator/spec/contracts/ENGINE_AND_KOLMOGROV.md`.
+Canonical fixtures:
+`../../orchestrator/conformance/fixtures/engine/semantic-v0/`.
+
+This reconciliation opens Orchestrator I1 fake-provider, adapter-trait,
+availability, cached-exact routing, manual-reconcile routing, and degraded
+fallback work. Installed runtime routing still waits for its platform-local
+authenticated transport; native indexing completion does not block that work.
 
 ## Engine ORC-KOL reply 002
 
@@ -293,7 +333,8 @@ fallback state rather than an empty result.
 ## Engine lifecycle and configuration reply 003
 
 Status: **project reply recorded 2026-08-05; development projection implemented;
-native service host and reconciled ORC contracts remain open**.
+ORC-LIF/ENG snapshot semantics later reconciled by ADR-007; native service host
+remains open**.
 
 This reply declares the whole engine service, not a Kolmogrov service. Exact
 catalogue identity and stored records are authoritative. Lexical, metadata,
@@ -357,8 +398,12 @@ Current declarations include:
   compatibility-only validation, and Linux is absent;
 - bounded status subscription: `negotiating`;
 - authenticated framed local transport: `deferred`;
-- `ORC-LIF-001`, `ORC-ENG-001`, and `ORC-ENG-002`: `negotiating`;
-- `ORC-ENG-003`: `unavailable`.
+- `ORC-LIF-001`, `ORC-ENG-001`, and `ORC-ENG-002`: this reply originally
+  declared `negotiating`; ADR-007 now freezes their semantic-v0 subset while
+  leaving the installed transport adapter gated;
+- `ORC-ENG-003`: this reply originally declared `unavailable`; ADR-007 now
+  freezes the status snapshot vocabulary while status subscription remains
+  `negotiating`.
 
 This list is intentionally honest enough for Frontend/Orchestrator to disable
 or annotate controls without treating absent work as an empty queue or healthy
@@ -504,3 +549,139 @@ Orchestrator reconciliation is requested for:
 Source locators: `api/service.go`, `internal/observation`,
 `internal/observation/fsevents`, `internal/service/background.go`, and
 `results/M4_BACKGROUND_CURRENTNESS_001.md`.
+
+## Orchestrator requirement 006 — catalogue-independent live search
+
+Status: **required proposal issued 2026-08-05 under accepted ADR-008; Engine
+reply and implementation evidence required**.
+
+The grand architect has clarified that search must work without a catalogue.
+Manual reconciliation followed by catalogue query does not satisfy that
+requirement. Orchestrator therefore opens `ORC-ENG-004` as a separate required
+Engine provision rather than changing the frozen `ORC-ENG-001` catalogue-query
+meaning. This provision gates File Manager search readiness, not Orchestrator
+Core 1.0, so the headless core and Engine implementation continue in parallel.
+
+### Required capability
+
+The Engine must provide `engine.query_live`: a read-only, zero-catalogue
+filesystem traversal over an already-authorized root/scope. The first slice
+must support bounded filename and relative-path matching and return exact
+filesystem observations progressively. It must work when:
+
+- persistent indexing is disabled by policy;
+- no catalogue has ever been built;
+- the catalogue is rebuilding, quarantined, corrupt, or version-incompatible;
+- the caller rejects a stale catalogue generation; or
+- background observation/currentness is unavailable.
+
+The operation must not build, persist, or require a catalogue as a side effect.
+It must not write inside the source tree, open file contents by default, follow
+directory symlinks/junctions/reparse points outside policy, or treat an
+unreadable scope as an empty successful result.
+
+### Semantic proposal
+
+```text
+engine.query_live request {
+  authorized scope {root_id, optional relative_path, descendants},
+  bounded name/path predicate,
+  optional ephemeral continuation cursor,
+  result/work/output budgets,
+  deadline and cancellation identity
+}
+
+engine.query_live page {
+  source = live_filesystem,
+  scan_id,
+  complete,
+  optional next_cursor,
+  exact observed file identities and bindings,
+  discovery-order rank within this scan,
+  visited_entries / stat_calls / elapsed_ms,
+  partial or unavailable subtrees,
+  warnings and terminal status
+}
+```
+
+The page has no catalogue generation. It is an observation during a mutable
+filesystem traversal and may not claim global snapshot completeness. A cursor
+is bounded, process-local, query-bound, expiring state. Expiry returns `stale`;
+it never causes a durable cursor journal or hidden index.
+
+Every continuation cursor names its source lane. Orchestrator will not switch a
+catalogue continuation to live traversal, or vice versa, in the middle of a
+result stream; fallback is reconsidered only for a new cursorless query.
+
+The reference traversal should stream depth-first or use another bounded-state
+enumeration. It may retain `O(depth + page + fixed work buffers)` state and a
+fixed descriptor cap; it may not materialize or globally sort the whole tree
+before returning. Results use discovery order for the live lane. Rich indexed
+ranking remains a separate catalogue advantage.
+
+### Initial resource constitution
+
+The server clamps caller budgets. These values are **CANDIDATE defaults and
+ceilings pending native measurement**, not performance claims:
+
+| Resource | Proposed default slice | Proposed hard ceiling per slice |
+|---|---:|---:|
+| returned results | 128 | 1,000 |
+| visited directory entries | 100,000 | 1,000,000 |
+| metadata/stat calls beyond enumeration facts | 4,096 | 65,536 |
+| wall time | 250 ms | 5 s |
+| simultaneously open directories | 8 | 32 |
+| encoded response | 256 KiB | 1 MiB |
+
+Reaching a work ceiling with resumable state returns a partial page plus a
+cursor. Reaching it without safe resumability returns `budget_exceeded`, never
+empty success. Cancellation and deadline checks occur during enumeration and
+before metadata expansion; blocked output cannot retain an unbounded producer
+queue.
+
+### Required route and authority behavior
+
+- `engine.query_live` uses query authority only and cannot admit roots.
+- The Engine resolves authorized root identity before traversal and fails
+  closed if the root is replaced or escapes containment.
+- Symlinks are returned as objects/bindings when matched but are not traversed
+  as directories in the first slice.
+- Permission and transient subtree failures produce named partial state.
+- A catalogue `denied`, `invalid`, `budget_exceeded`, `timeout`, or `cancelled`
+  result must not be used to bypass policy into live traversal.
+- Orchestrator may fall back from catalogue `unsupported`, `unavailable`,
+  `stale`, or `quarantined` to live traversal when caller policy permits.
+- An authoritative catalogue no-match does not trigger fallback.
+- Frontend does not walk the filesystem. It consumes the common result identity
+  and terminal vocabulary with explicit `live_filesystem` source and
+  completeness. Any direct Engine hot path must use a registered conformant
+  adapter and the Orchestrator-issued capability snapshot.
+
+### Required conformance and measurement reply
+
+The Engine reply must accept or counterpropose each item and identify code plus
+evidence for:
+
+1. no-catalogue and catalogue-damaged success fixtures;
+2. APFS, NTFS, and ext4 containment/identity fixtures;
+3. million-entry wide and deep-tree memory/descriptor bounds;
+4. first-result and page p50/p95/p99/max latency, CPU, bytes read, and RSS;
+5. cancellation during enumeration, metadata expansion, and blocked output;
+6. permission failure, root replacement, concurrent mutation, symlink loop,
+   mount-boundary, and cursor-expiry behavior;
+7. zero engine durable writes during live queries; and
+8. semantic equivalence of matched exact observations against a subsequent
+   authoritative reconcile on a quiescent fixture.
+
+Compatibility environments may exercise protocol and broad behavior, but
+native filesystem promotion evidence remains required. The first implementation
+may be basic-name/path-only; unsupported richer predicates must be explicit.
+
+## Engine reply 006 — reserved
+
+Status: **awaiting Engine reply**.
+
+The Engine should record accepted items, counterproposals, implementation
+locators, measured budgets, and red fixtures here. It must not answer this
+requirement by renaming `scan.reconcile` or by constructing a disposable full
+catalogue before returning the first result.

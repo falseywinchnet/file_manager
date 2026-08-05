@@ -70,6 +70,20 @@ void RecordingPainter::draw_text_utf8(Point origin,
     commands_.push_back(std::move(command));
 }
 
+Size RecordingPainter::measure_text_utf8(std::string_view text,
+                                         FontSpec font) {
+    // Display chunks record drawing, not renderer-specific layout. Stock
+    // controls which require exact text geometry are painted directly by the
+    // terminal renderer; this deterministic fallback keeps headless recording
+    // stable and deliberately exposes the unresolved shaping seam.
+    std::size_t scalars{};
+    for (const unsigned char byte : text) {
+        if ((byte & 0xc0U) != 0x80U) ++scalars;
+    }
+    return {static_cast<double>(scalars) * font.size * 0.55,
+            font.size * 1.2};
+}
+
 void RecordingPainter::draw_image(ImageId image, Rect destination, double opacity) {
     commands_.push_back({.operation = DisplayOperation::draw_image,
                          .rect = destination,

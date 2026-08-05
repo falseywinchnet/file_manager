@@ -1,6 +1,7 @@
 # Orchestrator
 
-Status: **bootstrap kernel opened; provider contracts negotiated incrementally**.
+Status: **headless Core 1.0 implementation active; provider contracts negotiated
+incrementally**.
 
 Orchestrator is File Manager's user-scoped Rust integration authority. It owns
 the required/available capability map and the canonical interoperability
@@ -18,6 +19,9 @@ GUI.Forms remains its direct in-process UI dependency, and a registered direct
 engine path remains available for degraded fallback. Orchestrator has no GUI;
 File Manager renders its settings and service controls.
 
+Orchestrator has no dependency on GUI.Forms. ADR-006 directs it toward a named
+Core 1.0 release before Frontend 001 bootstraps against the live service.
+
 ## Current executable slice
 
 The Rust bootstrap contains only provider-independent competence:
@@ -29,8 +33,24 @@ The Rust bootstrap contains only provider-independent competence:
 - JSONL-over-stdio conformance service;
 - explicit plugin and semantic-fact stubs.
 
-It does not yet contain a real engine client, database, plugin worker, semantic
-fact API, platform adapter, GUI, or durable user settings.
+Engine semantic v0 and its capability gates are now frozen for experimental
+implementation under ADR-007. ADR-008 separately requires catalogue-independent
+Engine search; Orchestrator now has a provider-neutral draft port and tested
+fallback law, while the real live-search provider contract and implementation
+remain negotiating. A bounded Rust development client now passes version,
+status, exact query, and shutdown against a separately built Go Engine process.
+The first ADR-009 local-daemon slice now provides bounded `ORC1` framing,
+private Unix discovery, an OS-random credential hello, instance verification,
+and CLI status/shutdown across separate processes. It remains pre-production
+until concurrency, hostile/cross-version, launchd session-location, independent
+client, and Windows named-pipe gates pass. A database, plugin worker, semantic
+fact API, GUI, and durable user settings remain absent and independently
+reported.
+
+The executable reports progress toward the Core 1.0 bootstrap profile. A target
+declaration is not a readiness claim: discovery/authentication, production
+local transport, independent client conformance, and stable contract horizons
+remain required before the release can report ready.
 
 ## Negotiated integration
 
@@ -44,6 +64,14 @@ producer code into ABI.
 
 - [`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md)
   records the current authority and sequencing decision.
+- [`ADR-006`](../decisions/ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md)
+  records the Core 1.0 target and live frontend bootstrap dependency.
+- [`ADR-007`](../decisions/ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md)
+  records the Engine semantic-v0 and capability-gated integration boundary.
+- [`ADR-008`](../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md)
+  records the required bounded catalogue-independent fallback and routing law.
+- [`ADR-009`](../decisions/ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md)
+  records the local wire, discovery, and session-authentication decision.
 - [`spec/CONTRACT_REGISTRY.md`](spec/CONTRACT_REGISTRY.md) is the master
   inventory.
 - [`planning/MASTER_SPECIFICATION.md`](planning/MASTER_SPECIFICATION.md) defines
@@ -62,4 +90,33 @@ cargo fmt --check --manifest-path orchestrator/Cargo.toml
 cargo test --manifest-path orchestrator/Cargo.toml
 cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-features -- -D warnings
 cargo run --manifest-path orchestrator/Cargo.toml -- status
+```
+
+The current Unix local-daemon slice requires an explicit short private runtime
+leaf until the launchd/session adapter owns its location:
+
+```sh
+cargo run --manifest-path orchestrator/Cargo.toml -- \
+  serve-local --runtime-dir /absolute/private/runtime-leaf
+cargo run --manifest-path orchestrator/Cargo.toml -- \
+  call-local status --runtime-dir /absolute/private/runtime-leaf --json
+cargo run --manifest-path orchestrator/Cargo.toml -- \
+  call-local shutdown --runtime-dir /absolute/private/runtime-leaf
+```
+
+The bounded JSONL development adapter can be probed against an explicitly built
+Engine binary and disposable sandbox without selecting JSONL as production IPC:
+
+```sh
+cargo run --manifest-path orchestrator/Cargo.toml \
+  --example engine_jsonl_probe -- /path/to/fileman-engine /path/to/disposable-sandbox
+```
+
+Supplying an indexed subroot and exact filename additionally exercises canonical
+root plan/apply, reconciliation, and the typed `ORC-ENG-001` adapter:
+
+```sh
+cargo run --manifest-path orchestrator/Cargo.toml \
+  --example engine_jsonl_probe -- /path/to/fileman-engine \
+  /path/to/disposable-sandbox /path/to/disposable-sandbox/source ledger.txt
 ```

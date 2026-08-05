@@ -3,13 +3,15 @@
 This directory is the Rust integration-authority project for File Manager. The
 component and executable are named **Orchestrator**.
 
-## Current phase
+## Current phase: Core 1.0
 
 The grand architect opened the provider-independent bootstrap kernel in
 [`ADR-003`](../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md).
-Rust implementation is permitted for common contracts, lifecycle,
-availability/capability state, CLI projections, deterministic fixtures, fake
-peers, and conformance work.
+Rust implementation is permitted and directed toward the headless Core 1.0
+release profile in ADR-006: common contracts, lifecycle, release readiness,
+availability/capability state, CLI projections, production local client
+bootstrap, deterministic fixtures, fake peers, and conformance work. GUI.Forms
+is not an Orchestrator dependency.
 
 Real provider adapters advance only after their project-local negotiation note
 records a reply and the relevant semantic contract/fixtures are sufficiently
@@ -20,14 +22,15 @@ Before editing, read in order:
 
 1. `README.md`
 2. `../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md`
-3. `planning/MASTER_SPECIFICATION.md`
-4. `spec/CONTRACT_REGISTRY.md`
-5. `planning/AUTHORITY_AND_PROCESS_MODEL.md`
-6. `planning/HIVE_AND_SETTINGS_MODEL.md`
-7. `planning/CONFORMANCE_AND_VERSIONING.md`
-8. `planning/DELIVERY_SEQUENCE.md`
-9. `negotiations/README.md`
-10. the relevant contract and project-local negotiation note
+3. `../decisions/ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md`
+4. `planning/MASTER_SPECIFICATION.md`
+5. `spec/CONTRACT_REGISTRY.md`
+6. `planning/AUTHORITY_AND_PROCESS_MODEL.md`
+7. `planning/HIVE_AND_SETTINGS_MODEL.md`
+8. `planning/CONFORMANCE_AND_VERSIONING.md`
+9. `planning/DELIVERY_SEQUENCE.md`
+10. `negotiations/README.md`
+11. the relevant contract and project-local negotiation note
 
 The root `AGENTS.md`, decision protocol, accepted ADRs, and negative product
 definition remain authoritative.

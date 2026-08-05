@@ -1,7 +1,7 @@
 {
   "schema": "gui.forms.generated-surface/v1",
   "toolVersion": "0.1.0",
-  "catalogue": "retired compatibility specimen-next-x64-6-1922.facade-catalogue-v1.json",
+  "catalogue": "retired-compatibility-specimen.facade-catalogue-v1.json",
   "requiredRowCount": 1104,
   "resolvedRowCount": 1104,
   "unresolvedRowCount": 0,

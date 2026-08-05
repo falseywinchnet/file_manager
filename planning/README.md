@@ -34,11 +34,14 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
 | `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Superseded historical Oracle name and global dependency gate |
 | `../decisions/ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md` | Accepted Orchestrator name, integration authority, project-local ABI negotiation, and active bootstrap kernel |
-| `../decisions/ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md` | Accepted frontend location, Design DNA authority, Frontend 001 scope, and GUI.Forms-only technical opening gate |
+| `../decisions/ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md` | Accepted frontend location and Design DNA authority; opening rule partially superseded |
+| `../decisions/ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md` | Accepted headless Core 1.0 target and live-Orchestrator frontend bootstrap dependency |
+| `../decisions/ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md` | Accepted Engine semantic v0 and capability-gated Orchestrator integration boundary |
+| `../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md` | Accepted requirement for bounded Engine search without a catalogue and the independent live-query contract |
 | `../engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
 | `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
 | `../orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
-| `../frontend/` | End-user frontend repository; Frontend 001 waits for GUI.Forms go-ahead and architect start direction, with service fixtures permitted |
+| `../frontend/` | Visual end-user frontend; Frontend 001 waits for Core 1.0, GUI.Forms go-ahead, and architect start direction |
 
 The following parent-level artifacts remain deliberately absent until the
 interview supplies their inputs:

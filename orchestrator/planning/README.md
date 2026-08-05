@@ -1,6 +1,6 @@
 # Orchestrator planning index
 
-Status: **active master specification alongside the bootstrap kernel**.
+Status: **active master specification alongside Core 1.0 implementation**.
 
 | File | Purpose |
 |---|---|
@@ -9,7 +9,8 @@ Status: **active master specification alongside the bootstrap kernel**.
 | `HIVE_AND_SETTINGS_MODEL.md` | Semantic memory, provider projections, registry/configuration ownership |
 | `STORAGE_REFERENCE_WINDOWS_REGISTRY.md` | Microsoft Registry hive backing/log comparison and its deliberately limited implication |
 | `CONFORMANCE_AND_VERSIONING.md` | Compatibility vocabulary, fixtures, generators, and gates |
-| `DELIVERY_SEQUENCE.md` | Parallel bootstrap, per-edge integration gates, and the GUI.Forms-triggered Frontend 001 opening |
+| `CORE_1_0_RELEASE.md` | Headless release profile, implementation sequence, readiness law, and current blockers |
+| `DELIVERY_SEQUENCE.md` | Core 1.0, per-edge integration gates, and the Core 1.0 + GUI.Forms-triggered Frontend 001 opening |
 | `FUTURE_THREAD_HANDOFF.md` | Superseded historical handoff retained for provenance |
 
 Canonical contract semantics live under `../spec/`, not in implementation notes

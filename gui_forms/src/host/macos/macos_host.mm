@@ -705,6 +705,8 @@ private:
 - (void)scheduledWake:(NSTimer*)timer;
 - (void)prepareForShutdown;
 - (HostDialogResult)showHostDialog:(const HostDialogRequest&)request;
+- (HostClipboardTextResult)readHostClipboard;
+- (HostServiceStatus)writeHostClipboard:(std::string_view)text;
 - (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request;
 - (void)hideHostTooltip;
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action;
@@ -874,6 +876,18 @@ private:
     }
     [self hideHostTooltip];
     return _hostServices->show_dialog(request);
+}
+
+- (HostClipboardTextResult)readHostClipboard {
+    if (_hostServices == nullptr) {
+        return {{HostServiceError::after_shutdown}, {}, 0, false};
+    }
+    return _hostServices->read_clipboard_text();
+}
+
+- (HostServiceStatus)writeHostClipboard:(std::string_view)text {
+    if (_hostServices == nullptr) return {HostServiceError::after_shutdown};
+    return _hostServices->write_clipboard_text(text);
 }
 
 - (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request {
@@ -1478,6 +1492,12 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                 },
                 [view] {
                     [view hideHostTooltip];
+                },
+                [view] {
+                    return [view readHostClipboard];
+                },
+                [view](std::string_view text) {
+                    return [view writeHostClipboard:text];
                 });
         }
         if (options.close_after_launch_for_testing) {

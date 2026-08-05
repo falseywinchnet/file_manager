@@ -1,0 +1,725 @@
+#include "fileman_orchestrator/client.hpp"
+
+#if defined(__unix__) || defined(__APPLE__)
+
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <charconv>
+#include <chrono>
+#include <cstring>
+#include <fstream>
+#include <limits>
+#include <map>
+#include <optional>
+#include <sstream>
+#include <string_view>
+#include <utility>
+#include <variant>
+
+namespace fileman::orchestrator {
+namespace {
+
+constexpr std::string_view wire_family = "orchestrator.local";
+constexpr std::string_view wire_magic = "ORC1";
+constexpr std::size_t discovery_limit = 16'384;
+constexpr std::size_t credential_limit = 256;
+constexpr std::size_t json_depth_limit = 64;
+
+struct JsonNumber {
+    std::string text;
+};
+
+struct JsonValue {
+    using Array = std::vector<JsonValue>;
+    using Object = std::map<std::string, JsonValue, std::less<>>;
+    std::variant<std::nullptr_t, bool, JsonNumber, std::string, Array, Object> value;
+};
+
+[[noreturn]] void fail(const std::string& message) {
+    throw ClientError(message);
+}
+
+std::string system_error(const std::string_view operation) {
+    return std::string(operation) + ": " + std::strerror(errno);
+}
+
+class JsonParser final {
+public:
+    explicit JsonParser(const std::string_view input) : input_(input) {}
+
+    JsonValue parse() {
+        auto result = parse_value(0);
+        whitespace();
+        if (position_ != input_.size()) {
+            fail("JSON contains trailing data");
+        }
+        return result;
+    }
+
+private:
+    JsonValue parse_value(const std::size_t depth) {
+        if (depth > json_depth_limit) {
+            fail("JSON nesting exceeds client limit");
+        }
+        whitespace();
+        if (position_ == input_.size()) {
+            fail("JSON ended before a value");
+        }
+        switch (input_[position_]) {
+            case '{': return JsonValue{parse_object(depth + 1)};
+            case '[': return JsonValue{parse_array(depth + 1)};
+            case '"': return JsonValue{parse_string()};
+            case 't': literal("true"); return JsonValue{true};
+            case 'f': literal("false"); return JsonValue{false};
+            case 'n': literal("null"); return JsonValue{nullptr};
+            default: return JsonValue{parse_number()};
+        }
+    }
+
+    JsonValue::Object parse_object(const std::size_t depth) {
+        ++position_;
+        JsonValue::Object object;
+        whitespace();
+        if (consume('}')) {
+            return object;
+        }
+        for (;;) {
+            whitespace();
+            if (position_ == input_.size() || input_[position_] != '"') {
+                fail("JSON object key is not a string");
+            }
+            auto key = parse_string();
+            whitespace();
+            require(':');
+            auto [_, inserted] = object.emplace(std::move(key), parse_value(depth));
+            if (!inserted) {
+                fail("JSON object contains a duplicate key");
+            }
+            whitespace();
+            if (consume('}')) {
+                return object;
+            }
+            require(',');
+        }
+    }
+
+    JsonValue::Array parse_array(const std::size_t depth) {
+        ++position_;
+        JsonValue::Array array;
+        whitespace();
+        if (consume(']')) {
+            return array;
+        }
+        for (;;) {
+            array.push_back(parse_value(depth));
+            whitespace();
+            if (consume(']')) {
+                return array;
+            }
+            require(',');
+        }
+    }
+
+    std::string parse_string() {
+        require('"');
+        std::string output;
+        while (position_ < input_.size()) {
+            const auto byte = static_cast<unsigned char>(input_[position_++]);
+            if (byte == '"') {
+                return output;
+            }
+            if (byte < 0x20) {
+                fail("JSON string contains an unescaped control byte");
+            }
+            if (byte != '\\') {
+                output.push_back(static_cast<char>(byte));
+                continue;
+            }
+            if (position_ == input_.size()) {
+                fail("JSON string ends inside an escape");
+            }
+            switch (input_[position_++]) {
+                case '"': output.push_back('"'); break;
+                case '\\': output.push_back('\\'); break;
+                case '/': output.push_back('/'); break;
+                case 'b': output.push_back('\b'); break;
+                case 'f': output.push_back('\f'); break;
+                case 'n': output.push_back('\n'); break;
+                case 'r': output.push_back('\r'); break;
+                case 't': output.push_back('\t'); break;
+                case 'u': append_unicode_escape(output); break;
+                default: fail("JSON string contains an invalid escape");
+            }
+        }
+        fail("JSON string is unterminated");
+    }
+
+    void append_unicode_escape(std::string& output) {
+        auto codepoint = parse_hex_quad();
+        if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+            if (position_ + 2 > input_.size() || input_.substr(position_, 2) != "\\u") {
+                fail("JSON high surrogate has no low surrogate");
+            }
+            position_ += 2;
+            const auto low = parse_hex_quad();
+            if (low < 0xDC00 || low > 0xDFFF) {
+                fail("JSON surrogate pair is invalid");
+            }
+            codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+        } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+            fail("JSON low surrogate has no high surrogate");
+        }
+        append_utf8(output, codepoint);
+    }
+
+    std::uint32_t parse_hex_quad() {
+        if (position_ + 4 > input_.size()) {
+            fail("JSON Unicode escape is truncated");
+        }
+        std::uint32_t value = 0;
+        for (int index = 0; index < 4; ++index) {
+            const char digit = input_[position_++];
+            value <<= 4;
+            if (digit >= '0' && digit <= '9') value |= static_cast<std::uint32_t>(digit - '0');
+            else if (digit >= 'a' && digit <= 'f') value |= static_cast<std::uint32_t>(digit - 'a' + 10);
+            else if (digit >= 'A' && digit <= 'F') value |= static_cast<std::uint32_t>(digit - 'A' + 10);
+            else fail("JSON Unicode escape contains a non-hex digit");
+        }
+        return value;
+    }
+
+    static void append_utf8(std::string& output, const std::uint32_t codepoint) {
+        if (codepoint <= 0x7F) {
+            output.push_back(static_cast<char>(codepoint));
+        } else if (codepoint <= 0x7FF) {
+            output.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+            output.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0xFFFF) {
+            output.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+            output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            output.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else {
+            output.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+            output.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            output.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            output.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+
+    JsonNumber parse_number() {
+        const auto start = position_;
+        consume('-');
+        if (consume('0')) {
+            if (position_ < input_.size() && input_[position_] >= '0' && input_[position_] <= '9') {
+                fail("JSON number has a leading zero");
+            }
+        } else {
+            digits();
+        }
+        if (consume('.')) digits();
+        if (position_ < input_.size() && (input_[position_] == 'e' || input_[position_] == 'E')) {
+            ++position_;
+            if (!consume('+')) consume('-');
+            digits();
+        }
+        if (position_ == start) {
+            fail("JSON value is invalid");
+        }
+        return JsonNumber{std::string(input_.substr(start, position_ - start))};
+    }
+
+    void digits() {
+        const auto start = position_;
+        while (position_ < input_.size() && input_[position_] >= '0' && input_[position_] <= '9') {
+            ++position_;
+        }
+        if (position_ == start) fail("JSON number requires digits");
+    }
+
+    void literal(const std::string_view text) {
+        if (input_.substr(position_, text.size()) != text) fail("JSON literal is invalid");
+        position_ += text.size();
+    }
+
+    void whitespace() {
+        while (position_ < input_.size()) {
+            const char value = input_[position_];
+            if (value != ' ' && value != '\n' && value != '\r' && value != '\t') break;
+            ++position_;
+        }
+    }
+
+    bool consume(const char expected) {
+        if (position_ < input_.size() && input_[position_] == expected) {
+            ++position_;
+            return true;
+        }
+        return false;
+    }
+
+    void require(const char expected) {
+        if (!consume(expected)) fail(std::string("JSON expected '") + expected + "'");
+    }
+
+    std::string_view input_;
+    std::size_t position_{};
+};
+
+const JsonValue::Object& object(const JsonValue& value, const std::string_view context) {
+    const auto* result = std::get_if<JsonValue::Object>(&value.value);
+    if (result == nullptr) fail(std::string(context) + " must be an object");
+    return *result;
+}
+
+const JsonValue::Array& array(const JsonValue& value, const std::string_view context) {
+    const auto* result = std::get_if<JsonValue::Array>(&value.value);
+    if (result == nullptr) fail(std::string(context) + " must be an array");
+    return *result;
+}
+
+const JsonValue& field(const JsonValue::Object& value, const std::string_view name) {
+    const auto found = value.find(name);
+    if (found == value.end()) fail("JSON object is missing field: " + std::string(name));
+    return found->second;
+}
+
+const std::string& string(const JsonValue& value, const std::string_view context) {
+    const auto* result = std::get_if<std::string>(&value.value);
+    if (result == nullptr) fail(std::string(context) + " must be a string");
+    return *result;
+}
+
+bool boolean(const JsonValue& value, const std::string_view context) {
+    const auto* result = std::get_if<bool>(&value.value);
+    if (result == nullptr) fail(std::string(context) + " must be a Boolean");
+    return *result;
+}
+
+std::uint64_t unsigned_integer(const JsonValue& value, const std::string_view context) {
+    const auto* number = std::get_if<JsonNumber>(&value.value);
+    if (number == nullptr || number->text.empty() || number->text.front() == '-') {
+        fail(std::string(context) + " must be an unsigned integer");
+    }
+    std::uint64_t result{};
+    const auto parsed = std::from_chars(number->text.data(), number->text.data() + number->text.size(), result);
+    if (parsed.ec != std::errc{} || parsed.ptr != number->text.data() + number->text.size()) {
+        fail(std::string(context) + " is outside the unsigned integer range");
+    }
+    return result;
+}
+
+std::string json_escape(const std::string_view input) {
+    std::ostringstream output;
+    output << '"';
+    constexpr char hex[] = "0123456789abcdef";
+    for (const auto raw : input) {
+        const auto byte = static_cast<unsigned char>(raw);
+        switch (byte) {
+            case '"': output << "\\\""; break;
+            case '\\': output << "\\\\"; break;
+            case '\b': output << "\\b"; break;
+            case '\f': output << "\\f"; break;
+            case '\n': output << "\\n"; break;
+            case '\r': output << "\\r"; break;
+            case '\t': output << "\\t"; break;
+            default:
+                if (byte < 0x20) {
+                    output << "\\u00" << hex[byte >> 4] << hex[byte & 0x0F];
+                } else {
+                    output << static_cast<char>(byte);
+                }
+        }
+    }
+    output << '"';
+    return output.str();
+}
+
+std::string read_bounded_file(const std::filesystem::path& path, const std::size_t limit) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) fail("cannot open " + path.string());
+    std::string bytes;
+    bytes.resize(limit + 1);
+    input.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    bytes.resize(static_cast<std::size_t>(input.gcount()));
+    if (bytes.size() > limit) fail("file exceeds byte ceiling: " + path.string());
+    if (!input.eof() && input.fail()) fail("cannot read " + path.string());
+    return bytes;
+}
+
+void validate_runtime_path(const std::filesystem::path& path) {
+    if (!path.is_absolute() || !path.has_filename()) fail("runtime directory must be an absolute leaf");
+    for (const auto& component : path) {
+        if (component == "." || component == "..") fail("runtime directory contains a dot component");
+    }
+}
+
+struct stat checked_stat(const std::filesystem::path& path) {
+    struct stat status {};
+    if (::lstat(path.c_str(), &status) != 0) fail(system_error("lstat " + path.string()));
+    return status;
+}
+
+void validate_private(const std::filesystem::path& path, const uid_t owner, const mode_t kind) {
+    const auto status = checked_stat(path);
+    if ((status.st_mode & S_IFMT) != kind || status.st_uid != owner) {
+        fail("endpoint object has unexpected type or owner: " + path.string());
+    }
+    if ((status.st_mode & 0077) != 0) fail("endpoint object is not private: " + path.string());
+}
+
+void send_all(const int socket, const void* data, const std::size_t size) {
+    const auto* bytes = static_cast<const char*>(data);
+    std::size_t sent = 0;
+    while (sent < size) {
+#if defined(MSG_NOSIGNAL)
+        const auto count = ::send(socket, bytes + sent, size - sent, MSG_NOSIGNAL);
+#else
+        const auto count = ::send(socket, bytes + sent, size - sent, 0);
+#endif
+        if (count > 0) sent += static_cast<std::size_t>(count);
+        else if (count < 0 && errno == EINTR) continue;
+        else fail(system_error("send local frame"));
+    }
+}
+
+void receive_all(const int socket, void* data, const std::size_t size) {
+    auto* bytes = static_cast<char*>(data);
+    std::size_t received = 0;
+    while (received < size) {
+        const auto count = ::recv(socket, bytes + received, size - received, 0);
+        if (count > 0) received += static_cast<std::size_t>(count);
+        else if (count == 0) fail(received == 0 ? "local session disconnected" : "local frame ended abruptly");
+        else if (errno == EINTR) continue;
+        else fail(system_error("receive local frame"));
+    }
+}
+
+void write_frame(const int socket, const std::string_view payload) {
+    if (payload.empty() || payload.size() > local_wire_max_frame_bytes) fail("outgoing frame violates byte ceiling");
+    const auto length = htonl(static_cast<std::uint32_t>(payload.size()));
+    char header[8];
+    std::memcpy(header, wire_magic.data(), wire_magic.size());
+    std::memcpy(header + 4, &length, sizeof(length));
+    send_all(socket, header, sizeof(header));
+    send_all(socket, payload.data(), payload.size());
+}
+
+std::string read_frame(const int socket) {
+    char header[8];
+    receive_all(socket, header, sizeof(header));
+    if (std::string_view(header, 4) != wire_magic) fail("local frame has invalid magic");
+    std::uint32_t network_length{};
+    std::memcpy(&network_length, header + 4, sizeof(network_length));
+    const auto length = ntohl(network_length);
+    if (length == 0 || length > local_wire_max_frame_bytes) fail("incoming frame violates byte ceiling");
+    std::string payload(length, '\0');
+    receive_all(socket, payload.data(), payload.size());
+    return payload;
+}
+
+void set_timeouts(const int socket) {
+    timeval timeout{};
+    timeout.tv_sec = 5;
+    if (::setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0 ||
+        ::setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) {
+        fail(system_error("configure local socket timeout"));
+    }
+}
+
+std::string trim_ascii(std::string value) {
+    const auto whitespace = [](const unsigned char byte) {
+        return byte == ' ' || byte == '\n' || byte == '\r' || byte == '\t';
+    };
+    while (!value.empty() && whitespace(static_cast<unsigned char>(value.front()))) value.erase(value.begin());
+    while (!value.empty() && whitespace(static_cast<unsigned char>(value.back()))) value.pop_back();
+    return value;
+}
+
+void validate_credential(const std::string_view credential) {
+    if (credential.size() != 64) fail("session credential has invalid width");
+    for (const char digit : credential) {
+        if (!((digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f') ||
+              (digit >= 'A' && digit <= 'F'))) {
+            fail("session credential is not hexadecimal");
+        }
+    }
+}
+
+struct ParsedResponse {
+    JsonValue root;
+
+    [[nodiscard]] const JsonValue& result() const {
+        return field(object(root, "response"), "result");
+    }
+};
+
+ParsedResponse parse_successful_response(const std::string_view response,
+                                         const std::string_view expected_id) {
+    ParsedResponse parsed{JsonParser(response).parse()};
+    const auto& root = object(parsed.root, "response");
+    if (string(field(root, "id"), "response.id") != expected_id) fail("response id does not match request");
+    const auto& status = string(field(root, "status"), "response.status");
+    if (status != "success") {
+        const auto& error = object(field(root, "error"), "response.error");
+        fail("Orchestrator returned " + status + ": " + string(field(error, "message"), "error.message"));
+    }
+    return parsed;
+}
+
+std::uint16_t narrow_u16(const std::uint64_t value, const std::string_view context) {
+    if (value > std::numeric_limits<std::uint16_t>::max()) fail(std::string(context) + " exceeds uint16");
+    return static_cast<std::uint16_t>(value);
+}
+
+std::uint32_t narrow_u32(const std::uint64_t value, const std::string_view context) {
+    if (value > std::numeric_limits<std::uint32_t>::max()) fail(std::string(context) + " exceeds uint32");
+    return static_cast<std::uint32_t>(value);
+}
+
+}  // namespace
+
+Client::Client(const int socket, SessionInfo session) noexcept
+    : socket_(socket), session_(std::move(session)) {}
+
+Client::Client(Client&& other) noexcept
+    : socket_(std::exchange(other.socket_, -1)),
+      next_request_id_(other.next_request_id_),
+      session_(std::move(other.session_)) {}
+
+Client& Client::operator=(Client&& other) noexcept {
+    if (this != &other) {
+        if (socket_ >= 0) ::close(socket_);
+        socket_ = std::exchange(other.socket_, -1);
+        next_request_id_ = other.next_request_id_;
+        session_ = std::move(other.session_);
+    }
+    return *this;
+}
+
+Client::~Client() {
+    if (socket_ >= 0) ::close(socket_);
+}
+
+Client Client::connect(const std::filesystem::path& runtime_directory, std::string client_name) {
+    validate_runtime_path(runtime_directory);
+    const auto directory = checked_stat(runtime_directory);
+    if ((directory.st_mode & S_IFMT) != S_IFDIR || directory.st_uid != ::geteuid()) {
+        fail("runtime directory has unexpected type or owner");
+    }
+    if ((directory.st_mode & 0077) != 0 || (directory.st_mode & 0700) != 0700) {
+        fail("runtime directory is not private");
+    }
+
+    const auto discovery_path = runtime_directory / "discovery.json";
+    const auto credential_path = runtime_directory / "session.token";
+    const auto socket_path = runtime_directory / "orchestrator.sock";
+    validate_private(discovery_path, directory.st_uid, S_IFREG);
+    validate_private(credential_path, directory.st_uid, S_IFREG);
+    validate_private(socket_path, directory.st_uid, S_IFSOCK);
+
+    auto discovery_json = read_bounded_file(discovery_path, discovery_limit);
+    const auto discovery_value = JsonParser(discovery_json).parse();
+    const auto& discovery = object(discovery_value, "discovery");
+    const auto instance_id = string(field(discovery, "instance_id"), "discovery.instance_id");
+    if (string(field(discovery, "family"), "discovery.family") != wire_family ||
+        unsigned_integer(field(discovery, "major"), "discovery.major") != local_wire_major ||
+        unsigned_integer(field(discovery, "minor"), "discovery.minor") > local_wire_minor ||
+        instance_id.empty() ||
+        string(field(discovery, "endpoint"), "discovery.endpoint") != socket_path.string() ||
+        string(field(discovery, "credential_file"), "discovery.credential_file") != "session.token") {
+        fail("discovery record does not match the local endpoint");
+    }
+
+    auto credential = trim_ascii(read_bounded_file(credential_path, credential_limit));
+    validate_credential(credential);
+    if (client_name.empty() || client_name.size() > 256) fail("client name is empty or too long");
+
+    const int socket = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (socket < 0) fail(system_error("create Unix socket"));
+    try {
+        set_timeouts(socket);
+        sockaddr_un address{};
+        address.sun_family = AF_UNIX;
+        const auto encoded_path = socket_path.string();
+        if (encoded_path.size() >= sizeof(address.sun_path)) fail("Unix socket path exceeds platform limit");
+        std::memcpy(address.sun_path, encoded_path.c_str(), encoded_path.size() + 1);
+        if (::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
+            fail(system_error("connect Unix socket"));
+        }
+
+        const std::string hello = "{\"family\":\"orchestrator.local\",\"major\":0,\"minor\":1,\"client\":" +
+                                  json_escape(client_name) + ",\"credential\":" + json_escape(credential) + "}";
+        write_frame(socket, hello);
+        const auto response = JsonParser(read_frame(socket)).parse();
+        const auto& server = object(response, "server hello");
+        if (string(field(server, "family"), "server.family") != wire_family ||
+            unsigned_integer(field(server, "major"), "server.major") != local_wire_major ||
+            unsigned_integer(field(server, "minor"), "server.minor") > local_wire_minor ||
+            string(field(server, "instance_id"), "server.instance_id") != instance_id) {
+            fail("server hello does not match discovery");
+        }
+        SessionInfo session{
+            instance_id,
+            unsigned_integer(field(server, "lifecycle_generation"), "server.lifecycle_generation"),
+            narrow_u32(
+                unsigned_integer(field(server, "max_frame_bytes"), "server.max_frame_bytes"),
+                "server.max_frame_bytes"),
+        };
+        if (session.max_frame_bytes == 0 || session.max_frame_bytes > local_wire_max_frame_bytes) {
+            fail("server selected an invalid frame ceiling");
+        }
+        return Client(socket, std::move(session));
+    } catch (...) {
+        ::close(socket);
+        throw;
+    }
+}
+
+const SessionInfo& Client::session() const noexcept { return session_; }
+
+std::string Client::call(const std::string_view method) {
+    if (socket_ < 0) fail("local session is closed");
+    const auto request_id = "cpp-" + std::to_string(next_request_id_++);
+    const auto request = "{\"id\":" + json_escape(request_id) + ",\"method\":" + json_escape(method) + ",\"params\":{}}";
+    write_frame(socket_, request);
+    auto response = read_frame(socket_);
+    auto parsed = parse_successful_response(response, request_id);
+    (void)parsed;
+    return response;
+}
+
+VersionInfo Client::version() {
+    const auto response = call("orchestrator.version");
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "version result");
+    const auto& protocol = object(field(result, "protocol"), "version.protocol");
+    return {
+        string(field(result, "component"), "version.component"),
+        string(field(result, "build_version"), "version.build_version"),
+        string(field(protocol, "family"), "version.protocol.family"),
+        narrow_u16(unsigned_integer(field(protocol, "major"), "version.protocol.major"), "version.protocol.major"),
+        narrow_u16(unsigned_integer(field(protocol, "minor"), "version.protocol.minor"), "version.protocol.minor"),
+    };
+}
+
+ReleaseInfo Client::release() {
+    const auto response = call("orchestrator.release");
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "release result");
+    ReleaseInfo release{
+        string(field(result, "profile"), "release.profile"),
+        string(field(result, "target_version"), "release.target_version"),
+        string(field(result, "build_version"), "release.build_version"),
+        string(field(result, "state"), "release.state"),
+        boolean(field(result, "ready"), "release.ready"),
+        {},
+        {},
+    };
+    for (const auto& contract : array(field(result, "required_contracts"), "release.required_contracts")) {
+        release.required_contracts.push_back(string(contract, "required contract"));
+    }
+    for (const auto& item : array(field(result, "requirements"), "release.requirements")) {
+        const auto& requirement = object(item, "release requirement");
+        release.requirements.push_back({
+            string(field(requirement, "id"), "requirement.id"),
+            string(field(requirement, "state"), "requirement.state"),
+            string(field(requirement, "evidence"), "requirement.evidence"),
+        });
+    }
+    return release;
+}
+
+StatusInfo Client::status() {
+    const auto response = call("orchestrator.status");
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "status result");
+    const auto& lifecycle = object(field(result, "lifecycle"), "status.lifecycle");
+    const auto& core = object(field(result, "core_release"), "status.core_release");
+    const auto& summary = object(field(result, "availability_summary"), "status.availability_summary");
+    return {
+        string(field(result, "component"), "status.component"),
+        string(field(result, "scope"), "status.scope"),
+        string(field(lifecycle, "state"), "lifecycle.state"),
+        unsigned_integer(field(lifecycle, "generation"), "lifecycle.generation"),
+        string(field(core, "state"), "core_release.state"),
+        string(field(core, "target_version"), "core_release.target_version"),
+        boolean(field(core, "ready"), "core_release.ready"),
+        boolean(field(result, "lazy"), "status.lazy"),
+        boolean(field(result, "has_gui"), "status.has_gui"),
+        boolean(field(result, "degraded_engine_fallback"), "status.degraded_engine_fallback"),
+        {
+            unsigned_integer(field(summary, "available"), "availability.available"),
+            unsigned_integer(field(summary, "degraded"), "availability.degraded"),
+            unsigned_integer(field(summary, "unavailable"), "availability.unavailable"),
+            unsigned_integer(field(summary, "negotiating"), "availability.negotiating"),
+            unsigned_integer(field(summary, "deferred"), "availability.deferred"),
+            unsigned_integer(field(summary, "stubbed"), "availability.stubbed"),
+        },
+    };
+}
+
+std::vector<AvailabilityInfo> Client::availability() {
+    const auto response = call("orchestrator.availability.list");
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    std::vector<AvailabilityInfo> output;
+    for (const auto& item : array(parsed.result(), "availability result")) {
+        const auto& record = object(item, "availability record");
+        output.push_back({
+            string(field(record, "id"), "availability.id"),
+            string(field(record, "provider"), "availability.provider"),
+            string(field(record, "state"), "availability.state"),
+            string(field(record, "reason"), "availability.reason"),
+            boolean(field(record, "required"), "availability.required"),
+        });
+    }
+    return output;
+}
+
+BootstrapSnapshot Client::bootstrap() {
+    BootstrapSnapshot snapshot;
+    snapshot.session = session_;
+    snapshot.version = version();
+    snapshot.release = release();
+    snapshot.status = status();
+    snapshot.availability = availability();
+    if (snapshot.status.lifecycle_generation != snapshot.session.lifecycle_generation) {
+        fail("lifecycle generation changed during bootstrap");
+    }
+    return snapshot;
+}
+
+void Client::shutdown() {
+    (void)call("orchestrator.shutdown");
+    ::close(std::exchange(socket_, -1));
+}
+
+}  // namespace fileman::orchestrator
+
+#else
+
+namespace fileman::orchestrator {
+
+Client Client::connect(const std::filesystem::path&, std::string) {
+    throw ClientError("the C++ conformance client currently requires a Unix-domain socket platform");
+}
+Client::Client(const int socket, SessionInfo session) noexcept : socket_(socket), session_(std::move(session)) {}
+Client::Client(Client&&) noexcept = default;
+Client& Client::operator=(Client&&) noexcept = default;
+Client::~Client() = default;
+const SessionInfo& Client::session() const noexcept { return session_; }
+VersionInfo Client::version() { throw ClientError("unsupported platform"); }
+ReleaseInfo Client::release() { throw ClientError("unsupported platform"); }
+StatusInfo Client::status() { throw ClientError("unsupported platform"); }
+std::vector<AvailabilityInfo> Client::availability() { throw ClientError("unsupported platform"); }
+BootstrapSnapshot Client::bootstrap() { throw ClientError("unsupported platform"); }
+void Client::shutdown() { throw ClientError("unsupported platform"); }
+std::string Client::call(std::string_view) { throw ClientError("unsupported platform"); }
+
+}  // namespace fileman::orchestrator
+
+#endif

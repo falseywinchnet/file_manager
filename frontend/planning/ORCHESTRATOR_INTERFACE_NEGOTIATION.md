@@ -1,7 +1,7 @@
 # Orchestrator ↔ File Manager interface negotiation
 
-Status: **round 001 proposal retained; frontend reply deferred until the real
-Orchestrator adapter follows Frontend 001**.
+Status: **round 002 active; live Core 1.0 bootstrap edge required before
+Frontend 001 under ADR-006**.
 
 Participants: Orchestrator integration authority and the future C++ File
 Manager frontend. Canonical families: `ORC-COM-001`, `ORC-LIF-001`,
@@ -16,6 +16,7 @@ File Manager is Orchestrator's GUI. Orchestrator itself renders nothing.
 | Operation | Purpose |
 |---|---|
 | `orchestrator.version` | Negotiate semantic, wire, and client ranges |
+| `orchestrator.release` | Inspect Core 1.0 target, readiness, and blocking requirements |
 | `orchestrator.status` | Display lifecycle and degraded provider state |
 | `orchestrator.contracts.list` | Inspect required/implemented contract families |
 | `orchestrator.availability.list` | Render required, available, degraded, unavailable, deferred, and stubbed capabilities |
@@ -67,3 +68,44 @@ Please provide:
 ## Orchestrator reconciliation 001
 
 Status: **not started; waits for File Manager reply 001**.
+
+## Architect sequencing correction 002
+
+**GIVEN:** Frontend 001 does not bootstrap on a frontend-owned Orchestrator
+fixture. Orchestrator advances independently to Core 1.0 and the product uses
+that live authority from startup. Canonical fixture replay remains permitted
+for deterministic frontend tests.
+
+## File Manager reply 002
+
+Status: **accepted planning reply; implementation evidence pending**.
+
+- The smallest startup surface is release compatibility, lifecycle generation,
+  immutable contract/availability snapshot, provider reasons, and registered
+  direct-Engine fallback state.
+- The authoritative cross-process projection should be a production local wire
+  with a thin C++ client. A Rust/C++ in-process ABI is not requested.
+- Delivery is pollable/queued and drained on the frontend UI thread. Deadlines
+  and cancellation identities are explicit; arbitrary foreign callbacks are
+  rejected.
+- Cached declarations are scoped to daemon identity plus lifecycle/configuration
+  generation. On disconnect they may remain visibly stale and read-only; they
+  cannot authorize mutation or plugin execution.
+- Degraded search uses the direct Engine route only when Orchestrator's last
+  compatible snapshot registered it. When `ORC-ENG-004` is registered and
+  available, catalogue failure may use its source-explicit reduced live search
+  under Orchestrator's fallback law. Otherwise live folder navigation remains
+  and search is provider-limited.
+- Service controls require release identity, lifecycle state/generation,
+  provider state/reason, compatibility state, restart/shutdown eligibility, and
+  redacted diagnostics locators. Policy secrets and raw grants do not cross for
+  display convenience.
+
+## Orchestrator reconciliation 002
+
+Status: **accepted semantic direction; production transport, authentication,
+and hostile fixtures remain Core 1.0 work**.
+
+These requirements enter the Core 1.0 profile for `ORC-COM-001`,
+`ORC-LIF-001`, `ORC-FE-001`, and `ORC-CLI-001`. Settings, handlers, commands,
+Engine queries, plugins, and semantic facts retain separate contract gates.

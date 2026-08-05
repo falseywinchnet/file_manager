@@ -1,0 +1,12 @@
+{
+  "contract": {"id": "ORC-ENG-001", "major": 0, "minor": 1},
+  "terminal": "unsupported",
+  "results": [],
+  "stale_roots": [],
+  "unavailable_channels": ["engine.live.query"],
+  "warnings": [],
+  "error": {
+    "code": "ENGINE_LIVE_QUERY_UNSUPPORTED",
+    "message": "zero-catalogue live filesystem traversal is not implemented"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "fixture-release",
+  "status": "success",
+  "result": {
+    "profile": "orchestrator-core",
+    "target_version": "1.0.0",
+    "build_version": "0.1.0",
+    "state": "development",
+    "ready": false,
+    "required_contracts": ["ORC-COM-001", "ORC-LIF-001", "ORC-FE-001", "ORC-CLI-001"],
+    "requirements": [
+      {"id":"contract.ORC-COM-001","state":"pending","evidence":"contract stage: fixture_draft"},
+      {"id":"contract.ORC-LIF-001","state":"pending","evidence":"contract stage: fixture_draft"},
+      {"id":"contract.ORC-FE-001","state":"pending","evidence":"contract stage: negotiating"},
+      {"id":"contract.ORC-CLI-001","state":"pending","evidence":"contract stage: fixture_draft"},
+      {"id":"daemon.discovery","state":"pending","evidence":"explicit private Unix discovery is implemented; launchd/login-session location and stale/restart promotion fixtures remain pending"},
+      {"id":"session.authentication","state":"pending","evidence":"256-bit private credential hello is implemented on Unix; independent-client, rotation, and platform peer-identity fixtures remain pending"},
+      {"id":"transport.local","state":"pending","evidence":"bounded ORC1 framing and Unix sockets are implemented; concurrent backpressure, hostile corpus, and Windows named pipes remain pending"},
+      {"id":"client.independent","state":"pending","evidence":"an independent C++-suitable conformance client is not implemented"},
+      {"id":"conformance.hostile_and_cross_version","state":"pending","evidence":"hostile framing and cross-version suites are incomplete"},
+      {"id":"release.provenance","state":"pending","evidence":"the release manifest has no final digest or signature"}
+    ]
+  }
+}

@@ -9,10 +9,16 @@ and existing implementation do not silently create decisions.
 | [`ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md`](ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md) | accepted | Go engine object/binding model, root/volume topology, immutable-generation storage spine, observation/publication policy, structures, ranking baseline, migration, API projections, external/network placement, large-directory mode, and initial performance constitution |
 | [`ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md`](ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md) | superseded | Historical paper-first Oracle name and global dependency gate |
 | [`ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md`](ADR-003-ORCHESTRATOR-INTEGRATION-AUTHORITY-AND-BOOTSTRAP.md) | accepted | Orchestrator naming, integration authority, project-local ABI negotiation, user-scoped bootstrap kernel, CLI authority, fallbacks, and stub boundaries |
-| [`ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md`](ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md) | accepted | `frontend/` ownership, Design DNA 006 authority for Frontend 001, GUI.Forms go-ahead plus architect start gate, and fixture-backed service boundaries |
+| [`ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md`](ADR-004-FRONTEND-001-LOCATION-AND-OPENING-GATE.md) | partially superseded | `frontend/` ownership and Design DNA 006 remain accepted; its GUI.Forms-only opening predicate is superseded by ADR-006 |
+| [`ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md`](ADR-006-ORCHESTRATOR-CORE-1-0-FRONTEND-BOOTSTRAP.md) | accepted | Headless Orchestrator Core 1.0 release target, truthful provider availability, live frontend bootstrap dependency, and independent GUI.Forms progress |
+| [`ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md`](ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md) | accepted | Stable experimental Engine semantic v0, capability-gated integration, manual-reconcile distinction, packaging boundary, and nonblocking platform-promotion gates |
+| [`ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md`](ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md) | accepted | Required bounded catalogue-independent Engine search, independent `ORC-ENG-004` semantics, and catalogue-to-live fallback law; partially supersedes ADR-007's optional classification |
+| [`ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md`](ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md) | accepted for implementation | Bounded framed local wire, private discovery endpoint, credential hello, Unix first projection, and remaining platform/concurrency promotion gates |
 
 Each record retains its alternatives, consequences, reversal path, and
 unresolved implementation edges. Engine workers consume ADR-001 through
 `../engine/docs/ARCHITECT_HANDOFF_001.md`, the retained Kolmogrov/semantic
-boundary through `../engine/docs/ARCHITECT_HANDOFF_002.md`, and current
-integration authority through ADR-003 and the engine-local negotiation ledger.
+boundary through `../engine/docs/ARCHITECT_HANDOFF_002.md`, current integration
+authority through ADR-003, the Core 1.0 gate through ADR-006, and the frozen
+Engine semantic-v0 handoff through ADR-007, as corrected for required live
+search by ADR-008, and the Engine negotiation ledger.

@@ -188,12 +188,17 @@ func TestCapabilitiesDeclareMissingEnginePieces(t *testing.T) {
 	}
 	for id, want := range map[string]api.CapabilityState{
 		"engine.exact.query":            api.CapabilityAvailable,
+		"engine.live.query":             api.CapabilityUnavailable,
 		"engine.lexical.index":          api.CapabilityUnavailable,
 		"engine.content_feature.intake": api.CapabilityDeferred,
 		"engine.similarity.fixed_width": api.CapabilityExperimental,
 		"engine.background.observation": api.CapabilityExperimental,
 		"engine.transport.framed_local": api.CapabilityDeferred,
-		"contract.ORC-ENG-003":          api.CapabilityUnavailable,
+		"contract.ORC-LIF-001":          api.CapabilityAvailable,
+		"contract.ORC-ENG-001":          api.CapabilityAvailable,
+		"contract.ORC-ENG-002":          api.CapabilityAvailable,
+		"contract.ORC-ENG-003":          api.CapabilityAvailable,
+		"contract.ORC-ENG-004":          api.CapabilityNegotiating,
 	} {
 		if states[id] != want {
 			t.Fatalf("capability %s=%s, want %s", id, states[id], want)

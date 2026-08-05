@@ -37,6 +37,7 @@ closed deterministic model.
 | `INTERACTION_CONTRACT.md` | pointer, keyboard, focus, path, search, criteria, preview, drag, motion, and sound behavior |
 | `FIXTURE_CATALOGUE.md` | exact deterministic paths, objects, results, properties, failures, and operations |
 | `IMPLEMENTATION_SEQUENCE.md` | dependency-ordered worker slices and evidence products |
+| `STATUS.md` | live milestone/capability/evidence ledger; implementation starts here after reading the specifications |
 | `ACCEPTANCE_GATES.md` | functional, visual, accessibility, accommodation, and performance gates |
 | `reference/README.md` | copied evidence, hashes, reference precedence, and known screenshot deltas |
 

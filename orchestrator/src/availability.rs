@@ -50,18 +50,88 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[
         reason: "required and available states are separately reported",
     },
     CapabilityAvailability {
-        id: "engine.query",
-        provider: "engine",
+        id: "orchestrator.release_readiness",
+        provider: "orchestrator",
         required: true,
-        state: AvailabilityState::Negotiating,
-        reason: "round 001 awaits engine reply and runtime discovery adapter",
+        state: AvailabilityState::Available,
+        reason: "Core 1.0 target and pending requirements are executable projections",
     },
     CapabilityAvailability {
-        id: "engine.administration",
+        id: "orchestrator.transport.local_unix",
+        provider: "orchestrator",
+        required: true,
+        state: AvailabilityState::Degraded,
+        reason: "ORC1 framing and Unix sockets are executable; concurrency, hostile promotion, and Windows named pipes remain open",
+    },
+    CapabilityAvailability {
+        id: "orchestrator.discovery.explicit_runtime_dir",
+        provider: "orchestrator",
+        required: true,
+        state: AvailabilityState::Degraded,
+        reason: "private Unix discovery and stale-socket checks are executable; the login-session supervisor location is not selected",
+    },
+    CapabilityAvailability {
+        id: "orchestrator.session.credential_auth",
+        provider: "orchestrator",
+        required: true,
+        state: AvailabilityState::Degraded,
+        reason: "OS-random credential hello and instance verification are executable; rotation and native peer-identity fixtures remain open",
+    },
+    CapabilityAvailability {
+        id: "engine.contract.semantic_v0",
+        provider: "orchestrator-spec+engine",
+        required: true,
+        state: AvailabilityState::Available,
+        reason: "ORC-ENG-001/002 semantic v0 is frozen for experimental implementation",
+    },
+    CapabilityAvailability {
+        id: "engine.query.cached_exact",
+        provider: "engine",
+        required: true,
+        state: AvailabilityState::Degraded,
+        reason: "the Rust development JSONL adapter passes a real Go Engine query probe; installed discovery and authenticated transport remain absent",
+    },
+    CapabilityAvailability {
+        id: "engine.adapter.development_jsonl",
+        provider: "orchestrator",
+        required: false,
+        state: AvailabilityState::Available,
+        reason: "bounded correlated version, status, exact query, and shutdown calls pass against a separately built Go Engine process",
+    },
+    CapabilityAvailability {
+        id: "engine.query.manual_reconcile",
+        provider: "engine",
+        required: false,
+        state: AvailabilityState::Unavailable,
+        reason: "semantic operation is frozen; authenticated administrative adapter is not connected",
+    },
+    CapabilityAvailability {
+        id: "engine.query.catalogue_free_fallback",
         provider: "engine",
         required: true,
         state: AvailabilityState::Negotiating,
-        reason: "query and administrative authority separation is unresolved",
+        reason: "ADR-008 requires ORC-ENG-004; Engine implementation and conformance evidence are in progress",
+    },
+    CapabilityAvailability {
+        id: "engine.background.currentness",
+        provider: "engine-platform-adapters",
+        required: false,
+        state: AvailabilityState::Degraded,
+        reason: "macOS and Windows adapters are experimental and declare incomplete exact-current coverage; Linux is absent",
+    },
+    CapabilityAvailability {
+        id: "engine.status.subscription",
+        provider: "engine",
+        required: false,
+        state: AvailabilityState::Negotiating,
+        reason: "snapshot semantics are accepted; bounded replay and resynchronization remain open",
+    },
+    CapabilityAvailability {
+        id: "engine.transport.installed_local",
+        provider: "engine-platform-adapters",
+        required: false,
+        state: AvailabilityState::Deferred,
+        reason: "framing, discovery, peer authentication, and query/admin endpoint separation are platform gates",
     },
     CapabilityAvailability {
         id: "gui_forms.consumption_manifest",
@@ -71,18 +141,18 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[
         reason: "round 001 requests a named experimental ABI manifest",
     },
     CapabilityAvailability {
-        id: "file_manager.client",
-        provider: "file-manager",
+        id: "frontend.bootstrap",
+        provider: "orchestrator",
         required: true,
         state: AvailabilityState::Negotiating,
-        reason: "frontend client projection awaits round 001 reply",
+        reason: "round 002 semantics are accepted; production transport and authentication remain open",
     },
     CapabilityAvailability {
         id: "kolmogrov.candidates",
         provider: "engine",
-        required: true,
+        required: false,
         state: AvailabilityState::Deferred,
-        reason: "first-class seam is required; transfer artifact is not ready",
+        reason: "candidate channel is independent of the semantic-v0 exact query adapter",
     },
     CapabilityAvailability {
         id: "settings.transactions",
@@ -157,5 +227,19 @@ mod tests {
             assert_eq!(capability.state, AvailabilityState::Stubbed);
             assert!(!capability.required);
         }
+    }
+
+    #[test]
+    fn development_engine_adapter_does_not_claim_installed_transport() {
+        let development = CAPABILITIES
+            .iter()
+            .find(|candidate| candidate.id == "engine.adapter.development_jsonl")
+            .expect("development adapter is registered");
+        let installed = CAPABILITIES
+            .iter()
+            .find(|candidate| candidate.id == "engine.transport.installed_local")
+            .expect("installed transport is registered");
+        assert_eq!(development.state, AvailabilityState::Available);
+        assert_eq!(installed.state, AvailabilityState::Deferred);
     }
 }

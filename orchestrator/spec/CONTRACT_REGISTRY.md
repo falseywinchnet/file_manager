@@ -1,6 +1,16 @@
 # Master contract registry
 
-Status: **canonical inventory; implementation versions not frozen**.
+Status: **canonical inventory; Engine semantic v0 frozen for experimental
+implementation, other implementation versions vary by entry**.
+
+## Orchestrator Core 1.0 profile
+
+Core 1.0 is a release/readiness profile, not a global API version. It requires
+stable compatible projections of `ORC-COM-001`, `ORC-LIF-001`, `ORC-FE-001`,
+and `ORC-CLI-001`, plus a production local transport, user-session discovery and
+authentication, immutable availability snapshots, a release manifest, and an
+independent client conformance suite. Other contract families may truthfully
+remain unavailable, deferred, negotiating, or stubbed.
 
 ## Registry rules
 
@@ -14,15 +24,16 @@ Status: **canonical inventory; implementation versions not frozen**.
 
 | ID | Contract | Owner | Provider | Consumers | Projection | Status |
 |---|---|---|---|---|---|---|
-| ORC-COM-001 | Common terminal status, request envelope, and bootstrap provenance | Orchestrator spec | Orchestrator bootstrap | CLI, tests; future all projects | semantic types + JSON fixtures | fixture-draft, implemented bootstrap subset |
-| ORC-LIF-001 | Service version, lifecycle, status, shutdown, restart | Orchestrator spec | Orchestrator; future engine | frontend, CLI, tests | CLI + JSONL stdio | fixture-draft, implemented bootstrap subset |
+| ORC-COM-001 | Common terminal status, request envelope, and bootstrap provenance | Orchestrator spec | Orchestrator bootstrap | CLI, tests; future all projects | semantic types + JSON fixtures + ADR-009 local framing | fixture-draft; bootstrap and Unix framed subset implemented |
+| ORC-LIF-001 | Service version, Core release readiness, lifecycle, status, shutdown, restart | Orchestrator spec | Orchestrator; future engine | frontend, CLI, tests | CLI + JSONL stdio + authenticated Unix local wire | fixture-draft; explicit-runtime discovery/status/shutdown implemented |
 | ORC-NEG-001 | Project-local interface proposal, reply, and reconciliation | Orchestrator | Orchestrator specification process | all projects | Markdown ledgers | accepted process |
-| ORC-ENG-001 | Exact/file query, inspect, evidence, pagination | engine semantics registered by Orchestrator | Go engine | frontend, Orchestrator | framed local API + JSONL fixtures | negotiation round 001 |
-| ORC-ENG-002 | Root policy, scan, integrity, rebuild administration | engine semantics registered by Orchestrator | Go engine | Orchestrator/admin tools | privileged local API | negotiation round 001 |
-| ORC-ENG-003 | Engine generation/status/backlog event stream | Orchestrator spec + engine | Go engine | Orchestrator, frontend diagnostics | local event stream | negotiation round 001 |
+| ORC-ENG-001 | Exact/file query, inspect, evidence, pagination | engine semantics registered by Orchestrator | Go engine | frontend, Orchestrator | semantic v0 + JSON fixtures; production local wire gated | frozen-v0 semantics; provider and Orchestrator development JSONL query adapter implemented; installed adapter open |
+| ORC-ENG-002 | Root policy, manual reconcile, integrity, rebuild administration | engine semantics registered by Orchestrator | Go engine | Orchestrator/admin tools | semantic v0 + JSON fixtures; authenticated admin wire gated | frozen-v0 semantics; provider implemented; Orchestrator adapter open |
+| ORC-ENG-003 | Engine status and currentness snapshot | Orchestrator spec + engine | Go engine | Orchestrator, frontend diagnostics | snapshot semantic v0; separate local event-stream extension | snapshot frozen-v0; subscription extension negotiating |
+| ORC-ENG-004 | Catalogue-independent bounded live filesystem search | Engine semantics registered by Orchestrator | Go engine | Orchestrator query broker, frontend through Orchestrator or registered direct fallback | semantic contract + JSON fixtures; production local wire gated | required product capability under ADR-008; negotiation round 006; provider work in progress |
 | ORC-KOL-001 | Kolmogrov configuration, hash identity, candidate query, evidence | Kolmogrov + engine | Go engine | engine planner, conformance tools | internal library/service seam | negotiation round 001 |
 | ORC-GUI-001 | GUI.Forms consumption manifest, stable C surface, and lifecycle | GUI.Forms registered by Orchestrator | GUI.Forms | C++ frontend | C ABI + manifest | negotiation round 001 |
-| ORC-FE-001 | Frontend integration session, lifecycle, availability, and fallback | frontend + Orchestrator | Orchestrator/C++ frontend | File Manager, diagnostics | local wire/C client | negotiation round 001 |
+| ORC-FE-001 | Frontend bootstrap session, lifecycle, availability, and fallback | Orchestrator + frontend | Orchestrator | File Manager, diagnostics, independent conformance client | production local wire + thin C++ client | semantic direction accepted; Unix Rust daemon/client slice implemented; C++ client and promotion pending |
 | ORC-PLG-001 | Package identity, discovery, install, grant, lifecycle | Orchestrator | future Rust supervisor | frontend, CLI | local API | stubbed; source research only |
 | ORC-PLG-002 | Sandboxed worker job and capability protocol | Orchestrator | future Rust supervisor/worker | plugin SDKs | hostile local wire | stubbed; source research only |
 | ORC-PLG-003 | Preview and thumbnail jobs/results | Orchestrator | future plugin workers | frontend | worker protocol + validated bulk data | stubbed; source research only |

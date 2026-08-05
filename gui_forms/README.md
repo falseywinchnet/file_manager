@@ -27,6 +27,15 @@ public retained core is renderer-neutral; Skia and AppKit remain private
 adapters. See `third_party/SKIA_BUILD_EVIDENCE.md` for the exact measured pin,
 archive sizes, link audit, and the non-PNG decoder negative result.
 
+## First-party consumer specification
+
+[`file_manager_demoboard/README.md`](file_manager_demoboard/README.md) defines
+the standalone Native File Manager Demoboard: a fully interactive,
+fixture-backed reproduction of the accepted File Manager prototype built only
+through public GUI.Forms. It is currently a detailed worker specification, not
+an implemented frontend or authorization to add missing GUI.Forms capabilities
+inside the consumer directory.
+
 ## Build and run the Windows Gallery under Wine
 
 ```sh
@@ -85,7 +94,7 @@ MSAA/UIA boundary.
 - [`planning/GUI_DRAWING_REVISION_PLAN.md`](planning/GUI_DRAWING_REVISION_PLAN.md)
   owns the 307 required captured drawing rows, separates native/facade/
   passthrough/missing status, and keeps broader File Manager drawing needs in a
-  distinct candidate oversight ledger.
+  distinct consumer-promotion ledger.
 - [`planning/CONTROL_COMPLETENESS_MATRIX.md`](planning/CONTROL_COMPLETENESS_MATRIX.md)
   remains authoritative for supported, deferred, packaged, and excluded
   control families.
