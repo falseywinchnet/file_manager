@@ -16,6 +16,12 @@ incompatibility and migration path. This admission does not include ActiveX,
 browser hosting, printing, MDI, obsolete control families, or undocumented
 HWND/WndProc accidents.
 
+**GIVEN:** captured `System.Drawing` calls are now part of the implementation
+program under the portable **GUI.Drawing** owner. A generated `System.Drawing`
+compatibility facade may preserve the managed names, but the installed .NET
+drawing service is an oracle/scaffold, not the implementation. See
+`GUI_DRAWING_REVISION_PLAN.md`.
+
 ## 1. Status and priority vocabulary
 
 Implementation status for each individual type eventually must be one of:
@@ -67,17 +73,52 @@ Evidence locators abbreviate:
 - `SDR` — `planning/gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md`;
 - `GF` — the current `gui_forms/` proving slice and tests.
 
+### 3.1 GUI.Drawing substrate
+
+The pinned catalogue has 353 drawing rows: 307 required static-IL rows across
+34 types and 46 deferred metadata-only rows. A family is complete only when its
+managed facade identity, native behavior, renderer result, lifetime, limits,
+and applicable platform qualification pass. Interface presence or a .NET
+passthrough is not support.
+
+| Order | Family | Required rows | Priority | Present state | Exit evidence |
+|---:|---|---:|---|---|---|
+| D0 | value geometry, ARGB/named/system-role color | 130 | P0 | partial native equivalents; managed behavior currently runtime-supplied | property/value oracle, checked geometry, color conversion and role tests |
+| D1 | brushes, pens, fonts, string formats, stock resources | 38 | P0 | passthrough | deterministic ownership/disposal, clone/stock-object rules, text-service binding |
+| D2 | graphics targets, state stack, clip, transform, quality, measurement | 25 | P0 | narrow native recorder plus passthrough | renderer-free command traces, state/clip/transform oracle, bounded stacks |
+| D3 | primitive/path/text/icon/image draw operations | 33 | P0 | rectangle/line/text/image subset native; remainder missing | canonical overload normalization, raster probes/goldens, damage integration |
+| D4 | paths, matrices, regions and hit testing | 31 | P0 | missing | geometry oracle, transform/bounds/hit tests, complexity limits |
+| D5 | linear/path gradients, color blends and hatches | 15 | P1 | missing | stop/wrap/hatch fixtures, alpha/color-space policy, renderer parity |
+| D6 | images, bitmaps, pixels, locks, codecs, thumbnails | 24 | P0 | PNG presentation subset native; mutation passthrough | owned CPU pixels, stride/lock rules, format trace, decoder limits/fuzzing |
+| D7 | image remap and color-matrix adjustment | 11 | P1 | missing | clone/lifetime tests and adjusted-image raster oracle |
+| D8 | HDC/HWND/HBITMAP compatibility surface lease | 7 cross-cutting | P1/host | passthrough | Windows/Wine handle round trips; explicit capability result elsewhere |
+
+The detailed required operation groups, boundaries, and M11e–M11h order are in
+`GUI_DRAWING_REVISION_PLAN.md`. D8 overlaps D2/D6 and is not added to the 307-row
+total.
+
+File Manager breadth is tracked separately as candidate FMD0–FMD8 oversight:
+complete vector/path and region algebra, stroke/paint vocabulary, compositing
+and bounded effects, image formats/metadata/color management, thumbnail
+primitives, text/glyph integration, pixel surfaces, and recording/inspection.
+Those families prevent an SDR-only implementation from becoming an accidental
+ceiling; individual operations become required only through a named workload or
+decision record. Printing, metafiles, desktop capture, and design-time drawing
+editors are not admitted by this oversight.
+
+### 3.2 Forms controls and components
+
 | Order | Family and types | Priority | Minimum behavioral center if admitted | Dependencies | Exclusion/defer boundary | Evidence and required tests |
 |---:|---|---|---|---|---|---|
 | 0 | Component/object lifetime: `Component`, container/site concepts, visual controls and nonvisual components | P0 | Strong identity; component owner distinct from visual parent; ordered child collection; reparent; parent-strong/child-weak ARC; detached lifetime; idempotent disposal; event/timer/dispatch revocation; stable IDs | UI thread, handles, events, diagnostics | Do not infer GC or .NET lifetime; leaked hostile-plugin references require process policy | **GIVEN** ownership; **OBSERVED** SDR §7.1/§18, WF §9, GF `Control`. Test duplicate IDs, cycles, callback disposal, detached objects, stale work/handles, partial construction |
 | 1 | Base `Control` and custom-control contract | P0 | Requested/arranged/client geometry; visible/enabled inheritance; focusability/tab metadata; name/tag/text; style/font/cursor; z-order; coordinate conversion; invalidation; measure/arrange/paint/input extension | lifetime, renderer vocabulary, events, style, host coordinates | Strict HWND, `WndProc`, `CreateParams`, or undocumented message emulation is not implied | **OBSERVED** SDR §5.1/§7, WF §4.2/§9, GF headers. Test inheritance, z-order, conversion, invalidation declaration, reparent/dispose in callback |
 | 2 | Property metadata, initialization, and change events | P0 | Typed property registry; default/reset/serialization metadata; bounded invalidation effects; `BeginInit`/`EndInit`; ordered synchronous change events; generated binding metadata | component model, event tokens, DML registry | No opaque observer-everywhere graph; no silent undeclared mutation | **GIVEN** invalidation rule; **OBSERVED** SDR §8.4/§19. Test default/reset, init batching, event order, undeclared dev failure and production fallback |
-| 3 | Retained invalidation, display chunks, damage, buffering, active surfaces | P0 | Typed measure/arrange/paint/text/style/semantic dirtiness; nested update scopes; coalesced/compacted regions; cached chunks; clipped z order; isolated CPU bitmap surfaces; no idle frame loop | base control, scheduler, resources, CPU renderer, metrics | No GPU and no immediate-mode reconstruction; non-PNG decode is outside core | **GIVEN**; **OBSERVED** SDR §6/§9 and GF. Test 10k mutations, theme batch, overlapping damage, 30 Hz bitmap band, idle zero paints |
+| 3 | Retained invalidation, display chunks, damage, buffering, active surfaces | P0 | Typed measure/arrange/paint/text/style/semantic dirtiness; nested update scopes; coalesced/compacted regions; cached chunks; clipped z order; isolated CPU bitmap surfaces; no idle frame loop | base control, scheduler, resources, GUI.Drawing, CPU renderer, metrics | No GPU and no immediate-mode reconstruction; codecs remain a bounded GUI.Drawing resource service, not display-chunk logic | **GIVEN**; **OBSERVED** SDR §6/§9 and GF. Test 10k mutations, theme batch, overlapping damage, 30 Hz bitmap band, idle zero paints |
 | 4 | Geometry, preferred size, Dock/Anchor, margins/padding, scaling | P0 | Bounds/client/min/max/preferred/autosize; all dock directions; compound anchors; margin/padding/baseline; logical scale and pixel snapping | layout scheduler, text measurement, host scale | Pixel-identical Windows metrics are not evidenced; define tolerance | **OBSERVED** SDR §7.2/§8, WF §9. Golden nested geometry, hidden children, min/max conflicts, font/scale platform matrix |
 | 5 | Layout batching/read barriers | P0 | Nested suspend/resume/perform; committed geometry in scopes; minimal read barriers; bounded reentrant passes; pass diagnostics | property effects, layout families, metrics | A no-op compatibility shim is insufficient; DML reorder policy remains explicit | **GIVEN/CANDIDATE L4**; **OBSERVED** GF partial. Test designer construction, nested scopes, dynamic insertion/removal, read during scope, pass limit |
 | 6 | Input routing, focus, validation, commands, capture | P0 | Internal preview/target/bubble; Forms events; focus scopes/active control; tab/mnemonics/default/cancel; validation; capture/hover/press; wheel/double click; safe handler mutation | tree/lifetime, host input, scheduler, semantics | Bad historic ordering is not automatically preserved | **GIVEN** broad familiarity; **OBSERVED** SDR §10 and GF subset. Oracle traces for tab, Space/Enter, mnemonic, capture drag, wheel suppression, double-click, handler disposal/modal |
-| 7 | Unicode text, caret, selection, clipboard, undo, IME | P0 | Typed UTF-8/cluster positions; shaping/fallback; caret/selection; committed/preedit text; candidate geometry; clipboard; undo; read-only/password/multiline; bidi/culture | font/text service, focus, host IME, semantics | Current UTF-8 append is not an editor; no native overlay; Portmouth asset pending | **GIVEN** staged correctness; **OBSERVED** SDR §5.2/§20 and GF limit. Test combining, emoji, bidi, complex script, selection replace, composition, candidate placement, password leakage |
-| 8 | Style roles, owner draw, resources, localization | P0 | Named relational roles; material/state recipes; inherited appearance; owner measure/draw; explicit image/font lifetime; PNG core service; message IDs/fallback | renderer chunks, text, theme/language packs | Plugins cannot override host controls/style; non-PNG codecs excluded; no pixel-identical Windows theme promise | **GIVEN**; **OBSERVED** SDR §7.3/§14. Test all states, theme batch, missing resource/string, PNG scale/alpha, owner-measure order |
+| 7 | Unicode text, caret, selection, clipboard, undo, IME | P0 | Typed UTF-8/cluster positions; shaping/fallback; caret/selection; committed/preedit text; candidate geometry; clipboard; undo; read-only/password/multiline; bidi/culture | font/text service, focus, host IME, semantics | M4b closes Unicode 17 grapheme segmentation and the shaping seam, not an editor or shaping backend; no native overlay | **GIVEN** staged correctness; **MEASURED** 766-case grapheme corpus; **OBSERVED** SDR §5.2/§20. Test bidi, complex shaping/fallback, selection replace, composition, candidate placement, password leakage |
+| 8 | Style roles, owner draw, resources, localization | P0 | Named relational roles; material/state recipes; inherited appearance; owner measure/draw through GUI.Drawing; explicit image/font lifetime; bounded codec service; message IDs/fallback | GUI.Drawing D0–D7, renderer chunks, text, theme/language packs | Plugins cannot override host controls/style; no pixel-identical Windows theme promise; admitted codecs require named bounds | **GIVEN**; **OBSERVED** SDR §7.3/§14. Test all states, theme batch, missing resource/string, image scale/alpha, owner-measure/draw order and zero-passthrough cutover |
 | 9 | Optional semantic hook, tooltip/help/automation | P0 | Stable semantic IDs; role/name/value/state/action/relations/bounds/text ranges; independent tooltip/help/accessibility/test consumers; virtual children | stable IDs, focus, localization, host publishers | Metadata remains optional for construction; pixels alone are insufficient | **GIVEN**; **OBSERVED** SDR §20, WF §8/§9. Test semantic snapshots, keyboard-only use, value/focus notifications, disabled consumer independence |
 | 10 | Dispatcher, timers, invocation, shutdown | P0 | UI-thread ownership; sync/async marshal; ordered input/layout/paint/timers; cancellable UI timer; deadline wakeup; shutdown revokes pending work | native/headless host, lifetime, callbacks | Unsafe cross-thread access rejected; nested `DoEvents` is a separate porting decision | **OBSERVED** SDR §11; GF `next_wake` is empty. Test invoke order, wrong-thread mutation, timer dispose race, callback disposal, shutdown, idle |
 | 11 | `ScrollableControl`, `ContainerControl`, `UserControl`, `Form` | P1 | Active-control/validation container; reusable composition/load; owned/top-level/modal windows; accept/cancel; close cancellation/reason; state/chrome; auto-scroll | rows 0–10, host/modal, scale | MDI P4; per-pixel alpha unresolved package/host feature | **OBSERVED** SDR §5.1/§12, WF §4.2. Test owned/modal focus restore, nested modal, close cancel, load once, reparent, scroll extent |
@@ -89,7 +130,7 @@ Evidence locators abbreviate:
 | 17 | `ListControl`, `ListBox`, `ComboBox` | P1 | Stable items; selection modes; collection mutation; display/value binding; dropdown commit/cancel/focus; type search/autocomplete; owner draw | item model, popup host, text, scrolling, binding | Gallery rows are not a reusable item model | **OBSERVED** SDR §5.2. Test selection across insert/delete, keyboard, popup cancel, owner draw, data refresh |
 | 18 | `UpDownBase`, `NumericUpDown` | P1 | Composite edit/spinner; min/max/increment; decimal/hex/culture; intermediate edit validation; commit/cancel; acceleration | text editor, commands, culture, binding | Domain strings are a separate P3 family | **OBSERVED** SDR custom numeric, WF §4.1/§4.3. Invalid/intermediate edits, boundary, culture, spinner capture/keys, event order |
 | 19 | `ScrollBar`, `HScrollBar`, `VScrollBar`, custom range base/`ColorSlider`, `ProgressBar` | P1 | Effective range; small/large changes; orientation; keyboard/wheel; drag capture; Scroll/Value order; determinate progress; accessible value | capture, layout, scheduler, semantics | Stock `TrackBar` P3; marquee only if explicitly admitted | **OBSERVED** SDR §5.2/§6. Boundary changes, outside drag, key commands, disabled state, 30 Hz damage |
-| 20 | `PictureBox` and image presentation | P1 | Explicit image ownership; normal/stretch/autosize/center/zoom; alpha/scale/color policy; disposal | PNG resource, layout, renderer | No remote loading; no general media decoder | **OBSERVED** SDR §5.2, WF §4.3. Mode geometry, replace/dispose, malformed/large PNG, high DPI |
+| 20 | `PictureBox` and image presentation | P1 | Explicit image ownership; normal/stretch/autosize/center/zoom; alpha/scale/color policy; disposal | GUI.Drawing image resource, layout, renderer | No remote loading or general media pipeline; only admitted bounded image codecs | **OBSERVED** SDR §5.2, WF §4.3. Mode geometry, replace/dispose, malformed/large images, high DPI |
 | 21 | `DateTimePicker` | P1 | Date value/format/culture; dropdown editor; focus/keyboard lifecycle; optional checkbox/nullable semantics when declared | text, popup, modal focus, binding, culture | `MonthCalendar` separate P3; platform visual identity not required | **OBSERVED** SDR §5.2/§13. Commit/cancel, format/culture, dropdown focus, DataGrid edit host |
 | 22 | `ContextMenuStrip`, `ToolStripMenuItem`, `ToolStripSeparator`, base item tree | P1 | Owned item tree; measure/layout; submenu; shortcut/mnemonic; check; image; opening/closing order; screen-edge placement; disposal | popup host, focus/commands, owner draw, semantics | Full strip merge/rafting/overflow later; plugins cannot restyle host | **OBSERVED** SDR §5.3/§14, WF §5.1. Keyboard nested menus, click-away/Escape, dynamic opening mutation, shortcut collision, dispose open |
 | 23 | `ToolTip`, `HelpProvider`, `ErrorProvider` | ToolTip P1; others P3 | Per-control attached values; delay/show/hide; hover/focus policy; accessible relations; validation error association | timers, semantic graph, popup/overlay, localization | Help overlay is a separate consumer; no mandatory metadata | **OBSERVED** SDR ToolTip; WF §6. Test delay/cancel, moving/disposed target, keyboard focus, multiple providers |

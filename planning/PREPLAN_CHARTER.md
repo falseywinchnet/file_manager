@@ -115,20 +115,29 @@ The project plan may be written when all are true:
 - identity, mutation, recovery, and index-consistency semantics are explicit;
 - the CLI/API grammar is sketched from real tasks;
 - plugin capabilities and denials are modeled;
-- semantic search has a staged, optional path that cannot corrupt exact search;
+- semantic interpretation has a staged Oracle/provider path that cannot corrupt
+  exact search, while Kolmogrov similarity remains a separately gated engine
+  candidate channel;
 - at least one packaging path per target OS is demonstrated;
 - remaining unknowns are bounded and assigned to later gates.
 
 ## Things this charter refuses to decide
 
-- Rust vs C++ for the native core/surface, and the exact boundary of a possible
-  Go indexing service;
+Subsequent grand-architect direction has resolved the Go engine's language,
+custom-backend mandate, reference model, and target storage spine in ADR-001,
+and the Oracle contract authority, repository topology, and delivery order in
+ADR-002. The historical candidate list below remains accurate only for choices
+not superseded by an accepted decision record.
+
+- private implementation details and exact process routing inside the accepted
+  C++ GUI/frontend, Go engine, and Rust Oracle boundaries;
 - the implementation of the native retained renderer and whether Modern.Forms
   becomes a compatibility/API frontend over it;
 - SQLite/FTS, a purpose-built store, or a hybrid;
-- single process vs service topology;
+- exact process routing and transport choice per registered contract;
 - local model family or inference runtime;
-- the default pane layout, tabs, ribbon, or command bar;
-- whether system handlers/previews are imported, mirrored, or isolated.
+- exact control-shelf composition within the accepted single-window pane model;
+- per-platform mechanisms for the accepted internal handlers and isolated
+  preview-provider boundary.
 
 Those are interview-and-experiment outputs, not assumptions.

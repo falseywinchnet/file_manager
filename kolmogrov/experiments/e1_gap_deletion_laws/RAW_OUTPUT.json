@@ -1,0 +1,30 @@
+{
+  "checks": {
+    "coordinatewise_pattern_containment": true,
+    "destroyed_count_pascal_identity": true,
+    "directional_containment_of_target": true,
+    "source_damage_fraction_k_over_n": true,
+    "survivor_content_and_order_preserved": true,
+    "survivor_gap_motion_one_standard_basis_step": true
+  },
+  "corpus": {
+    "alphabet": [
+      "a",
+      "b"
+    ],
+    "cases_checked": 254,
+    "deletion_pairs": 1538,
+    "max_length": 7,
+    "profiles": 9722
+  },
+  "environment": {
+    "machine": "arm64",
+    "python": "3.14.0",
+    "system": "Darwin"
+  },
+  "profile_stream_sha256": "f93f79be723a99aa0f3c34b9e031fcfaa8391e5766aa3af973a4e210bdce8b06",
+  "witness_counts": {
+    "destroyed": 72818,
+    "survivor_correspondences": 71280
+  }
+}

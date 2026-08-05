@@ -1,16 +1,19 @@
 # File Manager operating instructions
 
-This repository is in pre-architecture until the grand architect closes the
-questions required by `planning/PREPLAN_CHARTER.md`. Do not silently turn
-research candidates into architecture decisions.
+This repository has accepted several program-spine decisions but remains
+pre-architecture in unresolved areas. Do not silently turn research candidates
+into architecture decisions, and do not reopen an accepted ADR through older
+candidate language.
 
 Before planning or implementation, read:
 
 1. `planning/README.md`
-2. `planning/PREPLAN_CHARTER.md`
-3. `planning/EVIDENCE_REGISTER.md`
-4. `planning/DECISION_PROTOCOL.md`
-5. the relevant sections of `planning/QUESTION_ATLAS.md`
+2. `planning/PROGRAM_MAP.md`
+3. `planning/PREPLAN_CHARTER.md`
+4. `planning/EVIDENCE_REGISTER.md`
+5. `planning/DECISION_PROTOCOL.md`
+6. `decisions/README.md`
+7. the relevant component `AGENTS.md` and contract registry entries
 
 ## Scope boundaries
 
@@ -22,15 +25,30 @@ Before planning or implementation, read:
 - Treat BFFT only as a model for research discipline: label claims, keep failed
   experiments, measure against controls, and distinguish reasoned proposals
   from measured results.
-- File Manager may not rely on .NET, Java, Godot, or a bundled web engine. C++
-  and Rust are the admitted native core/surface languages. Go is admitted as a
-  candidate for the indexing/search service. C# bindings may target a native UI
-  engine without making .NET part of File Manager.
+- File Manager may not rely on .NET, Java, Godot, or a bundled web engine.
+  GUI.Forms and the frontend are disciplined C++; the indexing/search engine is
+  Go; Oracle and hostile plugin supervision are Rust. C# bindings may target a
+  native UI engine without making .NET part of File Manager.
 - Modern.Forms is fetched source material and a possible compatibility/API
   frontend over a new native retained engine. Its present .NET implementation is
   not an admitted File Manager runtime dependency.
 - Do not expand features merely because an operating system file manager has
   them. Absence is a first-class design decision here.
+
+## Program boundaries
+
+- `orchestrator/` is the paper-first Oracle repository and canonical authority
+  for cross-project API/ABI semantics. New cross-project contracts enter its
+  registry and proposal process.
+- `file_manager/` is the waiting end-user frontend. Do not implement it before
+  its dependency gate opens.
+- `engine/`, `gui_forms/`, and `kolmogrov/` remain independently buildable and
+  own their private implementations.
+- `plugin_runtime/` is frozen legacy research input. New runtime implementation
+  belongs to Oracle's plugin-supervisor subsystem after its gate opens.
+- Kolmogrov similarity is a gated core engine candidate channel. It is distinct
+  from AI interpretation and personal semantic memory, which belong in
+  Oracle-managed hives beyond the engine's critical boundary.
 
 ## Epistemic labels
 
@@ -57,7 +75,7 @@ core; it remains a hypothesis until `planning/SURFACE_PIPELINE.md` is resolved.
 
 ## Decision hygiene
 
-Architecture decisions live in future numbered records under `decisions/`.
+Architecture decisions live in numbered records under `decisions/`.
 Each must state the question, constraints, candidates, measurements, failure
 modes, chosen option, rejected options, reversal path, and owner approval.
 

@@ -1,0 +1,102 @@
+{
+  "checks": {
+    "all_exact_subsequences_accepted_at_every_degree": true,
+    "full_query_degree_equals_exact_subsequence_control": true,
+    "orthant_score_never_exceeds_pattern_only_score": true
+  },
+  "corpus": {
+    "alphabet": [
+      "a",
+      "b"
+    ],
+    "max_record_length": 6,
+    "query_lengths": "one through record length"
+  },
+  "environment": {
+    "machine": "arm64",
+    "python": "3.14.0",
+    "system": "Darwin"
+  },
+  "pair_stream_sha256": "8fd9d42d69f00d89f8ca13d7e4ce90ae79c780420a64395ca4f354b6e8375f75",
+  "statistics_by_degree": {
+    "1": {
+      "evaluated_pairs": 10668,
+      "exact_positive_pairs": 1932,
+      "first_orthant_false_positive": {
+        "query": [
+          "b",
+          "a"
+        ],
+        "record": [
+          "a",
+          "a",
+          "b",
+          "b"
+        ]
+      },
+      "orthant_false_positives": 154,
+      "orthant_positive_accepts": 1932,
+      "pattern_only_false_positives": 2520,
+      "pattern_positive_accepts": 1932
+    },
+    "2": {
+      "evaluated_pairs": 10416,
+      "exact_positive_pairs": 1692,
+      "first_orthant_false_positive": {
+        "query": [
+          "b",
+          "a",
+          "a"
+        ],
+        "record": [
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "b"
+        ]
+      },
+      "orthant_false_positives": 4,
+      "orthant_positive_accepts": 1692,
+      "pattern_only_false_positives": 550,
+      "pattern_positive_accepts": 1692
+    },
+    "3": {
+      "evaluated_pairs": 9920,
+      "exact_positive_pairs": 1296,
+      "first_orthant_false_positive": null,
+      "orthant_false_positives": 0,
+      "orthant_positive_accepts": 1296,
+      "pattern_only_false_positives": 66,
+      "pattern_positive_accepts": 1296
+    },
+    "4": {
+      "evaluated_pairs": 8960,
+      "exact_positive_pairs": 784,
+      "first_orthant_false_positive": null,
+      "orthant_false_positives": 0,
+      "orthant_positive_accepts": 784,
+      "pattern_only_false_positives": 2,
+      "pattern_positive_accepts": 784
+    },
+    "5": {
+      "evaluated_pairs": 7168,
+      "exact_positive_pairs": 320,
+      "first_orthant_false_positive": null,
+      "orthant_false_positives": 0,
+      "orthant_positive_accepts": 320,
+      "pattern_only_false_positives": 0,
+      "pattern_positive_accepts": 320
+    },
+    "6": {
+      "evaluated_pairs": 4096,
+      "exact_positive_pairs": 64,
+      "first_orthant_false_positive": null,
+      "orthant_false_positives": 0,
+      "orthant_positive_accepts": 64,
+      "pattern_only_false_positives": 0,
+      "pattern_positive_accepts": 64
+    }
+  }
+}

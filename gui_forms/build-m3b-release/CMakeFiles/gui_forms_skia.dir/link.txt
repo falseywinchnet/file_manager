@@ -1,2 +1,0 @@
-/usr/bin/ar qc libgui_forms_skia.a CMakeFiles/gui_forms_skia.dir/src/render/skia/skia_raster.cpp.o
-/usr/bin/ranlib libgui_forms_skia.a

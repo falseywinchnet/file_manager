@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wall -Wextra -Wpedantic -Werror -O3 -DNDEBUG -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/gui_forms_core_tests.dir/tests/core_tests.cpp.o -o gui_forms_core_tests  libgui_forms_core.a

@@ -1,0 +1,14 @@
+{
+  "claim_ids": ["T-CYBERNETIC-SUPPORT-1", "T-ACTION-SUPPORT-1"],
+  "command": "python3 experiments/e6_cybernetic_support/run.py",
+  "domain": {
+    "alphabet": [0, 1],
+    "fixed_lengths": [1, 2, 3, 4, 5, 6, 7, 8],
+    "variable_maximum_lengths": [1, 2, 3, 4, 5, 6, 7, 8]
+  },
+  "experiment_id": "e6_cybernetic_support_v0_2026-08-05",
+  "inference_boundary": "Exact finite partition refinement for two declared binary action contracts. This does not measure approximate lumpability, retrieval quality, semantic support, or a production representation.",
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "82a5750cd0336facad3378b4325cd2f52fb6988168c642362a6046782587030c",
+  "revision": "tracked Kolmogrov working tree; raw checksum recorded after replay"
+}

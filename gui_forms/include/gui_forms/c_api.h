@@ -22,6 +22,11 @@ extern "C" {
 
 /* Experimental 0.x ABI. Nothing in this header is a GUI.Forms 1.0 promise. */
 #define GF_ABI_VERSION_0_1 UINT32_C(0x00000001)
+#define GF_ABI_VERSION_0_2 UINT32_C(0x00000002)
+#define GF_ABI_VERSION_0_3 UINT32_C(0x00000003)
+#define GF_ABI_VERSION_0_4 UINT32_C(0x00000004)
+#define GF_ABI_VERSION_0_5 UINT32_C(0x00000005)
+#define GF_ABI_VERSION_0_6 UINT32_C(0x00000006)
 
 typedef struct gf_handle {
     uint32_t slot;
@@ -61,10 +66,66 @@ typedef enum gf_component_state {
 } gf_component_state;
 
 typedef enum gf_event_kind {
-    GF_EVENT_STATE_CHANGED = 1
+    GF_EVENT_STATE_CHANGED = 1,
+    GF_EVENT_CLICKED = 2,
+    GF_EVENT_FORM_CLOSING = 3,
+    GF_EVENT_FORM_CLOSED = 4,
+    GF_EVENT_MOUSE_MOVE = 5,
+    GF_EVENT_MOUSE_DOWN = 6,
+    GF_EVENT_MOUSE_UP = 7,
+    GF_EVENT_MOUSE_WHEEL = 8,
+    GF_EVENT_MOUSE_ENTER = 9,
+    GF_EVENT_MOUSE_LEAVE = 10
 } gf_event_kind;
 
+typedef enum gf_event_callback_result {
+    GF_EVENT_CALLBACK_CONTINUE = 0,
+    GF_EVENT_CALLBACK_CANCEL = 1,
+    GF_EVENT_CALLBACK_FAULTED = 2
+} gf_event_callback_result;
+
+typedef enum gf_control_kind {
+    GF_CONTROL_GENERIC = 0,
+    GF_CONTROL_FORM = 1,
+    GF_CONTROL_USER_CONTROL = 2,
+    GF_CONTROL_PANEL = 3,
+    GF_CONTROL_BUTTON = 4,
+    GF_CONTROL_CHECK_BOX = 5,
+    GF_CONTROL_COMBO_BOX = 6,
+    GF_CONTROL_LABEL = 7,
+    GF_CONTROL_LIST_BOX = 8,
+    GF_CONTROL_TEXT_BOX = 9,
+    GF_CONTROL_TRACK_BAR = 10,
+    GF_CONTROL_RADIO_BUTTON = 11,
+    GF_CONTROL_GROUP_BOX = 12,
+    GF_CONTROL_PROGRESS_BAR = 13,
+    GF_CONTROL_LINK_LABEL = 14,
+    GF_CONTROL_PICTURE_BOX = 15,
+    GF_CONTROL_DATA_GRID_VIEW = 16,
+    GF_CONTROL_TOOL_STRIP = 17,
+    GF_CONTROL_NUMERIC_UP_DOWN = 18,
+    GF_CONTROL_CUSTOM = 0x7fffffff
+} gf_control_kind;
+
+typedef enum gf_window_run_flag {
+    GF_WINDOW_RUN_DEFAULT = 0,
+    GF_WINDOW_RUN_AUTOMATION_CLOSE = 1 << 0,
+    GF_WINDOW_RUN_FORCE_HEADLESS = 1 << 1,
+    GF_WINDOW_RUN_AUTOMATION_ACTIVATE = 1 << 2
+} gf_window_run_flag;
+
 typedef void (*gf_event_callback)(gf_handle sender, uint32_t event_kind, void* context);
+typedef uint32_t (*gf_event_callback_v2)(gf_handle sender,
+                                         uint32_t event_kind,
+                                         void* context);
+typedef uint32_t (*gf_dispatch_callback)(void* context, uint32_t cancelled);
+typedef uint32_t (*gf_pointer_callback)(gf_handle sender,
+                                        uint32_t event_kind,
+                                        double x,
+                                        double y,
+                                        double wheel_delta,
+                                        uint32_t button,
+                                        void* context);
 
 typedef struct gf_error_view {
     uint32_t code;
@@ -97,6 +158,59 @@ typedef struct gf_api_v0 {
                            void* context,
                            gf_event_token* token);
     gf_result (*disconnect)(gf_event_token token);
+
+    /* ABI 0.2 additions. The 0.1 table is the prefix ending at disconnect. */
+    gf_result (*control_create_kind)(uint32_t kind,
+                                     gf_string_view stable_id,
+                                     gf_handle* control);
+    gf_result (*set_name)(gf_handle handle, gf_string_view name);
+    gf_result (*get_name)(gf_handle handle,
+                          char* buffer,
+                          uint64_t capacity,
+                          uint64_t* required_size);
+    gf_result (*set_text)(gf_handle handle, gf_string_view text);
+    gf_result (*get_text)(gf_handle handle,
+                          char* buffer,
+                          uint64_t capacity,
+                          uint64_t* required_size);
+    gf_result (*set_enabled)(gf_handle handle, uint32_t enabled);
+    gf_result (*get_enabled)(gf_handle handle, uint32_t* enabled);
+
+    /* ABI 0.3 additions. */
+    gf_result (*run_window)(gf_handle form, uint32_t flags);
+    gf_result (*last_host_trace)(gf_handle form,
+                                 char* buffer,
+                                 uint64_t capacity,
+                                 uint64_t* required_size);
+
+    /* ABI 0.4 additions. */
+    gf_result (*subscribe_v2)(gf_handle sender,
+                              uint32_t event_kind,
+                              gf_event_callback_v2 callback,
+                              void* context,
+                              gf_event_token* token);
+    gf_result (*begin_invoke)(gf_handle control,
+                              gf_dispatch_callback callback,
+                              void* context);
+    gf_result (*request_close)(gf_handle form);
+    gf_result (*callback_fault_count)(gf_handle control, uint64_t* count);
+
+    /* ABI 0.5 addition: retained owner-draw compatibility raster. */
+    gf_result (*set_control_png)(gf_handle control,
+                                 const uint8_t* encoded_png,
+                                 uint64_t encoded_size);
+    gf_result (*set_child_index)(gf_handle parent,
+                                 gf_handle child,
+                                 uint64_t index);
+    gf_result (*set_control_colors)(gf_handle control,
+                                    uint32_t foreground_argb,
+                                    uint32_t background_argb);
+
+    /* ABI 0.6 addition: pointer delivery for retained owner-draw controls. */
+    gf_result (*subscribe_pointer)(gf_handle sender,
+                                   gf_pointer_callback callback,
+                                   void* context,
+                                   gf_event_token* token);
 } gf_api_v0;
 
 /*

@@ -1,0 +1,38 @@
+{
+  "canonical_breakdown_sha256": "964074df2605f1ff980b719655378f4a49b541d78afcbe3a7093c043a0a531a3",
+  "checks": {
+    "all_features_source_anchored": true,
+    "canonical_repeat_equal": true,
+    "literal_reconstruction": true
+  },
+  "corpus": {
+    "alphabet": [
+      "a",
+      "b"
+    ],
+    "max_length": 5,
+    "objects": 63,
+    "total_features": 2325
+  },
+  "environment": {
+    "machine": "arm64",
+    "python": "3.14.0",
+    "system": "Darwin"
+  },
+  "minimal_content_multiset_collision": [
+    [
+      "a",
+      "b"
+    ],
+    [
+      "b",
+      "a"
+    ]
+  ],
+  "transformation_lineage": [
+    "substitute",
+    "insert",
+    "transpose_adjacent",
+    "delete"
+  ]
+}

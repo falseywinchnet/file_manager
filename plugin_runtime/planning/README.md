@@ -1,6 +1,10 @@
 # Plugin Runtime planning index
 
-Status: **research program, not an accepted architecture**.
+Status: **frozen research program, retained as Oracle input**.
+
+Do not dispatch implementation from this directory. The active specification,
+proposal, and future implementation path is [`../../orchestrator/`](../../orchestrator/).
+The documents below preserve research evidence and unresolved candidates.
 
 | File | Purpose |
 |---|---|
@@ -10,7 +14,7 @@ Status: **research program, not an accepted architecture**.
 | `EXTENSION_CONTRACTS.md` | Fixed preview, thumbnail, virtual-system, search, handler, icon, and metadata seams |
 | `LIFECYCLE_AND_DISTRIBUTION.md` | Discovery, install, grants, signing, updates, configuration, cleanup, SDKs |
 | `VALIDATION_AND_IMPLEMENTATION.md` | Experiments, benchmarks, milestones, tests, fuzzing, and release gates |
-| `SIBLING_THREAD_HANDOFF.md` | Exact bounded prompt for the first implementation sibling |
+| `SIBLING_THREAD_HANDOFF.md` | Superseded historical implementation prompt; do not dispatch |
 
 ## Governing separation
 
@@ -27,4 +31,3 @@ one ABI:
 A C ABI can stabilize the first boundary without exposing Rust layout. A wire
 protocol can evolve the third without recompiling the host. A raster/shared
 surface can transport presentation output without granting UI injection.
-

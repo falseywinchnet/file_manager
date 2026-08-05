@@ -1,0 +1,7 @@
+/bin/
+/coverage/
+/sandbox/work/
+/results/raw/
+*.test
+*.prof
+*.out

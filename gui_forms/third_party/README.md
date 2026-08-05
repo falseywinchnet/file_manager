@@ -1,5 +1,9 @@
 # Private third-party dependencies
 
+Unicode grapheme property tables and conformance cases are pinned, generated,
+and attributed under [`unicode/`](unicode/README.md). Unlike Skia, these are
+checked-in generated data so renderer-free builds stay offline.
+
 Skia is fetched locally into `skia/` and is deliberately not committed as a
 source copy. GUI.Forms pins the following upstream revisions:
 

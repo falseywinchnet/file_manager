@@ -61,8 +61,9 @@ rejections.
 The AppKit view registers as an `NSDraggingDestination`. It translates file
 URLs to paths, strings to UTF-8, `public.data` to media-typed bytes, operation
 masks to portable effects, and view coordinates to logical points. The adapter
-returns only the portable result selected by retained code. AppKit declarations
-remain under `src/host/macos` and the shared boundary audit stays authoritative.
+applies the shared count/byte limits while extracting and returns only the
+portable result selected by retained code. AppKit declarations remain under
+`src/host/macos` and the shared boundary audit stays authoritative.
 
 The Gallery collection opts in as the live consumer. It paints a restrained
 blue drop cue and reports accepted file/text/data counts in the command bar.
@@ -79,16 +80,21 @@ Its default banner is `Portable core · Host 0.4 · drop-ready`.
   accepted-effect filtering, malformed UTF-8, zero session identity, aggregate
   size rejection, accounting, and eligibility cleanup.
 - Gallery tests cover complete visible-child containment, inherited clipping,
-  a real typed file drop, and command-bar acknowledgement.
+  a retained typed file drop, and command-bar acknowledgement.
 - The AppKit smoke verifies capability publication and compiles/launches the
   native destination implementation. A real external drag is not automated;
   that remains a platform interaction test for the next native harness.
+- **NEGATIVE/UNRESOLVED:** one computer-control attempt dragged the checked-in
+  `gallery.dml` from Finder toward the live collection, but the command bar did
+  not transition. The automation could not distinguish a missed screen target
+  from rejected native delivery, so this is not counted as AppKit conformance
+  and the result is retained rather than silently promoted to success.
 
 ## Honest boundary
 
 This slice proves inbound destination translation and retained routing. It does
 not yet expose a portable begin-drag service, negotiate delayed data providers,
 promise non-UTF-8 Linux filenames, or prove Windows/Linux adapters. The broad
-`typed_drag_drop` capability currently means typed inbound destination support
-in protocol 0.4; it must be split or strengthened before a stable 1.0 capability
-contract claims bidirectional support.
+Protocol 0.4 exposes distinct `typed_drag_destination` and
+`typed_drag_source` bits. Headless and AppKit advertise only the implemented
+destination bit; the source bit remains unadvertised until its service exists.

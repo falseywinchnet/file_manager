@@ -10,9 +10,11 @@ enum class NodeKind {
     form,
     command_strip,
     panel,
+    user_control,
     backplane,
     group,
     label,
+    link_label,
     button,
     text_input,
     check_box,
@@ -62,8 +64,8 @@ struct NodeSpec final {
 inline constexpr unsigned ordinary = enabled | visible;
 inline constexpr unsigned interactive = ordinary | focusable;
 
-inline constexpr std::array<NodeSpec, 44> gallery_nodes {{
-    {"gallery.root", "", NodeKind::form, LayoutKind::flex_column, "GUI.Forms Gallery", ordinary, 0, 900, 620, 0.0, 0.0, 0.0},
+inline constexpr std::array<NodeSpec, 49> gallery_nodes {{
+    {"gallery.root", "", NodeKind::form, LayoutKind::flex_column, "GUI.Forms Gallery", ordinary, 0, 900, 660, 0.0, 0.0, 0.0},
     {"gallery.command-strip", "gallery.root", NodeKind::command_strip, LayoutKind::flex_row, "", ordinary, 0, 0, 34, 0.0, 0.0, 0.0},
     {"gallery.command.reset", "gallery.command-strip", NodeKind::button, LayoutKind::none, "Reset", interactive, 0, 72, 24, 0.0, 0.0, 0.0},
     {"gallery.command.diagnostics", "gallery.command-strip", NodeKind::button, LayoutKind::none, "Diagnostics", interactive, 1, 96, 24, 0.0, 0.0, 0.0},
@@ -85,6 +87,11 @@ inline constexpr std::array<NodeSpec, 44> gallery_nodes {{
     {"gallery.checkbox", "gallery.basics-group", NodeKind::check_box, LayoutKind::none, "Enable precise updates", interactive | checked, 4, 220, 24, 0.0, 0.0, 1.0},
     {"gallery.radio.classic", "gallery.basics-group", NodeKind::radio_button, LayoutKind::none, "Classic relief", interactive | checked, 5, 180, 24, 0.0, 0.0, 1.0},
     {"gallery.radio.quiet", "gallery.basics-group", NodeKind::radio_button, LayoutKind::none, "Quiet relief", interactive, 6, 180, 24, 0.0, 0.0, 0.0},
+    {"gallery.link", "gallery.basics-group", NodeKind::link_label, LayoutKind::none, "Show control contract", interactive, 7, 170, 24, 0.0, 0.0, 0.0},
+    {"gallery.checkbox.indeterminate", "gallery.basics-group", NodeKind::check_box, LayoutKind::none, "Three-state option", interactive, 8, 220, 24, 0.0, 0.0, 0.0},
+    {"gallery.lifecycle-card", "gallery.basics-group", NodeKind::user_control, LayoutKind::flex_row, "", ordinary, 9, 0, 24, 0.0, 0.0, 0.0},
+    {"gallery.lifecycle-title", "gallery.lifecycle-card", NodeKind::label, LayoutKind::none, "COMPOSED", ordinary, 0, 82, 20, 0.0, 0.0, 0.0},
+    {"gallery.lifecycle-status", "gallery.lifecycle-card", NodeKind::label, LayoutKind::none, "Awaiting attach", ordinary, 1, 0, 20, 0.0, 0.0, 0.0},
     {"gallery.values-group", "gallery.surface", NodeKind::group, LayoutKind::stack, "Values and retained state", ordinary, 1, 0, 116, 0.0, 0.0, 0.0},
     {"gallery.slider", "gallery.values-group", NodeKind::slider, LayoutKind::none, "", interactive, 0, 250, 28, 0.0, 100.0, 42.0},
     {"gallery.progress", "gallery.values-group", NodeKind::progress, LayoutKind::none, "", ordinary, 1, 250, 20, 0.0, 100.0, 42.0},

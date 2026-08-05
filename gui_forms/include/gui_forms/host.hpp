@@ -30,11 +30,12 @@ enum class HostCapability : std::uint64_t {
     pointer_capture = 1ULL << 8U,
     cursor = 1ULL << 9U,
     clipboard = 1ULL << 10U,
-    typed_drag_drop = 1ULL << 11U,
+    typed_drag_destination = 1ULL << 11U,
     dialogs = 1ULL << 12U,
     menus = 1ULL << 13U,
     font_discovery = 1ULL << 14U,
     accessibility = 1ULL << 15U,
+    typed_drag_source = 1ULL << 16U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

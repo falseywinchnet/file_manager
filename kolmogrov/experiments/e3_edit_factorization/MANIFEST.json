@@ -1,0 +1,16 @@
+{
+  "claim_ids": ["K-H02", "K-H04", "T-MULTIDEL-1", "T-EDIT-1"],
+  "command": "python3 experiments/e3_edit_factorization/run.py",
+  "corpus": {
+    "alphabet": ["a", "b"],
+    "deletions": "every nonempty source-index subset",
+    "max_length": 6,
+    "substitutions": "every position flipped to the other binary symbol",
+    "transpositions": "every adjacent distinct-symbol pair"
+  },
+  "experiment_id": "e3_edit_factorization_v0_2026-08-05",
+  "inference_boundary": "Finite implementation verification of exact combinatorial laws; no perceptual weighting, mixed-edit theorem, compact hash, or retrieval claim.",
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "c710f601339d0746bbcc2e3347fea1fe6b66fba803ba594d1250aa4306cb70bb",
+  "revision": "tracked Kolmogrov working tree; raw and profile-stream digests recorded by run"
+}

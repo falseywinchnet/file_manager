@@ -1,0 +1,2 @@
+{"id":"version","result":{"protocol":"engine.v0","features":["exact-reference","integrity","root-policy","scan-reconcile"]}}
+{"id":"shutdown","result":{"accepted":true}}

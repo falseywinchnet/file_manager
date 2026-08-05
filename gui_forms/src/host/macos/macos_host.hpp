@@ -19,6 +19,10 @@ struct MacHostOptions {
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};
     std::function<void(HostCloseRequest&)> close_request;
+    std::function<void(std::function<void()> wake,
+                       std::function<void()> request_close)> host_ready;
+    std::function<void()> dispatch_pending;
+    std::function<void()> closed;
     std::function<void(std::string_view metrics_json,
                        std::string_view host_json)> final_snapshot;
 };

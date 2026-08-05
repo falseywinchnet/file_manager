@@ -41,6 +41,7 @@ This is a control gallery, not File Manager and not a file browser.
 - PNG is the only image decoder admitted to the renderer/resource core. Other
   codecs are excluded.
 - AppKit types remain inside `src/host/macos/`.
+- Win32, COM, WIC, MSAA, and UIA types remain inside `src/host/windows/`.
 - The core is retained; do not introduce an immediate-mode control API or a
   perpetual redraw loop.
 - Accessibility/help metadata is optional secondary hook data, not required to
@@ -58,6 +59,7 @@ This is a control gallery, not File Manager and not a file browser.
   `src/controls/`.
 - Skia implementation lives under `src/render/skia/`.
 - Native macOS code lives under `src/host/macos/`.
+- Native Windows code lives under `src/host/windows/`.
 - Demonstrations and their static/DML descriptions live under `demo/`.
 - Tests live under `tests/`.
 - Instrumentation must be queryable as structured counters/snapshots, not only

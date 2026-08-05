@@ -37,8 +37,9 @@ for clarification.
 - Java would be a fundamental betrayal of the project.
 - Godot is not an acceptable delivery shortcut.
 - The native GUI engine is disciplined C++.
-- Rust is initially reserved for the hostile plugin-wrapper/sandbox boundary.
-- Go may be evaluated for the persistent indexing/search backend.
+- Rust owns Oracle's trusted control plane and hostile plugin supervision; it is
+  not the GUI rendering language.
+- Go owns the persistent indexing/search backend.
 - C# interoperability is allowed as a binding to a native engine, not as a File
   Manager runtime dependency.
 
@@ -76,9 +77,11 @@ Plugin classes admitted for later design:
 - search providers.
 
 Other plugin powers are not admitted merely by analogy with extensible shells.
-Whether an in-application plugin catalogue is permitted remains ambiguous: the
-answer “no” to “is a store forbidden?” means it is not categorically forbidden,
-but its networking and trust model are unresolved.
+Oracle may expose separately specified handler, icon, metadata, command-menu,
+and semantic-hive contracts only after capability review; this does not grant a
+plugin GUI control injection or direct engine-catalogue mutation. Whether an
+in-application plugin catalogue is permitted remains unresolved, including its
+networking and trust model.
 
 ## Anti-model work still required
 

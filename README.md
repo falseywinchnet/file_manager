@@ -4,14 +4,16 @@ The pre-architecture workspace for a fast, local-first, cross-platform file
 manager: visually descended from classic Windows Explorer, NeXTSTEP, and
 Watercolor, with a command surface and a deliberately simple AI-facing API.
 
-The project is currently in **pre-plan**. No implementation stack or system
-architecture has been selected. The work in [`planning/`](planning/) defines
-how those decisions will be made, what evidence is already available, and what
-the grand architect must exclude before feature planning begins.
+The parent product remains in **pre-plan** where decisions are unresolved, but
+its repository topology, engine spine, Oracle contract authority, and delivery
+order are now accepted. The work in [`planning/`](planning/) defines the
+remaining decisions, evidence, exclusions, and component gates.
 
 Start with:
 
 - [`planning/README.md`](planning/README.md) — current phase and artifact map;
+- [`planning/PROGRAM_MAP.md`](planning/PROGRAM_MAP.md) — component ownership,
+  current permissions, contract authority, and build order;
 - [`planning/PREPLAN_CHARTER.md`](planning/PREPLAN_CHARTER.md) — the plan for
   producing the actual project plan;
 - [`planning/EVIDENCE_REGISTER.md`](planning/EVIDENCE_REGISTER.md) — Zeta
@@ -39,3 +41,30 @@ Start with:
 
 The fetched Modern.Forms reference is pinned in
 [`third_party/README.md`](third_party/README.md).
+
+## Program repositories
+
+- [`gui_forms/`](gui_forms/) — independently buildable retained C++ GUI
+  framework, currently advancing first toward a semicomplete snapshot.
+- [`engine/`](engine/) — purpose-built, standalone Go catalogue/index/search
+  service with a narrow versioned API, mandatory sandbox, exact-identity oracle,
+  crash/corruption testing, and comparison benchmarks against mature stores.
+- [`kolmogrov/`](kolmogrov/) — independent formal and experimental program for
+  ConeDAG successors, practical algorithmic-information measures, exhaustive
+  breakdown, and fixed-width multi-channel perceptual hashes. It pursues proof
+  closure and adversarial measurement before production promotion.
+- [`orchestrator/`](orchestrator/) — the paper-first Rust Oracle: canonical
+  cross-project contract registry and future owner of hives, settings, handlers,
+  CLI/commands, platform policy, and hostile plugin supervision.
+- [`file_manager/`](file_manager/) — the waiting C++ end-user frontend. It begins
+  only after GUI.Forms, engine, and Oracle dependency gates open.
+- [`plugin_runtime/`](plugin_runtime/) — frozen earlier plugin-containment
+  research retained as input to Oracle, not a parallel runtime implementation.
+
+Each directory contains its own `AGENTS.md`, build boundary, ledgers, acceptance
+gates, and a handoff prompt suitable for a dedicated Codex task.
+
+Accepted architecture records are indexed in
+[`decisions/README.md`](decisions/README.md). Engine workers must also read both
+[`engine/docs/ARCHITECT_HANDOFF_001.md`](engine/docs/ARCHITECT_HANDOFF_001.md)
+and [`engine/docs/ARCHITECT_HANDOFF_002.md`](engine/docs/ARCHITECT_HANDOFF_002.md).

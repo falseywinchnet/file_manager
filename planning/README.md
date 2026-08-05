@@ -1,6 +1,7 @@
 # Pre-plan index
 
-Status: **grand-architect interview / evidence collection**.
+Status: **grand-architect interview / evidence collection with accepted program
+spine**.
 
 This directory does not contain the project plan. It defines how we will earn
 one. The immediate task is to discover exclusions, convert the surviving intent
@@ -12,6 +13,7 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | File | Purpose |
 |---|---|
 | `PREPLAN_CHARTER.md` | Stages and exit gates for creating the actual plan |
+| `PROGRAM_MAP.md` | Accepted component ownership, repository permissions, contract authority, and delivery order |
 | `PRODUCT_NEGATIVE.md` | Confirmed exclusions and anti-trajectories |
 | `ARCHITECTURE_INPUTS.md` | Confirmed positive constraints and deferred missions |
 | `EVIDENCE_REGISTER.md` | What the supplied references do and do not establish |
@@ -31,20 +33,30 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `visual/material-depth-atlas.html` | Static, visible accept/distill/reject board for 3D structure and pattern families |
 | `visual/MATERIAL_VERDICTS_001.md` | Architect's material, depth, configuration, and frozen-pattern synthesis |
 | `visual/COLOR_RELATION_MODEL.md` | OKLCH foreground/background pair doctrine and Office-derived seed palette |
+| `visual/FRONTEND_DESIGN_BRIEF_001.md` | Pooled frontend/dependency knowledge, first coherent daily-work visual grammar, icon shortlist, and open design questions |
+| `visual/frontend-concept-atlas.html` | Deterministic HTML program mockups for folder, search, criteria, theme, and icon-direction review |
 | `gui_forms/WINFORMS_CONTROL_INVENTORY.md` | Exhaustive compatibility catalogue (research in progress) |
 | `gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md` | Observed serious-consumer compatibility envelope (research in progress) |
 | `gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md` | Renderer, host, text, state, event, DML, ABI, and demonstration choices |
 | `gui_forms/GUI_FORMS_INTERVIEW_LEDGER.md` | Architect's GIVEN GUI.Forms constraints plus CANDIDATE tradeoffs and remaining subquestions; not an ADR |
 | `gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` | Theme/language assemblies, PNG boundary, safe fallback, and retired compatibility specimen-informed mutable configuration candidates |
 | `search/SEARCH_RECONCILIATION_001.md` | Search identity, root ownership, offline-catalogue, result-motion, mutation-boundary, ConeDAG, and semantic-deferral constraints from the first completed board export |
+| `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
+| `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Accepted Oracle contract authority, repository topology, and phased GUI.Forms → engine → Oracle → frontend program sequence |
+| `../engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
+| `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
+| `../orchestrator/` | Paper-first Oracle specification repository and canonical cross-project contract registry |
+| `../file_manager/` | Waiting end-user frontend repository; implementation is gated on GUI.Forms, engine, and Oracle snapshots |
 
-Future artifacts are deliberately absent until the interview supplies their
-inputs:
+The following parent-level artifacts remain deliberately absent until the
+interview supplies their inputs:
 
 - `INVARIANTS.md` — measurable behavior, performance, privacy, and UX laws;
 - `CAPABILITY_MODEL.md` — core/platform/plugin ownership of every capability;
-- `decisions/ADR-*.md` — accepted architecture decisions;
 - `PLAN.md` — only after the pre-plan exit gate passes.
+
+Accepted partial-spine decisions already live under `../decisions/`; they do
+not imply that the complete parent plan or every component choice is closed.
 
 ## Current facts
 
@@ -61,13 +73,15 @@ inputs:
 - File handlers, icons, previews, sorting, and plugins require explicit product
   models rather than uncontrolled inheritance from host-shell behavior.
 - File Manager itself will not rely on .NET, Java, Godot, or a bundled browser
-  engine. GUI.Forms and the native surface engine are disciplined C++; Rust is
-  initially reserved for hostile plugin wrappers, with Go admitted for the
-  opt-in indexing service.
+  engine. GUI.Forms and the end-user surface are disciplined C++; Oracle and
+  hostile plugin supervision are Rust; the opt-in indexing/search service is a
+  standalone Go engine with purpose-built storage and retrieval machinery.
+  Mature databases remain mandatory measurement controls rather than its
+  production backend.
 - The main surface is a single location-oriented window: collapsible tree,
   content, and collapsible preview/properties sections. No tabs and no dual pane.
 
-Everything else is either an open question or a candidate.
+Anything not recorded as GIVEN or DECIDED remains an open question or candidate.
 
 ## Interview loop
 

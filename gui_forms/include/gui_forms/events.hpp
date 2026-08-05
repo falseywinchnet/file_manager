@@ -69,6 +69,24 @@ struct KeyEvent {
     bool handled{};
 };
 
+// USB HID usage IDs are the normalized physical-key vocabulary at the host
+// boundary. Text remains a separate TextInputEvent.
+struct PhysicalKey final {
+    static constexpr std::uint32_t enter = 0x28U;
+    static constexpr std::uint32_t escape = 0x29U;
+    static constexpr std::uint32_t backspace = 0x2AU;
+    static constexpr std::uint32_t tab = 0x2BU;
+    static constexpr std::uint32_t space = 0x2CU;
+    static constexpr std::uint32_t home = 0x4AU;
+    static constexpr std::uint32_t page_up = 0x4BU;
+    static constexpr std::uint32_t end = 0x4DU;
+    static constexpr std::uint32_t page_down = 0x4EU;
+    static constexpr std::uint32_t right = 0x4FU;
+    static constexpr std::uint32_t left = 0x50U;
+    static constexpr std::uint32_t down = 0x51U;
+    static constexpr std::uint32_t up = 0x52U;
+};
+
 struct TextInputEvent {
     std::string text_utf8;
     bool composing{};
@@ -89,6 +107,15 @@ enum class DragEffect : std::uint8_t {
     copy = 1U << 0U,
     move = 1U << 1U,
     link = 1U << 2U,
+};
+
+struct DragLimits final {
+    static constexpr std::size_t maximum_items = 16U;
+    static constexpr std::size_t maximum_paths = 4096U;
+    static constexpr std::size_t maximum_path_bytes = 64U * 1024U;
+    static constexpr std::size_t maximum_text_bytes = 16U * 1024U * 1024U;
+    static constexpr std::size_t maximum_media_type_bytes = 255U;
+    static constexpr std::size_t maximum_total_bytes = 16U * 1024U * 1024U;
 };
 
 [[nodiscard]] constexpr DragEffect operator|(DragEffect left,

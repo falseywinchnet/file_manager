@@ -25,6 +25,10 @@ Control::~Control() = default;
 
 void Control::add_child(Ptr child) {
     require_mutable();
+    if (lifecycle_notification_ ||
+        (window_ != nullptr && window_->in_lifecycle_notification_)) {
+        throw std::logic_error("GUI.Forms cannot mutate the visual tree during lifecycle notification");
+    }
     if (!child) {
         throw std::invalid_argument("GUI.Forms cannot add a null child");
     }
@@ -36,6 +40,9 @@ void Control::add_child(Ptr child) {
     }
     if (child->window_) {
         child->window_->require_ui_thread("visual-tree mutation");
+        if (child->window_->in_lifecycle_notification_) {
+            throw std::logic_error("GUI.Forms cannot mutate the visual tree during lifecycle notification");
+        }
     }
     for (auto ancestor = shared_from_this(); ancestor; ancestor = ancestor->parent()) {
         if (ancestor == child) {
@@ -73,6 +80,10 @@ void Control::add_child(Ptr child) {
 
 Control::Ptr Control::remove_child(RuntimeId child_id) {
     require_mutable();
+    if (lifecycle_notification_ ||
+        (window_ != nullptr && window_->in_lifecycle_notification_)) {
+        throw std::logic_error("GUI.Forms cannot mutate the visual tree during lifecycle notification");
+    }
     const auto found = std::find_if(children_.begin(), children_.end(),
                                     [child_id](const Ptr& candidate) {
                                         return candidate->runtime_id() == child_id;
@@ -101,8 +112,32 @@ Control::Ptr Control::remove_child(RuntimeId child_id) {
     return removed;
 }
 
+bool Control::set_child_index(RuntimeId child_id, std::size_t index) {
+    require_mutable();
+    const auto found = std::find_if(children_.begin(), children_.end(),
+                                    [child_id](const Ptr& candidate) {
+                                        return candidate->runtime_id() == child_id;
+                                    });
+    if (found == children_.end()) {
+        return false;
+    }
+    Ptr child = *found;
+    children_.erase(found);
+    // WinForms index zero is topmost. GUI.Forms paints from front to back, so
+    // the topmost retained child is the final vector element.
+    const std::size_t bounded = std::min(index, children_.size());
+    children_.insert(children_.end() - static_cast<std::ptrdiff_t>(bounded),
+                     std::move(child));
+    invalidate_declared(invalidation::visual_tree);
+    return true;
+}
+
 void Control::clear_children() {
     require_mutable();
+    if (lifecycle_notification_ ||
+        (window_ != nullptr && window_->in_lifecycle_notification_)) {
+        throw std::logic_error("GUI.Forms cannot mutate the visual tree during lifecycle notification");
+    }
     while (!children_.empty()) {
         static_cast<void>(remove_child(children_.back()->runtime_id()));
     }
@@ -273,12 +308,16 @@ void Control::invalidate(Dirty requested_dirty) {
     if (requested_dirty == Dirty::none) {
         return;
     }
+    if (has_dirty(requested_dirty, Dirty::measure)) {
+        requested_dirty |= Dirty::arrange;
+    }
+    if (initialization_depth_ != 0) {
+        pending_initialization_dirty_ |= requested_dirty;
+        return;
+    }
     if (window_) {
         window_->mark_dirty(*this, requested_dirty);
         return;
-    }
-    if (has_dirty(requested_dirty, Dirty::measure)) {
-        requested_dirty |= Dirty::arrange;
     }
     dirty_ |= requested_dirty;
     for (Control* current = this; current != nullptr;) {
@@ -295,6 +334,11 @@ void Control::invalidate_subtree(Dirty requested_dirty) {
     }
     if (has_dirty(requested_dirty, Dirty::measure)) {
         requested_dirty |= Dirty::arrange;
+    }
+    if (initialization_depth_ != 0) {
+        pending_initialization_dirty_ |= requested_dirty;
+        pending_initialization_subtree_ = true;
+        return;
     }
     if (window_) {
         window_->mark_subtree_dirty(*this, requested_dirty);
@@ -330,6 +374,33 @@ void Control::invalidate_declared(Dirty declared_effects) {
 #endif
 }
 
+void Control::begin_init() {
+    require_mutable();
+    ++initialization_depth_;
+}
+
+void Control::end_init() {
+    require_mutable();
+    if (initialization_depth_ == 0) {
+        throw std::logic_error("GUI.Forms EndInit has no matching BeginInit");
+    }
+    --initialization_depth_;
+    if (initialization_depth_ != 0) {
+        return;
+    }
+
+    const Dirty pending = std::exchange(pending_initialization_dirty_, Dirty::none);
+    const bool subtree = std::exchange(pending_initialization_subtree_, false);
+    if (pending != Dirty::none) {
+        if (subtree) {
+            invalidate_subtree(pending);
+        } else {
+            invalidate(pending);
+        }
+    }
+    initialization_completed_.emit(pending, subtree);
+}
+
 Size Control::measure(Size available) {
     return {std::min(requested_bounds_.width, available.width),
             std::min(requested_bounds_.height, available.height)};
@@ -357,6 +428,9 @@ void Control::on_drag(DragEvent&) {}
 void Control::on_drag_bubble(DragEvent&) {}
 void Control::on_focus_changed(bool) {}
 void Control::on_activate() {}
+void Control::on_attached_to_window() {}
+void Control::on_attachment_committed() noexcept {}
+void Control::on_detached_from_window() noexcept {}
 
 void Control::clear_dirty(Dirty cleared) noexcept {
     dirty_ = without_dirty(dirty_, cleared);
@@ -384,12 +458,19 @@ void Control::require_mutable() const {
 }
 
 void Control::verify_dispose_thread() {
+    if (lifecycle_notification_ ||
+        (window_ != nullptr && window_->in_lifecycle_notification_)) {
+        throw std::logic_error("GUI.Forms cannot dispose a control during lifecycle notification");
+    }
     if (window_) {
         window_->require_ui_thread("control disposal");
     }
 }
 
 void Control::on_dispose() noexcept {
+    initialization_depth_ = 0;
+    pending_initialization_dirty_ = Dirty::none;
+    pending_initialization_subtree_ = false;
     Ptr self = weak_from_this().lock();
     if (window_ && self) {
         window_->dispose_subtree(self);

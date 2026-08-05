@@ -1,0 +1,15 @@
+{
+  "claim_ids": ["K-H02", "K-H04", "T-GAP-1", "T-DELETE-1"],
+  "command": "python3 experiments/e1_gap_deletion_laws/run.py",
+  "corpus": {
+    "alphabet": ["a", "b"],
+    "edits": "every single deletion position",
+    "max_length": 7,
+    "scales": "every degree 1 through source length"
+  },
+  "experiment_id": "e1_gap_deletion_laws_v0_2026-08-05",
+  "inference_boundary": "Exhaustive finite implementation check of paper laws; not a universal proof, retrieval result, compact representation, or novelty claim.",
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "aff5cc3e882b0cdd0865c6ff8e73ccc65ac6bf31079274cd78c8c9504bec4087",
+  "revision": "tracked Kolmogrov working tree; raw and profile-stream digests recorded by run"
+}

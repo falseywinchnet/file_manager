@@ -88,6 +88,7 @@ struct FontSpec {
     double size{13.0};
     std::uint16_t weight{400};
     bool italic{};
+    friend constexpr bool operator==(const FontSpec&, const FontSpec&) = default;
 };
 
 struct ImageId {

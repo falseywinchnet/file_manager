@@ -1,1 +1,0 @@
-/usr/bin/c++ -fsanitize=address -fno-omit-frame-pointer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/gui_forms_gallery_interaction_tests.dir/tests/gallery_interaction_tests.cpp.o -o gui_forms_gallery_interaction_tests  libgui_forms_gallery_model.a libgui_forms_core.a

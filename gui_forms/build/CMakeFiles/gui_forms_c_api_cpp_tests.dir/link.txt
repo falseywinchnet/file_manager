@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/gui_forms_c_api_cpp_tests.dir/tests/c_api_cpp_tests.cpp.o -o gui_forms_c_api_cpp_tests  -Wl,-rpath,/Users/quentinkuttenkuler/file_manager/gui_forms/build libgui_forms_abi0.0.1.0.dylib

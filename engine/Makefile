@@ -1,0 +1,19 @@
+.PHONY: test race vet bench cross-build check
+
+test:
+	go test ./...
+
+race:
+	go test -race ./...
+
+vet:
+	go vet ./...
+
+bench:
+	go test -run '^$$' -bench . -benchmem ./...
+
+cross-build:
+	GOOS=linux GOARCH=amd64 go build ./...
+	GOOS=windows GOARCH=amd64 go build ./...
+
+check: test race vet cross-build

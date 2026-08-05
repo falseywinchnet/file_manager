@@ -1,0 +1,217 @@
+{
+  "checks": {
+    "direct_and_library_signatures_match": true,
+    "mod_2_3_collision_rescued_by_joint_mod_6": true,
+    "mod_2_3_collision_rescued_by_mod_5": true,
+    "mod_5_collision_rescued_by_mod_2": true,
+    "mod_5_collision_rescued_by_mod_3": true
+  },
+  "collision_table_through_length_12": {
+    "content": {
+      "collision_pairs": 1826175,
+      "first_collision": [
+        [
+          "a",
+          "b"
+        ],
+        [
+          "b",
+          "a"
+        ]
+      ],
+      "maximum_class_size": 924
+    },
+    "independent_mod_2_3": {
+      "collision_pairs": 24,
+      "first_collision": [
+        [
+          "a",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "a"
+        ],
+        [
+          "b",
+          "b",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "b",
+          "b"
+        ]
+      ],
+      "maximum_class_size": 2
+    },
+    "independent_mod_2_3_5": {
+      "collision_pairs": 0,
+      "first_collision": null,
+      "maximum_class_size": 1
+    },
+    "joint_mod_6": {
+      "collision_pairs": 0,
+      "first_collision": null,
+      "maximum_class_size": 1
+    },
+    "order_degree_2": {
+      "collision_pairs": 83322,
+      "first_collision": [
+        [
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        [
+          "b",
+          "a",
+          "a",
+          "b"
+        ]
+      ],
+      "maximum_class_size": 58
+    },
+    "residue_mod_2": {
+      "collision_pairs": 3966,
+      "first_collision": [
+        [
+          "a",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "a"
+        ],
+        [
+          "b",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "b"
+        ]
+      ],
+      "maximum_class_size": 7
+    },
+    "residue_mod_3": {
+      "collision_pairs": 324,
+      "first_collision": [
+        [
+          "a",
+          "a",
+          "a",
+          "b",
+          "a",
+          "a",
+          "b",
+          "a",
+          "a",
+          "a"
+        ],
+        [
+          "b",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "a",
+          "b"
+        ]
+      ],
+      "maximum_class_size": 2
+    },
+    "residue_mod_5": {
+      "collision_pairs": 0,
+      "first_collision": null,
+      "maximum_class_size": 1
+    }
+  },
+  "environment": {
+    "machine": "arm64",
+    "python": "3.14.0",
+    "system": "Darwin"
+  },
+  "targeted_minimal_collisions": {
+    "independent_mod_2_3": [
+      [
+        "a",
+        "a",
+        "a",
+        "b",
+        "b",
+        "a",
+        "b",
+        "b",
+        "a",
+        "a",
+        "a"
+      ],
+      [
+        "b",
+        "b",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "b",
+        "b"
+      ]
+    ],
+    "residue_mod_5_through_length_16": [
+      [
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "b",
+        "a",
+        "a",
+        "a",
+        "a",
+        "b",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a"
+      ],
+      [
+        "b",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "a",
+        "b"
+      ]
+    ]
+  }
+}

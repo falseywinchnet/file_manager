@@ -1,0 +1,34 @@
+{
+  "checks": {
+    "deletion_set_gap_l1_equals_deletion_count": true,
+    "deletion_set_pattern_containment": true,
+    "substitution_changed_fraction_k_over_n": true,
+    "substitution_gap_motion_zero": true,
+    "transposition_exact_incidence_partition": true,
+    "transposition_gap_motion_zero": true
+  },
+  "corpus": {
+    "alphabet": [
+      "a",
+      "b"
+    ],
+    "cases_checked": 126,
+    "max_length": 6
+  },
+  "environment": {
+    "machine": "arm64",
+    "python": "3.14.0",
+    "system": "Darwin"
+  },
+  "profile_stream_sha256": "ac5ffc5eafabd3c8642be072b03df64ab193573636e6389c5eda10e713a82b07",
+  "profiles": {
+    "deletion_sets": 30306,
+    "substitutions": 3450,
+    "transpositions": 1404
+  },
+  "witness_totals": {
+    "deletion_survivors": 45192,
+    "substitution_changed": 15474,
+    "transposition_pattern_hamming": 12744
+  }
+}

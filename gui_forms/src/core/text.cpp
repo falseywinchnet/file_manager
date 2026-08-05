@@ -1,0 +1,630 @@
+#include "gui_forms/text.hpp"
+
+#include "unicode_grapheme.hpp"
+#include "unicode_grapheme_data.hpp"
+
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+
+namespace gui_forms {
+namespace {
+
+struct DecodedScalar final {
+  char32_t value{};
+  std::size_t bytes{};
+};
+
+[[nodiscard]] constexpr bool continuation(std::uint8_t byte) noexcept {
+  return (byte & 0xc0U) == 0x80U;
+}
+
+[[nodiscard]] DecodedScalar decode_valid(std::string_view text,
+                                         std::size_t offset) noexcept {
+  const auto first = static_cast<std::uint8_t>(text[offset]);
+  if (first < 0x80U) {
+    return {first, 1};
+  }
+  const auto second = static_cast<std::uint8_t>(text[offset + 1U]);
+  if (first < 0xe0U) {
+    return {static_cast<char32_t>(((first & 0x1fU) << 6U) | (second & 0x3fU)),
+            2};
+  }
+  const auto third = static_cast<std::uint8_t>(text[offset + 2U]);
+  if (first < 0xf0U) {
+    return {static_cast<char32_t>(((first & 0x0fU) << 12U) |
+                                  ((second & 0x3fU) << 6U) | (third & 0x3fU)),
+            3};
+  }
+  const auto fourth = static_cast<std::uint8_t>(text[offset + 3U]);
+  return {static_cast<char32_t>(((first & 0x07U) << 18U) |
+                                ((second & 0x3fU) << 12U) |
+                                ((third & 0x3fU) << 6U) | (fourth & 0x3fU)),
+          4};
+}
+
+[[nodiscard]] bool is_line_break(char32_t scalar) noexcept {
+  return scalar == U'\n' || scalar == U'\r' || scalar == U'\u0085' ||
+         scalar == U'\u2028' || scalar == U'\u2029';
+}
+
+[[nodiscard]] std::size_t checked_new_size(std::size_t current,
+                                           std::size_t removed,
+                                           std::size_t inserted) {
+  if (removed > current || inserted > std::numeric_limits<std::size_t>::max() -
+                                          (current - removed)) {
+    throw std::length_error("GUI.Forms text edit size overflow");
+  }
+  return current - removed + inserted;
+}
+
+} // namespace
+
+struct TextStore::Metadata final {
+  std::size_t scalars{};
+  std::size_t utf16_units{};
+  std::vector<std::size_t> line_starts;
+  std::vector<std::size_t> line_content_ends;
+  std::vector<std::size_t> grapheme_boundaries;
+};
+
+Utf8ValidationResult validate_utf8(std::string_view text) noexcept {
+  Utf8ValidationResult result;
+  std::size_t offset = 0;
+  while (offset < text.size()) {
+    const auto first = static_cast<std::uint8_t>(text[offset]);
+    std::size_t length = 0;
+    char32_t scalar = 0;
+    if (first < 0x80U) {
+      length = 1;
+      scalar = first;
+    } else if (first < 0xc0U) {
+      result.error = Utf8ValidationError::unexpected_continuation;
+    } else if (first < 0xc2U) {
+      result.error = Utf8ValidationError::overlong_encoding;
+    } else if (first < 0xe0U) {
+      length = 2;
+    } else if (first < 0xf0U) {
+      length = 3;
+    } else if (first < 0xf5U) {
+      length = 4;
+    } else {
+      result.error = Utf8ValidationError::code_point_out_of_range;
+    }
+
+    if (result.error != Utf8ValidationError::none) {
+      result.error_offset = Utf8Offset(offset);
+      return result;
+    }
+    if (length > text.size() - offset) {
+      result.error = Utf8ValidationError::truncated_sequence;
+      result.error_offset = Utf8Offset(offset);
+      return result;
+    }
+    for (std::size_t continuation_index = 1; continuation_index < length;
+         ++continuation_index) {
+      if (!continuation(
+              static_cast<std::uint8_t>(text[offset + continuation_index]))) {
+        result.error = Utf8ValidationError::invalid_continuation;
+        result.error_offset = Utf8Offset(offset + continuation_index);
+        return result;
+      }
+    }
+
+    if (length > 1) {
+      scalar = decode_valid(text, offset).value;
+      const auto second = static_cast<std::uint8_t>(text[offset + 1U]);
+      if ((first == 0xe0U && second < 0xa0U) ||
+          (first == 0xf0U && second < 0x90U)) {
+        result.error = Utf8ValidationError::overlong_encoding;
+      } else if (first == 0xedU && second >= 0xa0U) {
+        result.error = Utf8ValidationError::surrogate_code_point;
+      } else if (first == 0xf4U && second >= 0x90U) {
+        result.error = Utf8ValidationError::code_point_out_of_range;
+      }
+      if (result.error != Utf8ValidationError::none) {
+        result.error_offset = Utf8Offset(offset);
+        return result;
+      }
+    }
+
+    ++result.scalar_count;
+    result.utf16_unit_count += scalar > 0xffffU ? 2U : 1U;
+    offset += length;
+  }
+  result.error_offset = Utf8Offset(text.size());
+  return result;
+}
+
+std::string_view to_string(Utf8ValidationError error) noexcept {
+  switch (error) {
+  case Utf8ValidationError::none:
+    return "none";
+  case Utf8ValidationError::unexpected_continuation:
+    return "unexpected_continuation";
+  case Utf8ValidationError::invalid_continuation:
+    return "invalid_continuation";
+  case Utf8ValidationError::truncated_sequence:
+    return "truncated_sequence";
+  case Utf8ValidationError::overlong_encoding:
+    return "overlong_encoding";
+  case Utf8ValidationError::surrogate_code_point:
+    return "surrogate_code_point";
+  case Utf8ValidationError::code_point_out_of_range:
+    return "code_point_out_of_range";
+  }
+  return "unknown";
+}
+
+std::string_view grapheme_unicode_version() noexcept {
+  return unicode_data::version;
+}
+
+TextStore::TextStore(std::string_view text, TextStoreLimits limits)
+    : limits_(limits) {
+  if (text.size() > limits_.maximum_utf8_bytes) {
+    throw std::length_error("GUI.Forms initial text exceeds its byte limit");
+  }
+  Metadata metadata = analyze(text);
+  text_.assign(text);
+  scalar_count_ = metadata.scalars;
+  utf16_units_ = metadata.utf16_units;
+  line_starts_ = std::move(metadata.line_starts);
+  line_content_ends_ = std::move(metadata.line_content_ends);
+  grapheme_boundaries_ = std::move(metadata.grapheme_boundaries);
+  metadata_rebuild_count_ = 1;
+}
+
+void TextStore::set_text(std::string_view text) {
+  static_cast<void>(replace({Utf8Offset(0), utf8_size()}, text));
+}
+
+TextEditResult TextStore::replace(Utf8Range range, std::string_view replacement,
+                                  std::optional<TextStyleId> inserted_style) {
+  try {
+    validate_range(range);
+    const Utf8ValidationResult replacement_validation =
+        validate_utf8(replacement);
+    if (!replacement_validation.valid()) {
+      reject_invalid_utf8(replacement_validation);
+    }
+
+    const std::size_t start = range.start.value();
+    const std::size_t end = range.end.value();
+    const std::size_t removed_bytes = end - start;
+    const std::size_t next_size =
+        checked_new_size(text_.size(), removed_bytes, replacement.size());
+    if (next_size > limits_.maximum_utf8_bytes) {
+      throw std::length_error("GUI.Forms text edit exceeds its byte limit");
+    }
+    if (removed_bytes == 0 && replacement.empty() && !inserted_style) {
+      return {range, range, 0, 0, revision_, false};
+    }
+
+    const Utf8ValidationResult removed_validation =
+        validate_utf8(std::string_view(text_).substr(start, removed_bytes));
+    std::string candidate;
+    candidate.reserve(next_size);
+    candidate.append(text_.data(), start);
+    candidate.append(replacement);
+    candidate.append(text_.data() + end, text_.size() - end);
+    Metadata metadata = analyze(candidate);
+    std::vector<TextStyleSpan> transformed = transform_style_spans(
+        range, replacement.size(), inserted_style, candidate);
+    if (transformed.size() > limits_.maximum_style_spans) {
+      throw std::length_error(
+          "GUI.Forms text edit exceeds its style-span limit");
+    }
+
+    const bool styles_changed = transformed != style_spans_;
+    text_ = std::move(candidate);
+    line_starts_ = std::move(metadata.line_starts);
+    line_content_ends_ = std::move(metadata.line_content_ends);
+    grapheme_boundaries_ = std::move(metadata.grapheme_boundaries);
+    scalar_count_ = metadata.scalars;
+    utf16_units_ = metadata.utf16_units;
+    style_spans_ = std::move(transformed);
+    ++revision_;
+    ++edit_count_;
+    ++metadata_rebuild_count_;
+    if (styles_changed) {
+      ++style_update_count_;
+    }
+    return {
+        range,
+        {range.start, Utf8Offset(start + replacement.size())},
+        removed_validation.scalar_count,
+        replacement_validation.scalar_count,
+        revision_,
+        true,
+    };
+  } catch (const std::invalid_argument &) {
+    ++rejected_mutation_count_;
+    throw;
+  } catch (const std::out_of_range &) {
+    ++rejected_mutation_count_;
+    throw;
+  } catch (const std::length_error &) {
+    ++rejected_mutation_count_;
+    throw;
+  }
+}
+
+void TextStore::set_style_spans(std::span<const TextStyleSpan> spans) {
+  try {
+    std::vector<TextStyleSpan> normalized = normalize_style_spans(spans, text_);
+    if (normalized == style_spans_) {
+      return;
+    }
+    style_spans_ = std::move(normalized);
+    ++revision_;
+    ++style_update_count_;
+  } catch (const std::invalid_argument &) {
+    ++rejected_mutation_count_;
+    throw;
+  } catch (const std::out_of_range &) {
+    ++rejected_mutation_count_;
+    throw;
+  } catch (const std::length_error &) {
+    ++rejected_mutation_count_;
+    throw;
+  }
+}
+
+std::optional<TextStyleId> TextStore::style_at(Utf8Offset position) const {
+  validate_position(position);
+  if (position == utf8_size()) {
+    return std::nullopt;
+  }
+  const auto iterator =
+      std::upper_bound(style_spans_.begin(), style_spans_.end(), position,
+                       [](Utf8Offset value, const TextStyleSpan &span) {
+                         return value < span.range.start;
+                       });
+  if (iterator == style_spans_.begin()) {
+    return std::nullopt;
+  }
+  const TextStyleSpan &candidate = *std::prev(iterator);
+  return position < candidate.range.end ? std::optional(candidate.style)
+                                        : std::nullopt;
+}
+
+bool TextStore::is_scalar_boundary(Utf8Offset position) const noexcept {
+  if (position.value() > text_.size()) {
+    return false;
+  }
+  return position.value() == text_.size() ||
+         !continuation(static_cast<std::uint8_t>(text_[position.value()]));
+}
+
+bool TextStore::is_grapheme_boundary(Utf8Offset position) const noexcept {
+  return std::binary_search(grapheme_boundaries_.begin(),
+                            grapheme_boundaries_.end(), position.value());
+}
+
+Utf8Offset TextStore::utf8_offset(Utf16Offset position) const {
+  if (position.value() > utf16_units_) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms UTF-16 position exceeds text length");
+  }
+  std::size_t offset = 0;
+  std::size_t units = 0;
+  while (offset < text_.size() && units < position.value()) {
+    const DecodedScalar decoded = decode_valid(text_, offset);
+    const std::size_t next_units = units + (decoded.value > 0xffffU ? 2U : 1U);
+    if (position.value() < next_units) {
+      ++rejected_position_query_count_;
+      throw std::invalid_argument(
+          "GUI.Forms UTF-16 position splits a surrogate pair");
+    }
+    units = next_units;
+    offset += decoded.bytes;
+  }
+  return Utf8Offset(offset);
+}
+
+Utf8Offset TextStore::utf8_offset(ScalarIndex position) const {
+  if (position.value() > scalar_count_) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms scalar position exceeds text length");
+  }
+  std::size_t offset = 0;
+  for (std::size_t scalar = 0; scalar < position.value(); ++scalar) {
+    offset += decode_valid(text_, offset).bytes;
+  }
+  return Utf8Offset(offset);
+}
+
+Utf8Offset TextStore::utf8_offset(GraphemeIndex position) const {
+  if (position.value() >= grapheme_boundaries_.size()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms grapheme position exceeds text length");
+  }
+  return Utf8Offset(grapheme_boundaries_[position.value()]);
+}
+
+Utf16Offset TextStore::utf16_offset(Utf8Offset position) const {
+  validate_position(position);
+  std::size_t offset = 0;
+  std::size_t units = 0;
+  while (offset < position.value()) {
+    const DecodedScalar decoded = decode_valid(text_, offset);
+    units += decoded.value > 0xffffU ? 2U : 1U;
+    offset += decoded.bytes;
+  }
+  return Utf16Offset(units);
+}
+
+ScalarIndex TextStore::scalar_index(Utf8Offset position) const {
+  validate_position(position);
+  std::size_t offset = 0;
+  std::size_t scalars = 0;
+  while (offset < position.value()) {
+    offset += decode_valid(text_, offset).bytes;
+    ++scalars;
+  }
+  return ScalarIndex(scalars);
+}
+
+GraphemeIndex TextStore::grapheme_index(Utf8Offset position) const {
+  validate_position(position);
+  const auto iterator = std::lower_bound(grapheme_boundaries_.begin(),
+                                         grapheme_boundaries_.end(),
+                                         position.value());
+  if (iterator == grapheme_boundaries_.end() || *iterator != position.value()) {
+    ++rejected_position_query_count_;
+    throw std::invalid_argument(
+        "GUI.Forms UTF-8 position splits an extended grapheme cluster");
+  }
+  return GraphemeIndex(
+      static_cast<std::size_t>(iterator - grapheme_boundaries_.begin()));
+}
+
+Utf8Offset TextStore::next_scalar_boundary(Utf8Offset position) const {
+  validate_position(position);
+  if (position == utf8_size()) {
+    return position;
+  }
+  return Utf8Offset(position.value() +
+                    decode_valid(text_, position.value()).bytes);
+}
+
+Utf8Offset TextStore::previous_scalar_boundary(Utf8Offset position) const {
+  validate_position(position);
+  if (position.value() == 0) {
+    return position;
+  }
+  std::size_t offset = position.value() - 1U;
+  while (offset > 0 && continuation(static_cast<std::uint8_t>(text_[offset]))) {
+    --offset;
+  }
+  return Utf8Offset(offset);
+}
+
+Utf8Offset TextStore::next_grapheme_boundary(Utf8Offset position) const {
+  const GraphemeIndex index = grapheme_index(position);
+  if (index == grapheme_count()) {
+    return position;
+  }
+  return Utf8Offset(grapheme_boundaries_[index.value() + 1U]);
+}
+
+Utf8Offset TextStore::previous_grapheme_boundary(Utf8Offset position) const {
+  const GraphemeIndex index = grapheme_index(position);
+  if (index.value() == 0U) {
+    return position;
+  }
+  return Utf8Offset(grapheme_boundaries_[index.value() - 1U]);
+}
+
+Utf8Range TextStore::grapheme_range(GraphemeIndex grapheme) const {
+  if (grapheme >= grapheme_count()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms grapheme index has no cluster");
+  }
+  return {Utf8Offset(grapheme_boundaries_[grapheme.value()]),
+          Utf8Offset(grapheme_boundaries_[grapheme.value() + 1U])};
+}
+
+char32_t TextStore::scalar_at(Utf8Offset position) const {
+  validate_position(position);
+  if (position == utf8_size()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms cannot read a scalar at end of text");
+  }
+  return decode_valid(text_, position.value()).value;
+}
+
+Utf8Offset TextStore::line_start(LineIndex line) const {
+  if (line.value() >= line_starts_.size()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms line position exceeds text length");
+  }
+  return Utf8Offset(line_starts_[line.value()]);
+}
+
+Utf8Range TextStore::line_content_range(LineIndex line) const {
+  if (line.value() >= line_starts_.size()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms line position exceeds text length");
+  }
+  return {Utf8Offset(line_starts_[line.value()]),
+          Utf8Offset(line_content_ends_[line.value()])};
+}
+
+TextStoreSnapshot TextStore::snapshot() const noexcept {
+  return {
+      text_.size(),
+      utf16_units_,
+      scalar_count_,
+      grapheme_boundaries_.size() - 1U,
+      line_starts_.size(),
+      style_spans_.size(),
+      revision_,
+      edit_count_,
+      style_update_count_,
+      metadata_rebuild_count_,
+      rejected_mutation_count_,
+      rejected_position_query_count_,
+  };
+}
+
+TextStore::Metadata TextStore::analyze(std::string_view text) {
+  const Utf8ValidationResult validation = validate_utf8(text);
+  if (!validation.valid()) {
+    throw std::invalid_argument(
+        "GUI.Forms text is not valid UTF-8 at byte " +
+        std::to_string(validation.error_offset.value()) + ": " +
+        std::string(to_string(validation.error)));
+  }
+
+  Metadata metadata;
+  metadata.scalars = validation.scalar_count;
+  metadata.utf16_units = validation.utf16_unit_count;
+  metadata.grapheme_boundaries =
+      detail::extended_grapheme_boundaries(text, validation.scalar_count);
+  metadata.line_starts.push_back(0);
+  std::size_t offset = 0;
+  while (offset < text.size()) {
+    const DecodedScalar decoded = decode_valid(text, offset);
+    if (!is_line_break(decoded.value)) {
+      offset += decoded.bytes;
+      continue;
+    }
+    metadata.line_content_ends.push_back(offset);
+    offset += decoded.bytes;
+    if (decoded.value == U'\r' && offset < text.size()) {
+      const DecodedScalar next = decode_valid(text, offset);
+      if (next.value == U'\n') {
+        offset += next.bytes;
+      }
+    }
+    metadata.line_starts.push_back(offset);
+  }
+  metadata.line_content_ends.push_back(text.size());
+  return metadata;
+}
+
+std::vector<TextStyleSpan>
+TextStore::normalize_style_spans(std::span<const TextStyleSpan> spans,
+                                 std::string_view candidate_text) const {
+  if (spans.size() > limits_.maximum_style_spans) {
+    throw std::length_error("GUI.Forms style-span input exceeds its limit");
+  }
+  std::vector<TextStyleSpan> result(spans.begin(), spans.end());
+  std::sort(result.begin(), result.end(),
+            [](const TextStyleSpan &left, const TextStyleSpan &right) {
+              if (left.range.start != right.range.start) {
+                return left.range.start < right.range.start;
+              }
+              if (left.range.end != right.range.end) {
+                return left.range.end < right.range.end;
+              }
+              return left.style < right.style;
+            });
+
+  std::vector<TextStyleSpan> normalized;
+  normalized.reserve(result.size());
+  for (const TextStyleSpan &span : result) {
+    if (span.range.start >= span.range.end) {
+      throw std::invalid_argument("GUI.Forms style spans must be nonempty");
+    }
+    if (span.range.end.value() > candidate_text.size()) {
+      throw std::out_of_range("GUI.Forms style span exceeds text length");
+    }
+    const auto boundary = [&candidate_text](Utf8Offset position) {
+      return position.value() == candidate_text.size() ||
+             !continuation(
+                 static_cast<std::uint8_t>(candidate_text[position.value()]));
+    };
+    if (!boundary(span.range.start) || !boundary(span.range.end)) {
+      throw std::invalid_argument("GUI.Forms style span splits a UTF-8 scalar");
+    }
+    if (!normalized.empty() && span.range.start < normalized.back().range.end) {
+      throw std::invalid_argument("GUI.Forms style spans may not overlap");
+    }
+    if (!normalized.empty() &&
+        span.range.start == normalized.back().range.end &&
+        span.style == normalized.back().style) {
+      normalized.back().range.end = span.range.end;
+    } else {
+      normalized.push_back(span);
+    }
+  }
+  return normalized;
+}
+
+std::vector<TextStyleSpan>
+TextStore::transform_style_spans(Utf8Range removed, std::size_t inserted_bytes,
+                                 std::optional<TextStyleId> inserted_style,
+                                 std::string_view candidate_text) const {
+  const std::size_t start = removed.start.value();
+  const std::size_t end = removed.end.value();
+  const std::size_t removed_bytes = end - start;
+  const bool grows = inserted_bytes >= removed_bytes;
+  const std::size_t magnitude =
+      grows ? inserted_bytes - removed_bytes : removed_bytes - inserted_bytes;
+  const auto shifted = [grows, magnitude](std::size_t value) {
+    return grows ? value + magnitude : value - magnitude;
+  };
+
+  std::vector<TextStyleSpan> result;
+  result.reserve(style_spans_.size() +
+                 (inserted_style && inserted_bytes > 0 ? 1U : 0U));
+  for (const TextStyleSpan &span : style_spans_) {
+    if (span.range.end.value() <= start) {
+      result.push_back(span);
+    } else if (span.range.start.value() >= end) {
+      result.push_back({{Utf8Offset(shifted(span.range.start.value())),
+                         Utf8Offset(shifted(span.range.end.value()))},
+                        span.style});
+    } else {
+      if (span.range.start.value() < start) {
+        result.push_back({{span.range.start, Utf8Offset(start)}, span.style});
+      }
+      if (span.range.end.value() > end) {
+        result.push_back({{Utf8Offset(start + inserted_bytes),
+                           Utf8Offset(shifted(span.range.end.value()))},
+                          span.style});
+      }
+    }
+  }
+  if (inserted_style && inserted_bytes > 0) {
+    result.push_back({{Utf8Offset(start), Utf8Offset(start + inserted_bytes)},
+                      *inserted_style});
+  }
+  return normalize_style_spans(result, candidate_text);
+}
+
+void TextStore::validate_position(Utf8Offset position) const {
+  if (position.value() > text_.size()) {
+    ++rejected_position_query_count_;
+    throw std::out_of_range("GUI.Forms UTF-8 position exceeds text length");
+  }
+  if (!is_scalar_boundary(position)) {
+    ++rejected_position_query_count_;
+    throw std::invalid_argument("GUI.Forms UTF-8 position splits a scalar");
+  }
+}
+
+void TextStore::validate_range(Utf8Range range) const {
+  if (range.start > range.end) {
+    throw std::invalid_argument("GUI.Forms text range is reversed");
+  }
+  if (range.end.value() > text_.size()) {
+    throw std::out_of_range("GUI.Forms text range exceeds text length");
+  }
+  if (!is_scalar_boundary(range.start) || !is_scalar_boundary(range.end)) {
+    throw std::invalid_argument("GUI.Forms text range splits a UTF-8 scalar");
+  }
+}
+
+void TextStore::reject_invalid_utf8(const Utf8ValidationResult &validation) {
+  throw std::invalid_argument(
+      "GUI.Forms replacement is not valid UTF-8 at byte " +
+      std::to_string(validation.error_offset.value()) + ": " +
+      std::string(to_string(validation.error)));
+}
+
+} // namespace gui_forms

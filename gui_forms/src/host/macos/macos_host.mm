@@ -19,6 +19,7 @@ using gui_forms::DragDataItem;
 using gui_forms::DragEffect;
 using gui_forms::DragEvent;
 using gui_forms::DragFileListData;
+using gui_forms::DragLimits;
 using gui_forms::DragTextData;
 using gui_forms::HostActivationEvent;
 using gui_forms::HostAttachEvent;
@@ -111,6 +112,112 @@ static PointerButton button_for(NSInteger button_number) {
     return PointerButton::none;
 }
 
+// AppKit keyCode values describe positions in Apple's hardware vocabulary.
+// Translate them at the adapter boundary so retained controls see the same USB
+// HID usages on every host. Text remains owned by NSTextInputClient below.
+static std::uint32_t physical_key_for(unsigned short key_code) {
+    switch (key_code) {
+    case 0: return 0x04U;   // A
+    case 1: return 0x16U;   // S
+    case 2: return 0x07U;   // D
+    case 3: return 0x09U;   // F
+    case 4: return 0x0BU;   // H
+    case 5: return 0x0AU;   // G
+    case 6: return 0x1DU;   // Z
+    case 7: return 0x1BU;   // X
+    case 8: return 0x06U;   // C
+    case 9: return 0x19U;   // V
+    case 11: return 0x05U;  // B
+    case 12: return 0x14U;  // Q
+    case 13: return 0x1AU;  // W
+    case 14: return 0x08U;  // E
+    case 15: return 0x15U;  // R
+    case 16: return 0x1CU;  // Y
+    case 17: return 0x17U;  // T
+    case 18: return 0x1EU;  // 1
+    case 19: return 0x1FU;  // 2
+    case 20: return 0x20U;  // 3
+    case 21: return 0x21U;  // 4
+    case 22: return 0x23U;  // 6
+    case 23: return 0x22U;  // 5
+    case 24: return 0x2EU;  // =
+    case 25: return 0x26U;  // 9
+    case 26: return 0x24U;  // 7
+    case 27: return 0x2DU;  // -
+    case 28: return 0x25U;  // 8
+    case 29: return 0x27U;  // 0
+    case 30: return 0x30U;  // ]
+    case 31: return 0x12U;  // O
+    case 32: return 0x18U;  // U
+    case 33: return 0x2FU;  // [
+    case 34: return 0x0CU;  // I
+    case 35: return 0x13U;  // P
+    case 36: return 0x28U;  // Return
+    case 37: return 0x0FU;  // L
+    case 38: return 0x0DU;  // J
+    case 39: return 0x34U;  // '
+    case 40: return 0x0EU;  // K
+    case 41: return 0x33U;  // ;
+    case 42: return 0x31U;  // backslash
+    case 43: return 0x36U;  // comma
+    case 44: return 0x38U;  // slash
+    case 45: return 0x11U;  // N
+    case 46: return 0x10U;  // M
+    case 47: return 0x37U;  // period
+    case 48: return 0x2BU;  // Tab
+    case 49: return 0x2CU;  // Space
+    case 50: return 0x35U;  // grave
+    case 51: return 0x2AU;  // Backspace
+    case 53: return 0x29U;  // Escape
+    case 64: return 0x6CU;  // F17
+    case 65: return 0x63U;  // Keypad decimal
+    case 67: return 0x55U;  // Keypad multiply
+    case 69: return 0x57U;  // Keypad plus
+    case 71: return 0x53U;  // Keypad clear
+    case 75: return 0x54U;  // Keypad divide
+    case 76: return 0x58U;  // Keypad enter
+    case 78: return 0x56U;  // Keypad minus
+    case 81: return 0x67U;  // Keypad equals
+    case 82: return 0x62U;  // Keypad 0
+    case 83: return 0x59U;  // Keypad 1
+    case 84: return 0x5AU;  // Keypad 2
+    case 85: return 0x5BU;  // Keypad 3
+    case 86: return 0x5CU;  // Keypad 4
+    case 87: return 0x5DU;  // Keypad 5
+    case 88: return 0x5EU;  // Keypad 6
+    case 89: return 0x5FU;  // Keypad 7
+    case 91: return 0x60U;  // Keypad 8
+    case 92: return 0x61U;  // Keypad 9
+    case 96: return 0x3EU;  // F5
+    case 97: return 0x3FU;  // F6
+    case 98: return 0x40U;  // F7
+    case 99: return 0x3CU;  // F3
+    case 100: return 0x41U; // F8
+    case 101: return 0x42U; // F9
+    case 103: return 0x44U; // F11
+    case 105: return 0x68U; // F13
+    case 106: return 0x6BU; // F16
+    case 107: return 0x69U; // F14
+    case 109: return 0x43U; // F10
+    case 111: return 0x45U; // F12
+    case 113: return 0x6AU; // F15
+    case 114: return 0x49U; // Help/Insert
+    case 115: return 0x4AU; // Home
+    case 116: return 0x4BU; // Page Up
+    case 117: return 0x4CU; // Forward Delete
+    case 118: return 0x3DU; // F4
+    case 119: return 0x4DU; // End
+    case 120: return 0x3BU; // F2
+    case 121: return 0x4EU; // Page Down
+    case 122: return 0x3AU; // F1
+    case 123: return 0x50U; // Left
+    case 124: return 0x4FU; // Right
+    case 125: return 0x51U; // Down
+    case 126: return 0x52U; // Up
+    default: return 0U;
+    }
+}
+
 static DragEffect drag_effects_for(NSDragOperation operations) {
     DragEffect result = DragEffect::none;
     if ((operations & NSDragOperationCopy) != 0) {
@@ -137,24 +244,44 @@ static NSDragOperation native_drag_operation(DragEffect effect) {
 
 static std::vector<DragDataItem> drag_items_for(NSPasteboard* pasteboard) {
     std::vector<DragDataItem> result;
+    std::size_t total_bytes = 0;
     NSArray<NSURL*>* urls = [pasteboard
         readObjectsForClasses:@[[NSURL class]]
                     options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
     DragFileListData files;
+    if (urls.count > DragLimits::maximum_paths) {
+        return {};
+    }
     for (NSURL* url in urls) {
-        const char* path = url.path.UTF8String;
-        if (path != nullptr) {
-            files.paths_utf8.emplace_back(path);
+        NSString* native_path = url.path;
+        const NSUInteger byte_count =
+            [native_path lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        if (byte_count == 0 || byte_count > DragLimits::maximum_path_bytes ||
+            byte_count > DragLimits::maximum_total_bytes - total_bytes) {
+            return {};
         }
+        const char* path = native_path.UTF8String;
+        if (path == nullptr) {
+            return {};
+        }
+        files.paths_utf8.emplace_back(path, byte_count);
+        total_bytes += byte_count;
     }
     if (!files.paths_utf8.empty()) {
         result.emplace_back(std::move(files));
     }
     NSString* text = [pasteboard stringForType:NSPasteboardTypeString];
     if (text != nil) {
+        const NSUInteger byte_count =
+            [text lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+        if (byte_count > DragLimits::maximum_text_bytes ||
+            byte_count > DragLimits::maximum_total_bytes - total_bytes) {
+            return {};
+        }
         const char* bytes = text.UTF8String;
         if (bytes != nullptr) {
-            result.emplace_back(DragTextData{bytes});
+            result.emplace_back(DragTextData{std::string(bytes, byte_count)});
+            total_bytes += byte_count;
         }
     }
     NSPasteboardType type = [pasteboard availableTypeFromArray:@[@"public.data"]];
@@ -162,11 +289,17 @@ static std::vector<DragDataItem> drag_items_for(NSPasteboard* pasteboard) {
         ![type isEqualToString:NSPasteboardTypeFileURL]) {
         NSData* data = [pasteboard dataForType:type];
         const char* media = type.UTF8String;
-        if (data != nil && data.length != 0 && media != nullptr) {
-        const auto* begin = static_cast<const std::uint8_t*>(data.bytes);
-        result.emplace_back(DragBinaryData{
-            media, std::vector<std::uint8_t>(begin, begin + data.length)});
+        if (data != nil && data.length != 0 && media != nullptr &&
+            [type lengthOfBytesUsingEncoding:NSUTF8StringEncoding] <=
+                DragLimits::maximum_media_type_bytes &&
+            data.length <= DragLimits::maximum_total_bytes - total_bytes) {
+            const auto* begin = static_cast<const std::uint8_t*>(data.bytes);
+            result.emplace_back(DragBinaryData{
+                media, std::vector<std::uint8_t>(begin, begin + data.length)});
         }
+    }
+    if (result.size() > DragLimits::maximum_items) {
+        return {};
     }
     return result;
 }
@@ -991,7 +1124,7 @@ private:
 - (void)keyDown:(NSEvent*)event {
     KeyEvent input;
     input.action = KeyAction::down;
-    input.physical_key = static_cast<std::uint32_t>(event.keyCode);
+    input.physical_key = physical_key_for(event.keyCode);
     input.modifiers = modifiers_for(event.modifierFlags);
     input.repeat = event.isARepeat;
     const bool handled = [self dispatchHostPayload:std::move(input)
@@ -1005,7 +1138,7 @@ private:
 - (void)keyUp:(NSEvent*)event {
     KeyEvent input;
     input.action = KeyAction::up;
-    input.physical_key = static_cast<std::uint32_t>(event.keyCode);
+    input.physical_key = physical_key_for(event.keyCode);
     input.modifiers = modifiers_for(event.modifierFlags);
     static_cast<void>([self dispatchHostPayload:std::move(input)
                                timestampNanoseconds:host_event_nanoseconds(event)]);
@@ -1191,7 +1324,7 @@ HostCapabilities macos_capabilities() {
                 HostCapability::pointer_capture |
                 HostCapability::cursor |
                 HostCapability::clipboard |
-                HostCapability::typed_drag_drop |
+                HostCapability::typed_drag_destination |
                 HostCapability::dialogs};
 }
 
@@ -1235,6 +1368,21 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         [nativeWindow center];
         [nativeWindow makeKeyAndOrderFront:nil];
         [application activateIgnoringOtherApps:YES];
+        if (options.host_ready) {
+            const std::function<void()> dispatchPending = options.dispatch_pending;
+            options.host_ready(
+                [view, dispatchPending] {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (dispatchPending) dispatchPending();
+                        [view collectDamage];
+                    });
+                },
+                [nativeWindow] {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [nativeWindow performClose:nil];
+                    });
+                });
+        }
         if (options.close_after_launch_for_testing) {
             const std::uint32_t closeAttempts =
                 std::max<std::uint32_t>(1, options.close_attempts_for_testing);
@@ -1247,6 +1395,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
             });
         }
         [application run];
+        if (options.closed) options.closed();
 
         const std::string metrics = [view metricsJSON];
         const std::string host = [view hostJSON];

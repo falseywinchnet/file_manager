@@ -39,7 +39,6 @@ public:
 
     [[nodiscard]] dml::NodeKind kind() const noexcept;
     [[nodiscard]] bool selected() const;
-    [[nodiscard]] bool checked() const;
     [[nodiscard]] double value() const;
     [[nodiscard]] std::string display_text() const;
 
@@ -47,13 +46,11 @@ private:
     const dml::NodeSpec* specification_{};
     std::shared_ptr<GalleryContext> context_;
     bool pressed_{};
-    bool hovered_{};
     bool focused_{};
     bool drag_hovered_{};
     std::uint64_t paint_sequence_{};
 
     void arrange_children(Size size);
-    void set_slider_from_window_point(Point point);
 };
 
 struct GalleryTree final {

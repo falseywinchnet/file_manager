@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gui.forms.invalid/schemas/facade-catalogue-v1.json",
+  "title": "GUI.Forms compatibility facade catalogue v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "toolVersion", "source", "policy", "apiRows",
+    "customControlRows", "nativeImportRows", "facade", "summary"
+  ],
+  "properties": {
+    "schema": { "const": "gui.forms.compat.facade-catalogue/v1" },
+    "toolVersion": { "type": "string" },
+    "source": { "$ref": "#/$defs/source" },
+    "policy": { "type": "object" },
+    "apiRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/apiRow" }
+    },
+    "customControlRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/customRow" }
+    },
+    "nativeImportRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nativeRow" }
+    },
+    "facade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredTypes"],
+      "properties": {
+        "requiredTypes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "summary": { "type": "object" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^(api|custom|native)-[0-9a-f]{24}$"
+    },
+    "disposition": {
+      "enum": ["required", "deferred", "excluded", "application_side_port"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "captureSchema", "captureSha256", "specimenLabel", "specimenSha256",
+        "policySchema", "policySha256"
+      ],
+      "properties": {
+        "captureSchema": { "const": "gui.forms.compat.capture/v0" },
+        "captureSha256": { "$ref": "#/$defs/sha256" },
+        "specimenLabel": { "type": "string" },
+        "specimenSha256": { "$ref": "#/$defs/sha256" },
+        "policySchema": { "const": "gui.forms.compat.disposition-policy/v1" },
+        "policySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "classified": {
+      "type": "object",
+      "required": [
+        "id", "evidence", "disposition", "implementationOwner",
+        "rationaleCode", "rationale"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "evidence": { "type": "string" },
+        "disposition": { "$ref": "#/$defs/disposition" },
+        "implementationOwner": { "type": "string" },
+        "rationaleCode": { "type": "string" },
+        "rationale": { "type": "string" }
+      }
+    },
+    "apiRow": {
+      "allOf": [
+        { "$ref": "#/$defs/classified" },
+        {
+          "type": "object",
+          "required": [
+            "targetAssembly", "type", "memberKind", "operations",
+            "ilOccurrenceCount", "metadataReference", "sourceAssemblies"
+          ],
+          "properties": {
+            "targetAssembly": { "type": "string" },
+            "type": { "type": "string" },
+            "member": { "type": "string" },
+            "signature": { "type": "string" },
+            "memberKind": { "enum": ["type", "method", "field"] },
+            "operations": { "type": "array", "items": { "type": "string" } },
+            "ilOccurrenceCount": { "type": "integer", "minimum": 0 },
+            "metadataReference": { "type": "boolean" },
+            "sourceAssemblies": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "customRow": {
+      "allOf": [
+        { "$ref": "#/$defs/classified" },
+        {
+          "type": "object",
+          "required": [
+            "privateTypeId", "sourceAssembly", "formsBaseAssembly",
+            "formsBaseType", "inheritanceDepth"
+          ],
+          "properties": {
+            "privateTypeId": { "type": "string" },
+            "sourceAssembly": { "type": "string" },
+            "formsBaseAssembly": { "type": "string" },
+            "formsBaseType": { "type": "string" },
+            "inheritanceDepth": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "nativeRow": {
+      "allOf": [
+        { "$ref": "#/$defs/classified" },
+        {
+          "type": "object",
+          "required": [
+            "sourceAssembly", "module", "entryPoint", "attributes", "count"
+          ],
+          "properties": {
+            "sourceAssembly": { "type": "string" },
+            "module": { "type": "string" },
+            "entryPoint": { "type": "string" },
+            "attributes": { "type": "string" },
+            "count": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

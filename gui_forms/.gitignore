@@ -1,0 +1,8 @@
+/build*/
+/tools/**/bin/
+/tools/**/obj/
+/generated/**/bin/
+/generated/**/obj/
+
+# Keep retired compatibility specimen-derived demo and compatibility artifacts local because the specimen is proprietary.
+/compatibility/retired compatibility specimen/

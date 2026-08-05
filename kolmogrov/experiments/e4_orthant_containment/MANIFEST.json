@@ -1,0 +1,15 @@
+{
+  "claim_ids": ["K-H02", "K-H04", "K-H10", "T-ORTHANT-1"],
+  "command": "python3 experiments/e4_orthant_containment/run.py",
+  "corpus": {
+    "alphabet": ["a", "b"],
+    "max_record_length": 6,
+    "queries": "every nonempty binary query no longer than its record",
+    "scales": "every degree one through query length"
+  },
+  "experiment_id": "e4_orthant_containment_v0_2026-08-05",
+  "inference_boundary": "Finite exact-containment census; no judged perceptual relevance, compact representation, approximate matching, or production complexity claim.",
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "e3c0d784ee3d4259f2c658262f88df9426b106e5fdc715300666c35fcad50897",
+  "revision": "tracked Kolmogrov working tree; raw and pair-stream digests recorded by run"
+}

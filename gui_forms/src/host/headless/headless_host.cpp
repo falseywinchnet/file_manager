@@ -18,7 +18,7 @@ HostCapabilities headless_capabilities() {
                 HostCapability::pointer_capture |
                 HostCapability::cursor |
                 HostCapability::clipboard |
-                HostCapability::typed_drag_drop |
+                HostCapability::typed_drag_destination |
                 HostCapability::dialogs};
 }
 

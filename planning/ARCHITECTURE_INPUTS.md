@@ -96,6 +96,16 @@ implementations are a last resort, not the first architecture.
 
 ## Index service and consent
 
+- The indexing/search backend is a standalone Go engine behind a narrow,
+  versioned local API. It must be independently buildable, testable,
+  benchmarkable, and usable without importing the File Manager GUI.
+- Its production store is purpose-built for File Manager's exact identity,
+  ownership, update, catalogue, and retrieval workloads. SQLite and other mature
+  databases remain required comparison controls; this direction is not evidence
+  that the custom implementation is already faster or correct.
+- Development and destructive fault testing occur only inside an explicitly
+  named disposable sandbox root. Exact filesystem identity, crash recovery,
+  corruption containment, and rebuildability are release gates.
 - A persistent indexing/search service may run while the GUI is closed.
 - Indexing is opt-in, never opt-out.
 - During installation, an inline folder picker is prefilled with Home plus
@@ -120,18 +130,80 @@ implementations are a last resort, not the first architecture.
   store a distillation plus a small set of fingerprints/keyword hashes.
 - Content-derived records remain exact-source-anchored and disposable.
 
+## Kolmogrov and ConeDAG research boundary
+
+- Kolmogrov is an independent, high-ambition formal and experimental program,
+  and its successful gated transfer is the intended core fuzzy/structural
+  candidate mechanism for the production engine. Initial exact/lexical engine
+  work does not wait for it.
+- It investigates the architect's practical superposition thesis: content,
+  position, combination, hierarchy, prevalence, containment, scale, and context
+  can provide complementary addressable locations whose joint fixed-width
+  representation preserves useful perceptual distance better than a single
+  undifferentiated location.
+- Research order is exhaustive inspectable breakdown first, formal geometry and
+  counterexamples second, fixed-width construction third, retrieval evaluation
+  fourth, and speed optimization last.
+- Proofs, formally delimited hypotheses, adversarial failures, and equal-budget
+  comparisons are retained. No unmeasured result is promoted into exact file
+  identity or production ranking.
+
+## Oracle and program topology
+
+- The Rust component is named **Oracle** and lives under `../orchestrator/`.
+- Oracle owns the canonical specification, version, capability, and conformance
+  record for every cross-project API and ABI. Producers retain their private
+  implementations; registry ownership does not require every hot call to be
+  proxied through Oracle.
+- Oracle is the trusted control plane for hives, settings, handler association,
+  command/CLI authority, plugin lifecycle and containment, and platform policy.
+- Semantic/provider memory lives in Oracle-managed hives outside both the Go
+  engine's authoritative catalogue and untrusted plugin processes.
+- The C++ File Manager frontend lives under `../file_manager/` and is a client
+  of GUI.Forms, the engine, and Oracle. It does not become their hidden state
+  authority.
+- Delivery order is GUI.Forms semicompletion, a mostly-running standalone
+  engine with continuing Kolmogrov transfer, paper specification of Oracle,
+  Oracle construction and conformance, then frontend construction and macOS
+  dogfood.
+- The earlier `../plugin_runtime/` plan is preserved as research input but is
+  not a second runtime implementation beside Oracle.
+
+## Accepted engine implementation direction
+
+The full authoritative record is
+`../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md`.
+
+- Object records and path bindings are separate; compact posting ordinals are
+  generation-local.
+- Exclusive approved-root shards live under lightweight volume manifests.
+- Bounded immutable root generations and atomic manifests are the selected
+  storage spine; codecs and accelerators remain measured choices.
+- Generations commit filesystem-observation watermarks rather than an ordinary
+  per-event engine journal. Gaps cause reconciliation.
+- Deterministic exact/name/fuzzy/metadata/provider evidence tiers precede later
+  voting fusion.
+- Removable local external volumes offer on-volume full indexing or no
+  persistent catalogue. Network drives and other machines use full-at-source
+  plus local-coarse-catalogue semantics when explicitly admitted.
+- Directories with at least 65,536 immediate children default to name/basic-
+  metadata light mode, not exclusion.
+- The accepted performance constitution supplies experiment rejection gates and
+  becomes a measured claim only after its named workloads run.
+
 ## Search and external AI
 
 - One search box initially.
 - Match explanations should be concise.
 - AI-facing API begins read-only and returns file objects plus condensed,
   interrogatable index information.
-- Personal assistants live elsewhere and call this API.
+- Personal assistants live elsewhere and call Oracle's read-oriented
+  interrogation boundary, which may query the engine and permitted hives.
 - Model execution location is user policy and not an initial feature.
 - OCR, captions, people/places/dates/topics/summaries, temporal language, and
   assistant-style answers are later work.
-- The architecture should preserve a path to a secure, synchronizable information
-  hive and multi-machine search/copy. Remote federation is a future mission, not
+- Oracle owns the path to secure, synchronizable information hives and
+  multi-machine search/copy. Remote federation is a future mission, not
   permission for the local core to search the web.
 
 ## Handlers and previews

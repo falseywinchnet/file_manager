@@ -1,9 +1,14 @@
 # First sibling-thread handoff
 
-Status: **exact bounded implementation prompt for milestone R0**.
+Status: **SUPERSEDED — DO NOT DISPATCH**.
 
-Open a sibling task rooted at `/Users/quentinkuttenkuler/file_manager` and paste
-the following prompt without shortening it:
+The grand architect has moved production plugin supervision into the Oracle
+repository at `../../orchestrator/`, where it can be specified with every other
+cross-project API and ABI. This prompt is retained only as historical research
+input. Use `../../orchestrator/planning/FUTURE_THREAD_HANDOFF.md` after Oracle's
+implementation gate opens.
+
+The superseded prompt follows verbatim for provenance:
 
 ```text
 You are implementing milestone R0, the contract-and-threat laboratory for the
@@ -97,4 +102,3 @@ R0 forces the authority model, failure semantics, version vocabulary, and host
 independence to exist before an attractive codec, sandbox API, or plugin demo can
 smuggle in permanent architecture. It is useful work even if every R1/R2
 candidate changes, and it supplies one identical oracle for those comparisons.
-

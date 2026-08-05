@@ -106,10 +106,6 @@ bool valid_monitor_set(const std::vector<HostMonitor>& monitors) {
 }
 
 bool valid_drag_event(const DragEvent& event) noexcept {
-    constexpr std::size_t maximum_items = 16U;
-    constexpr std::size_t maximum_paths = 4096U;
-    constexpr std::size_t maximum_text_bytes = 16U * 1024U * 1024U;
-    constexpr std::size_t maximum_total_bytes = 16U * 1024U * 1024U;
     constexpr std::uint8_t known_effects =
         static_cast<std::uint8_t>(DragEffect::copy) |
         static_cast<std::uint8_t>(DragEffect::move) |
@@ -117,7 +113,8 @@ bool valid_drag_event(const DragEvent& event) noexcept {
     const auto effects = static_cast<std::uint8_t>(event.allowed_effects);
     if (event.session_id == 0 || !std::isfinite(event.position.x) ||
         !std::isfinite(event.position.y) || (effects & ~known_effects) != 0 ||
-        event.accepted_effect != DragEffect::none || event.items.size() > maximum_items) {
+        event.accepted_effect != DragEffect::none ||
+        event.items.size() > DragLimits::maximum_items) {
         return false;
     }
     if (event.action != DragAction::leave &&
@@ -126,7 +123,7 @@ bool valid_drag_event(const DragEvent& event) noexcept {
     }
     std::size_t total = 0;
     const auto add_size = [&total](std::size_t value) {
-        if (value > maximum_total_bytes - total) {
+        if (value > DragLimits::maximum_total_bytes - total) {
             return false;
         }
         total += value;
@@ -136,15 +133,16 @@ bool valid_drag_event(const DragEvent& event) noexcept {
         const bool valid = std::visit([&add_size](const auto& data) {
             using Data = std::decay_t<decltype(data)>;
             if constexpr (std::is_same_v<Data, DragTextData>) {
-                return data.text_utf8.size() <= maximum_text_bytes &&
+                return data.text_utf8.size() <= DragLimits::maximum_text_bytes &&
                        data.text_utf8.find('\0') == std::string::npos &&
                        valid_utf8(data.text_utf8) && add_size(data.text_utf8.size());
             } else if constexpr (std::is_same_v<Data, DragFileListData>) {
-                if (data.paths_utf8.empty() || data.paths_utf8.size() > maximum_paths) {
+                if (data.paths_utf8.empty() ||
+                    data.paths_utf8.size() > DragLimits::maximum_paths) {
                     return false;
                 }
                 for (const std::string& path : data.paths_utf8) {
-                    if (path.empty() || path.size() > HostServices::maximum_dialog_text_bytes ||
+                    if (path.empty() || path.size() > DragLimits::maximum_path_bytes ||
                         path.find('\0') != std::string::npos || !valid_utf8(path) ||
                         !add_size(path.size())) {
                         return false;
@@ -152,7 +150,8 @@ bool valid_drag_event(const DragEvent& event) noexcept {
                 }
                 return true;
             } else if constexpr (std::is_same_v<Data, DragBinaryData>) {
-                return !data.media_type.empty() && data.media_type.size() <= 255U &&
+                return !data.media_type.empty() &&
+                       data.media_type.size() <= DragLimits::maximum_media_type_bytes &&
                        data.media_type.find('\0') == std::string::npos &&
                        valid_utf8(data.media_type) && add_size(data.bytes.size());
             }
@@ -284,7 +283,7 @@ bool valid_dialog_result(const HostDialogRequest& request,
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 16> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 17> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -296,11 +295,12 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::pointer_capture, "pointer_capture"},
         {HostCapability::cursor, "cursor"},
         {HostCapability::clipboard, "clipboard"},
-        {HostCapability::typed_drag_drop, "typed_drag_drop"},
+        {HostCapability::typed_drag_destination, "typed_drag_destination"},
         {HostCapability::dialogs, "dialogs"},
         {HostCapability::menus, "menus"},
         {HostCapability::font_discovery, "font_discovery"},
         {HostCapability::accessibility, "accessibility"},
+        {HostCapability::typed_drag_source, "typed_drag_source"},
     }};
     std::ostringstream output;
     output << "{\"protocol_version\":" << protocol_version

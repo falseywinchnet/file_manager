@@ -1,1 +1,0 @@
-/usr/bin/c++ -fsanitize=undefined -fno-omit-frame-pointer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=undefined CMakeFiles/gui_forms_display_chunk_tests.dir/tests/display_chunk_tests.cpp.o -o gui_forms_display_chunk_tests  libgui_forms_core.a

@@ -24,7 +24,7 @@ class Api final {
 public:
     Api() {
         table_.struct_size = sizeof(table_);
-        const gf_result result = gf_get_api_v0(GF_ABI_VERSION_0_1, &table_);
+        const gf_result result = gf_get_api_v0(GF_ABI_VERSION_0_4, &table_);
         if (result != GF_OK) {
             throw Error(result, "GUI.Forms ABI 0.x negotiation failed");
         }
@@ -48,9 +48,10 @@ class Control final {
 public:
     Control() = default;
 
-    Control(const Api& api, std::string_view stable_id) : api_(&api) {
+    Control(const Api& api, std::string_view stable_id,
+            std::uint32_t kind = GF_CONTROL_GENERIC) : api_(&api) {
         const gf_string_view value{stable_id.data(), stable_id.size()};
-        const gf_result result = api.table().control_create(value, &handle_);
+        const gf_result result = api.table().control_create_kind(kind, value, &handle_);
         if (result != GF_OK) {
             api.throw_last(result);
         }
@@ -114,6 +115,43 @@ public:
         return value != 0U;
     }
 
+    void set_enabled(bool enabled) const {
+        check(api_->table().set_enabled(handle_, enabled ? 1U : 0U));
+    }
+
+    [[nodiscard]] bool enabled() const {
+        uint32_t value{};
+        check(api_->table().get_enabled(handle_, &value));
+        return value != 0U;
+    }
+
+    void set_name(std::string_view name) const { set_string(api_->table().set_name, name); }
+    void set_text(std::string_view text) const { set_string(api_->table().set_text, text); }
+    [[nodiscard]] std::string name() const { return get_string(api_->table().get_name); }
+    [[nodiscard]] std::string text() const { return get_string(api_->table().get_text); }
+
+    void run_window(std::uint32_t flags = GF_WINDOW_RUN_DEFAULT) const {
+        check(api_->table().run_window(handle_, flags));
+    }
+
+    [[nodiscard]] std::string last_host_trace() const {
+        return get_string(api_->table().last_host_trace);
+    }
+
+    void add_child(const Control& child) const {
+        check(api_->table().add_child(handle_, child.handle_));
+    }
+
+    void request_close() const {
+        check(api_->table().request_close(handle_));
+    }
+
+    [[nodiscard]] std::uint64_t callback_fault_count() const {
+        std::uint64_t value{};
+        check(api_->table().callback_fault_count(handle_, &value));
+        return value;
+    }
+
     [[nodiscard]] std::string stable_id() const {
         uint64_t required{};
         gf_result result = api_->table().stable_id(handle_, nullptr, 0U, &required);
@@ -132,6 +170,24 @@ public:
     }
 
 private:
+    using SetString = gf_result (*)(gf_handle, gf_string_view);
+    using GetString = gf_result (*)(gf_handle, char*, uint64_t, uint64_t*);
+
+    void set_string(SetString operation, std::string_view value) const {
+        check(operation(handle_, {value.data(), value.size()}));
+    }
+
+    [[nodiscard]] std::string get_string(GetString operation) const {
+        uint64_t required{};
+        gf_result result = operation(handle_, nullptr, 0U, &required);
+        if (result != GF_ERROR_BUFFER_TOO_SMALL && result != GF_OK) {
+            api_->throw_last(result);
+        }
+        std::string value(required, '\0');
+        check(operation(handle_, value.data(), value.size(), &required));
+        return value;
+    }
+
     void check(gf_result result) const {
         if (result != GF_OK) {
             api_->throw_last(result);

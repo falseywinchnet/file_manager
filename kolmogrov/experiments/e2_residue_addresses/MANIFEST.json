@@ -1,0 +1,15 @@
+{
+  "claim_ids": ["K-G02", "K-H02", "K-H05", "T-RESIDUE-1"],
+  "command": "python3 experiments/e2_residue_addresses/run.py",
+  "corpus": {
+    "alphabet": ["a", "b"],
+    "collision_table_max_length": 12,
+    "degree": 2,
+    "mod_5_targeted_search_max_length": 16
+  },
+  "experiment_id": "e2_residue_addresses_v0_2026-08-05",
+  "inference_boundary": "Finite collision census for exact uncompressed modular occurrence maps; no equal-bit serialized hash, retrieval-quality, latency, or universal injectivity claim.",
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "f89a793d5461ea93b801e67018b7752c3105e95b0fa35d29940280c461559bfe",
+  "revision": "tracked Kolmogrov working tree; raw output checksum recorded after replay"
+}

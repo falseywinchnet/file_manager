@@ -1,7 +1,7 @@
 form gallery.root {
   title: "GUI.Forms Gallery";
   layout: flex-column;
-  min-size: 900 620;
+  min-size: 900 660;
 
   command-strip gallery.command-strip {
     layout: flex-row;
@@ -45,6 +45,16 @@ form gallery.root {
           checkbox gallery.checkbox { text: "Enable precise updates"; checked: true; }
           radio gallery.radio.classic { text: "Classic relief"; group: gallery.style-mode; checked: true; }
           radio gallery.radio.quiet { text: "Quiet relief"; group: gallery.style-mode; }
+          link-label gallery.link { text: "Show control contract"; }
+          checkbox gallery.checkbox.indeterminate {
+            text: "Three-state option";
+            three-state: true;
+            state: indeterminate;
+          }
+          user-control gallery.lifecycle-card {
+            label gallery.lifecycle-title { text: "COMPOSED"; }
+            label gallery.lifecycle-status { text: "Awaiting attach"; }
+          }
         }
       }
 

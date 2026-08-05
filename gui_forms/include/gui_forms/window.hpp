@@ -179,6 +179,7 @@ private:
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};
+    bool in_lifecycle_notification_{};
     bool second_layout_pass_requested_{};
     bool occluded_{};
 };

@@ -1,0 +1,19 @@
+{
+  "claim_ids": ["K-G03", "K-H02", "T-ORACLE-1"],
+  "command": "python3 experiments/e0_oracle_bootstrap/run.py",
+  "corpus": {
+    "alphabet": ["a", "b"],
+    "enumeration_order": "length, then declared alphabet order",
+    "max_length": 5
+  },
+  "experiment_id": "e0_oracle_bootstrap_v0_2026-08-05",
+  "inference_boundary": "Finite executable check only; no universal theorem, perceptual-quality claim, or resource claim.",
+  "oracle_configuration": {
+    "max_contiguous_degree": null,
+    "max_subsequence_degree": null,
+    "version": "symbolic-oracle-v0"
+  },
+  "raw_output": "RAW_OUTPUT.json",
+  "raw_output_sha256": "d4432cf8fc8630587b713388d3d92b801983996e3f91ada7939319e76408cbda",
+  "revision": "untracked Kolmogrov bootstrap tree; canonical output digest recorded by run"
+}

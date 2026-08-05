@@ -3,6 +3,7 @@
 #include "gui_forms/component.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dirty.hpp"
+#include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"
 #include "gui_forms/types.hpp"
 
@@ -55,9 +56,11 @@ public:
     [[nodiscard]] const StableId& stable_id() const noexcept { return stable_id_; }
     [[nodiscard]] Ptr parent() const noexcept { return parent_.lock(); }
     [[nodiscard]] std::span<const Ptr> children() const noexcept { return children_; }
+    [[nodiscard]] bool attached() const noexcept { return window_ != nullptr; }
 
     void add_child(Ptr child);
     [[nodiscard]] Ptr remove_child(RuntimeId child);
+    bool set_child_index(RuntimeId child, std::size_t index);
     void clear_children();
 
     [[nodiscard]] Rect requested_bounds() const noexcept { return requested_bounds_; }
@@ -90,6 +93,16 @@ public:
     void invalidate_subtree(Dirty dirty);
     void invalidate_declared(Dirty declared_effects);
 
+    void begin_init();
+    void end_init();
+    [[nodiscard]] bool initializing() const noexcept { return initialization_depth_ != 0; }
+    [[nodiscard]] std::uint64_t initialization_depth() const noexcept {
+        return initialization_depth_;
+    }
+    [[nodiscard]] Event<Dirty, bool>& initialization_completed() noexcept {
+        return initialization_completed_;
+    }
+
     [[nodiscard]] virtual Size measure(Size available);
     virtual void arrange(Rect final_bounds);
     virtual void on_paint(Painter& painter, Rect local_damage);
@@ -110,6 +123,10 @@ public:
 
 protected:
     [[nodiscard]] Window* window() const noexcept { return window_; }
+    void require_mutable() const;
+    virtual void on_attached_to_window();
+    virtual void on_attachment_committed() noexcept;
+    virtual void on_detached_from_window() noexcept;
 
 private:
     friend class Window;
@@ -117,7 +134,6 @@ private:
     void clear_dirty(Dirty dirty) noexcept;
     void clear_subtree_dirty(Dirty dirty) noexcept;
     [[nodiscard]] std::uint64_t subtree_size() const noexcept;
-    void require_mutable() const;
     void verify_dispose_thread() override;
     void on_dispose() noexcept override;
 
@@ -139,6 +155,11 @@ private:
     bool focusable_{};
     bool allow_drop_{};
     std::optional<CursorKind> cursor_;
+    Event<Dirty, bool> initialization_completed_;
+    Dirty pending_initialization_dirty_{Dirty::none};
+    std::uint64_t initialization_depth_{};
+    bool pending_initialization_subtree_{};
+    bool lifecycle_notification_{};
 };
 
 template <typename ControlType, typename... Arguments>

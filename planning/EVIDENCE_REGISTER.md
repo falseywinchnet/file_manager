@@ -130,7 +130,7 @@ nearest-neighbor call.
 | Rainbow table | inverts hashes over bounded domains | no search-ranking role |
 | Character n-grams | tolerant lexical candidate generation | misspellings, filename fragments, OCR noise |
 | Bottom-k/MinHash family | approximate containment/Jaccard | partial-document and structural containment candidates |
-| ConeDAG | lossy lexical/order geometry | optional candidate channel, never identity |
+| ConeDAG/Kolmogrov | lossy lexical/order geometry | intended gated core fuzzy-candidate channel; never exact identity or semantic memory |
 | ANN | scalable vector candidate retrieval | only if exact scan fails the target scale/latency budget |
 | Typed multigraph | semantic relation model | proposed, requires locally stored relations and provenance |
 
@@ -287,6 +287,25 @@ DockPanel Suite and a MapControl as separable application libraries. TreeView,
 ListView, SplitContainer, MenuStrip, StatusStrip, TabControl, PropertyGrid,
 RichTextBox, browser, printing, and MDI are not current retired compatibility specimen core requirements.
 They may still be File Manager or general GUI.Forms requirements.
+
+**MEASURED (2026-08-04):** the deterministic Capture-0 scanner inspected the
+authoritative bundle and its two current managed plugins without executing
+target code. It found 26 managed assemblies, 1,436 tracked public
+Forms/Drawing/ComponentModel compatibility API rows, 1,165 present in static IL
+operands, 107 redacted Forms-derived consumer types, and 428 declared native
+imports with zero diagnostics. These counts are coverage evidence, not support
+decisions. The schema, reproducible gate, privacy boundary, and exact manifest
+are recorded in
+`gui_forms/experiments/CAPTURE_0_STATIC_COMPATIBILITY_MANIFEST.md`.
+
+**MEASURED (2026-08-04):** the M4a renderer-neutral `TextStore` passes strict
+UTF-8 error classification, typed UTF-8/UTF-16/scalar position round trips,
+surrogate/scalar split rejection, atomic failed edits, six Unicode line-break
+forms, style-span transformation, and 2,000 deterministic mixed-script edits
+against a scalar reference model. Contiguous UTF-8 is retained only as a
+counted baseline; grapheme segmentation, shaping, fallback, bidi, editing, and
+IME remain open. Evidence:
+`gui_forms/experiments/M4A_UNICODE_TEXT_STORE.md`.
 
 The full evidence, compatibility tiers, native-message fork, DML implications,
 plugin interfaces, and proposed tests live in

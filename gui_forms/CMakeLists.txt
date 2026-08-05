@@ -12,11 +12,16 @@ option(GUI_FORMS_BUILD_GALLERY "Build the native control gallery" ON)
 option(GUI_FORMS_BUILD_TESTS "Build automated proving-slice tests" ON)
 option(GUI_FORMS_ENABLE_SKIA "Build the private CPU-only Skia adapter" ON)
 option(GUI_FORMS_ENABLE_MACOS_HOST "Build the native AppKit host" ${APPLE})
+option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
 option(GUI_FORMS_BUILD_FUZZERS "Build libFuzzer entry points" OFF)
 option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
+endif()
+
+if(GUI_FORMS_ENABLE_WINDOWS_HOST AND NOT WIN32)
+    message(FATAL_ERROR "GUI_FORMS_ENABLE_WINDOWS_HOST requires a Windows target")
 endif()
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
@@ -25,6 +30,9 @@ endif()
 
 add_library(gui_forms_core STATIC
     src/core/types.cpp
+    src/core/text.cpp
+    src/core/text_shaping.cpp
+    src/core/unicode_grapheme.cpp
     src/core/metrics.cpp
     src/core/resources.cpp
     src/core/host.cpp
@@ -40,6 +48,48 @@ target_include_directories(gui_forms_core PUBLIC
 target_compile_features(gui_forms_core PUBLIC cxx_std_20)
 set_target_properties(gui_forms_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# GUI.Drawing is a renderer-free compatibility substrate.  It deliberately
+# remains separate from the retained GUI.Forms core and from every host and
+# raster adapter so consumers can use its value/resource semantics alone.
+add_library(gui_drawing_core STATIC
+    src/core/drawing.cpp
+)
+target_include_directories(gui_drawing_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_features(gui_drawing_core PUBLIC cxx_std_20)
+set_target_properties(gui_drawing_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_library(gui_drawing_c_api SHARED
+    src/abi/drawing_c_api.cpp
+)
+if(WIN32)
+    target_sources(gui_drawing_c_api PRIVATE src/abi/drawing_platform_windows.cpp)
+    target_link_libraries(gui_drawing_c_api PRIVATE gdi32 user32)
+else()
+    target_sources(gui_drawing_c_api PRIVATE src/abi/drawing_platform_stub.cpp)
+endif()
+target_link_libraries(gui_drawing_c_api PRIVATE gui_drawing_core)
+target_include_directories(gui_drawing_c_api PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_definitions(gui_drawing_c_api PRIVATE GD_C_API_BUILD)
+set_target_properties(gui_drawing_c_api PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES
+    OUTPUT_NAME gui_drawing_abi0
+    VERSION 0.1.0
+    SOVERSION 0
+)
+if(WIN32)
+    set_target_properties(gui_drawing_c_api PROPERTIES PREFIX "")
+endif()
+if(APPLE)
+    target_link_options(gui_drawing_c_api PRIVATE
+        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/cmake/drawing_c_api_exports_macos.txt"
+    )
+endif()
+
 add_library(gui_forms_host_headless STATIC
     src/host/headless/headless_host.cpp
 )
@@ -48,10 +98,23 @@ target_include_directories(gui_forms_host_headless PUBLIC
 )
 target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 
+add_library(gui_forms_controls STATIC
+    src/controls/basic_controls.cpp
+    src/controls/container_controls.cpp
+    src/controls/range_controls.cpp
+)
+target_include_directories(gui_forms_controls PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(gui_forms_controls PUBLIC gui_forms_core)
+
 add_library(gui_forms_c_api SHARED
     src/abi/c_api.cpp
 )
-target_link_libraries(gui_forms_c_api PRIVATE gui_forms_core)
+target_link_libraries(gui_forms_c_api PRIVATE
+    gui_forms_controls
+    gui_forms_host_headless
+)
 target_include_directories(gui_forms_c_api PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -60,9 +123,12 @@ set_target_properties(gui_forms_c_api PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN YES
     OUTPUT_NAME gui_forms_abi0
-    VERSION 0.1.0
+    VERSION 0.4.0
     SOVERSION 0
 )
+if(WIN32)
+    set_target_properties(gui_forms_c_api PROPERTIES PREFIX "")
+endif()
 if(APPLE)
     target_link_options(gui_forms_c_api PRIVATE
         "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_api_exports_macos.txt"
@@ -136,6 +202,59 @@ if(GUI_FORMS_ENABLE_SKIA)
         SK_CODEC_ENCODES_PNG_WITH_LIBPNG
         SK_DISABLE_TRACING
     )
+
+    add_library(gui_drawing_skia STATIC
+        src/render/skia/drawing_skia.cpp
+    )
+    add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
+    target_include_directories(gui_drawing_skia
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia
+    )
+    target_include_directories(gui_drawing_skia SYSTEM PRIVATE
+        ${GUI_FORMS_SKIA_ROOT}
+    )
+    target_link_libraries(gui_drawing_skia
+        PUBLIC gui_drawing_core
+        PRIVATE
+            gui_forms_skia_archive
+            gui_forms_skcms_archive
+            gui_forms_png_archive
+            gui_forms_zlib_archive
+    )
+    if(APPLE)
+        target_link_libraries(gui_drawing_skia PRIVATE
+            ${GUI_FORMS_COREFOUNDATION}
+            ${GUI_FORMS_COREGRAPHICS}
+            ${GUI_FORMS_CORETEXT}
+        )
+    endif()
+    target_compile_definitions(gui_drawing_skia PRIVATE
+        SK_CODEC_DECODES_PNG
+        SK_CODEC_DECODES_PNG_WITH_LIBPNG
+        SK_CODEC_ENCODES_PNG
+        SK_CODEC_ENCODES_PNG_WITH_LIBPNG
+        SK_DISABLE_TRACING
+    )
+
+    add_library(gui_drawing_raster_c_api SHARED
+        src/abi/drawing_skia_c_api.cpp
+    )
+    target_include_directories(gui_drawing_raster_c_api PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia
+    )
+    target_link_libraries(gui_drawing_raster_c_api PRIVATE
+        gui_drawing_skia
+        gui_drawing_c_api
+    )
+    set_target_properties(gui_drawing_raster_c_api PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES
+        OUTPUT_NAME gui_drawing_raster0
+    )
+    if(WIN32)
+        set_target_properties(gui_drawing_raster_c_api PROPERTIES PREFIX "")
+    endif()
 endif()
 
 if(APPLE)
@@ -176,6 +295,47 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
+    target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_macos)
+    target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_MACOS_HOST=1)
+endif()
+
+if(GUI_FORMS_ENABLE_WINDOWS_HOST)
+    add_library(gui_forms_host_windows STATIC
+        src/host/windows/windows_host.cpp
+    )
+    target_include_directories(gui_forms_host_windows PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows
+    )
+    target_compile_definitions(gui_forms_host_windows PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+    )
+    target_link_libraries(gui_forms_host_windows
+        PUBLIC gui_forms_core
+        PRIVATE gdi32 ole32 windowscodecs
+    )
+    target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
+    target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
+    add_executable(gui_forms_windows_probe
+        tools/windows_automation_probe.cpp
+    )
+    target_compile_definitions(gui_forms_windows_probe PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+    )
+    target_link_options(gui_forms_windows_probe PRIVATE
+        -static -static-libgcc -static-libstdc++
+    )
+    add_executable(gui_drawing_windows_probe
+        tests/drawing_windows_probe.c
+    )
+    target_compile_definitions(gui_drawing_windows_probe PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+    )
+    target_link_libraries(gui_drawing_windows_probe PRIVATE
+        gui_drawing_c_api gdi32 user32
+    )
+    target_link_options(gui_drawing_windows_probe PRIVATE
+        -static -static-libgcc
+    )
 endif()
 
 if(GUI_FORMS_BUILD_GALLERY)
@@ -188,7 +348,7 @@ if(GUI_FORMS_BUILD_GALLERY)
         ${CMAKE_CURRENT_SOURCE_DIR}/demo
         ${CMAKE_CURRENT_SOURCE_DIR}/src/controls
     )
-    target_link_libraries(gui_forms_gallery_model PUBLIC gui_forms_core)
+    target_link_libraries(gui_forms_gallery_model PUBLIC gui_forms_controls)
 
     if(GUI_FORMS_ENABLE_MACOS_HOST)
         set(GUI_FORMS_GALLERY_FONTS
@@ -214,6 +374,67 @@ if(GUI_FORMS_BUILD_GALLERY)
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
             OUTPUT_NAME "GUI.Forms Gallery"
         )
+    endif()
+
+    if(GUI_FORMS_ENABLE_WINDOWS_HOST)
+        add_executable(gui_forms_gallery_windows
+            src/host/windows/gallery_main.cpp
+        )
+        target_link_libraries(gui_forms_gallery_windows PRIVATE
+            gui_forms_gallery_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_gallery_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_gallery_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Gallery"
+        )
+        add_custom_command(TARGET gui_forms_gallery_windows POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:gui_forms_gallery_windows>/fonts"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
+                "$<TARGET_FILE_DIR:gui_forms_gallery_windows>/fonts/PortsmouthRapids.ttf"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
+                "$<TARGET_FILE_DIR:gui_forms_gallery_windows>/fonts/PortsmouthRapids-Bold.ttf"
+        )
+        find_program(GUI_FORMS_WINDOWS_OBJDUMP
+            NAMES x86_64-w64-mingw32-objdump
+            NO_CMAKE_FIND_ROOT_PATH
+        )
+        if(GUI_FORMS_WINDOWS_OBJDUMP)
+            add_custom_target(gui_forms_windows_boundary_audit
+                COMMAND ${CMAKE_COMMAND}
+                    -DSOURCE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DWINDOWS_GALLERY=$<TARGET_FILE:gui_forms_gallery_windows>
+                    -DOBJDUMP_EXECUTABLE=${GUI_FORMS_WINDOWS_OBJDUMP}
+                    -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/windows-boundary-audit.txt
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_windows_boundaries.cmake
+                DEPENDS gui_forms_gallery_windows
+                VERBATIM
+            )
+        endif()
+
+        if(CMAKE_HOST_APPLE)
+            find_program(GUI_FORMS_WINE_EXECUTABLE
+                NAMES wine
+                PATHS /opt/homebrew/bin
+                NO_CMAKE_FIND_ROOT_PATH
+            )
+            if(GUI_FORMS_WINE_EXECUTABLE)
+                add_custom_target(gui_forms_windows_wine_smoke
+                    COMMAND ${CMAKE_COMMAND} -E env
+                        WINE_BINARY=${GUI_FORMS_WINE_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_windows_wine_smoke.sh
+                        ${CMAKE_CURRENT_BINARY_DIR}
+                    DEPENDS gui_forms_gallery_windows gui_forms_windows_probe
+                    USES_TERMINAL
+                    VERBATIM
+                )
+            endif()
+        endif()
     endif()
 endif()
 
@@ -252,9 +473,82 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
+    add_executable(gui_drawing_core_tests tests/drawing_core_tests.cpp)
+    target_link_libraries(gui_drawing_core_tests PRIVATE gui_drawing_core)
+    add_test(NAME gui_drawing_core_tests COMMAND gui_drawing_core_tests)
+
+    add_executable(gui_drawing_c_api_c11_tests tests/drawing_c_api_c11_tests.c)
+    target_link_libraries(gui_drawing_c_api_c11_tests PRIVATE gui_drawing_c_api)
+    add_test(NAME gui_drawing_c_api_c11_tests COMMAND gui_drawing_c_api_c11_tests)
+
+    add_executable(gui_drawing_trace_equivalence_tests
+        tests/drawing_trace_equivalence_tests.cpp
+    )
+    target_link_libraries(gui_drawing_trace_equivalence_tests PRIVATE
+        gui_drawing_core
+        gui_drawing_c_api
+    )
+    add_test(NAME gui_drawing_trace_equivalence_tests
+             COMMAND gui_drawing_trace_equivalence_tests)
+
+    add_test(
+        NAME gui_drawing_renderer_boundary_audit
+        COMMAND ${CMAKE_COMMAND}
+            -DDRAWING_CORE=$<TARGET_FILE:gui_drawing_core>
+            -DDRAWING_C_API=$<TARGET_FILE:gui_drawing_c_api>
+            -DDRAWING_TEST_BINARY=$<TARGET_FILE:gui_drawing_core_tests>
+            -DSOURCE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_drawing_boundaries.cmake
+    )
+
+    if(APPLE)
+        add_test(
+            NAME gui_drawing_c_api_export_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DC_API_LIBRARY=$<TARGET_FILE:gui_drawing_c_api>
+                -DEXPECTED_SYMBOL=_gd_get_api_v0
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_single_c_api_export.cmake
+        )
+    endif()
+
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
+
+    add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
+    target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_text_store_tests COMMAND gui_forms_text_store_tests)
+
+    add_executable(gui_forms_grapheme_conformance_tests
+        tests/grapheme_conformance_tests.cpp
+    )
+    target_include_directories(gui_forms_grapheme_conformance_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests
+    )
+    target_link_libraries(gui_forms_grapheme_conformance_tests PRIVATE
+        gui_forms_core
+    )
+    add_test(NAME gui_forms_grapheme_conformance_tests
+             COMMAND gui_forms_grapheme_conformance_tests)
+
+    add_executable(gui_forms_text_shaping_tests tests/text_shaping_tests.cpp)
+    target_link_libraries(gui_forms_text_shaping_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_text_shaping_tests COMMAND gui_forms_text_shaping_tests)
+
+    add_executable(gui_forms_basic_controls_tests tests/basic_controls_tests.cpp)
+    target_link_libraries(gui_forms_basic_controls_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_basic_controls_tests COMMAND gui_forms_basic_controls_tests)
+
+    add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
+    target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
+
+    add_executable(gui_forms_lifecycle_controls_tests
+        tests/lifecycle_controls_tests.cpp
+    )
+    target_link_libraries(gui_forms_lifecycle_controls_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_lifecycle_controls_tests
+             COMMAND gui_forms_lifecycle_controls_tests)
 
     add_executable(gui_forms_retained_lifetime_tests
         tests/retained_lifetime_tests.cpp
@@ -374,6 +668,25 @@ if(GUI_FORMS_BUILD_TESTS)
                 -DSKIA_ARCHIVE=${GUI_FORMS_SKIA_OUT}/libskia.a
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_skia_archive.cmake
         )
+    endif()
+
+    if(TARGET gui_drawing_skia)
+        add_executable(gui_drawing_skia_tests tests/drawing_skia_tests.cpp)
+        target_compile_definitions(gui_drawing_skia_tests PRIVATE
+            GUI_DRAWING_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
+        )
+        target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia)
+        add_test(NAME gui_drawing_skia_tests COMMAND gui_drawing_skia_tests)
+
+        add_executable(gui_drawing_raster_c_api_tests
+            tests/drawing_raster_c_api_tests.cpp
+        )
+        target_link_libraries(gui_drawing_raster_c_api_tests PRIVATE
+            gui_drawing_c_api
+            gui_drawing_raster_c_api
+        )
+        add_test(NAME gui_drawing_raster_c_api_tests
+                 COMMAND gui_drawing_raster_c_api_tests)
     endif()
 
     if(TARGET gui_forms_coregraphics)

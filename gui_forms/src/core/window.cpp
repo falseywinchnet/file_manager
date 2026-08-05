@@ -714,15 +714,47 @@ void Window::cancel_drag() noexcept {
 void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent) {
     require_ui_thread("visual-tree attachment");
     register_subtree(control);
+    std::vector<Control::Ptr> controls;
     std::function<void(const Control::Ptr&, const Control::WeakPtr&)> attach =
         [&](const Control::Ptr& current, const Control::WeakPtr& current_parent) {
             current->window_ = this;
             current->parent_ = current_parent;
+            current->lifecycle_notification_ = true;
+            controls.push_back(current);
             for (const auto& child : current->children_) {
                 attach(child, current);
             }
         };
     attach(control, parent);
+    std::vector<Control::Ptr> notified;
+    in_lifecycle_notification_ = true;
+    try {
+        for (const Control::Ptr& current : controls) {
+            notified.push_back(current);
+            current->on_attached_to_window();
+        }
+    } catch (...) {
+        for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
+            (*current)->window_ = nullptr;
+        }
+        for (auto current = notified.rbegin(); current != notified.rend(); ++current) {
+            (*current)->on_detached_from_window();
+        }
+        for (const Control::Ptr& current : controls) {
+            current->lifecycle_notification_ = false;
+        }
+        in_lifecycle_notification_ = false;
+        unregister_subtree(control);
+        metrics_.set_population(stable_ids_.size(), stable_ids_.size());
+        throw;
+    }
+    for (const Control::Ptr& current : controls) {
+        current->on_attachment_committed();
+    }
+    for (const Control::Ptr& current : controls) {
+        current->lifecycle_notification_ = false;
+    }
+    in_lifecycle_notification_ = false;
     metrics_.set_population(root_ ? root_->subtree_size() : control->subtree_size(),
                             stable_ids_.size());
     static_cast<void>(recompute_subtree_dirty(root_));
@@ -738,13 +770,22 @@ void Window::detach_subtree(const Control::Ptr& control) {
     const Rect old_bounds = absolute_bounds_of(*control);
     add_subtree_damage(control);
     unregister_subtree(control);
+    std::vector<Control::Ptr> controls;
     std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
+        current->lifecycle_notification_ = true;
+        controls.push_back(current);
         current->window_ = nullptr;
         for (const auto& child : current->children_) {
             detach(child);
         }
     };
     detach(control);
+    in_lifecycle_notification_ = true;
+    for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
+        (*current)->on_detached_from_window();
+        (*current)->lifecycle_notification_ = false;
+    }
+    in_lifecycle_notification_ = false;
     paint_dirty_ = true;
     metrics_.record_dirty_mark(old_bounds.area());
     metrics_.set_population(stable_ids_.size(), stable_ids_.size());
@@ -757,13 +798,22 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
     const Rect old_bounds = absolute_bounds_of(*control);
     add_subtree_damage(control);
     unregister_subtree(control);
+    std::vector<Control::Ptr> controls;
     std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
+        current->lifecycle_notification_ = true;
+        controls.push_back(current);
         current->window_ = nullptr;
         for (const auto& child : current->children_) {
             detach(child);
         }
     };
     detach(control);
+    in_lifecycle_notification_ = true;
+    for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
+        (*current)->on_detached_from_window();
+        (*current)->lifecycle_notification_ = false;
+    }
+    in_lifecycle_notification_ = false;
     if (auto visual_parent = control->parent_.lock()) {
         const auto found = std::find(visual_parent->children_.begin(),
                                     visual_parent->children_.end(), control);

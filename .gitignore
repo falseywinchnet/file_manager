@@ -1,0 +1,9 @@
+# Local filesystem metadata.
+.DS_Store
+
+# Local diagnostic output.
+/gui_forms/backtrac*.txt
+/gui_forms/crash.txt
+
+# Fetched source repositories are reference material, not workspace contents.
+/third_party/*/

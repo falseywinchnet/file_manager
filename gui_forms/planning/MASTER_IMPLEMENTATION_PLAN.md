@@ -100,10 +100,10 @@ the lower `gui_forms/` build working without reading File Manager sources.
 - Text proves committed UTF-8 insertion and an AppKit composition bridge, not a
   complete editor, shaping stack, bidi algorithm, cluster indexing, selection,
   clipboard, undo, or accessible text ranges.
-- There is no stable C ABI, C# binding, component model, reusable event-token
-  API, resource pack, language catalogue, theme compiler, configuration
-  registry, accessibility publisher, Windows host, Linux host, packaging, or
-  compatibility runner.
+- There is an experimental C ABI 0.x, reusable component/event kernel, and a
+  bounded Win32 Gallery host. There is no C# binding, stable ABI, resource pack,
+  language catalogue, theme compiler, configuration registry, accessibility
+  publisher, Linux host, packaging, or compatibility runner.
 
 ### 1.3 MEASURED current baseline
 
@@ -232,6 +232,22 @@ p99/worst render and present latency, damaged pixels, determinism, text quality,
 and implementation complexity. Accept an ADR only after comparing the pinned
 Skia baseline with at least one credible lower-surface alternative. Until then,
 new framework behavior targets the renderer vocabulary, not Skia APIs.
+
+**GIVEN GUI.Drawing revision:** portable drawing semantics are owned by
+GUI.Drawing. The managed `System.Drawing` compatibility surface maps admitted
+calls to that native subsystem; the installed .NET drawing service is only a
+temporary compatibility scaffold and differential oracle. Imperative drawing
+records bounded commands into retained display chunks or targets an owned CPU
+image surface. It does not change the retained architecture into an
+immediate-mode GUI. Skia and platform objects remain private adapters.
+
+The authoritative retired compatibility specimen floor is 353 drawing rows: 307 required static-IL rows
+across 34 types and 46 deferred metadata-only rows. File Manager's broader
+vector-icon, thumbnail, preview, color, text/glyph, compositing, and diagnostic
+needs remain a separate candidate oversight ledger so the retired compatibility specimen closure number
+cannot hide broader product work. Exact families, status vocabulary, platform
+surface-lease boundary, and M11e–M11h stages are in
+`planning/GUI_DRAWING_REVISION_PLAN.md`.
 
 ### 4.2 Host boundary
 
@@ -592,8 +608,8 @@ Progress through M3e:
   leave/enter/over/drop order plus eligibility, close, and shutdown cleanup.
   Headless is the payload/order oracle and AppKit translates pasteboard values
   only inside its adapter. The Gallery collection is a live retained consumer.
-- **OPEN:** outbound drag-source initiation, owned-form/sheet integration and native nested-modal
-  focus restoration, menu policy, font discovery, complete IME geometry,
+- **OPEN:** outbound drag-source initiation, owned-form/sheet integration and
+  native nested-modal focus restoration, menu policy, font discovery, complete IME geometry,
   VoiceOver publication, Windows/Linux adapters, and session/power events. Gate
   H1 remains open.
 
@@ -607,6 +623,35 @@ Deliver in sub-slices:
 3. grapheme navigation, multiline layout, password/read-only modes;
 4. bidi, representative complex scripts, multi-stage IME, accessible ranges;
 5. Portmouth Rapids pack integration and per-cluster system fallback.
+
+Progress through the M4b grapheme/shaping-seam slice:
+
+- **OBSERVED:** renderer-neutral `TextStore` now validates strict UTF-8, uses
+  distinct UTF-8/UTF-16/scalar/line position types, performs bounded atomic
+  replacement, maintains Unicode separator line ranges, transforms opaque
+  nonoverlapping style spans, and publishes structured revision/rebuild/
+  rejection counters.
+- **MEASURED:** malformed-sequence classes, scalar/surrogate boundary rejection,
+  atomic failure, six line-break forms, style transformation, and 2,000 seeded
+  mixed-script edits pass against a scalar reference model on native arm64 and
+  as a strict MinGW PE32+ x86-64 executable under Wine.
+- **CANDIDATE:** contiguous UTF-8 is the reversible baseline, not a selected
+  large-document representation. Full metadata rebuilds are counted for later
+  comparison with gap and piece candidates.
+- **OBSERVED:** `TextStore` now exposes a distinct grapheme position domain and
+  implements Unicode 17.0.0 UAX #29 extended cluster boundaries; shaping and
+  fallback use renderer-neutral opaque font/glyph IDs and absolute UTF-8
+  cluster maps.
+- **MEASURED:** all 766 official Unicode grapheme conformance cases pass;
+  renderer-free strict and sanitizer builds pass; static MinGW PE32+ focused
+  tests also pass under Wine.
+- **CANDIDATE:** `TextShaper` and `FontFallbackResolver` admit backend
+  experiments without selecting HarfBuzz, platform shapers, font discovery, or
+  a cache policy.
+- **OPEN:** actual shaping/fallback, script/bidi analysis, line layout, glyph
+  cache, selection/clipboard/undo, IME, accessible text ranges, editor controls,
+  and the M4 exit gate. Evidence: `experiments/M4A_UNICODE_TEXT_STORE.md` and
+  `experiments/M4B_GRAPHEME_SHAPING_SEAM.md`.
 
 Exit: text/IME corpus passes on each supported host and no renderer-specific
 text object appears in public controls or ABI.
@@ -640,6 +685,68 @@ Deliver reusable public controls, not demo node switches:
 
 Exit: gallery is built solely from reusable controls; basic control behavior and
 event traces pass through headless, AppKit, C++, and early C ABI lanes.
+
+Progress through M6a:
+
+- **OBSERVED:** `gui_forms_controls` exports renderer-neutral `Panel`,
+  `GroupBox`, `Label`, `ButtonBase`, `Button`, `CheckBox`, `RadioButton`, and
+  `LinkLabel` with UI-thread property guards, retained invalidation, tokenized
+  events, deterministic activation/state order, and provisional Windows 7/10
+  rendering values.
+- **OBSERVED:** the Gallery consumes these types for its label/button/check/radio
+  families and visibly exercises indeterminate and visited-link state. AppKit
+  translates common hardware positions to the shared USB HID key vocabulary.
+- **OPEN:** Gallery-private containers, editor, range, list, category, and
+  instrument controls; every other M6 family; C ABI exposure; and the M6 exit
+  gate. Evidence: `experiments/M6A_REUSABLE_BASIC_CONTROLS.md`.
+
+Progress through M6b:
+
+- **OBSERVED:** public `ContainerControl` and `UserControl` identities provide
+  logical focus-containment operations without claiming M5 scrolling or an
+  unimplemented load lifecycle.
+- **OBSERVED:** renderer-neutral `RangeControl`, `TrackBar`, and determinate
+  `ProgressBar` provide finite range state, horizontal/vertical rendering,
+  pointer capture, normalized keyboard/wheel input, and the declared user order
+  `scroll` then `value_changed`. The Gallery slider/progress families now use
+  these public controls.
+- **OPEN:** scrolling containers and scrollbars, full stock `TrackBar`
+  compatibility, marquee progress, container validation/scaling/dialog-key and
+  load lifecycle, remaining Gallery-private families, and the M6 exit gate.
+  Evidence: `experiments/M6B_CONTAINER_RANGE_CONTROLS.md`.
+
+Progress through M6c:
+
+- **OBSERVED:** `Control` now provides nested initialization scopes that retain
+  synchronous property events while coalescing declared control/subtree
+  invalidation into one outer completion.
+- **OBSERVED:** retained tree attachment binds the complete subtree before
+  parent-first hooks; detachment unbinds the complete subtree before child-first
+  hooks. Throwing attachment rolls back bindings and stable IDs, and lifecycle
+  callbacks cannot structurally mutate or dispose the transitioning tree.
+- **OBSERVED:** `UserControl` publishes a tokenized one-shot lifetime `loaded`
+  event plus successful whole-subtree attachment state/count. The compiled DML
+  Gallery consumes a real composed `UserControl` with two reusable label
+  children and a visible nested initialization/load trace.
+- **OPEN:** typed property/default/reset/serialization metadata, validation,
+  scaling, scrolling, dialog routing, designer tooling, remaining
+  Gallery-private families, and the M6 exit gate. Evidence:
+  `experiments/M6C_INITIALIZATION_LIFECYCLE.md`.
+
+Sequencing note after M6c:
+
+- **GIVEN (2026-08-04):** the grand architect advances a bounded Windows host
+  proving round next. This is permitted because host protocol version 4 and its
+  headless/AppKit traces are already normative enough to act as the translation
+  oracle.
+- **MEASURED:** W0-W4 pass for the bounded Win32/Wine Gallery slice: PE64
+  cross-build, renderer-free portable libraries, protocol-v4 event translation,
+  GDI/DIB CPU presentation, WIC PNG, private Gallery fonts, stable-ID control
+  automation, framebuffer capture, clean close, strict GCC build, and portable
+  boundary/import audit. Evidence: `docs/WINDOWS_WINE_HOST.md`.
+- **OPEN:** this completed elevation does not pull M11 managed-facade work, retired compatibility specimen
+  unchanged-binary loading, TSF, OLE, UIA/MSAA, Windows packaging, physical
+  Windows dogfood, or the full M12 exit gate forward implicitly.
 
 ### M7 — collection, command, modal, data, and advanced controls
 
@@ -718,9 +825,126 @@ Deliver:
   deviation manifest;
 - package metadata for native and managed consumers.
 
+Capture-0 measurement pulled forward after the bounded Windows host round:
+
+- **MEASURED:** the opt-in, non-executing compatibility scanner reads PE/CLI
+  metadata, static IL operands, inheritance, native imports, and .NET
+  single-file bundle version 6 without entering the native build. Its synthetic
+  target proves non-execution, redaction, determinism, and hash rejection.
+- **MEASURED:** the authoritative 1922 specimen plus its two current managed
+  plugins yields 26 inspected managed assemblies, 1,436 tracked public
+  compatibility API rows, 1,165 rows present in static IL, 107 redacted
+  Forms-derived consumer types, and 428 native imports with zero capture
+  diagnostics. Evidence: `experiments/CAPTURE_0_STATIC_COMPATIBILITY_MANIFEST.md`.
+- **MEASURED:** Capture-1 classifies all 1,952 API/custom-control/native-import
+  evidence rows with zero unclassified entries. The 1,436 public API rows yield
+  1,160 required and 276 deferred rows; 796 required rows across 130 Forms types
+  belong to the future managed facade. Private derived controls and direct
+  native imports remain application-side.
+- **MEASURED:** a synthetic consumer compiled against Microsoft's strong-named
+  .NET 10 Forms reference loads through a private context against an unsigned
+  same-name experimental facade on host .NET and Wine. Independent builds are
+  byte-identical and the form/button probe passes.
+- **MEASURED:** M11a mechanically resolves and emits all 796 required
+  GUI.Forms-owned rows as 190 closure-complete types. Both replacement
+  assemblies compile cleanly; a compiled-assembly verifier reports 796/796
+  identities present; source, manifest, and repeated release builds are
+  deterministic.
+- **MEASURED:** additive ABI 0.2 preserves the 0.1 prefix and connects kinded
+  construction, name/text, enabled/visible, bounds, parenting, and subtree
+  disposal to the generated `Control` hot path. The same managed tree/property/
+  event/disposal trace passes on host .NET and Wine.
+- **MEASURED:** M11b additive ABI 0.3 projects generated `Form` trees into the
+  selected native host. `Application.Run(Form)` passes a deterministic headless
+  lifecycle on host .NET and a real Win32 DIB create/show/paint/close cycle
+  under Wine. The captured 960 x 640 demonstration has 17 managed-origin
+  retained controls; the host reports 17 measured/arranged/painted nodes.
+- **MEASURED:** M11c additive ABI 0.4 carries retained button activation into
+  managed `Click`, contains and counts a deliberate managed exception, performs
+  live retained mutation through queued UI dispatch, requests a cancelable
+  close, and emits `FormClosed` and `ApplicationContext.ThreadExit` once. The
+  exact callback/lifecycle counts pass in deterministic headless runs and in
+  the Win32 DIB host under Wine. AppKit compiles against the same platform-
+  neutral wake/close/dispatch seam; the renderer-neutral suite passes 19/19.
+- **OPEN:** behavioral implementation for the remaining generated calls,
+  broader typed mouse/key/paint/timer coverage, cross-thread blocking `Invoke`
+  stress and deadlock policy, exact close reasons, accessibility publication,
+  default/single-file binding, dynamic usage traces, ABI freeze, and unchanged-
+  binary execution remain M11/M12 gates. Evidence:
+  `experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md` and
+  `experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md` and
+  `experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md`.
+- **MEASURED:** M11d widens high-frequency managed behavior and privately binds
+  the pinned unchanged retired compatibility specimen specimen to the generated facade under Wine. The
+  resulting Win32 host published a 46-control/46-ID snapshot, painted 34
+  controls, accepted five host events with zero rejection, and closed through
+  automation without a managed or native exception. See
+  `experiments/M11D_BEHAVIORAL_FACADE_AND_PRIVATE_LOAD.md`.
+- **MEASURED:** the retained-surface continuation reaches a 165-control live
+  tree under Wine and visibly projects retired compatibility specimen resource-backed toolbar buttons,
+  numeric fields, radio/check controls, dock panes, and range controls. ABI 0.6
+  owner-pointer and raster-button probes pass, as do 797/797 surface verification
+  and 25/25 native tests. The source-configuration click reaches its map/control
+  assembly path without the prior stale-child repaint fault. **OPEN:** active
+  receiver streaming, secondary-window/popup composition, editing/accessibility,
+  and sustained paint performance remain compatibility gates; the dark spectrum
+  is not evidence of a running source.
+- **OBSERVED revision:** the visible M11d continuation combines native retained
+  GUI.Forms behavior with a managed drawing passthrough. Owner paint currently
+  executes through .NET 10 `System.Drawing`, encodes an intermediate PNG, and
+  projects that raster into the native tree. The compatibility catalogue now
+  assigns all 353 `System.Drawing*` rows to `gui_drawing_compat_facade`; 307 are
+  required. They are no longer counted as runtime-owned or implied by the
+  797/797 Forms surface score.
+- **MEASURED:** M11e adds an independent renderer-free GUI.Drawing semantic
+  core and experimental one-symbol drawing ABI. C++20 and C11 consumers produce
+  the same golden command trace; value/resource/state, path and logical image
+  handles, deterministic disposal, stale/wrong-kind/wrong-thread faults, and
+  renderer isolation pass 5/5 focused tests; the Skia-disabled/AppKit-disabled
+  native configuration passes 24/24. Pixel
+  storage, raster execution, facade mapping, and the M11d passthrough cutover
+  remain open. Evidence: `experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md`.
+- **MEASURED M11f continuation:** GUI.Drawing now owns bounded COW CPU bitmaps,
+  tokenized locks, PNG, paths/regions/gradients, a private CPU-only Skia raster
+  service, and a generated 307/307 Drawing facade. The combined verifier reports
+  1,104/1,104. PE64 C and generated .NET 10 probes pass HBITMAP, HDC, HWND,
+  capture/present, and tokenized GetHdc/ReleaseHdc behavior under Wine while the
+  renderer-free boundary remains clean. **OPEN:** only a macOS arm64 private
+  Skia archive is currently packaged; Windows x64 `gui_drawing_raster0.dll`, a
+  nonempty Wine surface-raster round trip, and the unchanged zero-passthrough
+  specimen run remain gates. Evidence:
+  `experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`.
+
+Next bounded M11 rounds:
+
+1. **M11f closure:** package the Windows x64 private CPU-only Skia raster
+   module and pass a nonempty Wine native-surface raster round trip.
+2. **M11g:** differential .NET/Wine oracle, unchanged-specimen dynamic call
+   trace, elimination of the managed bitmap/PNG paint round trip, and a visible
+   zero-passthrough retired compatibility specimen run.
+3. **M11h:** secondary windows/popups/modal focus, editing/source selection,
+   then active spectrum/waterfall streaming and sustained paint measurement.
+
+M11f closure is next because the remaining Windows raster packaging gate still
+obscures whether a missing Wine visual is Forms behavior, drawing behavior, or
+the temporary raster bridge.
+Multi-window work remains the next application blocker, but it cannot close the
+owned-toolkit claim while owner paint still executes in `System.Drawing.Common`.
+
 Exit: two independent native consumers plus the C# gallery pass lifetime,
 callback, thread, error, and packaging tests. Freeze 1.0 only after the breaking-
 change audit and architect approval.
+
+Pre-M11 documentation checkpoint:
+
+- **OBSERVED:** `docs/LIBRARY_AND_ASSEMBLY_GUIDE.md` now separates the native
+  engine, future managed facade, trusted retained-subtree extension shape,
+  File Manager capability plugins, and data-only theme/language assemblies.
+- **OBSERVED:** private-context resolution tolerates the authentic Forms public
+  key token resolving to the unsigned laboratory assembly. **OPEN:** default
+  context identity policy, target framework matrix, NuGet layout, complete
+  generated surface, and unload mechanics remain M11 decisions rather than
+  promises made by the guide.
 
 ### M12 — Windows/Linux hosts, packaging, dogfood, and 1.0
 
@@ -742,6 +966,21 @@ Deliver:
 
 Exit: all platform conformance suites and approved budgets pass on named
 hardware. Unresolved matrix rows are explicitly excluded, not silently partial.
+
+Windows preflight after M6c:
+
+- **MEASURED:** Wine devel 11.10, x86_64 MinGW-w64 GCC 15.2.0, an x64 Wine
+  prefix, Windows Desktop Runtime 10.0.3/10.0.5, and the authoritative x64 retired compatibility specimen
+  specimen are locally available.
+- **OBSERVED negative:** Wine can enumerate installed runtimes, while the
+  broader `dotnet --info` workload query reaches the runtime and then fails in a
+  Wine process/workload-installer stub. No retired compatibility specimen executable was launched.
+- **MEASURED:** the bounded W0-W4 host/toolchain gates now pass under Wine. See
+  `docs/WINDOWS_WINE_HOST.md` and the preserved original preflight in
+  `experiments/WINDOWS_ORACLE_PREFLIGHT.md`.
+- **OPEN:** native accessibility/automation publication, remaining Windows
+  services, physical Windows dogfood, the M11 managed facade, and the later
+  unchanged-binary dogfood gate.
 
 ## 6. Work that may run in parallel
 

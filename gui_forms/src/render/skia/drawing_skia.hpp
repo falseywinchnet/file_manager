@@ -1,0 +1,79 @@
+#pragma once
+
+#include "gui_forms/drawing.hpp"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <span>
+#include <string_view>
+#include <thread>
+#include <vector>
+
+namespace gui_drawing::render {
+
+enum class RasterError : std::uint8_t {
+    none,
+    wrong_thread,
+    invalid_argument,
+    target_unavailable,
+    missing_image_pixels,
+    decode_failed,
+    encode_failed,
+    encoded_limit_exceeded,
+    dimension_limit_exceeded,
+    internal_error,
+};
+
+struct RasterResult final {
+    RasterError error{RasterError::none};
+    std::size_t commands_executed{};
+
+    [[nodiscard]] explicit operator bool() const noexcept {
+        return error == RasterError::none;
+    }
+};
+
+struct DecodeResult final {
+    std::unique_ptr<Bitmap> bitmap;
+    RasterError error{RasterError::none};
+
+    [[nodiscard]] explicit operator bool() const noexcept {
+        return bitmap != nullptr && error == RasterError::none;
+    }
+};
+
+struct PngCodecLimits final {
+    std::size_t maximum_encoded_bytes{32U * 1024U * 1024U};
+    std::uint32_t maximum_width{4096};
+    std::uint32_t maximum_height{4096};
+    std::uint64_t maximum_pixels{4096ULL * 4096ULL};
+};
+
+class SkiaExecutor final {
+public:
+    SkiaExecutor();
+    ~SkiaExecutor();
+    SkiaExecutor(const SkiaExecutor&) = delete;
+    SkiaExecutor& operator=(const SkiaExecutor&) = delete;
+
+    [[nodiscard]] bool register_typeface(std::string_view family,
+                                         std::span<const std::byte> encoded);
+    [[nodiscard]] RasterResult execute(const GraphicsRecorder& recorder,
+                                       Bitmap& target);
+    [[nodiscard]] DecodeResult decode_png(
+        std::span<const std::byte> encoded,
+        const PngCodecLimits& limits = {});
+    [[nodiscard]] std::vector<std::byte> encode_png(
+        const Bitmap& bitmap, RasterError* error = nullptr,
+        const PngCodecLimits& limits = {});
+
+private:
+    [[nodiscard]] bool owner_thread() const noexcept;
+
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+    std::thread::id owner_thread_;
+};
+
+} // namespace gui_drawing::render

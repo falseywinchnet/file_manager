@@ -1,11 +1,15 @@
 # Plugin Runtime
 
-Status: **pre-architecture research subproject**.
+Status: **frozen legacy research source; superseded as an implementation home**.
 
-This subtree plans the Rust containment, capability, and interoperability layer
-for File Manager extensions. It is deliberately independent of GUI.Forms and
-shaped so it can later become its own repository without changing its internal
-paths.
+This subtree records the earlier Rust containment, capability, and
+interoperability study for File Manager extensions. Its valuable threat model,
+capability analysis, hostile fixtures, and protocol questions are retained.
+Production implementation now belongs to the Oracle plugin-supervisor subsystem
+under [`../orchestrator/`](../orchestrator/), whose contract registry reconciles
+the engine, frontend, plugin, hive, CLI, and platform boundaries together.
+
+Do not dispatch the old sibling handoff or create a competing runtime here.
 
 ## Confirmed purpose
 
@@ -17,7 +21,7 @@ paths.
 - **GIVEN:** File Manager core has no web search, store, or remote discovery.
 - **GIVEN:** Rust is preferred for the hostile wrapper/sandbox boundary.
 
-Nothing here selects a wire codec, sandbox primitive, package format, trust
+Nothing preserved here selects a wire codec, sandbox primitive, package format, trust
 tier, update channel, ABI horizon, or WebAssembly/native execution model. Those
 remain candidates until their declared gates run and an approved decision
 record accepts them.
@@ -33,10 +37,9 @@ record accepts them.
 7. [`planning/VALIDATION_AND_IMPLEMENTATION.md`](planning/VALIDATION_AND_IMPLEMENTATION.md)
 8. [`planning/SIBLING_THREAD_HANDOFF.md`](planning/SIBLING_THREAD_HANDOFF.md)
 
-## Independence contract
+## Historical independence contract
 
 Future C/C++ and Go consumers call a stable supervisor-facing C boundary or a
 versioned local protocol. Plugins never link GUI.Forms, the C++ GUI process, or
 the Go indexer's internal data structures. Host adapters translate host objects
 to explicit protocol values and scoped handles.
-

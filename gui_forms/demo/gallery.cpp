@@ -12,8 +12,9 @@ namespace gui_forms::gallery {
 std::unique_ptr<Window> make_gallery()
 {
     GalleryTree tree = build_gallery_tree();
-    auto window = std::make_unique<Window>(std::move(tree.root), Size {900.0, 620.0});
+    auto window = std::make_unique<Window>(std::move(tree.root), Size {900.0, 660.0});
     tree.context->window = window.get();
+    tree.context->synchronize("gallery.initial");
     const ImageLoadResult status_badge =
         window->load_png(std::as_bytes(std::span{assets::validated_status_png}));
     if (!status_badge) {

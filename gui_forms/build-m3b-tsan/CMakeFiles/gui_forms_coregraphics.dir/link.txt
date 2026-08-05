@@ -1,2 +1,0 @@
-/usr/bin/ar qc libgui_forms_coregraphics.a CMakeFiles/gui_forms_coregraphics.dir/src/render/coregraphics/coregraphics_raster.cpp.o
-/usr/bin/ranlib libgui_forms_coregraphics.a

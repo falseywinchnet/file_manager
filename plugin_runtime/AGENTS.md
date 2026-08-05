@@ -1,9 +1,17 @@
 # Plugin Runtime operating instructions
 
-This subtree is a repo-shaped lower project for the hostile plugin boundary. It
-must not depend on `gui_forms/` or on File Manager implementation details above
-this directory. The repository root `AGENTS.md` and planning governance remain
-authoritative.
+Status: **FROZEN LEGACY RESEARCH INPUT**.
+
+This subtree preserves the earlier repo-shaped study of the hostile plugin
+boundary. Do not begin or continue production implementation here. The active
+authority and future Rust implementation home are `../orchestrator/`; its Oracle
+plugin-supervisor subsystem must import useful threat, capability, protocol, and
+validation work through the contract proposal process.
+
+Edits here are limited to provenance, factual correction, negative-result
+retention, and explicit export into Oracle unless the grand architect reopens
+the subtree. The repository root `AGENTS.md` and Oracle planning governance
+remain authoritative.
 
 ## Status discipline
 
@@ -31,9 +39,9 @@ authoritative.
 - Exact filesystem identity and stored records remain authoritative. Plugin
   search results are attributed proposals, never filesystem truth.
 
-## Build-shape guardrail
+## Historical build-shape guardrail
 
-The intended future shape is a standalone Rust workspace rooted here:
+The earlier intended shape was a standalone Rust workspace rooted here:
 
 ```text
 plugin_runtime/
@@ -47,8 +55,8 @@ plugin_runtime/
   planning/
 ```
 
-Do not create a nested `.git` directory. Lower builds may produce libraries,
-helpers, tests, fixtures, and SDK artifacts; they must not build File Manager.
+Do not create that workspace here. Future libraries, helpers, tests, fixtures,
+and SDK artifacts belong under Oracle after its implementation gate opens.
 
 ## Security engineering
 
@@ -63,4 +71,3 @@ helpers, tests, fixtures, and SDK artifacts; they must not build File Manager.
 - Bound wall time, CPU, memory, output dimensions, output bytes, message size,
   recursion, child processes, open handles, and derived-data storage.
 - Logs and crash records omit file contents and redact paths by construction.
-

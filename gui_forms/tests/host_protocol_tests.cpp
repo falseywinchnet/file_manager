@@ -215,6 +215,7 @@ void test_capabilities_and_normalized_dispatch() {
                                       HostCapability::pointer_capture |
                                       HostCapability::cursor |
                                       HostCapability::clipboard |
+                                      HostCapability::typed_drag_destination |
                                       HostCapability::dialogs),
             "headless host must report every implemented normalized input capability");
     require(capabilities.to_json().find("\"scale_notifications\"") !=
@@ -390,7 +391,8 @@ void test_typed_drag_destination_routing_and_bounds() {
                 HostDispatchError::invalid_payload,
             "malformed drag UTF-8 must fail at the host boundary");
     invalid = drag_event(DragAction::enter, 92, {10.0, 10.0});
-    std::get<DragBinaryData>(invalid.items[2]).bytes.resize(16U * 1024U * 1024U);
+    std::get<DragBinaryData>(invalid.items[2]).bytes.resize(
+        DragLimits::maximum_total_bytes);
     require(fixture.host.dispatch(std::move(invalid), 6).error ==
                 HostDispatchError::invalid_payload,
             "aggregate drag payloads beyond 16 MiB must fail before callbacks");
