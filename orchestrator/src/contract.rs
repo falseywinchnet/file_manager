@@ -37,14 +37,19 @@ pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract> 
         | "orchestrator.status"
         | "orchestrator.shutdown" => Some(SupportedContract {
             id: "ORC-LIF-001",
-            major: 0,
-            minor: 1,
+            major: 1,
+            minor: 0,
+        }),
+        "orchestrator.frontend.bootstrap" => Some(SupportedContract {
+            id: "ORC-FE-001",
+            major: 1,
+            minor: 0,
         }),
         "orchestrator.contracts.list" | "orchestrator.availability.list" => {
             Some(SupportedContract {
                 id: "ORC-COM-001",
-                major: 0,
-                minor: 1,
+                major: 1,
+                minor: 0,
             })
         }
         _ => None,
@@ -56,14 +61,14 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-COM-001",
         name: "Common identities, terminal status, envelopes, and provenance",
         provider: "orchestrator",
-        stage: ContractStage::FixtureDraft,
+        stage: ContractStage::Stable,
         executable: true,
     },
     ContractDescriptor {
         id: "ORC-LIF-001",
         name: "Service lifecycle, status, shutdown, and restart",
         provider: "orchestrator",
-        stage: ContractStage::FixtureDraft,
+        stage: ContractStage::Stable,
         executable: true,
     },
     ContractDescriptor {
@@ -119,8 +124,8 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-FE-001",
         name: "File Manager bootstrap session, availability, and degraded fallback",
         provider: "orchestrator",
-        stage: ContractStage::Negotiating,
-        executable: false,
+        stage: ContractStage::Stable,
+        executable: true,
     },
     ContractDescriptor {
         id: "ORC-PLG-001",
@@ -196,7 +201,7 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-CLI-001",
         name: "Human and structured local CLI",
         provider: "orchestrator",
-        stage: ContractStage::FixtureDraft,
+        stage: ContractStage::Stable,
         executable: true,
     },
     ContractDescriptor {

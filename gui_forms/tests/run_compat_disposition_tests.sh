@@ -3,9 +3,22 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-capture="$project_dir/compatibility/retired compatibility specimen/retired compatibility specimen-next-x64-6-1922.capture-v0.json"
-policy="$project_dir/compatibility/retired compatibility specimen/retired compatibility specimen-next-x64-6-1922.disposition-policy-v1.json"
-checked_in="$project_dir/compatibility/retired compatibility specimen/retired compatibility specimen-next-x64-6-1922.facade-catalogue-v1.json"
+capture=
+for candidate in "$project_dir"/compatibility/*/*.capture-v0.json; do
+  [ -f "$candidate" ] || continue
+  [ -z "$capture" ] || {
+    echo "multiple private compatibility captures found" >&2
+    exit 1
+  }
+  capture=$candidate
+done
+[ -n "$capture" ] || {
+  echo "private compatibility capture not found" >&2
+  exit 1
+}
+capture_prefix=${capture%.capture-v0.json}
+policy="$capture_prefix.disposition-policy-v1.json"
+checked_in="$capture_prefix.facade-catalogue-v1.json"
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/gui-forms-disposition.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 

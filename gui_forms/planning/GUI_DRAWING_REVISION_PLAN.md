@@ -275,12 +275,26 @@ Exit: the unchanged specimen visibly populates and stays open with zero drawing
 passthrough calls; all exercised operations pass their behavior/raster oracle or
 carry a reviewed deviation; sustained paint has a recorded baseline.
 
-**MEASURED PARTIAL:** the unchanged specimen visibly publishes a 204-control
+**MEASURED PARTIAL:** the unchanged specimen visibly publishes a retained live
 tree and remains open through owned GUI.Drawing. Sequential cross-thread Drawing
 use is serialized at the ABI; reflected PNG bitmap and PNG-backed ICO resources
-hydrate without Microsoft Drawing/GDI+. Input/callback/repaint traversal is
-measured. Dynamic member counters, direct retained paint, differential review,
-and active-source performance remain open; see
+hydrate without Microsoft Drawing/GDI+. Dynamic call telemetry reconciles 874
+callable keys against all 1,104 required rows and has observed up to 446 keys and
+872,599 calls in one local-source run. ABI 0.16 removes the production
+managed-paint PNG round trip: an owned, bounded premultiplied-BGRA surface passes
+through the renderer-neutral resource registry to Skia, CoreGraphics, or Win32.
+The unchanged specimen recorded 283 such paints, 38,133,760 surface bytes, zero
+PNG bytes, and about 0.973 ms/paint, down from about 2.074 ms/paint in the prior
+PNG-path sample. A .NET 10/Wine text/raster differential slice and a bounded
+25-minute active-source pacing sample are recorded. The broader geometry/path
+oracle, exact line-height policy, and sustained native-surface cadence remain
+open. ABI 0.17 supplies authoritative root-relative control geometry and a
+Windows paint-only child-HWND lease; same-process sampling observes non-uniform
+connected SpectrumAnalyzer and Waterfall pixels. The expanded differential
+matches all observed requested-family widths and the complete 19-point compound
+rectangle/ellipse/line fixture plus all ten points of a non-axis-aligned
+230-degree arc, while family-dependent height deviations and the remaining
+region/clip/raster matrix stay open; see
 `../experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
 
 ### M11h and later — application closure
@@ -292,6 +306,40 @@ After M11g, return to the remaining Forms blockers in this order:
 3. active receiver streaming, damage isolation, frame pacing, and soak;
 4. accessibility publication and reliable GUI instrumentation;
 5. ABI freeze, packaging, physical Windows dogfood, then Linux host dogfood.
+
+**MEASURED PARTIAL M11h:** experimental Forms ABI 0.18 publishes form-level key
+preview before focused-descendant routing. The generated facade now has stable
+recursive tab order, scoped `ActiveControl`, functional accept/cancel buttons,
+owned-form cycle checks, cancellable modeless close, modal owner suppression,
+and deterministic focus restoration. The same headless form/ownership fixtures
+pass on host .NET and Wine; physical Wine Enter and Escape messages also reach
+the ABI preview and invoke the configured buttons. This processes only the
+retained behavior and modal-focus portion of item 1. Modeless secondary forms
+are still composed into the retained root rather than created as independent
+native top-level windows, and popup focus scopes remain open.
+
+**MEASURED PARTIAL M11h / compatibility breadth:** ABI 0.19 adds bounded
+portable cursor set/get projection over the existing retained cursor
+inheritance and Win32 cursor selection. The generated `Cursors` roles now have
+stable semantic identity rather than empty objects. `ScrollableControl` also
+owns its `DockPaddingEdges`; edge mutation projects into retained padding and
+reruns fill layout. Both fixtures pass on host .NET and Wine.
+
+**MEASURED PARTIAL M11h / FM-LY05:** GUI.Forms now exposes a public retained
+split composition with stable two-panel/seam ownership, thin visible seam plus
+larger hit target, live capture drag, keyboard resize, constraints,
+collapse/focus transfer, orientation, and fixed-panel resize. The generated
+`SplitContainer` projection passes host and physical Wine. Persistence,
+automatic/user responsive collapse, nested stress, DML/C ABI, and native
+semantics remain open. Evidence:
+`experiments/M11H_RETAINED_SPLIT_CONTAINER.md`.
+
+**MEASURED PARTIAL M11h / focus scopes:** the renderer-free `Window` now owns
+bounded nested focus containment, deterministic Tab/Shift+Tab traversal,
+out-of-order-safe restoration, owner-unavailable cleanup, typed changes, and
+structured metrics. Popup ownership/dismissal and the C ABI/generated binding
+projection remain open; this core slice does not justify calling item 1
+complete. Evidence: `experiments/M11H_RETAINED_FOCUS_SCOPES.md`.
 
 Multi-window work may proceed before the full D3–D7 breadth only if a narrow
 GUI.Drawing slice can populate the source dialog without falling back to the

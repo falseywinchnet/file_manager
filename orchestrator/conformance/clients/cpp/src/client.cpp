@@ -1,5 +1,7 @@
 #include "fileman_orchestrator/client.hpp"
 
+#include <utility>
+
 #if defined(__unix__) || defined(__APPLE__)
 
 #include <arpa/inet.h>
@@ -9,8 +11,10 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -18,7 +22,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
-#include <utility>
+#include <thread>
 #include <variant>
 
 namespace fileman::orchestrator {
@@ -29,6 +33,7 @@ constexpr std::string_view wire_magic = "ORC1";
 constexpr std::size_t discovery_limit = 16'384;
 constexpr std::size_t credential_limit = 256;
 constexpr std::size_t json_depth_limit = 64;
+constexpr std::size_t json_value_limit = 16'384;
 
 struct JsonNumber {
     std::string text;
@@ -44,13 +49,48 @@ struct JsonValue {
     throw ClientError(message);
 }
 
+void validate_utf8(const std::string_view input) {
+    std::size_t position = 0;
+    while (position < input.size()) {
+        const auto first = static_cast<unsigned char>(input[position++]);
+        if (first <= 0x7F) continue;
+
+        std::size_t continuation_count{};
+        std::uint32_t codepoint{};
+        if (first >= 0xC2 && first <= 0xDF) {
+            continuation_count = 1;
+            codepoint = first & 0x1F;
+        } else if (first >= 0xE0 && first <= 0xEF) {
+            continuation_count = 2;
+            codepoint = first & 0x0F;
+        } else if (first >= 0xF0 && first <= 0xF4) {
+            continuation_count = 3;
+            codepoint = first & 0x07;
+        } else {
+            fail("JSON is not valid UTF-8");
+        }
+        if (position + continuation_count > input.size()) fail("JSON is not valid UTF-8");
+        for (std::size_t index = 0; index < continuation_count; ++index) {
+            const auto continuation = static_cast<unsigned char>(input[position++]);
+            if ((continuation & 0xC0) != 0x80) fail("JSON is not valid UTF-8");
+            codepoint = (codepoint << 6) | (continuation & 0x3F);
+        }
+        const bool overlong = (continuation_count == 1 && codepoint < 0x80) ||
+                              (continuation_count == 2 && codepoint < 0x800) ||
+                              (continuation_count == 3 && codepoint < 0x10000);
+        if (overlong || (codepoint >= 0xD800 && codepoint <= 0xDFFF) || codepoint > 0x10FFFF) {
+            fail("JSON is not valid UTF-8");
+        }
+    }
+}
+
 std::string system_error(const std::string_view operation) {
     return std::string(operation) + ": " + std::strerror(errno);
 }
 
 class JsonParser final {
 public:
-    explicit JsonParser(const std::string_view input) : input_(input) {}
+    explicit JsonParser(const std::string_view input) : input_(input) { validate_utf8(input); }
 
     JsonValue parse() {
         auto result = parse_value(0);
@@ -65,6 +105,9 @@ private:
     JsonValue parse_value(const std::size_t depth) {
         if (depth > json_depth_limit) {
             fail("JSON nesting exceeds client limit");
+        }
+        if (++value_count_ > json_value_limit) {
+            fail("JSON value count exceeds client limit");
         }
         whitespace();
         if (position_ == input_.size()) {
@@ -268,6 +311,7 @@ private:
 
     std::string_view input_;
     std::size_t position_{};
+    std::size_t value_count_{};
 };
 
 const JsonValue::Object& object(const JsonValue& value, const std::string_view context) {
@@ -481,6 +525,137 @@ std::uint32_t narrow_u32(const std::uint64_t value, const std::string_view conte
     return static_cast<std::uint32_t>(value);
 }
 
+std::optional<std::string> optional_string(const JsonValue& value,
+                                           const std::string_view context) {
+    if (std::holds_alternative<std::nullptr_t>(value.value)) return std::nullopt;
+    return string(value, context);
+}
+
+std::optional<bool> optional_boolean(const JsonValue& value,
+                                     const std::string_view context) {
+    if (std::holds_alternative<std::nullptr_t>(value.value)) return std::nullopt;
+    return boolean(value, context);
+}
+
+VersionInfo parse_version_info(const JsonValue& value) {
+    const auto& result = object(value, "version result");
+    const auto& protocol = object(field(result, "protocol"), "version.protocol");
+    const auto& local_wire = object(field(result, "local_wire"), "version.local_wire");
+    return {
+        string(field(result, "component"), "version.component"),
+        string(field(result, "build_version"), "version.build_version"),
+        string(field(protocol, "family"), "version.protocol.family"),
+        narrow_u16(unsigned_integer(field(protocol, "major"), "version.protocol.major"),
+                   "version.protocol.major"),
+        narrow_u16(unsigned_integer(field(protocol, "minor"), "version.protocol.minor"),
+                   "version.protocol.minor"),
+        string(field(local_wire, "family"), "version.local_wire.family"),
+        narrow_u16(unsigned_integer(field(local_wire, "major"), "version.local_wire.major"),
+                   "version.local_wire.major"),
+        narrow_u16(unsigned_integer(field(local_wire, "minor"), "version.local_wire.minor"),
+                   "version.local_wire.minor"),
+    };
+}
+
+ReleaseInfo parse_release_info(const JsonValue& value) {
+    const auto& result = object(value, "release result");
+    ReleaseInfo release{
+        string(field(result, "profile"), "release.profile"),
+        string(field(result, "target_version"), "release.target_version"),
+        string(field(result, "build_version"), "release.build_version"),
+        string(field(result, "first_platform"), "release.first_platform"),
+        string(field(result, "state"), "release.state"),
+        boolean(field(result, "ready"), "release.ready"),
+        {},
+        {},
+        {},
+    };
+    for (const auto& contract : array(field(result, "required_contracts"),
+                                      "release.required_contracts")) {
+        release.required_contracts.push_back(string(contract, "required contract"));
+    }
+    for (const auto& item : array(field(result, "requirements"), "release.requirements")) {
+        const auto& requirement = object(item, "release requirement");
+        release.requirements.push_back({
+            string(field(requirement, "id"), "requirement.id"),
+            string(field(requirement, "state"), "requirement.state"),
+            string(field(requirement, "evidence"), "requirement.evidence"),
+        });
+    }
+    const auto& provenance = object(field(result, "provenance"), "release.provenance");
+    release.provenance = {
+        string(field(provenance, "algorithm"), "provenance.algorithm"),
+        string(field(provenance, "scope"), "provenance.scope"),
+        string(field(provenance, "digest"), "provenance.digest"),
+        boolean(field(provenance, "signed"), "provenance.signed"),
+        unsigned_integer(field(provenance, "embedded_inputs"), "provenance.embedded_inputs"),
+    };
+    if (release.provenance.algorithm != "sha256" || release.provenance.digest.size() != 64) {
+        fail("release provenance uses an unsupported digest shape");
+    }
+    return release;
+}
+
+StatusInfo parse_status_info(const JsonValue& value) {
+    const auto& result = object(value, "status result");
+    const auto& lifecycle = object(field(result, "lifecycle"), "status.lifecycle");
+    const auto& core = object(field(result, "core_release"), "status.core_release");
+    const auto& summary = object(field(result, "availability_summary"),
+                                 "status.availability_summary");
+    return {
+        string(field(result, "component"), "status.component"),
+        string(field(result, "scope"), "status.scope"),
+        string(field(lifecycle, "state"), "lifecycle.state"),
+        unsigned_integer(field(lifecycle, "generation"), "lifecycle.generation"),
+        string(field(core, "state"), "core_release.state"),
+        string(field(core, "target_version"), "core_release.target_version"),
+        boolean(field(core, "ready"), "core_release.ready"),
+        boolean(field(result, "lazy"), "status.lazy"),
+        boolean(field(result, "has_gui"), "status.has_gui"),
+        string(field(result, "engine_scope"), "status.engine_scope"),
+        string(field(result, "normal_integration_route"), "status.normal_integration_route"),
+        boolean(field(result, "degraded_engine_fallback"), "status.degraded_engine_fallback"),
+        {
+            unsigned_integer(field(summary, "available"), "availability.available"),
+            unsigned_integer(field(summary, "degraded"), "availability.degraded"),
+            unsigned_integer(field(summary, "unavailable"), "availability.unavailable"),
+            unsigned_integer(field(summary, "negotiating"), "availability.negotiating"),
+            unsigned_integer(field(summary, "deferred"), "availability.deferred"),
+            unsigned_integer(field(summary, "stubbed"), "availability.stubbed"),
+        },
+    };
+}
+
+std::vector<ContractInfo> parse_contracts(const JsonValue& value) {
+    std::vector<ContractInfo> output;
+    for (const auto& item : array(value, "contracts result")) {
+        const auto& record = object(item, "contract record");
+        output.push_back({
+            string(field(record, "id"), "contract.id"),
+            string(field(record, "name"), "contract.name"),
+            string(field(record, "provider"), "contract.provider"),
+            string(field(record, "stage"), "contract.stage"),
+            boolean(field(record, "executable"), "contract.executable"),
+        });
+    }
+    return output;
+}
+
+std::vector<AvailabilityInfo> parse_availability(const JsonValue& value) {
+    std::vector<AvailabilityInfo> output;
+    for (const auto& item : array(value, "availability result")) {
+        const auto& record = object(item, "availability record");
+        output.push_back({
+            string(field(record, "id"), "availability.id"),
+            string(field(record, "provider"), "availability.provider"),
+            string(field(record, "state"), "availability.state"),
+            string(field(record, "reason"), "availability.reason"),
+            boolean(field(record, "required"), "availability.required"),
+        });
+    }
+    return output;
+}
+
 }  // namespace
 
 Client::Client(const int socket, SessionInfo session) noexcept
@@ -505,7 +680,62 @@ Client::~Client() {
     if (socket_ >= 0) ::close(socket_);
 }
 
+std::filesystem::path default_runtime_directory() {
+#if defined(__APPLE__)
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || *home == '\0') fail("HOME is unavailable for macOS service discovery");
+    auto runtime = std::filesystem::path(home);
+    if (!runtime.is_absolute()) fail("HOME is not absolute for macOS service discovery");
+    return runtime / "Library" / "Application Support" / "fo-orchestrator";
+#else
+    std::error_code error;
+    auto runtime = std::filesystem::temp_directory_path(error);
+    if (error) fail("cannot resolve the user-session temporary directory: " + error.message());
+    return runtime / "fo-orchestrator";
+#endif
+}
+
+Client Client::connect_default(std::string client_name) {
+    return connect(default_runtime_directory(), std::move(client_name));
+}
+
 Client Client::connect(const std::filesystem::path& runtime_directory, std::string client_name) {
+    try {
+        return connect_once(runtime_directory, client_name);
+    } catch (const ClientError& initial_error) {
+        const auto initial_message = std::string(initial_error.what());
+        const auto socket_path = runtime_directory / "orchestrator.sock";
+        const int trigger = ::socket(AF_UNIX, SOCK_STREAM, 0);
+        if (trigger < 0) throw;
+        sockaddr_un address{};
+        address.sun_family = AF_UNIX;
+        const auto encoded_path = socket_path.string();
+        if (encoded_path.size() >= sizeof(address.sun_path)) {
+            ::close(trigger);
+            throw;
+        }
+        std::memcpy(address.sun_path, encoded_path.c_str(), encoded_path.size() + 1);
+        if (::connect(trigger, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
+            ::close(trigger);
+            throw;
+        }
+        ::close(trigger);
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (std::chrono::steady_clock::now() < deadline) {
+            try {
+                return connect_once(runtime_directory, client_name);
+            } catch (const ClientError&) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        fail("local daemon activation did not publish a usable endpoint; initial error: " +
+             initial_message);
+    }
+}
+
+Client Client::connect_once(const std::filesystem::path& runtime_directory,
+                            std::string client_name) {
     validate_runtime_path(runtime_directory);
     const auto directory = checked_stat(runtime_directory);
     if ((directory.st_mode & S_IFMT) != S_IFDIR || directory.st_uid != ::geteuid()) {
@@ -537,7 +767,9 @@ Client Client::connect(const std::filesystem::path& runtime_directory, std::stri
 
     auto credential = trim_ascii(read_bounded_file(credential_path, credential_limit));
     validate_credential(credential);
-    if (client_name.empty() || client_name.size() > 256) fail("client name is empty or too long");
+    if (client_name.empty() || client_name.size() > local_wire_max_client_name_bytes) {
+        fail("client name is empty or too long");
+    }
 
     const int socket = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (socket < 0) fail(system_error("create Unix socket"));
@@ -552,8 +784,11 @@ Client Client::connect(const std::filesystem::path& runtime_directory, std::stri
             fail(system_error("connect Unix socket"));
         }
 
-        const std::string hello = "{\"family\":\"orchestrator.local\",\"major\":0,\"minor\":1,\"client\":" +
-                                  json_escape(client_name) + ",\"credential\":" + json_escape(credential) + "}";
+        const std::string hello = "{\"family\":\"orchestrator.local\",\"major\":" +
+                                  std::to_string(local_wire_major) + ",\"minor\":" +
+                                  std::to_string(local_wire_minor) + ",\"client\":" +
+                                  json_escape(client_name) + ",\"credential\":" +
+                                  json_escape(credential) + "}";
         write_frame(socket, hello);
         const auto response = JsonParser(read_frame(socket)).parse();
         const auto& server = object(response, "server hello");
@@ -582,10 +817,22 @@ Client Client::connect(const std::filesystem::path& runtime_directory, std::stri
 
 const SessionInfo& Client::session() const noexcept { return session_; }
 
-std::string Client::call(const std::string_view method) {
+std::string Client::call(const std::string_view method,
+                         const std::string_view contract_id,
+                         const std::uint16_t contract_major,
+                         const std::uint16_t contract_minor) {
     if (socket_ < 0) fail("local session is closed");
     const auto request_id = "cpp-" + std::to_string(next_request_id_++);
-    const auto request = "{\"id\":" + json_escape(request_id) + ",\"method\":" + json_escape(method) + ",\"params\":{}}";
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch());
+    if (now.count() < 0) fail("system clock is before the Unix epoch");
+    const auto deadline = static_cast<std::uint64_t>(now.count()) + 5'000;
+    const auto request = "{\"id\":" + json_escape(request_id) + ",\"method\":" +
+                         json_escape(method) + ",\"contract\":{\"id\":" +
+                         json_escape(contract_id) + ",\"major\":" +
+                         std::to_string(contract_major) + ",\"minor\":" +
+                         std::to_string(contract_minor) + "},\"deadline_unix_ms\":" +
+                         std::to_string(deadline) + ",\"params\":{}}";
     write_frame(socket_, request);
     auto response = read_frame(socket_);
     auto parsed = parse_successful_response(response, request_id);
@@ -594,107 +841,225 @@ std::string Client::call(const std::string_view method) {
 }
 
 VersionInfo Client::version() {
-    const auto response = call("orchestrator.version");
+    const auto response = call("orchestrator.version", "ORC-LIF-001", 1, 0);
     auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
-    const auto& result = object(parsed.result(), "version result");
-    const auto& protocol = object(field(result, "protocol"), "version.protocol");
-    return {
-        string(field(result, "component"), "version.component"),
-        string(field(result, "build_version"), "version.build_version"),
-        string(field(protocol, "family"), "version.protocol.family"),
-        narrow_u16(unsigned_integer(field(protocol, "major"), "version.protocol.major"), "version.protocol.major"),
-        narrow_u16(unsigned_integer(field(protocol, "minor"), "version.protocol.minor"), "version.protocol.minor"),
-    };
+    return parse_version_info(parsed.result());
 }
 
 ReleaseInfo Client::release() {
-    const auto response = call("orchestrator.release");
+    const auto response = call("orchestrator.release", "ORC-LIF-001", 1, 0);
     auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
-    const auto& result = object(parsed.result(), "release result");
-    ReleaseInfo release{
-        string(field(result, "profile"), "release.profile"),
-        string(field(result, "target_version"), "release.target_version"),
-        string(field(result, "build_version"), "release.build_version"),
-        string(field(result, "state"), "release.state"),
-        boolean(field(result, "ready"), "release.ready"),
-        {},
-        {},
-    };
-    for (const auto& contract : array(field(result, "required_contracts"), "release.required_contracts")) {
-        release.required_contracts.push_back(string(contract, "required contract"));
-    }
-    for (const auto& item : array(field(result, "requirements"), "release.requirements")) {
-        const auto& requirement = object(item, "release requirement");
-        release.requirements.push_back({
-            string(field(requirement, "id"), "requirement.id"),
-            string(field(requirement, "state"), "requirement.state"),
-            string(field(requirement, "evidence"), "requirement.evidence"),
-        });
-    }
-    return release;
+    return parse_release_info(parsed.result());
 }
 
 StatusInfo Client::status() {
-    const auto response = call("orchestrator.status");
+    const auto response = call("orchestrator.status", "ORC-LIF-001", 1, 0);
     auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
-    const auto& result = object(parsed.result(), "status result");
-    const auto& lifecycle = object(field(result, "lifecycle"), "status.lifecycle");
-    const auto& core = object(field(result, "core_release"), "status.core_release");
-    const auto& summary = object(field(result, "availability_summary"), "status.availability_summary");
-    return {
-        string(field(result, "component"), "status.component"),
-        string(field(result, "scope"), "status.scope"),
-        string(field(lifecycle, "state"), "lifecycle.state"),
-        unsigned_integer(field(lifecycle, "generation"), "lifecycle.generation"),
-        string(field(core, "state"), "core_release.state"),
-        string(field(core, "target_version"), "core_release.target_version"),
-        boolean(field(core, "ready"), "core_release.ready"),
-        boolean(field(result, "lazy"), "status.lazy"),
-        boolean(field(result, "has_gui"), "status.has_gui"),
-        boolean(field(result, "degraded_engine_fallback"), "status.degraded_engine_fallback"),
-        {
-            unsigned_integer(field(summary, "available"), "availability.available"),
-            unsigned_integer(field(summary, "degraded"), "availability.degraded"),
-            unsigned_integer(field(summary, "unavailable"), "availability.unavailable"),
-            unsigned_integer(field(summary, "negotiating"), "availability.negotiating"),
-            unsigned_integer(field(summary, "deferred"), "availability.deferred"),
-            unsigned_integer(field(summary, "stubbed"), "availability.stubbed"),
-        },
-    };
+    return parse_status_info(parsed.result());
+}
+
+std::vector<ContractInfo> Client::contracts() {
+    const auto response = call("orchestrator.contracts.list", "ORC-COM-001", 1, 0);
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    return parse_contracts(parsed.result());
 }
 
 std::vector<AvailabilityInfo> Client::availability() {
-    const auto response = call("orchestrator.availability.list");
+    const auto response = call("orchestrator.availability.list", "ORC-COM-001", 1, 0);
     auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
-    std::vector<AvailabilityInfo> output;
-    for (const auto& item : array(parsed.result(), "availability result")) {
-        const auto& record = object(item, "availability record");
-        output.push_back({
-            string(field(record, "id"), "availability.id"),
-            string(field(record, "provider"), "availability.provider"),
-            string(field(record, "state"), "availability.state"),
-            string(field(record, "reason"), "availability.reason"),
-            boolean(field(record, "required"), "availability.required"),
-        });
-    }
-    return output;
+    return parse_availability(parsed.result());
 }
 
 BootstrapSnapshot Client::bootstrap() {
-    BootstrapSnapshot snapshot;
-    snapshot.session = session_;
-    snapshot.version = version();
-    snapshot.release = release();
-    snapshot.status = status();
-    snapshot.availability = availability();
-    if (snapshot.status.lifecycle_generation != snapshot.session.lifecycle_generation) {
+    const auto response = call("orchestrator.frontend.bootstrap", "ORC-FE-001",
+                               frontend_contract_major, frontend_contract_minor);
+    auto parsed = parse_successful_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "frontend bootstrap result");
+    const auto& schema = object(field(result, "schema"), "bootstrap.schema");
+    const auto& identity = object(field(result, "snapshot"), "bootstrap.snapshot");
+    const auto& routing = object(field(result, "routing"), "bootstrap.routing");
+    const auto& fallback = object(field(routing, "direct_engine_fallback"),
+                                  "bootstrap.routing.direct_engine_fallback");
+    const auto& controls = object(field(result, "service_controls"),
+                                  "bootstrap.service_controls");
+    const auto& opening = object(field(result, "frontend_opening"),
+                                 "bootstrap.frontend_opening");
+    const auto& orchestrator_gate = object(field(opening, "orchestrator_gate"),
+                                           "bootstrap.opening.orchestrator_gate");
+    const auto& external_gates = object(field(opening, "external_gates"),
+                                        "bootstrap.opening.external_gates");
+    const auto& gui_forms_gate = object(field(external_gates, "gui_forms"),
+                                        "bootstrap.opening.gui_forms");
+    const auto& architect_gate = object(field(external_gates, "architect_direction"),
+                                        "bootstrap.opening.architect_direction");
+    const auto& opening_policy = object(field(opening, "policy"),
+                                        "bootstrap.opening.policy");
+    std::vector<FrontendGateBlockerInfo> opening_blockers;
+    for (const auto& item : array(field(orchestrator_gate, "blockers"),
+                                  "bootstrap.opening.blockers")) {
+        const auto& blocker = object(item, "bootstrap opening blocker");
+        opening_blockers.push_back({
+            string(field(blocker, "kind"), "bootstrap.blocker.kind"),
+            string(field(blocker, "id"), "bootstrap.blocker.id"),
+            string(field(blocker, "state"), "bootstrap.blocker.state"),
+            string(field(blocker, "reason"), "bootstrap.blocker.reason"),
+        });
+    }
+
+    BootstrapSnapshot snapshot{
+        session_,
+        string(field(schema, "family"), "bootstrap.schema.family"),
+        narrow_u16(unsigned_integer(field(schema, "major"), "bootstrap.schema.major"),
+                   "bootstrap.schema.major"),
+        narrow_u16(unsigned_integer(field(schema, "minor"), "bootstrap.schema.minor"),
+                   "bootstrap.schema.minor"),
+        {
+            string(field(identity, "kind"), "bootstrap.snapshot.kind"),
+            unsigned_integer(field(identity, "lifecycle_generation"),
+                             "bootstrap.snapshot.lifecycle_generation"),
+            unsigned_integer(field(identity, "configuration_generation"),
+                             "bootstrap.snapshot.configuration_generation"),
+        },
+        parse_version_info(field(result, "version")),
+        parse_release_info(field(result, "release")),
+        parse_status_info(field(result, "status")),
+        parse_contracts(field(result, "contracts")),
+        parse_availability(field(result, "availability")),
+        {
+            string(field(routing, "normal_integration_route"),
+                   "bootstrap.routing.normal_integration_route"),
+            string(field(routing, "engine_scope"), "bootstrap.routing.engine_scope"),
+            {
+                boolean(field(fallback, "registered"), "bootstrap.fallback.registered"),
+                boolean(field(fallback, "eligible"), "bootstrap.fallback.eligible"),
+                string(field(fallback, "state"), "bootstrap.fallback.state"),
+                string(field(fallback, "reason"), "bootstrap.fallback.reason"),
+            },
+        },
+        {
+            boolean(field(controls, "shutdown_eligible"), "bootstrap.controls.shutdown"),
+            boolean(field(controls, "restart_eligible"), "bootstrap.controls.restart"),
+            string(field(controls, "diagnostics_state"), "bootstrap.controls.diagnostics_state"),
+            optional_string(field(controls, "diagnostics_locator"),
+                            "bootstrap.controls.diagnostics_locator"),
+        },
+        {
+            {
+                string(field(orchestrator_gate, "authority"),
+                       "bootstrap.opening.orchestrator.authority"),
+                string(field(orchestrator_gate, "state"),
+                       "bootstrap.opening.orchestrator.state"),
+                boolean(field(orchestrator_gate, "satisfied"),
+                        "bootstrap.opening.orchestrator.satisfied"),
+                std::move(opening_blockers),
+            },
+            {
+                string(field(gui_forms_gate, "authority"),
+                       "bootstrap.opening.gui_forms.authority"),
+                optional_string(field(gui_forms_gate, "evidence_capability_id"),
+                                "bootstrap.opening.gui_forms.evidence"),
+                string(field(gui_forms_gate, "state"),
+                       "bootstrap.opening.gui_forms.state"),
+                optional_boolean(field(gui_forms_gate, "satisfied"),
+                                 "bootstrap.opening.gui_forms.satisfied"),
+            },
+            {
+                string(field(architect_gate, "authority"),
+                       "bootstrap.opening.architect.authority"),
+                std::nullopt,
+                string(field(architect_gate, "state"),
+                       "bootstrap.opening.architect.state"),
+                optional_boolean(field(architect_gate, "satisfied"),
+                                 "bootstrap.opening.architect.satisfied"),
+            },
+            {
+                boolean(field(opening_policy, "live_snapshot_required"),
+                        "bootstrap.opening.policy.live_snapshot_required"),
+                boolean(field(opening_policy,
+                              "separately_gated_provider_absence_blocks_opening"),
+                        "bootstrap.opening.policy.provider_absence"),
+                string(field(opening_policy, "stale_snapshot_authority"),
+                       "bootstrap.opening.policy.stale_snapshot_authority"),
+            },
+        },
+    };
+    if (snapshot.schema_family != "ORC-FE-001" ||
+        snapshot.schema_major != frontend_contract_major ||
+        snapshot.schema_minor > frontend_contract_minor ||
+        snapshot.snapshot.kind != "immutable") {
+        fail("frontend bootstrap schema is incompatible");
+    }
+    if (snapshot.version.local_wire_family != wire_family ||
+        snapshot.version.local_wire_major != local_wire_major ||
+        snapshot.version.local_wire_minor > local_wire_minor) {
+        fail("frontend bootstrap reports an incompatible local wire");
+    }
+    if (snapshot.snapshot.lifecycle_generation != snapshot.session.lifecycle_generation ||
+        snapshot.status.lifecycle_generation != snapshot.session.lifecycle_generation) {
         fail("lifecycle generation changed during bootstrap");
+    }
+    if (snapshot.routing.normal_integration_route != snapshot.status.normal_integration_route ||
+        snapshot.routing.engine_scope != snapshot.status.engine_scope) {
+        fail("frontend bootstrap routing projections disagree");
+    }
+    const auto gui_forms = std::find_if(snapshot.availability.begin(),
+                                        snapshot.availability.end(), [](const auto& item) {
+        return item.id == "gui_forms.consumption_manifest";
+    });
+    if (snapshot.frontend_opening.orchestrator_gate.authority != "orchestrator" ||
+        (snapshot.frontend_opening.orchestrator_gate.satisfied &&
+         (!snapshot.frontend_opening.orchestrator_gate.blockers.empty() ||
+          snapshot.frontend_opening.orchestrator_gate.state != "available")) ||
+        (!snapshot.frontend_opening.orchestrator_gate.satisfied &&
+         snapshot.frontend_opening.orchestrator_gate.state != "blocked") ||
+        snapshot.frontend_opening.gui_forms_gate.authority != "gui_forms" ||
+        snapshot.frontend_opening.gui_forms_gate.evidence_capability_id !=
+            std::optional<std::string>{"gui_forms.consumption_manifest"} ||
+        gui_forms == snapshot.availability.end() ||
+        snapshot.frontend_opening.gui_forms_gate.state != gui_forms->state ||
+        snapshot.frontend_opening.gui_forms_gate.satisfied !=
+            std::optional<bool>{gui_forms->state == "available"} ||
+        snapshot.frontend_opening.architect_direction_gate.authority != "grand_architect" ||
+        snapshot.frontend_opening.architect_direction_gate.state != "not_reported" ||
+        snapshot.frontend_opening.architect_direction_gate.satisfied.has_value() ||
+        !snapshot.frontend_opening.policy.live_snapshot_required ||
+        snapshot.frontend_opening.policy.separately_gated_provider_absence_blocks_opening ||
+        snapshot.frontend_opening.policy.stale_snapshot_authority != "display_only") {
+        fail("frontend opening projection is inconsistent");
     }
     return snapshot;
 }
 
+bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept {
+    if (!frontend_opening.orchestrator_gate.satisfied ||
+        !frontend_opening.orchestrator_gate.blockers.empty() ||
+        frontend_opening.orchestrator_gate.state != "available" || !release.ready ||
+        !status.core_ready || status.lifecycle_state != "ready" ||
+        release.state != "ready" || release.target_version != "1.0.0" ||
+        status.core_release_state != release.state ||
+        status.core_target_version != release.target_version ||
+        schema_family != "ORC-FE-001" || schema_major != frontend_contract_major ||
+        schema_minor > frontend_contract_minor ||
+        snapshot.kind != "immutable" ||
+        snapshot.lifecycle_generation != session.lifecycle_generation ||
+        routing.normal_integration_route != "orchestrator" ||
+        !routing.direct_engine_fallback.registered_route) {
+        return false;
+    }
+    for (const auto& required : release.required_contracts) {
+        const auto found = std::find_if(contracts.begin(), contracts.end(), [&](const auto& item) {
+            return item.id == required && item.stage == "stable" && item.executable;
+        });
+        if (found == contracts.end()) return false;
+    }
+    const auto bootstrap = std::find_if(availability.begin(), availability.end(), [](const auto& item) {
+        return item.id == "frontend.bootstrap" && item.state == "available";
+    });
+    return bootstrap != availability.end();
+}
+
 void Client::shutdown() {
-    (void)call("orchestrator.shutdown");
+    (void)call("orchestrator.shutdown", "ORC-LIF-001", 1, 0);
     ::close(std::exchange(socket_, -1));
 }
 
@@ -704,7 +1069,14 @@ void Client::shutdown() {
 
 namespace fileman::orchestrator {
 
+std::filesystem::path default_runtime_directory() {
+    return std::filesystem::temp_directory_path() / "fo-orchestrator";
+}
+
 Client Client::connect(const std::filesystem::path&, std::string) {
+    throw ClientError("the C++ conformance client currently requires a Unix-domain socket platform");
+}
+Client Client::connect_default(std::string) {
     throw ClientError("the C++ conformance client currently requires a Unix-domain socket platform");
 }
 Client::Client(const int socket, SessionInfo session) noexcept : socket_(socket), session_(std::move(session)) {}
@@ -715,10 +1087,14 @@ const SessionInfo& Client::session() const noexcept { return session_; }
 VersionInfo Client::version() { throw ClientError("unsupported platform"); }
 ReleaseInfo Client::release() { throw ClientError("unsupported platform"); }
 StatusInfo Client::status() { throw ClientError("unsupported platform"); }
+std::vector<ContractInfo> Client::contracts() { throw ClientError("unsupported platform"); }
 std::vector<AvailabilityInfo> Client::availability() { throw ClientError("unsupported platform"); }
 BootstrapSnapshot Client::bootstrap() { throw ClientError("unsupported platform"); }
+bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept { return false; }
 void Client::shutdown() { throw ClientError("unsupported platform"); }
-std::string Client::call(std::string_view) { throw ClientError("unsupported platform"); }
+std::string Client::call(std::string_view, std::string_view, std::uint16_t, std::uint16_t) {
+    throw ClientError("unsupported platform");
+}
 
 }  // namespace fileman::orchestrator
 

@@ -1157,23 +1157,79 @@ std::vector<PointF> GraphicsPath::path_points() const {
                 {element.rect.right(), element.rect.bottom()},
                 {element.rect.left(), element.rect.bottom()}});
             break;
-        case PathVerb::ellipse:
-            result.insert(result.end(), {{element.rect.x + element.rect.width / 2.0,
-                                          element.rect.top()},
-                {element.rect.right(), element.rect.y + element.rect.height / 2.0},
-                {element.rect.x + element.rect.width / 2.0, element.rect.bottom()},
-                {element.rect.left(), element.rect.y + element.rect.height / 2.0}});
+        case PathVerb::ellipse: {
+            // The compatibility API exposes four cubic ellipse segments through
+            // PathPoints:
+            // the right-middle start, three points per quadrant, and the
+            // repeated closing point. Keep that public geometry rather than a
+            // four-cardinal approximation.
+            constexpr double kappa = 0.55228474983079339840;
+            const double center_x = element.rect.x + element.rect.width / 2.0;
+            const double center_y = element.rect.y + element.rect.height / 2.0;
+            const double radius_x = element.rect.width / 2.0;
+            const double radius_y = element.rect.height / 2.0;
+            const double control_x = radius_x * kappa;
+            const double control_y = radius_y * kappa;
+            result.insert(result.end(), {
+                {center_x + radius_x, center_y},
+                {center_x + radius_x, center_y + control_y},
+                {center_x + control_x, center_y + radius_y},
+                {center_x, center_y + radius_y},
+                {center_x - control_x, center_y + radius_y},
+                {center_x - radius_x, center_y + control_y},
+                {center_x - radius_x, center_y},
+                {center_x - radius_x, center_y - control_y},
+                {center_x - control_x, center_y - radius_y},
+                {center_x, center_y - radius_y},
+                {center_x + control_x, center_y - radius_y},
+                {center_x + radius_x, center_y - control_y},
+                {center_x + radius_x, center_y},
+            });
             break;
+        }
         case PathVerb::arc: {
-            const auto point_at = [&](double angle) {
-                const double radians = angle * degrees_to_radians;
-                return PointF{element.rect.x + element.rect.width / 2.0 +
-                                  std::cos(radians) * element.rect.width / 2.0,
-                              element.rect.y + element.rect.height / 2.0 +
-                                  std::sin(radians) * element.rect.height / 2.0};
+            const double center_x = element.rect.x + element.rect.width / 2.0;
+            const double center_y = element.rect.y + element.rect.height / 2.0;
+            const double radius_x = element.rect.width / 2.0;
+            const double radius_y = element.rect.height / 2.0;
+            const auto parameter_angle = [&](double geometric_degrees) {
+                const double geometric = geometric_degrees * degrees_to_radians;
+                return std::atan2(radius_x * std::sin(geometric),
+                                  radius_y * std::cos(geometric));
             };
-            result.push_back(point_at(element.start_angle));
-            result.push_back(point_at(element.start_angle + element.sweep_angle));
+            constexpr double two_pi = 6.283185307179586476925286766559;
+            constexpr double half_pi = 1.5707963267948966192313216916398;
+            const double sweep = std::clamp(element.sweep_angle, -360.0, 360.0);
+            double start = parameter_angle(element.start_angle);
+            double finish = parameter_angle(element.start_angle + sweep);
+            if (sweep > 0.0) {
+                while (finish <= start) finish += two_pi;
+                if (sweep == 360.0) finish = start + two_pi;
+            } else {
+                while (finish >= start) finish -= two_pi;
+                if (sweep == -360.0) finish = start - two_pi;
+            }
+            const auto point_at = [&](double parameter) {
+                return PointF{center_x + radius_x * std::cos(parameter),
+                              center_y + radius_y * std::sin(parameter)};
+            };
+            result.push_back(point_at(start));
+            while ((sweep > 0.0 && start < finish) ||
+                   (sweep < 0.0 && start > finish)) {
+                const double delta = sweep > 0.0
+                    ? std::min(half_pi, finish - start)
+                    : std::max(-half_pi, finish - start);
+                const double end = start + delta;
+                const double alpha = 4.0 / 3.0 * std::tan(delta / 4.0);
+                const PointF first = point_at(start);
+                const PointF last = point_at(end);
+                result.push_back({first.x - alpha * radius_x * std::sin(start),
+                                  first.y + alpha * radius_y * std::cos(start)});
+                result.push_back({last.x + alpha * radius_x * std::sin(end),
+                                  last.y - alpha * radius_y * std::cos(end)});
+                result.push_back(last);
+                start = end;
+            }
             break;
         }
         case PathVerb::start_figure:

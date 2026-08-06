@@ -54,7 +54,8 @@ reviewable compatibility decision rather than a scanner inference.
 
 Capture-1 applies that separate policy with `apply_dispositions.py`; it never
 rewrites Capture-0. The authoritative policy, generated catalogue, provenance,
-and closure test are documented under `compatibility/retired compatibility specimen/README.md`.
+and closure test are documented in the private specimen directory under
+`compatibility/`.
 
 ## Test
 

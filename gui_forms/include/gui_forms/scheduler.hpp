@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -13,6 +14,9 @@ namespace gui_forms {
 class Window;
 namespace detail {
 class ScheduledFrameRequest;
+struct WindowLifetime final {
+    Window* window{};
+};
 }
 
 using FrameClock = std::chrono::steady_clock;
@@ -23,10 +27,13 @@ inline constexpr std::size_t maximum_scheduled_frame_requests = 256;
 inline constexpr std::size_t maximum_active_surfaces = 32;
 inline constexpr FrameInterval minimum_active_surface_interval =
     std::chrono::milliseconds(8);
+inline constexpr FrameInterval minimum_ui_timer_interval =
+    std::chrono::milliseconds(1);
 
 struct FramePollResult final {
     std::uint64_t deadlines_fired{};
     std::uint64_t active_surface_ticks{};
+    std::uint64_t ui_timer_ticks{};
     std::uint64_t coalesced_requests{};
     bool damage_pending{};
     bool suppressed_by_occlusion{};

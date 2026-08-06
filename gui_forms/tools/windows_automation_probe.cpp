@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
@@ -115,6 +116,76 @@ bool capture_client_bitmap(HWND window, const std::wstring& path) {
     return written;
 }
 
+struct SurfaceStatistics {
+    unsigned count{};
+};
+
+BOOL CALLBACK sample_control_surface(HWND window, LPARAM context_value) {
+    wchar_t class_name[128]{};
+    if (GetClassNameW(window, class_name, 128) == 0 ||
+        std::wcscmp(class_name, L"GUIForms.ControlSurface.v1") != 0) return TRUE;
+    auto& context = *reinterpret_cast<SurfaceStatistics*>(context_value);
+    ++context.count;
+    RECT client{};
+    RECT screen{};
+    if (!GetClientRect(window, &client) || !GetWindowRect(window, &screen)) return TRUE;
+    const int width = client.right - client.left;
+    const int height = client.bottom - client.top;
+    if (width <= 0 || height <= 0) return TRUE;
+    HDC device = GetDC(window);
+    if (device == nullptr) return TRUE;
+    constexpr int grid = 24;
+    BITMAPINFO info{};
+    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    info.bmiHeader.biWidth = grid;
+    info.bmiHeader.biHeight = -grid;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    void* captured_pixels{};
+    HBITMAP captured = CreateDIBSection(device, &info, DIB_RGB_COLORS,
+                                        &captured_pixels, nullptr, 0);
+    HDC memory = captured == nullptr ? nullptr : CreateCompatibleDC(device);
+    HGDIOBJ previous = memory == nullptr ? nullptr : SelectObject(memory, captured);
+    const bool copied = previous != nullptr && previous != HGDI_ERROR &&
+        StretchBlt(memory, 0, 0, grid, grid, device, 0, 0, width, height,
+                   SRCCOPY) != FALSE;
+    unsigned minimum_r = 255, minimum_g = 255, minimum_b = 255;
+    unsigned maximum_r = 0, maximum_g = 0, maximum_b = 0;
+    COLORREF first = CLR_INVALID;
+    unsigned samples = 0;
+    unsigned different = 0;
+    if (copied) {
+        const auto* pixels = static_cast<const unsigned char*>(captured_pixels);
+        for (int row = 0; row < grid; ++row) {
+            for (int column = 0; column < grid; ++column) {
+            const auto* pixel = pixels + (row * grid + column) * 4;
+            const unsigned b = pixel[0];
+            const unsigned g = pixel[1];
+            const unsigned r = pixel[2];
+            minimum_r = std::min(minimum_r, r); maximum_r = std::max(maximum_r, r);
+            minimum_g = std::min(minimum_g, g); maximum_g = std::max(maximum_g, g);
+            minimum_b = std::min(minimum_b, b); maximum_b = std::max(maximum_b, b);
+            const COLORREF packed = RGB(r, g, b);
+            if (first == CLR_INVALID) first = packed;
+            else if (packed != first) ++different;
+            ++samples;
+            }
+        }
+    }
+    if (memory != nullptr && previous != nullptr && previous != HGDI_ERROR)
+        SelectObject(memory, previous);
+    if (memory != nullptr) DeleteDC(memory);
+    if (captured != nullptr) DeleteObject(captured);
+    ReleaseDC(window, device);
+    std::printf("surface=%p position=%ld,%ld size=%dx%d visible=%d "
+                "rgb=%u-%u,%u-%u,%u-%u different=%u/%u\n",
+                static_cast<void*>(window), screen.left, screen.top, width, height,
+                IsWindowVisible(window), minimum_r, maximum_r, minimum_g, maximum_g,
+                minimum_b, maximum_b, different, samples);
+    return TRUE;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -164,6 +235,13 @@ int main(int argc, char** argv) {
         }
         std::printf("captured=%s\n", argv[2]);
         return 0;
+    }
+    if (std::strcmp(argv[1], "surface-stats") == 0) {
+        SurfaceStatistics statistics;
+        EnumChildWindows(window, sample_control_surface,
+                         reinterpret_cast<LPARAM>(&statistics));
+        std::printf("surfaces=%u\n", statistics.count);
+        return statistics.count == 0 ? 5 : 0;
     }
     std::string command = "GUI.Forms.Automation/1 ";
     command += argv[1];

@@ -310,6 +310,25 @@ profile is their consumer overlay, not a second plan.
 
 ## 17. Frontend go-ahead slice
 
+**MEASURED PARTIAL (2026-08-05, FM-LY05):** the public C++ control library now
+contains a retained two-panel split composition with stable panel/seam IDs,
+separate thin paint and enlarged hit geometry, minimum constraints, live
+pointer capture, keyboard resizing, focus transfer, collapse/restore, and
+fixed-panel resize behavior. The compatible .NET projection passes the same
+bounded behavior on host and physical Wine. Automatic versus user collapse,
+extent persistence, collapse-tab proximity, DML/C ABI spelling, and native
+semantic publication remain open. Evidence:
+`experiments/M11H_RETAINED_SPLIT_CONTAINER.md`.
+
+**MEASURED PARTIAL (2026-08-05, FM-W05/FM-W06/FM-C07 substrate):** the
+renderer-free `Window` now owns bounded nested focus scopes, contained focus,
+stable Tab/Shift+Tab traversal, explicit and out-of-order restoration,
+owner-unavailable cleanup, typed changes, and structured diagnostics. This is
+the reusable focus half of popup behavior. Popup ownership, click-away/Escape,
+capture transfer, placement, semantic parentage, native accessibility
+publication, DML, and C ABI/binding projection remain open. Evidence:
+`experiments/M11H_RETAINED_FOCUS_SCOPES.md`.
+
 The first snapshot need not finish every FM1/FM2/FMX row. It must provide FM0
 behavior sufficient to compose:
 

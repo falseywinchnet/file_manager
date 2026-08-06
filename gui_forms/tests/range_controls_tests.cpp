@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -199,6 +200,95 @@ void test_progress_rendering_and_vertical_geometry() {
             "noninteractive ProgressBar must not intercept its container");
 }
 
+void test_scrollbar_geometry_capture_repeat_and_orientation() {
+    auto root = make_control<Panel>(StableId("scroll.root"));
+    auto horizontal = make_control<HScrollBar>(StableId("scroll.horizontal"));
+    horizontal->set_accessible_name("Horizontal viewport");
+    horizontal->set_requested_bounds({10.0, 10.0, 240.0, 18.0});
+    horizontal->set_range(0.0, 100.0);
+    horizontal->set_small_change(2.0);
+    horizontal->set_large_change(20.0);
+    horizontal->set_value(50.0);
+    auto vertical = make_control<VScrollBar>(StableId("scroll.vertical"));
+    vertical->set_requested_bounds({260.0, 10.0, 18.0, 180.0});
+    vertical->set_range(0.0, 200.0);
+    vertical->set_value(40.0);
+    root->add_child(horizontal);
+    root->add_child(vertical);
+    Window window(root, {300.0, 210.0});
+    window.perform_layout();
+
+    const Rect track = horizontal->track_bounds();
+    const Rect thumb = horizontal->thumb_bounds();
+    require(track.width > thumb.width && thumb.width >= 18.0 &&
+                thumb.x > track.x &&
+                vertical->thumb_bounds().height >= 18.0,
+            "scrollbar thumbs must be proportional, bounded, and orientation-aware");
+
+    std::vector<RangeAction> actions;
+    auto scroll = horizontal->scroll().subscribe(
+        [&](const RangeScrollEvent& event) { actions.push_back(event.action); });
+    const Rect absolute = horizontal->absolute_bounds();
+    const Rect decrement = horizontal->decrement_button_bounds();
+    Point decrement_point{absolute.x + decrement.x + decrement.width * 0.5,
+                          absolute.y + decrement.y + decrement.height * 0.5};
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     decrement_point}) &&
+                horizontal->value() == 48.0 &&
+                window.captured_control() == horizontal &&
+                window.next_wake().has_value(),
+            "scrollbar arrow press must step, capture, and schedule bounded repeat");
+    const FrameTime repeat_deadline = *window.next_wake();
+    static_cast<void>(window.poll_frame_schedule(repeat_deadline));
+    require(horizontal->value() == 46.0 && actions.size() == 2U &&
+                actions[0] == RangeAction::small_decrement &&
+                actions[1] == RangeAction::small_decrement,
+            "scrollbar hold deadline must repeat the declared small action");
+    require(window.dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                     decrement_point}) &&
+                !window.captured_control() && !window.next_wake(),
+            "scrollbar release must cancel capture and repeat without residue");
+
+    const Rect current_thumb = horizontal->thumb_bounds();
+    const double page_x = std::min(track.x + track.width - 1.0,
+                                   current_thumb.x + current_thumb.width + 8.0);
+    Point page_point{absolute.x + page_x, absolute.y + track.height * 0.5};
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     page_point}) &&
+                horizontal->value() == 66.0,
+            "scrollbar track press must apply the declared large increment");
+    require(window.dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                     page_point}),
+            "scrollbar page action must end cleanly");
+
+    const Rect drag_thumb = horizontal->thumb_bounds();
+    const Point drag_start{absolute.x + drag_thumb.x + drag_thumb.width * 0.5,
+                           absolute.y + drag_thumb.height * 0.5};
+    const Point drag_end{absolute.x + track.x + track.width - 2.0,
+                         drag_start.y};
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     drag_start}) &&
+                window.dispatch_pointer({PointerAction::move, PointerButton::none,
+                                         drag_end}) &&
+                horizontal->value() > 95.0 &&
+                actions.back() == RangeAction::thumb_track &&
+                window.dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                         drag_end}),
+            "scrollbar thumb must track continuously under retained capture");
+
+    const Rect vertical_absolute = vertical->absolute_bounds();
+    const Rect vertical_increment = vertical->increment_button_bounds();
+    const Point vertical_increment_point{
+        vertical_absolute.x + vertical_increment.width * 0.5,
+        vertical_absolute.y + vertical_increment.y + vertical_increment.height * 0.5};
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
+                                     vertical_increment_point}) &&
+                vertical->value() == 41.0 &&
+                window.dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                         vertical_increment_point}),
+            "vertical scrollbar lower arrow must increment the same retained model");
+}
+
 void test_disposal_and_ui_thread_guard() {
     auto root = make_control<Panel>(StableId("range.dispose.root"));
     auto slider = make_control<TrackBar>(StableId("range.dispose.slider"));
@@ -240,6 +330,7 @@ int main() {
         test_range_validation_and_event_order();
         test_pointer_capture_keyboard_and_disabled_state();
         test_progress_rendering_and_vertical_geometry();
+        test_scrollbar_geometry_capture_repeat_and_orientation();
         test_disposal_and_ui_thread_guard();
         std::cout << "gui_forms_range_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;

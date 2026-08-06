@@ -188,7 +188,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_15, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_19, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -216,15 +216,114 @@ static void test_version_negotiation(void) {
                 api.field_replace != NULL &&
                 api.field_history != NULL &&
                 api.field_clear_history != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_15,
+                api.set_control_pixels != NULL &&
+                api.get_control_absolute_bounds != NULL &&
+                api.subscribe_key_preview != NULL &&
+                api.set_cursor != NULL && api.get_cursor != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_19,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000010), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000014), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_19_cursor_contract(void) {
+    gf_handle control = {0U, 0U};
+    uint32_t cursor = UINT32_MAX;
+    require(api.control_create_kind(GF_CONTROL_PANEL, text("abi.cursor.panel"),
+                                    &control) == GF_OK,
+            "0.19 cursor fixture creation failed");
+    require(api.get_cursor(control, &cursor) == GF_OK &&
+                cursor == GF_CURSOR_INHERIT,
+            "0.19 cursor did not begin inherited");
+    require(api.set_cursor(control, GF_CURSOR_RESIZE_HORIZONTAL) == GF_OK &&
+                api.get_cursor(control, &cursor) == GF_OK &&
+                cursor == GF_CURSOR_RESIZE_HORIZONTAL,
+            "0.19 cursor round trip failed");
+    require(api.set_cursor(control, GF_CURSOR_INHERIT) == GF_OK &&
+                api.get_cursor(control, &cursor) == GF_OK &&
+                cursor == GF_CURSOR_INHERIT,
+            "0.19 cursor inheritance reset failed");
+    require(api.set_cursor(control, UINT32_C(9)) == GF_ERROR_INVALID_ARGUMENT &&
+                api.get_cursor(control, NULL) == GF_ERROR_INVALID_ARGUMENT,
+            "0.19 cursor accepted an invalid request");
+    require(api.dispose(control) == GF_OK,
+            "0.19 cursor fixture disposal failed");
+}
+
+static uint32_t preview_key_callback(gf_handle sender, uint32_t event_kind,
+                                     uint32_t physical_key, uint32_t modifiers,
+                                     uint32_t repeat, void* context) {
+    (void)sender;
+    (void)event_kind;
+    (void)physical_key;
+    (void)modifiers;
+    (void)repeat;
+    unsigned* calls = (unsigned*)context;
+    ++*calls;
+    return GF_EVENT_CALLBACK_CANCEL;
+}
+
+static void test_abi_0_18_form_key_preview_contract(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    gf_event_token token = {0U, 0U};
+    unsigned calls = 0U;
+    require(api.control_create_kind(GF_CONTROL_FORM, text("abi.preview.form"),
+                                    &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL, text("abi.preview.panel"),
+                                        &panel) == GF_OK,
+            "0.18 preview fixture creation failed");
+    require(api.subscribe_key_preview(form, preview_key_callback, &calls,
+                                      &token) == GF_OK,
+            "0.18 form preview subscription failed");
+    require(api.subscribe_key_preview(panel, preview_key_callback, &calls,
+                                      &token) == GF_ERROR_WRONG_HANDLE_KIND,
+            "0.18 preview accepted a non-form sender");
+    require(api.disconnect(token) == GF_OK,
+            "0.18 preview token did not disconnect");
+    require(calls == 0U,
+            "0.18 preview callback ran without key input");
+    require(api.dispose(panel) == GF_OK && api.dispose(form) == GF_OK,
+            "0.18 preview fixture disposal failed");
+}
+
+static void test_abi_0_16_owned_pixel_surface(void) {
+    gf_handle raster = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    const uint8_t pixels[16] = {
+        0U, 0U, 255U, 255U, 0U, 255U, 0U, 255U,
+        255U, 0U, 0U, 255U, 255U, 255U, 255U, 255U,
+    };
+    require(api.control_create_kind(GF_CONTROL_CUSTOM,
+                                    text("abi.surface.raster"), &raster) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.surface.panel"), &panel) == GF_OK,
+            "0.16 surface fixtures failed");
+    require(api.set_control_pixels(
+                raster, pixels, 2U, 2U, 8U,
+                GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED) == GF_OK,
+            "0.16 owned BGRA surface was rejected");
+    require(api.set_control_pixels(
+                raster, pixels, 2U, 2U, 7U,
+                GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED) ==
+                GF_ERROR_INVALID_ARGUMENT,
+            "0.16 surface accepted an undersized row stride");
+    require(api.set_control_pixels(
+                panel, pixels, 2U, 2U, 8U,
+                GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED) ==
+                GF_ERROR_WRONG_HANDLE_KIND,
+            "0.16 surface accepted a non-raster control");
+    require(api.set_control_pixels(
+                raster, NULL, 0U, 0U, 0U,
+                GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED) == GF_OK,
+            "0.16 surface clear was rejected");
+    require(api.dispose(raster) == GF_OK && api.dispose(panel) == GF_OK,
+            "0.16 surface fixture disposal failed");
 }
 
 static void test_abi_0_11_field_selection_contract(void) {
@@ -711,6 +810,16 @@ static void test_properties_tree_and_errors(void) {
             "bounds round trip failed");
 
     require(api.add_child(parent, child) == GF_OK, "visual parenting failed");
+    const gf_rect parent_bounds = {11.0, 13.0, 120.0, 60.0};
+    require(api.set_bounds(parent, parent_bounds) == GF_OK,
+            "parent bounds mutation failed");
+    gf_rect absolute = {0.0, 0.0, 0.0, 0.0};
+    require(api.get_control_absolute_bounds(child, &absolute) == GF_OK &&
+                absolute.x == parent_bounds.x + expected.x &&
+                absolute.y == parent_bounds.y + expected.y &&
+                absolute.width == expected.width &&
+                absolute.height == expected.height,
+            "0.17 absolute bounds did not follow retained ancestry");
     require(api.remove_child(parent, child) == GF_OK, "visual detach failed");
     require(api.remove_child(parent, child) == GF_ERROR_INVALID_ARGUMENT,
             "invalid visual detach did not produce a structured error");
@@ -926,6 +1035,9 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_19_cursor_contract();
+    test_abi_0_18_form_key_preview_contract();
+    test_abi_0_16_owned_pixel_surface();
     test_abi_0_11_field_selection_contract();
     test_abi_0_12_field_edit_geometry_contract();
     test_abi_0_13_clipboard_contract();

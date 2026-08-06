@@ -4,12 +4,14 @@ Status: **future delivery order**.
 
 ## Frontend 001 / F1 — deterministic shell
 
-Using GUI.Forms and fake registered services, render the classic location window:
+Using GUI.Forms, the live Core 1.0 Orchestrator bootstrap, and fake later
+provider ports, render the classic location window:
 custom title bar, menu/control shelf, breadcrumbs plus terminal path editor,
 search field, collapsible tree, content surface, and preview/properties pane.
 Prove keyboard, selection, focus, resize, collapse and shutdown traces.
-Engine and Orchestrator states are explicitly simulated in this slice. See
-[`FRONTEND_001.md`](FRONTEND_001.md).
+Engine and later-provider states are explicitly simulated in this slice.
+Deterministic tests replay Orchestrator's canonical Core fixtures, but product
+startup uses the live authority. See [`FRONTEND_001.md`](FRONTEND_001.md).
 
 ## F2 — sandbox filesystem navigator
 
@@ -24,7 +26,7 @@ search, deterministic result updates, unindexed live fallback and unavailable
 states. Exercise Kolmogrov-ready candidate envelopes without waiting for final
 research quality.
 
-## F4 — real Orchestrator
+## F4 — later Orchestrator user services
 
 Consume settings, handler resolution, context declarations, preview/thumbnail
 workers, provider lanes, semantic-memory query envelopes, local audit and

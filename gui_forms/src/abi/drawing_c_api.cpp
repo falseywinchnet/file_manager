@@ -4,6 +4,7 @@
 #include "drawing_platform.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -1405,7 +1406,8 @@ gd_result api_region_bounds(gd_handle handle, gd_rect* bounds) {
 gd_result api_raster_service_install(const gd_raster_service_v0* service) {
     if (service == nullptr || service->struct_size < sizeof(gd_raster_service_v0) ||
         service->abi_version != GD_ABI_VERSION_0_1 || service->execute == nullptr ||
-        service->encode_png == nullptr || service->decode_png == nullptr) {
+        service->encode_png == nullptr || service->decode_png == nullptr ||
+        service->measure_string == nullptr) {
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "raster service requires a complete ABI 0.1 callback table");
     }
@@ -1413,7 +1415,8 @@ gd_result api_raster_service_install(const gd_raster_service_v0* service) {
     if (raster_service.abi_version != 0U &&
         (raster_service.execute != service->execute ||
          raster_service.encode_png != service->encode_png ||
-         raster_service.decode_png != service->decode_png)) {
+         raster_service.decode_png != service->decode_png ||
+         raster_service.measure_string != service->measure_string)) {
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "a different GUI.Drawing raster service is already installed");
     }
@@ -1421,8 +1424,9 @@ gd_result api_raster_service_install(const gd_raster_service_v0* service) {
     return GD_OK;
 }
 
-gd_result api_recorder_execute(gd_handle recorder, gd_handle bitmap,
-                               std::uint64_t* commands_executed) {
+gd_result api_recorder_execute_from(gd_handle recorder, gd_handle bitmap,
+                                    std::uint64_t first_command,
+                                    std::uint64_t* commands_executed) {
     if (commands_executed == nullptr) {
         return fail(GD_ERROR_INVALID_ARGUMENT, "raster execution requires count output");
     }
@@ -1435,10 +1439,16 @@ gd_result api_recorder_execute(gd_handle recorder, gd_handle bitmap,
         [&](gui_drawing::GraphicsRecorder& native_recorder,
             gui_drawing::Bitmap& native_bitmap) {
             const gd_result result = service.execute(
-                &native_recorder, &native_bitmap, commands_executed);
+                &native_recorder, &native_bitmap, first_command,
+                commands_executed);
             return result == GD_OK ? GD_OK :
                 fail(result, "GUI.Drawing retained raster execution failed");
         });
+}
+
+gd_result api_recorder_execute(gd_handle recorder, gd_handle bitmap,
+                               std::uint64_t* commands_executed) {
+    return api_recorder_execute_from(recorder, bitmap, 0U, commands_executed);
 }
 
 gd_result api_bitmap_encode_png(gd_handle bitmap, void* buffer,
@@ -1492,6 +1502,47 @@ gd_result api_image_attributes_clone(gd_handle handle, gd_handle* output) {
         [output](gui_drawing::ImageAttributes& attributes) {
             return registry().adopt(GD_OBJECT_IMAGE_ATTRIBUTES, output,
                                     attributes.clone());
+        });
+}
+
+gd_result api_measure_string(gd_string_view text, gd_handle font,
+                             gd_handle format, double layout_width,
+                             gd_size* measured) {
+    if (measured == nullptr || !std::isfinite(layout_width) || layout_width < 0.0) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "text measurement requires valid width and output");
+    }
+    std::string native_text;
+    try {
+        native_text = string_from_c(text, "measure string text");
+    } catch (const std::exception& error) {
+        return fail(GD_ERROR_INVALID_ARGUMENT, error.what());
+    }
+    if (native_text.size() > gui_drawing::GraphicsRecorder::maximum_text_bytes) {
+        return fail(GD_ERROR_LIMIT_EXCEEDED, "measure string text exceeds its byte limit");
+    }
+    gd_raster_service_v0 service{};
+    if (!load_raster_service(service)) {
+        return fail(GD_ERROR_INTERNAL, "GUI.Drawing raster service is not installed");
+    }
+    const gd_string_view view{native_text.data(), native_text.size()};
+    if (format.slot == 0U && format.generation == 0U) {
+        return registry().with<gui_drawing::Font>(
+            font, GD_OBJECT_FONT, [&](gui_drawing::Font& native_font) {
+                const gd_result result = service.measure_string(
+                    &native_font, nullptr, view, layout_width, measured);
+                return result == GD_OK ? GD_OK :
+                    fail(result, "GUI.Drawing raster text measurement failed");
+            });
+    }
+    return registry().with_two<gui_drawing::Font, gui_drawing::StringFormat>(
+        font, GD_OBJECT_FONT, format, GD_OBJECT_STRING_FORMAT,
+        [&](gui_drawing::Font& native_font,
+            gui_drawing::StringFormat& native_format) {
+            const gd_result result = service.measure_string(
+                &native_font, &native_format, view, layout_width, measured);
+            return result == GD_OK ? GD_OK :
+                fail(result, "GUI.Drawing raster text measurement failed");
         });
 }
 
@@ -1660,6 +1711,8 @@ const gd_api_v0 api_table{
     &api_bitmap_export_hbitmap, &api_bitmap_import_hbitmap,
     &api_native_surface_capture, &api_native_surface_present,
     &api_bitmap_acquire_hdc, &api_bitmap_release_hdc,
+    &api_measure_string,
+    &api_recorder_execute_from,
 };
 
 } // namespace

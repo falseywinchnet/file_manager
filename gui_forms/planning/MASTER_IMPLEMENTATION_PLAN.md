@@ -979,18 +979,81 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   surface adapter probe pass under Wine. The unchanged zero-passthrough
   specimen run remains M11g. Evidence:
   `experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`.
+- **MEASURED PARTIAL M11h:** experimental ABI 0.18 adds form-level key preview
+  ahead of focused-descendant routing. The generated Forms facade now provides
+  scoped `ActiveControl`, stable recursive tab traversal, functional
+  `IButtonControl` accept/cancel dispatch, owned-form cycle rejection,
+  cancellable close reasons, and modal owner suppression with focus restoration.
+  Host and Wine headless gates pass, and a physical Wine Enter/Escape probe
+  crosses the Win32 host and ABI preview path. Modeless secondary forms remain
+  retained-hosted rather than independent native top-level windows; validation,
+  mnemonics, and full popup focus scopes remain open. Evidence:
+  `experiments/M11H_FORM_FOCUS_AND_DIALOG_KEYS.md`.
+- **MEASURED PARTIAL M11h / Forms breadth:** experimental ABI 0.19 projects
+  inherited portable cursor roles into the retained tree. Captured `Cursors`
+  singletons now carry real resize/hand/wait/forbidden identities, and
+  `Control.Cursor` updates native hit-target cursor selection. The legacy
+  `ScrollableControl.DockPadding` wrapper now projects into retained `Padding`
+  and immediately relayouts docked children. Native, host, and Wine facade gates
+  cover round trip, inheritance reset, fill insets, and mutation relayout.
+- **MEASURED PARTIAL M11h / FM-LY05:** the public retained control library now
+  owns split-pane geometry and input rather than leaving it to a consumer:
+  stable panel/seam identities, distinct thin paint and enlarged hit target,
+  constrained vertical/horizontal layout, live captured drag, keyboard resize,
+  collapse focus transfer, and fixed-panel resize. The generated `SplitContainer`
+  projection passes host, headless Wine, and physical Win32/Wine behavior.
+  Responsive automatic/user collapse distinction, persistence, nested stress,
+  DML/C ABI, and native semantics remain open. Evidence:
+  `experiments/M11H_RETAINED_SPLIT_CONTAINER.md`.
+- **MEASURED PARTIAL M11h / focus scopes:** the renderer-free retained `Window`
+  now owns bounded nested focus scopes, contained focus, deterministic
+  Tab/Shift+Tab traversal, LIFO and out-of-order focus restoration,
+  owner-unavailable cleanup, typed scope changes, UI-thread enforcement, and
+  structured scope metrics. This removes a core popup dependency but is not a
+  popup implementation: click-away/Escape, capture transfer, placement,
+  semantic parentage, DML/C ABI/binding projection, and native accessibility
+  publication remain open. Evidence:
+  `experiments/M11H_RETAINED_FOCUS_SCOPES.md`.
+- **MEASURED PARTIAL M11h / complete-showcase controls:** a second independent
+  native demonstration now covers twelve retained pages and at least 140 public
+  controls without changing the File Manager mockup demo. Public animation
+  timelines/easing, visual variants, multiline Label layout, single-line
+  TextBox, ListBox, ComboBox, NumericUpDown, H/V ScrollBar, PictureBox,
+  TabControl/TabPage, CheckedListBox, Timer, ToolTip, and an
+  owner-tokenized root popup controller are backed by headless conformance.
+  PictureBox covers all five canonical sizing policies over the validated,
+  window-owned image registry; removal now retires cached display chunks rather
+  than replaying stale generational IDs. Native dogfood proves mixed-script fallback,
+  typing, drag selection, Undo, initial collection viewports, popup commit, and
+  focus restoration, continuous scrollbar drag/value automation, image scaling,
+  opacity, image accessibility, all four tab alignments, all three tab
+  appearances, native semantic tab selection, independent list selection/check
+  state, semantic check-row activation, UI timer cadence/quiescence, and
+  target-anchored retained tooltip overlays. Renderer-free semantic snapshots, stock adapters, virtual
+  list rows, compound boundaries, action routing, and a stable-ID-reconciled
+  AppKit accessibility publisher are now measured by headless and live
+  automation dogfood. The native suite passes 42 tests; a fresh Skia/host-free
+  configuration builds the core/control/input libraries and passes nine focused
+  renderer-free tests. Multiline/password/IME/clipboard commands, editable
+  semantic text ranges, editable combo/binding/type search, UIA/AT-SPI publication, and the wider
+  control catalogue remain open. Evidence:
+  `experiments/M11H_COMPLETE_SHOWCASE_TEXT_COLLECTIONS.md`.
 
-Next bounded M11 rounds:
+Current bounded M11 rounds:
 
-1. **M11g:** differential .NET/Wine oracle, unchanged-specimen dynamic call
-   trace, elimination of the managed bitmap/PNG paint round trip, and a visible
-   zero-passthrough retired compatibility specimen run.
-2. **M11h:** secondary windows/popups/modal focus, editing/source selection,
-   then active spectrum/waterfall streaming and sustained paint measurement.
+1. **M11g:** finish exact line-height policy, the broader region/clip/raster
+   .NET/Wine differential, and sustained native-surface cadence. Dynamic calls,
+   zero-drawing-passthrough, direct surface transport, requested-family
+   resolution, and active central pixels are already measured.
+2. **M11h:** continue from the measured form/dialog-key, retained focus-scope,
+   split-pane, public text/list/combo, and popup-controller slices into
+   independent secondary native windows, validation, complete IME/clipboard
+   editing, binding/source selection, responsive collapse/pane
+   persistence, then damage isolation, sustained paint measurement, and soak.
 
-M11g is next: the Windows raster packaging gate is closed, so unchanged-specimen
-instrumentation can now distinguish missing Forms behavior from owned drawing
-behavior without the temporary Microsoft drawing implementation.
+M11g remains active, and the first bounded M11h Forms-semantics slice is
+measured: instrumentation distinguishes missing Forms behavior from owned
+drawing behavior without the temporary Microsoft drawing implementation.
 
 **MEASURED PARTIAL M11g:** the pinned unchanged specimen now passes bitmap/icon
 resource hydration, audio/device discovery, plugin loading, and main-window
@@ -998,9 +1061,9 @@ construction using the owned Drawing facade. Its live tree contains 204 controls
 and 204 stable IDs. ABI 0.7 now projects checkbox/radio state, DockPanelSuite's
 empty full-client auto-hide strip is input-transparent, and an exact routed
 `useSquelchCheckBox` click visibly toggles state and drives retired compatibility specimen's numeric-field
-enablement while the host stays responsive. Per-call counters, remaining
-radio/field families, direct retained paint cutover, differential fixtures,
-close/reopen, and active-source soak remain the M11g exit gates. Retained popup
+enablement while the host stays responsive. Remaining radio/field families,
+broader differential fixtures, requested-family resolution, and visible
+spectrum/waterfall closure remain M11g exit gates. Retained popup
 menus now have owned vertical geometry, nested submenu lifetime, checked/hot
 painting, native Portsmouth label projection, and close without terminating the
 main loop. Custom-painted labels are input-transparent, and preferred-size /
@@ -1027,8 +1090,38 @@ controls admit real tokenized key input; transparent raster overlays do not.
 Wine proves physical nested keyboard routing and outside-click ordering, while
 24 menu reopen cycles and twelve popup/dialog host cycles leave no retained
 orphans. The unchanged retired compatibility specimen menu passes Down/Right/Left/Escape and remains
-responsive with 165 retained controls. Direct Drawing chunks, differential
-oracles, call counters, and active-source pacing remain open. Evidence:
+responsive with 165 retained controls. The later calendar update below closes
+the call-counter and direct-surface items; broader differential and visual
+streaming work remains. Evidence:
+`experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
+
+**MEASURED M11g CALENDAR UPDATE:** the dynamic call ledger and direct retained
+surface gates are processed. The unchanged specimen has exercised 446 of 874
+instrumentable keys across 872,599 calls while the complete required surface
+remains `1104/1104`. ABI 0.16 replaces production managed-paint PNG transport
+with a bounded, owned premultiplied-BGRA resource consumed by all three raster
+adapters. Its unchanged-specimen confirmation records 283 paints, zero PNG
+bytes, and about 0.973 ms/paint versus about 2.074 ms/paint on the prior route.
+The .NET 10/Wine text/raster differential slice agrees on exception behavior
+and font height with reviewed width deviations of roughly 1–10%. A bounded
+25-minute active-source run establishes partial-frame, damage, CPU, and memory
+baselines. The central spectrum/waterfall is still visually blank; broader
+differential review, portable requested-family resolution, and visual streaming
+closure remain open. Evidence:
+`experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
+
+**MEASURED M11g ABI 0.17 CONTINUATION:** the blank central-surface cause was a
+false `Control.Handle` contract. The unchanged specimen's native bitmap performs
+direct `BitBlt`, so ABI 0.17 now exposes authoritative absolute control bounds
+and the Windows adapter attaches an input-disabled child HWND as a paint lease.
+The specimen reports correct central geometry and, after local-source
+connection, same-process samples observe non-uniform SpectrumAnalyzer and
+Waterfall content. All 21 Windows test executables pass under Wine. Portable TTC
+face selection plus a Windows installed-font provider resolve every family
+observed in the specimen; the v2 differential matches all tested string widths
+and all 19 compound-path points, bounds, translation, and hit tests. Exact
+family line heights, region/clip breadth, and sustained surface cadence
+remain M11g work. Evidence:
 `experiments/M11G_UNCHANGED_SPECIMEN_STARTUP.md`.
 
 Exit: two independent native consumers plus the C# gallery pass lifetime,
@@ -1078,7 +1171,7 @@ Windows preflight after M6c:
 - **MEASURED:** the bounded W0-W4 host/toolchain gates now pass under Wine. See
   `docs/WINDOWS_WINE_HOST.md` and the preserved original preflight in
   `experiments/WINDOWS_ORACLE_PREFLIGHT.md`.
-- **OPEN:** native accessibility/automation publication, remaining Windows
+- **OPEN:** Win32 UI Automation publication, remaining Windows
   services, physical Windows dogfood, the M11 managed facade, and the later
   unchanged-binary dogfood gate.
 

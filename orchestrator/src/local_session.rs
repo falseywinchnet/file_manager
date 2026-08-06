@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use zeroize::ZeroizeOnDrop;
 
 pub const LOCAL_WIRE_FAMILY: &str = "orchestrator.local";
-pub const LOCAL_WIRE_MAJOR: u16 = 0;
-pub const LOCAL_WIRE_MINOR: u16 = 1;
+pub const LOCAL_WIRE_MAJOR: u16 = 1;
+pub const LOCAL_WIRE_MINOR: u16 = 0;
 const SESSION_TOKEN_BYTES: usize = 32;
+pub const MAX_CLIENT_NAME_BYTES: usize = 128;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, ZeroizeOnDrop)]
 pub struct SessionToken([u8; SESSION_TOKEN_BYTES]);
 
 impl SessionToken {
@@ -71,13 +73,30 @@ impl Debug for SessionToken {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, ZeroizeOnDrop)]
 pub struct ClientHello {
+    #[zeroize(skip)]
     pub family: String,
+    #[zeroize(skip)]
     pub major: u16,
+    #[zeroize(skip)]
     pub minor: u16,
+    #[zeroize(skip)]
     pub client: String,
     pub credential: String,
+}
+
+impl Debug for ClientHello {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ClientHello")
+            .field("family", &self.family)
+            .field("major", &self.major)
+            .field("minor", &self.minor)
+            .field("client", &self.client)
+            .field("credential", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl ClientHello {
@@ -138,7 +157,11 @@ pub fn authenticate_client(
     expected: &SessionToken,
     hello: &ClientHello,
 ) -> Result<(), SessionAuthError> {
-    if hello.family != LOCAL_WIRE_FAMILY || hello.client.is_empty() {
+    if hello.family != LOCAL_WIRE_FAMILY
+        || hello.client.is_empty()
+        || hello.client.len() > MAX_CLIENT_NAME_BYTES
+        || hello.client.bytes().any(|byte| byte.is_ascii_control())
+    {
         return Err(SessionAuthError::InvalidHello);
     }
     if hello.major != LOCAL_WIRE_MAJOR || hello.minor > LOCAL_WIRE_MINOR {
@@ -161,8 +184,11 @@ mod tests {
         let decoded = SessionToken::decode(&token.encode()).expect("decode token");
         assert!(token.matches(&decoded));
         assert_eq!(format!("{token:?}"), "SessionToken([REDACTED])");
-        authenticate_client(&token, &ClientHello::new("test-client", &decoded))
-            .expect("matching credential");
+        let hello = ClientHello::new("test-client", &decoded);
+        let debug = format!("{hello:?}");
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains(&token.encode()));
+        authenticate_client(&token, &hello).expect("matching credential");
     }
 
     #[test]
@@ -179,6 +205,18 @@ mod tests {
         assert!(matches!(
             authenticate_client(&expected, &incompatible),
             Err(SessionAuthError::VersionMismatch)
+        ));
+
+        let mut oversized =
+            ClientHello::new("x".repeat(super::MAX_CLIENT_NAME_BYTES + 1), &expected);
+        assert!(matches!(
+            authenticate_client(&expected, &oversized),
+            Err(SessionAuthError::InvalidHello)
+        ));
+        oversized.client = "control\nname".to_owned();
+        assert!(matches!(
+            authenticate_client(&expected, &oversized),
+            Err(SessionAuthError::InvalidHello)
         ));
     }
 }

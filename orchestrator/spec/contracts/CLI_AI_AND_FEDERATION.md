@@ -1,6 +1,6 @@
 # ORC-CLI / future plugin-AI / ORC-FED contracts
 
-Status: **CLI bootstrap fixture-draft; plugin AI stubbed; federation deferred**.
+Status: **CLI Core bootstrap stable at 1.0; plugin AI stubbed; federation deferred**.
 
 ## Local CLI
 
@@ -17,7 +17,9 @@ operation itself lacks.
 The implemented bootstrap methods are:
 
 - `orchestrator.version`;
+- `orchestrator.release`;
 - `orchestrator.status`;
+- `orchestrator.frontend.bootstrap`;
 - `orchestrator.contracts.list`;
 - `orchestrator.availability.list`;
 - `orchestrator.shutdown`;

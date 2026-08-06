@@ -135,3 +135,14 @@ frontend bootstrap path that does not depend on frontend-owned core semantics.
 - Release-manifest signing versus local digest-only provenance.
 - Whether settings, handlers, and commands reach the first Core 1.0 profile or
   a later independently versioned capability release.
+
+## Implementation evidence — 2026-08-05
+
+- **OBSERVED:** the executable release result now includes a deterministic,
+  domain-separated SHA-256 digest over manifest fields and nineteen embedded Core
+  registry/contract/request inputs. Its golden fixture pins the digest.
+- **DECIDED by this ADR's existing criterion:** this satisfies the permitted
+  digest-addressed-manifest branch. `signed: false` remains explicit; platform
+  package signing is not claimed.
+- Core 1.0 remains `development` because the other independently reported
+  requirements remain pending.

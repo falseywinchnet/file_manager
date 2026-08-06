@@ -158,7 +158,7 @@ int main(void) {
           visible == 1);
     CHECK(api.graphics_path_points(path, NULL, 0, &path_point_count) ==
           GD_ERROR_BUFFER_TOO_SMALL);
-    CHECK(path_point_count == 12);
+    CHECK(path_point_count == 23);
     path_points = (gd_point*)calloc((size_t)path_point_count, sizeof(gd_point));
     CHECK(path_points != NULL);
     CHECK(api.graphics_path_points(path, path_points, path_point_count,

@@ -53,6 +53,12 @@ std::string MetricsSnapshot::to_json() const {
            << "\"partial_paints\":" << partial_paints << ','
            << "\"input_events\":" << input_events << ','
            << "\"focus_transitions\":" << focus_transitions << ','
+           << "\"focus_scopes_opened\":" << focus_scopes_opened << ','
+           << "\"focus_scopes_closed\":" << focus_scopes_closed << ','
+           << "\"focus_scope_restorations\":" << focus_scope_restorations << ','
+           << "\"focus_scope_rejections\":" << focus_scope_rejections << ','
+           << "\"focus_scope_depth\":" << focus_scope_depth << ','
+           << "\"maximum_focus_scope_depth\":" << maximum_focus_scope_depth << ','
            << "\"activations\":" << activations << ','
            << "\"disposals\":" << disposals << ','
            << "\"rejected_wrong_thread_operations\":" << rejected_wrong_thread_operations << ','
@@ -103,6 +109,8 @@ void Metrics::reset_activity() noexcept {
     const auto stable_ids = values_.stable_id_count;
     const auto depth = values_.update_scope_depth;
     const auto maximum_depth = values_.maximum_update_scope_depth;
+    const auto focus_scope_depth = values_.focus_scope_depth;
+    const auto maximum_focus_scope_depth = values_.maximum_focus_scope_depth;
     const auto renderer = values_.renderer_name;
     const auto cpu_only = values_.cpu_only;
     const auto display_cache_entries = values_.display_cache_entries;
@@ -113,6 +121,8 @@ void Metrics::reset_activity() noexcept {
     values_.stable_id_count = stable_ids;
     values_.update_scope_depth = depth;
     values_.maximum_update_scope_depth = maximum_depth;
+    values_.focus_scope_depth = focus_scope_depth;
+    values_.maximum_focus_scope_depth = maximum_focus_scope_depth;
     values_.renderer_name = renderer;
     values_.cpu_only = cpu_only;
     values_.display_cache_entries = display_cache_entries;
@@ -167,6 +177,24 @@ void Metrics::set_display_cache(std::uint64_t entries,
 }
 void Metrics::record_input() noexcept { ++values_.input_events; }
 void Metrics::record_focus_transition() noexcept { ++values_.focus_transitions; }
+void Metrics::record_focus_scope_opened(std::size_t depth) noexcept {
+    ++values_.focus_scopes_opened;
+    values_.focus_scope_depth = static_cast<std::uint64_t>(depth);
+    values_.maximum_focus_scope_depth =
+        std::max(values_.maximum_focus_scope_depth,
+                 static_cast<std::uint64_t>(depth));
+}
+void Metrics::record_focus_scope_closed(bool restored_focus,
+                                        std::size_t depth) noexcept {
+    ++values_.focus_scopes_closed;
+    values_.focus_scope_depth = static_cast<std::uint64_t>(depth);
+    if (restored_focus) {
+        ++values_.focus_scope_restorations;
+    }
+}
+void Metrics::record_focus_scope_rejection() noexcept {
+    ++values_.focus_scope_rejections;
+}
 void Metrics::record_activation() noexcept { ++values_.activations; }
 void Metrics::record_disposal(std::uint64_t count) noexcept { values_.disposals += count; }
 void Metrics::record_wrong_thread_rejection() noexcept {

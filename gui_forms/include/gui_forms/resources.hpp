@@ -19,6 +19,11 @@ enum class PngColorType : std::uint8_t {
     truecolor_alpha = 6,
 };
 
+enum class ImageResourceEncoding : std::uint8_t {
+    png,
+    bgra32_premultiplied,
+};
+
 struct ImageRegistryLimits final {
     std::size_t maximum_encoded_bytes_per_image{32U * 1024U * 1024U};
     std::uint32_t maximum_width{4096};
@@ -98,8 +103,10 @@ struct ImageLoadResult final {
 
 struct ImageResourceView final {
     ImageId image{};
+    ImageResourceEncoding encoding{ImageResourceEncoding::png};
     PngMetadata metadata{};
     std::span<const std::byte> encoded{};
+    std::uint64_t row_bytes{};
     std::uint64_t content_hash{};
 };
 
@@ -123,8 +130,19 @@ public:
     ImageRegistry& operator=(const ImageRegistry&) = delete;
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
+    [[nodiscard]] ImageLoadResult load_bgra32_premultiplied(
+        std::uint32_t width,
+        std::uint32_t height,
+        std::uint64_t row_bytes,
+        std::span<const std::byte> pixels);
     [[nodiscard]] ImageLoadResult replace_png(ImageId image,
                                                std::span<const std::byte> encoded);
+    [[nodiscard]] ImageLoadResult replace_bgra32_premultiplied(
+        ImageId image,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::uint64_t row_bytes,
+        std::span<const std::byte> pixels);
     [[nodiscard]] bool remove(ImageId image) noexcept;
     void clear() noexcept;
 
@@ -136,8 +154,10 @@ public:
 private:
     struct Slot;
 
-    [[nodiscard]] ImageLoadResult store_new(std::vector<std::byte> encoded,
+    [[nodiscard]] ImageLoadResult store_new(ImageResourceEncoding encoding,
+                                             std::vector<std::byte> encoded,
                                              PngMetadata metadata,
+                                             std::uint64_t row_bytes,
                                              std::uint64_t content_hash);
     [[nodiscard]] ImageResourceError registry_quota_error(
         std::uint64_t encoded_bytes,

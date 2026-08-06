@@ -1,5 +1,6 @@
 #include "gui_forms/resources.hpp"
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <new>
@@ -334,8 +335,10 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
 struct ImageRegistry::Slot final {
     std::uint64_t generation{1};
     bool occupied{};
+    ImageResourceEncoding encoding{ImageResourceEncoding::png};
     PngMetadata metadata{};
     std::vector<std::byte> encoded;
+    std::uint64_t row_bytes{};
     std::uint64_t content_hash{};
 };
 
@@ -376,15 +379,19 @@ ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
         return {.error = quota};
     }
     try {
-        return store_new(std::vector<std::byte>(encoded.begin(), encoded.end()),
-                         validated.metadata, hash_bytes(encoded));
+        return store_new(ImageResourceEncoding::png,
+                         std::vector<std::byte>(encoded.begin(), encoded.end()),
+                         validated.metadata, validated.metadata.source_row_bytes,
+                         hash_bytes(encoded));
     } catch (const std::bad_alloc&) {
         return {.error = ImageResourceError::allocation_failed};
     }
 }
 
-ImageLoadResult ImageRegistry::store_new(std::vector<std::byte> encoded,
+ImageLoadResult ImageRegistry::store_new(ImageResourceEncoding encoding,
+                                         std::vector<std::byte> encoded,
                                          PngMetadata metadata,
+                                         std::uint64_t row_bytes,
                                          std::uint64_t content_hash) {
     std::size_t slot_index = 0;
     for (; slot_index < slots_.size(); ++slot_index) {
@@ -402,14 +409,58 @@ ImageLoadResult ImageRegistry::store_new(std::vector<std::byte> encoded,
     }
     Slot& slot = slots_[slot_index];
     slot.occupied = true;
+    slot.encoding = encoding;
     slot.metadata = metadata;
     slot.encoded = std::move(encoded);
+    slot.row_bytes = row_bytes;
     slot.content_hash = content_hash;
     ++resource_count_;
     encoded_bytes_ += slot.encoded.size();
     decoded_bytes_ += slot.metadata.decoded_byte_count;
     ++revision_;
     return {.image = make_image_id(slot_index, slot.generation)};
+}
+
+ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
+    std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
+    std::span<const std::byte> pixels) {
+    if (width == 0 || height == 0 || width > limits_.maximum_width ||
+        height > limits_.maximum_height ||
+        static_cast<std::uint64_t>(width) * height > limits_.maximum_pixels ||
+        row_bytes < static_cast<std::uint64_t>(width) * 4U ||
+        row_bytes > std::numeric_limits<std::size_t>::max() ||
+        height > std::numeric_limits<std::size_t>::max() / row_bytes ||
+        pixels.size() != static_cast<std::size_t>(row_bytes) * height) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    const std::uint64_t decoded_bytes = tight_row_bytes * height;
+    if (decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    if (resource_count_ >= limits_.maximum_resources) {
+        return {.error = ImageResourceError::resource_count_exceeded};
+    }
+    if (const ImageResourceError quota = registry_quota_error(decoded_bytes, decoded_bytes);
+        quota != ImageResourceError::none) {
+        return {.error = quota};
+    }
+    try {
+        std::vector<std::byte> tight(static_cast<std::size_t>(decoded_bytes));
+        for (std::uint32_t row = 0; row < height; ++row) {
+            std::copy_n(pixels.data() + static_cast<std::size_t>(row_bytes) * row,
+                        static_cast<std::size_t>(tight_row_bytes),
+                        tight.data() + static_cast<std::size_t>(tight_row_bytes) * row);
+        }
+        PngMetadata metadata{width, height, 8, PngColorType::truecolor_alpha,
+                             false, tight_row_bytes, decoded_bytes};
+        std::uint64_t hash = hash_bytes(tight);
+        hash ^= (static_cast<std::uint64_t>(width) << 32U) | height;
+        return store_new(ImageResourceEncoding::bgra32_premultiplied,
+                         std::move(tight), metadata, tight_row_bytes, hash);
+    } catch (const std::bad_alloc&) {
+        return {.error = ImageResourceError::allocation_failed};
+    }
 }
 
 ImageLoadResult ImageRegistry::replace_png(ImageId image,
@@ -443,13 +494,73 @@ ImageLoadResult ImageRegistry::replace_png(ImageId image,
     encoded_bytes_ -= slot.encoded.size();
     decoded_bytes_ -= slot.metadata.decoded_byte_count;
     slot.generation = next_generation(slot.generation);
+    slot.encoding = ImageResourceEncoding::png;
     slot.metadata = validated.metadata;
     slot.encoded = std::move(replacement);
+    slot.row_bytes = validated.metadata.source_row_bytes;
     slot.content_hash = hash_bytes(encoded);
     encoded_bytes_ += slot.encoded.size();
     decoded_bytes_ += slot.metadata.decoded_byte_count;
     ++revision_;
     return {.image = make_image_id(slot_index, slot.generation)};
+}
+
+ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
+    ImageId image, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, std::span<const std::byte> pixels) {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    if (width == 0 || height == 0 || width > limits_.maximum_width ||
+        height > limits_.maximum_height ||
+        static_cast<std::uint64_t>(width) * height > limits_.maximum_pixels ||
+        row_bytes < static_cast<std::uint64_t>(width) * 4U ||
+        row_bytes > std::numeric_limits<std::size_t>::max() ||
+        height > std::numeric_limits<std::size_t>::max() / row_bytes ||
+        pixels.size() != static_cast<std::size_t>(row_bytes) * height) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    const std::uint64_t decoded_bytes = tight_row_bytes * height;
+    if (decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    if (const ImageResourceError quota = registry_quota_error(
+            decoded_bytes, decoded_bytes, slot.encoded.size(),
+            slot.metadata.decoded_byte_count);
+        quota != ImageResourceError::none) {
+        return {.error = quota};
+    }
+    try {
+        std::vector<std::byte> tight(static_cast<std::size_t>(decoded_bytes));
+        for (std::uint32_t row = 0; row < height; ++row) {
+            std::copy_n(pixels.data() + static_cast<std::size_t>(row_bytes) * row,
+                        static_cast<std::size_t>(tight_row_bytes),
+                        tight.data() + static_cast<std::size_t>(tight_row_bytes) * row);
+        }
+        encoded_bytes_ -= slot.encoded.size();
+        decoded_bytes_ -= slot.metadata.decoded_byte_count;
+        slot.generation = next_generation(slot.generation);
+        slot.encoding = ImageResourceEncoding::bgra32_premultiplied;
+        slot.metadata = {width, height, 8, PngColorType::truecolor_alpha,
+                         false, tight_row_bytes, decoded_bytes};
+        slot.encoded = std::move(tight);
+        slot.row_bytes = tight_row_bytes;
+        slot.content_hash = hash_bytes(slot.encoded) ^
+            ((static_cast<std::uint64_t>(width) << 32U) | height);
+        encoded_bytes_ += slot.encoded.size();
+        decoded_bytes_ += decoded_bytes;
+        ++revision_;
+        return {.image = make_image_id(slot_index, slot.generation)};
+    } catch (const std::bad_alloc&) {
+        return {.error = ImageResourceError::allocation_failed};
+    }
 }
 
 bool ImageRegistry::remove(ImageId image) noexcept {
@@ -466,8 +577,10 @@ bool ImageRegistry::remove(ImageId image) noexcept {
     decoded_bytes_ -= slot.metadata.decoded_byte_count;
     --resource_count_;
     slot.occupied = false;
+    slot.encoding = ImageResourceEncoding::png;
     slot.metadata = {};
     std::vector<std::byte>{}.swap(slot.encoded);
+    slot.row_bytes = 0;
     slot.content_hash = 0;
     ++revision_;
     return true;
@@ -480,8 +593,10 @@ void ImageRegistry::clear() noexcept {
     for (Slot& slot : slots_) {
         if (slot.occupied) {
             slot.occupied = false;
+            slot.encoding = ImageResourceEncoding::png;
             slot.metadata = {};
             std::vector<std::byte>{}.swap(slot.encoded);
+            slot.row_bytes = 0;
             slot.content_hash = 0;
         }
     }
@@ -501,7 +616,8 @@ std::optional<ImageResourceView> ImageRegistry::find(ImageId image) const noexce
     if (!slot.occupied || slot.generation != generation) {
         return std::nullopt;
     }
-    return ImageResourceView{image, slot.metadata, slot.encoded, slot.content_hash};
+    return ImageResourceView{image, slot.encoding, slot.metadata, slot.encoded,
+                             slot.row_bytes, slot.content_hash};
 }
 
 std::vector<ImageId> ImageRegistry::image_ids() const {

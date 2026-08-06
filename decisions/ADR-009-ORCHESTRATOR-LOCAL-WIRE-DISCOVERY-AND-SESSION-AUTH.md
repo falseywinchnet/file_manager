@@ -58,9 +58,8 @@ ORC contracts and can later gain another codec under a new wire version.
   reads status, requests shutdown, and observes endpoint cleanup on macOS.
 - **OBSERVED:** macOS rejects long Unix-socket paths; the adapter now enforces a
   platform byte ceiling before bind.
-- **UNMEASURED:** concurrent-client throughput, slow-client containment, native
-  Windows named-pipe behavior, launchd integration, and long-run resource use
-  remain promotion gates.
+- **UNMEASURED:** throughput tuning, native Windows named-pipe behavior, the
+  installed launchd lifecycle, and long-run resource use remain separate gates.
 
 ## Decision
 
@@ -116,9 +115,67 @@ or OS tokens while keeping the hello/version sequence.
 
 ## Unresolved edges
 
-- launchd-selected runtime location and socket activation on macOS;
+- installed launchd bootstrap/reactivation/removal on macOS;
 - systemd and Windows named-pipe discovery/ACL projections;
-- bounded concurrent sessions, cancellation, and slow-client backpressure;
-- credential rotation across daemon restart and cached frontend discovery;
-- independent C++ client and hostile/cross-version corpus;
 - wire latency/CPU/allocation measurements against alternatives.
+
+## Implementation evidence — 2026-08-05
+
+ADR-010 promotes the implemented framing to the stable 1.0 compatibility line;
+the 0.1 version selected here is retained only as pre-release rejection input.
+
+- **OBSERVED:** a separately configured C++17 library and executable now
+  authenticate without linking Rust, inspect typed version/release/lifecycle/
+  availability state, shut down the daemon, and reconnect at the same runtime
+  location after a new daemon instance is published.
+- **OBSERVED:** the C++ consumer independently validates endpoint ownership and
+  modes, instance identity, frame ceilings, JSON depth/value bounds, duplicate
+  keys, and UTF-8.
+- **OBSERVED:** the Unix daemon now uses four fixed session workers and an
+  eight-session pending queue. Authentication and socket waits occur outside
+  the serialized kernel-state lock; excess sessions are closed. Shutdown is
+  published before active socket clones are interrupted and workers are joined.
+- **OBSERVED:** all four workers may be occupied by stalled unauthenticated
+  peers without starving a queued authenticated status request beyond the
+  one-second handshake bound; shutdown remains bounded.
+- **OBSERVED:** a saturation fixture fills the four workers and eight pending
+  slots, observes excess connections close, and then verifies recovery and
+  authenticated shutdown without spawning more threads.
+- **OBSERVED:** macOS Rust and C++ callers derive the same per-login default
+  endpoint without configuration; the explicit path remains a development
+  override. Server publication proves effective directory ownership.
+- **OBSERVED:** daemon restart rotates both instance identity and credential;
+  the new daemon rejects the prior instance's token.
+- This closes the Core macOS independent-consumer, bounded-overload, and hostile
+  implementation slices. It does not freeze a cross-compiler client ABI or
+  close installed launchd, long-run tuning, or Windows promotion gates. The
+  current worker/queue counts are safety ceilings, not a throughput optimum.
+
+## Runtime hardening evidence — 2026-08-05
+
+- **OBSERVED:** macOS checks `getpeereid` through a safe Rust wrapper before
+  parsing the credential hello. This is defense in depth within the accepted
+  same-user authority boundary.
+- **OBSERVED:** endpoint reads open fixed publication files with no-follow and
+  validate owner, exact mode, type, and length on the opened descriptor.
+  Publication synchronizes content and the containing directory around atomic
+  rename. Symlink and noncanonical-mode fixtures fail closed.
+- **OBSERVED:** Rust token bytes and deserialized hello credential strings are
+  securely erased on drop; authentication comparison remains constant-time.
+- **OBSERVED:** request envelope identities have fixed count/byte ceilings and
+  oversized identifiers are not reflected into error envelopes.
+- **OBSERVED:** the stdio fixture transport bounds while reading, drains
+  oversized and non-UTF-8 records, and preserves alignment for the next valid
+  request. A worker panic requests complete daemon shutdown instead of leaving
+  an unnoticed reduced-capacity service.
+- **OBSERVED:** optional saturating runtime counters report local session
+  pressure as relaxed, non-authoritative telemetry.
+
+## Launchd implementation evidence — 2026-08-05
+
+ADR-011 resolves the macOS location and activation mechanism without changing
+the wire selected here. The daemon can adopt the exact named launchd listener,
+rotates publication without unlinking that supervisor socket, and Rust/C++
+clients perform bounded activation rediscovery across stale credentials. The
+generated plist passes `plutil`. Real installed LaunchAgent bootstrap/removal
+remains the final macOS discovery promotion measurement.

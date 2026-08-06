@@ -2,9 +2,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const PROTOCOL_FAMILY: &str = "orchestrator.cli.jsonl";
-pub const PROTOCOL_MAJOR: u16 = 0;
-pub const PROTOCOL_MINOR: u16 = 1;
+pub const PROTOCOL_MAJOR: u16 = 1;
+pub const PROTOCOL_MINOR: u16 = 0;
 pub const MAX_FRAME_BYTES: usize = 1_048_576;
+pub const MAX_REQUEST_ID_BYTES: usize = 128;
+pub const MAX_METHOD_BYTES: usize = 256;
+pub const MAX_CONTRACT_ID_BYTES: usize = 64;
+pub const MAX_CANCELLATION_ID_BYTES: usize = 128;
+pub const MAX_CRITICAL_EXTENSIONS: usize = 16;
+pub const MAX_CRITICAL_EXTENSION_BYTES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -28,6 +34,7 @@ pub enum TerminalStatus {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ApiErrorCode {
     InvalidRequest,
+    CancellationUnsupported,
     MethodUnavailable,
     VersionMismatch,
     DeadlineExceeded,
@@ -71,6 +78,8 @@ pub struct Request {
     pub deadline_unix_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cancellation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub critical_extensions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_response_bytes: Option<u64>,
     #[serde(default)]
@@ -86,6 +95,7 @@ impl Request {
             contract: None,
             deadline_unix_ms: None,
             cancellation_id: None,
+            critical_extensions: Vec::new(),
             max_response_bytes: None,
             params: Value::Object(serde_json::Map::new()),
         }

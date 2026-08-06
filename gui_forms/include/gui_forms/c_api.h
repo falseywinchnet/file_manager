@@ -36,6 +36,12 @@ extern "C" {
 #define GF_ABI_VERSION_0_13 UINT32_C(0x0000000d)
 #define GF_ABI_VERSION_0_14 UINT32_C(0x0000000e)
 #define GF_ABI_VERSION_0_15 UINT32_C(0x0000000f)
+#define GF_ABI_VERSION_0_16 UINT32_C(0x00000010)
+#define GF_ABI_VERSION_0_17 UINT32_C(0x00000011)
+#define GF_ABI_VERSION_0_18 UINT32_C(0x00000012)
+#define GF_ABI_VERSION_0_19 UINT32_C(0x00000013)
+
+#define GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED UINT32_C(1)
 
 typedef struct gf_handle {
     uint32_t slot;
@@ -133,6 +139,18 @@ typedef enum gf_control_kind {
     GF_CONTROL_INPUT_TRANSPARENT_CUSTOM = 20,
     GF_CONTROL_CUSTOM = 0x7fffffff
 } gf_control_kind;
+
+typedef enum gf_cursor_kind {
+    GF_CURSOR_INHERIT = 0,
+    GF_CURSOR_ARROW = 1,
+    GF_CURSOR_TEXT = 2,
+    GF_CURSOR_HAND = 3,
+    GF_CURSOR_CROSSHAIR = 4,
+    GF_CURSOR_RESIZE_HORIZONTAL = 5,
+    GF_CURSOR_RESIZE_VERTICAL = 6,
+    GF_CURSOR_WAIT = 7,
+    GF_CURSOR_FORBIDDEN = 8
+} gf_cursor_kind;
 
 typedef enum gf_window_run_flag {
     GF_WINDOW_RUN_DEFAULT = 0,
@@ -347,6 +365,32 @@ typedef struct gf_api_v0 {
                                int32_t direction,
                                gf_field_edit_result* result);
     gf_result (*field_clear_history)(gf_handle control);
+
+    /* ABI 0.16 addition: owned, unencoded renderer-neutral paint surface. */
+    gf_result (*set_control_pixels)(gf_handle control,
+                                    const uint8_t* pixels,
+                                    uint32_t width,
+                                    uint32_t height,
+                                    uint64_t row_bytes,
+                                    uint32_t pixel_format);
+
+    /* ABI 0.17 addition: renderer-authoritative bounds in root client space. */
+    gf_result (*get_control_absolute_bounds)(gf_handle control,
+                                             gf_rect* bounds);
+
+    /*
+     * ABI 0.18 addition: form-level preview for dialog/focus-scope keys.
+     * Returning GF_EVENT_CALLBACK_CANCEL marks the key handled before it
+     * reaches the focused descendant; CONTINUE preserves ordinary routing.
+     */
+    gf_result (*subscribe_key_preview)(gf_handle form,
+                                       gf_key_callback callback,
+                                       void* context,
+                                       gf_event_token* token);
+
+    /* ABI 0.19 additions: inherited retained cursor projection. */
+    gf_result (*set_cursor)(gf_handle control, uint32_t cursor_kind);
+    gf_result (*get_cursor)(gf_handle control, uint32_t* cursor_kind);
 } gf_api_v0;
 
 /*

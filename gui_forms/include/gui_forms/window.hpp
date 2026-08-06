@@ -9,8 +9,12 @@
 
 #include <chrono>
 #include <array>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
@@ -19,12 +23,88 @@
 namespace gui_forms {
 
 class UpdateScope;
+class Timer;
+class ToolTip;
+namespace detail {
+class PopupAttachment;
+}
+
+class PopupToken final {
+public:
+    PopupToken() = default;
+    ~PopupToken() { disconnect(); }
+    PopupToken(PopupToken&& other) noexcept
+        : attachment_(std::move(other.attachment_)) {}
+    PopupToken& operator=(PopupToken&& other) noexcept {
+        if (this != &other) {
+            disconnect();
+            attachment_ = std::move(other.attachment_);
+        }
+        return *this;
+    }
+    PopupToken(const PopupToken&) = delete;
+    PopupToken& operator=(const PopupToken&) = delete;
+
+    void disconnect() noexcept;
+    [[nodiscard]] bool connected() const noexcept;
+    [[nodiscard]] Event<>* closed_event() noexcept;
+
+private:
+    friend class Window;
+    explicit PopupToken(std::shared_ptr<detail::PopupAttachment> attachment)
+        : attachment_(std::move(attachment)) {}
+    std::shared_ptr<detail::PopupAttachment> attachment_;
+};
 
 struct PointerCaptureChange final {
     bool captured{};
     RuntimeId control_id{};
     std::string stable_id;
     std::uint64_t pointer_id{};
+};
+
+struct PopupOptions final {
+    // Interactive menus and editors require an enabled owner. Passive
+    // providers such as ToolTip may opt out while still requiring a live,
+    // attached, effectively visible owner.
+    bool require_enabled_owner{true};
+};
+
+struct FocusScopeId final {
+    std::uint64_t value{};
+    [[nodiscard]] explicit constexpr operator bool() const noexcept {
+        return value != 0;
+    }
+    friend constexpr auto operator<=>(const FocusScopeId&,
+                                      const FocusScopeId&) = default;
+};
+
+inline constexpr std::size_t maximum_focus_scope_depth = 32U;
+
+struct FocusScopeOptions final {
+    // Contained scopes reject attempts to move keyboard focus outside their
+    // retained subtree while the scope is active.
+    bool contain_focus{true};
+    // Closing a scope restores the focus that was active when it opened.
+    bool restore_focus{true};
+    // If the previous focus is outside the scope, focus the first eligible
+    // descendant in stable retained-tree order.
+    bool focus_first{true};
+};
+
+enum class FocusScopeCloseReason : std::uint8_t {
+    explicit_close,
+    owner_unavailable,
+};
+
+struct FocusScopeChange final {
+    FocusScopeId scope{};
+    RuntimeId root_id{};
+    std::string stable_id;
+    std::size_t depth{};
+    FocusScopeCloseReason close_reason{FocusScopeCloseReason::explicit_close};
+    bool opened{};
+    bool restored_focus{};
 };
 
 class Window {
@@ -54,17 +134,29 @@ public:
     [[nodiscard]] FrameRequestToken activate_surface(const Control::Ptr& control,
                                                      FrameInterval interval,
                                                      FrameTime first_deadline);
+    [[nodiscard]] FrameRequestToken schedule_ui_timer(
+        Component& owner, FrameInterval interval, FrameTime first_deadline,
+        std::function<void(FrameTime)> callback);
     [[nodiscard]] FramePollResult poll_frame_schedule(FrameTime now);
     void cancel_frame_requests();
     void set_occluded(bool occluded, FrameTime transition_time);
     [[nodiscard]] bool occluded() const noexcept { return occluded_; }
+    [[nodiscard]] bool check_access() const noexcept;
+    void verify_access(std::string_view operation = "window access");
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
+    [[nodiscard]] ImageLoadResult load_bgra32_premultiplied(
+        std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
+        std::span<const std::byte> pixels);
     [[nodiscard]] ImageLoadResult replace_png(ImageId image,
                                                std::span<const std::byte> encoded);
     [[nodiscard]] ImageLoadResult replace_png(ImageId image,
                                                std::span<const std::byte> encoded,
                                                Control& consumer);
+    [[nodiscard]] ImageLoadResult replace_bgra32_premultiplied(
+        ImageId image, std::uint32_t width, std::uint32_t height,
+        std::uint64_t row_bytes, std::span<const std::byte> pixels,
+        Control& consumer);
     [[nodiscard]] bool remove_image(ImageId image);
     [[nodiscard]] const ImageRegistry& image_resources() const noexcept {
         return image_resources_;
@@ -77,6 +169,19 @@ public:
     [[nodiscard]] Control::Ptr hit_test(Point position);
     bool request_focus(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr focused_control() const noexcept { return focused_.lock(); }
+    [[nodiscard]] FocusScopeId begin_focus_scope(
+        const Control::Ptr& root,
+        const Control::Ptr& preferred_focus = {},
+        FocusScopeOptions options = {});
+    bool end_focus_scope(
+        FocusScopeId scope,
+        FocusScopeCloseReason reason = FocusScopeCloseReason::explicit_close);
+    [[nodiscard]] std::size_t focus_scope_depth() const noexcept;
+    [[nodiscard]] Control::Ptr active_focus_scope_root() const noexcept;
+    bool move_focus(bool forward = true);
+    [[nodiscard]] Event<const FocusScopeChange&>& focus_scope_changed() noexcept {
+        return focus_scope_changed_;
+    }
     void capture_pointer(const Control::Ptr& control, std::uint64_t pointer_id = 1);
     void release_pointer();
     [[nodiscard]] Control::Ptr captured_control() const noexcept { return captured_.lock(); }
@@ -86,6 +191,9 @@ public:
     [[nodiscard]] Event<const PointerCaptureChange&>& pointer_capture_changed() noexcept {
         return pointer_capture_changed_;
     }
+    [[nodiscard]] PopupToken open_popup(const Control::Ptr& owner,
+                                        const Control::Ptr& popup,
+                                        PopupOptions options = {});
     [[nodiscard]] Control::Ptr pressed_control() const noexcept { return pressed_.lock(); }
 
     bool dispatch_pointer(PointerEvent event);
@@ -97,16 +205,34 @@ public:
     [[nodiscard]] MetricsSnapshot metrics_snapshot() const { return metrics_.snapshot(); }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
+    [[nodiscard]] SemanticSnapshot semantic_snapshot();
+    [[nodiscard]] std::uint64_t semantic_generation() const noexcept {
+        return semantic_generation_;
+    }
+    bool perform_semantic_action(std::string_view stable_id,
+                                 SemanticAction action,
+                                 std::string_view value = {});
 
 private:
     friend class Control;
     friend class UpdateScope;
+    friend class Timer;
+    friend class ToolTip;
+    friend class detail::PopupAttachment;
 
     void attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent);
     void detach_subtree(const Control::Ptr& control);
     void dispose_subtree(const Control::Ptr& control) noexcept;
     void revoke_interaction_for_subtree(const Control::Ptr& control,
                                         bool notify_focus);
+    void close_focus_scopes_for_subtree(const Control::Ptr& control);
+    void revoke_focus_scopes_for_subtree(const Control::Ptr& control) noexcept;
+    void close_popups_for_subtree(const Control::Ptr& control) noexcept;
+    void close_popup(detail::PopupAttachment& popup) noexcept;
+    [[nodiscard]] bool focus_allowed_by_active_scope(
+        const Control::Ptr& control) const noexcept;
+    [[nodiscard]] std::vector<Control::Ptr> focus_candidates(
+        const Control::Ptr& scope_root) const;
     void change_pointer_capture(const Control::Ptr& control,
                                 std::uint64_t pointer_id,
                                 bool revoked);
@@ -164,9 +290,22 @@ private:
     double scale_{1.0};
     std::unordered_map<std::string, Control::WeakPtr> stable_ids_;
     Control::WeakPtr focused_;
+    struct FocusScopeState final {
+        FocusScopeId id{};
+        Control::WeakPtr root;
+        Control::WeakPtr previous_focus;
+        std::string stable_id;
+        RuntimeId root_id{};
+        FocusScopeOptions options{};
+        bool active{true};
+    };
+    std::vector<FocusScopeState> focus_scopes_;
+    Event<const FocusScopeChange&> focus_scope_changed_;
+    std::uint64_t next_focus_scope_id_{1U};
     Control::WeakPtr captured_;
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
+    std::vector<std::shared_ptr<detail::PopupAttachment>> popups_;
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;
@@ -176,6 +315,7 @@ private:
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};
     std::vector<std::shared_ptr<detail::ScheduledFrameRequest>> frame_requests_;
+    std::shared_ptr<detail::WindowLifetime> lifetime_;
     std::thread::id ui_thread_;
     std::uint64_t update_depth_{};
     bool layout_dirty_{true};
@@ -186,6 +326,7 @@ private:
     bool in_lifecycle_notification_{};
     bool second_layout_pass_requested_{};
     bool occluded_{};
+    std::uint64_t semantic_generation_{1U};
 };
 
 class UpdateScope {

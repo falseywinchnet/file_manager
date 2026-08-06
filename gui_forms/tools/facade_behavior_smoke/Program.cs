@@ -64,6 +64,26 @@ if (args.Length == 1 && args[0] == "secondary-form")
 {
     return RunSecondaryFormHost();
 }
+if (args.Length == 1 && args[0] == "form-semantics")
+{
+    return RunFormSemantics();
+}
+if (args.Length == 1 && args[0] == "cursor")
+{
+    return RunCursorSemantics();
+}
+if (args.Length == 1 && args[0] == "dock-padding")
+{
+    return RunDockPaddingSemantics();
+}
+if (args.Length == 1 && args[0] == "split-container")
+{
+    return RunSplitContainerSemantics();
+}
+if (args.Length == 1 && args[0] == "dialog-key-live")
+{
+    return RunDialogKeyLiveHost();
+}
 if (args.Length == 1 && args[0] == "scroll-panel")
 {
     return RunScrollablePanelHost();
@@ -95,6 +115,10 @@ if (args.Length == 1 && args[0] == "folder-live")
 if (args.Length == 1 && args[0] == "tooltip-live")
 {
     return RunTooltipLiveHost();
+}
+if (args.Length == 1 && args[0] == "native-surface")
+{
+    return RunNativeWindowSurfaceHost();
 }
 
 var form = new Form { Name = "behaviorForm", Text = "M11d behavior", Size = new Size(640, 420) };
@@ -268,6 +292,16 @@ using (var textGraphics = Graphics.FromImage(textBitmap))
 {
     var measured = TextRenderer.MeasureText("Radio", textFont);
     Require(measured.Width > 8 && measured.Height >= textFont.Height, "text renderer measurement");
+    var narrowGlyphs = textGraphics.MeasureString("iiii", textFont);
+    var wideGlyphs = textGraphics.MeasureString("WWWW", textFont);
+    Require(wideGlyphs.Width > narrowGlyphs.Width,
+        "drawing measurement uses glyph advances rather than character count");
+    using var wrappedFormat = new StringFormat();
+    var unboundedText = textGraphics.MeasureString("alpha beta gamma", textFont);
+    var boundedText = textGraphics.MeasureString("alpha beta gamma", textFont,
+        (int)(unboundedText.Width / 2f), wrappedFormat);
+    Require(boundedText.Width <= unboundedText.Width / 2f &&
+        boundedText.Height > unboundedText.Height, "drawing measurement wraps to layout width");
     Require(textGraphics.MeasureString(null!, textFont, 120, new StringFormat()) == SizeF.Empty,
         "drawing null text matches System.Drawing empty-span semantics");
     using var nullTextBrush = new SolidBrush(Color.Black);
@@ -281,6 +315,22 @@ using (var textGraphics = Graphics.FromImage(textBitmap))
         for (var x = 0; x < textBitmap.Width; ++x)
             if (textBitmap.GetPixel(x, y).ToArgb() != Color.White.ToArgb()) { inkFound = true; break; }
     Require(inkFound, "text renderer drawing");
+    Require(textBitmap.GetPixel(textBitmap.Width - 1, textBitmap.Height - 1).ToArgb() ==
+        Color.White.ToArgb(), "bitmap read flushes retained drawing before Graphics disposal");
+    textGraphics.FillRectangle(nullTextBrush, textBitmap.Width - 1,
+        textBitmap.Height - 1, 1, 1);
+    Require(textBitmap.GetPixel(textBitmap.Width - 1, textBitmap.Height - 1).ToArgb() ==
+        Color.Black.ToArgb(), "bitmap read incrementally commits later retained commands");
+}
+using (var sourceBitmap = new Bitmap(8, 8))
+using (var sourceGraphics = Graphics.FromImage(sourceBitmap))
+using (var targetBitmap = new Bitmap(8, 8))
+using (var targetGraphics = Graphics.FromImage(targetBitmap))
+{
+    sourceGraphics.Clear(Color.Crimson);
+    targetGraphics.DrawImageUnscaled(sourceBitmap, 0, 0);
+    Require(targetBitmap.GetPixel(4, 4).ToArgb() == Color.Crimson.ToArgb(),
+        "image draw flushes pending source drawing before sampling");
 }
 Require(enabled.Checked && radio.Checked, "check state");
 Require(checkEvents == 1 && selectionEvents == 1 && valueEvents == 1 && radioEvents == 1, "state events");
@@ -437,6 +487,8 @@ static int RunThreadMutationHost()
 static int RunSecondaryFormHost()
 {
     var main = new Form { Name = "secondaryMain", Text = "Secondary owner", Size = new Size(640, 480) };
+    var mainField = new TextBox { Name = "mainFocus", Bounds = new Rectangle(16, 16, 140, 24) };
+    main.Controls.Add(mainField);
     var secondary = new Form
     {
         Name = "secondaryPanel",
@@ -444,30 +496,240 @@ static int RunSecondaryFormHost()
         Location = new Point(520, 410),
         Size = new Size(300, 260)
     };
-    secondary.Controls.Add(new Button { Name = "secondaryAction", Text = "Apply", Bounds = new Rectangle(16, 36, 96, 26) });
+    var secondaryAction = new Button { Name = "secondaryAction", Text = "Apply", Bounds = new Rectangle(16, 36, 96, 26) };
+    secondary.Controls.Add(secondaryAction);
     var loads = 0;
     var closes = 0;
+    var cancelFirstClose = true;
+    var closingReason = CloseReason.None;
+    var closedReason = CloseReason.None;
     secondary.Load += (_, _) => ++loads;
-    secondary.FormClosed += (_, _) => ++closes;
+    secondary.FormClosing += (_, e) => { closingReason = e.CloseReason; e.Cancel = cancelFirstClose; };
+    secondary.FormClosed += (_, e) => { ++closes; closedReason = e.CloseReason; };
     main.Load += (_, _) =>
     {
+        Require(mainField.Focus(), "main field accepts initial focus");
         secondary.Show();
         Require(ReferenceEquals(secondary.Parent, main) && secondary.Visible,
             "non-modal form attaches to the active retained host");
+        Require(ReferenceEquals(secondary.Owner, main) && main.OwnedForms.Length == 1,
+            "non-modal form records bidirectional ownership");
+        Require(secondaryAction.Focused, "secondary form establishes its own initial focus");
         Require(secondary.Right <= main.Width && secondary.Bottom <= main.Height,
             "non-modal form remains inside host bounds");
         secondary.Hide();
         secondary.Show();
         Require(loads == 1 && secondary.Visible, "non-modal form reopens without duplicate load");
         secondary.Close();
+        Require(secondary.Visible && ReferenceEquals(secondary.Parent, main) && closes == 0 &&
+            closingReason == CloseReason.UserClosing,
+            "cancelled non-modal close preserves visibility and ownership");
+        cancelFirstClose = false;
+        secondary.Close();
         Require(secondary.Parent is null && !secondary.Visible && closes == 1,
             "non-modal form closes and detaches deterministically");
+        Require(closedReason == CloseReason.UserClosing && mainField.Focused,
+            "non-modal close reports reason and restores prior focus");
         main.BeginInvoke((Action)main.Close);
     };
     Application.Run(main);
-    Console.WriteLine("secondary-form=attached:true|clamped:true|reopened:true|detached:true|loads:1|closed:1");
+    Console.WriteLine("secondary-form=attached:true|owned:true|clamped:true|reopened:true|cancelled:true|detached:true|focus-restored:true|loads:1|closed:1");
     secondary.Dispose();
     main.Dispose();
+    return 0;
+}
+
+static int RunSplitContainerSemantics()
+{
+    var form = new Form { Name = "splitHost", Text = "Split container", ClientSize = new Size(420, 220) };
+    var split = new SplitContainerProbe
+    {
+        Name = "splitProbe",
+        Dock = DockStyle.Fill,
+        SplitterWidth = 3,
+        Panel1MinSize = 80,
+        Panel2MinSize = 100,
+        SplitterDistance = 120
+    };
+    var first = new Button { Name = "splitFirst", Text = "First pane", Bounds = new Rectangle(8, 8, 90, 26) };
+    var second = new Button { Name = "splitSecond", Text = "Second pane", Bounds = new Rectangle(8, 8, 100, 26) };
+    split.Panel1.Controls.Add(first);
+    split.Panel2.Controls.Add(second);
+    form.Controls.Add(split);
+    form.Load += (_, _) =>
+    {
+        split.PerformLayout();
+        Require(split.Panel1.Width == 120 && split.Panel2.Left == 123 &&
+            split.Panel2.Width == split.ClientSize.Width - 123,
+            "split layout allocates both panels around its physical seam");
+        split.DragSplitter(121, 181);
+        Require(split.SplitterDistance == 180 && split.Panel1.Width == 180 && split.Panel2.Left == 183,
+            "split pointer drag updates pane allocation before release");
+        Require(first.Focus(), "split child accepts focus before collapse");
+        split.Panel1Collapsed = true;
+        Require(!split.Panel1.Visible && split.Focused &&
+            split.Panel2.Width == split.ClientSize.Width - 3,
+            "collapsing a focused pane transfers focus and removes it from layout");
+        split.Panel1Collapsed = false;
+        split.SplitterDistance = 150;
+        split.Orientation = Orientation.Horizontal;
+        split.SplitterDistance = 70;
+        split.PerformLayout();
+        Require(split.SplitterDistance == 80 && split.Panel1.Height == 80 &&
+            split.Panel2.Top == 83,
+            "horizontal split orientation divides the vertical axis while preserving minima");
+        split.IsSplitterFixed = true;
+        split.DragSplitter(71, 120);
+        Require(split.SplitterDistance == 80,
+            "fixed splitter rejects pointer mutation");
+        form.BeginInvoke((Action)form.Close);
+    };
+    Application.Run(form);
+    Console.WriteLine("split-container=geometry:constrained|drag:live|collapse:focus-transferred|orientation:horizontal|fixed:enforced");
+    form.Dispose();
+    return 0;
+}
+
+static int RunFormSemantics()
+{
+    var form = new DialogKeyProbe { Name = "formSemantics", Size = new Size(420, 220), KeyPreview = true };
+    var group = new Panel { Name = "nestedFields", Bounds = new Rectangle(12, 12, 220, 80) };
+    var later = new TextBox { Name = "later", TabIndex = 2, Bounds = new Rectangle(4, 4, 120, 22) };
+    var earlier = new TextBox { Name = "earlier", TabIndex = 1, Bounds = new Rectangle(4, 34, 120, 22) };
+    group.Controls.Add(later);
+    group.Controls.Add(earlier);
+    var accept = new Button { Name = "accept", Text = "OK", TabIndex = 3, DialogResult = DialogResult.OK };
+    var cancel = new Button { Name = "cancel", Text = "Cancel", TabIndex = 4, DialogResult = DialogResult.Cancel };
+    form.Controls.Add(group);
+    form.Controls.Add(accept);
+    form.Controls.Add(cancel);
+    form.AcceptButton = accept;
+    form.CancelButton = cancel;
+
+    Require(later.Focus() && form.Route(Keys.Shift | Keys.Tab) && earlier.Focused,
+        "reverse tab follows nested stable TabIndex order");
+    Require(form.Route(Keys.Tab) && later.Focused,
+        "forward tab follows nested stable TabIndex order");
+    form.ActiveControl = earlier;
+    Require(ReferenceEquals(form.ActiveControl, earlier), "active-control setter focuses descendants");
+    var outside = new TextBox();
+    var rejectedOutside = false;
+    try { form.ActiveControl = outside; }
+    catch (ArgumentException) { rejectedOutside = true; }
+    Require(rejectedOutside, "active-control setter rejects foreign controls");
+    var label = new Label();
+    Require(!label.Focus(), "noninteractive label rejects keyboard focus");
+
+    var order = new System.Collections.Generic.List<string>();
+    accept.Click += (_, _) => order.Add("accept-click");
+    cancel.Click += (_, _) => order.Add("cancel-click");
+    Require(form.Route(Keys.Enter) && form.DialogResult == DialogResult.OK &&
+        order.Count == 1 && order[0] == "accept-click",
+        "enter performs accept click before applying dialog result");
+    form.DialogResult = DialogResult.None;
+    Require(form.Route(Keys.Escape) && form.DialogResult == DialogResult.Cancel &&
+        order.Count == 2 && order[1] == "cancel-click",
+        "escape performs cancel click and applies dialog result");
+
+    var owner = new Form();
+    form.Owner = owner;
+    Require(ReferenceEquals(form.Owner, owner) && owner.OwnedForms.Length == 1,
+        "owned-form relationship is bidirectional");
+    var cycleRejected = false;
+    try { owner.Owner = form; }
+    catch (ArgumentException) { cycleRejected = true; }
+    Require(cycleRejected, "owned-form cycle rejected");
+
+    var modalOwner = new Form { Name = "modalOwner", Size = new Size(320, 180) };
+    var ownerField = new TextBox { Name = "ownerField", Bounds = new Rectangle(8, 8, 120, 22) };
+    modalOwner.Controls.Add(ownerField);
+    Require(ownerField.Focus(), "modal owner establishes prior focus");
+    var dialog = new Form { Name = "modalChild", Size = new Size(260, 140) };
+    var dialogField = new TextBox { Name = "dialogField", Bounds = new Rectangle(8, 8, 120, 22) };
+    dialog.Controls.Add(dialogField);
+    var ownerSuppressedDuringLoad = false;
+    dialog.Load += (_, _) =>
+    {
+        ownerSuppressedDuringLoad = !modalOwner.Enabled && !ownerField.Focused;
+        dialog.BeginInvoke((Action)(() => dialog.DialogResult = DialogResult.OK));
+    };
+    var modalResult = dialog.ShowDialog(modalOwner);
+    Require(ownerSuppressedDuringLoad && modalResult == DialogResult.OK &&
+        modalOwner.Enabled && ownerField.Focused && !dialog.Visible,
+        "modal owner suppression and focus restoration");
+
+    Console.WriteLine("form-semantics=tab:nested|accept:ordered|cancel:ordered|active-control:scoped|owner:acyclic|modal:focus-restored|label-focus:rejected");
+    outside.Dispose();
+    label.Dispose();
+    dialog.Dispose();
+    modalOwner.Dispose();
+    form.Dispose();
+    owner.Dispose();
+    return 0;
+}
+
+static int RunCursorSemantics()
+{
+    using var panel = new Panel { Name = "cursorPanel" };
+    Require(ReferenceEquals(Cursors.HSplit, Cursors.SizeWE),
+        "horizontal split cursors share retained identity");
+    Require(!ReferenceEquals(Cursors.HSplit, Cursors.VSplit) &&
+        !ReferenceEquals(Cursors.Default, Cursors.Hand),
+        "distinct cursor roles retain distinct identity");
+    panel.Cursor = Cursors.Hand;
+    Require(ReferenceEquals(panel.Cursor, Cursors.Hand),
+        "control cursor round trips through ABI projection");
+    panel.Cursor = Cursors.VSplit;
+    Require(ReferenceEquals(panel.Cursor, Cursors.VSplit),
+        "control cursor role can change");
+    panel.Cursor = null!;
+    Require(panel.Cursor is null, "null cursor restores inherited native state");
+    Console.WriteLine("cursor=identity:stable|projection:roundtrip|inherit:restored");
+    return 0;
+}
+
+static int RunDockPaddingSemantics()
+{
+    using var panel = new ScrollableControl { Name = "dockPaddingPanel", Size = new Size(200, 100) };
+    using var child = new Panel { Name = "dockFill", Dock = DockStyle.Fill };
+    panel.Controls.Add(child);
+    panel.DockPadding.All = 4;
+    panel.DockPadding.Left = 11;
+    panel.PerformLayout();
+    Require(panel.Padding.Left == 11 && panel.Padding.Top == 4 &&
+        panel.Padding.Right == 4 && panel.Padding.Bottom == 4,
+        "dock padding projects into retained Padding");
+    Require(child.Bounds == new Rectangle(11, 4, 185, 92),
+        "fill layout consumes dock padding edges");
+    panel.DockPadding.Bottom = 9;
+    panel.PerformLayout();
+    Require(child.Bounds == new Rectangle(11, 4, 185, 87),
+        "dock padding mutation relayouts the owner");
+    Console.WriteLine("dock-padding=projection:owned|fill:inset|relayout:updated");
+    return 0;
+}
+
+static int RunDialogKeyLiveHost()
+{
+    var form = new Form { Name = "dialogKeyLive", Text = "Dialog key routing", Size = new Size(360, 180) };
+    var field = new TextBox { Name = "dialogField", Bounds = new Rectangle(16, 18, 180, 24), TabIndex = 1 };
+    var accept = new Button { Name = "dialogAccept", Text = "OK", Bounds = new Rectangle(16, 62, 80, 26), DialogResult = DialogResult.OK, TabIndex = 2 };
+    var cancel = new Button { Name = "dialogCancel", Text = "Cancel", Bounds = new Rectangle(104, 62, 80, 26), DialogResult = DialogResult.Cancel, TabIndex = 3 };
+    form.Controls.Add(field);
+    form.Controls.Add(accept);
+    form.Controls.Add(cancel);
+    form.AcceptButton = accept;
+    form.CancelButton = cancel;
+    var accepts = 0;
+    var cancels = 0;
+    accept.Click += (_, _) => ++accepts;
+    cancel.Click += (_, _) => ++cancels;
+    form.Load += (_, _) => field.Focus();
+    Application.Run(form);
+    Require(accepts == 1 && cancels == 1 && form.DialogResult == DialogResult.Cancel,
+        "physical form preview routes enter and escape once");
+    Console.WriteLine($"dialog-key-live=enter:{accepts}|escape:{cancels}|focused-field:true|result:{form.DialogResult}");
+    form.Dispose();
     return 0;
 }
 
@@ -1195,6 +1457,59 @@ static int RunDialogHost()
     return 0;
 }
 
+static int RunNativeWindowSurfaceHost()
+{
+    var form = new Form { Name = "nativeSurfaceForm", Text = "Native surface", Size = new Size(240, 140) };
+    var surface = new PaintInputProbe
+    {
+        Name = "nativeSurface",
+        Bounds = new Rectangle(12, 12, 80, 40),
+        BackColor = Color.Black,
+    };
+    form.Controls.Add(surface);
+    var window = surface.Handle;
+    Require(window != 0 && NativeSurfaceProbe.IsWindow(window), "control handle is a Win32 window");
+    Require(!NativeSurfaceProbe.IsWindowEnabled(window),
+        "paint-only child HWND cannot become a second input authority");
+    surface.Size = new Size(96, 48);
+    Require(NativeSurfaceProbe.GetClientRect(window, out var resized) &&
+        resized.Right - resized.Left == 96 && resized.Bottom - resized.Top == 48,
+        "control HWND tracks retained client size");
+
+    using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+    var ticks = 0;
+    var paintedAttachedChild = false;
+    timer.Tick += (_, _) =>
+    {
+        ++ticks;
+        if (ticks == 1)
+        {
+            var device = NativeSurfaceProbe.GetDC(window);
+            Require(device != 0, "control HWND exposes a device context");
+            var brush = NativeSurfaceProbe.CreateSolidBrush(0x003322ccu);
+            var area = new NativeSurfaceProbe.NativeRect { Right = 96, Bottom = 48 };
+            Require(brush != 0 && NativeSurfaceProbe.FillRect(device, ref area, brush) != 0,
+                "direct GDI fill succeeds");
+            paintedAttachedChild = NativeSurfaceProbe.GetPixel(device, 20, 20) ==
+                0x003322ccu && NativeSurfaceProbe.GetParent(window) != 0;
+            _ = NativeSurfaceProbe.DeleteObject(brush);
+            _ = NativeSurfaceProbe.ReleaseDC(window, device);
+            return;
+        }
+        timer.Stop();
+        form.Close();
+    };
+    timer.Start();
+    Application.Run(form);
+    Require(ticks == 2, "native surface crosses an event-loop presentation boundary");
+    Require(paintedAttachedChild, "direct GDI targets the attached child HWND");
+    surface.Dispose();
+    Require(!NativeSurfaceProbe.IsWindow(window), "control HWND is destroyed with its owner");
+    Console.WriteLine("native-surface=hwnd:true|input:retained-host|size:96x48|gdi:true|present-boundary:true|disposed:true");
+    form.Dispose();
+    return 0;
+}
+
 static void Require(bool condition, string name)
 {
     if (!condition) throw new InvalidOperationException($"M11d behavior check failed: {name}");
@@ -1218,6 +1533,11 @@ sealed class LayoutProbe : Panel
         ++Layouts;
         base.OnLayout(e);
     }
+}
+
+sealed class DialogKeyProbe : Form
+{
+    internal bool Route(Keys keys) => ProcessDialogKey(keys);
 }
 
 sealed class StateChangeProbe : Control
@@ -1332,6 +1652,20 @@ sealed class ScrollProbe : Panel
         OnMouseWheel(new MouseEventArgs(MouseButtons.None, 0, Width / 2, Height / 2, delta));
 }
 
+sealed class SplitContainerProbe : SplitContainer
+{
+    internal void DragSplitter(int start, int end)
+    {
+        var vertical = Orientation == Orientation.Vertical;
+        OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1,
+            vertical ? start : Width / 2, vertical ? Height / 2 : start, 0));
+        OnMouseMove(new MouseEventArgs(MouseButtons.Left, 0,
+            vertical ? end : Width / 2, vertical ? Height / 2 : end, 0));
+        OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1,
+            vertical ? end : Width / 2, vertical ? Height / 2 : end, 0));
+    }
+}
+
 sealed class DragSliderProbe : Control
 {
     internal int Value { get; private set; }
@@ -1384,4 +1718,35 @@ sealed class DragSliderProbe : Control
         var x = 4 + (int)Math.Round(Math.Max(0, Width - 16) * Value / 100d);
         e.Graphics.FillRectangle(thumb, x, 4, 12, Math.Max(1, Height - 8));
     }
+}
+
+static class NativeSurfaceProbe
+{
+    [global::System.Runtime.InteropServices.StructLayout(global::System.Runtime.InteropServices.LayoutKind.Sequential)]
+    internal struct NativeRect { internal int Left, Top, Right, Bottom; }
+
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool IsWindow(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool IsWindowEnabled(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool GetClientRect(nint window, out NativeRect bounds);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    internal static extern nint GetDC(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    internal static extern nint GetParent(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    internal static extern int ReleaseDC(nint window, nint device);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    internal static extern int FillRect(nint device, ref NativeRect bounds, nint brush);
+    [global::System.Runtime.InteropServices.DllImport("gdi32.dll")]
+    internal static extern nint CreateSolidBrush(uint color);
+    [global::System.Runtime.InteropServices.DllImport("gdi32.dll")]
+    internal static extern uint GetPixel(nint device, int x, int y);
+    [global::System.Runtime.InteropServices.DllImport("gdi32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool DeleteObject(nint value);
 }

@@ -29,15 +29,18 @@ if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
 endif()
 
 add_library(gui_forms_core STATIC
+    src/core/animation.cpp
     src/core/types.cpp
     src/core/text.cpp
     src/core/text_shaping.cpp
     src/core/unicode_grapheme.cpp
     src/core/metrics.cpp
     src/core/resources.cpp
+    src/core/semantics.cpp
     src/core/host.cpp
     src/core/display_chunk.cpp
     src/core/component.cpp
+    src/core/timer.cpp
     src/core/control.cpp
     src/core/static_tree.cpp
     src/core/window.cpp
@@ -101,7 +104,10 @@ target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 add_library(gui_forms_controls STATIC
     src/controls/basic_controls.cpp
     src/controls/container_controls.cpp
+    src/controls/date_time_picker.cpp
+    src/controls/input_controls.cpp
     src/controls/range_controls.cpp
+    src/controls/tooltip.cpp
 )
 target_include_directories(gui_forms_controls PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -267,6 +273,7 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
     if(WIN32)
         set_target_properties(gui_drawing_raster_c_api PROPERTIES PREFIX "")
+        target_link_libraries(gui_drawing_raster_c_api PRIVATE advapi32)
     endif()
     add_custom_command(TARGET gui_drawing_raster_c_api POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -373,6 +380,16 @@ if(GUI_FORMS_BUILD_GALLERY)
     )
     target_link_libraries(gui_forms_gallery_model PUBLIC gui_forms_controls)
 
+    add_library(gui_forms_showcase_model STATIC
+        src/controls/showcase_controls.cpp
+        demo/showcase.cpp
+    )
+    target_include_directories(gui_forms_showcase_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/controls
+    )
+    target_link_libraries(gui_forms_showcase_model PUBLIC gui_forms_controls)
+
     if(GUI_FORMS_ENABLE_MACOS_HOST)
         set(GUI_FORMS_GALLERY_FONTS
             ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
@@ -397,6 +414,23 @@ if(GUI_FORMS_BUILD_GALLERY)
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
             OUTPUT_NAME "GUI.Forms Gallery"
         )
+
+        add_executable(gui_forms_showcase MACOSX_BUNDLE
+            src/host/macos/showcase_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+        )
+        target_compile_options(gui_forms_showcase PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_showcase PRIVATE
+            gui_forms_showcase_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_showcase PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Complete Showcase"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.complete-showcase"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Complete Showcase"
+        )
     endif()
 
     if(GUI_FORMS_ENABLE_WINDOWS_HOST)
@@ -412,6 +446,30 @@ if(GUI_FORMS_BUILD_GALLERY)
         )
         set_target_properties(gui_forms_gallery_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Gallery"
+        )
+
+        add_executable(gui_forms_showcase_windows
+            src/host/windows/showcase_main.cpp
+        )
+        target_link_libraries(gui_forms_showcase_windows PRIVATE
+            gui_forms_showcase_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_showcase_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_showcase_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Complete Showcase"
+        )
+        add_custom_command(TARGET gui_forms_showcase_windows POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:gui_forms_showcase_windows>/fonts"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
+                "$<TARGET_FILE_DIR:gui_forms_showcase_windows>/fonts/PortsmouthRapids.ttf"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
+                "$<TARGET_FILE_DIR:gui_forms_showcase_windows>/fonts/PortsmouthRapids-Bold.ttf"
         )
         add_custom_command(TARGET gui_forms_gallery_windows POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -562,9 +620,54 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_basic_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_basic_controls_tests COMMAND gui_forms_basic_controls_tests)
 
+    add_executable(gui_forms_input_controls_tests tests/input_controls_tests.cpp)
+    target_link_libraries(gui_forms_input_controls_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_input_controls_tests COMMAND gui_forms_input_controls_tests)
+
+    add_executable(gui_forms_checked_list_box_tests
+        tests/checked_list_box_tests.cpp
+    )
+    target_link_libraries(gui_forms_checked_list_box_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_checked_list_box_tests
+             COMMAND gui_forms_checked_list_box_tests)
+
     add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
+
+    add_executable(gui_forms_split_container_tests
+        tests/split_container_tests.cpp
+    )
+    target_link_libraries(gui_forms_split_container_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_split_container_tests
+             COMMAND gui_forms_split_container_tests)
+
+    add_executable(gui_forms_tab_control_tests
+        tests/tab_control_tests.cpp
+    )
+    target_link_libraries(gui_forms_tab_control_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tab_control_tests
+             COMMAND gui_forms_tab_control_tests)
+
+    add_executable(gui_forms_focus_scope_tests
+        tests/focus_scope_tests.cpp
+    )
+    target_link_libraries(gui_forms_focus_scope_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_focus_scope_tests
+             COMMAND gui_forms_focus_scope_tests)
+
+    add_executable(gui_forms_animation_tests
+        tests/animation_tests.cpp
+    )
+    target_link_libraries(gui_forms_animation_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_animation_tests
+             COMMAND gui_forms_animation_tests)
+
+    add_executable(gui_forms_semantic_tests
+        tests/semantic_tests.cpp
+    )
+    target_link_libraries(gui_forms_semantic_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_semantic_tests COMMAND gui_forms_semantic_tests)
 
     add_executable(gui_forms_lifecycle_controls_tests
         tests/lifecycle_controls_tests.cpp
@@ -598,6 +701,14 @@ if(GUI_FORMS_BUILD_TESTS)
     )
     target_link_libraries(gui_forms_frame_scheduler_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_frame_scheduler_tests COMMAND gui_forms_frame_scheduler_tests)
+
+    add_executable(gui_forms_timer_tests tests/timer_tests.cpp)
+    target_link_libraries(gui_forms_timer_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_timer_tests COMMAND gui_forms_timer_tests)
+
+    add_executable(gui_forms_tooltip_tests tests/tooltip_tests.cpp)
+    target_link_libraries(gui_forms_tooltip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tooltip_tests COMMAND gui_forms_tooltip_tests)
 
     add_executable(gui_forms_png_registry_tests tests/png_registry_tests.cpp)
     target_link_libraries(gui_forms_png_registry_tests PRIVATE gui_forms_core)
@@ -645,14 +756,28 @@ if(GUI_FORMS_BUILD_TESTS)
     endif()
 
     if(TARGET gui_forms_gallery_model)
-        add_executable(gui_forms_gallery_interaction_tests
-            tests/gallery_interaction_tests.cpp
+    add_executable(gui_forms_gallery_interaction_tests
+        tests/gallery_interaction_tests.cpp
         )
         target_link_libraries(gui_forms_gallery_interaction_tests PRIVATE
             gui_forms_gallery_model
         )
-        add_test(NAME gui_forms_gallery_interaction_tests
-                 COMMAND gui_forms_gallery_interaction_tests)
+    add_test(NAME gui_forms_gallery_interaction_tests
+             COMMAND gui_forms_gallery_interaction_tests)
+
+    if(TARGET gui_forms_showcase_model)
+        add_executable(gui_forms_showcase_interaction_tests
+            tests/showcase_interaction_tests.cpp
+        )
+        target_include_directories(gui_forms_showcase_interaction_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+        target_link_libraries(gui_forms_showcase_interaction_tests PRIVATE
+            gui_forms_showcase_model
+        )
+        add_test(NAME gui_forms_showcase_interaction_tests
+                 COMMAND gui_forms_showcase_interaction_tests)
+    endif()
     endif()
 
     if(TARGET gui_forms_gallery)

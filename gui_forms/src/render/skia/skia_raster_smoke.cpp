@@ -81,7 +81,11 @@ int main() {
     }
     const gui_forms::ImageLoadResult loaded =
         images.load_png(std::as_bytes(std::span{png}));
-    if (!loaded || !raster.synchronize_images(images)) {
+    constexpr std::array<std::byte, 4> bgra{
+        std::byte{0}, std::byte{128}, std::byte{255}, std::byte{255}};
+    const gui_forms::ImageLoadResult raw =
+        images.load_bgra32_premultiplied(1, 1, 4, bgra);
+    if (!loaded || !raw || !raster.synchronize_images(images)) {
         std::fputs("validated PNG registry resource failed eager decode\n", stderr);
         return 6;
     }
@@ -99,6 +103,7 @@ int main() {
     raster.draw_text_utf8(gui_forms::Point{12.0, 29.0}, "GUI.Forms CPU",
                           gui_forms::FontSpec{}, gui_forms::Color::rgba(255, 255, 255));
     raster.draw_image(loaded.image, gui_forms::Rect{130.0, 8.0, 20.0, 20.0}, 1.0);
+    raster.draw_image(raw.image, gui_forms::Rect{130.0, 32.0, 20.0, 20.0}, 1.0);
     raster.end_frame();
 
     const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());

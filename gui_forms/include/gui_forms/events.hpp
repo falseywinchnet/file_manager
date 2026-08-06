@@ -72,15 +72,23 @@ struct KeyEvent {
 // USB HID usage IDs are the normalized physical-key vocabulary at the host
 // boundary. Text remains a separate TextInputEvent.
 struct PhysicalKey final {
+    static constexpr std::uint32_t a = 0x04U;
+    static constexpr std::uint32_t c = 0x06U;
+    static constexpr std::uint32_t v = 0x19U;
+    static constexpr std::uint32_t x = 0x1bU;
+    static constexpr std::uint32_t y = 0x1cU;
+    static constexpr std::uint32_t z = 0x1dU;
     static constexpr std::uint32_t enter = 0x28U;
     static constexpr std::uint32_t escape = 0x29U;
     static constexpr std::uint32_t backspace = 0x2AU;
     static constexpr std::uint32_t tab = 0x2BU;
     static constexpr std::uint32_t space = 0x2CU;
+    static constexpr std::uint32_t f4 = 0x3DU;
     static constexpr std::uint32_t home = 0x4AU;
     static constexpr std::uint32_t page_up = 0x4BU;
     static constexpr std::uint32_t end = 0x4DU;
     static constexpr std::uint32_t page_down = 0x4EU;
+    static constexpr std::uint32_t delete_forward = 0x4CU;
     static constexpr std::uint32_t right = 0x4FU;
     static constexpr std::uint32_t left = 0x50U;
     static constexpr std::uint32_t down = 0x51U;

@@ -32,6 +32,7 @@ namespace {
 
 using gui_forms::ComponentState;
 using gui_forms::Control;
+using gui_forms::ImageResourceEncoding;
 using gui_forms::Rect;
 using gui_forms::Size;
 using gui_forms::StableId;
@@ -60,6 +61,7 @@ struct RasterKeySample final {
     std::uint32_t physical_key{};
     std::uint32_t modifiers{};
     bool repeat{};
+    bool handled{};
 };
 
 struct RasterTextSample final {
@@ -81,6 +83,36 @@ public:
     [[nodiscard]] bool hit_test_local(gui_forms::Point) const override {
         return false;
     }
+};
+
+// A form is a retained panel plus a preview seam for focus-scope commands.
+// Keeping this in the ABI adapter lets the portable Window route keys once,
+// before the focused child, without teaching the core about WinForms dialog
+// buttons or managed callback types.
+class FormControl final : public gui_forms::Panel {
+public:
+    explicit FormControl(StableId stable_id)
+        : Panel(std::move(stable_id)) {}
+
+    [[nodiscard]] gui_forms::Event<RasterKeySample&>& key_preview() noexcept {
+        return key_preview_;
+    }
+
+    void on_key_preview(gui_forms::KeyEvent& event) override {
+        RasterKeySample sample{
+            event.action == gui_forms::KeyAction::down
+                ? GF_EVENT_KEY_DOWN : GF_EVENT_KEY_UP,
+            event.physical_key,
+            static_cast<std::uint32_t>(event.modifiers),
+            event.repeat,
+            false,
+        };
+        key_preview_.emit(sample);
+        event.handled = sample.handled;
+    }
+
+private:
+    gui_forms::Event<RasterKeySample&> key_preview_;
 };
 
 // ABI-facing fields retain the platform-neutral text editor state. The managed
@@ -544,6 +576,10 @@ public:
             }
             image_ = {};
             encoded_.clear();
+            encoding_ = ImageResourceEncoding::png;
+            pixel_width_ = 0;
+            pixel_height_ = 0;
+            pixel_row_bytes_ = 0;
             invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
             return true;
         }
@@ -552,6 +588,10 @@ public:
             return false;
         }
         encoded_.assign(encoded.begin(), encoded.end());
+        encoding_ = ImageResourceEncoding::png;
+        pixel_width_ = validation.metadata.width;
+        pixel_height_ = validation.metadata.height;
+        pixel_row_bytes_ = validation.metadata.source_row_bytes;
         bool replacement_invalidated = false;
         if (window() != nullptr) {
             const bool replacing = image_.value != 0;
@@ -564,6 +604,44 @@ public:
             image_ = loaded.image;
             replacement_invalidated = replacing;
         }
+        if (!replacement_invalidated) {
+            invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+        }
+        return true;
+    }
+
+    bool set_bgra32_premultiplied(std::uint32_t width, std::uint32_t height,
+                                  std::uint64_t row_bytes,
+                                  std::span<const std::byte> pixels) {
+        require_mutable();
+        if (pixels.empty()) {
+            return set_png({});
+        }
+        std::vector<std::byte> replacement;
+        try {
+            replacement.assign(pixels.begin(), pixels.end());
+        } catch (const std::bad_alloc&) {
+            return false;
+        }
+        bool replacement_invalidated = false;
+        if (window() != nullptr) {
+            const bool replacing = image_.value != 0;
+            const auto loaded = replacing
+                ? window()->replace_bgra32_premultiplied(
+                    image_, width, height, row_bytes, replacement, *this)
+                : window()->load_bgra32_premultiplied(
+                    width, height, row_bytes, replacement);
+            if (!loaded) {
+                return false;
+            }
+            image_ = loaded.image;
+            replacement_invalidated = replacing;
+        }
+        encoded_ = std::move(replacement);
+        encoding_ = ImageResourceEncoding::bgra32_premultiplied;
+        pixel_width_ = width;
+        pixel_height_ = height;
+        pixel_row_bytes_ = row_bytes;
         if (!replacement_invalidated) {
             invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
         }
@@ -611,7 +689,10 @@ protected:
     void on_attached_to_window() override {
         Control::on_attached_to_window();
         if (!encoded_.empty() && image_.value == 0) {
-            const auto loaded = window()->load_png(encoded_);
+            const auto loaded = encoding_ == ImageResourceEncoding::png
+                ? window()->load_png(encoded_)
+                : window()->load_bgra32_premultiplied(
+                    pixel_width_, pixel_height_, pixel_row_bytes_, encoded_);
             if (loaded) {
                 image_ = loaded.image;
             }
@@ -629,6 +710,10 @@ protected:
 private:
     bool input_transparent_{};
     std::vector<std::byte> encoded_;
+    ImageResourceEncoding encoding_{ImageResourceEncoding::png};
+    std::uint32_t pixel_width_{};
+    std::uint32_t pixel_height_{};
+    std::uint64_t pixel_row_bytes_{};
     gui_forms::ImageId image_{};
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
     gui_forms::Event<const RasterKeySample&> key_input_;
@@ -675,6 +760,7 @@ struct SubscriptionRecord final {
     gf_event_callback_v2 callback_v2{};
     gf_pointer_callback pointer_callback{};
     gf_key_callback key_callback{};
+    gf_key_callback key_preview_callback{};
     gf_text_callback text_callback{};
     void* context{};
     std::thread::id ui_thread;
@@ -739,6 +825,8 @@ public:
         StableId native_id(std::move(id));
         switch (kind) {
         case GF_CONTROL_FORM:
+            record->control = std::make_shared<FormControl>(std::move(native_id));
+            break;
         case GF_CONTROL_USER_CONTROL:
             record->control = std::make_shared<gui_forms::Panel>(std::move(native_id));
             break;
@@ -909,6 +997,39 @@ public:
         return GF_OK;
     }
 
+    gf_result set_cursor(gf_handle handle, std::uint32_t cursor_kind) {
+        if (cursor_kind > GF_CURSOR_FORBIDDEN) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "cursor kind is outside the ABI 0.19 range");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        if (cursor_kind == GF_CURSOR_INHERIT) {
+            record->control->set_cursor(std::nullopt);
+        } else {
+            record->control->set_cursor(static_cast<gui_forms::CursorKind>(
+                cursor_kind - GF_CURSOR_ARROW));
+        }
+        return GF_OK;
+    }
+
+    gf_result get_cursor(gf_handle handle, std::uint32_t* cursor_kind) {
+        if (cursor_kind == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT, "get_cursor requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto value = record->control->cursor();
+        *cursor_kind = value.has_value()
+            ? static_cast<std::uint32_t>(*value) + GF_CURSOR_ARROW
+            : GF_CURSOR_INHERIT;
+        return GF_OK;
+    }
+
     gf_result set_control_png(gf_handle handle, const std::uint8_t* encoded,
                               std::uint64_t encoded_size) {
         if ((encoded_size != 0U && encoded == nullptr) ||
@@ -937,6 +1058,52 @@ public:
         // Raster replacement is renderer state, not a managed property change.
         // Emitting the generic state callback here can also re-enter a managed
         // UnmanagedCallersOnly thunk when paint was requested by an ABI dispatch.
+        return GF_OK;
+    }
+
+    gf_result set_control_pixels(gf_handle handle, const std::uint8_t* pixels,
+                                 std::uint32_t width, std::uint32_t height,
+                                 std::uint64_t row_bytes,
+                                 std::uint32_t pixel_format) {
+        if (pixel_format != GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "set_control_pixels requires BGRA32 premultiplied pixels");
+        }
+        if ((width == 0U || height == 0U) && pixels == nullptr) {
+            std::shared_ptr<ControlRecord> record;
+            if (const gf_result result = get_control(handle, record); result != GF_OK) {
+                return result;
+            }
+            const auto raster = std::dynamic_pointer_cast<RasterControl>(record->control);
+            return raster && raster->set_bgra32_premultiplied(0, 0, 0, {})
+                ? GF_OK
+                : fail(GF_ERROR_WRONG_HANDLE_KIND,
+                       "set_control_pixels requires a custom raster control");
+        }
+        if (pixels == nullptr || width == 0U || height == 0U ||
+            row_bytes < static_cast<std::uint64_t>(width) * 4U ||
+            row_bytes > std::numeric_limits<std::size_t>::max() ||
+            height > std::numeric_limits<std::size_t>::max() / row_bytes) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "set_control_pixels requires a bounded BGRA32 surface");
+        }
+        const std::size_t byte_count =
+            static_cast<std::size_t>(row_bytes) * height;
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto raster = std::dynamic_pointer_cast<RasterControl>(record->control);
+        if (!raster) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "set_control_pixels requires a custom raster control");
+        }
+        const auto bytes = std::span<const std::byte>(
+            reinterpret_cast<const std::byte*>(pixels), byte_count);
+        if (!raster->set_bgra32_premultiplied(width, height, row_bytes, bytes)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "set_control_pixels rejected an invalid or unbounded surface");
+        }
         return GF_OK;
     }
 
@@ -1954,6 +2121,29 @@ public:
         return GF_OK;
     }
 
+    gf_result get_control_absolute_bounds(gf_handle handle, gf_rect* bounds) {
+        if (bounds == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_control_absolute_bounds requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        Rect value = record->control->absolute_bounds();
+        if (!record->control->attached()) {
+            value = record->control->requested_bounds();
+            for (auto ancestor = record->control->parent(); ancestor;
+                 ancestor = ancestor->parent()) {
+                const Rect parent_bounds = ancestor->requested_bounds();
+                value.x += parent_bounds.x;
+                value.y += parent_bounds.y;
+            }
+        }
+        *bounds = {value.x, value.y, value.width, value.height};
+        return GF_OK;
+    }
+
     gf_result add_child(gf_handle parent_handle, gf_handle child_handle) {
         std::shared_ptr<ControlRecord> parent;
         std::shared_ptr<ControlRecord> child;
@@ -2192,6 +2382,51 @@ public:
                 static_cast<void>(record->key_callback(
                     sender_handle, sample.event_kind, sample.physical_key,
                     sample.modifiers, sample.repeat ? 1U : 0U, record->context));
+            });
+        return GF_OK;
+    }
+
+    gf_result subscribe_key_preview(gf_handle sender_handle,
+                                    gf_key_callback callback, void* context,
+                                    gf_event_token* output) {
+        if (callback == nullptr || output == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "subscribe_key_preview requires a callback and output");
+        }
+        std::scoped_lock lock(mutex_);
+        std::shared_ptr<ControlRecord> sender;
+        if (const gf_result result = control_locked(sender_handle, sender);
+            result != GF_OK) return result;
+        if (const gf_result result = require_thread(*sender); result != GF_OK) {
+            return result;
+        }
+        const auto form = std::dynamic_pointer_cast<FormControl>(sender->control);
+        if (!form || sender->kind != GF_CONTROL_FORM) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "key preview subscriptions require a form control");
+        }
+        auto record = std::make_shared<SubscriptionRecord>();
+        record->key_preview_callback = callback;
+        record->context = context;
+        record->ui_thread = sender->ui_thread;
+        *output = allocate_locked(SlotKind::subscription, {}, record);
+        sender->subscriptions.push_back(*output);
+        record->native_subscription = form->key_preview().subscribe(
+            [this, record, sender_handle, sender](RasterKeySample& sample) {
+                if (!record->connected ||
+                    record->key_preview_callback == nullptr) return;
+                const std::uint32_t result = record->key_preview_callback(
+                    sender_handle, sample.event_kind, sample.physical_key,
+                    sample.modifiers, sample.repeat ? 1U : 0U,
+                    record->context);
+                if (result == GF_EVENT_CALLBACK_CANCEL) {
+                    sample.handled = true;
+                } else if (result == GF_EVENT_CALLBACK_FAULTED ||
+                           result > GF_EVENT_CALLBACK_FAULTED) {
+                    std::scoped_lock callback_lock(mutex_);
+                    const auto root = root_record_locked(sender);
+                    ++root->callback_faults;
+                }
             });
         return GF_OK;
     }
@@ -2762,6 +2997,12 @@ gf_result api_set_bounds(gf_handle handle, gf_rect bounds) noexcept {
 gf_result api_get_bounds(gf_handle handle, gf_rect* bounds) noexcept {
     return translate([&] { return registry().get_bounds(handle, bounds); });
 }
+gf_result api_get_control_absolute_bounds(gf_handle handle,
+                                          gf_rect* bounds) noexcept {
+    return translate([&] {
+        return registry().get_control_absolute_bounds(handle, bounds);
+    });
+}
 gf_result api_add_child(gf_handle parent, gf_handle child) noexcept {
     return translate([&] { return registry().add_child(parent, child); });
 }
@@ -2799,6 +3040,12 @@ gf_result api_set_enabled(gf_handle handle, std::uint32_t enabled) noexcept {
 gf_result api_get_enabled(gf_handle handle, std::uint32_t* enabled) noexcept {
     return translate([&] { return registry().get_enabled(handle, enabled); });
 }
+gf_result api_set_cursor(gf_handle handle, std::uint32_t cursor_kind) noexcept {
+    return translate([&] { return registry().set_cursor(handle, cursor_kind); });
+}
+gf_result api_get_cursor(gf_handle handle, std::uint32_t* cursor_kind) noexcept {
+    return translate([&] { return registry().get_cursor(handle, cursor_kind); });
+}
 gf_result api_run_window(gf_handle handle, std::uint32_t flags) noexcept {
     return translate([&] { return registry().run_window(handle, flags); });
 }
@@ -2833,6 +3080,15 @@ gf_result api_set_control_png(gf_handle control, const std::uint8_t* encoded,
         return registry().set_control_png(control, encoded, encoded_size);
     });
 }
+gf_result api_set_control_pixels(gf_handle control, const std::uint8_t* pixels,
+                                 std::uint32_t width, std::uint32_t height,
+                                 std::uint64_t row_bytes,
+                                 std::uint32_t pixel_format) noexcept {
+    return translate([&] {
+        return registry().set_control_pixels(control, pixels, width, height,
+                                             row_bytes, pixel_format);
+    });
+}
 gf_result api_set_child_index(gf_handle parent, gf_handle child,
                               std::uint64_t index) noexcept {
     return translate([&] { return registry().set_child_index(parent, child, index); });
@@ -2859,6 +3115,13 @@ gf_result api_get_check_state(gf_handle control, std::uint32_t* check_state) noe
 gf_result api_subscribe_key(gf_handle sender, gf_key_callback callback,
                             void* context, gf_event_token* token) noexcept {
     return translate([&] { return registry().subscribe_key(sender, callback, context, token); });
+}
+gf_result api_subscribe_key_preview(gf_handle sender, gf_key_callback callback,
+                                    void* context,
+                                    gf_event_token* token) noexcept {
+    return translate([&] {
+        return registry().subscribe_key_preview(sender, callback, context, token);
+    });
 }
 gf_result api_subscribe_text(gf_handle sender, gf_text_callback callback,
                              void* context, gf_event_token* token) noexcept {
@@ -3003,7 +3266,11 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_12 &&
         requested_version != GF_ABI_VERSION_0_13 &&
         requested_version != GF_ABI_VERSION_0_14 &&
-        requested_version != GF_ABI_VERSION_0_15) {
+        requested_version != GF_ABI_VERSION_0_15 &&
+        requested_version != GF_ABI_VERSION_0_16 &&
+        requested_version != GF_ABI_VERSION_0_17 &&
+        requested_version != GF_ABI_VERSION_0_18 &&
+        requested_version != GF_ABI_VERSION_0_19) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -3066,6 +3333,11 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_field_replace,
         &api_field_history,
         &api_field_clear_history,
+        &api_set_control_pixels,
+        &api_get_control_absolute_bounds,
+        &api_subscribe_key_preview,
+        &api_set_cursor,
+        &api_get_cursor,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

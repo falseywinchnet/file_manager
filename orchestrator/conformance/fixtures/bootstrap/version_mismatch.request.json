@@ -1,1 +1,1 @@
-{"id":"fixture-version-mismatch","method":"orchestrator.status","contract":{"id":"ORC-LIF-001","major":1,"minor":0},"params":{}}
+{"id":"fixture-version-mismatch","method":"orchestrator.status","contract":{"id":"ORC-LIF-001","major":0,"minor":1},"params":{}}

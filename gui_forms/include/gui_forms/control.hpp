@@ -5,6 +5,8 @@
 #include "gui_forms/dirty.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"
+#include "gui_forms/semantics.hpp"
+#include "gui_forms/scheduler.hpp"
 #include "gui_forms/types.hpp"
 
 #include <atomic>
@@ -79,6 +81,14 @@ public:
     void set_allow_drop(bool allow_drop);
     [[nodiscard]] std::optional<CursorKind> cursor() const noexcept { return cursor_; }
     void set_cursor(std::optional<CursorKind> cursor);
+    [[nodiscard]] const std::string& accessible_name() const noexcept {
+        return accessible_name_;
+    }
+    void set_accessible_name(std::string name);
+    [[nodiscard]] const std::string& accessible_description() const noexcept {
+        return accessible_description_;
+    }
+    void set_accessible_description(std::string description);
     [[nodiscard]] CursorKind effective_cursor() const noexcept;
     [[nodiscard]] bool effectively_visible() const noexcept;
     [[nodiscard]] bool effectively_enabled() const noexcept;
@@ -107,6 +117,12 @@ public:
     [[nodiscard]] Event<const PointerEvent&>& pointer_observed() noexcept {
         return pointer_observed_;
     }
+    [[nodiscard]] Event<bool>& focus_observed() noexcept {
+        return focus_observed_;
+    }
+    [[nodiscard]] Event<Rect>& arranged_bounds_changed() noexcept {
+        return arranged_bounds_changed_;
+    }
 
     [[nodiscard]] virtual Size measure(Size available);
     virtual void arrange(Rect final_bounds);
@@ -120,6 +136,14 @@ public:
     virtual void on_key(KeyEvent& event);
     virtual void on_key_bubble(KeyEvent& event);
     virtual void on_text_input(TextInputEvent& event);
+    virtual void on_frame(FrameTime now);
+    [[nodiscard]] virtual SemanticDescriptor semantic_descriptor() const;
+    [[nodiscard]] virtual std::vector<SemanticNode> semantic_virtual_children() const;
+    virtual bool on_semantic_action(SemanticAction action,
+                                    std::string_view value);
+    virtual bool on_semantic_child_action(std::string_view stable_id,
+                                          SemanticAction action,
+                                          std::string_view value);
     virtual void on_drag_preview(DragEvent& event);
     virtual void on_drag(DragEvent& event);
     virtual void on_drag_bubble(DragEvent& event);
@@ -160,8 +184,12 @@ private:
     bool focusable_{};
     bool allow_drop_{};
     std::optional<CursorKind> cursor_;
+    std::string accessible_name_;
+    std::string accessible_description_;
     Event<Dirty, bool> initialization_completed_;
     Event<const PointerEvent&> pointer_observed_;
+    Event<bool> focus_observed_;
+    Event<Rect> arranged_bounds_changed_;
     Dirty pending_initialization_dirty_{Dirty::none};
     std::uint64_t initialization_depth_{};
     bool pending_initialization_subtree_{};
@@ -172,8 +200,18 @@ template <typename ControlType, typename... Arguments>
 [[nodiscard]] std::shared_ptr<ControlType> make_control(StableId stable_id,
                                                         Arguments&&... arguments) {
     static_assert(std::is_base_of_v<Control, ControlType>);
-    return std::make_shared<ControlType>(std::move(stable_id),
-                                         std::forward<Arguments>(arguments)...);
+    auto control = std::make_shared<ControlType>(
+        std::move(stable_id), std::forward<Arguments>(arguments)...);
+    // Retained compound controls cannot safely establish parent links from
+    // their constructor because Control::add_child intentionally requires a
+    // live shared owner for cycle checks. A type may opt into this bounded
+    // post-construction step; ordinary leaf controls pay no runtime cost.
+    if constexpr (requires(ControlType& value) {
+                      value.initialize_control_tree();
+                  }) {
+        control->initialize_control_tree();
+    }
+    return control;
 }
 
 } // namespace gui_forms

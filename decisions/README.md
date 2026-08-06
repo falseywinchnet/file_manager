@@ -14,6 +14,8 @@ and existing implementation do not silently create decisions.
 | [`ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md`](ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md) | accepted | Stable experimental Engine semantic v0, capability-gated integration, manual-reconcile distinction, packaging boundary, and nonblocking platform-promotion gates |
 | [`ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md`](ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md) | accepted | Required bounded catalogue-independent Engine search, independent `ORC-ENG-004` semantics, and catalogue-to-live fallback law; partially supersedes ADR-007's optional classification |
 | [`ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md`](ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md) | accepted for implementation | Bounded framed local wire, private discovery endpoint, credential hello, Unix first projection, and remaining platform/concurrency promotion gates |
+| [`ADR-010-ORCHESTRATOR-CORE-1-0-COMPATIBILITY-HORIZON.md`](ADR-010-ORCHESTRATOR-CORE-1-0-COMPATIBILITY-HORIZON.md) | accepted for implementation | macOS first-platform release, Core contract/wire 1.0 line, Core 1.x additive compatibility law, and retained 0.1 rejection corpus |
+| [`ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md`](ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md) | accepted for implementation | stable per-user macOS discovery, launchd socket adoption, restart credential rotation, and bounded client activation retry |
 
 Each record retains its alternatives, consequences, reversal path, and
 unresolved implementation edges. Engine workers consume ADR-001 through

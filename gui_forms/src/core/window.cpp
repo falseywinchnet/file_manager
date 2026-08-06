@@ -11,6 +11,55 @@
 
 namespace gui_forms {
 
+namespace detail {
+
+class PopupAttachment final : public Revocable {
+public:
+    PopupAttachment(Window& window, Control::Ptr owner, Control::Ptr popup)
+        : window_(&window), owner_(std::move(owner)), popup_(std::move(popup)) {}
+
+    void disconnect() noexcept override {
+        if (connected_ && window_ != nullptr) {
+            window_->close_popup(*this);
+        }
+    }
+    [[nodiscard]] bool connected() const noexcept override { return connected_; }
+    [[nodiscard]] Control::Ptr owner() const noexcept { return owner_.lock(); }
+    [[nodiscard]] Control::Ptr popup() const noexcept { return popup_.lock(); }
+    [[nodiscard]] Event<>& closed() noexcept { return closed_; }
+    void revoke() noexcept {
+        connected_ = false;
+        window_ = nullptr;
+        closed_.emit();
+        owner_.reset();
+        popup_.reset();
+    }
+
+private:
+    Window* window_{};
+    Control::WeakPtr owner_;
+    Control::WeakPtr popup_;
+    bool connected_{true};
+    Event<> closed_;
+};
+
+} // namespace detail
+
+void PopupToken::disconnect() noexcept {
+    if (attachment_) {
+        attachment_->disconnect();
+        attachment_.reset();
+    }
+}
+
+bool PopupToken::connected() const noexcept {
+    return attachment_ && attachment_->connected();
+}
+
+Event<>* PopupToken::closed_event() noexcept {
+    return attachment_ ? &attachment_->closed() : nullptr;
+}
+
 namespace {
 
 constexpr std::uint32_t maximum_layout_passes = 4;
@@ -37,11 +86,74 @@ bool single_allowed_effect(DragEffect effect, DragEffect allowed) noexcept {
            has_drag_effect(allowed, effect);
 }
 
+void append_semantic_nodes(const Control::Ptr& control,
+                           const Control::Ptr& focused,
+                           std::vector<SemanticNode>& destination,
+                           std::size_t& count) {
+    if (!control || !control->effectively_visible()) return;
+    const SemanticDescriptor descriptor = control->semantic_descriptor();
+    std::vector<SemanticNode> descendants;
+    if (!descriptor.exposed || descriptor.include_descendants) {
+        for (const Control::Ptr& child : control->children()) {
+            append_semantic_nodes(child, focused, descendants, count);
+        }
+        std::vector<SemanticNode> virtual_children =
+            control->semantic_virtual_children();
+        count += virtual_children.size();
+        descendants.insert(descendants.end(),
+                            std::make_move_iterator(virtual_children.begin()),
+                            std::make_move_iterator(virtual_children.end()));
+    }
+    if (!descriptor.exposed) {
+        destination.insert(destination.end(),
+                           std::make_move_iterator(descendants.begin()),
+                           std::make_move_iterator(descendants.end()));
+        return;
+    }
+    SemanticNode node;
+    node.runtime_id = control->runtime_id().value;
+    node.stable_id = std::string(control->stable_id().value());
+    node.role = descriptor.role;
+    node.name = descriptor.name;
+    node.value = descriptor.value;
+    node.description = descriptor.description;
+    node.numeric_value = descriptor.numeric_value;
+    node.minimum_value = descriptor.minimum_value;
+    node.maximum_value = descriptor.maximum_value;
+    node.bounds = control->absolute_bounds();
+    node.states |= descriptor.states;
+    if (control->effectively_enabled()) node.states |= SemanticState::enabled;
+    node.states |= SemanticState::visible;
+    if (control->focusable()) node.states |= SemanticState::focusable;
+    if (control == focused) node.states |= SemanticState::focused;
+    node.actions = descriptor.actions;
+    node.children = std::move(descendants);
+    destination.push_back(std::move(node));
+    ++count;
+}
+
+bool dispatch_semantic_child_action(Control::Ptr control,
+                                    std::string_view stable_id,
+                                    SemanticAction action,
+                                    std::string_view value) {
+    if (!control || !control->effectively_visible() ||
+        !control->effectively_enabled()) return false;
+    if (control->on_semantic_child_action(stable_id, action, value)) return true;
+    const std::vector<Control::Ptr> children(control->children().begin(),
+                                             control->children().end());
+    for (const Control::Ptr& child : children) {
+        if (dispatch_semantic_child_action(child, stable_id, action, value)) return true;
+    }
+    return false;
+}
+
 } // namespace
 
 Window::Window(Control::Ptr root, Size client_size)
     : root_(std::move(root)), client_size_(client_size),
+      lifetime_(std::make_shared<detail::WindowLifetime>()),
       ui_thread_(std::this_thread::get_id()) {
+    lifetime_->window = this;
     if (!root_) {
         throw std::invalid_argument("GUI.Forms window requires a retained root control");
     }
@@ -62,6 +174,14 @@ ImageLoadResult Window::load_png(std::span<const std::byte> encoded) {
     return image_resources_.load_png(encoded);
 }
 
+ImageLoadResult Window::load_bgra32_premultiplied(
+    std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
+    std::span<const std::byte> pixels) {
+    require_ui_thread("BGRA resource load");
+    return image_resources_.load_bgra32_premultiplied(
+        width, height, row_bytes, pixels);
+}
+
 ImageLoadResult Window::replace_png(ImageId image,
                                     std::span<const std::byte> encoded) {
     require_ui_thread("PNG resource replacement");
@@ -69,6 +189,23 @@ ImageLoadResult Window::replace_png(ImageId image,
     if (result) {
         add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
         paint_dirty_ = true;
+    }
+    return result;
+}
+
+ImageLoadResult Window::replace_bgra32_premultiplied(
+    ImageId image, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, std::span<const std::byte> pixels,
+    Control& consumer) {
+    require_ui_thread("scoped BGRA resource replacement");
+    if (consumer.window_ != this) {
+        throw std::invalid_argument(
+            "scoped BGRA replacement requires an attached consumer");
+    }
+    ImageLoadResult result = image_resources_.replace_bgra32_premultiplied(
+        image, width, height, row_bytes, pixels);
+    if (result) {
+        mark_dirty(consumer, Dirty::paint | Dirty::semantics);
     }
     return result;
 }
@@ -93,12 +230,19 @@ bool Window::remove_image(ImageId image) {
     if (!image_resources_.remove(image)) {
         return false;
     }
-    add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
-    paint_dirty_ = true;
+    // The unscoped removal API cannot know which retained display chunks
+    // reference this generational ID. Conservatively retire all cached paint
+    // chunks so a dead ImageId is never replayed into any renderer. Scoped
+    // replacement APIs remain available when the caller can name a consumer.
+    mark_subtree_dirty(*root_, Dirty::paint | Dirty::semantics);
     return true;
 }
 
 Window::~Window() {
+    while (!popups_.empty()) {
+        popups_.back()->disconnect();
+    }
+    focus_scopes_.clear();
     for (const auto& request : frame_requests_) {
         request->disconnect();
     }
@@ -106,6 +250,61 @@ Window::~Window() {
     update_frame_schedule_metrics();
     if (root_) {
         detach_subtree(root_);
+    }
+    lifetime_->window = nullptr;
+}
+
+PopupToken Window::open_popup(const Control::Ptr& owner,
+                              const Control::Ptr& popup,
+                              PopupOptions options) {
+    require_ui_thread("popup attachment");
+    const bool owner_available = owner && owner->window_ == this &&
+        owner->is_alive() && owner->effectively_visible() &&
+        (!options.require_enabled_owner || owner->effectively_enabled());
+    if (!owner_available) {
+        throw std::logic_error(
+            options.require_enabled_owner
+                ? "GUI.Forms popup requires an enabled, visible attached owner"
+                : "GUI.Forms passive popup requires a visible attached owner");
+    }
+    if (!popup || popup->window_ != nullptr || popup->parent() || !popup->is_alive()) {
+        throw std::logic_error("GUI.Forms popup must be a live detached root");
+    }
+    root_->add_child(popup);
+    auto attachment = std::make_shared<detail::PopupAttachment>(*this, owner, popup);
+    popups_.push_back(attachment);
+    owner->own_revocable(attachment);
+    return PopupToken(std::move(attachment));
+}
+
+void Window::close_popup(detail::PopupAttachment& popup) noexcept {
+    const auto found = std::find_if(popups_.begin(), popups_.end(),
+        [&popup](const auto& candidate) { return candidate.get() == &popup; });
+    if (found == popups_.end()) {
+        popup.revoke();
+        return;
+    }
+    const Control::Ptr overlay = (*found)->popup();
+    (*found)->revoke();
+    popups_.erase(found);
+    if (overlay && overlay->parent().get() == root_.get() &&
+        overlay->window_ == this && !in_lifecycle_notification_) {
+        try {
+            static_cast<void>(root_->remove_child(overlay->runtime_id()));
+        } catch (...) {
+        }
+    }
+}
+
+void Window::close_popups_for_subtree(const Control::Ptr& control) noexcept {
+    std::vector<std::shared_ptr<detail::PopupAttachment>> closing;
+    for (const auto& popup : popups_) {
+        if (contains_control(control, popup->owner())) {
+            closing.push_back(popup);
+        }
+    }
+    for (const auto& popup : closing) {
+        popup->disconnect();
     }
 }
 
@@ -245,16 +444,23 @@ bool Window::needs_frame() const noexcept {
 }
 
 std::optional<FrameTime> Window::next_wake() const noexcept {
-    if (occluded_) {
-        return std::nullopt;
-    }
     std::optional<FrameTime> result;
     for (const auto& request : frame_requests_) {
         if (!request->connected()) {
             continue;
         }
+        if (request->kind == detail::FrameRequestKind::ui_timer) {
+            if (!result || request->deadline < *result) {
+                result = request->deadline;
+            }
+            continue;
+        }
+        if (occluded_) {
+            continue;
+        }
         const auto target = request->target.lock();
-        if (!target || !target->is_alive() || target->window_ != this) {
+        if (!target || !target->is_alive() || target->window_ != this ||
+            !target->effectively_visible()) {
             continue;
         }
         if (!result || request->deadline < *result) {
@@ -307,26 +513,70 @@ FrameRequestToken Window::activate_surface(const Control::Ptr& control,
     return FrameRequestToken(request);
 }
 
+FrameRequestToken Window::schedule_ui_timer(
+    Component& owner, FrameInterval interval, FrameTime first_deadline,
+    std::function<void(FrameTime)> callback) {
+    require_ui_thread("UI timer scheduling");
+    if (!owner.is_alive()) {
+        throw std::logic_error("GUI.Forms UI timer requires a live component owner");
+    }
+    if (interval < minimum_ui_timer_interval) {
+        throw std::invalid_argument("GUI.Forms UI timer interval is below the bound");
+    }
+    if (!callback) {
+        throw std::invalid_argument("GUI.Forms UI timer requires a callback");
+    }
+    compact_frame_requests();
+    if (frame_requests_.size() >= maximum_scheduled_frame_requests) {
+        throw std::length_error("GUI.Forms scheduled frame request limit reached");
+    }
+    auto request = std::make_shared<detail::ScheduledFrameRequest>(
+        first_deadline, interval, std::move(callback));
+    frame_requests_.push_back(request);
+    owner.own_revocable(request);
+    metrics_.record_frame_request();
+    update_frame_schedule_metrics();
+    return FrameRequestToken(request);
+}
+
 FramePollResult Window::poll_frame_schedule(FrameTime now) {
     require_ui_thread("frame schedule polling");
     compact_frame_requests();
 
     FramePollResult result;
-    if (occluded_) {
-        result.damage_pending = needs_frame();
-        result.suppressed_by_occlusion = true;
-        metrics_.record_occluded_frame_poll();
-        update_frame_schedule_metrics();
-        return result;
-    }
+    result.suppressed_by_occlusion = occluded_;
+    if (occluded_) metrics_.record_occluded_frame_poll();
     std::unordered_set<std::uint64_t> invalidated_controls;
-    for (const auto& request : frame_requests_) {
+    std::unordered_set<std::uint64_t> frame_callbacks;
+    const auto requests = frame_requests_;
+    for (const auto& request : requests) {
         if (!request->connected() || request->deadline > now) {
+            continue;
+        }
+        if (request->kind == detail::FrameRequestKind::ui_timer) {
+            ++result.ui_timer_ticks;
+            const FrameInterval lateness = now - request->deadline;
+            const auto skipped = lateness / request->interval;
+            result.coalesced_requests += static_cast<std::uint64_t>(skipped);
+            request->deadline += request->interval * (skipped + 1);
+            metrics_.record_callback_emitted();
+            const auto callback = request->callback;
+            if (callback) callback(now);
+            continue;
+        }
+        if (occluded_) {
+            result.suppressed_by_occlusion = true;
             continue;
         }
         const auto target = request->target.lock();
         if (!target || !target->is_alive() || target->window_ != this) {
             request->disconnect();
+            continue;
+        }
+        if (!target->effectively_visible()) {
+            if (request->kind == detail::FrameRequestKind::active_surface) {
+                request->deadline = now + request->interval;
+            }
             continue;
         }
 
@@ -341,6 +591,14 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             // Never issue a burst of catch-up frames. A late active surface
             // emits one invalidation and starts its next interval from now.
             request->deadline = now + request->interval;
+        }
+
+        if (frame_callbacks.insert(target->runtime_id().value).second) {
+            metrics_.record_callback_emitted();
+            target->on_frame(now);
+            if (!target->is_alive() || target->window_ != this) {
+                continue;
+            }
         }
 
         const bool already_requested = has_dirty(target->dirty_, Dirty::paint) ||
@@ -389,6 +647,14 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
     update_frame_schedule_metrics();
 }
 
+bool Window::check_access() const noexcept {
+    return std::this_thread::get_id() == ui_thread_;
+}
+
+void Window::verify_access(std::string_view operation) {
+    require_ui_thread(operation);
+}
+
 Control::Ptr Window::find(std::string_view stable_id) const {
     const auto found = stable_ids_.find(std::string(stable_id));
     return found == stable_ids_.end() ? Control::Ptr{} : found->second.lock();
@@ -405,6 +671,10 @@ bool Window::request_focus(const Control::Ptr& control) {
     if (control && (!eligible(control) || !control->focusable_)) {
         return false;
     }
+    if (control && !focus_allowed_by_active_scope(control)) {
+        metrics_.record_focus_scope_rejection();
+        return false;
+    }
     Control::Ptr previous = focused_.lock();
     if (previous == control) {
         return true;
@@ -413,6 +683,7 @@ bool Window::request_focus(const Control::Ptr& control) {
         focused_.reset();
         metrics_.record_callback_emitted();
         previous->on_focus_changed(false);
+        if (previous->is_alive()) previous->focus_observed_.emit(false);
         if (previous->is_alive()) {
             previous->invalidate(invalidation::focus);
         }
@@ -421,6 +692,7 @@ bool Window::request_focus(const Control::Ptr& control) {
         focused_ = control;
         metrics_.record_callback_emitted();
         control->on_focus_changed(true);
+        if (control->is_alive()) control->focus_observed_.emit(true);
         if (eligible(control)) {
             control->invalidate(invalidation::focus);
         } else {
@@ -429,6 +701,212 @@ bool Window::request_focus(const Control::Ptr& control) {
     }
     metrics_.record_focus_transition();
     return true;
+}
+
+FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
+                                       const Control::Ptr& preferred_focus,
+                                       FocusScopeOptions options) {
+    require_ui_thread("focus-scope entry");
+    if (!root || !eligible(root)) {
+        throw std::logic_error(
+            "GUI.Forms focus scope requires an eligible attached root");
+    }
+    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+         ++current) {
+        if (!current->active) {
+            continue;
+        }
+        if (current->options.contain_focus &&
+            !contains_control(current->root.lock(), root)) {
+            throw std::logic_error(
+                "GUI.Forms nested focus scope must remain inside its containing scope");
+        }
+        break;
+    }
+    if (focus_scope_depth() >= maximum_focus_scope_depth) {
+        throw std::length_error("GUI.Forms focus-scope nesting limit reached");
+    }
+    if (preferred_focus &&
+        (!contains_control(root, preferred_focus) || !eligible(preferred_focus) ||
+         !preferred_focus->focusable_)) {
+        throw std::invalid_argument(
+            "GUI.Forms preferred focus must be an eligible focusable scope descendant");
+    }
+
+    FocusScopeState state;
+    state.id = FocusScopeId{next_focus_scope_id_++};
+    if (!state.id) {
+        state.id = FocusScopeId{next_focus_scope_id_++};
+    }
+    state.root = root;
+    state.previous_focus = focused_;
+    state.stable_id = std::string(root->stable_id().value());
+    state.root_id = root->runtime_id();
+    state.options = options;
+    focus_scopes_.push_back(state);
+
+    const std::size_t depth = focus_scope_depth();
+    metrics_.record_focus_scope_opened(depth);
+    FocusScopeChange change;
+    change.scope = state.id;
+    change.root_id = state.root_id;
+    change.stable_id = state.stable_id;
+    change.depth = depth;
+    change.opened = true;
+    focus_scope_changed_.emit(change);
+
+    const bool remains_active = std::any_of(
+        focus_scopes_.begin(), focus_scopes_.end(),
+        [id = state.id](const FocusScopeState& candidate) {
+            return candidate.id == id && candidate.active;
+        });
+    if (!remains_active) {
+        return state.id;
+    }
+
+    if (preferred_focus) {
+        static_cast<void>(request_focus(preferred_focus));
+    } else if (options.focus_first &&
+               !contains_control(root, focused_.lock())) {
+        static_cast<void>(move_focus(true));
+    }
+    return state.id;
+}
+
+bool Window::end_focus_scope(FocusScopeId scope,
+                             FocusScopeCloseReason reason) {
+    require_ui_thread("focus-scope exit");
+    const auto found = std::find_if(
+        focus_scopes_.begin(), focus_scopes_.end(),
+        [scope](const FocusScopeState& state) {
+            return state.id == scope && state.active;
+        });
+    if (found == focus_scopes_.end()) {
+        return false;
+    }
+
+    const FocusScopeId closed_id = found->id;
+    const RuntimeId closed_root_id = found->root_id;
+    const std::string closed_stable_id = found->stable_id;
+    found->active = false;
+    const bool closes_top = std::next(found) == focus_scopes_.end();
+
+    bool restored = false;
+    if (closes_top) {
+        Control::Ptr restoration;
+        bool restoration_requested = false;
+        while (!focus_scopes_.empty() && !focus_scopes_.back().active) {
+            const FocusScopeState& removed = focus_scopes_.back();
+            if (removed.options.restore_focus) {
+                restoration = removed.previous_focus.lock();
+                restoration_requested = true;
+            }
+            focus_scopes_.pop_back();
+        }
+
+        if (restoration_requested) {
+            if (restoration && eligible(restoration) && restoration->focusable_ &&
+                focus_allowed_by_active_scope(restoration)) {
+                restored = request_focus(restoration) &&
+                           focused_.lock() == restoration;
+            } else if (const Control::Ptr active_root = active_focus_scope_root()) {
+                if (!contains_control(active_root, focused_.lock())) {
+                    static_cast<void>(move_focus(true));
+                }
+            } else {
+                static_cast<void>(request_focus({}));
+            }
+        } else if (!focus_allowed_by_active_scope(focused_.lock())) {
+            static_cast<void>(move_focus(true));
+        }
+    }
+
+    const std::size_t depth = focus_scope_depth();
+    metrics_.record_focus_scope_closed(restored, depth);
+    FocusScopeChange change;
+    change.scope = closed_id;
+    change.root_id = closed_root_id;
+    change.stable_id = closed_stable_id;
+    change.depth = depth;
+    change.close_reason = reason;
+    change.restored_focus = restored;
+    focus_scope_changed_.emit(change);
+    return true;
+}
+
+std::size_t Window::focus_scope_depth() const noexcept {
+    return static_cast<std::size_t>(std::count_if(
+        focus_scopes_.begin(), focus_scopes_.end(),
+        [](const FocusScopeState& state) { return state.active; }));
+}
+
+Control::Ptr Window::active_focus_scope_root() const noexcept {
+    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+         ++current) {
+        if (current->active) {
+            return current->root.lock();
+        }
+    }
+    return {};
+}
+
+bool Window::focus_allowed_by_active_scope(
+    const Control::Ptr& control) const noexcept {
+    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+         ++current) {
+        if (!current->active) {
+            continue;
+        }
+        if (!current->options.contain_focus || !control) {
+            return true;
+        }
+        return contains_control(current->root.lock(), control);
+    }
+    return true;
+}
+
+std::vector<Control::Ptr> Window::focus_candidates(
+    const Control::Ptr& scope_root) const {
+    std::vector<Control::Ptr> result;
+    std::function<void(const Control::Ptr&)> collect =
+        [&](const Control::Ptr& control) {
+            if (!control || !eligible(control)) {
+                return;
+            }
+            if (control->focusable_) {
+                result.push_back(control);
+            }
+            for (const Control::Ptr& child : control->children_) {
+                collect(child);
+            }
+        };
+    collect(scope_root);
+    return result;
+}
+
+bool Window::move_focus(bool forward) {
+    require_ui_thread("focus traversal");
+    const Control::Ptr scope_root = active_focus_scope_root();
+    std::vector<Control::Ptr> candidates =
+        focus_candidates(scope_root ? scope_root : root_);
+    if (candidates.empty()) {
+        return false;
+    }
+    const Control::Ptr current = focused_.lock();
+    const auto found = std::find(candidates.begin(), candidates.end(), current);
+    std::size_t index = 0;
+    if (found == candidates.end()) {
+        index = forward ? 0U : candidates.size() - 1U;
+    } else if (forward) {
+        index = (static_cast<std::size_t>(found - candidates.begin()) + 1U) %
+                candidates.size();
+    } else {
+        const std::size_t current_index =
+            static_cast<std::size_t>(found - candidates.begin());
+        index = current_index == 0U ? candidates.size() - 1U
+                                   : current_index - 1U;
+    }
+    return request_focus(candidates[index]);
 }
 
 void Window::capture_pointer(const Control::Ptr& control, std::uint64_t pointer_id) {
@@ -581,9 +1059,14 @@ bool Window::dispatch_pointer(PointerEvent event) {
 bool Window::dispatch_key(KeyEvent event) {
     require_ui_thread("key dispatch");
     metrics_.record_input();
+    const bool traversal_key = event.action == KeyAction::down &&
+        event.physical_key == PhysicalKey::tab;
+    const bool forward =
+        (static_cast<std::uint8_t>(event.modifiers) &
+         static_cast<std::uint8_t>(Modifier::shift)) == 0U;
     Control::Ptr target = focused_.lock();
     if (!target || !eligible(target)) {
-        return false;
+        return traversal_key && move_focus(forward);
     }
     const auto route = route_to(target);
     event.phase = EventPhase::preview;
@@ -615,6 +1098,9 @@ bool Window::dispatch_key(KeyEvent event) {
                 break;
             }
         }
+    }
+    if (!event.handled && traversal_key) {
+        return move_focus(forward);
     }
     return event.handled;
 }
@@ -811,6 +1297,8 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
 
 void Window::detach_subtree(const Control::Ptr& control) {
     require_ui_thread("visual-tree detachment");
+    close_popups_for_subtree(control);
+    close_focus_scopes_for_subtree(control);
     revoke_interaction_for_subtree(control, true);
     if (control->window_ != this) {
         return;
@@ -835,6 +1323,8 @@ void Window::detach_subtree(const Control::Ptr& control) {
     }
     in_lifecycle_notification_ = false;
     paint_dirty_ = true;
+    ++semantic_generation_;
+    if (semantic_generation_ == 0U) ++semantic_generation_;
     metrics_.record_dirty_mark(old_bounds.area());
     metrics_.set_population(stable_ids_.size(), stable_ids_.size());
     update_display_cache_metrics();
@@ -842,6 +1332,7 @@ void Window::detach_subtree(const Control::Ptr& control) {
 
 void Window::dispose_subtree(const Control::Ptr& control) noexcept {
     const std::uint64_t disposal_count = control->subtree_size();
+    revoke_focus_scopes_for_subtree(control);
     revoke_interaction_for_subtree(control, false);
     const Rect old_bounds = absolute_bounds_of(*control);
     add_subtree_damage(control);
@@ -868,11 +1359,20 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
         if (found != visual_parent->children_.end()) {
             visual_parent->children_.erase(found);
         }
+        // Explicit child disposal is also a structural mutation of its live
+        // parent. Retire the parent's retained layout/paint chunk now; merely
+        // setting the Window-level dirty booleans leaves recursive layout with
+        // no dirty node to visit and composites cannot reconcile their model.
+        if (visual_parent->is_alive()) {
+            mark_dirty(*visual_parent, invalidation::visual_tree);
+        }
     }
     control->parent_.reset();
     paint_dirty_ = true;
     layout_dirty_ = true;
     hit_test_dirty_ = true;
+    ++semantic_generation_;
+    if (semantic_generation_ == 0U) ++semantic_generation_;
     metrics_.record_dirty_mark(old_bounds.area());
     metrics_.record_disposal(disposal_count);
     metrics_.set_population(stable_ids_.size(), stable_ids_.size());
@@ -890,6 +1390,7 @@ void Window::revoke_interaction_for_subtree(const Control::Ptr& control,
         if (notify_focus && focused && focused->is_alive()) {
             metrics_.record_callback_emitted();
             focused->on_focus_changed(false);
+            if (focused->is_alive()) focused->focus_observed_.emit(false);
             if (focused->is_alive()) {
                 focused->invalidate(invalidation::focus);
             }
@@ -910,8 +1411,42 @@ void Window::revoke_interaction_for_subtree(const Control::Ptr& control,
     }
 }
 
+void Window::close_focus_scopes_for_subtree(const Control::Ptr& control) {
+    std::vector<FocusScopeId> closing;
+    closing.reserve(focus_scopes_.size());
+    for (const FocusScopeState& state : focus_scopes_) {
+        if (state.active && contains_control(control, state.root.lock())) {
+            closing.push_back(state.id);
+        }
+    }
+    for (FocusScopeId scope : closing) {
+        static_cast<void>(end_focus_scope(
+            scope, FocusScopeCloseReason::owner_unavailable));
+    }
+}
+
+void Window::revoke_focus_scopes_for_subtree(
+    const Control::Ptr& control) noexcept {
+    std::size_t closed = 0;
+    focus_scopes_.erase(
+        std::remove_if(
+            focus_scopes_.begin(), focus_scopes_.end(),
+            [&](const FocusScopeState& state) {
+                const bool remove = state.active &&
+                    contains_control(control, state.root.lock());
+                closed += remove ? 1U : 0U;
+                return remove;
+            }),
+        focus_scopes_.end());
+    while (closed-- > 0U) {
+        metrics_.record_focus_scope_closed(false, focus_scope_depth());
+    }
+}
+
 void Window::on_eligibility_changed(const Control::Ptr& control) {
     require_ui_thread("eligibility mutation");
+    close_popups_for_subtree(control);
+    close_focus_scopes_for_subtree(control);
     revoke_interaction_for_subtree(control, true);
 }
 
@@ -969,6 +1504,10 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     if (has_dirty(requested_dirty, Dirty::hit_test)) {
         hit_test_dirty_ = true;
     }
+    if (has_dirty(requested_dirty, Dirty::semantics)) {
+        ++semantic_generation_;
+        if (semantic_generation_ == 0U) ++semantic_generation_;
+    }
     if (has_dirty(requested_dirty, Dirty::paint)) {
         paint_dirty_ = true;
         Rect bounds = absolute_bounds_of(control);
@@ -980,6 +1519,29 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     } else {
         metrics_.record_dirty_mark(0.0);
     }
+}
+
+SemanticSnapshot Window::semantic_snapshot() {
+    require_ui_thread("semantic snapshot");
+    ensure_layout(true);
+    SemanticSnapshot snapshot;
+    snapshot.generation = semantic_generation_;
+    append_semantic_nodes(root_, focused_.lock(), snapshot.roots,
+                          snapshot.node_count);
+    return snapshot;
+}
+
+bool Window::perform_semantic_action(std::string_view stable_id,
+                                     SemanticAction action,
+                                     std::string_view value) {
+    require_ui_thread("semantic action");
+    const Control::Ptr control = find(stable_id);
+    if (!control) {
+        return dispatch_semantic_child_action(root_, stable_id, action, value);
+    }
+    if (!eligible(control)) return false;
+    if (action == SemanticAction::focus) return request_focus(control);
+    return control->on_semantic_action(action, value);
 }
 
 void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
@@ -1203,6 +1765,7 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
             add_damage(old_bounds, control->paint_plane_);
             add_damage(new_bounds, control->paint_plane_);
             paint_dirty_ = true;
+            control->arranged_bounds_changed_.emit(new_bounds);
         }
     }
     for (const auto& child : control->children_) {
@@ -1314,6 +1877,9 @@ void Window::update_display_cache_metrics() noexcept {
 
 void Window::compact_frame_requests() noexcept {
     for (const auto& request : frame_requests_) {
+        if (request->kind == detail::FrameRequestKind::ui_timer) {
+            continue;
+        }
         const auto target = request->target.lock();
         if (!target || !target->is_alive() || target->window_ != this) {
             request->disconnect();

@@ -5,30 +5,30 @@ namespace System.Drawing {
     [global::System.ComponentModel.TypeConverter(typeof(global::System.Drawing.ImageConverter))]
     public partial class Bitmap : global::System.Drawing.Image, global::System.IDisposable {
         public Bitmap() { }
-        public Bitmap(global::System.Drawing.Image original) { if (original is null) throw new global::System.ArgumentNullException(nameof(original)); __width = original.Width; __height = original.Height; __pixelFormat = original.PixelFormat; __bitmap = NativeDrawingBridge.BitmapClone(original.__BitmapHandle, 0, 0, __width, __height); }
-        public Bitmap(global::System.IO.Stream stream) { if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); using var copy = new global::System.IO.MemoryStream(); stream.CopyTo(copy); var decoded = NativeDrawingBridge.DecodePng(copy.ToArray()); __width = decoded.__width; __height = decoded.__height; __pixelFormat = decoded.__pixelFormat; __bitmap = decoded.__bitmap; decoded.__bitmap = default; decoded.Dispose(); }
-        public Bitmap(int width, int height) { if (width <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(width)); if (height <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(height)); __width = width; __height = height; __pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb; __bitmap = NativeDrawingBridge.BitmapCreate(width, height); }
-        public Bitmap(int width, int height, global::System.Drawing.Imaging.PixelFormat format) { if (width <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(width)); if (height <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(height)); __width = width; __height = height; __pixelFormat = format; __bitmap = NativeDrawingBridge.BitmapCreate(width, height); }
-        public global::System.Drawing.Color GetPixel(int x, int y) { return NativeDrawingBridge.BitmapGetPixel(__bitmap, x, y); }
-        public global::System.Drawing.Imaging.BitmapData LockBits(global::System.Drawing.Rectangle rect, global::System.Drawing.Imaging.ImageLockMode flags, global::System.Drawing.Imaging.PixelFormat format) { return NativeDrawingBridge.BitmapLock(__bitmap, flags); }
-        public nint GetHbitmap(global::System.Drawing.Color background) { return NativeDrawingBridge.GetHbitmap(this, background); }
-        public void MakeTransparent(global::System.Drawing.Color transparentColor) { NativeDrawingBridge.BitmapMakeTransparent(__bitmap, transparentColor); }
-        public void UnlockBits(global::System.Drawing.Imaging.BitmapData bitmapdata) { if (bitmapdata is null) throw new global::System.ArgumentNullException(nameof(bitmapdata)); NativeDrawingBridge.BitmapUnlock(__bitmap, bitmapdata); }
+        public Bitmap(global::System.Drawing.Image original) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Drawing.Image)");  if (original is null) throw new global::System.ArgumentNullException(nameof(original)); __width = original.Width; __height = original.Height; __pixelFormat = original.PixelFormat; __bitmap = NativeDrawingBridge.BitmapClone(original.__BitmapHandle, 0, 0, __width, __height); }
+        public Bitmap(global::System.IO.Stream stream) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.IO.Stream)");  if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); using var copy = new global::System.IO.MemoryStream(); stream.CopyTo(copy); var decoded = NativeDrawingBridge.DecodePng(copy.ToArray()); __width = decoded.__width; __height = decoded.__height; __pixelFormat = decoded.__pixelFormat; __bitmap = decoded.__bitmap; decoded.__bitmap = default; decoded.Dispose(); }
+        public Bitmap(int width, int height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Int32,System.Int32)");  if (width <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(width)); if (height <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(height)); __width = width; __height = height; __pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb; __bitmap = NativeDrawingBridge.BitmapCreate(width, height); }
+        public Bitmap(int width, int height, global::System.Drawing.Imaging.PixelFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Int32,System.Int32,System.Drawing.Imaging.PixelFormat)");  if (width <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(width)); if (height <= 0) throw new global::System.ArgumentOutOfRangeException(nameof(height)); __width = width; __height = height; __pixelFormat = format; __bitmap = NativeDrawingBridge.BitmapCreate(width, height); }
+        public global::System.Drawing.Color GetPixel(int x, int y) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|GetPixel|System.Drawing.Color (System.Int32,System.Int32)");  __FlushGraphics(); return NativeDrawingBridge.BitmapGetPixel(__bitmap, x, y); }
+        public global::System.Drawing.Imaging.BitmapData LockBits(global::System.Drawing.Rectangle rect, global::System.Drawing.Imaging.ImageLockMode flags, global::System.Drawing.Imaging.PixelFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|LockBits|System.Drawing.Imaging.BitmapData (System.Drawing.Rectangle,System.Drawing.Imaging.ImageLockMode,System.Drawing.Imaging.PixelFormat)");  __FlushGraphics(); return NativeDrawingBridge.BitmapLock(__bitmap, flags); }
+        public nint GetHbitmap(global::System.Drawing.Color background) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|GetHbitmap|System.IntPtr (System.Drawing.Color)");  __FlushGraphics(); return NativeDrawingBridge.GetHbitmap(this, background); }
+        public void MakeTransparent(global::System.Drawing.Color transparentColor) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|MakeTransparent|System.Void (System.Drawing.Color)");  __FlushGraphics(); NativeDrawingBridge.BitmapMakeTransparent(__bitmap, transparentColor); }
+        public void UnlockBits(global::System.Drawing.Imaging.BitmapData bitmapdata) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Bitmap|UnlockBits|System.Void (System.Drawing.Imaging.BitmapData)");  if (bitmapdata is null) throw new global::System.ArgumentNullException(nameof(bitmapdata)); NativeDrawingBridge.BitmapUnlock(__bitmap, bitmapdata); }
     }
     public abstract partial class Brush : global::System.MarshalByRefObject, global::System.IDisposable {
         internal NativeDrawingBridge.Handle __handle;
         internal global::System.Drawing.Color __color;
         internal bool __brushDisposed;
         public Brush() { }
-        public void Dispose() { if (__brushDisposed) return; __brushDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brush|Dispose|System.Void ()");  if (__brushDisposed) return; __brushDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
     }
     public static partial class Brushes {
-        public static global::System.Drawing.Brush Black { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Black")); } }
-        public static global::System.Drawing.Brush Gainsboro { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Gainsboro")); } }
-        public static global::System.Drawing.Brush Red { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Red")); } }
-        public static global::System.Drawing.Brush Transparent { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Transparent")); } }
-        public static global::System.Drawing.Brush White { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("White")); } }
-        public static global::System.Drawing.Brush Yellow { get { return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Yellow")); } }
+        public static global::System.Drawing.Brush Black { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_Black|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Black")); } }
+        public static global::System.Drawing.Brush Gainsboro { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_Gainsboro|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Gainsboro")); } }
+        public static global::System.Drawing.Brush Red { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_Red|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Red")); } }
+        public static global::System.Drawing.Brush Transparent { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_Transparent|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Transparent")); } }
+        public static global::System.Drawing.Brush White { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_White|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("White")); } }
+        public static global::System.Drawing.Brush Yellow { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Brushes|get_Yellow|System.Drawing.Brush ()");  return new global::System.Drawing.SolidBrush(global::System.Drawing.Color.FromName("Yellow")); } }
     }
     public enum ContentAlignment : int {
         TopLeft = 1,
@@ -49,17 +49,17 @@ namespace System.Drawing {
         internal global::System.Drawing.GraphicsUnit __unit = global::System.Drawing.GraphicsUnit.Point;
         internal bool __fontDisposed;
         public Font() { }
-        public Font(global::System.Drawing.Font prototype, global::System.Drawing.FontStyle newStyle) { if (prototype is null) throw new global::System.ArgumentNullException(nameof(prototype)); __family = prototype.__family; __size = prototype.__size; __style = newStyle; __unit = prototype.__unit; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, 1); }
-        public Font(string familyName, float emSize) { __family = familyName ?? throw new global::System.ArgumentNullException(nameof(familyName)); __size = emSize; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, 1); }
-        public Font(string familyName, float emSize, global::System.Drawing.FontStyle style, global::System.Drawing.GraphicsUnit unit, byte gdiCharSet) { __family = familyName ?? throw new global::System.ArgumentNullException(nameof(familyName)); __size = emSize; __style = style; __unit = unit; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, gdiCharSet); }
-        public int Height { get { return global::System.Math.Max(1, (int)global::System.Math.Ceiling(__size * 1.2f)); } }
-        public void Dispose() { if (__fontDisposed) return; __fontDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public Font(global::System.Drawing.Font prototype, global::System.Drawing.FontStyle newStyle) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.Drawing.Font,System.Drawing.FontStyle)");  if (prototype is null) throw new global::System.ArgumentNullException(nameof(prototype)); __family = prototype.__family; __size = prototype.__size; __style = newStyle; __unit = prototype.__unit; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, 1); }
+        public Font(string familyName, float emSize) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.String,System.Single)");  __family = familyName ?? throw new global::System.ArgumentNullException(nameof(familyName)); __size = emSize; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, 1); }
+        public Font(string familyName, float emSize, global::System.Drawing.FontStyle style, global::System.Drawing.GraphicsUnit unit, byte gdiCharSet) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.String,System.Single,System.Drawing.FontStyle,System.Drawing.GraphicsUnit,System.Byte)");  __family = familyName ?? throw new global::System.ArgumentNullException(nameof(familyName)); __size = emSize; __style = style; __unit = unit; __handle = NativeDrawingBridge.FontCreate(__family, __size, __style, __unit, gdiCharSet); }
+        public int Height { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Font|get_Height|System.Int32 ()");  return global::System.Math.Max(1, (int)global::System.Math.Ceiling(NativeDrawingBridge.FontPixelSize(__size, __unit) * 1.2f)); } }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Font|Dispose|System.Void ()");  if (__fontDisposed) return; __fontDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
     }
     public partial class FontFamily : global::System.MarshalByRefObject, global::System.IDisposable {
         internal string __name = "Lucida Grande";
         public FontFamily() { }
-        public FontFamily(string name) { __name = name ?? throw new global::System.ArgumentNullException(nameof(name)); }
-        public void Dispose() { }
+        public FontFamily(string name) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.FontFamily|.ctor|System.Void (System.String)");  __name = name ?? throw new global::System.ArgumentNullException(nameof(name)); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.FontFamily|Dispose|System.Void ()");  }
     }
     public enum FontStyle : int {
         Regular = 0,
@@ -70,6 +70,7 @@ namespace System.Drawing {
     }
     public partial class Graphics : global::System.MarshalByRefObject, global::System.IDisposable, global::System.Drawing.IDeviceContext {
         internal NativeDrawingBridge.Handle __recorder;
+        internal ulong __executedCommands;
         internal void __EnsureRecorder() { if (__recorder.IsNull) __recorder = NativeDrawingBridge.RecorderCreate(); }
         internal global::System.Drawing.Image? __target;
         internal nint __nativeSurface;
@@ -84,61 +85,61 @@ namespace System.Drawing {
         internal global::System.Drawing.Drawing2D.CompositingQuality __compositingQuality;
         internal global::System.Drawing.Drawing2D.Matrix __transform = new global::System.Drawing.Drawing2D.Matrix();
         public Graphics() { }
-        public global::System.Drawing.RectangleF ClipBounds { get { return __target is null ? global::System.Drawing.RectangleF.Empty : new global::System.Drawing.RectangleF(0, 0, __target.Width, __target.Height); } }
-        public global::System.Drawing.Drawing2D.CompositingMode CompositingMode { set { __compositing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
-        public global::System.Drawing.Drawing2D.CompositingQuality CompositingQuality { set { __compositingQuality = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
-        public global::System.Drawing.Drawing2D.InterpolationMode InterpolationMode { get { return __interpolation; } set { __interpolation = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
-        public global::System.Drawing.Drawing2D.PixelOffsetMode PixelOffsetMode { set { __pixelOffset = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
-        public global::System.Drawing.Drawing2D.SmoothingMode SmoothingMode { get { return __smoothing; } set { __smoothing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
-        public global::System.Drawing.Drawing2D.Matrix Transform { get { return __transform; } set { __transform = value ?? throw new global::System.ArgumentNullException(nameof(value)); __EnsureRecorder(); NativeDrawingBridge.RecorderSetTransform(__recorder, __transform); } }
-        public bool IsVisible(global::System.Drawing.PointF point) { __EnsureRecorder(); return NativeDrawingBridge.RecorderIsVisible(__recorder, point); }
-        public global::System.Drawing.Drawing2D.GraphicsState Save() { __EnsureRecorder(); return new global::System.Drawing.Drawing2D.GraphicsState { __token = NativeDrawingBridge.RecorderSave(__recorder) }; }
-        public static global::System.Drawing.Graphics FromImage(global::System.Drawing.Image image) { if (image is null) throw new global::System.ArgumentNullException(nameof(image)); if (image.__BitmapHandle.IsNull) throw new global::System.ArgumentException("Image has no native bitmap.", nameof(image)); return new global::System.Drawing.Graphics { __target = image }; }
-        public static global::System.Drawing.Graphics FromHdc(nint hdc) { return NativeDrawingBridge.GraphicsFromNativeSurface(hdc, 0); }
-        public static global::System.Drawing.Graphics FromHdcInternal(nint hdc) { return NativeDrawingBridge.GraphicsFromNativeSurface(hdc, 0); }
-        public static global::System.Drawing.Graphics FromHwnd(nint hwnd) { return NativeDrawingBridge.GraphicsFromNativeSurface(hwnd, 1); }
-        public global::System.Drawing.SizeF MeasureString(string text, global::System.Drawing.Font font) { if (global::System.String.IsNullOrEmpty(text)) return global::System.Drawing.SizeF.Empty; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var measured = new global::System.Drawing.SizeF(text.Length * font.__size * 0.55f, font.Height); return measured; }
-        public global::System.Drawing.SizeF MeasureString(string text, global::System.Drawing.Font font, int width, global::System.Drawing.StringFormat format) { if (global::System.String.IsNullOrEmpty(text)) return global::System.Drawing.SizeF.Empty; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); var measured = new global::System.Drawing.SizeF(text.Length * font.__size * 0.55f, font.Height); return new global::System.Drawing.SizeF(global::System.Math.Min(width, measured.Width), measured.Height); }
-        public nint GetHdc() { return NativeDrawingBridge.GetHdc(this); }
-        public void Dispose() { if (__graphicsDisposed) return; __graphicsDisposed = true; try { if (__hdcLeaseToken != 0) NativeDrawingBridge.ReleaseHdc(this, __leasedHdc); if (__target is not null && !__recorder.IsNull) { NativeDrawingBridge.Execute(__recorder, __target.__BitmapHandle); if (__nativeSurface != 0) NativeDrawingBridge.PresentNativeSurface(this); } } finally { NativeDrawingBridge.Release(ref __recorder); if (__nativeSurface != 0) __target?.Dispose(); __target = null; __nativeSurface = 0; global::System.GC.SuppressFinalize(this); } }
-        public void Flush() { }
-        public void FillPath(global::System.Drawing.Brush brush, global::System.Drawing.Drawing2D.GraphicsPath path) { if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __EnsureRecorder(); NativeDrawingBridge.FillPath(__recorder, brush.__handle, path.__handle); }
-        public void FillPolygon(global::System.Drawing.Brush brush, global::System.Drawing.PointF[] points) { if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }
-        public void FillPolygon(global::System.Drawing.Brush brush, global::System.Drawing.Point[] points) { if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }
-        public void FillRectangle(global::System.Drawing.Brush brush, global::System.Drawing.Rectangle rect) { __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void FillRectangle(global::System.Drawing.Brush brush, global::System.Drawing.RectangleF rect) { __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, rect); }
-        public void FillRectangles(global::System.Drawing.Brush brush, global::System.Drawing.Rectangle[] rects) { if (rects is null) throw new global::System.ArgumentNullException(nameof(rects)); __EnsureRecorder(); foreach (var rect in rects) NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void FillRectangle(global::System.Drawing.Brush brush, int x, int y, int width, int height) { __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
-        public void FillEllipse(global::System.Drawing.Brush brush, float x, float y, float width, float height) { __EnsureRecorder(); NativeDrawingBridge.FillEllipse(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
-        public void FillRectangle(global::System.Drawing.Brush brush, float x, float y, float width, float height) { __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
-        public void Clear(global::System.Drawing.Color color) { __EnsureRecorder(); NativeDrawingBridge.RecorderClear(__recorder, color); }
-        public void Restore(global::System.Drawing.Drawing2D.GraphicsState gstate) { if (gstate is null) throw new global::System.ArgumentNullException(nameof(gstate)); __EnsureRecorder(); NativeDrawingBridge.RecorderRestore(__recorder, gstate.__token); }
-        public void DrawIcon(global::System.Drawing.Icon icon, global::System.Drawing.Rectangle targetRect) { if (icon is null) throw new global::System.ArgumentNullException(nameof(icon)); using var image = icon.ToBitmap(); DrawImage(image, targetRect); }
-        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle rect) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
-        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, global::System.Drawing.Rectangle srcRect, global::System.Drawing.GraphicsUnit srcUnit) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height), null); }
-        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight, global::System.Drawing.GraphicsUnit srcUnit, global::System.Drawing.Imaging.ImageAttributes imageAttr) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), imageAttr); }
-        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, float srcX, float srcY, float srcWidth, float srcHeight, global::System.Drawing.GraphicsUnit srcUnit, global::System.Drawing.Imaging.ImageAttributes imageAttrs) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), imageAttrs); }
-        public void DrawImage(global::System.Drawing.Image image, int x, int y) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
-        public void DrawImageUnscaled(global::System.Drawing.Image image, int x, int y) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
-        public void DrawImage(global::System.Drawing.Image image, int x, int y, int width, int height) { __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, width, height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
-        public void DrawPath(global::System.Drawing.Pen pen, global::System.Drawing.Drawing2D.GraphicsPath path) { if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __EnsureRecorder(); NativeDrawingBridge.DrawPath(__recorder, pen.__handle, path.__handle); }
-        public void DrawLine(global::System.Drawing.Pen pen, global::System.Drawing.Point pt1, global::System.Drawing.Point pt2) { __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }
-        public void DrawLine(global::System.Drawing.Pen pen, global::System.Drawing.PointF pt1, global::System.Drawing.PointF pt2) { __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }
-        public void DrawLines(global::System.Drawing.Pen pen, global::System.Drawing.PointF[] points) { if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }
-        public void DrawLines(global::System.Drawing.Pen pen, global::System.Drawing.Point[] points) { if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }
-        public void DrawRectangle(global::System.Drawing.Pen pen, global::System.Drawing.Rectangle rect) { __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void DrawLine(global::System.Drawing.Pen pen, int x1, int y1, int x2, int y2) { __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
-        public void DrawRectangle(global::System.Drawing.Pen pen, int x, int y, int width, int height) { __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
-        public void DrawEllipse(global::System.Drawing.Pen pen, float x, float y, float width, float height) { __EnsureRecorder(); NativeDrawingBridge.DrawEllipse(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
-        public void DrawLine(global::System.Drawing.Pen pen, float x1, float y1, float x2, float y2) { __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
-        public void SetClip(global::System.Drawing.Rectangle rect) { __EnsureRecorder(); NativeDrawingBridge.RecorderSetClip(__recorder, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void ReleaseHdc(nint hdc) { NativeDrawingBridge.ReleaseHdc(this, hdc); }
-        public void TranslateTransform(float dx, float dy) { __transform.Translate(dx, dy); __EnsureRecorder(); NativeDrawingBridge.RecorderTranslate(__recorder, dx, dy); }
-        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.PointF point) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, null); }
-        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.PointF point, global::System.Drawing.StringFormat format) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, format); }
-        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.RectangleF layoutRectangle) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, null); }
-        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.RectangleF layoutRectangle, global::System.Drawing.StringFormat format) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, format); }
-        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, float x, float y) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, new global::System.Drawing.PointF(x, y), null); }
+        public global::System.Drawing.RectangleF ClipBounds { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|get_ClipBounds|System.Drawing.RectangleF ()");  return __target is null ? global::System.Drawing.RectangleF.Empty : new global::System.Drawing.RectangleF(0, 0, __target.Width, __target.Height); } }
+        public global::System.Drawing.Drawing2D.CompositingMode CompositingMode { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_CompositingMode|System.Void (System.Drawing.Drawing2D.CompositingMode)");  __compositing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
+        public global::System.Drawing.Drawing2D.CompositingQuality CompositingQuality { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_CompositingQuality|System.Void (System.Drawing.Drawing2D.CompositingQuality)");  __compositingQuality = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
+        public global::System.Drawing.Drawing2D.InterpolationMode InterpolationMode { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|get_InterpolationMode|System.Drawing.Drawing2D.InterpolationMode ()");  return __interpolation; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_InterpolationMode|System.Void (System.Drawing.Drawing2D.InterpolationMode)");  __interpolation = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
+        public global::System.Drawing.Drawing2D.PixelOffsetMode PixelOffsetMode { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_PixelOffsetMode|System.Void (System.Drawing.Drawing2D.PixelOffsetMode)");  __pixelOffset = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
+        public global::System.Drawing.Drawing2D.SmoothingMode SmoothingMode { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|get_SmoothingMode|System.Drawing.Drawing2D.SmoothingMode ()");  return __smoothing; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_SmoothingMode|System.Void (System.Drawing.Drawing2D.SmoothingMode)");  __smoothing = value; __EnsureRecorder(); NativeDrawingBridge.RecorderQuality(this); } }
+        public global::System.Drawing.Drawing2D.Matrix Transform { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|get_Transform|System.Drawing.Drawing2D.Matrix ()");  return __transform; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|set_Transform|System.Void (System.Drawing.Drawing2D.Matrix)");  __transform = value ?? throw new global::System.ArgumentNullException(nameof(value)); __EnsureRecorder(); NativeDrawingBridge.RecorderSetTransform(__recorder, __transform); } }
+        public bool IsVisible(global::System.Drawing.PointF point) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|IsVisible|System.Boolean (System.Drawing.PointF)");  __EnsureRecorder(); return NativeDrawingBridge.RecorderIsVisible(__recorder, point); }
+        public global::System.Drawing.Drawing2D.GraphicsState Save() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|Save|System.Drawing.Drawing2D.GraphicsState ()");  __EnsureRecorder(); return new global::System.Drawing.Drawing2D.GraphicsState { __token = NativeDrawingBridge.RecorderSave(__recorder) }; }
+        public static global::System.Drawing.Graphics FromImage(global::System.Drawing.Image image) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FromImage|System.Drawing.Graphics (System.Drawing.Image)");  if (image is null) throw new global::System.ArgumentNullException(nameof(image)); if (image.__BitmapHandle.IsNull) throw new global::System.ArgumentException("Image has no native bitmap.", nameof(image)); FacadeCallTelemetry.Observe("graphics.target-kind", "bitmap"); FacadeCallTelemetry.Observe("graphics.target-dimensions", image.Width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + image.Height.ToString(global::System.Globalization.CultureInfo.InvariantCulture)); var graphics = new global::System.Drawing.Graphics { __target = image }; image.__AttachGraphics(graphics); return graphics; }
+        public static global::System.Drawing.Graphics FromHdc(nint hdc) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FromHdc|System.Drawing.Graphics (System.IntPtr)");  return NativeDrawingBridge.GraphicsFromNativeSurface(hdc, 0); }
+        public static global::System.Drawing.Graphics FromHdcInternal(nint hdc) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FromHdcInternal|System.Drawing.Graphics (System.IntPtr)");  return NativeDrawingBridge.GraphicsFromNativeSurface(hdc, 0); }
+        public static global::System.Drawing.Graphics FromHwnd(nint hwnd) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FromHwnd|System.Drawing.Graphics (System.IntPtr)");  return NativeDrawingBridge.GraphicsFromNativeSurface(hwnd, 1); }
+        public global::System.Drawing.SizeF MeasureString(string text, global::System.Drawing.Font font) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|MeasureString|System.Drawing.SizeF (System.String,System.Drawing.Font)");  if (global::System.String.IsNullOrEmpty(text)) return global::System.Drawing.SizeF.Empty; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); return NativeDrawingBridge.MeasureString(text, font, null, 0); }
+        public global::System.Drawing.SizeF MeasureString(string text, global::System.Drawing.Font font, int width, global::System.Drawing.StringFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|MeasureString|System.Drawing.SizeF (System.String,System.Drawing.Font,System.Int32,System.Drawing.StringFormat)");  if (global::System.String.IsNullOrEmpty(text)) return global::System.Drawing.SizeF.Empty; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); return NativeDrawingBridge.MeasureString(text, font, format, global::System.Math.Max(0, width)); }
+        public nint GetHdc() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|GetHdc|System.IntPtr ()");  return NativeDrawingBridge.GetHdc(this); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|Dispose|System.Void ()");  if (__graphicsDisposed) return; try { if (__hdcLeaseToken != 0) NativeDrawingBridge.ReleaseHdc(this, __leasedHdc); NativeDrawingBridge.Flush(this); } finally { __graphicsDisposed = true; var target = __target; target?.__DetachGraphics(this); NativeDrawingBridge.Release(ref __recorder); __target = null; if (__nativeSurface != 0) target?.Dispose(); __nativeSurface = 0; global::System.GC.SuppressFinalize(this); } }
+        public void Flush() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|Flush|System.Void ()");  NativeDrawingBridge.Flush(this); }
+        public void FillPath(global::System.Drawing.Brush brush, global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillPath|System.Void (System.Drawing.Brush,System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); if (FacadeCallTelemetry.IsEnabled) FacadeCallTelemetry.ObserveValue("path.point-count", NativeDrawingBridge.GraphicsPathPoints(path.__handle).Length); __EnsureRecorder(); NativeDrawingBridge.FillPath(__recorder, brush.__handle, path.__handle); }
+        public void FillPolygon(global::System.Drawing.Brush brush, global::System.Drawing.PointF[] points) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillPolygon|System.Void (System.Drawing.Brush,System.Drawing.PointF[])");  if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }
+        public void FillPolygon(global::System.Drawing.Brush brush, global::System.Drawing.Point[] points) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillPolygon|System.Void (System.Drawing.Brush,System.Drawing.Point[])");  if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); var converted = new global::System.Drawing.PointF[points.Length]; for (var i = 0; i < points.Length; ++i) converted[i] = new global::System.Drawing.PointF(points[i].X, points[i].Y); NativeDrawingBridge.FillPolygon(__recorder, brush.__handle, converted); }
+        public void FillRectangle(global::System.Drawing.Brush brush, global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Drawing.Rectangle)");  __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void FillRectangle(global::System.Drawing.Brush brush, global::System.Drawing.RectangleF rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Drawing.RectangleF)");  __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, rect); }
+        public void FillRectangles(global::System.Drawing.Brush brush, global::System.Drawing.Rectangle[] rects) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillRectangles|System.Void (System.Drawing.Brush,System.Drawing.Rectangle[])");  if (rects is null) throw new global::System.ArgumentNullException(nameof(rects)); __EnsureRecorder(); foreach (var rect in rects) NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void FillRectangle(global::System.Drawing.Brush brush, int x, int y, int width, int height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Int32,System.Int32,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
+        public void FillEllipse(global::System.Drawing.Brush brush, float x, float y, float width, float height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillEllipse|System.Void (System.Drawing.Brush,System.Single,System.Single,System.Single,System.Single)");  __EnsureRecorder(); NativeDrawingBridge.FillEllipse(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
+        public void FillRectangle(global::System.Drawing.Brush brush, float x, float y, float width, float height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Single,System.Single,System.Single,System.Single)");  __EnsureRecorder(); NativeDrawingBridge.FillRectangle(__recorder, brush.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
+        public void Clear(global::System.Drawing.Color color) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|Clear|System.Void (System.Drawing.Color)");  __EnsureRecorder(); NativeDrawingBridge.RecorderClear(__recorder, color); }
+        public void Restore(global::System.Drawing.Drawing2D.GraphicsState gstate) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|Restore|System.Void (System.Drawing.Drawing2D.GraphicsState)");  if (gstate is null) throw new global::System.ArgumentNullException(nameof(gstate)); __EnsureRecorder(); NativeDrawingBridge.RecorderRestore(__recorder, gstate.__token); }
+        public void DrawIcon(global::System.Drawing.Icon icon, global::System.Drawing.Rectangle targetRect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawIcon|System.Void (System.Drawing.Icon,System.Drawing.Rectangle)");  if (icon is null) throw new global::System.ArgumentNullException(nameof(icon)); using var image = icon.ToBitmap(); DrawImage(image, targetRect); }
+        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
+        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, global::System.Drawing.Rectangle srcRect, global::System.Drawing.GraphicsUnit srcUnit) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Drawing.Rectangle,System.Drawing.GraphicsUnit)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height), null); }
+        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight, global::System.Drawing.GraphicsUnit srcUnit, global::System.Drawing.Imaging.ImageAttributes imageAttr) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Int32,System.Int32,System.Int32,System.Int32,System.Drawing.GraphicsUnit,System.Drawing.Imaging.ImageAttributes)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), imageAttr); }
+        public void DrawImage(global::System.Drawing.Image image, global::System.Drawing.Rectangle destRect, float srcX, float srcY, float srcWidth, float srcHeight, global::System.Drawing.GraphicsUnit srcUnit, global::System.Drawing.Imaging.ImageAttributes imageAttrs) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Single,System.Single,System.Single,System.Single,System.Drawing.GraphicsUnit,System.Drawing.Imaging.ImageAttributes)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(destRect.X, destRect.Y, destRect.Width, destRect.Height), new global::System.Drawing.RectangleF(srcX, srcY, srcWidth, srcHeight), imageAttrs); }
+        public void DrawImage(global::System.Drawing.Image image, int x, int y) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
+        public void DrawImageUnscaled(global::System.Drawing.Image image, int x, int y) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImageUnscaled|System.Void (System.Drawing.Image,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, image.Width, image.Height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
+        public void DrawImage(global::System.Drawing.Image image, int x, int y, int width, int height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Int32,System.Int32,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.DrawImage(__recorder, image, new global::System.Drawing.RectangleF(x, y, width, height), new global::System.Drawing.RectangleF(0, 0, image.Width, image.Height), null); }
+        public void DrawPath(global::System.Drawing.Pen pen, global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawPath|System.Void (System.Drawing.Pen,System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); if (FacadeCallTelemetry.IsEnabled) FacadeCallTelemetry.ObserveValue("path.point-count", NativeDrawingBridge.GraphicsPathPoints(path.__handle).Length); __EnsureRecorder(); NativeDrawingBridge.DrawPath(__recorder, pen.__handle, path.__handle); }
+        public void DrawLine(global::System.Drawing.Pen pen, global::System.Drawing.Point pt1, global::System.Drawing.Point pt2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Drawing.Point,System.Drawing.Point)");  __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }
+        public void DrawLine(global::System.Drawing.Pen pen, global::System.Drawing.PointF pt1, global::System.Drawing.PointF pt2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Drawing.PointF,System.Drawing.PointF)");  __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(pt1.X, pt1.Y), new global::System.Drawing.PointF(pt2.X, pt2.Y)); }
+        public void DrawLines(global::System.Drawing.Pen pen, global::System.Drawing.PointF[] points) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLines|System.Void (System.Drawing.Pen,System.Drawing.PointF[])");  if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }
+        public void DrawLines(global::System.Drawing.Pen pen, global::System.Drawing.Point[] points) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLines|System.Void (System.Drawing.Pen,System.Drawing.Point[])");  if (points is null) throw new global::System.ArgumentNullException(nameof(points)); __EnsureRecorder(); for (var i = 1; i < points.Length; ++i) NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(points[i - 1].X, points[i - 1].Y), new global::System.Drawing.PointF(points[i].X, points[i].Y)); }
+        public void DrawRectangle(global::System.Drawing.Pen pen, global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawRectangle|System.Void (System.Drawing.Pen,System.Drawing.Rectangle)");  __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void DrawLine(global::System.Drawing.Pen pen, int x1, int y1, int x2, int y2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Int32,System.Int32,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
+        public void DrawRectangle(global::System.Drawing.Pen pen, int x, int y, int width, int height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawRectangle|System.Void (System.Drawing.Pen,System.Int32,System.Int32,System.Int32,System.Int32)");  __EnsureRecorder(); NativeDrawingBridge.DrawRectangle(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
+        public void DrawEllipse(global::System.Drawing.Pen pen, float x, float y, float width, float height) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawEllipse|System.Void (System.Drawing.Pen,System.Single,System.Single,System.Single,System.Single)");  __EnsureRecorder(); NativeDrawingBridge.DrawEllipse(__recorder, pen.__handle, new global::System.Drawing.RectangleF(x, y, width, height)); }
+        public void DrawLine(global::System.Drawing.Pen pen, float x1, float y1, float x2, float y2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Single,System.Single,System.Single,System.Single)");  __EnsureRecorder(); NativeDrawingBridge.DrawLine(__recorder, pen.__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
+        public void SetClip(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|SetClip|System.Void (System.Drawing.Rectangle)");  __EnsureRecorder(); NativeDrawingBridge.RecorderSetClip(__recorder, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void ReleaseHdc(nint hdc) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|ReleaseHdc|System.Void (System.IntPtr)");  NativeDrawingBridge.ReleaseHdc(this, hdc); }
+        public void TranslateTransform(float dx, float dy) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|TranslateTransform|System.Void (System.Single,System.Single)");  __transform.Translate(dx, dy); __EnsureRecorder(); NativeDrawingBridge.RecorderTranslate(__recorder, dx, dy); }
+        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.PointF point) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.PointF)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, null); }
+        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.PointF point, global::System.Drawing.StringFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.PointF,System.Drawing.StringFormat)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, point, format); }
+        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.RectangleF layoutRectangle) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.RectangleF)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, null); }
+        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, global::System.Drawing.RectangleF layoutRectangle, global::System.Drawing.StringFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.RectangleF,System.Drawing.StringFormat)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, layoutRectangle.Location, format); }
+        public void DrawString(string s, global::System.Drawing.Font font, global::System.Drawing.Brush brush, float x, float y) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Single,System.Single)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); if (global::System.String.IsNullOrEmpty(s)) return; if (font is null) throw new global::System.ArgumentNullException(nameof(font)); __EnsureRecorder(); NativeDrawingBridge.DrawString(__recorder, s, font, brush, new global::System.Drawing.PointF(x, y), null); }
     }
     public enum GraphicsUnit : int {
         World = 0,
@@ -155,9 +156,9 @@ namespace System.Drawing {
         internal byte[] __iconData = global::System.Array.Empty<byte>();
         internal bool __iconDisposed;
         public Icon() { }
-        public Icon(global::System.IO.Stream stream) { if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); __iconData = NativeDrawingBridge.ReadBounded(stream, "ICO"); }
-        public global::System.Drawing.Bitmap ToBitmap() { if (__iconDisposed) throw new global::System.ObjectDisposedException(nameof(Icon)); return NativeDrawingBridge.DecodeIcon(__iconData); }
-        public void Dispose() { if (__iconDisposed) return; __iconDisposed = true; __iconData = global::System.Array.Empty<byte>(); global::System.GC.SuppressFinalize(this); }
+        public Icon(global::System.IO.Stream stream) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Icon|.ctor|System.Void (System.IO.Stream)");  if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); __iconData = NativeDrawingBridge.ReadBounded(stream, "ICO"); }
+        public global::System.Drawing.Bitmap ToBitmap() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Icon|ToBitmap|System.Drawing.Bitmap ()");  if (__iconDisposed) throw new global::System.ObjectDisposedException(nameof(Icon)); return NativeDrawingBridge.DecodeIcon(__iconData); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Icon|Dispose|System.Void ()");  if (__iconDisposed) return; __iconDisposed = true; __iconData = global::System.Array.Empty<byte>(); global::System.GC.SuppressFinalize(this); }
     }
     [global::System.ComponentModel.TypeConverter(typeof(global::System.Drawing.ImageConverter))]
     public abstract partial class Image : global::System.MarshalByRefObject, global::System.IDisposable {
@@ -166,53 +167,57 @@ namespace System.Drawing {
         internal int __height;
         internal global::System.Drawing.Imaging.PixelFormat __pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb;
         internal bool __imageDisposed;
+        internal global::System.WeakReference<global::System.Drawing.Graphics>? __graphicsOwner;
+        internal void __AttachGraphics(global::System.Drawing.Graphics graphics) { if (__graphicsOwner is not null && __graphicsOwner.TryGetTarget(out var current) && !current.__graphicsDisposed) throw new global::System.InvalidOperationException("Image already has an active Graphics owner."); __graphicsOwner = new global::System.WeakReference<global::System.Drawing.Graphics>(graphics); }
+        internal void __DetachGraphics(global::System.Drawing.Graphics graphics) { if (__graphicsOwner is not null && __graphicsOwner.TryGetTarget(out var current) && global::System.Object.ReferenceEquals(current, graphics)) __graphicsOwner = null; }
+        internal void __FlushGraphics() { if (__graphicsOwner is not null && __graphicsOwner.TryGetTarget(out var graphics) && !graphics.__graphicsDisposed) global::System.Drawing.NativeDrawingBridge.Flush(graphics); }
         internal NativeDrawingBridge.Handle __BitmapHandle { get { return __bitmap; } }
         public Image() { }
-        public int Height { get { return __height; } }
-        public global::System.Drawing.Imaging.PixelFormat PixelFormat { get { return __pixelFormat; } }
-        public int Width { get { return __width; } }
-        public static global::System.Drawing.Bitmap FromHbitmap(nint hbitmap) { return NativeDrawingBridge.FromHbitmap(hbitmap); }
-        public static global::System.Drawing.Image FromStream(global::System.IO.Stream stream) { if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); using var copy = new global::System.IO.MemoryStream(); stream.CopyTo(copy); return NativeDrawingBridge.DecodePng(copy.ToArray()); }
-        public global::System.Drawing.Image GetThumbnailImage(int thumbWidth, int thumbHeight, global::System.Drawing.Image.GetThumbnailImageAbort callback, nint callbackData) { return NativeDrawingBridge.Thumbnail(this, thumbWidth, thumbHeight); }
-        public static global::System.Drawing.Image FromFile(string filename) { if (filename is null) throw new global::System.ArgumentNullException(nameof(filename)); return NativeDrawingBridge.DecodePng(global::System.IO.File.ReadAllBytes(filename)); }
-        public object Clone() { return NativeDrawingBridge.CloneBitmap(this); }
-        public void Dispose() { if (__imageDisposed) return; __imageDisposed = true; NativeDrawingBridge.Release(ref __bitmap); global::System.GC.SuppressFinalize(this); }
-        public void Save(global::System.IO.Stream stream, global::System.Drawing.Imaging.ImageFormat format) { if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); var png = NativeDrawingBridge.EncodePng(__bitmap); stream.Write(png, 0, png.Length); }
-        public void Save(string filename) { if (filename is null) throw new global::System.ArgumentNullException(nameof(filename)); global::System.IO.File.WriteAllBytes(filename, NativeDrawingBridge.EncodePng(__bitmap)); }
+        public int Height { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|get_Height|System.Int32 ()");  return __height; } }
+        public global::System.Drawing.Imaging.PixelFormat PixelFormat { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|get_PixelFormat|System.Drawing.Imaging.PixelFormat ()");  return __pixelFormat; } }
+        public int Width { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|get_Width|System.Int32 ()");  return __width; } }
+        public static global::System.Drawing.Bitmap FromHbitmap(nint hbitmap) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|FromHbitmap|System.Drawing.Bitmap (System.IntPtr)");  return NativeDrawingBridge.FromHbitmap(hbitmap); }
+        public static global::System.Drawing.Image FromStream(global::System.IO.Stream stream) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|FromStream|System.Drawing.Image (System.IO.Stream)");  if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); using var copy = new global::System.IO.MemoryStream(); stream.CopyTo(copy); return NativeDrawingBridge.DecodePng(copy.ToArray()); }
+        public global::System.Drawing.Image GetThumbnailImage(int thumbWidth, int thumbHeight, global::System.Drawing.Image.GetThumbnailImageAbort callback, nint callbackData) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|GetThumbnailImage|System.Drawing.Image (System.Int32,System.Int32,System.Drawing.Image+GetThumbnailImageAbort,System.IntPtr)");  __FlushGraphics(); return NativeDrawingBridge.Thumbnail(this, thumbWidth, thumbHeight); }
+        public static global::System.Drawing.Image FromFile(string filename) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|FromFile|System.Drawing.Image (System.String)");  if (filename is null) throw new global::System.ArgumentNullException(nameof(filename)); return NativeDrawingBridge.DecodePng(global::System.IO.File.ReadAllBytes(filename)); }
+        public object Clone() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|Clone|System.Object ()");  __FlushGraphics(); return NativeDrawingBridge.CloneBitmap(this); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|Dispose|System.Void ()");  if (__imageDisposed) return; __FlushGraphics(); __imageDisposed = true; NativeDrawingBridge.Release(ref __bitmap); global::System.GC.SuppressFinalize(this); }
+        public void Save(global::System.IO.Stream stream, global::System.Drawing.Imaging.ImageFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|Save|System.Void (System.IO.Stream,System.Drawing.Imaging.ImageFormat)");  if (stream is null) throw new global::System.ArgumentNullException(nameof(stream)); __FlushGraphics(); var png = NativeDrawingBridge.EncodePng(__bitmap); stream.Write(png, 0, png.Length); }
+        public void Save(string filename) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Image|Save|System.Void (System.String)");  if (filename is null) throw new global::System.ArgumentNullException(nameof(filename)); __FlushGraphics(); global::System.IO.File.WriteAllBytes(filename, NativeDrawingBridge.EncodePng(__bitmap)); }
         public delegate bool GetThumbnailImageAbort();
     }
     public partial class Pen : global::System.MarshalByRefObject, global::System.IDisposable {
         internal NativeDrawingBridge.Handle __handle;
         internal bool __penDisposed;
         public Pen() { }
-        public Pen(global::System.Drawing.Brush brush) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); __handle = NativeDrawingBridge.PenCreate(brush.__color, 1f); }
-        public Pen(global::System.Drawing.Brush brush, float width) { if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); __handle = NativeDrawingBridge.PenCreate(brush.__color, width); }
-        public Pen(global::System.Drawing.Color color) { __handle = NativeDrawingBridge.PenCreate(color, 1f); }
-        public Pen(global::System.Drawing.Color color, float width) { __handle = NativeDrawingBridge.PenCreate(color, width); }
-        public float[] DashPattern { set { NativeDrawingBridge.PenSetDashPattern(__handle, value); } }
-        public global::System.Drawing.Drawing2D.DashStyle DashStyle { set { NativeDrawingBridge.PenSetDashStyle(__handle, (uint)value); } }
-        public float Width { set { NativeDrawingBridge.PenSetWidth(__handle, value); } }
-        public void Dispose() { if (__penDisposed) return; __penDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public Pen(global::System.Drawing.Brush brush) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Brush)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); __handle = NativeDrawingBridge.PenCreate(brush.__color, 1f); }
+        public Pen(global::System.Drawing.Brush brush, float width) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Brush,System.Single)");  if (brush is null) throw new global::System.ArgumentNullException(nameof(brush)); __handle = NativeDrawingBridge.PenCreate(brush.__color, width); }
+        public Pen(global::System.Drawing.Color color) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Color)");  __handle = NativeDrawingBridge.PenCreate(color, 1f); }
+        public Pen(global::System.Drawing.Color color, float width) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Color,System.Single)");  __handle = NativeDrawingBridge.PenCreate(color, width); }
+        public float[] DashPattern { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|set_DashPattern|System.Void (System.Single[])");  NativeDrawingBridge.PenSetDashPattern(__handle, value); } }
+        public global::System.Drawing.Drawing2D.DashStyle DashStyle { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|set_DashStyle|System.Void (System.Drawing.Drawing2D.DashStyle)");  NativeDrawingBridge.PenSetDashStyle(__handle, (uint)value); } }
+        public float Width { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|set_Width|System.Void (System.Single)");  NativeDrawingBridge.PenSetWidth(__handle, value); } }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pen|Dispose|System.Void ()");  if (__penDisposed) return; __penDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
     }
     public static partial class Pens {
-        public static global::System.Drawing.Pen DarkGray { get { return new global::System.Drawing.Pen(global::System.Drawing.Color.FromName("DarkGray")); } }
-        public static global::System.Drawing.Pen Yellow { get { return new global::System.Drawing.Pen(global::System.Drawing.Color.FromName("Yellow")); } }
+        public static global::System.Drawing.Pen DarkGray { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pens|get_DarkGray|System.Drawing.Pen ()");  return new global::System.Drawing.Pen(global::System.Drawing.Color.FromName("DarkGray")); } }
+        public static global::System.Drawing.Pen Yellow { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Pens|get_Yellow|System.Drawing.Pen ()");  return new global::System.Drawing.Pen(global::System.Drawing.Color.FromName("Yellow")); } }
     }
     public partial class Region : global::System.MarshalByRefObject, global::System.IDisposable {
         internal NativeDrawingBridge.Handle __handle;
         internal bool __regionDisposed;
         public Region() { }
-        public Region(global::System.Drawing.Drawing2D.GraphicsPath path) { if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = NativeDrawingBridge.RegionCreate(path.__handle); }
-        public Region(global::System.Drawing.Rectangle rect) { __handle = NativeDrawingBridge.RegionCreate(new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void Dispose() { if (__regionDisposed) return; __regionDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
-        public void Union(global::System.Drawing.Drawing2D.GraphicsPath path) { if (path is null) throw new global::System.ArgumentNullException(nameof(path)); NativeDrawingBridge.RegionUnion(__handle, path.__handle); }
-        public void Exclude(global::System.Drawing.Rectangle rect) { NativeDrawingBridge.RegionExclude(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void Union(global::System.Drawing.Rectangle rect) { NativeDrawingBridge.RegionUnion(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public Region(global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = NativeDrawingBridge.RegionCreate(path.__handle); }
+        public Region(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Rectangle)");  __handle = NativeDrawingBridge.RegionCreate(new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Dispose|System.Void ()");  if (__regionDisposed) return; __regionDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public void Union(global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); NativeDrawingBridge.RegionUnion(__handle, path.__handle); }
+        public void Exclude(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Exclude|System.Void (System.Drawing.Rectangle)");  NativeDrawingBridge.RegionExclude(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void Union(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Rectangle)");  NativeDrawingBridge.RegionUnion(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
     }
     public partial class SolidBrush : global::System.Drawing.Brush, global::System.IDisposable {
         public SolidBrush() { }
-        public SolidBrush(global::System.Drawing.Color color) { __color = color; __handle = NativeDrawingBridge.SolidBrushCreate(color); }
-        public global::System.Drawing.Color Color { get { return __color; } }
+        public SolidBrush(global::System.Drawing.Color color) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.SolidBrush|.ctor|System.Void (System.Drawing.Color)");  __color = color; __handle = NativeDrawingBridge.SolidBrushCreate(color); }
+        public global::System.Drawing.Color Color { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.SolidBrush|get_Color|System.Drawing.Color ()");  return __color; } }
     }
     public enum StringAlignment : int {
         Near = 0,
@@ -226,16 +231,16 @@ namespace System.Drawing {
         internal global::System.Drawing.StringTrimming __trimming;
         internal global::System.Drawing.StringFormatFlags __flags;
         internal bool __formatDisposed;
-        public StringFormat() { __handle = NativeDrawingBridge.StringFormatCreate(0); }
-        public StringFormat(global::System.Drawing.StringFormat format) { if (format is null) throw new global::System.ArgumentNullException(nameof(format)); __alignment = format.__alignment; __lineAlignment = format.__lineAlignment; __trimming = format.__trimming; __flags = format.__flags; __handle = NativeDrawingBridge.StringFormatCreate((uint)__flags); NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); }
-        public StringFormat(global::System.Drawing.StringFormatFlags options) { __flags = options; __handle = NativeDrawingBridge.StringFormatCreate((uint)options); }
-        public global::System.Drawing.StringAlignment Alignment { set { __alignment = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
-        public global::System.Drawing.StringFormatFlags FormatFlags { get { return __flags; } set { __flags = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
-        public static global::System.Drawing.StringFormat GenericDefault { get { return new global::System.Drawing.StringFormat(); } }
-        public static global::System.Drawing.StringFormat GenericTypographic { get { return new global::System.Drawing.StringFormat(); } }
-        public global::System.Drawing.StringAlignment LineAlignment { set { __lineAlignment = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
-        public global::System.Drawing.StringTrimming Trimming { set { __trimming = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
-        public void Dispose() { if (__formatDisposed) return; __formatDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public StringFormat() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void ()");  __handle = NativeDrawingBridge.StringFormatCreate(0); }
+        public StringFormat(global::System.Drawing.StringFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void (System.Drawing.StringFormat)");  if (format is null) throw new global::System.ArgumentNullException(nameof(format)); __alignment = format.__alignment; __lineAlignment = format.__lineAlignment; __trimming = format.__trimming; __flags = format.__flags; __handle = NativeDrawingBridge.StringFormatCreate((uint)__flags); NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); }
+        public StringFormat(global::System.Drawing.StringFormatFlags options) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void (System.Drawing.StringFormatFlags)");  __flags = options; __handle = NativeDrawingBridge.StringFormatCreate((uint)options); }
+        public global::System.Drawing.StringAlignment Alignment { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|set_Alignment|System.Void (System.Drawing.StringAlignment)");  __alignment = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
+        public global::System.Drawing.StringFormatFlags FormatFlags { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|get_FormatFlags|System.Drawing.StringFormatFlags ()");  return __flags; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|set_FormatFlags|System.Void (System.Drawing.StringFormatFlags)");  __flags = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
+        public static global::System.Drawing.StringFormat GenericDefault { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|get_GenericDefault|System.Drawing.StringFormat ()");  return new global::System.Drawing.StringFormat(); } }
+        public static global::System.Drawing.StringFormat GenericTypographic { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|get_GenericTypographic|System.Drawing.StringFormat ()");  return new global::System.Drawing.StringFormat(); } }
+        public global::System.Drawing.StringAlignment LineAlignment { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|set_LineAlignment|System.Void (System.Drawing.StringAlignment)");  __lineAlignment = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
+        public global::System.Drawing.StringTrimming Trimming { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|set_Trimming|System.Void (System.Drawing.StringTrimming)");  __trimming = value; NativeDrawingBridge.StringFormatSet(__handle, __alignment, __lineAlignment, __trimming, __flags); } }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.StringFormat|Dispose|System.Void ()");  if (__formatDisposed) return; __formatDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
     }
     public enum StringFormatFlags : int {
         DirectionRightToLeft = 1,
@@ -257,8 +262,8 @@ namespace System.Drawing {
         EllipsisPath = 5,
     }
     public static partial class SystemFonts {
-        public static global::System.Drawing.Font DefaultFont { get { return new global::System.Drawing.Font("Lucida Grande", 12f); } }
-        public static global::System.Drawing.Font MenuFont { get { return new global::System.Drawing.Font("Lucida Grande", 12f); } }
+        public static global::System.Drawing.Font DefaultFont { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.SystemFonts|get_DefaultFont|System.Drawing.Font ()");  return new global::System.Drawing.Font("Lucida Grande", 12f); } }
+        public static global::System.Drawing.Font MenuFont { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.SystemFonts|get_MenuFont|System.Drawing.Font ()");  return new global::System.Drawing.Font("Lucida Grande", 12f); } }
     }
 }
 namespace System.Drawing.Drawing2D {
@@ -268,10 +273,10 @@ namespace System.Drawing.Drawing2D {
     public partial class ColorBlend : object {
         internal global::System.Drawing.Color[] __colors = global::System.Array.Empty<global::System.Drawing.Color>();
         internal float[] __positions = global::System.Array.Empty<float>();
-        public ColorBlend() { }
-        public ColorBlend(int count) { if (count < 0) throw new global::System.ArgumentOutOfRangeException(nameof(count)); __colors = new global::System.Drawing.Color[count]; __positions = new float[count]; }
-        public global::System.Drawing.Color[] Colors { get { return __colors; } set { __colors = value ?? throw new global::System.ArgumentNullException(nameof(value)); } }
-        public float[] Positions { get { return __positions; } set { __positions = value ?? throw new global::System.ArgumentNullException(nameof(value)); } }
+        public ColorBlend() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|.ctor|System.Void ()");  }
+        public ColorBlend(int count) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|.ctor|System.Void (System.Int32)");  if (count < 0) throw new global::System.ArgumentOutOfRangeException(nameof(count)); __colors = new global::System.Drawing.Color[count]; __positions = new float[count]; }
+        public global::System.Drawing.Color[] Colors { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|get_Colors|System.Drawing.Color[] ()");  return __colors; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|set_Colors|System.Void (System.Drawing.Color[])");  __colors = value ?? throw new global::System.ArgumentNullException(nameof(value)); } }
+        public float[] Positions { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|get_Positions|System.Single[] ()");  return __positions; } set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|set_Positions|System.Void (System.Single[])");  __positions = value ?? throw new global::System.ArgumentNullException(nameof(value)); } }
     }
     public enum CompositingMode : int {
         SourceOver = 0,
@@ -296,26 +301,26 @@ namespace System.Drawing.Drawing2D {
     public partial class GraphicsPath : global::System.MarshalByRefObject, global::System.IDisposable {
         internal global::System.Drawing.NativeDrawingBridge.Handle __handle;
         internal bool __pathDisposed;
-        public GraphicsPath() { __handle = global::System.Drawing.NativeDrawingBridge.GraphicsPathCreate(); }
-        public global::System.Drawing.PointF[] PathPoints { get { return global::System.Drawing.NativeDrawingBridge.GraphicsPathPoints(__handle); } }
-        public bool IsVisible(global::System.Drawing.Point point) { return global::System.Drawing.NativeDrawingBridge.GraphicsPathIsVisible(__handle, new global::System.Drawing.PointF(point.X, point.Y)); }
-        public global::System.Drawing.RectangleF GetBounds() { return global::System.Drawing.NativeDrawingBridge.GraphicsPathBounds(__handle); }
-        public object Clone() { return global::System.Drawing.NativeDrawingBridge.GraphicsPathClone(__handle); }
-        public void Dispose() { if (__pathDisposed) return; __pathDisposed = true; global::System.Drawing.NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
-        public void CloseFigure() { global::System.Drawing.NativeDrawingBridge.GraphicsPathClose(__handle); }
-        public void Reset() { global::System.Drawing.NativeDrawingBridge.GraphicsPathReset(__handle); }
-        public void StartFigure() { global::System.Drawing.NativeDrawingBridge.GraphicsPathStart(__handle); }
-        public void AddPath(global::System.Drawing.Drawing2D.GraphicsPath addingPath, bool connect) { if (addingPath is null) throw new global::System.ArgumentNullException(nameof(addingPath)); global::System.Drawing.NativeDrawingBridge.GraphicsPathAddPath(__handle, addingPath.__handle, connect); }
-        public void Transform(global::System.Drawing.Drawing2D.Matrix matrix) { if (matrix is null) throw new global::System.ArgumentNullException(nameof(matrix)); global::System.Drawing.NativeDrawingBridge.GraphicsPathTransform(__handle, matrix); }
-        public void AddLine(global::System.Drawing.PointF pt1, global::System.Drawing.PointF pt2) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddLine(__handle, pt1, pt2); }
-        public void AddRectangle(global::System.Drawing.Rectangle rect) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void AddArc(global::System.Drawing.Rectangle rect, float startAngle, float sweepAngle) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), startAngle, sweepAngle); }
-        public void AddEllipse(global::System.Drawing.RectangleF rect) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddEllipse(__handle, rect); }
-        public void AddRectangle(global::System.Drawing.RectangleF rect) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
-        public void AddArc(global::System.Drawing.RectangleF rect, float startAngle, float sweepAngle) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), startAngle, sweepAngle); }
-        public void AddLine(int x1, int y1, int x2, int y2) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddLine(__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
-        public void AddArc(int x, int y, int width, int height, float startAngle, float sweepAngle) { global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(x, y, width, height), startAngle, sweepAngle); }
-        public void AddString(string s, global::System.Drawing.FontFamily family, int style, float emSize, global::System.Drawing.Point origin, global::System.Drawing.StringFormat format) { if (s is null) throw new global::System.ArgumentNullException(nameof(s)); var width = global::System.Math.Max(0f, s.Length * emSize * 0.55f); global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(origin.X, origin.Y - emSize, width, emSize * 1.2f)); }
+        public GraphicsPath() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|.ctor|System.Void ()");  __handle = global::System.Drawing.NativeDrawingBridge.GraphicsPathCreate(); }
+        public global::System.Drawing.PointF[] PathPoints { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|get_PathPoints|System.Drawing.PointF[] ()");  return global::System.Drawing.NativeDrawingBridge.GraphicsPathPoints(__handle); } }
+        public bool IsVisible(global::System.Drawing.Point point) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|IsVisible|System.Boolean (System.Drawing.Point)");  return global::System.Drawing.NativeDrawingBridge.GraphicsPathIsVisible(__handle, new global::System.Drawing.PointF(point.X, point.Y)); }
+        public global::System.Drawing.RectangleF GetBounds() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|GetBounds|System.Drawing.RectangleF ()");  return global::System.Drawing.NativeDrawingBridge.GraphicsPathBounds(__handle); }
+        public object Clone() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Clone|System.Object ()");  return global::System.Drawing.NativeDrawingBridge.GraphicsPathClone(__handle); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Dispose|System.Void ()");  if (__pathDisposed) return; __pathDisposed = true; global::System.Drawing.NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public void CloseFigure() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|CloseFigure|System.Void ()");  global::System.Drawing.NativeDrawingBridge.GraphicsPathClose(__handle); }
+        public void Reset() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Reset|System.Void ()");  global::System.Drawing.NativeDrawingBridge.GraphicsPathReset(__handle); }
+        public void StartFigure() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|StartFigure|System.Void ()");  global::System.Drawing.NativeDrawingBridge.GraphicsPathStart(__handle); }
+        public void AddPath(global::System.Drawing.Drawing2D.GraphicsPath addingPath, bool connect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddPath|System.Void (System.Drawing.Drawing2D.GraphicsPath,System.Boolean)");  if (addingPath is null) throw new global::System.ArgumentNullException(nameof(addingPath)); global::System.Drawing.NativeDrawingBridge.GraphicsPathAddPath(__handle, addingPath.__handle, connect); }
+        public void Transform(global::System.Drawing.Drawing2D.Matrix matrix) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Transform|System.Void (System.Drawing.Drawing2D.Matrix)");  if (matrix is null) throw new global::System.ArgumentNullException(nameof(matrix)); global::System.Drawing.NativeDrawingBridge.GraphicsPathTransform(__handle, matrix); }
+        public void AddLine(global::System.Drawing.PointF pt1, global::System.Drawing.PointF pt2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddLine|System.Void (System.Drawing.PointF,System.Drawing.PointF)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddLine(__handle, pt1, pt2); }
+        public void AddRectangle(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddRectangle|System.Void (System.Drawing.Rectangle)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void AddArc(global::System.Drawing.Rectangle rect, float startAngle, float sweepAngle) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Drawing.Rectangle,System.Single,System.Single)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), startAngle, sweepAngle); }
+        public void AddEllipse(global::System.Drawing.RectangleF rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddEllipse|System.Void (System.Drawing.RectangleF)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddEllipse(__handle, rect); }
+        public void AddRectangle(global::System.Drawing.RectangleF rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddRectangle|System.Void (System.Drawing.RectangleF)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public void AddArc(global::System.Drawing.RectangleF rect, float startAngle, float sweepAngle) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Drawing.RectangleF,System.Single,System.Single)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height), startAngle, sweepAngle); }
+        public void AddLine(int x1, int y1, int x2, int y2) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddLine|System.Void (System.Int32,System.Int32,System.Int32,System.Int32)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddLine(__handle, new global::System.Drawing.PointF(x1, y1), new global::System.Drawing.PointF(x2, y2)); }
+        public void AddArc(int x, int y, int width, int height, float startAngle, float sweepAngle) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Int32,System.Int32,System.Int32,System.Int32,System.Single,System.Single)");  global::System.Drawing.NativeDrawingBridge.GraphicsPathAddArc(__handle, new global::System.Drawing.RectangleF(x, y, width, height), startAngle, sweepAngle); }
+        public void AddString(string s, global::System.Drawing.FontFamily family, int style, float emSize, global::System.Drawing.Point origin, global::System.Drawing.StringFormat format) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddString|System.Void (System.String,System.Drawing.FontFamily,System.Int32,System.Single,System.Drawing.Point,System.Drawing.StringFormat)");  if (s is null) throw new global::System.ArgumentNullException(nameof(s)); var width = global::System.Math.Max(0f, s.Length * emSize * 0.55f); global::System.Drawing.NativeDrawingBridge.GraphicsPathAddRectangle(__handle, new global::System.Drawing.RectangleF(origin.X, origin.Y - emSize, width, emSize * 1.2f)); }
     }
     public partial class GraphicsState : global::System.MarshalByRefObject {
         internal ulong __token;
@@ -323,7 +328,7 @@ namespace System.Drawing.Drawing2D {
     }
     public partial class HatchBrush : global::System.Drawing.Brush, global::System.IDisposable {
         public HatchBrush() { }
-        public HatchBrush(global::System.Drawing.Drawing2D.HatchStyle hatchstyle, global::System.Drawing.Color foreColor, global::System.Drawing.Color backColor) { __color = foreColor; __handle = global::System.Drawing.NativeDrawingBridge.HatchBrushCreate((uint)hatchstyle, foreColor, backColor); }
+        public HatchBrush(global::System.Drawing.Drawing2D.HatchStyle hatchstyle, global::System.Drawing.Color foreColor, global::System.Drawing.Color backColor) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.HatchBrush|.ctor|System.Void (System.Drawing.Drawing2D.HatchStyle,System.Drawing.Color,System.Drawing.Color)");  __color = foreColor; __handle = global::System.Drawing.NativeDrawingBridge.HatchBrushCreate((uint)hatchstyle, foreColor, backColor); }
     }
     public enum HatchStyle : int {
         Horizontal = 0,
@@ -396,11 +401,11 @@ namespace System.Drawing.Drawing2D {
     }
     public partial class LinearGradientBrush : global::System.Drawing.Brush, global::System.IDisposable {
         public LinearGradientBrush() { }
-        public LinearGradientBrush(global::System.Drawing.Rectangle rect, global::System.Drawing.Color color1, global::System.Drawing.Color color2, global::System.Drawing.Drawing2D.LinearGradientMode linearGradientMode) { var bounds = new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height); var angle = linearGradientMode switch { global::System.Drawing.Drawing2D.LinearGradientMode.Vertical => 90f, global::System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal => 45f, global::System.Drawing.Drawing2D.LinearGradientMode.BackwardDiagonal => 135f, _ => 0f }; __color = color1; __handle = global::System.Drawing.NativeDrawingBridge.LinearGradientBrushCreate(bounds, color1, color2, angle, global::System.Drawing.Drawing2D.WrapMode.Tile); }
-        public LinearGradientBrush(global::System.Drawing.RectangleF rect, global::System.Drawing.Color color1, global::System.Drawing.Color color2, global::System.Drawing.Drawing2D.LinearGradientMode linearGradientMode) { var bounds = new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height); var angle = linearGradientMode switch { global::System.Drawing.Drawing2D.LinearGradientMode.Vertical => 90f, global::System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal => 45f, global::System.Drawing.Drawing2D.LinearGradientMode.BackwardDiagonal => 135f, _ => 0f }; __color = color1; __handle = global::System.Drawing.NativeDrawingBridge.LinearGradientBrushCreate(bounds, color1, color2, angle, global::System.Drawing.Drawing2D.WrapMode.Tile); }
-        public global::System.Drawing.Drawing2D.Blend Blend { set { } }
-        public global::System.Drawing.Drawing2D.ColorBlend InterpolationColors { set { if (value is null) throw new global::System.ArgumentNullException(nameof(value)); global::System.Drawing.NativeDrawingBridge.LinearGradientSetInterpolation(__handle, value.__colors, value.__positions); } }
-        public global::System.Drawing.Drawing2D.WrapMode WrapMode { set { global::System.Drawing.NativeDrawingBridge.LinearGradientSetWrap(__handle, value); } }
+        public LinearGradientBrush(global::System.Drawing.Rectangle rect, global::System.Drawing.Color color1, global::System.Drawing.Color color2, global::System.Drawing.Drawing2D.LinearGradientMode linearGradientMode) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|.ctor|System.Void (System.Drawing.Rectangle,System.Drawing.Color,System.Drawing.Color,System.Drawing.Drawing2D.LinearGradientMode)");  var bounds = new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height); var angle = linearGradientMode switch { global::System.Drawing.Drawing2D.LinearGradientMode.Vertical => 90f, global::System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal => 45f, global::System.Drawing.Drawing2D.LinearGradientMode.BackwardDiagonal => 135f, _ => 0f }; __color = color1; __handle = global::System.Drawing.NativeDrawingBridge.LinearGradientBrushCreate(bounds, color1, color2, angle, global::System.Drawing.Drawing2D.WrapMode.Tile); }
+        public LinearGradientBrush(global::System.Drawing.RectangleF rect, global::System.Drawing.Color color1, global::System.Drawing.Color color2, global::System.Drawing.Drawing2D.LinearGradientMode linearGradientMode) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|.ctor|System.Void (System.Drawing.RectangleF,System.Drawing.Color,System.Drawing.Color,System.Drawing.Drawing2D.LinearGradientMode)");  var bounds = new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height); var angle = linearGradientMode switch { global::System.Drawing.Drawing2D.LinearGradientMode.Vertical => 90f, global::System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal => 45f, global::System.Drawing.Drawing2D.LinearGradientMode.BackwardDiagonal => 135f, _ => 0f }; __color = color1; __handle = global::System.Drawing.NativeDrawingBridge.LinearGradientBrushCreate(bounds, color1, color2, angle, global::System.Drawing.Drawing2D.WrapMode.Tile); }
+        public global::System.Drawing.Drawing2D.Blend Blend { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_Blend|System.Void (System.Drawing.Drawing2D.Blend)");  } }
+        public global::System.Drawing.Drawing2D.ColorBlend InterpolationColors { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_InterpolationColors|System.Void (System.Drawing.Drawing2D.ColorBlend)");  if (value is null) throw new global::System.ArgumentNullException(nameof(value)); global::System.Drawing.NativeDrawingBridge.LinearGradientSetInterpolation(__handle, value.__colors, value.__positions); } }
+        public global::System.Drawing.Drawing2D.WrapMode WrapMode { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_WrapMode|System.Void (System.Drawing.Drawing2D.WrapMode)");  global::System.Drawing.NativeDrawingBridge.LinearGradientSetWrap(__handle, value); } }
     }
     public enum LinearGradientMode : int {
         Horizontal = 0,
@@ -410,17 +415,17 @@ namespace System.Drawing.Drawing2D {
     }
     public partial class Matrix : global::System.MarshalByRefObject, global::System.IDisposable {
         internal float __m11 = 1f, __m12, __m21, __m22 = 1f, __dx, __dy;
-        public Matrix() { }
-        public Matrix(global::System.Drawing.Rectangle rect, global::System.Drawing.Point[] plgpts) { if (rect.Width == 0 || rect.Height == 0) throw new global::System.ArgumentException("Matrix source rectangle is empty.", nameof(rect)); if (plgpts is null || plgpts.Length != 3) throw new global::System.ArgumentException("Matrix parallelogram requires three points.", nameof(plgpts)); __m11 = (plgpts[1].X - plgpts[0].X) / (float)rect.Width; __m12 = (plgpts[1].Y - plgpts[0].Y) / (float)rect.Width; __m21 = (plgpts[2].X - plgpts[0].X) / (float)rect.Height; __m22 = (plgpts[2].Y - plgpts[0].Y) / (float)rect.Height; __dx = plgpts[0].X - rect.X * __m11 - rect.Y * __m21; __dy = plgpts[0].Y - rect.X * __m12 - rect.Y * __m22; }
-        public void Dispose() { }
-        public void RotateAt(float angle, global::System.Drawing.PointF point) { var radians = angle * (float)(global::System.Math.PI / 180.0); var cosine = (float)global::System.Math.Cos(radians); var sine = (float)global::System.Math.Sin(radians); __m11 = cosine; __m12 = sine; __m21 = -sine; __m22 = cosine; __dx = point.X - point.X * cosine + point.Y * sine; __dy = point.Y - point.X * sine - point.Y * cosine; }
-        public void Translate(float offsetX, float offsetY) { __dx += offsetX; __dy += offsetY; }
+        public Matrix() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.Matrix|.ctor|System.Void ()");  }
+        public Matrix(global::System.Drawing.Rectangle rect, global::System.Drawing.Point[] plgpts) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.Matrix|.ctor|System.Void (System.Drawing.Rectangle,System.Drawing.Point[])");  if (rect.Width == 0 || rect.Height == 0) throw new global::System.ArgumentException("Matrix source rectangle is empty.", nameof(rect)); if (plgpts is null || plgpts.Length != 3) throw new global::System.ArgumentException("Matrix parallelogram requires three points.", nameof(plgpts)); __m11 = (plgpts[1].X - plgpts[0].X) / (float)rect.Width; __m12 = (plgpts[1].Y - plgpts[0].Y) / (float)rect.Width; __m21 = (plgpts[2].X - plgpts[0].X) / (float)rect.Height; __m22 = (plgpts[2].Y - plgpts[0].Y) / (float)rect.Height; __dx = plgpts[0].X - rect.X * __m11 - rect.Y * __m21; __dy = plgpts[0].Y - rect.X * __m12 - rect.Y * __m22; }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.Matrix|Dispose|System.Void ()");  }
+        public void RotateAt(float angle, global::System.Drawing.PointF point) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.Matrix|RotateAt|System.Void (System.Single,System.Drawing.PointF)");  var radians = angle * (float)(global::System.Math.PI / 180.0); var cosine = (float)global::System.Math.Cos(radians); var sine = (float)global::System.Math.Sin(radians); __m11 = cosine; __m12 = sine; __m21 = -sine; __m22 = cosine; __dx = point.X - point.X * cosine + point.Y * sine; __dy = point.Y - point.X * sine - point.Y * cosine; }
+        public void Translate(float offsetX, float offsetY) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.Matrix|Translate|System.Void (System.Single,System.Single)");  __dx += offsetX; __dy += offsetY; }
     }
     public partial class PathGradientBrush : global::System.Drawing.Brush, global::System.IDisposable {
         public PathGradientBrush() { }
-        public PathGradientBrush(global::System.Drawing.Drawing2D.GraphicsPath path) { if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = global::System.Drawing.NativeDrawingBridge.PathGradientBrushCreate(global::System.Drawing.NativeDrawingBridge.GraphicsPathPoints(path.__handle)); }
-        public global::System.Drawing.Color CenterColor { set { global::System.Drawing.NativeDrawingBridge.PathGradientSetCenterColor(__handle, value); } }
-        public global::System.Drawing.Color[] SurroundColors { set { global::System.Drawing.NativeDrawingBridge.PathGradientSetSurroundColors(__handle, value); } }
+        public PathGradientBrush(global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|.ctor|System.Void (System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = global::System.Drawing.NativeDrawingBridge.PathGradientBrushCreate(global::System.Drawing.NativeDrawingBridge.GraphicsPathPoints(path.__handle)); }
+        public global::System.Drawing.Color CenterColor { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|set_CenterColor|System.Void (System.Drawing.Color)");  global::System.Drawing.NativeDrawingBridge.PathGradientSetCenterColor(__handle, value); } }
+        public global::System.Drawing.Color[] SurroundColors { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|set_SurroundColors|System.Void (System.Drawing.Color[])");  global::System.Drawing.NativeDrawingBridge.PathGradientSetSurroundColors(__handle, value); } }
     }
     public enum PixelOffsetMode : int {
         Invalid = -1,
@@ -453,8 +458,8 @@ namespace System.Drawing.Imaging {
         internal nint __scan0;
         internal int __stride;
         public BitmapData() { }
-        public nint Scan0 { get { return __scan0; } }
-        public int Stride { get { return __stride; } }
+        public nint Scan0 { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.BitmapData|get_Scan0|System.IntPtr ()");  return __scan0; } }
+        public int Stride { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.BitmapData|get_Stride|System.Int32 ()");  return __stride; } }
     }
     public enum ColorAdjustType : int {
         Default = 0,
@@ -468,14 +473,14 @@ namespace System.Drawing.Imaging {
     public partial class ColorMap : object {
         internal global::System.Drawing.Color __oldColor;
         internal global::System.Drawing.Color __newColor;
-        public ColorMap() { }
-        public global::System.Drawing.Color NewColor { set { __newColor = value; } }
-        public global::System.Drawing.Color OldColor { set { __oldColor = value; } }
+        public ColorMap() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ColorMap|.ctor|System.Void ()");  }
+        public global::System.Drawing.Color NewColor { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ColorMap|set_NewColor|System.Void (System.Drawing.Color)");  __newColor = value; } }
+        public global::System.Drawing.Color OldColor { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ColorMap|set_OldColor|System.Void (System.Drawing.Color)");  __oldColor = value; } }
     }
     public partial class ColorMatrix : object {
         internal float[] __values = new float[] { 1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0, 0,0,0,0,1 };
-        public ColorMatrix() { }
-        public float Matrix33 { set { __values[18] = value; } }
+        public ColorMatrix() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ColorMatrix|.ctor|System.Void ()");  }
+        public float Matrix33 { set { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ColorMatrix|set_Matrix33|System.Void (System.Single)");  __values[18] = value; } }
     }
     public enum ColorMatrixFlag : int {
         Default = 0,
@@ -485,16 +490,16 @@ namespace System.Drawing.Imaging {
     public partial class ImageAttributes : object, global::System.IDisposable {
         internal global::System.Drawing.NativeDrawingBridge.Handle __handle;
         internal bool __attributesDisposed;
-        public ImageAttributes() { __handle = global::System.Drawing.NativeDrawingBridge.ImageAttributesCreate(); }
-        public object Clone() { return global::System.Drawing.NativeDrawingBridge.ImageAttributesClone(__handle); }
-        public void Dispose() { if (__attributesDisposed) return; __attributesDisposed = true; global::System.Drawing.NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
-        public void SetRemapTable(global::System.Drawing.Imaging.ColorMap[] map) { global::System.Drawing.NativeDrawingBridge.ImageAttributesSetRemap(__handle, map); }
-        public void SetColorMatrix(global::System.Drawing.Imaging.ColorMatrix newColorMatrix, global::System.Drawing.Imaging.ColorMatrixFlag mode, global::System.Drawing.Imaging.ColorAdjustType type) { if (newColorMatrix is null) throw new global::System.ArgumentNullException(nameof(newColorMatrix)); global::System.Drawing.NativeDrawingBridge.ImageAttributesSetColorMatrix(__handle, newColorMatrix.__values); }
+        public ImageAttributes() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|.ctor|System.Void ()");  __handle = global::System.Drawing.NativeDrawingBridge.ImageAttributesCreate(); }
+        public object Clone() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|Clone|System.Object ()");  return global::System.Drawing.NativeDrawingBridge.ImageAttributesClone(__handle); }
+        public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|Dispose|System.Void ()");  if (__attributesDisposed) return; __attributesDisposed = true; global::System.Drawing.NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
+        public void SetRemapTable(global::System.Drawing.Imaging.ColorMap[] map) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|SetRemapTable|System.Void (System.Drawing.Imaging.ColorMap[])");  global::System.Drawing.NativeDrawingBridge.ImageAttributesSetRemap(__handle, map); }
+        public void SetColorMatrix(global::System.Drawing.Imaging.ColorMatrix newColorMatrix, global::System.Drawing.Imaging.ColorMatrixFlag mode, global::System.Drawing.Imaging.ColorAdjustType type) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|SetColorMatrix|System.Void (System.Drawing.Imaging.ColorMatrix,System.Drawing.Imaging.ColorMatrixFlag,System.Drawing.Imaging.ColorAdjustType)");  if (newColorMatrix is null) throw new global::System.ArgumentNullException(nameof(newColorMatrix)); global::System.Drawing.NativeDrawingBridge.ImageAttributesSetColorMatrix(__handle, newColorMatrix.__values); }
     }
     public partial class ImageFormat : object {
         internal static readonly global::System.Drawing.Imaging.ImageFormat __png = new global::System.Drawing.Imaging.ImageFormat();
         public ImageFormat() { }
-        public static global::System.Drawing.Imaging.ImageFormat Png { get { return __png; } }
+        public static global::System.Drawing.Imaging.ImageFormat Png { get { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Imaging.ImageFormat|get_Png|System.Drawing.Imaging.ImageFormat ()");  return __png; } }
     }
     public enum ImageLockMode : int {
         ReadOnly = 1,
@@ -529,6 +534,229 @@ namespace System.Drawing.Imaging {
     }
 }
 namespace System.Drawing {
+    internal static class FacadeCallTelemetry {
+        private const string AssemblyName = "System.Drawing.Common";
+        private static readonly string? DirectoryPath = global::System.Environment.GetEnvironmentVariable("GUI_FACADE_CALL_REPORT_DIR");
+        private static readonly bool Enabled = !global::System.String.IsNullOrWhiteSpace(DirectoryPath);
+        private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, long> Counts = new(global::System.StringComparer.Ordinal);
+        private static readonly object FlushGate = new();
+        private static readonly string[] AllKeys = new string[] {
+            "System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Drawing.Image)",
+            "System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.IO.Stream)",
+            "System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Bitmap|.ctor|System.Void (System.Int32,System.Int32,System.Drawing.Imaging.PixelFormat)",
+            "System.Drawing.Common|System.Drawing.Bitmap|GetHbitmap|System.IntPtr (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Bitmap|GetPixel|System.Drawing.Color (System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Bitmap|LockBits|System.Drawing.Imaging.BitmapData (System.Drawing.Rectangle,System.Drawing.Imaging.ImageLockMode,System.Drawing.Imaging.PixelFormat)",
+            "System.Drawing.Common|System.Drawing.Bitmap|MakeTransparent|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Bitmap|UnlockBits|System.Void (System.Drawing.Imaging.BitmapData)",
+            "System.Drawing.Common|System.Drawing.Brushes|get_Black|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brushes|get_Gainsboro|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brushes|get_Red|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brushes|get_Transparent|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brushes|get_White|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brushes|get_Yellow|System.Drawing.Brush ()",
+            "System.Drawing.Common|System.Drawing.Brush|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|.ctor|System.Void (System.Int32)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|get_Colors|System.Drawing.Color[] ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|get_Positions|System.Single[] ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|set_Colors|System.Void (System.Drawing.Color[])",
+            "System.Drawing.Common|System.Drawing.Drawing2D.ColorBlend|set_Positions|System.Void (System.Single[])",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Drawing.Rectangle,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Drawing.RectangleF,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddArc|System.Void (System.Int32,System.Int32,System.Int32,System.Int32,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddEllipse|System.Void (System.Drawing.RectangleF)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddLine|System.Void (System.Drawing.PointF,System.Drawing.PointF)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddLine|System.Void (System.Int32,System.Int32,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddPath|System.Void (System.Drawing.Drawing2D.GraphicsPath,System.Boolean)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddRectangle|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddRectangle|System.Void (System.Drawing.RectangleF)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|AddString|System.Void (System.String,System.Drawing.FontFamily,System.Int32,System.Single,System.Drawing.Point,System.Drawing.StringFormat)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Clone|System.Object ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|CloseFigure|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|GetBounds|System.Drawing.RectangleF ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|IsVisible|System.Boolean (System.Drawing.Point)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Reset|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|StartFigure|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|Transform|System.Void (System.Drawing.Drawing2D.Matrix)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.GraphicsPath|get_PathPoints|System.Drawing.PointF[] ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.HatchBrush|.ctor|System.Void (System.Drawing.Drawing2D.HatchStyle,System.Drawing.Color,System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|.ctor|System.Void (System.Drawing.Rectangle,System.Drawing.Color,System.Drawing.Color,System.Drawing.Drawing2D.LinearGradientMode)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|.ctor|System.Void (System.Drawing.RectangleF,System.Drawing.Color,System.Drawing.Color,System.Drawing.Drawing2D.LinearGradientMode)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_Blend|System.Void (System.Drawing.Drawing2D.Blend)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_InterpolationColors|System.Void (System.Drawing.Drawing2D.ColorBlend)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.LinearGradientBrush|set_WrapMode|System.Void (System.Drawing.Drawing2D.WrapMode)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.Matrix|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.Matrix|.ctor|System.Void (System.Drawing.Rectangle,System.Drawing.Point[])",
+            "System.Drawing.Common|System.Drawing.Drawing2D.Matrix|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Drawing2D.Matrix|RotateAt|System.Void (System.Single,System.Drawing.PointF)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.Matrix|Translate|System.Void (System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|.ctor|System.Void (System.Drawing.Drawing2D.GraphicsPath)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|set_CenterColor|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Drawing2D.PathGradientBrush|set_SurroundColors|System.Void (System.Drawing.Color[])",
+            "System.Drawing.Common|System.Drawing.FontFamily|.ctor|System.Void (System.String)",
+            "System.Drawing.Common|System.Drawing.FontFamily|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.Drawing.Font,System.Drawing.FontStyle)",
+            "System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.String,System.Single)",
+            "System.Drawing.Common|System.Drawing.Font|.ctor|System.Void (System.String,System.Single,System.Drawing.FontStyle,System.Drawing.GraphicsUnit,System.Byte)",
+            "System.Drawing.Common|System.Drawing.Font|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Font|get_Height|System.Int32 ()",
+            "System.Drawing.Common|System.Drawing.Graphics|Clear|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Graphics|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawEllipse|System.Void (System.Drawing.Pen,System.Single,System.Single,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawIcon|System.Void (System.Drawing.Icon,System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImageUnscaled|System.Void (System.Drawing.Image,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Drawing.Rectangle,System.Drawing.GraphicsUnit)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Int32,System.Int32,System.Int32,System.Int32,System.Drawing.GraphicsUnit,System.Drawing.Imaging.ImageAttributes)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Drawing.Rectangle,System.Single,System.Single,System.Single,System.Single,System.Drawing.GraphicsUnit,System.Drawing.Imaging.ImageAttributes)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawImage|System.Void (System.Drawing.Image,System.Int32,System.Int32,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLines|System.Void (System.Drawing.Pen,System.Drawing.PointF[])",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLines|System.Void (System.Drawing.Pen,System.Drawing.Point[])",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Drawing.Point,System.Drawing.Point)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Drawing.PointF,System.Drawing.PointF)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Int32,System.Int32,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawLine|System.Void (System.Drawing.Pen,System.Single,System.Single,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawPath|System.Void (System.Drawing.Pen,System.Drawing.Drawing2D.GraphicsPath)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawRectangle|System.Void (System.Drawing.Pen,System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawRectangle|System.Void (System.Drawing.Pen,System.Int32,System.Int32,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.PointF)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.PointF,System.Drawing.StringFormat)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.RectangleF)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Drawing.RectangleF,System.Drawing.StringFormat)",
+            "System.Drawing.Common|System.Drawing.Graphics|DrawString|System.Void (System.String,System.Drawing.Font,System.Drawing.Brush,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillEllipse|System.Void (System.Drawing.Brush,System.Single,System.Single,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillPath|System.Void (System.Drawing.Brush,System.Drawing.Drawing2D.GraphicsPath)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillPolygon|System.Void (System.Drawing.Brush,System.Drawing.PointF[])",
+            "System.Drawing.Common|System.Drawing.Graphics|FillPolygon|System.Void (System.Drawing.Brush,System.Drawing.Point[])",
+            "System.Drawing.Common|System.Drawing.Graphics|FillRectangles|System.Void (System.Drawing.Brush,System.Drawing.Rectangle[])",
+            "System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Drawing.RectangleF)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Int32,System.Int32,System.Int32,System.Int32)",
+            "System.Drawing.Common|System.Drawing.Graphics|FillRectangle|System.Void (System.Drawing.Brush,System.Single,System.Single,System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|Flush|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Graphics|FromHdcInternal|System.Drawing.Graphics (System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Graphics|FromHdc|System.Drawing.Graphics (System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Graphics|FromHwnd|System.Drawing.Graphics (System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Graphics|FromImage|System.Drawing.Graphics (System.Drawing.Image)",
+            "System.Drawing.Common|System.Drawing.Graphics|GetHdc|System.IntPtr ()",
+            "System.Drawing.Common|System.Drawing.Graphics|IsVisible|System.Boolean (System.Drawing.PointF)",
+            "System.Drawing.Common|System.Drawing.Graphics|MeasureString|System.Drawing.SizeF (System.String,System.Drawing.Font)",
+            "System.Drawing.Common|System.Drawing.Graphics|MeasureString|System.Drawing.SizeF (System.String,System.Drawing.Font,System.Int32,System.Drawing.StringFormat)",
+            "System.Drawing.Common|System.Drawing.Graphics|ReleaseHdc|System.Void (System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Graphics|Restore|System.Void (System.Drawing.Drawing2D.GraphicsState)",
+            "System.Drawing.Common|System.Drawing.Graphics|Save|System.Drawing.Drawing2D.GraphicsState ()",
+            "System.Drawing.Common|System.Drawing.Graphics|SetClip|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Graphics|TranslateTransform|System.Void (System.Single,System.Single)",
+            "System.Drawing.Common|System.Drawing.Graphics|get_ClipBounds|System.Drawing.RectangleF ()",
+            "System.Drawing.Common|System.Drawing.Graphics|get_InterpolationMode|System.Drawing.Drawing2D.InterpolationMode ()",
+            "System.Drawing.Common|System.Drawing.Graphics|get_SmoothingMode|System.Drawing.Drawing2D.SmoothingMode ()",
+            "System.Drawing.Common|System.Drawing.Graphics|get_Transform|System.Drawing.Drawing2D.Matrix ()",
+            "System.Drawing.Common|System.Drawing.Graphics|set_CompositingMode|System.Void (System.Drawing.Drawing2D.CompositingMode)",
+            "System.Drawing.Common|System.Drawing.Graphics|set_CompositingQuality|System.Void (System.Drawing.Drawing2D.CompositingQuality)",
+            "System.Drawing.Common|System.Drawing.Graphics|set_InterpolationMode|System.Void (System.Drawing.Drawing2D.InterpolationMode)",
+            "System.Drawing.Common|System.Drawing.Graphics|set_PixelOffsetMode|System.Void (System.Drawing.Drawing2D.PixelOffsetMode)",
+            "System.Drawing.Common|System.Drawing.Graphics|set_SmoothingMode|System.Void (System.Drawing.Drawing2D.SmoothingMode)",
+            "System.Drawing.Common|System.Drawing.Graphics|set_Transform|System.Void (System.Drawing.Drawing2D.Matrix)",
+            "System.Drawing.Common|System.Drawing.Icon|.ctor|System.Void (System.IO.Stream)",
+            "System.Drawing.Common|System.Drawing.Icon|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Icon|ToBitmap|System.Drawing.Bitmap ()",
+            "System.Drawing.Common|System.Drawing.Image+GetThumbnailImageAbort|Invoke|System.Boolean ()",
+            "System.Drawing.Common|System.Drawing.Image|Clone|System.Object ()",
+            "System.Drawing.Common|System.Drawing.Image|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Image|FromFile|System.Drawing.Image (System.String)",
+            "System.Drawing.Common|System.Drawing.Image|FromHbitmap|System.Drawing.Bitmap (System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Image|FromStream|System.Drawing.Image (System.IO.Stream)",
+            "System.Drawing.Common|System.Drawing.Image|GetThumbnailImage|System.Drawing.Image (System.Int32,System.Int32,System.Drawing.Image+GetThumbnailImageAbort,System.IntPtr)",
+            "System.Drawing.Common|System.Drawing.Image|Save|System.Void (System.IO.Stream,System.Drawing.Imaging.ImageFormat)",
+            "System.Drawing.Common|System.Drawing.Image|Save|System.Void (System.String)",
+            "System.Drawing.Common|System.Drawing.Image|get_Height|System.Int32 ()",
+            "System.Drawing.Common|System.Drawing.Image|get_PixelFormat|System.Drawing.Imaging.PixelFormat ()",
+            "System.Drawing.Common|System.Drawing.Image|get_Width|System.Int32 ()",
+            "System.Drawing.Common|System.Drawing.Imaging.BitmapData|get_Scan0|System.IntPtr ()",
+            "System.Drawing.Common|System.Drawing.Imaging.BitmapData|get_Stride|System.Int32 ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ColorMap|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ColorMap|set_NewColor|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Imaging.ColorMap|set_OldColor|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Imaging.ColorMatrix|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ColorMatrix|set_Matrix33|System.Void (System.Single)",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|Clone|System.Object ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|SetColorMatrix|System.Void (System.Drawing.Imaging.ColorMatrix,System.Drawing.Imaging.ColorMatrixFlag,System.Drawing.Imaging.ColorAdjustType)",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageAttributes|SetRemapTable|System.Void (System.Drawing.Imaging.ColorMap[])",
+            "System.Drawing.Common|System.Drawing.Imaging.ImageFormat|get_Png|System.Drawing.Imaging.ImageFormat ()",
+            "System.Drawing.Common|System.Drawing.Pens|get_DarkGray|System.Drawing.Pen ()",
+            "System.Drawing.Common|System.Drawing.Pens|get_Yellow|System.Drawing.Pen ()",
+            "System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Brush)",
+            "System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Brush,System.Single)",
+            "System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.Pen|.ctor|System.Void (System.Drawing.Color,System.Single)",
+            "System.Drawing.Common|System.Drawing.Pen|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Pen|set_DashPattern|System.Void (System.Single[])",
+            "System.Drawing.Common|System.Drawing.Pen|set_DashStyle|System.Void (System.Drawing.Drawing2D.DashStyle)",
+            "System.Drawing.Common|System.Drawing.Pen|set_Width|System.Void (System.Single)",
+            "System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Drawing2D.GraphicsPath)",
+            "System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Region|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.Region|Exclude|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Drawing2D.GraphicsPath)",
+            "System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.SolidBrush|.ctor|System.Void (System.Drawing.Color)",
+            "System.Drawing.Common|System.Drawing.SolidBrush|get_Color|System.Drawing.Color ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void (System.Drawing.StringFormat)",
+            "System.Drawing.Common|System.Drawing.StringFormat|.ctor|System.Void (System.Drawing.StringFormatFlags)",
+            "System.Drawing.Common|System.Drawing.StringFormat|Dispose|System.Void ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|get_FormatFlags|System.Drawing.StringFormatFlags ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|get_GenericDefault|System.Drawing.StringFormat ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|get_GenericTypographic|System.Drawing.StringFormat ()",
+            "System.Drawing.Common|System.Drawing.StringFormat|set_Alignment|System.Void (System.Drawing.StringAlignment)",
+            "System.Drawing.Common|System.Drawing.StringFormat|set_FormatFlags|System.Void (System.Drawing.StringFormatFlags)",
+            "System.Drawing.Common|System.Drawing.StringFormat|set_LineAlignment|System.Void (System.Drawing.StringAlignment)",
+            "System.Drawing.Common|System.Drawing.StringFormat|set_Trimming|System.Void (System.Drawing.StringTrimming)",
+            "System.Drawing.Common|System.Drawing.SystemFonts|get_DefaultFont|System.Drawing.Font ()",
+            "System.Drawing.Common|System.Drawing.SystemFonts|get_MenuFont|System.Drawing.Font ()",
+        };
+        private static readonly global::System.Threading.Timer? FlushTimer = Enabled ? new global::System.Threading.Timer(_ => Flush(), null, 2000, 2000) : null;
+        static FacadeCallTelemetry() { if (Enabled) global::System.AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush(); }
+        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        internal static void Hit(string key) { if (!Enabled) return; Counts.AddOrUpdate(key, 1, static (_, value) => value + 1); }
+        internal static bool IsEnabled { get { return Enabled; } }
+        internal static void Observe(string category, string value) { if (!Enabled) return; Hit("metric|" + category + "|" + value); }
+        internal static void ObserveValue(string category, long value) { if (!Enabled) return; Counts.AddOrUpdate("metric|" + category + "|samples", 1, static (_, prior) => prior + 1); Counts.AddOrUpdate("metric|" + category + "|sum", value, (_, prior) => checked(prior + value)); Counts.AddOrUpdate("metric|" + category + "|min", value, (_, prior) => global::System.Math.Min(prior, value)); Counts.AddOrUpdate("metric|" + category + "|max", value, (_, prior) => global::System.Math.Max(prior, value)); }
+        internal static void Flush() {
+            if (!Enabled || DirectoryPath is null) return;
+            lock (FlushGate) {
+                try {
+                    global::System.IO.Directory.CreateDirectory(DirectoryPath);
+                    var lines = new global::System.Collections.Generic.List<string>(AllKeys.Length + 5);
+                    lines.Add("schema\tgui.forms.call-coverage/v1");
+                    lines.Add("assembly\t" + AssemblyName);
+                    lines.Add("process_id\t" + global::System.Environment.ProcessId.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+                    lines.Add("instrumented_keys\t" + AllKeys.Length.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+                    lines.Add("key\tcount");
+                    foreach (var key in AllKeys) { Counts.TryGetValue(key, out var count); lines.Add(key + "\t" + count.ToString(global::System.Globalization.CultureInfo.InvariantCulture)); }
+                    var known = new global::System.Collections.Generic.HashSet<string>(AllKeys, global::System.StringComparer.Ordinal);
+                    var metrics = new global::System.Collections.Generic.List<global::System.Collections.Generic.KeyValuePair<string, long>>();
+                    foreach (var entry in Counts) if (!known.Contains(entry.Key)) metrics.Add(entry);
+                    metrics.Sort((left, right) => global::System.StringComparer.Ordinal.Compare(left.Key, right.Key));
+                    foreach (var entry in metrics) lines.Add(entry.Key + "\t" + entry.Value.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+                    var process = global::System.Environment.ProcessId.ToString(global::System.Globalization.CultureInfo.InvariantCulture);
+                    var path = global::System.IO.Path.Combine(DirectoryPath, AssemblyName + "." + process + ".calls.tsv");
+                    var temporary = path + ".tmp";
+                    global::System.IO.File.WriteAllLines(temporary, lines);
+                    global::System.IO.File.Move(temporary, path, true);
+                } catch (global::System.Exception error) {
+                    if (global::System.Environment.GetEnvironmentVariable("GUI_FACADE_CALL_REPORT_TRACE") == "1") global::System.Console.Error.WriteLine("facade-call-report-error=assembly:" + AssemblyName + "|type:" + error.GetType().FullName + "|message:" + error.Message.Replace('\r', ' ').Replace('\n', ' '));
+                }
+            }
+        }
+    }
     internal static class FacadeStubDiagnostics {
         private static readonly bool Trace = global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_STUBS") == "1";
         internal static T Value<T>(string member) { if (Trace) global::System.Console.Error.WriteLine("drawing-facade-stub=" + member); return default!; }

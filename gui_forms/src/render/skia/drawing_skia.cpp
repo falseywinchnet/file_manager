@@ -10,6 +10,7 @@
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
+#include "include/core/SkFontStyle.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMatrix.h"
@@ -19,6 +20,7 @@
 #include "include/core/SkPixmap.h"
 #include "include/core/SkSamplingOptions.h"
 #include "include/core/SkSurface.h"
+#include "include/core/SkString.h"
 #include "include/core/SkTypeface.h"
 #include "include/effects/SkColorMatrixFilter.h"
 #include "include/effects/SkDashPathEffect.h"
@@ -35,6 +37,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -42,6 +45,43 @@
 
 namespace gui_drawing::render {
 namespace {
+
+[[nodiscard]] double pixel_font_size(const FontSnapshot& font) noexcept {
+    constexpr double dpi = 96.0;
+    switch (font.unit) {
+    case GraphicsUnit::display: return font.size * dpi / 75.0;
+    case GraphicsUnit::point: return font.size * dpi / 72.0;
+    case GraphicsUnit::inch: return font.size * dpi;
+    case GraphicsUnit::document: return font.size * dpi / 300.0;
+    case GraphicsUnit::millimeter: return font.size * dpi / 25.4;
+    case GraphicsUnit::world:
+    case GraphicsUnit::pixel: return font.size;
+    }
+    return font.size;
+}
+
+[[nodiscard]] std::string typeface_key(std::string_view family,
+                                       std::uint32_t style) {
+    return std::string(family) + '\x1f' + std::to_string(style & 1U);
+}
+
+[[nodiscard]] std::string ascii_lower(std::string_view value) {
+    std::string result(value);
+    std::transform(result.begin(), result.end(), result.begin(), [](char entry) {
+        return entry >= 'A' && entry <= 'Z' ? static_cast<char>(entry + ('a' - 'A'))
+                                            : entry;
+    });
+    return result;
+}
+
+[[nodiscard]] std::size_t first_utf8_codepoint_size(std::string_view text) noexcept {
+    if (text.empty()) return 0U;
+    const auto first = static_cast<unsigned char>(text.front());
+    if ((first & 0x80U) == 0U) return 1U;
+    if ((first & 0xe0U) == 0xc0U) return std::min<std::size_t>(2U, text.size());
+    if ((first & 0xf0U) == 0xe0U) return std::min<std::size_t>(3U, text.size());
+    return std::min<std::size_t>(4U, text.size());
+}
 
 [[nodiscard]] SkColor to_sk_color(Color color) noexcept {
     return color.is_empty() ? SK_ColorTRANSPARENT :
@@ -366,11 +406,45 @@ public:
     };
     std::unordered_map<std::string, sk_sp<SkTypeface>> typefaces;
 
-    [[nodiscard]] sk_sp<SkTypeface> typeface(std::string_view family) const {
-        const auto found = typefaces.find(std::string(family));
+    [[nodiscard]] sk_sp<SkTypeface> typeface(std::string_view family,
+                                             std::uint32_t style) const {
+        const auto found = typefaces.find(typeface_key(family, style));
         if (found != typefaces.end()) return found->second;
-        const auto fallback = typefaces.find("Portsmouth Rapids");
-        return fallback == typefaces.end() ? SkTypeface::MakeEmpty() : fallback->second;
+        const auto regular = typefaces.find(typeface_key(family, 0U));
+        if (regular != typefaces.end()) return regular->second;
+        const SkFontStyle requested(
+            (style & 1U) != 0U ? SkFontStyle::kBold_Weight
+                               : SkFontStyle::kNormal_Weight,
+            SkFontStyle::kNormal_Width,
+            (style & 2U) != 0U ? SkFontStyle::kItalic_Slant
+                               : SkFontStyle::kUpright_Slant);
+        if (!family.empty()) {
+            if (sk_sp<SkTypeface> platform = font_manager->matchFamilyStyle(
+                    std::string(family).c_str(), requested)) {
+                return platform;
+            }
+        }
+        const auto fallback = typefaces.find(typeface_key("Portsmouth Rapids", style));
+        if (fallback != typefaces.end()) return fallback->second;
+        const auto regular_fallback = typefaces.find(typeface_key("Portsmouth Rapids", 0U));
+        if (regular_fallback != typefaces.end()) return regular_fallback->second;
+        if (sk_sp<SkTypeface> platform = font_manager->legacyMakeTypeface(
+                nullptr, requested)) {
+            return platform;
+        }
+        return SkTypeface::MakeEmpty();
+    }
+
+    [[nodiscard]] SkFont font(const FontSnapshot& spec) const {
+        SkFont result(typeface(spec.family, spec.style),
+                      static_cast<SkScalar>(pixel_font_size(spec)));
+        result.setEdging(SkFont::Edging::kAntiAlias);
+        if ((spec.style & 1U) != 0U &&
+            typefaces.find(typeface_key(spec.family, 1U)) == typefaces.end()) {
+            result.setEmbolden(true);
+        }
+        if ((spec.style & 2U) != 0U) result.setSkewX(-0.25F);
+        return result;
     }
 };
 
@@ -379,22 +453,132 @@ SkiaExecutor::SkiaExecutor()
 SkiaExecutor::~SkiaExecutor() = default;
 
 bool SkiaExecutor::register_typeface(std::string_view family,
-                                     std::span<const std::byte> encoded) {
+                                     std::span<const std::byte> encoded,
+                                     std::uint32_t style) {
     if (!owner_thread() || family.empty() || family.size() > 4096U || encoded.empty()) {
         return false;
     }
     sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-    sk_sp<SkTypeface> typeface = impl_->font_manager->makeFromData(std::move(data));
-    if (!typeface) return false;
-    impl_->typefaces[std::string(family)] = std::move(typeface);
+    const std::string requested_family = ascii_lower(family);
+    const int requested_weight = (style & 1U) != 0U
+        ? SkFontStyle::kBold_Weight : SkFontStyle::kNormal_Weight;
+    sk_sp<SkTypeface> best;
+    int best_score = std::numeric_limits<int>::min();
+    // makeFromData's collection index is observable for TTC/OTC files. Scan a
+    // bounded number of faces and choose the requested family/style instead of
+    // silently using collection face zero.
+    for (int index = 0; index < 64; ++index) {
+        sk_sp<SkTypeface> candidate = impl_->font_manager->makeFromData(data, index);
+        if (!candidate) {
+            if (index == 0) return false;
+            break;
+        }
+        SkString candidate_family;
+        candidate->getFamilyName(&candidate_family);
+        const bool exact_family = ascii_lower(candidate_family.c_str()) == requested_family;
+        const int weight_distance = std::abs(candidate->fontStyle().weight() -
+                                             requested_weight);
+        const int score = (exact_family ? 100000 : 0) - weight_distance;
+        if (score > best_score) {
+            best_score = score;
+            best = std::move(candidate);
+        }
+        if (exact_family && weight_distance == 0) break;
+    }
+    if (!best) return false;
+    impl_->typefaces[typeface_key(family, style)] = std::move(best);
     return true;
 }
 
+SizeF SkiaExecutor::measure_string(std::string_view utf8,
+                                  const FontSnapshot& font_spec,
+                                  const StringFormatSnapshot& format,
+                                  double layout_width) {
+    if (!owner_thread() || !std::isfinite(layout_width) || layout_width < 0.0) {
+        throw std::invalid_argument("text measurement arguments are invalid");
+    }
+    if (utf8.empty()) return {};
+    const SkFont font = impl_->font(font_spec);
+    SkFontMetrics metrics{};
+    font.getMetrics(&metrics);
+    const bool fit_black_box = (format.flags & UINT32_C(0x0004)) != 0U;
+    const double overhang = fit_black_box ? 0.0 : pixel_font_size(font_spec) / 6.0;
+    const double line_height = std::max(0.0,
+        static_cast<double>(metrics.fDescent - metrics.fAscent + metrics.fLeading) +
+        overhang);
+    const bool wrap = layout_width > 0.0 && (format.flags & UINT32_C(0x1000)) == 0U;
+    const double content_width = wrap ? std::max(0.0, layout_width - overhang * 2.0) : 0.0;
+    double maximum_width{};
+    std::size_t line_count{};
+    std::size_t offset{};
+    do {
+        const std::size_t newline = utf8.find('\n', offset);
+        const std::size_t end = newline == std::string_view::npos ? utf8.size() : newline;
+        std::string_view line = utf8.substr(offset, end - offset);
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1U);
+        if (!wrap || line.empty()) {
+            const SkScalar width = font.measureText(line.data(), line.size(),
+                                                    SkTextEncoding::kUTF8);
+            maximum_width = std::max(maximum_width, static_cast<double>(width));
+            ++line_count;
+        } else {
+            while (!line.empty()) {
+                std::vector<std::size_t> byte_ends;
+                for (std::string_view rest = line; !rest.empty();) {
+                    const std::size_t count = first_utf8_codepoint_size(rest);
+                    byte_ends.push_back(line.size() - rest.size() + count);
+                    rest.remove_prefix(count);
+                }
+                std::vector<SkGlyphID> glyphs(font.countText(
+                    line.data(), line.size(), SkTextEncoding::kUTF8));
+                font.textToGlyphs(line.data(), line.size(), SkTextEncoding::kUTF8,
+                                  SkSpan<SkGlyphID>(glyphs));
+                std::vector<SkScalar> widths(glyphs.size());
+                font.getWidths(SkSpan<const SkGlyphID>(glyphs), SkSpan<SkScalar>(widths));
+                SkScalar width{};
+                std::size_t fitted{};
+                while (fitted < widths.size() &&
+                       width + widths[fitted] <= static_cast<SkScalar>(content_width)) {
+                    width += widths[fitted++];
+                }
+                if (fitted == 0U) {
+                    fitted = 1U;
+                    width = widths.empty() ? 0.0F : widths.front();
+                }
+                std::size_t consumed = byte_ends[std::min(fitted, byte_ends.size()) - 1U];
+                if (consumed < line.size()) {
+                    const std::size_t space = line.substr(0U, consumed).find_last_of(" \t");
+                    if (space != std::string_view::npos && space != 0U) {
+                        consumed = space;
+                        width = font.measureText(line.data(), consumed,
+                                                 SkTextEncoding::kUTF8);
+                    }
+                }
+                maximum_width = std::max(maximum_width,
+                                         std::min(content_width, static_cast<double>(width)));
+                ++line_count;
+                line.remove_prefix(consumed);
+                while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+                    line.remove_prefix(1U);
+                }
+            }
+        }
+        if (newline == std::string_view::npos) break;
+        offset = newline + 1U;
+    } while (offset <= utf8.size());
+    return {wrap ? std::min(layout_width, maximum_width + overhang * 2.0) :
+                   maximum_width + overhang * 2.0,
+            line_height * static_cast<double>(line_count)};
+}
+
 RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
-                                   Bitmap& target) {
+                                   Bitmap& target,
+                                   std::size_t first_command) {
     if (!owner_thread()) return {RasterError::wrong_thread};
     try {
         const std::span<const DrawingCommand> commands = recorder.commands();
+        if (first_command > commands.size()) return {RasterError::invalid_argument};
+        if (first_command == commands.size()) return {};
         auto scratch = target.clone({0, 0, static_cast<std::int32_t>(target.width()),
                                       static_cast<std::int32_t>(target.height())});
         const BitmapLockView scratch_lock = scratch->lock(BitmapLockMode::write);
@@ -406,7 +590,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
         if (!surface) return {RasterError::target_unavailable};
         SkCanvas* canvas = surface->getCanvas();
         std::size_t executed{};
-        for (const DrawingCommand& command : commands) {
+        for (const DrawingCommand& command : commands.subspan(first_command)) {
             canvas->restoreToCount(1);
             canvas->resetMatrix();
             if (command.state.clip) {
@@ -446,13 +630,14 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 break;
             case CommandKind::draw_string: {
                 paint.setColor(to_sk_color(command.color));
-                SkFont font(impl_->typeface(command.font.family),
-                            static_cast<SkScalar>(command.font.size));
-                SkScalar x = static_cast<SkScalar>(command.first.x);
+                SkFont font = impl_->font(command.font);
+                const SkScalar overhang = (command.format.flags & UINT32_C(0x0004)) == 0U ?
+                    static_cast<SkScalar>(pixel_font_size(command.font) / 6.0) : 0.0F;
+                SkScalar x = static_cast<SkScalar>(command.first.x) + overhang;
                 SkFontMetrics metrics;
                 font.getMetrics(&metrics);
                 const SkScalar baseline = static_cast<SkScalar>(command.first.y) -
-                    metrics.fAscent;
+                    metrics.fAscent + overhang;
                 if (command.format.alignment != StringAlignment::near) {
                     const SkScalar width = font.measureText(
                         command.text.data(), command.text.size(),

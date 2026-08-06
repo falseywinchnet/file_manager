@@ -199,11 +199,15 @@ typedef struct gd_raster_service_v0 {
     uint32_t struct_size;
     uint32_t abi_version;
     gd_result (*execute)(const void* recorder, void* bitmap,
+                         uint64_t first_command,
                          uint64_t* commands_executed);
     gd_result (*encode_png)(const void* bitmap, void* buffer,
                             uint64_t capacity, uint64_t* required_size);
     gd_result (*decode_png)(const void* data, uint64_t size,
                             void** bitmap);
+    gd_result (*measure_string)(const void* font, const void* format,
+                                gd_string_view text, double layout_width,
+                                gd_size* measured);
 } gd_raster_service_v0;
 
 typedef struct gd_api_v0 {
@@ -401,6 +405,14 @@ typedef struct gd_api_v0 {
     gd_result (*bitmap_acquire_hdc)(gd_handle bitmap, uintptr_t* hdc,
                                     uint64_t* lease_token);
     gd_result (*bitmap_release_hdc)(gd_handle bitmap, uint64_t lease_token);
+    /* M11g renderer-owned glyph metrics; a zero format handle means defaults. */
+    gd_result (*measure_string)(gd_string_view text, gd_handle font,
+                                gd_handle format, double layout_width,
+                                gd_size* measured);
+    /* M11g incremental retained commit; returns commands run from first_command. */
+    gd_result (*recorder_execute_from)(gd_handle recorder, gd_handle bitmap,
+                                       uint64_t first_command,
+                                       uint64_t* commands_executed);
 } gd_api_v0;
 
 /*

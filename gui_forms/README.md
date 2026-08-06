@@ -20,12 +20,18 @@ cmake -S gui_forms -B gui_forms/build -DCMAKE_BUILD_TYPE=Release
 cmake --build gui_forms/build --parallel
 ctest --test-dir gui_forms/build --output-on-failure
 open "gui_forms/build/GUI.Forms Gallery.app"
+open "gui_forms/build/GUI.Forms Complete Showcase.app"
 ```
 
 The lower project does not consume sources from the File Manager parent. The
 public retained core is renderer-neutral; Skia and AppKit remain private
 adapters. See `third_party/SKIA_BUILD_EVIDENCE.md` for the exact measured pin,
 archive sizes, link audit, and the non-PNG decoder negative result.
+
+The independent Complete Showcase is the broad dogfood board rather than the
+File Manager mockup. Its current twelve pages include stock controls, ranges,
+containers, animation/state matrices, text and collections, values, images and
+drawing, tabs, checked lists, and live Timer/ToolTip provider behavior.
 
 ## First-party consumer specification
 

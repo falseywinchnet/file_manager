@@ -41,11 +41,25 @@ remain negotiating. A bounded Rust development client now passes version,
 status, exact query, and shutdown against a separately built Go Engine process.
 The first ADR-009 local-daemon slice now provides bounded `ORC1` framing,
 private Unix discovery, an OS-random credential hello, instance verification,
-and CLI status/shutdown across separate processes. It remains pre-production
-until concurrency, hostile/cross-version, launchd session-location, independent
-client, and Windows named-pipe gates pass. A database, plugin worker, semantic
-fact API, GUI, and durable user settings remain absent and independently
-reported.
+and CLI status/shutdown across separate processes. ADR-011 adds a stable macOS
+Application Support endpoint, launchd listener adoption, and bounded
+activation/credential rediscovery. An actual installed LaunchAgent lifecycle
+and the Windows named-pipe gate remain open. Its fixed worker pool and bounded
+pending-session queue prevent slow peers from creating unbounded threads or
+blocking the control plane beyond the bounded handshake interval. Native peer
+UID verification, no-follow durable endpoint publication, secure Rust secret
+erasure, fail-closed worker panic containment, bounded stdio draining, and
+non-authoritative live transport counters harden that boundary. A separately
+built C++17 conformance client now reads the
+atomic typed bootstrap snapshot—including contracts, availability, route/
+fallback state, and service-control eligibility—verifies the golden digest,
+and reconnects across daemon restarts. A database, plugin worker,
+semantic fact API, GUI, and durable user settings remain absent and
+independently reported.
+
+The release projection now carries a deterministic SHA-256 digest over the
+manifest fields and embedded Core contract inputs. It is explicitly unsigned;
+packaged-artifact signing remains outside this development build's claim.
 
 The executable reports progress toward the Core 1.0 bootstrap profile. A target
 declaration is not a readiness claim: discovery/authentication, production
@@ -72,6 +86,10 @@ producer code into ABI.
   records the required bounded catalogue-independent fallback and routing law.
 - [`ADR-009`](../decisions/ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md)
   records the local wire, discovery, and session-authentication decision.
+- [`ADR-010`](../decisions/ADR-010-ORCHESTRATOR-CORE-1-0-COMPATIBILITY-HORIZON.md)
+  starts the macOS Core contract/wire 1.0 line and defines Core 1.x compatibility.
+- [`ADR-011`](../decisions/ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md)
+  defines stable macOS discovery, launchd socket adoption, and activation retry.
 - [`spec/CONTRACT_REGISTRY.md`](spec/CONTRACT_REGISTRY.md) is the master
   inventory.
 - [`planning/MASTER_SPECIFICATION.md`](planning/MASTER_SPECIFICATION.md) defines
@@ -92,16 +110,26 @@ cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-feature
 cargo run --manifest-path orchestrator/Cargo.toml -- status
 ```
 
-The current Unix local-daemon slice requires an explicit short private runtime
-leaf until the launchd/session adapter owns its location:
+On macOS, the Rust CLI and independent C++ client derive the same stable private
+Application Support location. `--runtime-dir` remains available as an explicit
+test or development override:
 
 ```sh
 cargo run --manifest-path orchestrator/Cargo.toml -- \
-  serve-local --runtime-dir /absolute/private/runtime-leaf
+  serve-local
 cargo run --manifest-path orchestrator/Cargo.toml -- \
-  call-local status --runtime-dir /absolute/private/runtime-leaf --json
+  call-local status --json
 cargo run --manifest-path orchestrator/Cargo.toml -- \
-  call-local shutdown --runtime-dir /absolute/private/runtime-leaf
+  call-local shutdown
+```
+
+`launchd-plist` prints (but does not install or load) a LaunchAgent definition
+for the current binary. Packaging must first create the printed socket's parent
+leaf as the user with mode `0700`, install the binary and plist, and then perform
+the remaining real activation/removal gate:
+
+```sh
+cargo run --manifest-path orchestrator/Cargo.toml -- launchd-plist
 ```
 
 The bounded JSONL development adapter can be probed against an explicitly built

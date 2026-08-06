@@ -434,7 +434,20 @@ public:
             decoded.content_hash = resource->content_hash;
             decoded.width = resource->metadata.width;
             decoded.height = resource->metadata.height;
-            if (!decode_png(*factory, *resource, decoded)) {
+            if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+                const std::size_t expected =
+                    static_cast<std::size_t>(decoded.width) * decoded.height * 4U;
+                if (resource->row_bytes !=
+                        static_cast<std::uint64_t>(decoded.width) * 4U ||
+                    resource->encoded.size() != expected) {
+                    images_.erase(id.value);
+                    synchronized = false;
+                    continue;
+                }
+                decoded.pixels.resize(
+                    static_cast<std::size_t>(decoded.width) * decoded.height);
+                std::memcpy(decoded.pixels.data(), resource->encoded.data(), expected);
+            } else if (!decode_png(*factory, *resource, decoded)) {
                 images_.erase(id.value);
                 synchronized = false;
                 continue;

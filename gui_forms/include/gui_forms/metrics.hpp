@@ -34,6 +34,12 @@ struct MetricsSnapshot {
     std::uint64_t partial_paints{};
     std::uint64_t input_events{};
     std::uint64_t focus_transitions{};
+    std::uint64_t focus_scopes_opened{};
+    std::uint64_t focus_scopes_closed{};
+    std::uint64_t focus_scope_restorations{};
+    std::uint64_t focus_scope_rejections{};
+    std::uint64_t focus_scope_depth{};
+    std::uint64_t maximum_focus_scope_depth{};
     std::uint64_t activations{};
     std::uint64_t disposals{};
     std::uint64_t rejected_wrong_thread_operations{};
@@ -93,6 +99,10 @@ public:
     void set_display_cache(std::uint64_t entries, std::uint64_t generation) noexcept;
     void record_input() noexcept;
     void record_focus_transition() noexcept;
+    void record_focus_scope_opened(std::size_t depth) noexcept;
+    void record_focus_scope_closed(bool restored_focus,
+                                   std::size_t depth) noexcept;
+    void record_focus_scope_rejection() noexcept;
     void record_activation() noexcept;
     void record_disposal(std::uint64_t count = 1) noexcept;
     void record_wrong_thread_rejection() noexcept;

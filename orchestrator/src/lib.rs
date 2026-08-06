@@ -19,6 +19,7 @@ pub mod local_endpoint;
 pub mod local_session;
 pub mod local_wire;
 pub mod release;
+pub mod runtime_health;
 
 pub use common::{ApiError, ApiErrorCode, Request, Response, TerminalStatus};
 pub use kernel::Kernel;

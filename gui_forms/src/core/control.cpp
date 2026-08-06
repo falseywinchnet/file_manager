@@ -241,6 +241,20 @@ void Control::set_cursor(std::optional<CursorKind> cursor) {
     invalidate(Dirty::semantics);
 }
 
+void Control::set_accessible_name(std::string name) {
+    require_mutable();
+    if (accessible_name_ == name) return;
+    accessible_name_ = std::move(name);
+    invalidate(Dirty::semantics);
+}
+
+void Control::set_accessible_description(std::string description) {
+    require_mutable();
+    if (accessible_description_ == description) return;
+    accessible_description_ = std::move(description);
+    invalidate(Dirty::semantics);
+}
+
 CursorKind Control::effective_cursor() const noexcept {
     const Control* current = this;
     Ptr owner;
@@ -441,6 +455,28 @@ void Control::on_key_preview(KeyEvent&) {}
 void Control::on_key(KeyEvent&) {}
 void Control::on_key_bubble(KeyEvent&) {}
 void Control::on_text_input(TextInputEvent&) {}
+void Control::on_frame(FrameTime) {}
+SemanticDescriptor Control::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.name = accessible_name_;
+    descriptor.description = accessible_description_;
+    return descriptor;
+}
+
+std::vector<SemanticNode> Control::semantic_virtual_children() const {
+    return {};
+}
+
+bool Control::on_semantic_action(SemanticAction action, std::string_view) {
+    if (action == SemanticAction::focus && window_ != nullptr && focusable_) {
+        return window_->request_focus(shared_from_this());
+    }
+    return false;
+}
+bool Control::on_semantic_child_action(std::string_view, SemanticAction,
+                                       std::string_view) {
+    return false;
+}
 void Control::on_drag_preview(DragEvent&) {}
 void Control::on_drag(DragEvent&) {}
 void Control::on_drag_bubble(DragEvent&) {}

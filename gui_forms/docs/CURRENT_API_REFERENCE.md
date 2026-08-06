@@ -59,6 +59,18 @@ Core control events are synchronous on the UI thread that caused the mutation;
 the event template does not imply background delivery. Experimental ABI 0.6
 adds an explicit host queue for `BeginInvoke`-shaped work, described below.
 
+### `Timer`
+
+- binds to one live `Window` and emits `tick()` on that Window's UI thread;
+- interval is at least 1 ms; `start`, deterministic `start_at`, `stop`, and
+  interval mutation are supported;
+- late deadlines coalesce to one callback while preserving their cadence and
+  registration order;
+- rendering occlusion does not suspend component time, while disabled timers
+  publish no wake; and
+- stop, component disposal, and Window shutdown synchronously revoke future
+  callbacks. This is not a background worker or general posted dispatcher.
+
 ## Unicode text and shaping foundation
 
 `TextStore` is the renderer- and host-neutral M4 mutable-text baseline.
@@ -138,6 +150,9 @@ Subclass hooks `on_attached_to_window`, `on_attachment_committed`, and
 observes a fully bound subtree parent-first. Detachment observes a fully unbound
 subtree child-first. The commit hook is nonthrowing and runs only after all
 throwing attach hooks succeed.
+
+`pointer_observed`, `focus_observed`, and `arranged_bounds_changed` provide
+tokenized observation for nonvisual providers without subclassing a target.
 
 ### Custom-control overrides
 
@@ -225,8 +240,27 @@ This is a GUI.Forms range control, not yet the complete stock WinForms facade.
 
 ### `ProgressBar`
 
-Horizontal/vertical determinate display. It is nonfocusable and does not
-intercept hit testing. Marquee mode is not implemented.
+Horizontal/vertical blocks and continuous determinate display plus bounded
+marquee and pulse animation through active-surface deadlines. It is
+nonfocusable, does not intercept hit testing, becomes scheduler-quiescent when
+paused or effectively hidden, and publishes numeric or busy semantics.
+
+## Nonvisual providers
+
+### `ToolTip`
+
+- tokenized `set_tool_tip`, lookup, removal, and clear mappings per attached
+  Control;
+- initial, reshow, and auto-pop delay policies plus hover/focus enablement and
+  `show_always`;
+- explicit persistent or duration-bounded show and immediate hide;
+- target-anchored or pointer-adjacent client-edge placement and live
+  repositioning when the owner moves;
+- input-transparent overlay-plane presentation and a stable semantic
+  `tool_tip` node; and
+- synchronous popup/timer cleanup when a mapping, target, provider, or Window
+  goes away. Accessible described-by relations, title/icon/balloon variants,
+  HelpProvider, and ErrorProvider remain open.
 
 ## `Window`
 
@@ -236,8 +270,11 @@ intercept hit testing. Marquee mode is not implemented.
 - nested update scopes, explicit layout, flush, paint, and per-plane damage;
 - retained lookup by stable ID and recursive hit testing;
 - focus, pointer capture, pressed state, and routed input dispatch;
+- nested focus scopes and owner-tokenized retained popup attachment;
 - frame scheduling, active surfaces, occlusion, and wake deadlines;
+- UI timer callbacks plus `check_access`/`verify_access` thread guards;
 - validated PNG load/replace/remove through the resource registry;
+- renderer-free semantic snapshots and stable-ID action routing;
 - structured metrics and activity reset.
 
 `Window` is not yet a reusable `Form` control or public top-level-window facade.
@@ -338,7 +375,7 @@ than closure. See `../planning/GUI_DRAWING_REVISION_PLAN.md`.
   scrollbars, Dock/Anchor/table/flow layout;
 - grapheme-aware editing, shaping/fallback, IME, selection, clipboard commands,
   and undo;
-- combo/list/numeric/date/grid/menu/toolstrip/provider/timer/background-worker
+- date/grid/menu/toolstrip/help/error-provider/background-worker
   control families;
 - property metadata/default/reset/serialization registry;
 - accessibility publisher and complete semantic tree;

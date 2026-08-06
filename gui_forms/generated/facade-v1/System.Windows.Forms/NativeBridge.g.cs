@@ -25,6 +25,9 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct ErrorView { internal uint Code; internal StringView Message; }
     [StructLayout(LayoutKind.Sequential)] private struct Rect { internal double X, Y, Width, Height; }
     [StructLayout(LayoutKind.Sequential)] private struct FieldEditResult { internal ulong Anchor, Caret, Revision; internal uint Changed, CanUndo, CanRedo; }
+    [StructLayout(LayoutKind.Sequential)] private struct BitmapInfoHeader { internal uint Size; internal int Width, Height; internal ushort Planes, BitCount; internal uint Compression, SizeImage; internal int XPelsPerMeter, YPelsPerMeter; internal uint ClrUsed, ClrImportant; }
+    [StructLayout(LayoutKind.Sequential)] private struct BitmapInfo { internal BitmapInfoHeader Header; internal uint Color; }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct WindowClass { internal uint Style; internal nint WindowProcedure; internal int ClassExtra, WindowExtra; internal nint Instance, Icon, Cursor, Background; internal string? MenuName; internal string ClassName; }
     [StructLayout(LayoutKind.Sequential)] private struct Api
     {
         internal uint StructSize, AbiVersion;
@@ -43,6 +46,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint WriteClipboardText, ReadClipboardText;
         internal nint FieldNavigate;
         internal nint FieldReplace, FieldHistory, FieldClearHistory;
+        internal nint SetControlPixels;
+        internal nint GetControlAbsoluteBounds;
+        internal nint SubscribeKeyPreview;
+        internal nint SetCursor, GetCursor;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -50,22 +57,41 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static readonly Api api = LoadApi();
     private static readonly bool traceControls = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_CONTROLS") == "1";
     private static readonly bool traceDelegates = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DELEGATES") == "1";
+    private const string windowSurfaceClassName = "GUIForms.ControlSurface.v1";
+    private static readonly bool windowSurfaceClassRegistered = RegisterWindowSurfaceClass();
     private static long nextId;
     private static long nextAsyncId;
+    private static long nextSurfaceId;
     [ThreadStatic] private static int nativeCallbackDepth;
     private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<int,
         global::System.Collections.Concurrent.ConcurrentDictionary<long, NativeAsyncResult>> pendingByThread = new();
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<long,
+        global::System.WeakReference<NativeControlBridge>> windowSurfaces = new();
+    [ThreadStatic] private static bool flushingWindowSurfaces;
     private SafeControlHandle handle;
     private readonly string stableId;
     private readonly string managedTypeName;
     private readonly bool supportsRaster;
+    private readonly bool promotesPointerClick;
     private GCHandle callbackRoot;
     private readonly global::System.Collections.Generic.List<Handle> subscriptions = new();
     private readonly int ownerThreadId;
+    private readonly long surfaceId = Interlocked.Increment(ref nextSurfaceId);
     private NativeChange pendingChange;
     private readonly object windowHandleGate = new();
     private readonly object stateGate = new();
     private nint windowHandle;
+    private nint windowParent;
+    private global::System.Drawing.Point windowPosition;
+    private global::System.Drawing.Size windowSize;
+    private global::System.Drawing.Point appliedWindowPosition;
+    private global::System.Drawing.Size appliedWindowSize;
+    private bool appliedWindowVisible;
+    private bool haveAppliedWindowState;
+    private bool windowSurfaceConfigured;
+    private int windowSurfaceTraceCount;
+    private ulong windowSurfaceContentHash;
+    private int windowSurfaceContentTraceCount;
     private string cachedName = string.Empty;
     private string cachedText = string.Empty;
     private volatile bool cachedVisible = true;
@@ -83,8 +109,23 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             lock (windowHandleGate)
             {
                 if (windowHandle == 0)
-                    windowHandle = CreateWindowExW(0, "STATIC", string.Empty, 0x80000000u,
-                        0, 0, 1, 1, 0, 0, 0, 0);
+                {
+                    var width = global::System.Math.Max(1, cachedBounds.Width);
+                    var height = global::System.Math.Max(1, cachedBounds.Height);
+                    if (!windowSurfaceClassRegistered) return 0;
+                    windowHandle = CreateWindowExW(0x080000a0u, windowSurfaceClassName, string.Empty, 0x80000000u,
+                        0, 0, width, height, 0, 0, 0, 0);
+                    if (windowHandle != 0)
+                    {
+                        // This HWND is a paint lease for native consumers, not a
+                        // second input authority. Disabled child windows are
+                        // skipped by Win32 hit testing, so pointer/keyboard input
+                        // continues through the retained host and its capture /
+                        // focus machinery.
+                        _ = EnableWindow(windowHandle, false);
+                        windowSurfaces[surfaceId] = new(this);
+                    }
+                }
                 return windowHandle;
             }
         }
@@ -93,6 +134,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal event Func<NativeEvent, bool>? NativeEventRaised;
     internal event Action<NativePointer>? PointerRaised;
     internal event Action<NativeKey>? KeyRaised;
+    internal event Func<NativeKey, bool>? KeyPreviewRaised;
     internal event Action<string, bool, int, int>? TextRaised;
 
     private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName)
@@ -101,6 +143,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         this.stableId = stableId;
         this.managedTypeName = managedTypeName;
         supportsRaster = kind is 20u or 0x7fffffffu;
+        promotesPointerClick = kind is 4u or 5u or 11u or 14u;
         ownerThreadId = Environment.CurrentManagedThreadId;
         callbackRoot = GCHandle.Alloc(this, GCHandleType.Weak);
         Handle token;
@@ -111,9 +154,12 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); }
         if (kind == 10u) { SubscribeTyped(NativeEvent.RangeScroll); SubscribeTyped(NativeEvent.RangeValueChanged); }
         SubscribePointer();
+        if (kind == 1u) SubscribeKeyPreview();
         if (kind is 6u or 8u or 9u or 16u or 18u) { SubscribeKey(); SubscribeText(); }
         else if (kind == 0x7fffffffu) SubscribeKey();
     }
+
+    internal bool PromotesPointerClick => promotesPointerClick;
 
     internal static NativeControlBridge Create(Type managedType)
     {
@@ -160,10 +206,15 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal string Text { get { EnsureAlive(); lock (stateGate) return cachedText; } set => SetString(api.SetText, value, NativeChange.Text); }
     internal bool Visible { get { EnsureAlive(); return cachedVisible; } set => SetBool(api.SetVisible, value, NativeChange.Visible); }
     internal bool Enabled { get { EnsureAlive(); return cachedEnabled; } set => SetBool(api.SetEnabled, value, NativeChange.Enabled); }
+    internal uint CursorKind
+    {
+        get { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.GetCursor)(handle.Value, &value)); return value; }
+        set { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetCursor)(handle.Value, value)); }
+    }
     internal global::System.Drawing.Rectangle Bounds
     {
         get { EnsureAlive(); lock (stateGate) return cachedBounds; }
-        set { pendingChange = NativeChange.Bounds; lock (stateGate) cachedBounds = value; Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)api.SetBounds)(handle.Value, new Rect { X = value.X, Y = value.Y, Width = value.Width, Height = value.Height })); }
+        set { pendingChange = NativeChange.Bounds; lock (stateGate) cachedBounds = value; ResizeWindowSurface(value.Width, value.Height); Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)api.SetBounds)(handle.Value, new Rect { X = value.X, Y = value.Y, Width = value.Width, Height = value.Height })); }
     }
 
     internal void AddChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=add|parent={stableId}|parent-type={managedTypeName}|child={child.stableId}|child-type={child.managedTypeName}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.AddChild)(handle.Value, child.handle.Value)); }
@@ -237,6 +288,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal bool InvokeRequired => Environment.CurrentManagedThreadId != ownerThreadId;
     internal bool SupportsRaster { get { return supportsRaster && api.SetControlPng != 0; } }
     internal void SetRaster(byte[] encodedPng) { if (!SupportsRaster) return; fixed (byte* data = encodedPng) Check(((delegate* unmanaged[Cdecl]<Handle, byte*, ulong, int>)api.SetControlPng)(handle.Value, data, (ulong)encodedPng.Length)); }
+    internal void SetRasterPixels(nint pixels, int width, int height, int rowBytes) { if (!SupportsRaster || api.SetControlPixels == 0) return; if (pixels == 0 || width <= 0 || height <= 0 || rowBytes < checked(width * 4)) throw new global::System.ArgumentException("Invalid retained paint surface."); Check(((delegate* unmanaged[Cdecl]<Handle, byte*, uint, uint, ulong, uint, int>)api.SetControlPixels)(handle.Value, (byte*)pixels, checked((uint)width), checked((uint)height), checked((ulong)rowBytes), 1u)); PresentWindowPixels((byte*)pixels, width, height, rowBytes); }
     internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate, bool popup)
     {
         var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u) | (popup ? 8u : 0u);
@@ -250,13 +302,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         // This prevents DoEvents from turning pointer or load callbacks into an
         // accidental recursive dispatcher.
         if (nativeCallbackDepth != 0) return;
-        if (!pendingByThread.TryGetValue(ownerThreadId, out var pending)) return;
-        foreach (var item in pending.OrderBy(item => item.Key).ToArray())
+        try
         {
-            try { item.Value.Execute(); }
-            catch (Exception error) { Application.__ReportCallbackException(error); }
+            if (!pendingByThread.TryGetValue(ownerThreadId, out var pending)) return;
+            foreach (var item in pending.OrderBy(item => item.Key).ToArray())
+            {
+                try { item.Value.Execute(); }
+                catch (Exception error) { Application.__ReportCallbackException(error); }
+            }
+            if (pending.IsEmpty) pendingByThread.TryRemove(ownerThreadId, out _);
         }
-        if (pending.IsEmpty) pendingByThread.TryRemove(ownerThreadId, out _);
+        finally { FlushWindowSurfaces(ownerThreadId); }
     }
     private static void Track(NativeAsyncResult pending) =>
         pendingByThread.GetOrAdd(pending.OwnerThreadId, _ => new()).TryAdd(pending.Id, pending);
@@ -295,15 +351,186 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     }
     internal void RequestClose() { Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.RequestClose)(handle.Value)); }
     public void Dispose() { if (IsDisposed) return; ReleaseSubscriptions(true); ReleaseWindowHandle(); handle.DisposeNative(); IsDisposed = true; GC.SuppressFinalize(this); }
-    ~NativeControlBridge() { ReleaseSubscriptions(false); }
+    ~NativeControlBridge() { ReleaseSubscriptions(false); ReleaseWindowHandle(); }
 
     private void ReleaseWindowHandle()
     {
         nint value;
-        lock (windowHandleGate) { value = windowHandle; windowHandle = 0; }
+        windowSurfaces.TryRemove(surfaceId, out _);
+        lock (windowHandleGate) { value = windowHandle; windowHandle = 0; windowParent = 0; }
         if (value == 0 || !global::System.OperatingSystem.IsWindows()) return;
         if (global::System.Environment.CurrentManagedThreadId == ownerThreadId) _ = DestroyWindow(value);
         else _ = PostMessageW(value, 0x0010u, 0, 0);
+    }
+
+    private void ResizeWindowSurface(int width, int height)
+    {
+        if (!global::System.OperatingSystem.IsWindows()) return;
+        lock (windowHandleGate)
+        {
+            if (windowHandle == 0) return;
+            width = global::System.Math.Max(1, width);
+            height = global::System.Math.Max(1, height);
+            windowSize = new(width, height);
+            if (windowParent == 0) _ = SetWindowPos(windowHandle, 0, 0, 0, width, height, 0x0016u);
+        }
+    }
+
+    internal void ConfigureWindowSurface(global::System.Drawing.Point position,
+                                         global::System.Drawing.Size size)
+    {
+        if (!global::System.OperatingSystem.IsWindows()) return;
+        lock (windowHandleGate)
+        {
+            windowPosition = position;
+            windowSize = new(global::System.Math.Max(1, size.Width),
+                             global::System.Math.Max(1, size.Height));
+            windowSurfaceConfigured = true;
+        }
+    }
+
+    private static bool RegisterWindowSurfaceClass()
+    {
+        if (!global::System.OperatingSystem.IsWindows()) return false;
+        var instance = GetModuleHandleW(null);
+        var user = GetModuleHandleW("user32.dll");
+        var procedure = user == 0 ? 0 : GetProcAddress(user, "DefWindowProcW");
+        if (instance == 0 || procedure == 0) return false;
+        var value = new WindowClass
+        {
+            Style = 0x0020u,
+            WindowProcedure = procedure,
+            Instance = instance,
+            ClassName = windowSurfaceClassName,
+        };
+        var atom = RegisterClassW(ref value);
+        return atom != 0 || global::System.Runtime.InteropServices.Marshal.GetLastWin32Error() == 1410;
+    }
+
+    internal static void FlushWindowSurfaces(int ownerThread)
+    {
+        if (!global::System.OperatingSystem.IsWindows() || flushingWindowSurfaces) return;
+        flushingWindowSurfaces = true;
+        try
+        {
+            foreach (var item in windowSurfaces.ToArray())
+            {
+                if (!item.Value.TryGetTarget(out var bridge) || bridge.IsDisposed)
+                {
+                    windowSurfaces.TryRemove(item.Key, out _);
+                    continue;
+                }
+                if (bridge.ownerThreadId != ownerThread || !bridge.supportsRaster) continue;
+                try { bridge.SynchronizeWindowSurface(); }
+                catch (global::System.Exception error) { Application.__ReportCallbackException(error); }
+            }
+        }
+        finally { flushingWindowSurfaces = false; }
+    }
+
+    private void SynchronizeWindowSurface()
+    {
+        lock (windowHandleGate)
+        {
+            if (windowHandle == 0 || IsDisposed || !SupportsRaster || !windowSurfaceConfigured) return;
+            Rect absolute;
+            Check(((delegate* unmanaged[Cdecl]<Handle, Rect*, int>)api.GetControlAbsoluteBounds)(handle.Value, &absolute));
+            windowPosition = new(global::System.Convert.ToInt32(global::System.Math.Round(absolute.X)),
+                                 global::System.Convert.ToInt32(global::System.Math.Round(absolute.Y)));
+            windowSize = new(global::System.Math.Max(1, global::System.Convert.ToInt32(global::System.Math.Round(absolute.Width))),
+                             global::System.Math.Max(1, global::System.Convert.ToInt32(global::System.Math.Round(absolute.Height))));
+            var host = FindHostWindow();
+            if (host == 0) return;
+            if (windowParent != host)
+            {
+                _ = SetParent(windowHandle, host);
+                _ = SetWindowLongPtrW(windowHandle, -16, new nint(0x40000000u));
+                windowParent = host;
+                haveAppliedWindowState = false;
+            }
+            if (!haveAppliedWindowState || appliedWindowPosition != windowPosition ||
+                appliedWindowSize != windowSize || appliedWindowVisible != cachedVisible)
+            {
+                var flags = 0x0014u | (cachedVisible ? 0x0040u : 0x0080u);
+                _ = SetWindowPos(windowHandle, 0, windowPosition.X, windowPosition.Y,
+                    windowSize.Width, windowSize.Height, flags);
+                appliedWindowPosition = windowPosition;
+                appliedWindowSize = windowSize;
+                appliedWindowVisible = cachedVisible;
+                haveAppliedWindowState = true;
+                if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACES") == "1" && windowSurfaceTraceCount++ < 4)
+                    global::System.Console.Error.WriteLine("gui-forms-native-surface=id:" + stableId + "|type:" + managedTypeName + "|mode:child-hwnd|position:" + windowPosition.X + "," + windowPosition.Y + "|size:" + windowSize.Width + "x" + windowSize.Height);
+            }
+            TraceWindowSurfaceContent();
+        }
+    }
+
+    private void TraceWindowSurfaceContent()
+    {
+        if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACE_CONTENT") != "1" ||
+            windowSurfaceContentTraceCount >= 16 || windowHandle == 0 || windowParent == 0 ||
+            !cachedVisible || windowSize.Width < 2 || windowSize.Height < 2) return;
+        var device = GetDC(windowHandle);
+        if (device == 0) return;
+        try
+        {
+            const int grid = 7;
+            ulong hash = 1469598103934665603UL;
+            uint first = 0;
+            var haveFirst = false;
+            var different = 0;
+            for (var row = 0; row < grid; ++row)
+            {
+                var y = global::System.Math.Min(windowSize.Height - 1,
+                    (row * (windowSize.Height - 1)) / (grid - 1));
+                for (var column = 0; column < grid; ++column)
+                {
+                    var x = global::System.Math.Min(windowSize.Width - 1,
+                        (column * (windowSize.Width - 1)) / (grid - 1));
+                    var pixel = GetPixel(device, x, y);
+                    hash = (hash ^ pixel) * 1099511628211UL;
+                    if (!haveFirst) { first = pixel; haveFirst = true; }
+                    else if (pixel != first) ++different;
+                }
+            }
+            if (hash == windowSurfaceContentHash) return;
+            windowSurfaceContentHash = hash;
+            ++windowSurfaceContentTraceCount;
+            global::System.Console.Error.WriteLine("gui-forms-native-surface-content=id:" + stableId +
+                "|type:" + managedTypeName + "|hash:" + hash.ToString("x16") +
+                "|different:" + different + "/49|size:" + windowSize.Width + "x" + windowSize.Height);
+        }
+        finally { _ = ReleaseDC(windowHandle, device); }
+    }
+
+    private void PresentWindowPixels(byte* pixels, int width, int height, int rowBytes)
+    {
+        if (rowBytes != checked(width * 4)) return;
+        lock (windowHandleGate)
+        {
+            if (windowHandle == 0 || windowParent == 0 || !cachedVisible) return;
+            var device = GetDC(windowHandle);
+            if (device == 0) return;
+            var info = new BitmapInfo { Header = new BitmapInfoHeader { Size = 40, Width = width, Height = -height, Planes = 1, BitCount = 32 } };
+            _ = StretchDIBits(device, 0, 0, windowSize.Width, windowSize.Height,
+                0, 0, width, height, pixels, ref info, 0, 0x00cc0020u);
+            _ = ReleaseDC(windowHandle, device);
+        }
+    }
+
+    private static nint FindHostWindow()
+    {
+        var process = GetCurrentProcessId();
+        nint cursor = 0;
+        for (var count = 0; count < 1024; ++count)
+        {
+            var next = FindWindowExW(0, cursor, "GUIForms.Window.v1", null);
+            if (next == 0 || next == cursor) return 0;
+            cursor = next;
+            _ = GetWindowThreadProcessId(cursor, out var owner);
+            if (owner == process) return cursor;
+        }
+        return 0;
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -316,6 +543,39 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessageW(nint window, uint message, nint wParam, nint lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern ushort RegisterClassW(ref WindowClass value);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindowExW(nint parent, nint childAfter, string className, string? windowName);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetParent(nint child, nint parent);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWindowLongPtrW(nint window, int index, nint value);
+    [DllImport("user32.dll")]
+    private static extern nint GetDC(nint window);
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(nint window, nint device);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnableWindow(nint window, bool enable);
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(nint window, nint insertAfter, int x, int y,
+        int width, int height, uint flags);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint GetModuleHandleW(string? moduleName);
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentProcessId();
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
+    private static extern nint GetProcAddress(nint module, string name);
+    [DllImport("gdi32.dll")]
+    private static extern int StretchDIBits(nint device, int x, int y, int destinationWidth,
+        int destinationHeight, int sourceX, int sourceY, int sourceWidth, int sourceHeight,
+        byte* pixels, ref BitmapInfo info, uint usage, uint operation);
+    [DllImport("gdi32.dll")]
+    private static extern uint GetPixel(nint device, int x, int y);
 
     private void SetString(nint operation, string value, NativeChange change)
     {
@@ -362,6 +622,14 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         Handle token;
         Check(((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<Handle, uint, uint, uint, uint, void*, uint>, void*, Handle*, int>)api.SubscribeKey)(
             handle.Value, &KeyCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
+        subscriptions.Add(token);
+    }
+
+    private void SubscribeKeyPreview()
+    {
+        Handle token;
+        Check(((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<Handle, uint, uint, uint, uint, void*, uint>, void*, Handle*, int>)api.SubscribeKeyPreview)(
+            handle.Value, &KeyPreviewCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
         subscriptions.Add(token);
     }
 
@@ -417,6 +685,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static uint KeyPreviewCallback(Handle sender, uint kind, uint physicalKey,
+                                           uint modifiers, uint repeat, void* context)
+    {
+        if (context == null || GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return 0;
+        ++nativeCallbackDepth;
+        try { return bridge.KeyPreviewRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)) == true ? 1u : 0u; }
+        catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
+        finally { --nativeCallbackDepth; }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint TextCallback(Handle sender, StringView text, uint composing,
                                      int replacementStart, int replacementLength,
                                      void* context)
@@ -447,7 +726,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             Application.__ReportCallbackException(error);
             return 2u;
         }
-        finally { --nativeCallbackDepth; root.Free(); }
+        finally { --nativeCallbackDepth; root.Free(); if (nativeCallbackDepth == 0) FlushWindowSurfaces(global::System.Environment.CurrentManagedThreadId); }
     }
 
     private void ReleaseSubscriptions(bool check)
@@ -469,8 +748,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(15, ref value));
-        if (value.AbiVersion != 15 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0) throw new InvalidOperationException("GUI.Forms ABI 0.15 table is incomplete.");
+        Check(GetApi(19, ref value));
+        if (value.AbiVersion != 19 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0) throw new InvalidOperationException("GUI.Forms ABI 0.19 table is incomplete.");
         return value;
     }
     private static void Check(int result)

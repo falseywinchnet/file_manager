@@ -7,6 +7,10 @@ namespace System.Drawing;
 
 internal static unsafe class NativeDrawingBridge
 {
+    private static readonly bool traceImageContent =
+        global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_IMAGE_CONTENT") == "1";
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, int>
+        tracedImageDimensions = new(global::System.StringComparer.Ordinal);
     [StructLayout(LayoutKind.Sequential)] internal record struct Handle(uint Slot, uint Generation)
     {
         internal readonly bool IsNull => Slot == 0;
@@ -15,6 +19,7 @@ internal static unsafe class NativeDrawingBridge
     [StructLayout(LayoutKind.Sequential)] private struct Point { internal double X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct Rect { internal double X, Y, Width, Height; }
     [StructLayout(LayoutKind.Sequential)] private struct RectI { internal int X, Y, Width, Height; }
+    [StructLayout(LayoutKind.Sequential)] private struct NativeSize { internal double Width, Height; }
     [StructLayout(LayoutKind.Sequential)] private struct MatrixValue { internal double M11, M12, M21, M22, Dx, Dy; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapLockView
     {
@@ -32,7 +37,7 @@ internal static unsafe class NativeDrawingBridge
     [StructLayout(LayoutKind.Sequential)] private struct Api
     {
         internal uint StructSize, AbiVersion;
-        internal fixed ulong Entries[96];
+        internal fixed ulong Entries[98];
     }
 
     [DllImport("gui_drawing_abi0", EntryPoint = "gd_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -91,6 +96,8 @@ internal static unsafe class NativeDrawingBridge
         Handle handle;
         Check(((delegate* unmanaged[Cdecl]<uint, uint, uint, Handle*, int>)Entry(49))(
             checked((uint)width), checked((uint)height), 0, &handle));
+        FacadeCallTelemetry.Observe("bitmap.create-dimensions", width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + height.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+        FacadeCallTelemetry.Observe("bitmap.storage-format", "premultiplied-bgra32");
         return handle;
     }
 
@@ -174,6 +181,13 @@ internal static unsafe class NativeDrawingBridge
                                       global::System.Drawing.GraphicsUnit unit,
                                       byte charset)
     {
+        if (FacadeCallTelemetry.IsEnabled)
+        {
+            FacadeCallTelemetry.Observe("font.family", family);
+            FacadeCallTelemetry.Observe("font.spec",
+                family + "|" + size.ToString(global::System.Globalization.CultureInfo.InvariantCulture) +
+                "|" + style + "|" + unit + "|" + charset);
+        }
         var bytes = Encoding.UTF8.GetBytes(family);
         fixed (byte* pointer = bytes)
         {
@@ -183,6 +197,41 @@ internal static unsafe class NativeDrawingBridge
                 (uint)style, (uint)unit, charset, &handle));
             return handle;
         }
+    }
+
+    internal static float FontPixelSize(float size,
+                                        global::System.Drawing.GraphicsUnit unit) => unit switch
+    {
+        global::System.Drawing.GraphicsUnit.Display => size * 96f / 75f,
+        global::System.Drawing.GraphicsUnit.Point => size * 96f / 72f,
+        global::System.Drawing.GraphicsUnit.Inch => size * 96f,
+        global::System.Drawing.GraphicsUnit.Document => size * 96f / 300f,
+        global::System.Drawing.GraphicsUnit.Millimeter => size * 96f / 25.4f,
+        _ => size,
+    };
+
+    internal static global::System.Drawing.SizeF MeasureString(
+        string text, global::System.Drawing.Font font,
+        global::System.Drawing.StringFormat? format, int layoutWidth)
+    {
+        EnsureRaster();
+        var bytes = Encoding.UTF8.GetBytes(text);
+        NativeSize measured;
+        var started = FacadeCallTelemetry.IsEnabled ?
+            global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+        fixed (byte* pointer = bytes)
+            Check(((delegate* unmanaged[Cdecl]<StringView, Handle, Handle, double, NativeSize*, int>)Entry(96))(
+                new StringView { Data = pointer, Size = (ulong)bytes.Length },
+                font.__handle, format?.__handle ?? default, layoutWidth, &measured));
+        if (FacadeCallTelemetry.IsEnabled)
+        {
+            var elapsed = global::System.Diagnostics.Stopwatch.GetTimestamp() - started;
+            FacadeCallTelemetry.ObserveValue("text-measure.nanoseconds",
+                elapsed * 1_000_000_000L / global::System.Diagnostics.Stopwatch.Frequency);
+            FacadeCallTelemetry.ObserveValue("text-measure.utf8-bytes", bytes.Length);
+        }
+        return new global::System.Drawing.SizeF((float)measured.Width,
+                                                (float)measured.Height);
     }
 
     internal static Handle StringFormatCreate(uint flags)
@@ -292,6 +341,9 @@ internal static unsafe class NativeDrawingBridge
                                    global::System.Drawing.RectangleF source,
                                    global::System.Drawing.Imaging.ImageAttributes? attributes)
     {
+        if (image is null) throw new global::System.ArgumentNullException(nameof(image));
+        image.__FlushGraphics();
+        TraceImageContent(image);
         var temporary = attributes is null;
         attributes ??= new global::System.Drawing.Imaging.ImageAttributes();
         try
@@ -300,6 +352,51 @@ internal static unsafe class NativeDrawingBridge
                 recorder, image.__BitmapHandle, Native(destination), Native(source), attributes.__handle));
         }
         finally { if (temporary) attributes.Dispose(); }
+    }
+
+    private static void TraceImageContent(global::System.Drawing.Image image)
+    {
+        if (!traceImageContent || image.Width <= 0 || image.Height <= 0) return;
+        var dimensions = image.Width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) +
+            "x" + image.Height.ToString(global::System.Globalization.CultureInfo.InvariantCulture);
+        var sequence = tracedImageDimensions.AddOrUpdate(dimensions, 1, static (_, prior) => prior + 1);
+        if (sequence > 3) return;
+        var data = BitmapLock(image.__BitmapHandle,
+            global::System.Drawing.Imaging.ImageLockMode.ReadOnly);
+        try
+        {
+            var pixels = (byte*)data.Scan0;
+            var total = checked((long)image.Width * image.Height);
+            var step = global::System.Math.Max(1,
+                (int)global::System.Math.Sqrt(global::System.Math.Max(1d, total / 4096d)));
+            var minB = 255; var minG = 255; var minR = 255; var minA = 255;
+            var maxB = 0; var maxG = 0; var maxR = 0; var maxA = 0;
+            long samples = 0; long differing = 0;
+            uint first = 0; var haveFirst = false;
+            for (var y = 0; y < image.Height; y += step)
+            {
+                var row = pixels + checked(y * data.Stride);
+                for (var x = 0; x < image.Width; x += step)
+                {
+                    var pixel = row + checked(x * 4);
+                    var b = pixel[0]; var g = pixel[1]; var r = pixel[2]; var a = pixel[3];
+                    minB = global::System.Math.Min(minB, b); maxB = global::System.Math.Max(maxB, b);
+                    minG = global::System.Math.Min(minG, g); maxG = global::System.Math.Max(maxG, g);
+                    minR = global::System.Math.Min(minR, r); maxR = global::System.Math.Max(maxR, r);
+                    minA = global::System.Math.Min(minA, a); maxA = global::System.Math.Max(maxA, a);
+                    var packed = (uint)(b | g << 8 | r << 16 | a << 24);
+                    if (!haveFirst) { first = packed; haveFirst = true; }
+                    else if (packed != first) ++differing;
+                    ++samples;
+                }
+            }
+            global::System.Console.Error.WriteLine("gui-drawing-image-content=dimensions:" +
+                dimensions + "|sequence:" + sequence.ToString(global::System.Globalization.CultureInfo.InvariantCulture) +
+                "|b:" + minB + "-" + maxB + "|g:" + minG + "-" + maxG +
+                "|r:" + minR + "-" + maxR + "|a:" + minA + "-" + maxA +
+                "|different:" + differing + "/" + samples);
+        }
+        finally { BitmapUnlock(image.__BitmapHandle, data); }
     }
     internal static global::System.Drawing.Imaging.BitmapData BitmapLock(
         Handle bitmap, global::System.Drawing.Imaging.ImageLockMode mode)
@@ -544,14 +641,57 @@ internal static unsafe class NativeDrawingBridge
 
     internal static void Execute(Handle recorder, Handle bitmap)
     {
-        ulong recorded;
-        Check(((delegate* unmanaged[Cdecl]<Handle, ulong*, int>)Entry(29))(
-            recorder, &recorded));
+        var recorded = RecorderCommandCount(recorder);
         if (recorded == 0) return;
         EnsureRaster();
+        var started = FacadeCallTelemetry.IsEnabled ? global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
         ulong count;
         Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong*, int>)Entry(86))(
             recorder, bitmap, &count));
+        if (FacadeCallTelemetry.IsEnabled)
+        {
+            FacadeCallTelemetry.ObserveValue("raster.command-count", checked((long)count));
+            FacadeCallTelemetry.ObserveValue("raster.execute-nanoseconds",
+                checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(started).Ticks * 100L));
+        }
+    }
+
+    internal static ulong RecorderCommandCount(Handle recorder)
+    {
+        ulong count;
+        Check(((delegate* unmanaged[Cdecl]<Handle, ulong*, int>)Entry(29))(
+            recorder, &count));
+        return count;
+    }
+
+    internal static ulong ExecuteFrom(Handle recorder, Handle bitmap, ulong firstCommand)
+    {
+        EnsureRaster();
+        var started = FacadeCallTelemetry.IsEnabled ?
+            global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+        ulong count;
+        Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, ulong*, int>)Entry(97))(
+            recorder, bitmap, firstCommand, &count));
+        if (FacadeCallTelemetry.IsEnabled && count != 0)
+        {
+            FacadeCallTelemetry.ObserveValue("raster.incremental-command-count",
+                checked((long)count));
+            FacadeCallTelemetry.ObserveValue("raster.incremental-execute-nanoseconds",
+                checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(started).Ticks * 100L));
+        }
+        return count;
+    }
+
+    internal static void Flush(global::System.Drawing.Graphics graphics)
+    {
+        var target = graphics.__target;
+        var recorder = graphics.__recorder;
+        if (target is null || recorder.IsNull) return;
+        if (graphics.__executedCommands == RecorderCommandCount(recorder)) return;
+        graphics.__executedCommands += ExecuteFrom(
+            recorder, target.__BitmapHandle,
+            graphics.__executedCommands);
+        if (graphics.__nativeSurface != 0) PresentNativeSurface(graphics);
     }
 
     internal static byte[] EncodePng(Handle bitmap)
@@ -565,6 +705,13 @@ internal static unsafe class NativeDrawingBridge
         fixed (byte* pointer = bytes)
             Check(((delegate* unmanaged[Cdecl]<Handle, void*, ulong, ulong*, int>)Entry(87))(
                 bitmap, pointer, (ulong)bytes.Length, &required));
+        if (FacadeCallTelemetry.IsEnabled)
+        {
+            Dimensions(bitmap, out var width, out var height);
+            FacadeCallTelemetry.Observe("image.encode-format", "png");
+            FacadeCallTelemetry.Observe("image.encode-dimensions", width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + height.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+            FacadeCallTelemetry.ObserveValue("image.encoded-bytes", bytes.Length);
+        }
         return bytes;
     }
 
@@ -578,6 +725,9 @@ internal static unsafe class NativeDrawingBridge
             Check(((delegate* unmanaged[Cdecl]<void*, ulong, Handle*, int>)Entry(88))(
                 pointer, (ulong)bytes.Length, &handle));
             Dimensions(handle, out var width, out var height);
+            FacadeCallTelemetry.Observe("image.decode-format", "png");
+            FacadeCallTelemetry.Observe("image.decode-dimensions", width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + height.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
+            FacadeCallTelemetry.ObserveValue("image.decoded-input-bytes", bytes.Length);
             var bitmap = WrapBitmap(handle, width, height);
             // PNG exposes straight-alpha ARGB semantics even though the owned
             // raster store normalizes its internal bytes to premultiplied BGRA.
@@ -660,12 +810,15 @@ internal static unsafe class NativeDrawingBridge
             "Native HDC/HWND drawing is available only through the Windows adapter.");
         Check(result);
         Dimensions(bitmapHandle, out var width, out var height);
+        FacadeCallTelemetry.Observe("graphics.target-kind", kind == 0 ? "hdc" : "hwnd");
+        FacadeCallTelemetry.Observe("graphics.target-dimensions", width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + height.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
         var graphics = new global::System.Drawing.Graphics
         {
             __target = WrapBitmap(bitmapHandle, width, height),
             __nativeSurface = surface,
             __nativeSurfaceKind = kind,
         };
+        graphics.__target.__AttachGraphics(graphics);
         graphics.__EnsureRecorder();
         if (bounds.X != 0 || bounds.Y != 0)
             RecorderTranslate(graphics.__recorder, (float)-bounds.X, (float)-bounds.Y);

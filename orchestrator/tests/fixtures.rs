@@ -10,11 +10,15 @@ fn bootstrap_golden_fixtures_match() {
         "version",
         "release",
         "status",
+        "frontend_bootstrap",
         "expired_deadline",
         "response_budget",
         "version_mismatch",
         "semantic_facts_stub",
         "unknown_method",
+        "cancellation_unsupported",
+        "critical_extension",
+        "unknown_optional",
     ] {
         assert_fixture(fixture);
     }

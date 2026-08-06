@@ -64,6 +64,10 @@ using GFPoint = gui_forms::Point;
 using gui_forms::PointerAction;
 using gui_forms::PointerButton;
 using gui_forms::PointerEvent;
+using gui_forms::SemanticAction;
+using gui_forms::SemanticNode;
+using gui_forms::SemanticRole;
+using gui_forms::SemanticState;
 using GFRect = gui_forms::Rect;
 using GFSize = gui_forms::Size;
 using gui_forms::TextInputEvent;
@@ -359,6 +363,41 @@ NSString* native_string(std::string_view text) {
     return [[NSString alloc] initWithBytes:text.data()
                                     length:text.size()
                                   encoding:NSUTF8StringEncoding];
+}
+
+NSString* native_accessibility_role(SemanticRole role) {
+    switch (role) {
+    case SemanticRole::group: return NSAccessibilityGroupRole;
+    case SemanticRole::static_text: return NSAccessibilityStaticTextRole;
+    case SemanticRole::button: return NSAccessibilityButtonRole;
+    case SemanticRole::check_box: return NSAccessibilityCheckBoxRole;
+    case SemanticRole::radio_button: return NSAccessibilityRadioButtonRole;
+    case SemanticRole::link: return NSAccessibilityLinkRole;
+    case SemanticRole::text_box:
+    case SemanticRole::numeric_field: return NSAccessibilityTextFieldRole;
+    case SemanticRole::list: return NSAccessibilityListRole;
+    case SemanticRole::list_item: return NSAccessibilityRowRole;
+    case SemanticRole::check_list_item: return NSAccessibilityCheckBoxRole;
+    case SemanticRole::combo_box: return NSAccessibilityComboBoxRole;
+    case SemanticRole::slider: return NSAccessibilitySliderRole;
+    case SemanticRole::scroll_bar: return NSAccessibilityScrollBarRole;
+    case SemanticRole::progress_bar: return NSAccessibilityProgressIndicatorRole;
+    case SemanticRole::image: return NSAccessibilityImageRole;
+    case SemanticRole::tab_group: return NSAccessibilityTabGroupRole;
+    case SemanticRole::tab: return NSAccessibilityRadioButtonRole;
+    case SemanticRole::split_pane: return NSAccessibilitySplitGroupRole;
+    case SemanticRole::tool_tip: return NSAccessibilityStaticTextRole;
+    case SemanticRole::date_picker: return NSAccessibilityComboBoxRole;
+    case SemanticRole::calendar: return NSAccessibilityGroupRole;
+    case SemanticRole::date_cell: return NSAccessibilityButtonRole;
+    case SemanticRole::generic: return NSAccessibilityGroupRole;
+    }
+    return NSAccessibilityGroupRole;
+}
+
+bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
+    return std::find(node.actions.begin(), node.actions.end(), action) !=
+           node.actions.end();
 }
 
 NSURL* native_directory_url(const std::string& path) {
@@ -674,6 +713,8 @@ private:
 
 } // namespace
 
+@class GUIFormsAccessibilityElement;
+
 @interface GUIFormsView : NSView <NSTextInputClient, NSDraggingDestination> {
     std::unique_ptr<Window> _model;
     std::unique_ptr<HostSession> _hostSession;
@@ -688,6 +729,11 @@ private:
     NSTimer* _wakeTimer;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
+    std::uint64_t _lastSemanticGeneration;
+    std::uint64_t _accessibilityCacheGeneration;
+    NSArray* _semanticAccessibilityChildren;
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
+        _semanticAccessibilityElements;
 }
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
@@ -712,7 +758,232 @@ private:
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action;
 - (std::string)metricsJSON;
 - (std::string)hostJSON;
+- (NSRect)accessibilityFrameForSemanticBounds:(GFRect)bounds;
+- (BOOL)performSemanticAction:(SemanticAction)action
+                     stableId:(NSString*)stableId
+                        value:(NSString*)value;
 @end
+
+@interface GUIFormsAccessibilityElement : NSAccessibilityElement {
+    __weak GUIFormsView* _owner;
+    SemanticNode _node;
+    NSArray* _semanticChildren;
+}
+- (instancetype)initWithNode:(const SemanticNode&)node
+                       owner:(GUIFormsView*)owner
+                      parent:(id)parent;
+- (void)updateWithNode:(const SemanticNode&)node
+                 owner:(GUIFormsView*)owner
+                parent:(id)parent;
+- (void)setSemanticChildren:(NSArray*)children;
+@end
+
+@implementation GUIFormsAccessibilityElement
+
+- (instancetype)initWithNode:(const SemanticNode&)node
+                       owner:(GUIFormsView*)owner
+                      parent:(id)parent {
+    self = [super init];
+    if (self != nil) {
+        _owner = owner;
+        _node = node;
+        self.accessibilityParent = parent;
+        NSMutableArray* children = [[NSMutableArray alloc]
+            initWithCapacity:_node.children.size()];
+        for (const SemanticNode& childNode : _node.children) {
+            GUIFormsAccessibilityElement* child =
+                [[GUIFormsAccessibilityElement alloc] initWithNode:childNode
+                                                              owner:owner
+                                                             parent:self];
+            [children addObject:child];
+        }
+        _semanticChildren = children;
+    }
+    return self;
+}
+
+- (void)updateWithNode:(const SemanticNode&)node
+                 owner:(GUIFormsView*)owner
+                parent:(id)parent {
+    _owner = owner;
+    _node = node;
+    self.accessibilityParent = parent;
+}
+
+- (void)setSemanticChildren:(NSArray*)children {
+    _semanticChildren = [children copy];
+}
+
+- (BOOL)isAccessibilityElement { return YES; }
+- (NSString*)accessibilityRole { return native_accessibility_role(_node.role); }
+- (NSString*)accessibilityLabel { return native_string(_node.name); }
+- (NSString*)accessibilityHelp { return native_string(_node.description); }
+- (NSString*)accessibilityIdentifier { return native_string(_node.stable_id); }
+- (NSArray*)accessibilityChildren { return _semanticChildren; }
+- (NSRect)accessibilityFrame {
+    return _owner == nil ? NSZeroRect
+                         : [_owner accessibilityFrameForSemanticBounds:_node.bounds];
+}
+- (BOOL)isAccessibilityEnabled {
+    return gui_forms::has_semantic_state(_node.states, SemanticState::enabled);
+}
+- (BOOL)isAccessibilityFocused {
+    return gui_forms::has_semantic_state(_node.states, SemanticState::focused);
+}
+- (BOOL)isAccessibilitySelected {
+    return gui_forms::has_semantic_state(_node.states, SemanticState::selected);
+}
+- (BOOL)isAccessibilityExpanded {
+    return gui_forms::has_semantic_state(_node.states, SemanticState::expanded);
+}
+- (id)accessibilityValue {
+    if (_node.role == SemanticRole::check_box ||
+        _node.role == SemanticRole::check_list_item ||
+        _node.role == SemanticRole::radio_button) {
+        if (gui_forms::has_semantic_state(_node.states, SemanticState::mixed)) {
+            return @2;
+        }
+        return @(gui_forms::has_semantic_state(_node.states, SemanticState::checked));
+    }
+    if (_node.numeric_value) return @(*_node.numeric_value);
+    return native_string(_node.value);
+}
+- (id)accessibilityMinValue {
+    return _node.minimum_value ? @(*_node.minimum_value) : nil;
+}
+- (id)accessibilityMaxValue {
+    return _node.maximum_value ? @(*_node.maximum_value) : nil;
+}
+- (BOOL)accessibilityPerformPress {
+    if (_owner == nil) return NO;
+    SemanticAction action = SemanticAction::press;
+    if (!semantic_has_action(_node, action)) {
+        if (semantic_has_action(_node, SemanticAction::select)) {
+            action = SemanticAction::select;
+        } else if (semantic_has_action(_node, SemanticAction::collapse)) {
+            action = SemanticAction::collapse;
+        } else if (semantic_has_action(_node, SemanticAction::expand)) {
+            action = SemanticAction::expand;
+        } else {
+            return NO;
+        }
+    }
+    return [_owner performSemanticAction:action
+                                 stableId:native_string(_node.stable_id)
+                                    value:nil];
+}
+- (void)setAccessibilitySelected:(BOOL)selected {
+    if (selected && _owner != nil &&
+        semantic_has_action(_node, SemanticAction::select)) {
+        [_owner performSemanticAction:SemanticAction::select
+                              stableId:native_string(_node.stable_id)
+                                 value:nil];
+    }
+}
+- (BOOL)accessibilityPerformShowMenu {
+    if (_owner == nil || !semantic_has_action(_node, SemanticAction::expand)) return NO;
+    return [_owner performSemanticAction:SemanticAction::expand
+                                 stableId:native_string(_node.stable_id)
+                                    value:nil];
+}
+- (BOOL)accessibilityPerformIncrement {
+    if (_owner == nil || !semantic_has_action(_node, SemanticAction::increment)) return NO;
+    return [_owner performSemanticAction:SemanticAction::increment
+                                 stableId:native_string(_node.stable_id)
+                                    value:nil];
+}
+- (BOOL)accessibilityPerformDecrement {
+    if (_owner == nil || !semantic_has_action(_node, SemanticAction::decrement)) return NO;
+    return [_owner performSemanticAction:SemanticAction::decrement
+                                 stableId:native_string(_node.stable_id)
+                                    value:nil];
+}
+- (void)setAccessibilityFocused:(BOOL)focused {
+    if (focused && _owner != nil &&
+        semantic_has_action(_node, SemanticAction::focus)) {
+        [_owner performSemanticAction:SemanticAction::focus
+                              stableId:native_string(_node.stable_id)
+                                 value:nil];
+    }
+}
+- (void)setAccessibilityValue:(id)value {
+    if (_owner == nil || !semantic_has_action(_node, SemanticAction::set_value)) return;
+    NSString* text = [value isKindOfClass:[NSString class]]
+        ? (NSString*)value : [value stringValue];
+    [_owner performSemanticAction:SemanticAction::set_value
+                          stableId:native_string(_node.stable_id)
+                             value:text];
+}
+
+- (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {
+    if (selector == @selector(setAccessibilityFocused:)) {
+        return semantic_has_action(_node, SemanticAction::focus);
+    }
+    if (selector == @selector(setAccessibilityValue:)) {
+        return semantic_has_action(_node, SemanticAction::set_value);
+    }
+    if (selector == @selector(setAccessibilitySelected:)) {
+        return semantic_has_action(_node, SemanticAction::select);
+    }
+    if (selector == @selector(accessibilityPerformPress)) {
+        return semantic_has_action(_node, SemanticAction::press) ||
+               semantic_has_action(_node, SemanticAction::select) ||
+               semantic_has_action(_node, SemanticAction::expand) ||
+               semantic_has_action(_node, SemanticAction::collapse);
+    }
+    if (selector == @selector(accessibilityPerformShowMenu)) {
+        return semantic_has_action(_node, SemanticAction::expand);
+    }
+    if (selector == @selector(accessibilityPerformIncrement)) {
+        return semantic_has_action(_node, SemanticAction::increment);
+    }
+    if (selector == @selector(accessibilityPerformDecrement)) {
+        return semantic_has_action(_node, SemanticAction::decrement);
+    }
+    return [super isAccessibilitySelectorAllowed:selector];
+}
+
+- (BOOL)accessibilityIsAttributeSettable:(NSAccessibilityAttributeName)attribute {
+    if ([attribute isEqualToString:NSAccessibilityFocusedAttribute]) {
+        return semantic_has_action(_node, SemanticAction::focus);
+    }
+    if ([attribute isEqualToString:NSAccessibilityValueAttribute]) {
+        return semantic_has_action(_node, SemanticAction::set_value);
+    }
+    if ([attribute isEqualToString:NSAccessibilitySelectedAttribute]) {
+        return semantic_has_action(_node, SemanticAction::select);
+    }
+    return [super accessibilityIsAttributeSettable:attribute];
+}
+
+@end
+
+
+static GUIFormsAccessibilityElement* reconcile_accessibility_element(
+    const SemanticNode& node,
+    GUIFormsView* owner,
+    id parent,
+    NSDictionary<NSString*, GUIFormsAccessibilityElement*>* previous,
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next) {
+    NSString* identifier = native_string(node.stable_id);
+    GUIFormsAccessibilityElement* element = previous[identifier];
+    if (element == nil) {
+        element = [[GUIFormsAccessibilityElement alloc] initWithNode:node
+                                                               owner:owner
+                                                              parent:parent];
+    } else {
+        [element updateWithNode:node owner:owner parent:parent];
+    }
+    next[identifier] = element;
+    NSMutableArray* children = [[NSMutableArray alloc]
+        initWithCapacity:node.children.size()];
+    for (const SemanticNode& childNode : node.children) {
+        [children addObject:reconcile_accessibility_element(
+            childNode, owner, element, previous, next)];
+    }
+    [element setSemanticChildren:children];
+    return element;
+}
 
 @implementation GUIFormsView
 
@@ -724,6 +995,10 @@ private:
         _hostSession = std::make_unique<HostSession>(
             *_model, gui_forms::host::macos_capabilities(), _hostServices.get());
         _nextHostSequence = 1;
+        _lastSemanticGeneration = 0;
+        _accessibilityCacheGeneration = 0;
+        _semanticAccessibilityChildren = nil;
+        _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
         _selectedRange = NSMakeRange(NSNotFound, 0);
         [self setWantsLayer:NO];
@@ -837,6 +1112,66 @@ private:
 
 - (BOOL)resignFirstResponder {
     return YES;
+}
+
+- (BOOL)isAccessibilityElement { return YES; }
+- (NSString*)accessibilityRole { return NSAccessibilityGroupRole; }
+- (NSString*)accessibilityLabel {
+    return @"GUI.Forms retained surface";
+}
+
+- (NSArray*)accessibilityChildren {
+    if (!_model) return @[];
+    const gui_forms::SemanticSnapshot snapshot = _model->semantic_snapshot();
+    if (_semanticAccessibilityChildren != nil &&
+        _accessibilityCacheGeneration == snapshot.generation) {
+        return _semanticAccessibilityChildren;
+    }
+    NSMutableArray* result = [[NSMutableArray alloc]
+        initWithCapacity:snapshot.roots.size()];
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next =
+        [[NSMutableDictionary alloc] initWithCapacity:snapshot.node_count];
+    for (const SemanticNode& node : snapshot.roots) {
+        GUIFormsAccessibilityElement* element = reconcile_accessibility_element(
+            node, self, self, _semanticAccessibilityElements, next);
+        [result addObject:element];
+    }
+    _semanticAccessibilityElements = next;
+    _semanticAccessibilityChildren = [result copy];
+    _accessibilityCacheGeneration = snapshot.generation;
+    return _semanticAccessibilityChildren;
+}
+
+- (NSArray*)accessibilityChildrenInNavigationOrder {
+    return [self accessibilityChildren];
+}
+
+- (NSArray*)accessibilityVisibleChildren {
+    return [self accessibilityChildren];
+}
+
+- (NSRect)accessibilityFrameForSemanticBounds:(GFRect)bounds {
+    if (self.window == nil) return NSZeroRect;
+    const NSRect local = NSMakeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+    const NSRect inWindow = [self convertRect:local toView:nil];
+    return [self.window convertRectToScreen:inWindow];
+}
+
+- (BOOL)performSemanticAction:(SemanticAction)action
+                     stableId:(NSString*)stableId
+                        value:(NSString*)value {
+    if (!_model || stableId == nil) return NO;
+    const std::string identifier = utf8_string(stableId);
+    const std::string actionValue = value == nil ? std::string{} : utf8_string(value);
+    if (action == SemanticAction::focus) {
+        [self.window makeFirstResponder:self];
+    }
+    const bool handled = _model->perform_semantic_action(identifier, action, actionValue);
+    if (handled) {
+        [self collectDamage];
+        NSAccessibilityPostNotification(self, NSAccessibilityValueChangedNotification);
+    }
+    return handled ? YES : NO;
 }
 
 - (void)viewDidMoveToWindow {
@@ -991,6 +1326,14 @@ private:
         return;
     }
     static_cast<void>(_model->poll_frame_schedule(std::chrono::steady_clock::now()));
+    const std::uint64_t semanticGeneration = _model->semantic_generation();
+    if (semanticGeneration != _lastSemanticGeneration) {
+        _lastSemanticGeneration = semanticGeneration;
+        _semanticAccessibilityChildren = nil;
+        _accessibilityCacheGeneration = 0;
+        NSAccessibilityPostNotification(self,
+                                        NSAccessibilityLayoutChangedNotification);
+    }
     DamageRegion damage = _model->take_damage();
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     for (GFRect rect : damage.rectangles()) {

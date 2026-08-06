@@ -58,9 +58,15 @@ public:
     SkiaExecutor& operator=(const SkiaExecutor&) = delete;
 
     [[nodiscard]] bool register_typeface(std::string_view family,
-                                         std::span<const std::byte> encoded);
+                                         std::span<const std::byte> encoded,
+                                         std::uint32_t style = 0U);
     [[nodiscard]] RasterResult execute(const GraphicsRecorder& recorder,
-                                       Bitmap& target);
+                                       Bitmap& target,
+                                       std::size_t first_command = 0U);
+    [[nodiscard]] SizeF measure_string(std::string_view utf8,
+                                       const FontSnapshot& font,
+                                       const StringFormatSnapshot& format,
+                                       double layout_width = 0.0);
     [[nodiscard]] DecodeResult decode_png(
         std::span<const std::byte> encoded,
         const PngCodecLimits& limits = {});

@@ -236,6 +236,39 @@ void deterministic_mutation_oracle() {
     require(first == second, "PNG mutation oracle was nondeterministic");
 }
 
+void owned_pixel_surface_contract() {
+    ImageRegistry registry;
+    const std::array<std::byte, 24> padded{
+        std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255},
+        std::byte{0}, std::byte{255}, std::byte{0}, std::byte{255},
+        std::byte{99}, std::byte{99}, std::byte{99}, std::byte{99},
+        std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255},
+        std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255},
+        std::byte{88}, std::byte{88}, std::byte{88}, std::byte{88},
+    };
+    const ImageLoadResult loaded = registry.load_bgra32_premultiplied(
+        2, 2, 12, padded);
+    require(static_cast<bool>(loaded), "owned BGRA surface was rejected");
+    const auto resource = registry.find(loaded.image);
+    require(resource.has_value() &&
+                resource->encoding == ImageResourceEncoding::bgra32_premultiplied &&
+                resource->row_bytes == 8 && resource->encoded.size() == 16 &&
+                resource->metadata.decoded_byte_count == 16,
+            "owned BGRA surface was not tightly normalized");
+    require(resource->encoded[8] == std::byte{255},
+            "owned BGRA surface retained source row padding");
+    require(registry.load_bgra32_premultiplied(2, 2, 7, padded).error ==
+                ImageResourceError::dimension_limit_exceeded,
+            "owned BGRA surface accepted an undersized stride");
+
+    std::array<std::byte, 16> replacement{};
+    const ImageLoadResult replaced = registry.replace_bgra32_premultiplied(
+        loaded.image, 2, 2, 8, replacement);
+    require(replaced && replaced.image != loaded.image &&
+                !registry.find(loaded.image).has_value(),
+            "owned BGRA replacement did not stale its prior generation");
+}
+
 void window_thread_boundary() {
     auto root = make_control<Control>(StableId("resource.root"));
     Window window(root, {32.0, 32.0});
@@ -286,6 +319,7 @@ int main() {
     parser_contract();
     ownership_and_quota_contract();
     deterministic_mutation_oracle();
+    owned_pixel_surface_contract();
     window_thread_boundary();
     scoped_window_replacement_damage();
     return 0;

@@ -168,14 +168,14 @@ void extended_vocabulary_snapshots_resources() {
     CHECK(path.bounds() == (RectF{-1.0, -2.0, 29.0, 27.0}));
     CHECK(path.is_visible({0.0, 0.0}));
     CHECK(!path.is_visible({100.0, 100.0}));
-    CHECK(path.path_points().size() == 12U);
+    CHECK(path.path_points().size() == 23U);
     auto copied_path = path.clone();
     copied_path->transform(Matrix::translation(4.0, 5.0));
     CHECK(copied_path->bounds() == (RectF{3.0, 3.0, 29.0, 27.0}));
     GraphicsPath appended;
     appended.add_line({-10.0, -10.0}, {-5.0, -5.0});
     appended.add_path(*copied_path, true);
-    CHECK(appended.path_points().size() == 14U);
+    CHECK(appended.path_points().size() == 25U);
     Region region(RectF{0, 0, 10, 10});
     region.exclude({2, 2, 4, 4});
     CHECK(region.is_visible({1, 1}));

@@ -16,11 +16,13 @@
 #include "include/core/SkRegion.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
+#include "include/core/SkTypeface.h"
 #if defined(__APPLE__)
 #include "include/ports/SkFontMgr_mac_ct.h"
 #else
 #include "include/ports/SkFontMgr_empty.h"
 #endif
+#include "src/core/SkUTF.h"
 
 #include <algorithm>
 #include <cmath>
@@ -66,6 +68,12 @@ public:
         sk_sp<SkImage> image;
     };
 
+    struct TextRun final {
+        std::size_t offset{};
+        std::size_t length{};
+        sk_sp<SkTypeface> face;
+    };
+
     sk_sp<SkSurface> surface;
     sk_sp<SkFontMgr> fonts{
 #if defined(__APPLE__)
@@ -87,6 +95,13 @@ public:
         return surface ? surface->getCanvas() : nullptr;
     }
 
+    [[nodiscard]] static SkFontStyle font_style(FontSpec spec) {
+        const SkFontStyle::Slant slant = spec.italic
+            ? SkFontStyle::kItalic_Slant
+            : SkFontStyle::kUpright_Slant;
+        return {static_cast<int>(spec.weight), SkFontStyle::kNormal_Width, slant};
+    }
+
     [[nodiscard]] sk_sp<SkTypeface> typeface(FontSpec spec) const {
         const RegisteredTypeface* registered = nullptr;
         int registered_distance = std::numeric_limits<int>::max();
@@ -105,12 +120,7 @@ public:
             return registered->face;
         }
 
-        const SkFontStyle::Slant slant = spec.italic
-            ? SkFontStyle::kItalic_Slant
-            : SkFontStyle::kUpright_Slant;
-        const SkFontStyle style(static_cast<int>(spec.weight),
-                                SkFontStyle::kNormal_Width,
-                                slant);
+        const SkFontStyle style = font_style(spec);
         const char* family = nullptr;
         if (spec.role == FontRole::control) {
             family = "Lucida Grande";
@@ -122,6 +132,47 @@ public:
             face = fonts->legacyMakeTypeface(nullptr, style);
         }
         return face;
+    }
+
+    [[nodiscard]] std::vector<TextRun> text_runs(std::string_view text,
+                                                 FontSpec spec) const {
+        std::vector<TextRun> runs;
+        if (text.empty()) {
+            return runs;
+        }
+        const SkFontStyle style = font_style(spec);
+        const sk_sp<SkTypeface> primary = typeface(spec);
+        sk_sp<SkTypeface> current = primary;
+        std::size_t run_start{};
+        const char* cursor = text.data();
+        const char* const end = cursor + text.size();
+        while (cursor < end) {
+            const char* const scalar_start = cursor;
+            const SkUnichar scalar = SkUTF::NextUTF8(&cursor, end);
+            sk_sp<SkTypeface> face = primary;
+            if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
+                face = fonts->matchFamilyStyleCharacter(
+                    nullptr, style, nullptr, 0, scalar);
+                if (!face) {
+                    face = primary;
+                }
+            }
+            const bool same_face = (!current && !face) ||
+                (current && face && current->uniqueID() == face->uniqueID());
+            if (!same_face) {
+                const std::size_t scalar_offset = static_cast<std::size_t>(
+                    scalar_start - text.data());
+                if (scalar_offset > run_start) {
+                    runs.push_back({run_start, scalar_offset - run_start, current});
+                }
+                run_start = scalar_offset;
+                current = std::move(face);
+            }
+        }
+        if (run_start < text.size()) {
+            runs.push_back({run_start, text.size() - run_start, current});
+        }
+        return runs;
     }
 };
 
@@ -163,8 +214,13 @@ bool SkiaRaster::resize(Size logical_size, double scale) {
         return false;
     }
 
-    const SkImageInfo info = SkImageInfo::MakeN32Premul(
-        width, height, SkColorSpace::MakeSRGB());
+    // The host-facing surface contract is premultiplied RGBA8 on every target.
+    // Skia's N32 alias follows the build's native channel order (RGBA on the
+    // macOS archive, BGRA on the MinGW archive), which makes identical renderer
+    // commands expose different bytes across hosts.
+    const SkImageInfo info = SkImageInfo::Make(
+        width, height, kRGBA_8888_SkColorType, kPremul_SkAlphaType,
+        SkColorSpace::MakeSRGB());
     sk_sp<SkSurface> replacement = SkSurfaces::Raster(info);
     if (!replacement) {
         return false;
@@ -247,23 +303,12 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             continue;
         }
 
-        sk_sp<SkData> encoded =
-            SkData::MakeWithCopy(resource->encoded.data(), resource->encoded.size());
-        SkCodec::Result codec_result = SkCodec::kInternalError;
-        std::unique_ptr<SkCodec> codec =
-            SkPngDecoder::Decode(std::move(encoded), &codec_result);
-        if (!codec || codec_result != SkCodec::kSuccess ||
-            codec->getInfo().width() != static_cast<int>(resource->metadata.width) ||
-            codec->getInfo().height() != static_cast<int>(resource->metadata.height)) {
-            impl_->images.erase(id.value);
-            synchronized = false;
-            continue;
-        }
-
         const SkImageInfo output_info = SkImageInfo::Make(
             static_cast<int>(resource->metadata.width),
             static_cast<int>(resource->metadata.height),
-            kRGBA_8888_SkColorType, kPremul_SkAlphaType,
+            resource->encoding == ImageResourceEncoding::bgra32_premultiplied
+                ? kBGRA_8888_SkColorType : kRGBA_8888_SkColorType,
+            kPremul_SkAlphaType,
             SkColorSpace::MakeSRGB());
         const std::size_t row_bytes = output_info.minRowBytes();
         if (row_bytes != static_cast<std::size_t>(resource->metadata.width) * 4U ||
@@ -273,11 +318,37 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             synchronized = false;
             continue;
         }
-        std::vector<std::byte> pixels(resource->metadata.decoded_byte_count);
-        if (codec->getPixels(output_info, pixels.data(), row_bytes) != SkCodec::kSuccess) {
-            impl_->images.erase(id.value);
-            synchronized = false;
-            continue;
+        std::vector<std::byte> pixels;
+        if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+            if (resource->row_bytes != row_bytes ||
+                resource->encoded.size() != resource->metadata.decoded_byte_count) {
+                impl_->images.erase(id.value);
+                synchronized = false;
+                continue;
+            }
+            pixels.assign(resource->encoded.begin(), resource->encoded.end());
+        } else {
+            sk_sp<SkData> encoded = SkData::MakeWithCopy(
+                resource->encoded.data(), resource->encoded.size());
+            SkCodec::Result codec_result = SkCodec::kInternalError;
+            std::unique_ptr<SkCodec> codec =
+                SkPngDecoder::Decode(std::move(encoded), &codec_result);
+            if (!codec || codec_result != SkCodec::kSuccess ||
+                codec->getInfo().width() !=
+                    static_cast<int>(resource->metadata.width) ||
+                codec->getInfo().height() !=
+                    static_cast<int>(resource->metadata.height)) {
+                impl_->images.erase(id.value);
+                synchronized = false;
+                continue;
+            }
+            pixels.resize(resource->metadata.decoded_byte_count);
+            if (codec->getPixels(output_info, pixels.data(), row_bytes) !=
+                SkCodec::kSuccess) {
+                impl_->images.erase(id.value);
+                synchronized = false;
+                continue;
+            }
         }
         sk_sp<SkData> pixel_data = SkData::MakeWithCopy(pixels.data(), pixels.size());
         sk_sp<SkImage> image =
@@ -379,25 +450,34 @@ void SkiaRaster::draw_text_utf8(Point origin,
                                 FontSpec font_spec,
                                 Color color) {
     if (SkCanvas* canvas = impl_->canvas(); canvas && !text.empty()) {
-        SkFont font(impl_->typeface(font_spec), static_cast<SkScalar>(font_spec.size));
-        font.setEdging(SkFont::Edging::kAntiAlias);
-        canvas->drawSimpleText(text.data(), text.size(), SkTextEncoding::kUTF8,
-                               static_cast<SkScalar>(origin.x),
-                               static_cast<SkScalar>(origin.y), font, make_paint(color));
+        SkScalar x = static_cast<SkScalar>(origin.x);
+        const SkPaint paint = make_paint(color);
+        for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
+            SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
+            font.setEdging(SkFont::Edging::kAntiAlias);
+            const char* bytes = text.data() + run.offset;
+            canvas->drawSimpleText(bytes, run.length, SkTextEncoding::kUTF8,
+                                   x, static_cast<SkScalar>(origin.y), font, paint);
+            x += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
+        }
     }
 }
 
 Size SkiaRaster::measure_text_utf8(std::string_view text,
                                    FontSpec font_spec) {
     if (text.empty()) return {0.0, font_spec.size};
-    SkFont font(impl_->typeface(font_spec), static_cast<SkScalar>(font_spec.size));
-    SkRect bounds{};
-    const SkScalar width = font.measureText(text.data(), text.size(),
-                                            SkTextEncoding::kUTF8, &bounds);
-    SkFontMetrics metrics{};
-    font.getMetrics(&metrics);
-    return {std::max(0.0, static_cast<double>(width)),
-            std::max(0.0, static_cast<double>(metrics.fDescent - metrics.fAscent))};
+    double width{};
+    double height{};
+    for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
+        SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
+        const char* bytes = text.data() + run.offset;
+        width += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
+        SkFontMetrics metrics{};
+        font.getMetrics(&metrics);
+        height = std::max(height,
+            static_cast<double>(metrics.fDescent - metrics.fAscent));
+    }
+    return {std::max(0.0, width), std::max(0.0, height)};
 }
 
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {

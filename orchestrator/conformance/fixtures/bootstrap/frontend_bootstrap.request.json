@@ -1,0 +1,10 @@
+{
+  "id": "fixture-frontend-bootstrap",
+  "method": "orchestrator.frontend.bootstrap",
+  "contract": {
+    "id": "ORC-FE-001",
+    "major": 1,
+    "minor": 0
+  },
+  "params": {}
+}

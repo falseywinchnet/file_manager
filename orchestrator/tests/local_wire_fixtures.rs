@@ -1,7 +1,9 @@
 #![cfg(unix)]
 
 use fileman_orchestrator::Request;
-use fileman_orchestrator::local_session::{ClientHello, ServerHello};
+use fileman_orchestrator::local_session::{
+    ClientHello, LOCAL_WIRE_MAJOR, LOCAL_WIRE_MINOR, ServerHello,
+};
 use fileman_orchestrator::local_wire::{LOCAL_WIRE_MAGIC, read_json_frame, write_json_frame};
 use std::fs;
 use std::io::Cursor;
@@ -12,6 +14,11 @@ fn local_wire_payload_fixtures_encode_with_canonical_header_and_round_trip() {
     let client: ClientHello = read_fixture("client_hello.json");
     let server: ServerHello = read_fixture("server_hello.json");
     let request: Request = read_fixture("status.request.json");
+
+    assert_eq!(client.major, LOCAL_WIRE_MAJOR);
+    assert_eq!(client.minor, LOCAL_WIRE_MINOR);
+    assert_eq!(server.major, LOCAL_WIRE_MAJOR);
+    assert_eq!(server.minor, LOCAL_WIRE_MINOR);
 
     assert_frame_round_trip(&client);
     assert_frame_round_trip(&server);
@@ -42,5 +49,5 @@ fn read_fixture<T: serde::de::DeserializeOwned>(name: &str) -> T {
 }
 
 fn fixture_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance/fixtures/local-wire-v0")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance/fixtures/local-wire-v1")
 }

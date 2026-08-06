@@ -1,0 +1,165 @@
+#include "gui_forms/gui_forms.hpp"
+
+#include <cstdlib>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+
+using namespace gui_forms;
+
+void require(bool condition, const char* message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+class RecordingPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override { ++fills; }
+    void stroke_rect(Rect, Color, double) override { ++strokes; }
+    void draw_line(Point, Point, Color, double) override { ++lines; }
+    void draw_text_utf8(Point origin, std::string_view text, FontSpec, Color) override {
+        origins.push_back(origin);
+        texts.emplace_back(text);
+    }
+    void draw_image(ImageId, Rect, double) override {}
+
+    std::uint64_t fills{};
+    std::uint64_t strokes{};
+    std::uint64_t lines{};
+    std::vector<Point> origins;
+    std::vector<std::string> texts;
+};
+
+Point row_point(const CheckedListBox& list, std::size_t index) {
+    const Rect bounds = list.absolute_bounds();
+    return {bounds.x + 12.0,
+            bounds.y + 2.0 +
+                (static_cast<double>(index - list.top_index()) + 0.5) *
+                    list.item_height()};
+}
+
+void click_row(Window& window, const CheckedListBox& list, std::size_t index) {
+    const Point point = row_point(list, index);
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, point}) &&
+                window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::primary, point}),
+            "CheckedListBox row click must route through retained input");
+}
+
+void test_check_model_events_and_mutation() {
+    auto list = make_control<CheckedListBox>(StableId("checks"));
+    list->add_item("Renderer", CheckState::checked);
+    list->add_item("Host", CheckState::unchecked);
+    list->add_item("Accessibility", CheckState::unchecked);
+    list->add_item("Telemetry", CheckState::indeterminate);
+    list->set_requested_bounds({0.0, 0.0, 260.0, 150.0});
+    Window window(list, {260.0, 150.0});
+    std::string order;
+    auto checking = list->item_checking().subscribe(
+        [&order, list](ItemCheckEvent& event) {
+            order += "before:" + std::to_string(event.index) + ":" +
+                     std::to_string(static_cast<int>(list->item_check_state(event.index))) +
+                     "\n";
+            if (event.index == 1U) event.cancel = true;
+            if (event.index == 2U) event.new_state = CheckState::checked;
+        });
+    auto changed = list->item_check_state_changed().subscribe(
+        [&order, list](std::size_t index, CheckState state) {
+            require(list->item_check_state(index) == state,
+                    "post-check event must observe committed state");
+            order += "after:" + std::to_string(index) + ":" +
+                     std::to_string(static_cast<int>(state)) + "\n";
+        });
+    list->set_item_checked(1U, true);
+    list->set_item_check_state(2U, CheckState::indeterminate);
+    require(!list->item_checked(1U) && list->item_checked(2U) &&
+                order == "before:1:0\nbefore:2:0\nafter:2:1\n",
+            "ItemCheck must be cancellable/modifiable before one committed event");
+    require(list->checked_indices() == std::vector<std::size_t>{0U, 2U},
+            "checked indices must remain independent of selection");
+
+    list->remove_item(0U);
+    require(list->items().size() == 3U && list->item_checked(1U) &&
+                list->item_check_state(2U) == CheckState::indeterminate,
+            "item removal must remap check state with the item collection");
+    list->clear_items();
+    require(list->items().empty() && list->checked_indices().empty(),
+            "clearing items must atomically clear the check model");
+}
+
+void test_pointer_keyboard_and_disabled_policy() {
+    auto list = make_control<CheckedListBox>(StableId("checks.input"));
+    list->set_items({"First", "Second", "Third"});
+    list->set_requested_bounds({0.0, 0.0, 240.0, 120.0});
+    Window window(list, {240.0, 120.0});
+    window.perform_layout();
+
+    click_row(window, *list, 0U);
+    require(list->selected_index() == 0U && !list->item_checked(0U),
+            "default first click must select without changing check state");
+    click_row(window, *list, 0U);
+    require(list->item_checked(0U),
+            "default second click on the selected item must toggle its check");
+    list->set_check_on_click(true);
+    click_row(window, *list, 1U);
+    require(list->selected_index() == 1U && list->item_checked(1U),
+            "CheckOnClick must select and toggle on the first click");
+
+    KeyEvent space{KeyAction::down, PhysicalKey::space};
+    require(window.dispatch_key(space) && !list->item_checked(1U),
+            "Space must toggle the active checked-list item");
+    list->set_enabled(false);
+    const Point third = row_point(*list, 2U);
+    require(!window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, third}) &&
+                !list->item_checked(2U),
+            "disabled CheckedListBox must reject pointer check mutation");
+}
+
+void test_paint_and_semantic_actions() {
+    auto list = make_control<CheckedListBox>(StableId("checks.semantic"));
+    list->set_accessible_name("Feature checks");
+    list->add_item("Checked", CheckState::checked);
+    list->add_item("Mixed", CheckState::indeterminate);
+    list->add_item("Empty", CheckState::unchecked);
+    list->set_requested_bounds({0.0, 0.0, 240.0, 120.0});
+    Window window(list, {240.0, 120.0});
+    window.perform_layout();
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 240.0, 120.0});
+    require(painter.texts.size() == 3U && painter.strokes >= 3U &&
+                painter.lines >= 2U && painter.origins.front().x == 28.0,
+            "CheckedListBox must paint check adornments and shifted row text");
+
+    const std::string json = window.semantic_snapshot().to_json();
+    require(json.find("\"role\":\"check_list_item\"") != std::string::npos &&
+                json.find("\"value\":\"checked\"") != std::string::npos &&
+                json.find("\"value\":\"indeterminate\"") != std::string::npos,
+            "checked rows must publish stable checkable virtual semantics");
+    require(window.perform_semantic_action("checks.semantic.item.2",
+                                           SemanticAction::press) &&
+                list->item_checked(2U) && list->selected_index() == 2U,
+            "semantic press must select and toggle through public behavior");
+}
+
+} // namespace
+
+int main() {
+    try {
+        test_check_model_events_and_mutation();
+        test_pointer_keyboard_and_disabled_policy();
+        test_paint_and_semantic_actions();
+        std::cout << "gui_forms_checked_list_box_tests: all tests passed\n";
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
+        std::cerr << "gui_forms_checked_list_box_tests: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
+}

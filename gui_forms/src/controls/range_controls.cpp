@@ -1,7 +1,9 @@
 #include "gui_forms/range_controls.hpp"
+#include "gui_forms/window.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -209,6 +211,15 @@ void TrackBar::set_show_ticks(bool show) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void TrackBar::set_visual_style(TrackBarVisualStyle style_value) {
+    require_mutable();
+    if (visual_style_ == style_value) {
+        return;
+    }
+    visual_style_ = style_value;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
 Size TrackBar::measure(Size available) {
     const Rect requested = requested_bounds();
     const Size preferred = orientation() == Orientation::horizontal
@@ -228,9 +239,25 @@ void TrackBar::on_paint(Painter& painter, Rect) {
                std::max(0.0, bounds.width - track_inset * 2.0), 5.0}
         : Rect{bounds.width * 0.5 - 2.5, track_inset, 5.0,
                std::max(0.0, bounds.height - track_inset * 2.0)};
-    paint_sunken(painter, track, style(), style().face_light);
+    if (visual_style_ == TrackBarVisualStyle::classic) {
+        paint_sunken(painter, track, style(), style().face_light);
+    } else {
+        const Rect modern_track = horizontal
+            ? Rect{track.x, track.y + 1.5, track.width, 2.0}
+            : Rect{track.x + 1.5, track.y, 2.0, track.height};
+        painter.fill_rect(modern_track, style().border);
+        Rect filled = modern_track;
+        if (horizontal) {
+            filled.width *= normalized_value();
+        } else {
+            const double height = filled.height * normalized_value();
+            filled.y += filled.height - height;
+            filled.height = height;
+        }
+        painter.fill_rect(filled, style().accent);
+    }
 
-    if (show_ticks_) {
+    if (show_ticks_ && visual_style_ != TrackBarVisualStyle::compact) {
         const double span = maximum() - minimum();
         const double requested_count = std::floor(span / tick_frequency_);
         const std::size_t bounded_count = static_cast<std::size_t>(
@@ -254,12 +281,24 @@ void TrackBar::on_paint(Painter& painter, Rect) {
     }
 
     const double ratio = normalized_value();
+    const double thumb_extent = visual_style_ == TrackBarVisualStyle::compact
+        ? 8.0 : visual_style_ == TrackBarVisualStyle::filled ? 12.0 : 14.0;
     const Rect thumb = horizontal
-        ? Rect{track.x + ratio * track.width - 7.0, 2.0, 14.0,
-               std::max(0.0, bounds.height - 8.0)}
-        : Rect{2.0, track.y + (1.0 - ratio) * track.height - 7.0,
-               std::max(0.0, bounds.width - 8.0), 14.0};
-    paint_thumb(painter, thumb, style(), focused_);
+        ? Rect{track.x + ratio * track.width - thumb_extent * 0.5,
+               std::max(2.0, (bounds.height - thumb_extent) * 0.5),
+               thumb_extent, thumb_extent}
+        : Rect{std::max(2.0, (bounds.width - thumb_extent) * 0.5),
+               track.y + (1.0 - ratio) * track.height - thumb_extent * 0.5,
+               thumb_extent, thumb_extent};
+    if (visual_style_ == TrackBarVisualStyle::classic) {
+        paint_thumb(painter, thumb, style(), focused_);
+    } else {
+        painter.fill_rect(thumb, focused_ ? style().accent : style().face_light);
+        painter.stroke_rect({thumb.x + 0.5, thumb.y + 0.5,
+                             std::max(0.0, thumb.width - 1.0),
+                             std::max(0.0, thumb.height - 1.0)},
+                            style().dark_border, 1.0);
+    }
 }
 
 double TrackBar::value_from_window_point(Point point) const noexcept {
@@ -358,9 +397,126 @@ void TrackBar::on_focus_changed(bool focused) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+SemanticDescriptor TrackBar::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::slider;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    std::ostringstream value_text;
+    value_text << value();
+    descriptor.value = value_text.str();
+    descriptor.numeric_value = value();
+    descriptor.minimum_value = minimum();
+    descriptor.maximum_value = maximum();
+    descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
+                          SemanticAction::decrement, SemanticAction::set_value};
+    descriptor.exposed = true;
+    return descriptor;
+}
+
+bool TrackBar::on_semantic_action(SemanticAction action, std::string_view value_text) {
+    if (action == SemanticAction::increment || action == SemanticAction::decrement) {
+        const bool increasing = action == SemanticAction::increment;
+        set_value_from_input(value() + (increasing ? small_change() : -small_change()),
+                             increasing ? RangeAction::small_increment
+                                        : RangeAction::small_decrement);
+        return true;
+    }
+    if (action == SemanticAction::set_value) {
+        try {
+            std::size_t consumed{};
+            const double parsed = std::stod(std::string(value_text), &consumed);
+            if (consumed != value_text.size() || !std::isfinite(parsed)) return false;
+            return set_value_from_input(parsed, RangeAction::thumb_position) ||
+                   parsed == value();
+        } catch (const std::exception&) {
+            return false;
+        }
+    }
+    return RangeControl::on_semantic_action(action, value_text);
+}
+
 ProgressBar::ProgressBar(StableId stable_id)
     : RangeControl(std::move(stable_id)) {
     set_focusable(false);
+}
+
+void ProgressBar::set_visual_style(ProgressBarVisualStyle style_value) {
+    require_mutable();
+    if (visual_style_ == style_value) {
+        return;
+    }
+    visual_style_ = style_value;
+    animation_phase_ = 0.0;
+    update_animation_registration();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ProgressBar::set_animation_enabled(bool enabled_value) {
+    require_mutable();
+    if (animation_enabled_ == enabled_value) {
+        return;
+    }
+    animation_enabled_ = enabled_value;
+    if (!animation_enabled_) {
+        animation_phase_ = 0.0;
+    }
+    update_animation_registration();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ProgressBar::set_animation_period(FrameInterval period) {
+    require_mutable();
+    if (period < std::chrono::milliseconds(100)) {
+        throw std::invalid_argument(
+            "progress animation period must be at least 100 milliseconds");
+    }
+    if (animation_period_ == period) {
+        return;
+    }
+    animation_period_ = period;
+    animation_origin_ = FrameClock::now();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+bool ProgressBar::animated_style() const noexcept {
+    return visual_style_ == ProgressBarVisualStyle::marquee ||
+           visual_style_ == ProgressBarVisualStyle::pulse;
+}
+
+void ProgressBar::update_animation_registration() {
+    animation_frames_.disconnect();
+    if (window() == nullptr || !animation_enabled_ || !animated_style()) {
+        return;
+    }
+    constexpr FrameInterval interval = std::chrono::milliseconds(16);
+    animation_origin_ = FrameClock::now();
+    animation_frames_ = window()->activate_surface(
+        shared_from_this(), interval, animation_origin_ + interval);
+}
+
+void ProgressBar::on_attached_to_window() {
+    RangeControl::on_attached_to_window();
+    update_animation_registration();
+}
+
+void ProgressBar::on_detached_from_window() noexcept {
+    animation_frames_.disconnect();
+    RangeControl::on_detached_from_window();
+}
+
+void ProgressBar::on_frame(FrameTime now) {
+    if (!animation_enabled_ || !animated_style()) {
+        return;
+    }
+    const double elapsed =
+        std::chrono::duration<double>(now - animation_origin_).count();
+    const double period =
+        std::chrono::duration<double>(animation_period_).count();
+    animation_phase_ = period <= 0.0 ? 0.0 : std::fmod(elapsed / period, 1.0);
+    if (animation_phase_ < 0.0) {
+        animation_phase_ += 1.0;
+    }
 }
 
 Size ProgressBar::measure(Size available) {
@@ -380,21 +536,448 @@ void ProgressBar::on_paint(Painter& painter, Rect) {
     const double ratio = normalized_value();
     Rect fill{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
               std::max(0.0, bounds.height - 4.0)};
-    if (orientation() == Orientation::horizontal) {
-        fill.width *= ratio;
+    if (visual_style_ == ProgressBarVisualStyle::marquee) {
+        if (orientation() == Orientation::horizontal) {
+            const double band = std::max(18.0, fill.width * 0.28);
+            fill.x += (fill.width + band) * animation_phase_ - band;
+            fill.width = band;
+            fill = Rect::intersection(fill, {2.0, 2.0,
+                                             std::max(0.0, bounds.width - 4.0),
+                                             std::max(0.0, bounds.height - 4.0)});
+        } else {
+            const double band = std::max(18.0, fill.height * 0.28);
+            fill.y += (fill.height + band) * (1.0 - animation_phase_) - band;
+            fill.height = band;
+            fill = Rect::intersection(fill, {2.0, 2.0,
+                                             std::max(0.0, bounds.width - 4.0),
+                                             std::max(0.0, bounds.height - 4.0)});
+        }
     } else {
-        const double filled_height = fill.height * ratio;
-        fill.y += fill.height - filled_height;
-        fill.height = filled_height;
+        if (orientation() == Orientation::horizontal) {
+            fill.width *= ratio;
+        } else {
+            const double filled_height = fill.height * ratio;
+            fill.y += fill.height - filled_height;
+            fill.height = filled_height;
+        }
     }
-    painter.fill_rect(fill, enabled() ? style().accent : style().border);
+
+    const Color progress_color = enabled() ? style().accent : style().border;
+    if (visual_style_ == ProgressBarVisualStyle::blocks) {
+        constexpr double gap = 2.0;
+        constexpr double block = 9.0;
+        if (orientation() == Orientation::horizontal) {
+            for (double x = fill.x; x + block <= fill.x + fill.width; x += block + gap) {
+                painter.fill_rect({x, fill.y, block, fill.height}, progress_color);
+            }
+        } else {
+            for (double y = fill.y + fill.height - block; y >= fill.y; y -= block + gap) {
+                painter.fill_rect({fill.x, y, fill.width, block}, progress_color);
+            }
+        }
+    } else {
+        painter.fill_rect(fill, progress_color);
+    }
     if (fill.width > 0.0 && fill.height > 3.0) {
-        painter.fill_rect({fill.x, fill.y, fill.width, 3.0}, style().accent_light);
+        if (visual_style_ == ProgressBarVisualStyle::pulse) {
+            const double highlight_width = std::max(8.0, fill.width * 0.18);
+            const double x = fill.x +
+                std::max(0.0, fill.width - highlight_width) * animation_phase_;
+            painter.fill_rect({x, fill.y, std::min(highlight_width, fill.width),
+                               fill.height}, style().accent_light);
+        } else {
+            painter.fill_rect({fill.x, fill.y, fill.width, 3.0},
+                              style().accent_light);
+        }
     }
 }
 
 bool ProgressBar::hit_test_local(Point) const {
     return false;
+}
+
+SemanticDescriptor ProgressBar::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::progress_bar;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    std::ostringstream value_text;
+    value_text << value();
+    descriptor.value = value_text.str();
+    descriptor.numeric_value = value();
+    descriptor.minimum_value = minimum();
+    descriptor.maximum_value = maximum();
+    if (animation_enabled_ && animated_style()) descriptor.states |= SemanticState::busy;
+    descriptor.exposed = true;
+    return descriptor;
+}
+
+ScrollBar::ScrollBar(StableId stable_id, Orientation orientation)
+    : RangeControl(std::move(stable_id)) {
+    set_orientation(orientation);
+    set_focusable(true);
+    set_cursor(CursorKind::arrow);
+}
+
+HScrollBar::HScrollBar(StableId stable_id)
+    : ScrollBar(std::move(stable_id), Orientation::horizontal) {}
+
+VScrollBar::VScrollBar(StableId stable_id)
+    : ScrollBar(std::move(stable_id), Orientation::vertical) {}
+
+void ScrollBar::set_button_extent(double extent) {
+    require_mutable();
+    require_finite(extent, "scrollbar button extent must be finite");
+    if (extent < 8.0 || extent > 64.0) {
+        throw std::invalid_argument("scrollbar button extent must be between 8 and 64");
+    }
+    if (button_extent_ == extent) return;
+    button_extent_ = extent;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ScrollBar::set_minimum_thumb_extent(double extent) {
+    require_mutable();
+    require_finite(extent, "scrollbar thumb extent must be finite");
+    if (extent < 8.0 || extent > 128.0) {
+        throw std::invalid_argument("scrollbar thumb extent must be between 8 and 128");
+    }
+    if (minimum_thumb_extent_ == extent) return;
+    minimum_thumb_extent_ = extent;
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ScrollBar::set_initial_repeat_delay(FrameInterval delay) {
+    require_mutable();
+    if (delay < std::chrono::milliseconds(100) ||
+        delay > std::chrono::seconds(2)) {
+        throw std::invalid_argument(
+            "scrollbar initial repeat delay must be between 100ms and 2s");
+    }
+    initial_repeat_delay_ = delay;
+}
+
+void ScrollBar::set_repeat_interval(FrameInterval interval) {
+    require_mutable();
+    if (interval < std::chrono::milliseconds(16) ||
+        interval > std::chrono::milliseconds(500)) {
+        throw std::invalid_argument(
+            "scrollbar repeat interval must be between 16ms and 500ms");
+    }
+    repeat_interval_ = interval;
+}
+
+Rect ScrollBar::decrement_button_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const double axis = orientation() == Orientation::horizontal
+        ? bounds.width : bounds.height;
+    const double extent = std::min(button_extent_, axis * 0.5);
+    return orientation() == Orientation::horizontal
+        ? Rect{0.0, 0.0, extent, bounds.height}
+        : Rect{0.0, 0.0, bounds.width, extent};
+}
+
+Rect ScrollBar::increment_button_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const double axis = orientation() == Orientation::horizontal
+        ? bounds.width : bounds.height;
+    const double extent = std::min(button_extent_, axis * 0.5);
+    return orientation() == Orientation::horizontal
+        ? Rect{std::max(0.0, bounds.width - extent), 0.0, extent, bounds.height}
+        : Rect{0.0, std::max(0.0, bounds.height - extent), bounds.width, extent};
+}
+
+Rect ScrollBar::track_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const Rect decrement = decrement_button_bounds();
+    const Rect increment = increment_button_bounds();
+    return orientation() == Orientation::horizontal
+        ? Rect{decrement.width, 0.0,
+               std::max(0.0, increment.x - decrement.width), bounds.height}
+        : Rect{0.0, decrement.height, bounds.width,
+               std::max(0.0, increment.y - decrement.height)};
+}
+
+Rect ScrollBar::thumb_bounds() const noexcept {
+    const Rect track = track_bounds();
+    const double track_extent = orientation() == Orientation::horizontal
+        ? track.width : track.height;
+    if (track_extent <= 0.0) return track;
+    const double range = maximum() - minimum();
+    const double proportion = large_change() / (range + large_change());
+    const double thumb_extent = std::clamp(track_extent * proportion,
+        std::min(minimum_thumb_extent_, track_extent), track_extent);
+    const double movable = std::max(0.0, track_extent - thumb_extent);
+    const double position = normalized_value() * movable;
+    return orientation() == Orientation::horizontal
+        ? Rect{track.x + position, track.y, thumb_extent, track.height}
+        : Rect{track.x, track.y + position, track.width, thumb_extent};
+}
+
+double ScrollBar::axis_coordinate(Point local_point) const noexcept {
+    return orientation() == Orientation::horizontal ? local_point.x : local_point.y;
+}
+
+ScrollBarPart ScrollBar::part_at(Point local_point) const noexcept {
+    if (!local_bounds().contains(local_point)) return ScrollBarPart::none;
+    if (decrement_button_bounds().contains(local_point)) {
+        return ScrollBarPart::decrement_button;
+    }
+    if (increment_button_bounds().contains(local_point)) {
+        return ScrollBarPart::increment_button;
+    }
+    const Rect thumb = thumb_bounds();
+    if (thumb.contains(local_point)) return ScrollBarPart::thumb;
+    const double coordinate = axis_coordinate(local_point);
+    const double thumb_start = orientation() == Orientation::horizontal
+        ? thumb.x : thumb.y;
+    return coordinate < thumb_start ? ScrollBarPart::decrement_track
+                                    : ScrollBarPart::increment_track;
+}
+
+double ScrollBar::value_from_thumb_coordinate(double coordinate) const noexcept {
+    const Rect track = track_bounds();
+    const Rect thumb = thumb_bounds();
+    const double track_start = orientation() == Orientation::horizontal
+        ? track.x : track.y;
+    const double track_extent = orientation() == Orientation::horizontal
+        ? track.width : track.height;
+    const double thumb_extent = orientation() == Orientation::horizontal
+        ? thumb.width : thumb.height;
+    const double movable = std::max(0.0, track_extent - thumb_extent);
+    if (movable <= 0.0) return minimum();
+    const double ratio = std::clamp((coordinate - track_start) / movable, 0.0, 1.0);
+    return minimum() + ratio * (maximum() - minimum());
+}
+
+bool ScrollBar::apply_part(ScrollBarPart part) {
+    switch (part) {
+    case ScrollBarPart::decrement_button:
+        return set_value_from_input(value() - small_change(),
+                                    RangeAction::small_decrement);
+    case ScrollBarPart::increment_button:
+        return set_value_from_input(value() + small_change(),
+                                    RangeAction::small_increment);
+    case ScrollBarPart::decrement_track:
+        return set_value_from_input(value() - large_change(),
+                                    RangeAction::large_decrement);
+    case ScrollBarPart::increment_track:
+        return set_value_from_input(value() + large_change(),
+                                    RangeAction::large_increment);
+    case ScrollBarPart::none:
+    case ScrollBarPart::thumb:
+        return false;
+    }
+    return false;
+}
+
+void ScrollBar::begin_repeat(ScrollBarPart part, Point pointer) {
+    repeat_frames_.disconnect();
+    repeat_pointer_ = pointer;
+    if (window() == nullptr || part == ScrollBarPart::none ||
+        part == ScrollBarPart::thumb) return;
+    const FrameTime now = FrameClock::now();
+    repeat_frames_ = window()->activate_surface(
+        shared_from_this(), repeat_interval_, now + initial_repeat_delay_);
+}
+
+void ScrollBar::stop_interaction() noexcept {
+    repeat_frames_.disconnect();
+    pressed_part_ = ScrollBarPart::none;
+    tracking_thumb_ = false;
+    thumb_drag_offset_ = 0.0;
+}
+
+Size ScrollBar::measure(Size available) {
+    const Rect requested = requested_bounds();
+    const Size preferred = orientation() == Orientation::horizontal
+        ? Size{requested.width > 0.0 ? requested.width : 180.0,
+               requested.height > 0.0 ? requested.height : 18.0}
+        : Size{requested.width > 0.0 ? requested.width : 18.0,
+               requested.height > 0.0 ? requested.height : 180.0};
+    return {std::min(available.width, preferred.width),
+            std::min(available.height, preferred.height)};
+}
+
+void ScrollBar::on_paint(Painter& painter, Rect) {
+    const Rect bounds = local_bounds();
+    const BasicControlStyle& colors = style();
+    const Rect track = track_bounds();
+    painter.fill_rect(bounds, colors.face);
+    paint_sunken(painter, track, colors, colors.face_light);
+
+    const auto paint_button = [&](Rect button, ScrollBarPart part, bool incrementing) {
+        paint_thumb(painter, button, colors, pressed_part_ == part);
+        const double cx = button.x + button.width * 0.5;
+        const double cy = button.y + button.height * 0.5;
+        const Color arrow = enabled() ? colors.dark_border : colors.disabled_text;
+        if (orientation() == Orientation::horizontal) {
+            const double direction = incrementing ? 1.0 : -1.0;
+            painter.draw_line({cx - 2.0 * direction, cy - 4.0},
+                              {cx + 2.0 * direction, cy}, arrow, 1.5);
+            painter.draw_line({cx + 2.0 * direction, cy},
+                              {cx - 2.0 * direction, cy + 4.0}, arrow, 1.5);
+        } else {
+            const double direction = incrementing ? 1.0 : -1.0;
+            painter.draw_line({cx - 4.0, cy - 2.0 * direction},
+                              {cx, cy + 2.0 * direction}, arrow, 1.5);
+            painter.draw_line({cx, cy + 2.0 * direction},
+                              {cx + 4.0, cy - 2.0 * direction}, arrow, 1.5);
+        }
+    };
+    paint_button(decrement_button_bounds(), ScrollBarPart::decrement_button, false);
+    paint_button(increment_button_bounds(), ScrollBarPart::increment_button, true);
+    paint_thumb(painter, thumb_bounds(), colors, focused_ || tracking_thumb_);
+}
+
+void ScrollBar::on_pointer(PointerEvent& event) {
+    if (!eligible_for_input()) return;
+    const Rect absolute = absolute_bounds();
+    const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
+    if (event.action == PointerAction::wheel && event.wheel_delta.y != 0.0) {
+        const bool decrementing = event.wheel_delta.y > 0.0;
+        set_value_from_input(value() + (decrementing ? -small_change() : small_change()),
+                             decrementing ? RangeAction::small_decrement
+                                          : RangeAction::small_increment);
+        event.handled = true;
+        return;
+    }
+    if (event.action == PointerAction::down &&
+        event.button == PointerButton::primary) {
+        if (window() != nullptr) static_cast<void>(window()->request_focus(shared_from_this()));
+        pressed_part_ = part_at(local);
+        if (pressed_part_ == ScrollBarPart::none) return;
+        set_pointer_capture(true);
+        if (pressed_part_ == ScrollBarPart::thumb) {
+            const Rect thumb = thumb_bounds();
+            const double thumb_start = orientation() == Orientation::horizontal
+                ? thumb.x : thumb.y;
+            thumb_drag_offset_ = axis_coordinate(local) - thumb_start;
+            tracking_thumb_ = true;
+        } else {
+            static_cast<void>(apply_part(pressed_part_));
+            begin_repeat(pressed_part_, local);
+        }
+        invalidate(Dirty::paint);
+        event.handled = true;
+        return;
+    }
+    if (event.action == PointerAction::move && tracking_thumb_) {
+        const double coordinate = axis_coordinate(local) - thumb_drag_offset_;
+        set_value_from_input(value_from_thumb_coordinate(coordinate),
+                             RangeAction::thumb_track);
+        event.handled = true;
+        return;
+    }
+    if (event.action == PointerAction::move && pressed_part_ != ScrollBarPart::none) {
+        repeat_pointer_ = local;
+        event.handled = true;
+        return;
+    }
+    if (event.action == PointerAction::up &&
+        event.button == PointerButton::primary &&
+        pressed_part_ != ScrollBarPart::none) {
+        const bool was_thumb = tracking_thumb_;
+        if (has_pointer_capture()) set_pointer_capture(false);
+        stop_interaction();
+        if (was_thumb) invalidate(Dirty::paint | Dirty::semantics);
+        else invalidate(Dirty::paint);
+        event.handled = true;
+    }
+}
+
+void ScrollBar::on_key(KeyEvent& event) {
+    if (!focused_ || event.action != KeyAction::down) return;
+    double next = value();
+    RangeAction action = RangeAction::thumb_position;
+    bool recognized = true;
+    switch (event.physical_key) {
+    case PhysicalKey::left:
+    case PhysicalKey::up:
+        next -= small_change(); action = RangeAction::small_decrement; break;
+    case PhysicalKey::right:
+    case PhysicalKey::down:
+        next += small_change(); action = RangeAction::small_increment; break;
+    case PhysicalKey::page_up:
+        next -= large_change(); action = RangeAction::large_decrement; break;
+    case PhysicalKey::page_down:
+        next += large_change(); action = RangeAction::large_increment; break;
+    case PhysicalKey::home:
+        next = minimum(); action = RangeAction::first; break;
+    case PhysicalKey::end:
+        next = maximum(); action = RangeAction::last; break;
+    default:
+        recognized = false; break;
+    }
+    if (recognized) {
+        static_cast<void>(set_value_from_input(next, action));
+        event.handled = true;
+    }
+}
+
+void ScrollBar::on_focus_changed(bool focused) {
+    focused_ = focused;
+    if (!focused) {
+        if (has_pointer_capture()) set_pointer_capture(false);
+        stop_interaction();
+    }
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ScrollBar::on_frame(FrameTime) {
+    if (pressed_part_ == ScrollBarPart::decrement_track ||
+        pressed_part_ == ScrollBarPart::increment_track) {
+        if (part_at(repeat_pointer_) != pressed_part_) {
+            repeat_frames_.disconnect();
+            return;
+        }
+    }
+    if (!apply_part(pressed_part_)) repeat_frames_.disconnect();
+}
+
+void ScrollBar::on_detached_from_window() noexcept {
+    stop_interaction();
+    RangeControl::on_detached_from_window();
+}
+
+SemanticDescriptor ScrollBar::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::scroll_bar;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    std::ostringstream value_text;
+    value_text << value();
+    descriptor.value = value_text.str();
+    descriptor.numeric_value = value();
+    descriptor.minimum_value = minimum();
+    descriptor.maximum_value = maximum();
+    descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
+                          SemanticAction::decrement, SemanticAction::set_value};
+    descriptor.exposed = true;
+    return descriptor;
+}
+
+bool ScrollBar::on_semantic_action(SemanticAction action,
+                                   std::string_view value_text) {
+    if (action == SemanticAction::increment || action == SemanticAction::decrement) {
+        const bool increasing = action == SemanticAction::increment;
+        set_value_from_input(value() + (increasing ? small_change() : -small_change()),
+                             increasing ? RangeAction::small_increment
+                                        : RangeAction::small_decrement);
+        return true;
+    }
+    if (action == SemanticAction::set_value) {
+        try {
+            std::size_t consumed{};
+            const double parsed = std::stod(std::string(value_text), &consumed);
+            if (consumed != value_text.size() || !std::isfinite(parsed)) return false;
+            return set_value_from_input(parsed, RangeAction::thumb_position) ||
+                   parsed == value();
+        } catch (const std::exception&) {
+            return false;
+        }
+    }
+    return RangeControl::on_semantic_action(action, value_text);
 }
 
 } // namespace gui_forms

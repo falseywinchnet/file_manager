@@ -1,6 +1,7 @@
 # Orchestrator ↔ File Manager interface negotiation
 
-Status: **round 002 active; live Core 1.0 bootstrap edge required before
+Status: **round 003 reconciled; live Core 1.0 bootstrap edge requires final
+launchd lifecycle evidence before
 Frontend 001 under ADR-006**.
 
 Participants: Orchestrator integration authority and the future C++ File
@@ -109,3 +110,87 @@ and hostile fixtures remain Core 1.0 work**.
 These requirements enter the Core 1.0 profile for `ORC-COM-001`,
 `ORC-LIF-001`, `ORC-FE-001`, and `ORC-CLI-001`. Settings, handlers, commands,
 Engine queries, plugins, and semantic facts retain separate contract gates.
+
+## Orchestrator implementation evidence after reconciliation 002
+
+Status: **OBSERVED first-platform consumer; no new File Manager reply required**.
+
+Orchestrator now carries a separately built C++17 conformance client under
+`../../orchestrator/conformance/clients/cpp/`. It authenticates over the Unix local
+wire, materializes the accepted startup fields, and reconnects across daemon
+instance replacement without linking Rust or GUI.Forms. This exercises the
+consumer side while Frontend 001 remains gated. Pollable delivery, stable client
+ABI, full hostile fixtures, and Windows named pipes remain open before product
+consumption.
+
+## Orchestrator implementation reconciliation 003
+
+Status: **OBSERVED complete source-client projection; installed launchd gate
+pending**.
+
+The sequential conformance reads exposed a future torn-snapshot risk and did
+not materialize the complete contract catalogue, fallback eligibility, or
+service-control state requested in reply 002. The additive
+`orchestrator.frontend.bootstrap` / `ORC-FE-001` 1.0 operation now returns one
+bounded immutable value containing:
+
+- version, release/provenance, lifecycle and configuration generations;
+- complete contract and availability catalogues;
+- normal route, Engine scope, and registered-versus-eligible direct fallback;
+- shutdown/restart eligibility and nullable redacted diagnostics locator.
+
+The server hello's instance identity plus the two snapshot generations form the
+frontend cache key. The separately built C++17 source client performs one
+synchronous request, validates the schema/generation/route invariants, and
+computes the strict Orchestrator-owned part of the Frontend 001 opening
+predicate. It owns no thread or callback. File Manager therefore owns the I/O
+worker and posts completed value snapshots to its GUI.Forms UI-thread queue,
+exactly as reply 002 requested.
+
+On disconnect, a prior compatible snapshot is display-only and visibly stale.
+It cannot authorize mutation, plugin execution, or an Engine fallback that the
+same snapshot did not register. Route registration and current eligibility are
+separate fields so an installed-provider gap cannot become accidental access.
+
+This closes the Orchestrator-side data-shape and delivery-model work for the
+Frontend 001 bootstrap. The remaining Core release gate is a real installed
+launchd activation, shutdown, reactivation, and removal measurement. A frozen
+C++ binary ABI and Windows named pipes remain later platform/source-packaging
+work; they are not required by the accepted macOS source-client projection.
+
+## Orchestrator availability preparation 004
+
+Status: **OBSERVED consumer gate projection implemented; Frontend 001 remains
+closed**.
+
+The raw capability catalogue's `required` field is a product/contract property,
+not a statement that every unfinished provider blocks Frontend 001. To prevent
+the future application from inventing that distinction, the atomic bootstrap
+now includes `frontend_opening`:
+
+- `orchestrator_gate` is the only locally decidable opening gate. It combines
+  the Core release manifest with `frontend.bootstrap` availability and carries
+  exact blockers. At this round it is `blocked` by `daemon.discovery` and the
+  degraded bootstrap capability, both naming the still-open installed launchd
+  evidence.
+- `external_gates.gui_forms` mirrors the attributed
+  `gui_forms.consumption_manifest` row and is currently `negotiating`. It does
+  not manufacture a GUI.Forms go-ahead.
+- `external_gates.architect_direction` is `not_reported` with nullable
+  satisfaction. Orchestrator does not infer owner direction from tests or
+  documents.
+- policy states that product startup needs a live snapshot, stale state is
+  display-only, and separately gated provider absence does not block the 001
+  opening predicate.
+
+The independent C++ source client materializes and cross-checks this projection
+against the raw availability rows. Its former globally named readiness helper
+is replaced by `orchestrator_gate_ready()`. The probe reports the three
+attributed gate states and Orchestrator blocker count, giving the future
+frontend a deterministic startup/preflight seam without granting permission to
+create application source.
+
+No File Manager application source, build files, or GUI.Forms consumption code
+is opened by this round. Once installed launchd evidence makes the Orchestrator
+gate ready, the remaining opening events are still the named GUI.Forms go-ahead
+and explicit architect direction required by ADR-006.

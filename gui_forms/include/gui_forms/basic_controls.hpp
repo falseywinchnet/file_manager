@@ -43,6 +43,41 @@ enum class HorizontalAlignment : std::uint8_t {
     far,
 };
 
+enum class VerticalAlignment : std::uint8_t {
+    near,
+    center,
+    far,
+};
+
+enum class TextWrapping : std::uint8_t {
+    no_wrap,
+    word,
+};
+
+enum class ButtonVisualStyle : std::uint8_t {
+    standard,
+    flat,
+    accent,
+    command,
+};
+
+enum class ChoiceIndicatorStyle : std::uint8_t {
+    classic,
+    modern,
+    toggle,
+};
+
+// Mirrors the five System.Windows.Forms PictureBoxSizeMode policies. Image
+// storage remains owned by Window's renderer-neutral ImageRegistry; PictureBox
+// is only a retained presentation consumer of a generational ImageId.
+enum class PictureBoxSizeMode : std::uint8_t {
+    normal,
+    stretch_image,
+    auto_size,
+    center_image,
+    zoom,
+};
+
 class Panel : public Control {
 public:
     explicit Panel(StableId stable_id);
@@ -76,10 +111,43 @@ public:
     void set_font(FontSpec font);
 
     void on_paint(Painter& painter, Rect local_damage) override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
     std::string text_;
     FontSpec font_{FontRole::control, 12.0, 600, false};
+};
+
+class PictureBox : public Panel {
+public:
+    explicit PictureBox(StableId stable_id);
+
+    [[nodiscard]] ImageId image() const noexcept { return image_; }
+    void set_image(ImageId image);
+    void clear_image();
+    [[nodiscard]] bool has_valid_image() const noexcept;
+    [[nodiscard]] Size image_size() const noexcept;
+    [[nodiscard]] PictureBoxSizeMode size_mode() const noexcept {
+        return size_mode_;
+    }
+    void set_size_mode(PictureBoxSizeMode mode);
+    [[nodiscard]] double image_opacity() const noexcept { return image_opacity_; }
+    void set_image_opacity(double opacity);
+    [[nodiscard]] Rect image_bounds() const noexcept;
+    [[nodiscard]] Event<ImageId>& image_changed() noexcept { return image_changed_; }
+
+    [[nodiscard]] Size measure(Size available) override;
+    void on_paint(Painter& painter, Rect local_damage) override;
+    [[nodiscard]] bool hit_test_local(Point local_point) const override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+
+private:
+    [[nodiscard]] Rect content_bounds() const noexcept;
+
+    ImageId image_{};
+    PictureBoxSizeMode size_mode_{PictureBoxSizeMode::normal};
+    double image_opacity_{1.0};
+    Event<ImageId> image_changed_;
 };
 
 class Label : public Control {
@@ -94,6 +162,14 @@ public:
     void set_foreground(Color color);
     [[nodiscard]] HorizontalAlignment alignment() const noexcept { return alignment_; }
     void set_alignment(HorizontalAlignment alignment);
+    [[nodiscard]] VerticalAlignment vertical_alignment() const noexcept {
+        return vertical_alignment_;
+    }
+    void set_vertical_alignment(VerticalAlignment alignment);
+    [[nodiscard]] TextWrapping text_wrapping() const noexcept { return text_wrapping_; }
+    void set_text_wrapping(TextWrapping wrapping);
+    [[nodiscard]] double line_spacing() const noexcept { return line_spacing_; }
+    void set_line_spacing(double spacing);
     [[nodiscard]] Event<const std::string&>& text_changed() noexcept {
         return text_changed_;
     }
@@ -101,6 +177,7 @@ public:
     [[nodiscard]] Size measure(Size available) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 protected:
     [[nodiscard]] virtual std::string display_text() const;
@@ -111,6 +188,9 @@ private:
     FontSpec font_{FontRole::content, 12.0, 400, false};
     Color foreground_{Color::rgba(27, 39, 51)};
     HorizontalAlignment alignment_{HorizontalAlignment::near};
+    VerticalAlignment vertical_alignment_{VerticalAlignment::center};
+    TextWrapping text_wrapping_{TextWrapping::no_wrap};
+    double line_spacing_{1.25};
     Event<const std::string&> text_changed_;
 };
 
@@ -139,6 +219,9 @@ public:
     void on_key(KeyEvent& event) override;
     void on_focus_changed(bool focused) override;
     void on_activate() override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    bool on_semantic_action(SemanticAction action,
+                            std::string_view value) override;
 
 protected:
     [[nodiscard]] Rect local_bounds() const noexcept;
@@ -165,10 +248,15 @@ public:
 
     [[nodiscard]] bool default_button() const noexcept { return default_button_; }
     void set_default_button(bool is_default);
+    [[nodiscard]] ButtonVisualStyle visual_style() const noexcept {
+        return visual_style_;
+    }
+    void set_visual_style(ButtonVisualStyle style);
     void on_paint(Painter& painter, Rect local_damage) override;
 
 private:
     bool default_button_{};
+    ButtonVisualStyle visual_style_{ButtonVisualStyle::standard};
 };
 
 enum class CheckState : std::uint8_t {
@@ -191,6 +279,10 @@ public:
     void set_three_state(bool enabled);
     [[nodiscard]] bool auto_check() const noexcept { return auto_check_; }
     void set_auto_check(bool enabled);
+    [[nodiscard]] ChoiceIndicatorStyle indicator_style() const noexcept {
+        return indicator_style_;
+    }
+    void set_indicator_style(ChoiceIndicatorStyle style);
     [[nodiscard]] Event<CheckState>& check_state_changed() noexcept {
         return check_state_changed_;
     }
@@ -200,6 +292,7 @@ public:
 
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_activate() override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
     CheckState check_state_{CheckState::unchecked};
@@ -207,6 +300,7 @@ private:
     Event<bool> checked_changed_;
     bool three_state_{};
     bool auto_check_{true};
+    ChoiceIndicatorStyle indicator_style_{ChoiceIndicatorStyle::classic};
 };
 
 class RadioButton : public ButtonBase {
@@ -219,12 +313,17 @@ public:
     void set_group_name(std::string name);
     [[nodiscard]] bool auto_check() const noexcept { return auto_check_; }
     void set_auto_check(bool enabled);
+    [[nodiscard]] ChoiceIndicatorStyle indicator_style() const noexcept {
+        return indicator_style_;
+    }
+    void set_indicator_style(ChoiceIndicatorStyle style);
     [[nodiscard]] Event<bool>& checked_changed() noexcept {
         return checked_changed_;
     }
 
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_activate() override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
     void set_checked_without_exclusion(bool checked);
@@ -233,6 +332,7 @@ private:
     Event<bool> checked_changed_;
     bool checked_{};
     bool auto_check_{true};
+    ChoiceIndicatorStyle indicator_style_{ChoiceIndicatorStyle::classic};
 };
 
 class LinkLabel : public ButtonBase {
@@ -243,6 +343,7 @@ public:
     void set_visited(bool visited);
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_activate() override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
     bool visited_{};

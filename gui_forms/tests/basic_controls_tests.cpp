@@ -1,6 +1,7 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -29,11 +30,16 @@ public:
     void fill_rect(Rect, Color) override { ++fills; }
     void stroke_rect(Rect, Color, double) override { ++strokes; }
     void draw_line(Point, Point, Color, double) override { ++lines; }
-    void draw_text_utf8(Point, std::string_view text, FontSpec font, Color) override {
+    void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color) override {
         texts.emplace_back(text);
         roles.push_back(font.role);
+        text_origins.push_back(origin);
     }
-    void draw_image(ImageId, Rect, double) override {}
+    void draw_image(ImageId image, Rect destination, double opacity) override {
+        images.push_back(image);
+        image_destinations.push_back(destination);
+        image_opacities.push_back(opacity);
+    }
 
     std::uint64_t saves{};
     std::uint64_t restores{};
@@ -43,6 +49,10 @@ public:
     std::uint64_t lines{};
     std::vector<std::string> texts;
     std::vector<FontRole> roles;
+    std::vector<Point> text_origins;
+    std::vector<ImageId> images;
+    std::vector<Rect> image_destinations;
+    std::vector<double> image_opacities;
 };
 
 Point center(const Control::Ptr& control) {
@@ -229,6 +239,105 @@ void test_wrong_thread_property_mutation_is_rejected() {
             "reusable control properties must retain core UI-thread enforcement");
 }
 
+void test_label_multiline_wrapping_and_alignment() {
+    auto label = make_control<Label>(StableId("label.multiline"),
+                                     "Retained labels wrap words\nand preserve breaks");
+    label->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    label->set_text_wrapping(TextWrapping::word);
+    label->set_vertical_alignment(VerticalAlignment::near);
+    label->set_alignment(HorizontalAlignment::far);
+    Window window(label, {120.0, 80.0});
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 120.0, 80.0});
+    require(painter.texts.size() == 4U && painter.texts.front() == "Retained labels" &&
+                painter.texts[2] == "and preserve" && painter.texts.back() == "breaks",
+            "Label must word-wrap and preserve explicit line breaks");
+    require(painter.text_origins.front().y < painter.text_origins.back().y &&
+                painter.text_origins.front().x > 2.0,
+            "Label multiline alignment must position each line independently");
+
+    bool rejected = false;
+    try {
+        label->set_line_spacing(0.1);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && label->line_spacing() == 1.25,
+            "Label must reject invalid line spacing without mutation");
+}
+
+void test_picture_box_modes_registry_and_semantics() {
+    auto picture = make_control<PictureBox>(StableId("picture"));
+    picture->set_requested_bounds({0.0, 0.0, 100.0, 100.0});
+    picture->set_border_style(BorderStyle::line);
+    picture->set_accessible_name("Professional test card");
+    Window window(picture, {100.0, 100.0});
+    const std::vector<std::byte> pixels(4U * 2U * 4U, std::byte{0xff});
+    const ImageLoadResult loaded = window.load_bgra32_premultiplied(
+        4U, 2U, 16U, pixels);
+    require(static_cast<bool>(loaded),
+            "PictureBox test image must enter the window-owned registry");
+    std::uint64_t changes{};
+    auto changed = picture->image_changed().subscribe(
+        [&changes](ImageId) { ++changes; });
+    picture->set_image(loaded.image);
+    window.perform_layout();
+    require(changes == 1U && picture->has_valid_image() &&
+                picture->image_size() == Size{4.0, 2.0},
+            "PictureBox must publish an image change and resolve registry metadata");
+
+    const std::array<std::pair<PictureBoxSizeMode, Rect>, 4> modes{{
+        {PictureBoxSizeMode::normal, {1.0, 1.0, 4.0, 2.0}},
+        {PictureBoxSizeMode::stretch_image, {1.0, 1.0, 98.0, 98.0}},
+        {PictureBoxSizeMode::center_image, {48.0, 49.0, 4.0, 2.0}},
+        {PictureBoxSizeMode::zoom, {1.0, 25.5, 98.0, 49.0}},
+    }};
+    for (const auto& [mode, expected] : modes) {
+        picture->set_size_mode(mode);
+        require(picture->image_bounds() == expected,
+                "PictureBox sizing mode must compute deterministic image geometry");
+        RecordingPainter painter;
+        window.paint(painter, {0.0, 0.0, 100.0, 100.0});
+        require(painter.images.size() == 1U &&
+                    painter.images.front() == loaded.image &&
+                    painter.image_destinations.front() == expected,
+                "PictureBox must submit the resolved image and destination to Painter");
+    }
+
+    picture->set_size_mode(PictureBoxSizeMode::auto_size);
+    require(picture->measure({1000.0, 1000.0}) == Size{6.0, 4.0} &&
+                picture->image_bounds() == Rect{1.0, 1.0, 4.0, 2.0},
+            "PictureBox AutoSize must measure to intrinsic pixels plus its border");
+    picture->set_image_opacity(0.42);
+    RecordingPainter opacity_painter;
+    window.paint(opacity_painter, {0.0, 0.0, 100.0, 100.0});
+    require(opacity_painter.image_opacities.size() == 1U &&
+                opacity_painter.image_opacities.front() == 0.42,
+            "PictureBox must preserve renderer-neutral image opacity");
+
+    const SemanticSnapshot semantics = window.semantic_snapshot();
+    const std::string json = semantics.to_json();
+    require(json.find("\"role\":\"image\"") != std::string::npos &&
+                json.find("Professional test card") != std::string::npos &&
+                json.find("4 x 2") != std::string::npos,
+            "PictureBox must expose stable image semantics and intrinsic dimensions");
+
+    bool rejected{};
+    try {
+        picture->set_image_opacity(1.1);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && picture->image_opacity() == 0.42,
+            "PictureBox must reject invalid opacity without mutation");
+    require(window.remove_image(loaded.image) && !picture->has_valid_image(),
+            "PictureBox must reject a removed generational image ID safely");
+    RecordingPainter stale_painter;
+    window.paint(stale_painter, {0.0, 0.0, 100.0, 100.0});
+    require(stale_painter.images.empty(),
+            "PictureBox must never submit a stale ImageId to a renderer");
+}
+
 } // namespace
 
 int main() {
@@ -239,6 +348,8 @@ int main() {
         test_radio_group_scope_and_order();
         test_link_and_callback_disposal();
         test_wrong_thread_property_mutation_is_rejected();
+        test_label_multiline_wrapping_and_alignment();
+        test_picture_box_modes_registry_and_semantics();
         std::cout << "gui_forms_basic_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

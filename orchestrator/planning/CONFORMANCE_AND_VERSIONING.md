@@ -1,7 +1,7 @@
 # Orchestrator conformance and versioning constitution
 
-Status: **bootstrap and Engine semantic-v0 fixtures active; codec/IDL and
-cross-language runtime peers unresolved**.
+Status: **macOS Core 1.0 bootstrap and independent C++ source-client conformance
+active; other platform projections and later-family codec/IDL work remain open**.
 
 ## Independent version namespaces
 
@@ -29,6 +29,12 @@ contract versions, not an exception to this rule. Its executable release
 manifest remains `development` until every requirement in
 [`CORE_1_0_RELEASE.md`](CORE_1_0_RELEASE.md) passes.
 
+ADR-010 starts the stable Core bootstrap, structured CLI, and installed local
+wire namespaces at 1.0 on the first macOS artifact. Pre-release 0.1 peers are
+negative fixtures, not supported consumers. Later Core 1.x minors preserve 1.0
+bootstrap meanings and add only optional fields or new methods; incompatible or
+new must-understand semantics require another major.
+
 ## Contract artifact ladder
 
 Every contract advances through:
@@ -47,6 +53,14 @@ A `fixture-draft` may have a deliberately disposable executable laboratory
 projection, as the bootstrap does. That does not promote the contract to
 `implemented`; that stage still requires an independently built provider and
 consumer against the accepted fixtures.
+
+**OBSERVED:** `conformance/clients/cpp/` is independently configured and built
+as C++17, then authenticates to the Rust daemon, materializes the single-read
+Core bootstrap snapshot including contracts, availability, routes and service
+controls, verifies the golden release digest, shuts down, and reconnects to a
+second daemon instance at the same runtime location. Together with the Rust
+hostile/bootstrap fixtures and ADR-010 horizon this satisfies the macOS Core 1.0
+consumer gate. Windows named pipes remain a separate platform projection.
 
 ADR-007 freezes the transport-neutral `ORC-ENG-001/002` semantic-v0 subset for
 experimental implementation. Its Rust fixture projection proves that
@@ -81,6 +95,11 @@ For each boundary preserve:
 Cross-language consumers decode and re-encode the same canonical semantic
 fixtures. Where encoding is intentionally noncanonical, semantic equality rather
 than bytes is tested and signing/digest rules use a separately canonical form.
+
+**OBSERVED:** the Core release manifest uses length-delimited fields and
+embedded inputs under a domain-separated SHA-256 digest rather than relying on
+JSON object byte order. Its golden response pins the result. The digest is
+content identity, not a signature or a packaged-binary attestation.
 
 ## ABI rules
 
