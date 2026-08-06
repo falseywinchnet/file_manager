@@ -33,9 +33,11 @@ Before editing, read:
 6. `planning/visual/FRONTEND_DESIGN_BRIEF_001.md`
 7. `planning/visual/ICON_AUDIT_MIT_002.md`
 8. `planning/DOGFOOD_SEQUENCE.md`
-9. `../orchestrator/spec/CONTRACT_REGISTRY.md`
-10. the accepted root ADRs and relevant parent planning records.
-11. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the frontend client edge.
+9. `planning/CONTEXTUAL_BUILTIN_COMMANDS.md`
+10. `planning/DESKTOP_INTEGRATION_BOUNDARY.md`
+11. `../orchestrator/spec/CONTRACT_REGISTRY.md`
+12. the accepted root ADRs and relevant parent planning records.
+13. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the frontend client edge.
 
 ## Boundary rules
 
@@ -56,3 +58,6 @@ Before editing, read:
   remain unresolved unless a later verdict or ADR promotes them.
 - Core navigation and file operations remain usable when Orchestrator augmentation is
   unavailable; reduced behavior must be explicit.
+- Persistent side panels are specific to File Manager and its embedded picker/
+  browser projection. This permission does not extend through shared packages
+  to Paint, Text Editor, Games, plugins, or providers.

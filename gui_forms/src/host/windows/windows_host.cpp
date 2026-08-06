@@ -1345,11 +1345,16 @@ public:
     }
 
     void bind_window(HWND window) noexcept {
+        if (native_phase_ != NativePhase::creating) return;
         hwnd_ = window;
         services_.bind_owner(window);
+        native_phase_ = NativePhase::bound;
     }
 
     bool initialize(HWND window) {
+        if (native_phase_ != NativePhase::bound || window == nullptr || hwnd_ != window) {
+            return false;
+        }
         hwnd_ = window;
         scale_ = query_scale(window);
         load_private_fonts();
@@ -1360,8 +1365,9 @@ public:
         raster_.resize(logical, scale_);
         model_->metrics().set_renderer(
             "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts", true);
-        dispatch(HostAttachEvent{logical, scale_});
-        dispatch(HostActivationEvent{GetActiveWindow() == window});
+        const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
+        if (!attached.accepted()) return false;
+        native_phase_ = NativePhase::attached;
         model_->set_dispatch_wake_handler([this] {
             if (hwnd_ != nullptr) {
                 PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
@@ -1383,11 +1389,42 @@ public:
                     return services_.write_clipboard_text(text);
                 });
         }
+        // One FIFO initialization turn runs before presentation. Work posted by
+        // those callbacks stays deferred to the ordinary next host turn.
+        static_cast<void>(model_->drain_posted_work());
+        if (options_.dispatch_pending) options_.dispatch_pending();
+        native_phase_ = NativePhase::ready;
         collect_damage();
         return true;
     }
 
+    bool will_show() noexcept {
+        if (native_phase_ != NativePhase::ready) return false;
+        native_phase_ = NativePhase::visible;
+        return true;
+    }
+
     LRESULT message(UINT message, WPARAM wparam, LPARAM lparam) {
+        const bool ready = native_phase_ == NativePhase::ready ||
+            native_phase_ == NativePhase::visible ||
+            native_phase_ == NativePhase::closing;
+        if (!ready) {
+            switch (message) {
+            case WM_GETMINMAXINFO:
+                minimum_size(reinterpret_cast<MINMAXINFO*>(lparam));
+                return 0;
+            case WM_PAINT: {
+                PAINTSTRUCT paint_state{};
+                BeginPaint(hwnd_, &paint_state);
+                EndPaint(hwnd_, &paint_state);
+                return 0;
+            }
+            case WM_DESTROY:
+                break;
+            default:
+                return DefWindowProcW(hwnd_, message, wparam, lparam);
+            }
+        }
         switch (message) {
         case WM_SIZE: resize(); return 0;
         case WM_DPICHANGED: dpi_changed(wparam, lparam); return 0;
@@ -1433,11 +1470,17 @@ public:
         case WM_CLOSE: return close();
         case WM_DESTROY:
             if (!closed_) {
-                dispatch(HostClosedEvent{HostCloseReason::user});
+                const HostLifecyclePhase phase = session_.snapshot().phase;
+                if (phase == HostLifecyclePhase::attached ||
+                    phase == HostLifecyclePhase::close_authorized) {
+                    dispatch(HostClosedEvent{HostCloseReason::user});
+                }
                 closed_ = true;
+                native_phase_ = NativePhase::closed;
                 if (options_.closed) options_.closed();
             }
             session_.shutdown();
+            native_phase_ = NativePhase::shutdown;
             services_.shutdown();
             if (options_.quit_thread_on_close) PostQuitMessage(0);
             return 0;
@@ -1780,7 +1823,10 @@ private:
         HostCloseRequest request{HostCloseReason::user, false};
         if (options_.close_request) options_.close_request(request);
         const HostDispatchResult result = dispatch(request);
-        if (result.accepted() && result.close_allowed) DestroyWindow(hwnd_);
+        if (result.accepted() && result.close_allowed) {
+            native_phase_ = NativePhase::closing;
+            DestroyWindow(hwnd_);
+        }
         return 0;
     }
 
@@ -2093,6 +2139,17 @@ private:
         return directory;
     }
 
+    enum class NativePhase : std::uint8_t {
+        creating,
+        bound,
+        attached,
+        ready,
+        visible,
+        closing,
+        closed,
+        shutdown,
+    };
+
     std::unique_ptr<Window> model_;
     WindowsHostOptions options_;
     WindowsHostServices services_;
@@ -2104,6 +2161,7 @@ private:
     std::uint64_t next_sequence_{1};
     wchar_t pending_high_surrogate_{};
     bool closed_{};
+    NativePhase native_phase_{NativePhase::creating};
     std::vector<std::wstring> private_font_paths_;
     TooltipPopup tooltip_;
 };
@@ -2177,6 +2235,11 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
         return 4;
     }
     if (!state.initialize(window)) {
+        DestroyWindow(window);
+        if (SUCCEEDED(com_status)) CoUninitialize();
+        return 5;
+    }
+    if (!state.will_show()) {
         DestroyWindow(window);
         if (SUCCEEDED(com_status)) CoUninitialize();
         return 5;
@@ -2303,6 +2366,13 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     }
 
     for (std::size_t index = 0; index < windows.size(); ++index) {
+        if (!states[index]->will_show()) {
+            for (HWND created : handles) {
+                if (IsWindow(created)) DestroyWindow(created);
+            }
+            if (SUCCEEDED(com_status)) CoUninitialize();
+            return 5;
+        }
         ShowWindow(handles[index], windows[index].tool_window ? SW_SHOWNOACTIVATE
                                                               : SW_SHOWNORMAL);
         UpdateWindow(handles[index]);

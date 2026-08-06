@@ -774,6 +774,13 @@ struct DispatchRecord final {
     void* context{};
 };
 
+enum class AbiHostPhase : std::uint8_t {
+    idle,
+    starting,
+    ready,
+    stopping,
+};
+
 struct ControlRecord final {
     std::shared_ptr<Control> control;
     std::thread::id ui_thread;
@@ -799,7 +806,7 @@ struct ControlRecord final {
     std::uint64_t dispatches{};
     std::uint64_t dispatch_turns{};
     bool close_requested{};
-    bool host_running{};
+    AbiHostPhase host_phase{AbiHostPhase::idle};
     std::uint64_t external_references{1};
     std::vector<gf_event_token> subscriptions;
 };
@@ -1764,12 +1771,12 @@ public:
             const bool popup = (flags & GF_WINDOW_RUN_POPUP) != 0U;
             const bool valid_root = record->kind == GF_CONTROL_FORM ||
                 (popup && record->kind == GF_CONTROL_CUSTOM);
-            if (record->host_running || record->control->attached() ||
+            if (record->host_phase != AbiHostPhase::idle || record->control->attached() ||
                 record->control->parent() || !valid_root) {
                 return fail(GF_ERROR_INVALID_ARGUMENT,
                             "run_window requires an unattached form or custom popup");
             }
-            record->host_running = true;
+            record->host_phase = AbiHostPhase::starting;
             record->close_requested = false;
             record->callback_faults = 0;
             record->dispatches = 0;
@@ -1832,7 +1839,8 @@ public:
                 pump_pending(record);
                 refresh_named_controls(record, *automation_controls);
             };
-            options.closed = [this, handle] {
+            options.closed = [this, handle, record] {
+                mark_host_stopping(record);
                 static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
             };
             options.final_snapshot = [this, record](std::string_view metrics,
@@ -1873,7 +1881,8 @@ public:
                              std::move(clipboard_write));
             };
             options.dispatch_pending = [this, record] { pump_pending(record); };
-            options.closed = [this, handle] {
+            options.closed = [this, handle, record] {
+                mark_host_stopping(record);
                 static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
             };
             options.final_snapshot = [this, record](std::string_view metrics,
@@ -1891,10 +1900,22 @@ public:
 
         gui_forms::host::HeadlessHost host(*model);
         static_cast<void>(host.dispatch(gui_forms::HostAttachEvent{client_size, 1.0}, 1));
-        static_cast<void>(host.dispatch(gui_forms::HostActivationEvent{true}, 2));
-        model->flush();
+        {
+            std::scoped_lock lock(mutex_);
+            record->host_phase = AbiHostPhase::ready;
+        }
+        // One FIFO snapshot is the initialization transaction. Work posted by
+        // Load remains a normal next-turn callback, matching native hosts.
+        pump_pending(record);
         std::uint64_t timestamp = 3;
-        if (auto_activate) {
+        bool close_before_input = close_requested(record);
+        if (!close_before_input) {
+            static_cast<void>(host.dispatch(gui_forms::HostActivationEvent{true}, 2));
+            model->flush();
+            pump_pending(record);
+            close_before_input = close_requested(record);
+        }
+        if (!close_before_input && auto_activate) {
             std::shared_ptr<Control> target = first_button(record->control);
             if (!target) target = first_pointer_control(record->control);
             if (target) {
@@ -1914,17 +1935,19 @@ public:
                     timestamp++));
             }
         }
-        bool dispatch_quiescent = false;
-        for (std::size_t turn = 0U;
-             turn < gui_forms::maximum_posted_callbacks; ++turn) {
-            pump_pending(record);
-            std::scoped_lock lock(mutex_);
-            dispatch_quiescent = record->dispatch_queue.empty();
-            if (dispatch_quiescent) break;
+        bool dispatch_quiescent = close_before_input;
+        if (!close_before_input) {
+            for (std::size_t turn = 0U;
+                 turn < gui_forms::maximum_posted_callbacks; ++turn) {
+                pump_pending(record);
+                std::scoped_lock lock(mutex_);
+                dispatch_quiescent = record->dispatch_queue.empty();
+                if (dispatch_quiescent) break;
+            }
         }
         if (!dispatch_quiescent) {
             return fail(GF_ERROR_INTERNAL,
-                        "headless BeginInvoke queue did not reach quiescence");
+                        "headless runtime queue did not reach quiescence");
         }
         gui_forms::HostCloseRequest close{
             gui_forms::HostCloseReason::application, false};
@@ -1932,11 +1955,13 @@ public:
                        GF_EVENT_CALLBACK_CANCEL;
         const auto close_result = host.dispatch(close, timestamp++);
         if (close_result.accepted() && close_result.close_allowed) {
+            mark_host_stopping(record);
             static_cast<void>(host.dispatch(
                 gui_forms::HostClosedEvent{gui_forms::HostCloseReason::application},
                 timestamp++));
             static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
         }
+        mark_host_stopping(record);
         static_cast<void>(host.dispatch(gui_forms::HostShutdownEvent{}, timestamp));
         record->host_trace = host.trace() + "managed=" + managed_trace(record) + "\n";
         return GF_OK;
@@ -2510,9 +2535,12 @@ public:
                 return result;
             }
             const auto root = root_record_locked(control);
-            if (!root || root->kind != GF_CONTROL_FORM || root->control->parent()) {
+            const bool dispatch_root = root &&
+                (root->kind == GF_CONTROL_FORM || root->kind == GF_CONTROL_CUSTOM) &&
+                !root->control->parent();
+            if (!dispatch_root) {
                 return fail(GF_ERROR_WRONG_HANDLE_KIND,
-                            "begin_invoke requires a control rooted in a top-level form");
+                            "begin_invoke requires a control rooted in a top-level form or popup");
             }
             if (root->dispatch_queue.size() >=
                 gui_forms::maximum_posted_callbacks) {
@@ -2541,7 +2569,8 @@ public:
                 return result;
             }
             const bool closable_root = form->kind == GF_CONTROL_FORM ||
-                (form->kind == GF_CONTROL_CUSTOM && form->host_running);
+                (form->kind == GF_CONTROL_CUSTOM &&
+                 form->host_phase != AbiHostPhase::idle);
             if (!closable_root || form->control->parent()) {
                 return fail(GF_ERROR_WRONG_HANDLE_KIND,
                             "request_close requires a running top-level form or popup");
@@ -2724,6 +2753,7 @@ private:
             root->host_tooltip_hide = std::move(tooltip_hide);
             root->host_clipboard_read = std::move(clipboard_read);
             root->host_clipboard_write = std::move(clipboard_write);
+            root->host_phase = AbiHostPhase::ready;
             should_wake = !root->dispatch_queue.empty() &&
                 !root->dispatch_wake_pending;
             if (should_wake) root->dispatch_wake_pending = true;
@@ -2735,7 +2765,22 @@ private:
         if (should_close && published_close) published_close();
     }
 
+    void mark_host_stopping(const std::shared_ptr<ControlRecord>& root) noexcept {
+        {
+            std::scoped_lock lock(mutex_);
+            if (root->host_phase != AbiHostPhase::idle) {
+                root->host_phase = AbiHostPhase::stopping;
+            }
+        }
+    }
+
+    bool close_requested(const std::shared_ptr<ControlRecord>& root) {
+        std::scoped_lock lock(mutex_);
+        return root->close_requested;
+    }
+
     void finish_host(const std::shared_ptr<ControlRecord>& root) noexcept {
+        mark_host_stopping(root);
         cancel_pending(root);
         std::scoped_lock lock(mutex_);
         root->host_wake = {};
@@ -2746,7 +2791,7 @@ private:
         root->host_clipboard_read = {};
         root->host_clipboard_write = {};
         root->dispatch_wake_pending = false;
-        root->host_running = false;
+        root->host_phase = AbiHostPhase::idle;
     }
 
     static bool copy_view(gf_string_view input, std::string& output) {
@@ -2801,9 +2846,17 @@ private:
 
     std::string managed_trace(const std::shared_ptr<ControlRecord>& root) {
         std::scoped_lock lock(mutex_);
+        const char* phase = "idle";
+        switch (root->host_phase) {
+        case AbiHostPhase::idle: phase = "idle"; break;
+        case AbiHostPhase::starting: phase = "starting"; break;
+        case AbiHostPhase::ready: phase = "ready"; break;
+        case AbiHostPhase::stopping: phase = "stopping"; break;
+        }
         return "{\"callback_faults\":" + std::to_string(root->callback_faults) +
                ",\"dispatches\":" + std::to_string(root->dispatches) +
                ",\"dispatch_turns\":" + std::to_string(root->dispatch_turns) +
+               ",\"host_phase\":\"" + phase + "\"" +
                ",\"close_requested\":" +
                std::string(root->close_requested ? "true" : "false") + "}";
     }

@@ -52,6 +52,12 @@ mandatory for work in that directory.
 - Win32, COM, WIC, MSAA, and UIA types remain inside `src/host/windows/`.
 - The core is retained; do not introduce an immediate-mode control API or a
   perpetual redraw loop.
+- ADR-013 reserves persistent side-panel composition to File Manager and its
+  embedded picker/browser. GUI.Forms may implement reusable panel controls, but
+  Paint, Text Editor, Games, and other consumers require owned popup dialogs
+  instead. Future capability routing is recorded in
+  `planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md`; it does not alter the
+  currently opened implementation milestone by itself.
 - Authored accessibility/help metadata is optional secondary hook data and is
   not required to instantiate a control. Supported stock controls still supply
   default semantic adapters; File Manager requires native accessibility

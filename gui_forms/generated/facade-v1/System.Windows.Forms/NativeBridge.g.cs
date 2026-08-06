@@ -70,6 +70,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static long nextAsyncId;
     private static long nextSurfaceId;
     [ThreadStatic] private static int nativeCallbackDepth;
+    internal static bool InNativeCallback => nativeCallbackDepth != 0;
     private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<int,
         global::System.Collections.Concurrent.ConcurrentDictionary<long, NativeAsyncResult>> pendingByThread = new();
     private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<long,
@@ -77,6 +78,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<nint,
         global::System.WeakReference<NativeControlBridge>> windowSurfacesByHandle = new();
     [ThreadStatic] private static bool flushingWindowSurfaces;
+
+    private static void ExitNativeCallback()
+    {
+        if (--nativeCallbackDepth != 0) return;
+        // Commit every custom-painted control touched by one native input
+        // callback before the host can present its retained tree. This keeps a
+        // WinForms event's related text, bounds, and raster changes atomic and
+        // prevents one-frame fragments from old control surfaces.
+        global::System.Windows.Forms.Control.__FlushCallbackPaintQueue();
+        FlushWindowSurfaces(global::System.Environment.CurrentManagedThreadId);
+    }
     private SafeControlHandle handle;
     private readonly string stableId;
     private readonly string managedTypeName;
@@ -774,7 +786,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { bridge.Changed?.Invoke(bridge.pendingChange); }
         catch (Exception error) { Application.__ReportCallbackException(error); }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -784,7 +796,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { if ((NativeEvent)kind == NativeEvent.BoundsChanged) { bridge.QueueManagedBoundsSynchronization(); return 0; } return bridge.NativeEventRaised?.Invoke((NativeEvent)kind) == true ? 1u : 0u; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -795,7 +807,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { bridge.PointerRaised?.Invoke(new NativePointer(kind, x, y, wheelDelta, button)); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -806,7 +818,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { bridge.KeyRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -817,7 +829,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { return bridge.KeyPreviewRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)) == true ? 1u : 0u; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -829,7 +841,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { var value = text.Data == null || text.Size == 0 ? string.Empty : Encoding.UTF8.GetString(text.Data, checked((int)text.Size)); bridge.TextRaised?.Invoke(value, composing != 0, replacementStart, replacementLength); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { --nativeCallbackDepth; }
+        finally { ExitNativeCallback(); }
     }
 
     private static uint DispatchCallback(void* context, uint cancelled)
@@ -851,7 +863,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             Application.__ReportCallbackException(error);
             return 2u;
         }
-        finally { --nativeCallbackDepth; root.Free(); if (nativeCallbackDepth == 0) FlushWindowSurfaces(global::System.Environment.CurrentManagedThreadId); }
+        finally { ExitNativeCallback(); root.Free(); }
     }
 
     private void ReleaseSubscriptions(bool check)

@@ -22,6 +22,18 @@ File Manager renders its settings and service controls.
 Orchestrator has no dependency on GUI.Forms. ADR-006 directs it toward a named
 Core 1.0 release before Frontend 001 bootstraps against the live service.
 
+The first-party application-backbone proposal—Document Picker sessions,
+application profiles, shared administration projection, local help resolution,
+and transfer-flavor registration—is recorded in
+[`proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md`](proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md).
+It does not add those operations to Core 1.0 or put GUI code in this daemon.
+
+The proposed Lexicon provider and host-mediated Archive Viewer/Image Converter
+proofs are separately recorded in `../lexicon/` and
+[`proposals/first_party_extensions/`](proposals/first_party_extensions/). They
+do not open plugin execution, lexical lookup, filesystem write authority, or UI
+injection in Core 1.0.
+
 ## Current executable slice
 
 The Rust bootstrap contains only provider-independent competence:
@@ -100,6 +112,12 @@ producer code into ABI.
   defines fixtures and compatibility.
 - [`planning/DELIVERY_SEQUENCE.md`](planning/DELIVERY_SEQUENCE.md) defines the
   incremental bootstrap and adapter gates.
+- [`proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md`](proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md)
+  records the proposed multi-application picker/help/transfer edge.
+- [`proposals/first_party_extensions/`](proposals/first_party_extensions/)
+  records the host-mediated Archive Viewer/Image Converter proposal family.
+- [`../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md)
+  records the proposed exact lexical/corpus provider edge.
 
 ## Build
 

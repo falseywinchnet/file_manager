@@ -4,6 +4,9 @@
 |---|---|
 | `FRONTEND_CHARTER.md` | What the frontend owns and refuses to absorb |
 | `FRONTEND_001.md` | Exact first executable slice, fixture boundary, and exit gate |
+| `DOCUMENT_PICKER_SURFACE.md` | Reusable File Manager browser/selection surface for File Manager, Paint, and Text Editor; planning-only until the frontend gate opens |
+| `CONTEXTUAL_BUILTIN_COMMANDS.md` | Trusted on-demand checksum and native-terminal context-command policy |
+| `DESKTOP_INTEGRATION_BOUNDARY.md` | Bounded desktop-file/background role and explicit non-DE exclusions |
 | `DEPENDENCY_GATES.md` | GUI.Forms opening gate and later per-adapter gates |
 | `DOGFOOD_SEQUENCE.md` | First macOS implementation and daily-use progression |
 | `FUTURE_THREAD_HANDOFF.md` | Prompt for the later frontend implementation task |

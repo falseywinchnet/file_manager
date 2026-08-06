@@ -3,6 +3,8 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <initializer_list>
 #include <iostream>
@@ -14,6 +16,7 @@
 namespace {
 
 using namespace gui_forms;
+using namespace std::chrono_literals;
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -308,6 +311,133 @@ void test_shared_command_binding() {
             "disabled command state must synchronize and reject execution");
 }
 
+std::vector<CorrespondenceItem> correspondence_fixture(std::size_t count) {
+    std::vector<CorrespondenceItem> items;
+    items.reserve(count);
+    for (std::size_t index = 0; index < count; ++index) {
+        items.push_back({
+            "correspondence." + std::to_string(index),
+            "Evidence record " + std::to_string(index),
+            "Projects / deterministic fixture",
+            "Exact stored reason " + std::to_string(index),
+            "Matched excerpt for record " + std::to_string(index),
+            std::to_string(100U - index % 80U) + "%",
+            "Provider information",
+            {"Local index", "Text extractor"},
+            "Generation 86 · factual fixture evidence",
+            index % 4U == 0U ? ObjectGlyph::image : ObjectGlyph::document,
+            true,
+            index == 12U,
+            index == 13U,
+        });
+    }
+    return items;
+}
+
+void test_correspondence_virtualization_and_anchor_stability() {
+    auto records = make_control<CorrespondenceView>(
+        StableId("correspondence.records"));
+    records->set_requested_bounds({0.0, 0.0, 820.0, 230.0});
+    records->set_items(correspondence_fixture(10000U));
+    records->set_accessible_name("Evidence correspondence");
+    Window window(records, {820.0, 230.0});
+    window.perform_layout();
+    require(records->children().empty(),
+            "CorrespondenceView must not allocate one retained control per logical item");
+    require(records->realized_count() <= 8U &&
+                records->semantic_virtual_children().size() <= 8U,
+            "variable-height correspondence realization must remain viewport bounded");
+
+    records->set_scroll_offset(45.0 * 10.0);
+    const double anchored_y = records->item_bounds("correspondence.10")->y;
+    records->set_pinned_id("correspondence.2");
+    require(records->pinned_id() == "correspondence.2" &&
+                records->expanded("correspondence.2") &&
+                std::abs(records->item_bounds("correspondence.10")->y -
+                         anchored_y) < 0.01,
+            "expanding a row above the viewport must preserve the visible scroll anchor");
+
+    const auto hover_bounds = records->item_bounds("correspondence.12");
+    require(hover_bounds && hover_bounds->y >= 0.0 &&
+                hover_bounds->y < 230.0,
+            "hover test row must be physically realized");
+    const Point hover_center{hover_bounds->x + hover_bounds->width * .5,
+                             hover_bounds->y + hover_bounds->height * .5};
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none, hover_center}));
+    require(records->hovered_id() == "correspondence.12" &&
+                !records->expanded("correspondence.12") &&
+                window.next_wake().has_value(),
+            "pointer arrival must schedule rather than immediately fake hover intent");
+    const double before_expand = records->item_bounds("correspondence.12")->y;
+    static_cast<void>(window.poll_frame_schedule(*window.next_wake()));
+    require(records->expanded("correspondence.12") &&
+                records->pinned_id() == "correspondence.2" &&
+                std::abs(records->item_bounds("correspondence.12")->y -
+                         before_expand) < 0.01,
+            "hover intent must preserve its pointer target while a distinct pinned row persists");
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none, {900.0, 300.0}}));
+    require(!records->expanded("correspondence.12") &&
+                records->expanded("correspondence.2"),
+            "pointer leave must collapse only transient inspection");
+}
+
+void test_correspondence_keyboard_pin_semantics_and_activation() {
+    auto records = make_control<CorrespondenceView>(
+        StableId("correspondence.keyboard"));
+    records->set_requested_bounds({0.0, 0.0, 820.0, 360.0});
+    records->set_items(correspondence_fixture(20U));
+    records->set_selected_id("correspondence.10");
+    records->set_pinned_id("correspondence.0");
+    Window window(records, {820.0, 360.0});
+    require(window.request_focus(records) &&
+                records->focused_id() == "correspondence.10" &&
+                records->expanded("correspondence.10") &&
+                records->expanded("correspondence.0"),
+            "keyboard focus must expand independently from one persistent pin");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
+                records->focused_id() == "correspondence.11" &&
+                records->selected_id() == "correspondence.11" &&
+                records->expanded("correspondence.11"),
+            "Down must move stable focus/selection and expand the keyboard-active row");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::space}) &&
+                records->pinned_id() == "correspondence.11" &&
+                !records->expanded("correspondence.0"),
+            "Space must replace the sole persistent pin without losing focus");
+
+    std::string activated;
+    auto activation = records->item_activated().subscribe(
+        [&activated](const std::string& id) { activated = id; });
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                activated == "correspondence.11",
+            "Enter must activate rather than toggle the active correspondence pin");
+    const auto nodes = records->semantic_virtual_children();
+    const auto active = std::find_if(nodes.begin(), nodes.end(),
+        [](const SemanticNode& node) {
+            return node.stable_id == "correspondence.11";
+        });
+    require(active != nodes.end() &&
+                has_semantic_state(active->states, SemanticState::expanded) &&
+                active->children.size() == 5U &&
+                active->children[0].stable_id ==
+                    "correspondence.11.activate" &&
+                active->children[1].stable_id ==
+                    "correspondence.11.percentage" &&
+                active->children[4].role == SemanticRole::group,
+            "expanded virtual semantics must expose default action, factual metric, metadata, excerpt, and provider lanes");
+    activated.clear();
+    require(records->on_semantic_child_action(
+                "correspondence.11.activate", SemanticAction::press, {}) &&
+                activated == "correspondence.11",
+            "the explicit correspondence default-action child must share item activation");
+    require(records->on_semantic_child_action(
+                "correspondence.12", SemanticAction::expand, {}) &&
+                records->pinned_id() == "correspondence.12" &&
+                records->expanded("correspondence.12"),
+            "semantic expansion must enter the same one-pin state path for unavailable evidence");
+}
+
 } // namespace
 
 int main() {
@@ -317,6 +447,8 @@ int main() {
         test_object_virtualization_view_preservation_and_input();
         test_object_multiselection_pointer_keyboard_and_semantics();
         test_shared_command_binding();
+        test_correspondence_virtualization_and_anchor_stability();
+        test_correspondence_keyboard_pin_semantics_and_activation();
         std::cout << "gui_forms_collection_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

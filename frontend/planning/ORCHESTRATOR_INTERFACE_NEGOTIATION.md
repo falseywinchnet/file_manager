@@ -194,3 +194,110 @@ No File Manager application source, build files, or GUI.Forms consumption code
 is opened by this round. Once installed launchd evidence makes the Orchestrator
 gate ready, the remaining opening events are still the named GUI.Forms go-ahead
 and explicit architect direction required by ADR-006.
+
+## Architect application-backbone direction 005
+
+Date: 2026-08-06.
+
+Status: **GIVEN product direction; process/package details remain CANDIDATE**.
+
+- File Manager and its open/save-as picker representation are implemented from
+  the same navigation substrate when frontend work opens.
+- The picker is reusable by future first-party Paint and Text Editor
+  applications without linking or launching the complete File Manager program.
+- Text Editor may show hidden files under an application-scoped preference that
+  does not mutate File Manager's view preference.
+- File Manager file/preview objects may transfer into Paint; Paint owns
+  alpha-capable reusable clipart/composite objects.
+- Orchestrator service/settings UI may appear standalone and within File Manager
+  while Orchestrator itself remains headless.
+- Application help content remains local and app-owned; GUI.Forms supplies help
+  mechanics and Orchestrator resolves registered providers/topics.
+
+Planning detail:
+[`DOCUMENT_PICKER_SURFACE.md`](DOCUMENT_PICKER_SURFACE.md) and
+[`../../planning/APPLICATION_BACKBONE_AND_DOCUMENT_PICKER.md`](../../planning/APPLICATION_BACKBONE_AND_DOCUMENT_PICKER.md).
+
+## Orchestrator proposal 005
+
+Status: **awaiting future frontend reply; Frontend 001 remains closed**.
+
+Provisional families `ORC-APP-001`, `ORC-PCK-001`, `ORC-UI-001`,
+`ORC-HLP-001`, and `ORC-XFR-001` request the frontend to define:
+
+- the reusable file-browser model, selection controller, and picker-view
+  boundary;
+- the smallest open/open-many/folder/save-as/import/export profile matrix;
+- live navigation and visibility behavior without Engine;
+- the app-scoped hidden-file setting and session override presentation;
+- exact accepted/cancelled/unavailable result mapping;
+- native fallback presentation and route disclosure;
+- shared Orchestrator administration rendering without arbitrary server-driven
+  controls;
+- file-reference and preview/clipart drag-source payload behavior.
+
+No answer may require File Manager private executable state, duplicate a
+GUI.Forms control, place policy in the view, or open frontend source before its
+existing gate.
+
+## File Manager reply 005
+
+Status: **planning counterproposal; implementation evidence unavailable**.
+
+The candidate split in `DOCUMENT_PICKER_SURFACE.md` is:
+
+- a reusable `FileBrowserModel`;
+- a purpose-bounded `FileSelectionController`;
+- a GUI.Forms `DocumentPickerView`;
+- a host adapter that obtains and terminates the Orchestrator session.
+
+The first slice omits the full tree/preview/shelf/recent-path/search surface
+unless separately admitted. File Manager executable linkage is rejected; an
+independently consumable first-party package is recommended. Final naming,
+package location, profile commands, overwrite-dialog ownership, and
+out-of-process Picker Host timing remain open.
+
+## Orchestrator reconciliation 005
+
+Status: **not started; waits for GUI.Forms reply 002 and the frontend opening
+round**.
+
+## Architect future-scope direction 006
+
+Date: 2026-08-06.
+
+Status: **GIVEN scope under ADR-013; no frontend or plugin implementation
+opened**.
+
+- Persistent side panels belong only to File Manager and its embedded picker/
+  browser projection. Paint, Text Editor, Games, providers and plugins do not
+  inherit that topology.
+- Checksum inspection and `Open Command Line Here` are trusted first-party File
+  Manager context commands, not plugins. Their on-demand/context/platform
+  semantics are in `CONTEXTUAL_BUILTIN_COMMANDS.md`.
+- Desktop integration is limited by `DESKTOP_INTEGRATION_BOUNDARY.md`.
+- Lexicon may contribute typed exact-definition results without becoming an
+  Engine file row or provider-owned UI.
+- Archive Viewer may supply a bounded virtual hierarchy through the trusted
+  embedded browser and use the trusted Document Picker for extraction
+  destination. Image Converter may return bounded create-new outputs. Plugin
+  code supplies no controls and receives no ambient filesystem writes.
+
+## Orchestrator proposal 006
+
+Status: **paper routing only**.
+
+The frontend must later define:
+
+- built-in versus plugin command identity and visible trust distinction;
+- checksum/terminal contextual applicability, settings and terminal errors;
+- typed lexical-result composition independent of file-result ranking;
+- virtual archive location identity, paging, stale generation, entry-open and
+  extraction destination presentation;
+- host-rendered transform/extraction/password/progress/collision dialogs;
+- absence/disabled/crashed plugin states with no injected controls;
+- proof that the embedded browser package does not grant panels to its host
+  application outside the picker/archive surface.
+
+Contract IDs and implementation wait on the existing frontend opening and
+plugin/provider gates.

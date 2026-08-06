@@ -323,6 +323,7 @@ std::string HostCapabilities::to_json() const {
 std::string HostSessionSnapshot::to_json() const {
     std::ostringstream output;
     output << "{\"capabilities\":" << capabilities.to_json()
+           << ",\"phase\":\"" << host_lifecycle_phase_name(phase) << '\"'
            << ",\"last_sequence\":" << last_sequence
            << ",\"events_accepted\":" << events_accepted
            << ",\"events_rejected\":" << events_rejected
@@ -651,6 +652,39 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
     } else if (snapshot_.shutdown) {
         result.error = HostDispatchError::after_shutdown;
     }
+    if (result.accepted()) {
+        const bool attach = std::holds_alternative<HostAttachEvent>(event.payload);
+        const bool shutdown = std::holds_alternative<HostShutdownEvent>(event.payload);
+        const bool closed = std::holds_alternative<HostClosedEvent>(event.payload);
+        const bool passive_terminal = std::visit([](const auto& payload) {
+            using Payload = std::decay_t<decltype(payload)>;
+            if constexpr (std::is_same_v<Payload, HostActivationEvent>) {
+                return !payload.active;
+            } else if constexpr (std::is_same_v<Payload, HostOcclusionEvent>) {
+                return payload.occluded;
+            }
+            return false;
+        }, event.payload);
+        switch (snapshot_.phase) {
+        case HostLifecyclePhase::constructed:
+            if (!attach && !shutdown) result.error = HostDispatchError::invalid_lifecycle;
+            break;
+        case HostLifecyclePhase::attached:
+            if (attach) result.error = HostDispatchError::invalid_lifecycle;
+            break;
+        case HostLifecyclePhase::close_authorized:
+            if (!closed && !shutdown && !passive_terminal) {
+                result.error = HostDispatchError::invalid_lifecycle;
+            }
+            break;
+        case HostLifecyclePhase::closed:
+            if (!shutdown) result.error = HostDispatchError::invalid_lifecycle;
+            break;
+        case HostLifecyclePhase::shutdown:
+            result.error = HostDispatchError::after_shutdown;
+            break;
+        }
+    }
     if (!result.accepted()) {
         ++snapshot_.events_rejected;
         observed_.emit(event, result);
@@ -706,6 +740,7 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
                 window_->set_scale(payload.scale);
                 update.close();
                 snapshot_.attached = true;
+                snapshot_.phase = HostLifecyclePhase::attached;
             } else if constexpr (std::is_same_v<Payload, HostResizeEvent>) {
                 window_->resize(payload.client_size);
             } else if constexpr (std::is_same_v<Payload, HostScaleEvent>) {
@@ -737,9 +772,15 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
                 closing_.emit(payload);
                 result.close_allowed = !payload.cancel;
                 snapshot_.close_cancellations += payload.cancel ? 1U : 0U;
+                if (!payload.cancel) {
+                    snapshot_.phase = HostLifecyclePhase::close_authorized;
+                }
             } else if constexpr (std::is_same_v<Payload, HostClosedEvent>) {
+                snapshot_.phase = HostLifecyclePhase::closed;
+                snapshot_.attached = false;
                 snapshot_.closed = true;
                 snapshot_.active = false;
+                snapshot_.occluded = false;
                 window_->shutdown_dispatcher();
                 window_->cancel_frame_requests();
                 window_->release_pointer();
@@ -757,6 +798,8 @@ void HostSession::shutdown() noexcept {
         return;
     }
     snapshot_.active = false;
+    snapshot_.attached = false;
+    snapshot_.occluded = false;
     if (window_ != nullptr) {
         window_->shutdown_dispatcher();
         window_->cancel_frame_requests();
@@ -765,6 +808,7 @@ void HostSession::shutdown() noexcept {
         if (window_->host_services_ == services_) window_->host_services_ = nullptr;
     }
     snapshot_.shutdown = true;
+    snapshot_.phase = HostLifecyclePhase::shutdown;
 }
 
 HostSessionSnapshot HostSession::snapshot() const {
@@ -778,8 +822,20 @@ const char* host_dispatch_error_name(HostDispatchError error) noexcept {
     case HostDispatchError::non_monotonic_sequence: return "non_monotonic_sequence";
     case HostDispatchError::wrong_thread: return "wrong_thread";
     case HostDispatchError::after_shutdown: return "after_shutdown";
+    case HostDispatchError::invalid_lifecycle: return "invalid_lifecycle";
     case HostDispatchError::invalid_geometry: return "invalid_geometry";
     case HostDispatchError::invalid_payload: return "invalid_payload";
+    }
+    return "unknown";
+}
+
+const char* host_lifecycle_phase_name(HostLifecyclePhase phase) noexcept {
+    switch (phase) {
+    case HostLifecyclePhase::constructed: return "constructed";
+    case HostLifecyclePhase::attached: return "attached";
+    case HostLifecyclePhase::close_authorized: return "close_authorized";
+    case HostLifecyclePhase::closed: return "closed";
+    case HostLifecyclePhase::shutdown: return "shutdown";
     }
     return "unknown";
 }

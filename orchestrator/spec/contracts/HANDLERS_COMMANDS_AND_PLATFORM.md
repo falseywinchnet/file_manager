@@ -20,3 +20,14 @@ Invocation classes must distinguish:
 Systemwide file-manager, handler, shell, or desktop integration is implemented
 only by first-party platform adapters after explicit user/OS authorization. A
 plugin cannot turn a declaration into OS registration or privilege.
+
+Checksum inspection and `Open Command Line Here` are future trusted first-party
+commands under ADR-013, not plugin declarations. Checksum computation is
+on-demand and terminal launch invokes a configured native terminal without an
+embedded shell or elevation. The planning semantics live in
+`../../../frontend/planning/CONTEXTUAL_BUILTIN_COMMANDS.md`.
+
+Desktop integration is limited to platform-supported file-object/background
+roles. Virtual desktops, compositors, window managers, display servers, native-
+app hosting and desktop-environment ownership are excluded by
+`../../../frontend/planning/DESKTOP_INTEGRATION_BOUNDARY.md`.

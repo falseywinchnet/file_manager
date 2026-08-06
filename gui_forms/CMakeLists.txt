@@ -177,6 +177,7 @@ add_library(gui_forms_controls STATIC
     src/controls/diagnostic_controls.cpp
     src/controls/input_controls.cpp
     src/controls/inspection_controls.cpp
+    src/controls/instrument_controls.cpp
     src/controls/range_controls.cpp
     src/controls/tooltip.cpp
 )
@@ -882,6 +883,13 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_controls)
     add_test(NAME gui_forms_inspection_controls_tests
              COMMAND gui_forms_inspection_controls_tests)
+
+    add_executable(gui_forms_instrument_controls_tests
+        tests/instrument_controls_tests.cpp)
+    target_link_libraries(gui_forms_instrument_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_instrument_controls_tests
+             COMMAND gui_forms_instrument_controls_tests)
 
     add_executable(gui_forms_checked_list_box_tests
         tests/checked_list_box_tests.cpp

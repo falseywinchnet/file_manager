@@ -15,5 +15,10 @@ namespace file_manager_demoboard {
 // second mutation path.
 [[nodiscard]] bool apply_capture_state(gui_forms::Window& product,
                                        std::string_view state);
+// Switches the live product between the implemented public surfaces. This is
+// used by the separate review controller and remains a normal retained-state
+// transition rather than a capture-only mutation path.
+[[nodiscard]] bool set_product_surface(gui_forms::Window& product,
+                                       std::string_view surface);
 
 } // namespace file_manager_demoboard

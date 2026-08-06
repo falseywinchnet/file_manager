@@ -18,3 +18,14 @@ or generated language bindings.
 
 Runtime bootstrap source lives under `../src/`. Project-to-project dialogue is
 indexed by `../negotiations/README.md`.
+
+The proposed first-party application identity, Document Picker, administration
+projection, help, and transfer families are deliberately outside Core 1.0 and
+live under
+[`../proposals/application_backbone/`](../proposals/application_backbone/)
+until GUI.Forms and frontend negotiations reply.
+
+The proposed Lexicon provider and first-party Archive Viewer/Image Converter
+proofs are outside Core 1.0. Their planning lives in `../../lexicon/` and
+[`../proposals/first_party_extensions/`](../proposals/first_party_extensions/).
+No plugin execution or lexical-provider operation is opened by those records.

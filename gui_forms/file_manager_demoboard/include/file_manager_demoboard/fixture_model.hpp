@@ -42,6 +42,44 @@ struct FixturePathResolution final {
     std::string explanation;
 };
 
+struct FixtureSearchResult final {
+    std::string id;
+    std::string name;
+    std::string location;
+    std::string metadata;
+    std::string excerpt;
+    std::string metric;
+    std::vector<std::string> providers;
+    std::string provider_detail;
+    std::string icon_role;
+    std::string destination_id;
+    std::string object_id;
+    bool available{true};
+    bool stale{};
+    bool default_pinned{};
+};
+
+struct FixtureCriterionField final {
+    std::string id;
+    std::string name;
+    std::string value;
+    std::vector<std::string> choices;
+    bool editable_text{};
+    bool required{};
+    double width_weight{1.0};
+};
+
+struct FixtureCriterionModule final {
+    std::string id;
+    std::string name;
+    std::vector<FixtureCriterionField> fields;
+    std::string status;
+    bool enabled{true};
+    bool expensive{};
+    bool staged{};
+    std::int32_t priority{};
+};
+
 class FixtureCatalogue final {
 public:
     [[nodiscard]] static const FixtureCatalogue& instance();
@@ -61,6 +99,17 @@ public:
     }
     [[nodiscard]] std::span<const FixturePathCompletion> path_completions()
         const noexcept { return path_completions_; }
+    [[nodiscard]] std::string_view search_query() const noexcept {
+        return search_query_;
+    }
+    [[nodiscard]] std::span<const FixtureSearchResult> search_results()
+        const noexcept { return search_results_; }
+    [[nodiscard]] std::span<const FixtureCriterionModule> criteria_modules()
+        const noexcept { return criteria_modules_; }
+    [[nodiscard]] std::span<const FixtureCriterionModule> criterion_templates()
+        const noexcept { return criterion_templates_; }
+    [[nodiscard]] std::span<const FixtureObject> criteria_objects()
+        const noexcept { return criteria_objects_; }
     [[nodiscard]] FixturePathResolution resolve_path(
         std::string_view input) const;
     [[nodiscard]] std::vector<FixturePathCompletion> complete_path(
@@ -76,6 +125,11 @@ private:
     FixturePath current_path_stack_;
     std::vector<FixturePath> recent_paths_;
     std::vector<FixturePathCompletion> path_completions_;
+    std::string search_query_;
+    std::vector<FixtureSearchResult> search_results_;
+    std::vector<FixtureCriterionModule> criteria_modules_;
+    std::vector<FixtureCriterionModule> criterion_templates_;
+    std::vector<FixtureObject> criteria_objects_;
 };
 
 [[nodiscard]] std::vector<CapabilityEntry> initial_capability_report();

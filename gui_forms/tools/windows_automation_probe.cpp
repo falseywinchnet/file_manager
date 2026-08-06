@@ -304,6 +304,18 @@ int main(int argc, char** argv) {
         std::printf("clicked=%ld,%ld\n", x, y);
         return 0;
     }
+    if (std::strcmp(argv[1], "native-move") == 0) {
+        if (argc != 4) return 2;
+        const long x = std::strtol(argv[2], nullptr, 10);
+        const long y = std::strtol(argv[3], nullptr, 10);
+        const LPARAM point = MAKELPARAM(static_cast<short>(x), static_cast<short>(y));
+        if (!PostMessageW(window, WM_MOUSEMOVE, 0, point)) {
+            std::fprintf(stderr, "failed to post native pointer move\n");
+            return 4;
+        }
+        std::printf("moved=%ld,%ld\n", x, y);
+        return 0;
+    }
     if (std::strcmp(argv[1], "native-press-capture") == 0) {
         if (argc != 5) return 2;
         const long x = std::strtol(argv[2], nullptr, 10);

@@ -408,8 +408,21 @@ enum class HostDispatchError : std::uint8_t {
     non_monotonic_sequence,
     wrong_thread,
     after_shutdown,
+    invalid_lifecycle,
     invalid_geometry,
     invalid_payload,
+};
+
+// Portable presentation lifecycle. Native adapters may have private allocation
+// and handle-binding steps, but no portable callback or input may escape before
+// attached. A cancelled close remains attached; an allowed close becomes
+// close_authorized and admits only terminal host notifications.
+enum class HostLifecyclePhase : std::uint8_t {
+    constructed,
+    attached,
+    close_authorized,
+    closed,
+    shutdown,
 };
 
 struct HostDispatchResult final {
@@ -425,6 +438,7 @@ struct HostDispatchResult final {
 
 struct HostSessionSnapshot final {
     HostCapabilities capabilities;
+    HostLifecyclePhase phase{HostLifecyclePhase::constructed};
     std::uint64_t last_sequence{};
     std::uint64_t events_accepted{};
     std::uint64_t events_rejected{};
@@ -478,6 +492,7 @@ private:
 };
 
 [[nodiscard]] const char* host_dispatch_error_name(HostDispatchError error) noexcept;
+[[nodiscard]] const char* host_lifecycle_phase_name(HostLifecyclePhase phase) noexcept;
 [[nodiscard]] const char* host_event_name(const HostEventPayload& payload) noexcept;
 [[nodiscard]] const char* host_service_error_name(HostServiceError error) noexcept;
 [[nodiscard]] const char* cursor_kind_name(CursorKind cursor) noexcept;

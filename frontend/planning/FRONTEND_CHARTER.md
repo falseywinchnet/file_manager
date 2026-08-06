@@ -19,11 +19,19 @@ reimplement dependency internals.
 - drag/drop and file-operation user flows;
 - preview/properties composition using host controls and validated provider data;
 - context-menu rendering from core plus Orchestrator declarations;
+- trusted contextual checksum and native-terminal commands under their explicit
+  on-demand/launch boundaries;
 - search presentation, result revision, focus preservation and explanations;
 - accessibility/help overlay presentation hooks;
+- a bounded reusable file-browsing/selection model and Document Picker view for
+  first-party applications, without making the full File Manager executable a
+  library;
 - theme, language and interaction-sound application;
 - error, unavailable, degraded and restart presentation;
 - first-run/setup orchestration as experienced by the user.
+- optional platform-supported desktop-file/background composition without
+  becoming a compositor, window manager, virtual-desktop system or desktop
+  environment.
 
 ## Dependency-owned state
 

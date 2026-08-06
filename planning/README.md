@@ -14,6 +14,8 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 |---|---|
 | `PREPLAN_CHARTER.md` | Stages and exit gates for creating the actual plan |
 | `PROGRAM_MAP.md` | Accepted component ownership, repository permissions, contract authority, and delivery order |
+| `APPLICATION_BACKBONE_AND_DOCUMENT_PICKER.md` | Paint/Text Editor first-party backbone, reusable file chooser, app-scoped hidden policy, help ownership, and transfer candidates |
+| `FUTURE_SCOPE_LEDGER.md` | Accepted Games, Lexicon, dialog utilities, contextual built-ins, desktop boundary, and first-party plugin-proof routing |
 | `PRODUCT_NEGATIVE.md` | Confirmed exclusions and anti-trajectories |
 | `ARCHITECTURE_INPUTS.md` | Confirmed positive constraints and deferred missions |
 | `EVIDENCE_REGISTER.md` | What the supplied references do and do not establish |
@@ -30,6 +32,7 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `gui_forms/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md` | Native accessibility verdicts; HarfBuzz/FreeType/bundled-font owner direction; remaining profile, coverage, security, and evidence gates |
 | `gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` | Theme/language assemblies, PNG boundary, safe fallback, and retired compatibility specimen-informed mutable configuration candidates |
 | `../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md` | Generous File Manager control/layout/popup/transfer/accessibility/typography/drawing shopping list promoted into GUI.Forms landmarks |
+| `../gui_forms/planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md` | Paint/Text Editor/Games/dialog/plugin-host capability profile and the non-File-Manager no-panel topology |
 | `search/SEARCH_RECONCILIATION_001.md` | Search identity, root ownership, offline-catalogue, result-motion, mutation-boundary, ConeDAG, and semantic-deferral constraints from the first completed board export |
 | `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
 | `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Superseded historical Oracle name and global dependency gate |
@@ -42,6 +45,13 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
 | `../orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
 | `../frontend/` | Visual end-user frontend; Frontend 001 waits for Core 1.0, GUI.Forms go-ahead, and architect start direction |
+| `../paint/` | Interview-first Paint planning subproject; implementation waits on its GUI.Forms/Orchestrator/picker/transfer gates and owner direction |
+| `../text_editor/` | Interview-first Text Editor planning subproject; implementation waits on its text/Orchestrator/picker gates and owner direction |
+| `../games/` | Planning-only nine-game GUI.Forms dogfood collection; implementation waits on interview/framework/owner gates |
+| `../lexicon/` | Planning-only local lexical provider and Shakespeare-first corpus program; implementation waits on source/contract/owner gates |
+| `../malkuth/` | Planning-only suite mission, 1.0/2.0/3.0 release, online documentation, installer, website, and acceptance program |
+| `../decisions/ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md` | Accepted Malkuth suite identity, mission and release horizons |
+| `../decisions/ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md` | Accepted future utility scope and suite-wide panel/dialog topology |
 
 The following parent-level artifacts remain deliberately absent until the
 interview supplies their inputs:
@@ -56,6 +66,7 @@ not imply that the complete parent plan or every component choice is closed.
 ## Current facts
 
 - Product name: **File Manager**.
+- Suite/distribution name: **Malkuth**. Mission: **Curious, Concise, Friendly.**
 - Target systems: Windows, macOS, and Linux.
 - Product stance: local-first, fast, quiet, simple, inspectable, scriptable.
 - Visual lineage: classic Windows Explorer (roughly XP/7 through restrained
@@ -75,6 +86,9 @@ not imply that the complete parent plan or every component choice is closed.
   production backend.
 - The main surface is a single location-oriented window: collapsible tree,
   content, and collapsible preview/properties sections. No tabs and no dual pane.
+- Persistent side panels belong only to File Manager and its embedded picker/
+  browser projection. Paint, Text Editor, Games, and other apps use owned popup
+  dialogs for secondary tools.
 
 Anything not recorded as GIVEN or DECIDED remains an open question or candidate.
 

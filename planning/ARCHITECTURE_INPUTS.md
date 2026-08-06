@@ -173,6 +173,96 @@ implementations are a last resort, not the first architecture.
 - The earlier `../plugin_runtime/` plan is preserved as research input but is
   not a second runtime implementation beside Orchestrator.
 
+## First-party application backbone
+
+- **GIVEN:** File Manager is the first substantial GUI application on the
+  Orchestrator/GUI.Forms backbone, not its only future consumer.
+- **GIVEN:** File Manager and a reusable open/save-as Document Picker are built
+  from one navigation substrate when frontend implementation opens.
+- **GIVEN:** a future minimal classic-Paint descendant uses the picker and
+  accepts File Manager files/previews through typed drag/drop. It emphasizes
+  alpha-capable reusable clipart/composites rather than layer-management and
+  revision-history feature growth.
+- **GIVEN:** a future **Text Editor** is a tabless plain-text/configuration
+  editor, not an RTF/TextEdit/WordPad trajectory. Its picker may show hidden
+  files under an application-scoped preference independent of File Manager.
+- **GIVEN:** Orchestrator remains headless. Its settings/service GUI may be
+  projected into File Manager and a possible standalone first-party shell from
+  shared typed semantics and GUI.Forms composition; arbitrary server/plugin
+  controls remain forbidden.
+- **GIVEN:** application help content is local and application-owned. GUI.Forms
+  owns help-key/overlay mechanics; Orchestrator may own provider/topic
+  registration and availability.
+- **CANDIDATE:** first-party apps link a bounded in-process picker surface for
+  correct modality; native dialogs remain fallback and a dedicated Picker Host
+  remains a later sandbox/incompatibility route.
+
+Detailed proposal:
+`APPLICATION_BACKBONE_AND_DOCUMENT_PICKER.md`.
+
+## Future utilities, games, and extension proofs
+
+- **DECIDED:** persistent left/right panels belong only to File Manager and its
+  bounded embedded picker/browser projection. Paint, Text Editor, Games, and
+  other applications use owned modal/modeless popup dialogs for secondary
+  tools.
+- **GIVEN:** Paint's detailed color selector and CMYK/OKLCH/RGB/hex converter
+  are popup-dialog utilities. Text Editor's character chooser is an owned popup
+  dialog, not a separate application or side panel.
+- **GIVEN:** the future `games/` project contains Solitaire, FreeCell, Checkers,
+  Sudoku, Crossword, an Atom Probe-like hidden-clues game, a four-peg deduction
+  game, Switchbox, and a two-motorcycle bidirectional route puzzle. Competition
+  and platform/social mechanics are minimized.
+- **GIVEN:** the two latter games deliberately dogfood animation. Animation
+  remains event-driven, bounded, reduced-motion capable, and subordinate to a
+  deterministic rules model.
+- **GIVEN:** Lexicon is a first-party provider/extension rather than another
+  desktop application. It returns typed local definitions for exact terms and
+  supplies Crossword corpora without requiring AI or the broad semantic hive.
+- **GIVEN:** Crossword begins with a pinned Shakespeare vocabulary corpus and
+  later admits user-selected installed corpus profiles. Vocabulary, definition,
+  and clue provenance remain separate.
+- **GIVEN:** checksums and `Open Command Line Here` are trusted File Manager
+  built-ins. Checksum UI is contextually prominent for executables, archives,
+  and disk images and reads only on request. Terminal launch is contextually
+  prominent in repositories, hidden folders, and system/configuration folders;
+  File Manager launches a configured native terminal and does not embed a shell.
+- **GIVEN:** a first-party Archive Viewer plugin uses the embedded File Manager
+  browser/Document Picker plus a supervised external engine such as 7z. A
+  first-party Image Converter remains a create-new transform proof. Plugins
+  receive scoped input/output capabilities, never ambient filesystem writes or
+  UI injection. OCR is deferred.
+- **GIVEN:** platform-supported desktop-file/background integration is allowed;
+  virtual desktops, compositors, window managers, display servers, native-app
+  hosting, Wayland replacement, and a full desktop environment are rejected.
+
+The detailed routing and individual plans live in `FUTURE_SCOPE_LEDGER.md`,
+`../games/`, `../lexicon/`, the Paint/Text Editor planning roots, frontend
+context/desktop plans, and Orchestrator first-party-extension proposals.
+
+## Malkuth suite and release horizons
+
+- **GIVEN:** the unified suite/distribution is named **Malkuth**, because it
+  governs the physical existence of files and reveals their provenance and
+  location. Component and application names remain distinct.
+- **GIVEN:** the mission is **Curious, Concise, Friendly.** The accepted full
+  framing lives in ADR-012.
+- **GIVEN:** after File Manager capabilities are dogfooded, public release work
+  adds online documentation, native cross-platform installers, and a polished
+  website using real builds and honest capability states.
+- **GIVEN:** 1.0 focuses on getting the integrated system working and stable on
+  physical Windows, Linux and macOS, fixing material bugs, and supplying basic
+  installers/documentation.
+- **GIVEN:** 2.0 preserves calls while tightening mutexes, memory, performance,
+  correctness and coarse/duplicated machinery; it adds the hostile plugin
+  wrapper and secure LAN-only tracking/remote-file availability.
+- **GIVEN:** 3.0 adds formal verification, further hardening/platform support,
+  decent touch, more configuration/fonts, and app-store signing/distribution.
+- **DECIDED:** a Malkuth suite version pins independently versioned components
+  in an evidence-bearing release manifest; it does not force one ABI version.
+
+Release planning lives under `../malkuth/`.
+
 ## Accepted engine implementation direction
 
 The full authoritative record is

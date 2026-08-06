@@ -44,7 +44,7 @@ GUI_FORMS_FORCE_HEADLESS=1 GUI_FORMS_AUTOMATION_ACTIVATE=1 \
   DYLD_LIBRARY_PATH="$mac_build" \
   dotnet "$smoke_output/GuiForms.FacadeSmoke.dll"
 behavior_host_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-host.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding split-container; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding split-container lifecycle-order; do
   GUI_FORMS_FORCE_HEADLESS=1 DYLD_LIBRARY_PATH="$mac_build" \
     dotnet "$behavior_output/GuiForms.FacadeBehaviorSmoke.dll" "$behavior_mode" \
     >>"$behavior_host_log"
@@ -55,6 +55,7 @@ rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|ca
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_host_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_host_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_host_log"
+rg -q 'lifecycle-order=load>input>closing>closed' "$behavior_host_log"
 unlink "$behavior_host_log"
 
 cmake -S "$repo" -B "$windows_build" \
@@ -112,7 +113,7 @@ rg -q 'callbacks=click:1\|dispatch:1\|closing:1\|closed:1\|faults:1' "$wine_log"
 unlink "$wine_log"
 
 behavior_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-wine.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding split-container; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding split-container lifecycle-order; do
   (cd "$behavior_output" && GUI_FORMS_FORCE_HEADLESS=1 WINEDEBUG=-all \
     "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
     GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$behavior_wine_log" 2>&1
@@ -123,6 +124,7 @@ rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|ca
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_wine_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_wine_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_wine_log"
+rg -q 'lifecycle-order=load>input>closing>closed\|handle-created:1\|handle-destroyed:1\|early-close:suppressed' "$behavior_wine_log"
 unlink "$behavior_wine_log"
 
 echo "Generated facade surface and current experimental-ABI managed-loop smoke passed on host .NET and Wine."

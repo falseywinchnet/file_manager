@@ -34,10 +34,16 @@ remain unavailable, deferred, negotiating, or stubbed.
 | ORC-KOL-001 | Kolmogrov configuration, hash identity, candidate query, evidence | Kolmogrov + engine | Go engine | engine planner, conformance tools | internal library/service seam | negotiation round 001 |
 | ORC-GUI-001 | GUI.Forms consumption manifest, stable C surface, and lifecycle | GUI.Forms registered by Orchestrator | GUI.Forms | C++ frontend | C ABI + manifest | negotiation round 001 |
 | ORC-FE-001 | Frontend bootstrap session, lifecycle, availability, and fallback | Orchestrator + frontend | Orchestrator | File Manager, diagnostics, independent conformance client | atomic immutable snapshot over production local wire + thin C++ source client | stable 1.0 Core bootstrap projection; one-read Rust/C++ macOS bootstrap and restart client implemented |
+| ORC-APP-001 | First-party application identity, profile namespace, and capability snapshot | Orchestrator | Orchestrator application registry | File Manager, future Paint/Text Editor/Games, shared surfaces | local API + immutable snapshot | proposed in application-backbone round 001; no operation admitted |
+| ORC-PCK-001 | File Selection Session policy, route, cancellation, and result | Orchestrator plus selected first-party/native provider | Orchestrator policy; UI provider remains negotiated | File Manager, future Paint/Text Editor | local API plus in-process GUI.Forms surface or native fallback | proposed; GUI.Forms/frontend replies pending |
+| ORC-UI-001 | Bounded Orchestrator administration presentation model | Orchestrator settings/service registries | Orchestrator | File Manager settings; possible standalone first-party control shell | local immutable schema/state snapshot | proposed; arbitrary server-driven UI forbidden |
+| ORC-HLP-001 | Local application help-provider registration and topic resolution | Orchestrator registry + application package | Orchestrator resolver | File Manager, future Paint/Text Editor/Games/help dialogs | local API; content remains package-owned | proposed; no web/provider UI admitted |
+| ORC-XFR-001 | First-party transfer-flavor identity and capability declaration | Orchestrator registry | applications/platform adapters | File Manager, future Paint/Text Editor | registry only; bytes use GUI.Forms/OS path | proposed; no hot-path relay admitted |
 | ORC-PLG-001 | Package identity, discovery, install, grant, lifecycle | Orchestrator | future Rust supervisor | frontend, CLI | local API | stubbed; source research only |
 | ORC-PLG-002 | Sandboxed worker job and capability protocol | Orchestrator | future Rust supervisor/worker | plugin SDKs | hostile local wire | stubbed; source research only |
 | ORC-PLG-003 | Preview and thumbnail jobs/results | Orchestrator | future plugin workers | frontend | worker protocol + validated bulk data | stubbed; source research only |
 | ORC-PLG-004 | Search, virtual-system, and plugin-AI exchange | Orchestrator | future plugin workers | Orchestrator query broker | worker protocol | stubbed; source research only |
+| ORC-LEX-001 | Bounded exact lexical lookup and immutable corpus-generation enumeration | Orchestrator provider semantics + Lexicon | future Lexicon provider | File Manager query composition, Games/Crossword | local provider API; worker placement unresolved | proposed in Lexicon intake; no operation admitted and no Engine ownership |
 | ORC-HIV-001 | Provider schema and derived-generation deposit | Orchestrator | future hive service | plugin supervisor, extractors | capability API | stubbed |
 | ORC-HIV-002 | Semantic fact operations | Orchestrator | future semantic hive | undecided | capability API | stubbed; architect design pending |
 | ORC-HIV-003 | Hive lifecycle, quota, migration, sync/export | Orchestrator | future hive service | settings/admin, federation | privileged API | stubbed |
@@ -52,11 +58,18 @@ remain unavailable, deferred, negotiating, or stubbed.
 ## Explicitly forbidden edges
 
 - plugin worker → Go engine writable/index API;
+- Lexicon provider → Go engine fact mutation or fake file/path result;
 - plugin worker → GUI.Forms object or native window;
 - GUI.Forms → engine, hive, plugin, or filesystem policy;
+- Orchestrator → arbitrary GUI control/layout/native-window injection;
+- picker caller → unregistered capability widening through presentation
+  overrides;
+- Orchestrator → drag pointer-motion or canvas-byte hot path;
 - engine → plugin executable code;
 - AI client → source-file mutation through Orchestrator search/hive contracts;
 - provider fact → exact filesystem field overwrite;
+- plugin worker → ambient destination path, arbitrary directory enumeration, or
+  direct source replace/delete under a transform/extraction job;
 - raw Rust ABI, Go ABI, C++ object layout, allocator, exception, panic, or
   process-local pointer crossing a registered boundary.
 
@@ -69,3 +82,14 @@ remain unavailable, deferred, negotiating, or stubbed.
 - [`contracts/HIVES_AND_SETTINGS.md`](contracts/HIVES_AND_SETTINGS.md)
 - [`contracts/HANDLERS_COMMANDS_AND_PLATFORM.md`](contracts/HANDLERS_COMMANDS_AND_PLATFORM.md)
 - [`contracts/CLI_AI_AND_FEDERATION.md`](contracts/CLI_AI_AND_FEDERATION.md)
+
+Application-backbone families remain proposal-only in
+[`../proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md`](../proposals/application_backbone/DOCUMENT_PICKER_HELP_AND_TRANSFER.md)
+until project-local replies permit canonical contract files.
+
+`ORC-LEX-001` remains proposal-only in
+[`../../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md).
+Archive Viewer and Image Converter do not yet receive new frozen IDs; their
+host-mediated capability proposals live under
+[`../proposals/first_party_extensions/`](../proposals/first_party_extensions/)
+until the plugin-supervisor and frontend/picker negotiations open.

@@ -6,14 +6,18 @@ Watercolor, with a local CLI surface and future capability-scoped plugin AI.
 
 The parent product remains in **pre-plan** where decisions are unresolved, but
 its repository topology, engine spine, Orchestrator integration authority, and
-negotiated delivery order are now accepted. The work in [`planning/`](planning/) defines the
-remaining decisions, evidence, exclusions, and component gates.
+negotiated delivery order are now accepted. The unified suite/distribution is
+named **Malkuth** under ADR-012; File Manager remains the application name. The
+work in [`planning/`](planning/) defines the remaining decisions, evidence,
+exclusions, and component gates.
 
 Start with:
 
 - [`planning/README.md`](planning/README.md) — current phase and artifact map;
 - [`planning/PROGRAM_MAP.md`](planning/PROGRAM_MAP.md) — component ownership,
   current permissions, contract authority, and build order;
+- [`malkuth/`](malkuth/) — Curious/Concise/Friendly mission, release horizons,
+  documentation, installer, website, and release-manifest planning;
 - [`planning/PREPLAN_CHARTER.md`](planning/PREPLAN_CHARTER.md) — the plan for
   producing the actual project plan;
 - [`planning/EVIDENCE_REGISTER.md`](planning/EVIDENCE_REGISTER.md) — Zeta
@@ -61,6 +65,16 @@ The fetched Modern.Forms reference is pinned in
 - [`frontend/`](frontend/) — the C++ end-user application. Frontend 001 begins
   after Orchestrator Core 1.0, the named GUI.Forms go-ahead, and explicit
   architect direction. Engine and later providers retain separate gates.
+- [`paint/`](paint/) — interview-first planning for the future classic direct
+  image editor and alpha clipart/composite workflow; implementation gated.
+- [`text_editor/`](text_editor/) — interview-first planning for the future
+  tabless plain-text/configuration editor; implementation gated.
+- [`games/`](games/) — planning-only deterministic game collection and
+  GUI.Forms dogfood program; implementation gated.
+- [`lexicon/`](lexicon/) — planning-only local dictionary/corpus provider and
+  Shakespeare-first Crossword source; implementation gated.
+- [`malkuth/`](malkuth/) — planning-only suite release program for 1.0/2.0/3.0,
+  cross-platform installers, online documentation, and polished public website.
 - [`plugin_runtime/`](plugin_runtime/) — frozen earlier plugin-containment
   research retained as input to Orchestrator, not a parallel runtime implementation.
 

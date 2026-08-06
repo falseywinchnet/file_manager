@@ -916,7 +916,13 @@ static void test_abi_0_3_headless_window(void) {
     char trace[4096] = {0};
     require(api.last_host_trace(form, trace, sizeof(trace), &required) == GF_OK &&
                 strstr(trace, "event=attach") != NULL &&
-                strstr(trace, "closed=1") != NULL && strstr(trace, "shutdown=1") != NULL,
+                strstr(trace, "phase=attached") != NULL &&
+                strstr(trace, "phase=close_authorized") != NULL &&
+                strstr(trace, "phase=closed") != NULL &&
+                strstr(trace, "phase=shutdown") != NULL &&
+                strstr(trace, "closed=1") != NULL &&
+                strstr(trace, "shutdown=1") != NULL &&
+                strstr(trace, "\"host_phase\":\"stopping\"") != NULL,
             "0.3 host trace did not close deterministically");
     require(api.dispose(form) == GF_OK, "0.3 form disposal failed");
 }

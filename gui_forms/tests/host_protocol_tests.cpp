@@ -393,6 +393,8 @@ DragEvent drag_event(DragAction action, std::uint64_t session_id, Point position
 
 void test_typed_drag_destination_routing_and_bounds() {
     Fixture fixture;
+    require(fixture.host.dispatch(HostAttachEvent{{100.0, 80.0}, 1.0}, 0).accepted(),
+            "drag fixture must attach before host input");
     require(fixture.host.dispatch(drag_event(DragAction::enter, 90, {10.0, 10.0}), 1)
                 .drag_effect == DragEffect::copy,
             "drag enter must return the target's allowed portable effect");
@@ -444,6 +446,9 @@ void test_typed_drag_destination_routing_and_bounds() {
     root->add_child(right);
     Window transition_window(root, {100.0, 40.0});
     host::HeadlessHost transition_host(transition_window);
+    require(transition_host.dispatch(HostAttachEvent{{100.0, 40.0}, 1.0}, 0)
+                .accepted(),
+            "transition drag fixture must attach before host input");
     static_cast<void>(transition_host.dispatch(
         drag_event(DragAction::enter, 93, {10.0, 10.0}), 1));
     static_cast<void>(transition_host.dispatch(
@@ -463,6 +468,8 @@ void test_typed_drag_destination_routing_and_bounds() {
 
 void test_nested_modal_order_owner_suppression_and_limit() {
     Fixture fixture;
+    require(fixture.host.dispatch(HostAttachEvent{{100.0, 80.0}, 1.0}, 0).accepted(),
+            "modal fixture must attach before host input");
     auto& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     PointerEvent down;
@@ -744,6 +751,64 @@ void test_sequence_geometry_and_shutdown_guards() {
             "events after shutdown must be rejected deterministically");
 }
 
+void test_lifecycle_transition_guards() {
+    Fixture fixture;
+
+    require(fixture.host.dispatch(HostActivationEvent{true}, 1).error ==
+                HostDispatchError::invalid_lifecycle,
+            "activation before attach must be rejected");
+    require(fixture.host.session().snapshot().phase == HostLifecyclePhase::constructed,
+            "rejected pre-attach input must not advance lifecycle state");
+
+    require(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 1.0}, 2).accepted(),
+            "first attach must enter the attached phase");
+    require(fixture.host.session().snapshot().phase == HostLifecyclePhase::attached,
+            "accepted attach must publish the attached phase");
+    require(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 1.0}, 3).error ==
+                HostDispatchError::invalid_lifecycle,
+            "duplicate attach must be rejected");
+
+    auto cancel = fixture.host.session().closing().subscribe(
+        [](HostCloseRequest& request) { request.cancel = true; });
+    require(!fixture.host.dispatch(
+                 HostCloseRequest{HostCloseReason::user, false}, 4).close_allowed &&
+                fixture.host.session().snapshot().phase == HostLifecyclePhase::attached,
+            "a cancelled close must return to the attached phase");
+    cancel.disconnect();
+
+    require(fixture.host.dispatch(
+                HostCloseRequest{HostCloseReason::user, false}, 5).close_allowed &&
+                fixture.host.session().snapshot().phase ==
+                    HostLifecyclePhase::close_authorized,
+            "an allowed close must enter close-authorized");
+    PointerEvent input;
+    input.action = PointerAction::move;
+    input.position = {10.0, 10.0};
+    require(fixture.host.dispatch(input, 6).error ==
+                HostDispatchError::invalid_lifecycle,
+            "input after close authorization must not reach retained controls");
+    require(fixture.host.dispatch(HostActivationEvent{false}, 7).accepted() &&
+                !fixture.host.session().snapshot().active,
+            "native deactivation may complete during authorized close");
+    require(fixture.host.dispatch(HostActivationEvent{true}, 8).error ==
+                HostDispatchError::invalid_lifecycle,
+            "authorized close must not permit a late activation to reopen state");
+    require(fixture.host.dispatch(HostOcclusionEvent{true}, 9).accepted() &&
+                fixture.host.session().snapshot().occluded,
+            "native occlusion may complete during authorized close");
+    require(fixture.host.dispatch(
+                HostClosedEvent{HostCloseReason::user}, 10).accepted() &&
+                fixture.host.session().snapshot().phase == HostLifecyclePhase::closed &&
+                !fixture.host.session().snapshot().attached,
+            "closed must detach the portable host session");
+    require(fixture.host.dispatch(HostResizeEvent{{640.0, 360.0}}, 11).error ==
+                HostDispatchError::invalid_lifecycle,
+            "nonterminal events after closed must be rejected");
+    require(fixture.host.dispatch(HostShutdownEvent{}, 12).accepted() &&
+                fixture.host.session().snapshot().phase == HostLifecyclePhase::shutdown,
+            "shutdown must be the terminal lifecycle phase");
+}
+
 void test_close_cancellation_and_closed_cleanup() {
     Fixture fixture;
     static_cast<void>(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 1.0}, 1));
@@ -792,6 +857,7 @@ int main() {
         test_display_capture_and_occlusion_synchronization();
         test_environment_services_are_bounded_and_deterministic();
         test_sequence_geometry_and_shutdown_guards();
+        test_lifecycle_transition_guards();
         test_close_cancellation_and_closed_cleanup();
         test_headless_trace_is_byte_deterministic();
         std::cout << "headless_capabilities="

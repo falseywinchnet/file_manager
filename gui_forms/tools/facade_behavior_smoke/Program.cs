@@ -16,6 +16,10 @@ if (args.Length == 1 && args[0] == "lifecycle")
 {
     return RunLoadLifecycle();
 }
+if (args.Length == 1 && args[0] == "lifecycle-order")
+{
+    return RunInitializationOrder();
+}
 if (args.Length == 1 && args[0] == "pointer")
 {
     return RunPointerHost();
@@ -247,6 +251,24 @@ lateAutoSizeTable.Controls.Add(lateAutoSizeLabel, 0, 0);
 lateAutoSizeTable.Controls.Add(pictureBox, 1, 0);
 lateAutoSizeLabel.Text = "Zoom";
 pictureBox.Image = pictureImage;
+var autoPercentTable = new TableLayoutPanel
+{
+    Size = new Size(240, 0), ColumnCount = 1, RowCount = 2, Padding = new Padding(0),
+    Dock = DockStyle.Top, AutoSize = true,
+};
+autoPercentTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+autoPercentTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+autoPercentTable.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+var autoPercentPanel = new Panel { Size = new Size(240, 0), Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0) };
+var autoPercentHost = new Panel { Size = new Size(240, 30), Dock = DockStyle.Top, Margin = new Padding(0) };
+autoPercentPanel.Controls.Add(autoPercentHost);
+var autoPercentFooter = new Label { Size = new Size(100, 20), Margin = new Padding(0) };
+autoPercentTable.Controls.Add(autoPercentPanel, 0, 0);
+autoPercentTable.Controls.Add(autoPercentFooter, 0, 1);
+var autoPercentExpandedHeight = autoPercentTable.Height;
+autoPercentPanel.Visible = false;
+var autoPercentCollapsedHeight = autoPercentTable.Height;
+autoPercentPanel.Visible = true;
 var flowProbe = new FlowLayoutPanel { Size = new Size(170, 80), Padding = new Padding(0), WrapContents = true };
 var flowFirst = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
 var flowSecond = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
@@ -426,6 +448,92 @@ using (var gradientPen = new Pen(gradient))
     Require(gradientBitmap.GetPixel(0, 255).GetBrightness() < 0.1f,
         "gradient-backed line preserves its inclusive far endpoint without wrapping");
 }
+using (var overlayBitmap = new Bitmap(220, 100))
+using (var overlayGraphics = Graphics.FromImage(overlayBitmap))
+using (var overlayFill = new SolidBrush(Color.FromArgb(200, 50, 50, 50)))
+using (var overlayBorder = new Pen(Color.FromArgb(200, Color.Gray)))
+using (var overlayFont = new Font("Helvetica", 13f))
+using (var overlayPath = new System.Drawing.Drawing2D.GraphicsPath())
+{
+    var bounds = new RectangleF(18, 14, 174, 64);
+    const float diameter = 12f;
+    overlayPath.AddArc(new RectangleF(bounds.Left, bounds.Top, diameter, diameter), 180f, 90f);
+    overlayPath.AddArc(new RectangleF(bounds.Right - diameter, bounds.Top, diameter, diameter), 270f, 90f);
+    overlayPath.AddArc(new RectangleF(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter), 0f, 90f);
+    overlayPath.AddArc(new RectangleF(bounds.Left, bounds.Bottom - diameter, diameter, diameter), 90f, 90f);
+    overlayPath.CloseFigure();
+    overlayGraphics.Clear(Color.Black);
+    overlayGraphics.FillPath(overlayFill, overlayPath);
+    overlayGraphics.DrawPath(overlayBorder, overlayPath);
+    overlayGraphics.DrawString("99.935 MHz\r\n-91.2 dBFS", overlayFont, Brushes.White, 32f, 25f);
+    overlayGraphics.Flush();
+    Require(overlayBitmap.GetPixel(80, 40).ToArgb() != Color.Black.ToArgb(),
+        "spectrum hover overlay rounded path and text render atomically");
+}
+using (var multilineBitmap = new Bitmap(180, 70))
+using (var multilineGraphics = Graphics.FromImage(multilineBitmap))
+using (var multilineFont = new Font("Helvetica", 13f))
+{
+    multilineGraphics.Clear(Color.Black);
+    multilineGraphics.DrawString("99.935 MHz\r\n-91.2 dBFS", multilineFont,
+        Brushes.White, 2f, 2f);
+    multilineGraphics.Flush();
+    var secondLineInk = false;
+    for (var y = 26; y < multilineBitmap.Height && !secondLineInk; ++y)
+        for (var x = 0; x < multilineBitmap.Width; ++x)
+            if (multilineBitmap.GetPixel(x, y).GetBrightness() > 0.5f)
+            {
+                secondLineInk = true;
+                break;
+            }
+    Require(secondLineInk, "DrawString honors CRLF as a second rendered line");
+
+    using var alignedBitmap = new Bitmap(240, 80);
+    using var alignedGraphics = Graphics.FromImage(alignedBitmap);
+    alignedGraphics.Clear(Color.Black);
+    using var alignedFont = new Font("Lucida Console", 10f);
+    using var alignedBrush = new SolidBrush(Color.White);
+    using var alignedFormat = new StringFormat
+    {
+        Alignment = StringAlignment.Center,
+        LineAlignment = StringAlignment.Center,
+    };
+    alignedGraphics.DrawString("Band Plan", alignedFont, alignedBrush,
+        new RectangleF(20f, 10f, 200f, 60f), alignedFormat);
+    alignedGraphics.Flush();
+    var alignedCenterInk = false;
+    var alignedLeftInk = false;
+    for (var y = 10; y < 70; ++y)
+    {
+        for (var x = 20; x < 220; ++x)
+        {
+            if (alignedBitmap.GetPixel(x, y).ToArgb() == Color.Black.ToArgb()) continue;
+            if (x >= 80 && x <= 160 && y >= 28 && y <= 52) alignedCenterInk = true;
+            if (x < 55) alignedLeftInk = true;
+        }
+    }
+    Require(alignedCenterInk && !alignedLeftInk,
+        "DrawString RectangleF honors centered StringFormat alignment");
+}
+using (var longLivedBitmap = new Bitmap(2, 2))
+using (var longLivedGraphics = Graphics.FromImage(longLivedBitmap))
+{
+    Color last = default;
+    for (var frame = 0; frame < 5000; ++frame)
+    {
+        last = Color.FromArgb(255, frame & 0xff, (frame >> 3) & 0xff,
+            (frame >> 6) & 0xff);
+        longLivedGraphics.Clear(last);
+        longLivedGraphics.Flush();
+    }
+    var executedField = typeof(Graphics).GetField("__executedCommands",
+        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+    Require(executedField is not null &&
+        (ulong)executedField.GetValue(longLivedGraphics)! < 4096UL,
+        "long-lived direct-surface graphics compacts executed command history");
+    Require(longLivedBitmap.GetPixel(0, 0).ToArgb() == last.ToArgb(),
+        "recorder compaction preserves the most recently committed frame");
+}
 Require(enabled.Checked && radio.Checked, "check state");
 Require(checkEvents == 1 && selectionEvents == 1 && valueEvents == 1 && radioEvents == 1, "state events");
 Require(stateProbe.TextChanges == 1 && stateProbe.EnabledChanges == 1 &&
@@ -471,6 +579,9 @@ Require(lateAutoSizeLabel.Width > 0 && lateAutoSizeLabel.Height > 0,
     "late text invalidates label auto-size layout");
 Require(pictureBox.Width >= pictureImage.Width && pictureBox.Height >= pictureImage.Height,
     "picture image contributes auto-size preferred dimensions");
+Require(autoPercentPanel.Height == 30 && autoPercentExpandedHeight == 50 &&
+    autoPercentCollapsedHeight == 20 && autoPercentTable.Height == 50,
+    "auto-size table preserves percent-row content and reacts to visibility");
 Require(flowFirst.Location == Point.Empty && flowSecond.Location == new Point(80, 0) &&
     flowThird.Location == new Point(0, 20), "flow layout wrapping");
 Require(listProbe.Items.Count == 2 && Equals(listProbe.Items[0], "alpha") &&
@@ -1494,9 +1605,13 @@ static int RunLoadLifecycle()
 {
     var form = new Form { Name = "loadForm", Size = new Size(360, 180) };
     var initial = new LoadProbe();
+    var nestedPaintHost = new Panel { Size = new Size(80, 40) };
+    var nestedPaint = new PaintInputProbe { Dock = DockStyle.Fill };
+    nestedPaintHost.Controls.Add(nestedPaint);
     LoadProbe? late = null;
     var formLoads = 0;
     form.Controls.Add(initial);
+    form.Controls.Add(nestedPaintHost);
     form.Load += (_, _) =>
     {
         ++formLoads;
@@ -1508,10 +1623,62 @@ static int RunLoadLifecycle()
     Require(initial.Loads == 1, "initial child load once");
     var attachedLate = late ?? throw new InvalidOperationException("M11d behavior check failed: late child created");
     Require(attachedLate.Loads == 1, "late child load once");
+    Require(nestedPaint.Paints >= 2, "final form-load pass repaints nested custom surfaces");
     form.Show();
     Require(formLoads == 1 && initial.Loads == 1 && attachedLate.Loads == 1, "load idempotence");
     Console.WriteLine($"lifecycle=form:{formLoads}|initial:{initial.Loads}|late:{attachedLate.Loads}");
     form.Dispose();
+    return 0;
+}
+
+static int RunInitializationOrder()
+{
+    var form = new Form { Name = "initializationOrder", Size = new Size(360, 180) };
+    var button = new Button { Name = "initializationAction", Dock = DockStyle.Fill };
+    form.Controls.Add(button);
+    var order = new System.Collections.Generic.List<string>();
+    var handleCreated = 0;
+    var handleDestroyed = 0;
+    form.HandleCreated += (_, _) => ++handleCreated;
+    form.HandleDestroyed += (_, _) => ++handleDestroyed;
+    form.Load += (_, _) => order.Add("load");
+    button.Click += (_, _) =>
+    {
+        order.Add("input");
+        form.Close();
+    };
+    form.FormClosing += (_, _) => order.Add("closing");
+    form.FormClosed += (_, _) => order.Add("closed");
+
+    if (OperatingSystem.IsWindows())
+    {
+        Require(!form.IsHandleCreated, "compatibility handle begins unleased");
+        Require(form.Handle != 0 && form.IsHandleCreated && handleCreated == 1,
+            "compatibility handle acquisition raises HandleCreated exactly once");
+        _ = form.Handle;
+        Require(handleCreated == 1, "re-reading a compatibility handle is idempotent");
+    }
+
+    Application.Run(form);
+    Require(string.Join(",", order) == "load,input,closing,closed",
+        "portable initialization completes before input and terminal callbacks");
+    form.Dispose();
+    if (OperatingSystem.IsWindows())
+        Require(handleDestroyed == 1, "disposing a leased handle raises HandleDestroyed once");
+
+    var early = new Form { Name = "earlyCloseInitialization", Size = new Size(240, 120) };
+    var forbiddenInput = new Button { Name = "earlyCloseInput", Dock = DockStyle.Fill };
+    early.Controls.Add(forbiddenInput);
+    var earlyClosed = 0;
+    forbiddenInput.Click += (_, _) => throw new InvalidOperationException(
+        "input escaped after Load requested close");
+    early.Load += (_, _) => early.Close();
+    early.FormClosed += (_, _) => ++earlyClosed;
+    Application.Run(early);
+    Require(earlyClosed == 1,
+        "Load-time close suppresses input and reaches one terminal callback");
+    early.Dispose();
+    Console.WriteLine($"lifecycle-order={string.Join('>', order)}|handle-created:{handleCreated}|handle-destroyed:{handleDestroyed}|early-close:suppressed");
     return 0;
 }
 

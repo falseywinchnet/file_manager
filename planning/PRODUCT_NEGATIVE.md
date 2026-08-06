@@ -30,6 +30,12 @@ for clarification.
   aliases.
 - No provider plugin may insert, replace, or restyle core controls.
 - No Mica/rounded-corner modern-Windows styling trajectory.
+- No persistent left/right panels in Paint, Text Editor, Games, or other
+  ordinary Malkuth applications. Only File Manager and its embedded picker/
+  browser projection own that topology; secondary utilities elsewhere are
+  owned popup dialogs.
+- No virtual-desktop, compositor, window-manager, display-server, native-app-
+  hosting, Wayland-replacement, or full desktop-environment trajectory.
 
 ## Runtime and framework exclusions
 
@@ -84,6 +90,24 @@ and semantic-hive contracts only after capability review; this does not grant a
 plugin GUI control injection or direct engine-catalogue mutation. Whether an
 in-application plugin catalogue is permitted remains unresolved, including its
 networking and trust model.
+
+ADR-013 admits Archive Viewer and Image Converter as paper-stage first-party
+reef proofs. This does not grant plugin mutation: plugins receive scoped inputs
+and return virtual entries or bounded staged output; trusted File Manager code
+selects destinations, validates names/collisions, and publishes create-new
+files. Checksums and native terminal launch are trusted built-ins, not plugin
+powers. OCR remains deferred.
+
+## Future-suite feature exclusions
+
+- No Games account, multiplayer service, matchmaking, leaderboard, achievement
+  platform, daily-streak coercion, store, advertising, or casino economy.
+- No standalone Dictionary application, web dictionary, or dictionary records
+  masquerading as Engine file rows.
+- No application-independent Character Map program in the initial scope; Text
+  Editor owns the bounded Characters popup.
+- No Paint layer/history side panels, Text Editor IDE/project furniture, or
+  plugin/provider-supplied dialogs, controls, styles, or native windows.
 
 ## Anti-model work still required
 

@@ -399,10 +399,19 @@ Platform window creation lives in private host adapters.
 
 ## Portable host protocol
 
-Protocol version 4 declares capabilities for lifecycle, scale, monitors,
+Protocol version 5 declares capabilities for lifecycle, scale, monitors,
 occlusion, scheduled wake, input, text composition, capture, cursor, clipboard,
 typed drag destination, dialogs, menus, font discovery, accessibility, and drag
 source.
+
+`HostSessionSnapshot.phase` is the portable lifecycle authority:
+`constructed → attached → close_authorized → closed → shutdown`. A cancelled
+close remains attached; a forced native close may move directly from attached
+to closed. Pre-attach input, duplicate attach, input after close authorization,
+and non-shutdown work after closed are rejected as `invalid_lifecycle` without
+mutating retained state. Backend-private native creation and handle binding must
+complete before the single attach event. See [LIFECYCLE_CONTRACT.md](LIFECYCLE_CONTRACT.md)
+for the initialization transaction and compatibility-handle rules.
 
 The current headless/AppKit work implements a bounded subset including monitor
 records, cursor, capture, clipboard text, typed inbound drag data, and five

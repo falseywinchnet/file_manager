@@ -196,10 +196,29 @@ namespace {
             has_current_point = false;
             break;
         case PathVerb::arc:
-            builder.addArc(to_sk_rect(element.rect),
-                           static_cast<SkScalar>(element.start_angle),
-                           static_cast<SkScalar>(element.sweep_angle));
-            has_current_point = false;
+            // GDI+ GraphicsPath.AddArc extends the current figure. Skia's
+            // addArc starts a fresh contour, which left rounded rectangles as
+            // four disconnected corner outlines with an empty centre. arcTo
+            // preserves the implicit connecting edges used by WinForms custom
+            // controls while still starting a contour for the first arc.
+            builder.arcTo(to_sk_rect(element.rect),
+                          static_cast<SkScalar>(element.start_angle),
+                          static_cast<SkScalar>(element.sweep_angle),
+                          !has_current_point);
+            {
+                constexpr double degrees_to_radians =
+                    0.01745329251994329576923690768489;
+                const double angle =
+                    (element.start_angle + element.sweep_angle) *
+                    degrees_to_radians;
+                current_point = {
+                    element.rect.x + element.rect.width * 0.5 +
+                        element.rect.width * 0.5 * std::cos(angle),
+                    element.rect.y + element.rect.height * 0.5 +
+                        element.rect.height * 0.5 * std::sin(angle),
+                };
+            }
+            has_current_point = true;
             break;
         case PathVerb::close_figure:
             builder.close();
@@ -633,22 +652,36 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 SkFont font = impl_->font(command.font);
                 const SkScalar overhang = (command.format.flags & UINT32_C(0x0004)) == 0U ?
                     static_cast<SkScalar>(pixel_font_size(command.font) / 6.0) : 0.0F;
-                SkScalar x = static_cast<SkScalar>(command.first.x) + overhang;
                 SkFontMetrics metrics;
                 font.getMetrics(&metrics);
-                const SkScalar baseline = static_cast<SkScalar>(command.first.y) -
+                const SkScalar first_baseline = static_cast<SkScalar>(command.first.y) -
                     metrics.fAscent + overhang;
-                if (command.format.alignment != StringAlignment::near) {
-                    const SkScalar width = font.measureText(
-                        command.text.data(), command.text.size(),
-                        SkTextEncoding::kUTF8, nullptr, &paint);
-                    x -= command.format.alignment == StringAlignment::center ?
-                        width / 2.0F : width;
+                const SkScalar line_height = std::max(
+                    0.0F, metrics.fDescent - metrics.fAscent + metrics.fLeading + overhang);
+                std::string_view remaining = command.text;
+                std::size_t line_index{};
+                for (;;) {
+                    const std::size_t newline = remaining.find('\n');
+                    std::string_view line = remaining.substr(0U, newline);
+                    if (!line.empty() && line.back() == '\r') line.remove_suffix(1U);
+                    SkScalar x = static_cast<SkScalar>(command.first.x) + overhang;
+                    if (command.format.alignment != StringAlignment::near) {
+                        const SkScalar width = font.measureText(
+                            line.data(), line.size(), SkTextEncoding::kUTF8,
+                            nullptr, &paint);
+                        x -= command.format.alignment == StringAlignment::center ?
+                            width / 2.0F : width;
+                    }
+                    if (!line.empty()) {
+                        canvas->drawSimpleText(
+                            line.data(), line.size(), SkTextEncoding::kUTF8, x,
+                            first_baseline + line_height * static_cast<SkScalar>(line_index),
+                            font, paint);
+                    }
+                    if (newline == std::string_view::npos) break;
+                    remaining.remove_prefix(newline + 1U);
+                    ++line_index;
                 }
-                canvas->drawSimpleText(command.text.data(), command.text.size(),
-                                       SkTextEncoding::kUTF8, x,
-                                       baseline,
-                                       font, paint);
                 break;
             }
             case CommandKind::draw_ellipse:

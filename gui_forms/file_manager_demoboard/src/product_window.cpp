@@ -4,7 +4,9 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include <algorithm>
+#include <any>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cctype>
 #include <functional>
@@ -19,6 +21,11 @@ namespace file_manager_demoboard {
 namespace {
 
 using namespace gui_forms;
+
+class NavigationSession;
+class PathMatrixController;
+class SearchController;
+class CriteriaController;
 
 constexpr Color paper = Color::rgba(255, 255, 255);
 constexpr Color ink = Color::rgba(29, 45, 75);
@@ -42,6 +49,19 @@ struct ProductRefs final {
     std::shared_ptr<Button> selection_collapse;
     std::shared_ptr<SplitContainer> selection_split;
     std::shared_ptr<SplitContainer> workspace_split;
+    std::shared_ptr<Panel> surface_host;
+    Control::Ptr folder_surface;
+    Control::Ptr search_surface;
+    std::shared_ptr<CorrespondenceView> search_results;
+    Control::Ptr criteria_surface;
+    std::shared_ptr<Label> criteria_title;
+    std::shared_ptr<InstrumentRack> criteria_rack;
+    std::shared_ptr<ObjectView> criteria_objects;
+    std::shared_ptr<Label> criteria_results_summary;
+    std::shared_ptr<Button> criteria_add;
+    std::shared_ptr<Button> criteria_apply;
+    std::shared_ptr<Label> criteria_action_state;
+    std::shared_ptr<ProgressBar> criteria_progress;
     Control::Ptr preview;
     std::shared_ptr<Label> status_summary;
     std::shared_ptr<Label> status_authority;
@@ -67,8 +87,10 @@ struct ProductLifetime final {
     std::vector<AcceleratorToken> accelerators;
     std::vector<SubscriptionToken> subscriptions;
     std::shared_ptr<SemanticFeedback> feedback;
-    std::shared_ptr<void> navigation;
-    std::shared_ptr<void> path_matrix;
+    std::shared_ptr<NavigationSession> navigation;
+    std::shared_ptr<PathMatrixController> path_matrix;
+    std::shared_ptr<SearchController> search_controller;
+    std::shared_ptr<CriteriaController> criteria_controller;
 };
 
 BasicControlStyle house_style() {
@@ -289,6 +311,267 @@ std::shared_ptr<ObjectView> make_object_field(ProductRefs& refs) {
     return field;
 }
 
+std::shared_ptr<Panel> make_search_surface(ProductRefs& refs) {
+    auto surface = std::make_shared<Panel>(StableId("fm.search.surface"));
+    surface->set_background(paper);
+    surface->set_accessible_name("Search correspondence surface");
+    auto results = std::make_shared<CorrespondenceView>(
+        StableId("fm.search.results"));
+    results->set_style(house_style());
+    results->set_font({FontRole::content, 11.0, 400, false});
+    results->set_compact_height(45.0);
+    results->set_expanded_height(126.0);
+    results->set_hover_intent_delay(std::chrono::milliseconds(180));
+    results->set_accessible_name("Search results");
+    results->set_accessible_description(
+        "Seven factual fixture correspondences with one pinned row and bounded virtual realization");
+    std::vector<CorrespondenceItem> items;
+    std::string pinned;
+    for (const FixtureSearchResult& fixture :
+         FixtureCatalogue::instance().search_results()) {
+        const std::string id = "fm.result." + fixture.id;
+        CorrespondenceItem item{
+            id, fixture.name, fixture.location, fixture.metadata,
+            fixture.excerpt, fixture.metric, "Plugin information",
+            fixture.providers, fixture.provider_detail,
+            object_glyph(fixture.icon_role), true, !fixture.available,
+            fixture.stale};
+        item.emphasis_terms = {"invoice", "quartz"};
+        items.push_back(std::move(item));
+        if (fixture.default_pinned) pinned = id;
+    }
+    results->set_items(std::move(items));
+    results->set_selected_id(pinned);
+    results->set_pinned_id(pinned);
+    results->set_dock(DockStyle::fill);
+    surface->add_child(results);
+    refs.search_results = results;
+    refs.search_surface = surface;
+    surface->set_visible(false);
+    return surface;
+}
+
+class CriteriaSurfacePanel final : public Panel {
+public:
+    explicit CriteriaSurfacePanel(StableId stable_id)
+        : Panel(std::move(stable_id)) {
+        set_background(paper);
+        set_accessible_name("Criteria virtual folder surface");
+    }
+
+    std::shared_ptr<Label> title;
+    std::shared_ptr<InstrumentRack> rack;
+    Control::Ptr results;
+
+    void arrange(Rect final_bounds) override {
+        arrange_self(final_bounds);
+        const double scale = effective_text_scale();
+        const double width = std::max(0.0, final_bounds.width);
+        const double height = std::max(0.0, final_bounds.height);
+        const double rack_width = std::max(1.0, width - 18.0 * scale);
+        const double desired_console = 30.0 * scale +
+            (rack ? rack->preferred_height(rack_width) : 0.0) + 8.0 * scale;
+        const double minimum_console = 104.0 * scale;
+        const double maximum_console = std::max(
+            minimum_console, height * (height < 280.0 * scale ? 0.72 : 0.58));
+        const double console_height = std::min(
+            height, std::clamp(desired_console, minimum_console,
+                               maximum_console));
+        if (title) {
+            set_child_layout(title, {9.0 * scale, 5.0 * scale,
+                                     std::max(0.0, width - 18.0 * scale),
+                                     21.0 * scale});
+        }
+        if (rack) {
+            set_child_layout(rack, {9.0 * scale, 30.0 * scale, rack_width,
+                                    std::max(0.0, console_height -
+                                                      38.0 * scale)});
+        }
+        if (results) {
+            set_child_layout(results, {0.0, console_height, width,
+                                       std::max(0.0, height - console_height)});
+        }
+    }
+
+    void on_paint(Painter& painter, Rect damage) override {
+        Panel::on_paint(painter, damage);
+        const double scale = effective_text_scale();
+        const double rack_width = std::max(
+            1.0, committed_arranged_bounds().width - 18.0 * scale);
+        const double desired_console = 30.0 * scale +
+            (rack ? rack->preferred_height(rack_width) : 0.0) + 8.0 * scale;
+        const double minimum_console = 104.0 * scale;
+        const double maximum_console = std::max(
+            minimum_console, committed_arranged_bounds().height *
+                (committed_arranged_bounds().height < 280.0 * scale
+                    ? 0.72 : 0.58));
+        const double console_height = std::min(
+            committed_arranged_bounds().height,
+            std::clamp(desired_console, minimum_console, maximum_console));
+        painter.fill_rect({0.0, 0.0, committed_arranged_bounds().width,
+                           console_height}, Color::rgba(228, 237, 243));
+        painter.fill_rect({0.0, 0.0, committed_arranged_bounds().width,
+                           1.0 * scale}, Color::rgba(250, 253, 255));
+        painter.draw_line({0.0, console_height - 0.5 * scale},
+                          {committed_arranged_bounds().width,
+                           console_height - 0.5 * scale},
+                          Color::rgba(92, 119, 140), scale);
+    }
+};
+
+InstrumentFieldSpec criterion_field(const FixtureCriterionField& fixture) {
+    InstrumentFieldSpec field;
+    field.stable_id = fixture.id;
+    field.name = fixture.name;
+    field.value = fixture.value;
+    field.editor = fixture.editable_text ? InstrumentFieldEditor::text
+                                         : InstrumentFieldEditor::choice;
+    field.choices = fixture.choices;
+    field.required = fixture.required;
+    field.width_weight = fixture.width_weight;
+    return field;
+}
+
+InstrumentModuleSpec criterion_module(const FixtureCriterionModule& fixture,
+                                      std::string stable_id = {}) {
+    InstrumentModuleSpec module;
+    module.stable_id = stable_id.empty()
+        ? "fm.criteria.module." + fixture.id : std::move(stable_id);
+    module.name = fixture.name;
+    module.status_text = fixture.status;
+    module.state = fixture.staged ? InstrumentModuleState::staged
+                                  : InstrumentModuleState::live;
+    module.priority = fixture.priority;
+    module.enabled = fixture.enabled;
+    for (const FixtureCriterionField& field : fixture.fields) {
+        module.fields.push_back(criterion_field(field));
+    }
+    return module;
+}
+
+std::vector<ObjectViewItem> criteria_object_items(std::size_t limit = 31U) {
+    std::vector<ObjectViewItem> items;
+    const auto fixtures = FixtureCatalogue::instance().criteria_objects();
+    limit = std::min(limit, fixtures.size());
+    items.reserve(limit);
+    for (std::size_t index = 0; index < limit; ++index) {
+        const FixtureObject& object = fixtures[index];
+        items.push_back({"fm.object." + object.id, object.name, object.size,
+                         object.kind + " · Projects and descendants",
+                         object_glyph(object.icon_role)});
+    }
+    return items;
+}
+
+std::shared_ptr<CriteriaSurfacePanel> make_criteria_surface(ProductRefs& refs) {
+    auto surface = make_control<CriteriaSurfacePanel>(
+        StableId("fm.criteria.surface"));
+    surface->title = label(
+        "fm.criteria.console.title",
+        "PROJECTS   ·   VIRTUAL FOLDER   ·   TWO LIVE MODULES   ·   ONE STAGED",
+        {9.0, 5.0, 900.0, 21.0},
+        {FontRole::control, 9.0, 700, false, .30});
+    surface->title->set_accessible_name("Projects criteria console");
+    surface->add_child(surface->title);
+    refs.criteria_title = surface->title;
+
+    auto rack = make_control<InstrumentRack>(StableId("fm.criteria.console"));
+    rack->set_accessible_name("Projects predicate rack");
+    rack->set_accessible_description(
+        "Two live inexpensive modules and one staged expensive module");
+    std::vector<InstrumentModuleSpec> modules;
+    for (const FixtureCriterionModule& fixture :
+         FixtureCatalogue::instance().criteria_modules()) {
+        modules.push_back(criterion_module(fixture));
+    }
+    rack->set_modules(std::move(modules));
+
+    auto actions = make_control<TableLayoutPanel>(
+        StableId("fm.criteria.actions"));
+    actions->set_accessible_name("Predicate rack actions");
+    actions->set_column_count(2);
+    actions->set_row_count(3);
+    actions->set_column_style(0, {TableSizeMode::percent, 100.0});
+    actions->set_column_style(1, {TableSizeMode::absolute, 78.0});
+    actions->set_row_style(0, {TableSizeMode::absolute, 20.0});
+    actions->set_row_style(1, {TableSizeMode::percent, 100.0});
+    actions->set_row_style(2, {TableSizeMode::absolute, 9.0});
+    actions->set_grow_style(TableLayoutGrowStyle::fixed_size);
+    auto action_title = label("fm.criteria.actions.title", "PREDICATE RACK",
+                              {0, 0, 120, 20},
+                              {FontRole::control, 8.0, 700, false, .35});
+    action_title->set_margin({6, 1, 3, 0});
+    action_title->set_dock(DockStyle::fill);
+    actions->add_child(action_title);
+    actions->set_cell_position(*action_title, {0, 0});
+    refs.criteria_add = button("fm.criteria.add", "+ module", {0, 0, 78, 27},
+                               ButtonVisualStyle::standard);
+    refs.criteria_add->set_margin({2, 1, 2, 1});
+    refs.criteria_add->set_dock(DockStyle::fill);
+    actions->add_child(refs.criteria_add);
+    actions->set_cell_position(*refs.criteria_add, {1, 0});
+    refs.criteria_action_state = label(
+        "fm.criteria.actions.state", "1 expensive change staged",
+        {0, 0, 120, 27}, {FontRole::content, 8.0, 600, false});
+    refs.criteria_action_state->set_margin({6, 1, 3, 0});
+    refs.criteria_action_state->set_dock(DockStyle::fill);
+    actions->add_child(refs.criteria_action_state);
+    actions->set_cell_position(*refs.criteria_action_state, {0, 1});
+    refs.criteria_apply = button("fm.criteria.apply", "Apply 1", {0, 0, 78, 27},
+                                 ButtonVisualStyle::accent);
+    refs.criteria_apply->set_default_button(true);
+    refs.criteria_apply->set_margin({2, 1, 2, 1});
+    refs.criteria_apply->set_dock(DockStyle::fill);
+    actions->add_child(refs.criteria_apply);
+    actions->set_cell_position(*refs.criteria_apply, {1, 1});
+    refs.criteria_progress = make_control<ProgressBar>(
+        StableId("fm.criteria.progress"));
+    refs.criteria_progress->set_range(0.0, 100.0);
+    refs.criteria_progress->set_value(0.0);
+    refs.criteria_progress->set_visual_style(ProgressBarVisualStyle::continuous);
+    refs.criteria_progress->set_overlay_style(
+        ProgressBarOverlayStyle::moving_stripes);
+    refs.criteria_progress->set_animation_enabled(false);
+    refs.criteria_progress->set_accessible_name("Criteria application progress");
+    refs.criteria_progress->set_margin({5, 0, 5, 1});
+    refs.criteria_progress->set_dock(DockStyle::fill);
+    actions->add_child(refs.criteria_progress);
+    actions->set_cell_position(*refs.criteria_progress, {0, 2});
+    actions->set_column_span(*refs.criteria_progress, 2);
+    rack->set_action_content(actions, 170.0);
+    refs.criteria_rack = rack;
+    surface->rack = rack;
+    surface->add_child(rack);
+
+    auto results = make_control<Panel>(StableId("fm.criteria.results"));
+    results->set_background(paper);
+    auto virtual_label = label(
+        "fm.criteria.results.summary",
+        "31 OBJECTS   ·   FROM PROJECTS AND DESCENDANTS   ·   ONE INSPECTABLE VIRTUAL FOLDER",
+        {11, 2, 900, 28}, {FontRole::content, 9.0, 600, false});
+    virtual_label->set_margin({11, 2, 8, 0});
+    virtual_label->set_dock(DockStyle::top);
+    refs.criteria_results_summary = virtual_label;
+    auto objects = make_control<ObjectView>(StableId("fm.criteria.objects"));
+    objects->set_items(criteria_object_items());
+    objects->set_selected_id("fm.object.obj-facade-study");
+    objects->set_icon_cell_size({112.0, 91.0});
+    objects->set_font({FontRole::content, 9.5, 400, false});
+    objects->set_style(house_style());
+    objects->set_background(paper);
+    objects->set_accessible_name("Criteria virtual folder objects");
+    objects->set_margin({});
+    objects->set_dock(DockStyle::fill);
+    results->add_child(objects);
+    results->add_child(virtual_label);
+    surface->results = results;
+    surface->add_child(results);
+    refs.criteria_objects = objects;
+    refs.criteria_surface = surface;
+    surface->set_visible(false);
+    return surface;
+}
+
 std::shared_ptr<Panel> make_tree_pane(ProductRefs& refs) {
     auto pane = std::make_shared<Panel>(StableId("fm.tree.pane"));
     pane->set_background(Color::rgba(235, 240, 246));
@@ -430,14 +713,31 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     inner->set_second_minimum(288);
     inner->set_second_maximum(420);
     inner->first_panel()->set_background(paper);
+    auto daily_content = std::make_shared<Panel>(
+        StableId("fm.content.host"));
+    daily_content->set_background(paper);
+    daily_content->set_dock(DockStyle::fill);
     auto objects = make_object_field(refs);
     objects->set_dock(DockStyle::fill);
-    inner->first_panel()->add_child(objects);
+    daily_content->add_child(objects);
+    auto criteria = make_criteria_surface(refs);
+    criteria->set_dock(DockStyle::fill);
+    daily_content->add_child(criteria);
+    inner->first_panel()->add_child(daily_content);
     auto selection = make_selection_pane(refs);
     selection->set_dock(DockStyle::fill);
     inner->second_panel()->add_child(selection);
     inner->set_dock(DockStyle::fill);
-    outer->second_panel()->add_child(inner);
+    refs.folder_surface = inner;
+    auto surface_host = std::make_shared<Panel>(StableId("fm.surface.host"));
+    surface_host->set_background(paper);
+    surface_host->set_dock(DockStyle::fill);
+    surface_host->add_child(inner);
+    auto search = make_search_surface(refs);
+    search->set_dock(DockStyle::fill);
+    surface_host->add_child(search);
+    refs.surface_host = surface_host;
+    outer->second_panel()->add_child(surface_host);
     return outer;
 }
 
@@ -509,6 +809,24 @@ std::vector<ObjectViewItem> location_items(std::string_view id) {
          "Plain text field note", ObjectGlyph::document},
         {"fm.object.notes-audio", "Usability Session.m4a", "8.4 MB",
          "Audio field note", ObjectGlyph::audio}};
+    if (id == "orchard-study") return {
+        {"fm.object.search-invoice-pdf", "Invoice 0428.pdf", "1.8 MB",
+         "PDF document · matched invoice and extracted quartz text",
+         ObjectGlyph::document},
+        {"fm.object.orchard-billing", "Billing", "Folder",
+         "Fixture billing records", ObjectGlyph::folder},
+        {"fm.object.orchard-materials", "Material Schedule.xlsx", "96 KB",
+         "Fixture material schedule", ObjectGlyph::document}};
+    if (id == "north-shore") return {
+        {"fm.object.search-quartz-image", "quartz-countertop-final.png", "8.4 MB",
+         "PNG image · filename evidence", ObjectGlyph::image},
+        {"fm.object.search-correspondence", "Client correspondence.rtf", "118 KB",
+         "Rich text · extracted invoice and quartz evidence",
+         ObjectGlyph::document},
+        {"fm.object.search-stone-schedule", "Stone schedule.csv", "66 KB",
+         "Delimited text · extracted quartz evidence", ObjectGlyph::code},
+        {"fm.object.search-quartz-order", "Quartz order.msg", "84 KB",
+         "Message metadata · stale relation", ObjectGlyph::document}};
     if (id == "local") return {
         folder("quentin", "quentin"), folder("volumes", "Volumes")};
     if (id == "volumes") return {
@@ -640,6 +958,8 @@ public:
         return history_[index_].id;
     }
 
+    void restore_projection() { apply(); }
+
 private:
     void snapshot_current() {
         NavigationLocation& location = history_[index_];
@@ -731,6 +1051,7 @@ public:
     [[nodiscard]] std::uint64_t completion_generation() const noexcept {
         return completion_generation_;
     }
+    void dismiss() { close(); }
 
 private:
     static std::string segment_id(std::string_view text) {
@@ -975,10 +1296,22 @@ private:
     void refresh_completions() {
         if (!editor_ || !completions_) return;
         const std::uint64_t generation = ++completion_generation_;
-        const auto matches = FixtureCatalogue::instance().complete_path(editor_->text());
-        // Results are applied only to the generation that produced them. The
-        // deterministic fixture provider resolves inline today; this guard is
-        // the same cancellation boundary an asynchronous provider uses.
+        auto matches = FixtureCatalogue::instance().complete_path(editor_->text());
+        static_cast<void>(pending_completion_.cancel());
+        pending_completion_ = editor_->begin_invoke(
+            [this, generation, matches = std::move(matches)]() mutable {
+                apply_completion_generation(generation, std::move(matches));
+            });
+    }
+
+    void apply_completion_generation(
+        std::uint64_t generation,
+        std::vector<FixturePathCompletion> matches) {
+        if (!editing_ || !editor_ || !completions_ || !resolution_) return;
+        // Only the latest posted provider result may reach the retained model.
+        // Replacing an in-flight request explicitly cancels its dispatcher
+        // operation, while the generation check also rejects work that had
+        // already begun before a newer request was issued.
         if (generation != completion_generation_) return;
         std::vector<std::string> values;
         std::vector<std::string> ids;
@@ -1088,6 +1421,8 @@ private:
     }
 
     void reset_popup() {
+        static_cast<void>(pending_completion_.cancel());
+        pending_completion_ = {};
         popup_controls_.clear();
         layer_.reset();
         content_.reset();
@@ -1117,9 +1452,733 @@ private:
     SubscriptionToken popup_dismissal_;
     SubscriptionToken popup_revocation_;
     std::vector<SubscriptionToken> popup_controls_;
+    DispatchOperation pending_completion_;
     std::uint64_t completion_generation_{};
     bool editing_{};
     bool closing_{};
+};
+
+class SearchController final : public Component {
+public:
+    SearchController(ProductRefs refs,
+                     std::shared_ptr<NavigationSession> navigation,
+                     std::shared_ptr<PathMatrixController> path_matrix,
+                     std::function<void(std::string)> status,
+                     std::function<void(SemanticFeedbackKind)> feedback)
+        : refs_(std::move(refs)), navigation_(std::move(navigation)),
+          path_matrix_(std::move(path_matrix)), status_(std::move(status)),
+          feedback_(std::move(feedback)) {
+        text_changed_ = refs_.search->text_changed().subscribe(
+            *this, [this](const std::string& query) {
+                if (!applying_) schedule_query(query);
+            });
+        committed_ = refs_.search->committed().subscribe(
+            *this, [this](const std::string& query) {
+                if (!query.empty()) show_search(query, true);
+            });
+        cancelled_ = refs_.search->cancelled().subscribe(
+            *this, [this] {
+                if (search_visible_) static_cast<void>(select_surface("folder"));
+            });
+        selected_ = refs_.search_results->selection_changed().subscribe(
+            *this, [this](const CorrespondenceSelectionChange& change) {
+                update_context_availability(change.current_id);
+            });
+        pinned_ = refs_.search_results->pin_changed().subscribe(
+            *this, [this](const CorrespondencePinChange& change) {
+                if (change.current_id.empty()) {
+                    status_("Search correspondence unpinned · hover and keyboard inspection remain independent");
+                } else {
+                    status_("Search correspondence pinned · " +
+                            title_for(change.current_id));
+                }
+                feedback_(SemanticFeedbackKind::pane_changed);
+            });
+        expanded_ = refs_.search_results->expansion_changed().subscribe(
+            *this, [this](const CorrespondenceExpansionChange& change) {
+                if (change.reason == CorrespondenceExpansionReason::hover_intent) {
+                    status_(change.expanded
+                        ? "Search evidence inspected · " + title_for(change.stable_id)
+                        : search_status());
+                }
+            });
+        activated_ = refs_.search_results->item_activated().subscribe(
+            *this, [this](const std::string& stable_id) {
+                activate(stable_id, true);
+            });
+        context_requested_ = refs_.search_results->context_requested().subscribe(
+            *this, [this](const ObjectContextRequest& request) {
+                context_id_ = request.stable_id;
+                update_context_availability(context_id_);
+                context_menu_->show(refs_.search_results,
+                                    request.screen_position);
+            });
+        build_context_menu();
+        update_context_availability(refs_.search_results->selected_id());
+    }
+
+    [[nodiscard]] bool select_surface(std::string_view surface) {
+        const std::string normalized = lower_ascii(surface);
+        if (normalized == "folder") {
+            pending_query_.disconnect();
+            ++query_generation_;
+            path_matrix_->dismiss();
+            search_visible_ = false;
+            refs_.search_surface->set_visible(false);
+            refs_.folder_surface->set_visible(true);
+            refs_.criteria_surface->set_visible(false);
+            refs_.objects->set_visible(true);
+            navigation_->restore_projection();
+            if (Window* window = refs_.shell->attached_window()) {
+                window->perform_layout();
+                static_cast<void>(window->request_focus(refs_.objects));
+            }
+            feedback_(SemanticFeedbackKind::pane_changed);
+            return true;
+        }
+        if (normalized != "search") return false;
+        const std::string query(refs_.search->text().empty()
+            ? FixtureCatalogue::instance().search_query()
+            : refs_.search->text());
+        show_search(query, true);
+        return true;
+    }
+
+    [[nodiscard]] bool search_visible() const noexcept { return search_visible_; }
+    [[nodiscard]] bool non_folder_surface_visible() const noexcept {
+        return search_visible_ || refs_.criteria_surface->visible();
+    }
+    void deactivate_for_other_surface() {
+        pending_query_.disconnect();
+        ++query_generation_;
+        search_visible_ = false;
+        refs_.search_surface->set_visible(false);
+    }
+    [[nodiscard]] std::uint64_t query_generation() const noexcept {
+        return query_generation_;
+    }
+
+private:
+    [[nodiscard]] const FixtureSearchResult* fixture_for(
+        std::string_view stable_id) const noexcept {
+        constexpr std::string_view prefix = "fm.result.";
+        const std::string_view fixture_id = stable_id.starts_with(prefix)
+            ? stable_id.substr(prefix.size()) : stable_id;
+        const auto fixtures = FixtureCatalogue::instance().search_results();
+        const auto found = std::find_if(fixtures.begin(), fixtures.end(),
+            [fixture_id](const FixtureSearchResult& fixture) {
+                return fixture.id == fixture_id;
+            });
+        return found == fixtures.end() ? nullptr : &*found;
+    }
+
+    [[nodiscard]] std::string title_for(std::string_view stable_id) const {
+        if (const FixtureSearchResult* fixture = fixture_for(stable_id)) {
+            return fixture->name;
+        }
+        return std::string(stable_id);
+    }
+
+    [[nodiscard]] std::string search_status() const {
+        return "5 of 7 results shown · 1 unavailable source";
+    }
+
+    void schedule_query(std::string query) {
+        pending_query_.disconnect();
+        const std::uint64_t generation = ++query_generation_;
+        if (query.empty()) {
+            static_cast<void>(select_surface("folder"));
+            return;
+        }
+        Window* window = refs_.search->attached_window();
+        if (!window) return;
+        pending_query_ = window->schedule_ui_timer(
+            *this, std::chrono::hours(24),
+            FrameClock::now() + std::chrono::milliseconds(160),
+            [this, generation, query = std::move(query)](FrameTime) {
+                pending_query_.disconnect();
+                if (generation != query_generation_) return;
+                show_search(query, false);
+            });
+        status_("Search pending · deterministic debounce generation " +
+                std::to_string(generation));
+    }
+
+    void show_search(const std::string& query, bool immediate) {
+        pending_query_.disconnect();
+        if (immediate) ++query_generation_;
+        path_matrix_->dismiss();
+        applying_ = true;
+        if (refs_.search->text() != query) refs_.search->set_text(query);
+        applying_ = false;
+        search_visible_ = true;
+        refs_.folder_surface->set_visible(false);
+        refs_.search_surface->set_visible(true);
+        refs_.title->set_text("File Manager  ·  Search");
+        refs_.status_summary->set_text(search_status());
+        refs_.status_authority->set_text(
+            "Local navigation ready · result generation 86");
+        if (Window* window = refs_.shell->attached_window()) {
+            window->perform_layout();
+            static_cast<void>(window->request_focus(refs_.search_results));
+        }
+        feedback_(SemanticFeedbackKind::pane_changed);
+    }
+
+    void activate(std::string_view stable_id, bool select_object) {
+        const FixtureSearchResult* fixture = fixture_for(stable_id);
+        if (!fixture) return;
+        if (!fixture->available) {
+            status_("Cannot open · " + fixture->name +
+                    " · source volume unavailable");
+            feedback_(SemanticFeedbackKind::operation_failed);
+            return;
+        }
+        const std::string destination = fixture->destination_id;
+        const std::string object_id = fixture->object_id;
+        static_cast<void>(select_surface("folder"));
+        navigation_->navigate(destination);
+        if (select_object && !object_id.empty()) {
+            const std::string stable_object = "fm.object." + object_id;
+            if (std::any_of(refs_.objects->items().begin(), refs_.objects->items().end(),
+                            [&stable_object](const ObjectViewItem& item) {
+                                return item.stable_id == stable_object;
+                            })) {
+                refs_.objects->set_selected_id(stable_object);
+            }
+        }
+        status_(select_object ? "Opened search result · " + fixture->name
+                              : "Opened containing location · " + fixture->location);
+        feedback_(SemanticFeedbackKind::location_changed);
+    }
+
+    void build_context_menu() {
+        open_ = std::make_shared<Command>("search.open", "Open");
+        open_->set_description(
+            "Open the selected result through deterministic fixture navigation");
+        containing_ = std::make_shared<Command>(
+            "search.open_containing", "Open containing location");
+        containing_->set_description(
+            "Return to Folder and navigate to the result location");
+        copy_path_ = std::make_shared<Command>("search.copy_path", "Copy path");
+        copy_path_->set_description(
+            "Copy a deterministic fixture path description");
+        properties_ = std::make_shared<Command>(
+            "search.properties", "Properties");
+        properties_->set_description(
+            "Keep the evidence row pinned for retained inspection");
+        command_tokens_.push_back(open_->invoked().subscribe(
+            *this, [this](const CommandInvocation&) { activate(context_id_, true); }));
+        command_tokens_.push_back(containing_->invoked().subscribe(
+            *this, [this](const CommandInvocation&) { activate(context_id_, false); }));
+        command_tokens_.push_back(copy_path_->invoked().subscribe(
+            *this, [this](const CommandInvocation&) {
+                if (const FixtureSearchResult* fixture = fixture_for(context_id_)) {
+                    status_("Fixture path copied · " + fixture->location +
+                            " / " + fixture->name);
+                }
+            }));
+        command_tokens_.push_back(properties_->invoked().subscribe(
+            *this, [this](const CommandInvocation&) {
+                if (!context_id_.empty()) {
+                    refs_.search_results->set_selected_id(context_id_);
+                    refs_.search_results->set_pinned_id(context_id_);
+                    status_("Search evidence pinned · " + title_for(context_id_));
+                }
+            }));
+        context_menu_ = std::make_shared<ContextMenu>("fm.search.context");
+        context_menu_->set_items({
+            {"open", MenuItemKind::command, open_},
+            {"open_containing", MenuItemKind::command, containing_},
+            {"separator", MenuItemKind::separator},
+            {"copy_path", MenuItemKind::command, copy_path_},
+            {"properties", MenuItemKind::command, properties_},
+        });
+    }
+
+    void update_context_availability(std::string_view stable_id) {
+        const FixtureSearchResult* fixture = fixture_for(stable_id);
+        const bool present = fixture != nullptr;
+        const bool available = present && fixture->available;
+        if (open_) {
+            open_->set_enabled(available);
+            open_->set_availability_reason(available ? std::string{}
+                : "The source volume is unavailable");
+        }
+        if (containing_) containing_->set_enabled(present);
+        if (copy_path_) copy_path_->set_enabled(present);
+        if (properties_) properties_->set_enabled(present);
+    }
+
+    ProductRefs refs_;
+    std::shared_ptr<NavigationSession> navigation_;
+    std::shared_ptr<PathMatrixController> path_matrix_;
+    std::function<void(std::string)> status_;
+    std::function<void(SemanticFeedbackKind)> feedback_;
+    std::shared_ptr<ContextMenu> context_menu_;
+    std::shared_ptr<Command> open_;
+    std::shared_ptr<Command> containing_;
+    std::shared_ptr<Command> copy_path_;
+    std::shared_ptr<Command> properties_;
+    std::vector<SubscriptionToken> command_tokens_;
+    SubscriptionToken text_changed_;
+    SubscriptionToken committed_;
+    SubscriptionToken cancelled_;
+    SubscriptionToken selected_;
+    SubscriptionToken pinned_;
+    SubscriptionToken expanded_;
+    SubscriptionToken activated_;
+    SubscriptionToken context_requested_;
+    FrameRequestToken pending_query_;
+    std::string context_id_;
+    std::uint64_t query_generation_{};
+    bool applying_{};
+    bool search_visible_{};
+};
+
+class CriteriaController final : public Component {
+public:
+    CriteriaController(ProductRefs refs,
+                       std::shared_ptr<NavigationSession> navigation,
+                       std::shared_ptr<PathMatrixController> path_matrix,
+                       std::shared_ptr<SearchController> search,
+                       std::function<void(std::string)> status,
+                       std::function<void(SemanticFeedbackKind)> feedback)
+        : refs_(std::move(refs)), navigation_(std::move(navigation)),
+          path_matrix_(std::move(path_matrix)), search_(std::move(search)),
+          status_(std::move(status)), feedback_(std::move(feedback)),
+          modules_(refs_.criteria_rack->modules()) {
+        const auto fixtures = FixtureCatalogue::instance().criteria_modules();
+        for (std::size_t index = 0; index < fixtures.size() &&
+                                    index < modules_.size(); ++index) {
+            expensive_[modules_[index].stable_id] = fixtures[index].expensive;
+        }
+        toggled_ = refs_.criteria_rack->module_toggled().subscribe(
+            *this, [this](const InstrumentModuleToggle& change) {
+                adopt_rack_model();
+                changed(change.module_id);
+            });
+        field_committed_ = refs_.criteria_rack->field_committed().subscribe(
+            *this, [this](const InstrumentFieldChange& change) {
+                adopt_rack_model();
+                const auto module = find_module(change.module_id);
+                if (module == modules_.end()) return;
+                const auto field = std::find_if(
+                    module->fields.begin(), module->fields.end(),
+                    [&change](const InstrumentFieldSpec& candidate) {
+                        return candidate.stable_id == change.field_id;
+                    });
+                if (field != module->fields.end() && field->required &&
+                    field->value.empty()) {
+                    module->state = InstrumentModuleState::invalid;
+                    module->status_text = field->name + " is required";
+                    static_cast<void>(refs_.criteria_rack->set_field_validation(
+                        module->stable_id, field->stable_id,
+                        module->status_text));
+                    static_cast<void>(refs_.criteria_rack->set_module_state(
+                        module->stable_id, module->state, module->status_text));
+                    update_actions();
+                    status_("Criterion rejected · " + module->status_text);
+                    feedback_(SemanticFeedbackKind::operation_failed);
+                    return;
+                }
+                if (field != module->fields.end()) {
+                    static_cast<void>(refs_.criteria_rack->set_field_validation(
+                        module->stable_id, field->stable_id, {}));
+                }
+                changed(change.module_id);
+            });
+        remove_ = refs_.criteria_rack->remove_requested().subscribe(
+            *this, [this](const InstrumentModuleRequest& request) {
+                remove_module(request.module_id);
+            });
+        moved_ = refs_.criteria_rack->move_requested().subscribe(
+            *this, [this](const InstrumentModuleMoveRequest& request) {
+                if (request.previous_index >= modules_.size() ||
+                    request.requested_index >= modules_.size()) return;
+                InstrumentModuleSpec moved =
+                    std::move(modules_[request.previous_index]);
+                modules_.erase(modules_.begin() +
+                               static_cast<std::ptrdiff_t>(request.previous_index));
+                modules_.insert(modules_.begin() +
+                                static_cast<std::ptrdiff_t>(request.requested_index),
+                                std::move(moved));
+                refs_.criteria_rack->set_modules(modules_);
+                status_("Criterion reordered · " + request.module_id);
+                feedback_(SemanticFeedbackKind::option_committed);
+            });
+        add_clicked_ = refs_.criteria_add->clicked().subscribe(
+            *this, [this](ButtonBase&) { show_add_menu(); });
+        apply_clicked_ = refs_.criteria_apply->clicked().subscribe(
+            *this, [this](ButtonBase&) { apply_staged(); });
+        selection_ = refs_.criteria_objects->selection_changed().subscribe(
+            *this, [this](const ObjectSelectionChange&) {
+                project_selection();
+            });
+        build_add_menu();
+        update_actions();
+    }
+
+    bool show() {
+        path_matrix_->dismiss();
+        search_->deactivate_for_other_surface();
+        refs_.search_surface->set_visible(false);
+        refs_.folder_surface->set_visible(true);
+        refs_.objects->set_visible(false);
+        refs_.criteria_surface->set_visible(true);
+        refs_.title->set_text("File Manager  ·  Criteria");
+        refs_.search->set_placeholder_text("Search this virtual folder");
+        update_actions();
+        update_status();
+        refs_.status_authority->set_text(
+            "Local navigation ready · index " + std::to_string(generation_) +
+            " current");
+        project_selection();
+        if (Window* window = refs_.shell->attached_window()) {
+            window->perform_layout();
+            Control::Ptr focus;
+            if (!modules_.empty() && !modules_.front().fields.empty()) {
+                focus = refs_.criteria_rack->field_editor(
+                    modules_.front().stable_id,
+                    modules_.front().fields.front().stable_id);
+            }
+            static_cast<void>(window->request_focus(
+                focus ? focus : std::static_pointer_cast<Control>(
+                    refs_.criteria_rack)));
+        }
+        feedback_(SemanticFeedbackKind::pane_changed);
+        return true;
+    }
+
+    [[nodiscard]] bool visible() const noexcept {
+        return refs_.criteria_surface->visible();
+    }
+
+private:
+    using ModuleIterator = std::vector<InstrumentModuleSpec>::iterator;
+
+    ModuleIterator find_module(std::string_view id) {
+        return std::find_if(modules_.begin(), modules_.end(),
+            [id](const InstrumentModuleSpec& module) {
+                return module.stable_id == id;
+            });
+    }
+
+    void adopt_rack_model() {
+        modules_ = refs_.criteria_rack->modules();
+    }
+
+    [[nodiscard]] bool is_expensive(std::string_view id) const {
+        const auto found = expensive_.find(std::string(id));
+        return found != expensive_.end() && found->second;
+    }
+
+    [[nodiscard]] std::size_t staged_count() const {
+        return static_cast<std::size_t>(std::count_if(
+            modules_.begin(), modules_.end(), [](const InstrumentModuleSpec& module) {
+                return module.state == InstrumentModuleState::staged;
+            }));
+    }
+
+    [[nodiscard]] std::size_t invalid_count() const {
+        return static_cast<std::size_t>(std::count_if(
+            modules_.begin(), modules_.end(), [](const InstrumentModuleSpec& module) {
+                return module.state == InstrumentModuleState::invalid;
+            }));
+    }
+
+    [[nodiscard]] std::size_t enabled_count() const {
+        return static_cast<std::size_t>(std::count_if(
+            modules_.begin(), modules_.end(), [](const InstrumentModuleSpec& module) {
+                return module.enabled;
+            }));
+    }
+
+    [[nodiscard]] std::size_t live_count() const {
+        return static_cast<std::size_t>(std::count_if(
+            modules_.begin(), modules_.end(), [](const InstrumentModuleSpec& module) {
+                return module.enabled &&
+                       module.state == InstrumentModuleState::live;
+            }));
+    }
+
+    void changed(std::string_view module_id) {
+        auto module = find_module(module_id);
+        if (module == modules_.end()) return;
+        if (is_expensive(module_id)) {
+            module->state = InstrumentModuleState::staged;
+            module->status_text = "Expensive · staged until Apply";
+            static_cast<void>(refs_.criteria_rack->set_module_state(
+                module->stable_id, module->state, module->status_text));
+            status_("Expensive criterion staged · Apply explicitly to evaluate");
+        } else {
+            module->state = InstrumentModuleState::live;
+            module->status_text = "Live · inexpensive";
+            static_cast<void>(refs_.criteria_rack->set_module_state(
+                module->stable_id, module->state, module->status_text));
+            update_live_projection();
+            status_("Live criterion committed · deterministic local projection updated");
+        }
+        update_actions();
+        feedback_(SemanticFeedbackKind::option_committed);
+    }
+
+    void update_live_projection() {
+        const std::size_t enabled_cheap = static_cast<std::size_t>(std::count_if(
+            modules_.begin(), modules_.end(), [this](const InstrumentModuleSpec& module) {
+                return module.enabled && !is_expensive(module.stable_id);
+            }));
+        const std::size_t limit = enabled_cheap >= 2U ? 31U
+                                : enabled_cheap == 1U ? 18U : 7U;
+        const std::string selected(refs_.criteria_objects->selected_id());
+        refs_.criteria_objects->set_items(criteria_object_items(limit));
+        const bool survives = std::any_of(
+            refs_.criteria_objects->items().begin(),
+            refs_.criteria_objects->items().end(),
+            [&selected](const ObjectViewItem& item) {
+                return item.stable_id == selected;
+            });
+        if (survives) refs_.criteria_objects->set_selected_id(selected);
+        else if (!refs_.criteria_objects->items().empty()) {
+            refs_.criteria_objects->set_selected_id(
+                refs_.criteria_objects->items().front().stable_id);
+        }
+        ++generation_;
+        update_status();
+        refs_.status_authority->set_text(
+            "Local navigation ready · index " + std::to_string(generation_) +
+            " current");
+    }
+
+    void update_status() {
+        const std::size_t staged = staged_count();
+        const std::size_t shown = refs_.criteria_objects->items().size();
+        refs_.criteria_results_summary->set_text(
+            std::to_string(shown) +
+            " OBJECTS   ·   FROM PROJECTS AND DESCENDANTS   ·   ONE INSPECTABLE VIRTUAL FOLDER");
+        refs_.status_summary->set_text(
+            std::to_string(shown) + " objects · " +
+            std::to_string(live_count()) + " live criteria" +
+            (staged == 0U ? std::string{}
+                          : " · " + std::to_string(staged) +
+                            (staged == 1U ? " expensive criterion staged"
+                                          : " expensive criteria staged")));
+    }
+
+    void update_actions() {
+        const std::size_t staged = staged_count();
+        const std::size_t invalid = invalid_count();
+        refs_.criteria_title->set_text(
+            "PROJECTS   ·   VIRTUAL FOLDER   ·   " +
+            std::to_string(live_count()) + " LIVE MODULES   ·   " +
+            (pending_ ? std::string("APPLYING")
+                      : std::to_string(staged) + " STAGED"));
+        refs_.criteria_apply->set_enabled(!pending_ && staged > 0U && invalid == 0U);
+        refs_.criteria_apply->set_text(staged == 0U ? "Applied"
+            : "Apply " + std::to_string(staged));
+        if (pending_) {
+            refs_.criteria_action_state->set_text("Applying staged criteria");
+        } else if (invalid > 0U) {
+            refs_.criteria_action_state->set_text(
+                std::to_string(invalid) + " invalid criterion");
+        } else if (staged > 0U) {
+            refs_.criteria_action_state->set_text(
+                std::to_string(staged) + " expensive change staged");
+        } else {
+            refs_.criteria_action_state->set_text("All criteria live");
+        }
+    }
+
+    void remove_module(std::string_view module_id) {
+        const auto module = find_module(module_id);
+        if (module == modules_.end()) return;
+        const std::string name = module->name;
+        expensive_.erase(module->stable_id);
+        modules_.erase(module);
+        refs_.criteria_rack->set_modules(modules_);
+        update_live_projection();
+        update_actions();
+        status_("Criterion removed · " + name +
+                " · focus transferred within the predicate rack");
+        feedback_(SemanticFeedbackKind::option_committed);
+    }
+
+    void build_add_menu() {
+        add_menu_ = std::make_shared<ContextMenu>("fm.criteria.add.menu");
+        std::vector<MenuItemSpec> items;
+        const auto fixtures = FixtureCatalogue::instance().criterion_templates();
+        for (std::size_t index = 0; index < fixtures.size(); ++index) {
+            auto command = std::make_shared<Command>(
+                "criteria.add." + fixtures[index].id, fixtures[index].name);
+            command->set_description(fixtures[index].expensive
+                ? "Add an explicitly staged expensive criterion"
+                : "Add an inexpensive live criterion");
+            add_tokens_.push_back(command->invoked().subscribe(
+                *this, [this, index](const CommandInvocation&) {
+                    add_template(index);
+                }));
+            items.push_back({"add." + fixtures[index].id,
+                             MenuItemKind::command, command});
+            add_commands_.push_back(std::move(command));
+        }
+        add_menu_->set_items(std::move(items));
+    }
+
+    void show_add_menu() {
+        const Rect bounds = refs_.criteria_add->absolute_bounds();
+        add_menu_->show(refs_.criteria_add,
+                        {bounds.x, bounds.y + bounds.height});
+    }
+
+    void project_selection() {
+        if (!visible()) return;
+        const std::string selected(refs_.criteria_objects->selected_id());
+        constexpr std::string_view prefix = "fm.object.";
+        const std::string_view fixture_id = selected.starts_with(prefix)
+            ? std::string_view(selected).substr(prefix.size())
+            : std::string_view(selected);
+        const auto fixtures = FixtureCatalogue::instance().criteria_objects();
+        const auto fixture = std::find_if(
+            fixtures.begin(), fixtures.end(), [fixture_id](const FixtureObject& item) {
+                return item.id == fixture_id;
+            });
+        if (fixture == fixtures.end()) {
+            refs_.selection_name->set_text("No selection");
+            return;
+        }
+        refs_.selection_name->set_text(fixture->name);
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.kind", fixture->kind));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.location", "Projects virtual folder"));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.size", fixture->size));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.dimensions", "fixture dimensions"));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.profile", "criteria generation " +
+            std::to_string(generation_)));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.created", "August 2026"));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.name", fixture->name));
+        static_cast<void>(refs_.properties->set_value(
+            "fm.property.handler", "Preview"));
+    }
+
+    void add_template(std::size_t index) {
+        const auto fixtures = FixtureCatalogue::instance().criterion_templates();
+        if (index >= fixtures.size()) return;
+        const FixtureCriterionModule& fixture = fixtures[index];
+        const std::string id = "fm.criteria.module.session-" +
+                               std::to_string(session_id_++);
+        InstrumentModuleSpec module = criterion_module(fixture, id);
+        module.state = fixture.expensive ? InstrumentModuleState::staged
+                                         : InstrumentModuleState::live;
+        module.status_text = fixture.expensive
+            ? "Expensive · staged until Apply" : "Live · inexpensive";
+        expensive_[id] = fixture.expensive;
+        modules_.push_back(std::move(module));
+        refs_.criteria_rack->set_modules(modules_);
+        if (!fixture.expensive) update_live_projection();
+        update_actions();
+        status_(fixture.expensive
+            ? "Criterion added · expensive evaluation staged"
+            : "Criterion added · live projection updated");
+        feedback_(SemanticFeedbackKind::option_committed);
+    }
+
+    void apply_staged() {
+        if (pending_ || staged_count() == 0U || invalid_count() != 0U) return;
+        pending_ = true;
+        for (InstrumentModuleSpec& module : modules_) {
+            if (module.state != InstrumentModuleState::staged) continue;
+            module.state = InstrumentModuleState::pending;
+            module.status_text = "Evaluating · deterministic fixture";
+            static_cast<void>(refs_.criteria_rack->set_module_state(
+                module.stable_id, module.state, module.status_text));
+        }
+        refs_.criteria_progress->set_value(0.0);
+        refs_.criteria_progress->set_animation_enabled(true);
+        update_actions();
+        refs_.status_summary->set_text(
+            "Applying staged criteria · selection remains stable");
+        status_("Criteria evaluation started · deterministic local fixture");
+        feedback_(SemanticFeedbackKind::operation_started);
+        Window* window = refs_.criteria_apply->attached_window();
+        if (!window) return;
+        pending_apply_ = window->schedule_ui_timer(
+            *this, std::chrono::milliseconds(90),
+            FrameClock::now() + std::chrono::milliseconds(90),
+            [this](FrameTime) {
+                progress_ = std::min(100, progress_ + 25);
+                refs_.criteria_progress->set_value(
+                    static_cast<double>(progress_));
+                if (progress_ >= 100) finish_apply();
+            });
+    }
+
+    void finish_apply() {
+        pending_apply_.disconnect();
+        pending_ = false;
+        progress_ = 0;
+        for (InstrumentModuleSpec& module : modules_) {
+            if (module.state != InstrumentModuleState::pending) continue;
+            module.state = InstrumentModuleState::live;
+            module.status_text = "Applied · indexed fixture";
+            static_cast<void>(refs_.criteria_rack->set_module_state(
+                module.stable_id, module.state, module.status_text));
+        }
+        const std::string selected(refs_.criteria_objects->selected_id());
+        refs_.criteria_objects->set_items(criteria_object_items(5U));
+        if (std::any_of(refs_.criteria_objects->items().begin(),
+                        refs_.criteria_objects->items().end(),
+                        [&selected](const ObjectViewItem& item) {
+                            return item.stable_id == selected;
+                        })) {
+            refs_.criteria_objects->set_selected_id(selected);
+        } else if (!refs_.criteria_objects->items().empty()) {
+            refs_.criteria_objects->set_selected_id(
+                refs_.criteria_objects->items().front().stable_id);
+        }
+        ++generation_;
+        refs_.criteria_progress->set_animation_enabled(false);
+        update_actions();
+        update_status();
+        refs_.status_summary->set_text(
+            "5 objects · " + std::to_string(enabled_count()) +
+            " criteria applied");
+        status_("Criteria evaluation complete · deterministic generation " +
+                std::to_string(generation_));
+        refs_.status_authority->set_text(
+            "Local navigation ready · index " + std::to_string(generation_) +
+            " current");
+        feedback_(SemanticFeedbackKind::operation_completed);
+    }
+
+    ProductRefs refs_;
+    std::shared_ptr<NavigationSession> navigation_;
+    std::shared_ptr<PathMatrixController> path_matrix_;
+    std::shared_ptr<SearchController> search_;
+    std::function<void(std::string)> status_;
+    std::function<void(SemanticFeedbackKind)> feedback_;
+    std::vector<InstrumentModuleSpec> modules_;
+    std::unordered_map<std::string, bool> expensive_;
+    std::shared_ptr<ContextMenu> add_menu_;
+    std::vector<std::shared_ptr<Command>> add_commands_;
+    std::vector<SubscriptionToken> add_tokens_;
+    SubscriptionToken toggled_;
+    SubscriptionToken field_committed_;
+    SubscriptionToken remove_;
+    SubscriptionToken moved_;
+    SubscriptionToken add_clicked_;
+    SubscriptionToken apply_clicked_;
+    SubscriptionToken selection_;
+    FrameRequestToken pending_apply_;
+    std::uint64_t session_id_{1U};
+    std::uint64_t generation_{86U};
+    int progress_{};
+    bool pending_{};
 };
 
 std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
@@ -1672,10 +2731,16 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
                     });
                 if (session_item == field->items().end()) return;
                 if (const auto label = name.lock()) label->set_text(session_item->name);
-                set_properties("Folder", "~/Work/Projects", "Session fixture",
-                    "—", "—", "August 2026", session_item->name, "Preview");
+                const std::string kind = session_item->glyph == ObjectGlyph::folder
+                    ? "Folder" : session_item->glyph == ObjectGlyph::image
+                    ? "Image" : session_item->glyph == ObjectGlyph::audio
+                    ? "Audio" : session_item->glyph == ObjectGlyph::code
+                    ? "Structured text" : "Document";
+                set_properties(kind, "Fixture navigation result",
+                    session_item->secondary_text, "—", "fixture metadata",
+                    "August 2026", session_item->name, "Preview");
                 if (const auto summary = status.lock()) {
-                    summary->set_text("1 selected · session fixture · " +
+                    summary->set_text("1 selected · " + session_item->secondary_text + " · " +
                                       std::to_string(field->items().size()) +
                                       " objects");
                 }
@@ -1827,7 +2892,14 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
     lifetime->navigation = navigation;
     lifetime->path_matrix = std::make_shared<PathMatrixController>(
         refs, navigation, status_message);
+    lifetime->search_controller = std::make_shared<SearchController>(
+        refs, navigation, lifetime->path_matrix, status_message, emit_feedback);
+    lifetime->criteria_controller = std::make_shared<CriteriaController>(
+        refs, navigation, lifetime->path_matrix, lifetime->search_controller,
+        status_message, emit_feedback);
     const std::weak_ptr<NavigationSession> weak_navigation = navigation;
+    const std::weak_ptr<SearchController> weak_search =
+        lifetime->search_controller;
     lifetime->subscriptions.push_back(nav_back->invoked().subscribe(
         [weak_navigation](const CommandInvocation&) {
             if (const auto session = weak_navigation.lock()) session->back();
@@ -1841,7 +2913,12 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
             if (const auto session = weak_navigation.lock()) session->up();
         }));
     lifetime->subscriptions.push_back(refs.tree->selection_changed().subscribe(
-        [weak_navigation](const TreeSelectionChange& change) {
+        [weak_navigation, weak_search](const TreeSelectionChange& change) {
+            if (const auto search = weak_search.lock()) {
+                if (search->non_folder_surface_visible()) {
+                    static_cast<void>(search->select_surface("folder"));
+                }
+            }
             if (const auto session = weak_navigation.lock()) {
                 constexpr std::string_view prefix = "fm.tree.node.";
                 session->navigate(change.current_id.starts_with(prefix)
@@ -1952,7 +3029,40 @@ bool apply_capture_state(gui_forms::Window& product, std::string_view state) {
                    "fm.path.matrix.current.tail",
                    gui_forms::SemanticAction::press);
     }
+    if (state == "search-pinned") {
+        return set_product_surface(product, "search");
+    }
+    if (state == "search-offline-expanded") {
+        return set_product_surface(product, "search") &&
+               product.perform_semantic_action(
+                   "fm.result.result-pages-offline",
+                   gui_forms::SemanticAction::expand);
+    }
+    if (state == "criteria-default") {
+        return set_product_surface(product, "criteria");
+    }
+    if (state == "criteria-staged-progress") {
+        return set_product_surface(product, "criteria") &&
+               product.perform_semantic_action(
+                   "fm.criteria.apply", gui_forms::SemanticAction::press);
+    }
     return false;
+}
+
+bool set_product_surface(gui_forms::Window& product,
+                         std::string_view surface) {
+    const gui_forms::Control::Ptr root = product.root();
+    if (!root) return false;
+    const auto lifetime = std::any_cast<std::shared_ptr<ProductLifetime>>(
+        &root->tag());
+    if (lifetime == nullptr || *lifetime == nullptr) return false;
+    const std::string normalized = lower_ascii(surface);
+    if (normalized == "criteria") {
+        return (*lifetime)->criteria_controller != nullptr &&
+               (*lifetime)->criteria_controller->show();
+    }
+    return (*lifetime)->search_controller != nullptr &&
+           (*lifetime)->search_controller->select_surface(normalized);
 }
 
 } // namespace file_manager_demoboard

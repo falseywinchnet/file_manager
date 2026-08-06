@@ -16,6 +16,9 @@ and existing implementation do not silently create decisions.
 | [`ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md`](ADR-009-ORCHESTRATOR-LOCAL-WIRE-DISCOVERY-AND-SESSION-AUTH.md) | accepted for implementation | Bounded framed local wire, private discovery endpoint, credential hello, Unix first projection, and remaining platform/concurrency promotion gates |
 | [`ADR-010-ORCHESTRATOR-CORE-1-0-COMPATIBILITY-HORIZON.md`](ADR-010-ORCHESTRATOR-CORE-1-0-COMPATIBILITY-HORIZON.md) | accepted for implementation | macOS first-platform release, Core contract/wire 1.0 line, Core 1.x additive compatibility law, and retained 0.1 rejection corpus |
 | [`ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md`](ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md) | accepted for implementation | stable per-user macOS discovery, launchd socket adoption, restart credential rotation, and bounded client activation retry |
+| [`ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md`](ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md) | accepted | Malkuth suite identity, Curious/Concise/Friendly mission, independent-component release manifests, and 1.0/2.0/3.0 horizons |
+| [`ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md`](ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md) | accepted | Future Games/Lexicon/plugin/built-in scope, desktop boundary, and the rule that persistent side panels belong only to File Manager and its embedded picker/browser |
+| [`ADR-014-GUI-FORMS-INITIALIZATION-AND-HANDLE-LIFECYCLE.md`](ADR-014-GUI-FORMS-INITIALIZATION-AND-HANDLE-LIFECYCLE.md) | accepted for implementation | Portable GUI.Forms host, managed presentation, retained attachment, native identity, and compatibility-handle lifecycle order |
 
 Each record retains its alternatives, consequences, reversal path, and
 unresolved implementation edges. Engine workers consume ADR-001 through

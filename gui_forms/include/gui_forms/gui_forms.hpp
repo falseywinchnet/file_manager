@@ -20,6 +20,7 @@
 #include "gui_forms/host.hpp"
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/inspection_controls.hpp"
+#include "gui_forms/instrument_controls.hpp"
 #include "gui_forms/menu_controls.hpp"
 #include "gui_forms/popup_controls.hpp"
 #include "gui_forms/range_controls.hpp"

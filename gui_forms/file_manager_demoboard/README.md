@@ -1,7 +1,7 @@
 # Native File Manager Demoboard
 
-Status: **GIVEN first-party interface-consumer project; specification only;
-implementation not yet authorized by this document**.
+Status: **GIVEN first-party interface-consumer project; implementation active;
+D0–D6 measured partial**.
 
 The Native File Manager Demoboard is a deterministic GUI.Forms application
 that reproduces the latest File Manager prototype as a fully interactive native
@@ -112,6 +112,25 @@ cmake --build gui_forms/build --target gui_forms_file_manager_demoboard
 ctest --test-dir gui_forms/build -R file_manager_demoboard --output-on-failure
 gui_forms/build/.../gui_forms_file_manager_demoboard
 ```
+
+For deterministic native review, the executable also accepts:
+
+```text
+--product-only
+--capture-state=folder
+--capture-state=path-matrix-browse
+--capture-state=path-matrix-editing
+--capture-state=search-pinned
+--capture-state=search-offline-expanded
+--capture-state=criteria-default
+--capture-state=criteria-staged-progress
+```
+
+`--product-only` omits the separate controller window so native accessibility
+and Computer Use inspect the product at full resolution instead of returning a
+gathered multi-window overview. Capture states enter through the same public
+semantic actions as assistive technology; they do not mutate private product
+state.
 
 The exact target spelling may follow parent conventions. The application must
 also be consumable against an installed GUI.Forms package so build-tree private

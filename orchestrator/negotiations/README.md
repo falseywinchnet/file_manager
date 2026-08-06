@@ -25,9 +25,13 @@ are appended with provenance.
 | Project | Note | Round | State |
 |---|---|---:|---|
 | Engine | [`../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../engine/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001-006 | semantic v0 reconciled; required catalogue-independent fallback round 006 awaiting Engine reply |
-| GUI.Forms | [`../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | awaiting GUI.Forms reply |
+| GUI.Forms | [`../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001–002 | consumption-manifest reply and application-backbone modal/help/transfer reply pending |
 | Kolmogrov | [`../../kolmogrov/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../kolmogrov/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 001 | awaiting Kolmogrov reply |
-| File Manager | [`../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 003 | accepted bootstrap semantics now have an atomic snapshot and complete C++ projection; installed launchd evidence pending |
+| File Manager | [`../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | 003–006 | bootstrap semantics implemented; picker and future provider/plugin/context-command rounds remain paper-only while frontend is closed |
+| Paint | [`../../paint/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../paint/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | intake 001 | waits for Paint architect interview; no runtime contract admitted |
+| Text Editor | [`../../text_editor/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../text_editor/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | intake 001 | waits for Text Editor architect interview; no runtime contract admitted |
+| Games | [`../../games/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../games/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | intake 001 | waits for Games architect interview; existing app/settings/help families only |
+| Lexicon | [`../../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../lexicon/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | intake 001 | proposed lexical-provider family; source/data/runtime gates open only on paper |
 | Plugin Runtime research | [`../../plugin_runtime/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`](../../plugin_runtime/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md) | import 001 | frozen input; factual corrections only |
 
 ## Ownership

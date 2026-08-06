@@ -786,6 +786,41 @@ internal static unsafe class NativeDrawingBridge
             recorder, target.__BitmapHandle,
             graphics.__executedCommands);
         if (graphics.__nativeSurface != 0) PresentNativeSurface(graphics);
+        CompactExecutedRecorder(graphics);
+    }
+
+    // Graphics.FromHwnd is commonly retained for the lifetime of a custom
+    // control.  Executed commands are already committed to its bitmap, so
+    // retaining them forever only consumes memory and eventually reaches the
+    // native recorder's hard command ceiling.  Rebase at a frame boundary and
+    // seed a fresh recorder with the managed drawing state required by future
+    // commands.  An open Save/Restore scope is deliberately left intact.
+    private const ulong ExecutedRecorderCompactionThreshold = 4096;
+    private static void CompactExecutedRecorder(global::System.Drawing.Graphics graphics)
+    {
+        if (graphics.__savedStateDepth != 0 ||
+            graphics.__executedCommands < ExecutedRecorderCompactionThreshold)
+            return;
+        var replacement = RecorderCreate();
+        var previous = graphics.__recorder;
+        graphics.__recorder = replacement;
+        try
+        {
+            RecorderSetTransform(replacement, graphics.__transform);
+            if (graphics.__nativeOriginX != 0f || graphics.__nativeOriginY != 0f)
+                RecorderTranslate(replacement, graphics.__nativeOriginX,
+                    graphics.__nativeOriginY);
+            if (graphics.__hasClip) RecorderSetClip(replacement, graphics.__clip);
+            RecorderQuality(graphics);
+            graphics.__executedCommands = RecorderCommandCount(replacement);
+        }
+        catch
+        {
+            Release(ref replacement);
+            graphics.__recorder = previous;
+            throw;
+        }
+        Release(ref previous);
     }
 
     private static void RefreshNativeSurfaceTarget(global::System.Drawing.Graphics graphics,
@@ -937,7 +972,12 @@ internal static unsafe class NativeDrawingBridge
         graphics.__target.__AttachGraphics(graphics);
         graphics.__EnsureRecorder();
         if (bounds.X != 0 || bounds.Y != 0)
-            RecorderTranslate(graphics.__recorder, (float)-bounds.X, (float)-bounds.Y);
+        {
+            graphics.__nativeOriginX = (float)-bounds.X;
+            graphics.__nativeOriginY = (float)-bounds.Y;
+            RecorderTranslate(graphics.__recorder, graphics.__nativeOriginX,
+                graphics.__nativeOriginY);
+        }
         return graphics;
     }
     internal static void PresentNativeSurface(global::System.Drawing.Graphics graphics)

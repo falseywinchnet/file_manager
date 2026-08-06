@@ -47,11 +47,23 @@ Before planning or implementation, read:
   explicitly directs implementation to begin.
 - `engine/`, `gui_forms/`, and `kolmogrov/` remain independently buildable and
   own their private implementations.
+- `malkuth/` is the planning-only suite release, installer, documentation, and
+  website program. It does not absorb component versions or open publishing
+  implementation before its release gates.
+- `paint/` and `text_editor/` are interview-first planning subprojects. Their
+  planning gates are open; source/build implementation remains closed until
+  their local dependency gates and explicit architect start directions pass.
+- `games/` and `lexicon/` are planning-only future projects. Research/interview
+  work is open; source/build/provider implementation remains closed until their
+  local gates and explicit architect start directions pass.
 - `plugin_runtime/` is frozen legacy research input. New runtime implementation
   belongs to Orchestrator's plugin-supervisor subsystem after its gate opens.
 - Kolmogrov similarity is a gated core engine candidate channel. It is distinct
   from AI interpretation and personal semantic memory, which belong in
   Orchestrator-managed hives beyond the engine's critical boundary.
+- Persistent left/right panels are reserved to File Manager and its embedded
+  picker/browser projection. Other first-party applications use owned popup
+  dialogs for secondary tools.
 
 ## Epistemic labels
 

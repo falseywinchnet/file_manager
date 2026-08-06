@@ -21,3 +21,10 @@ A proposal must state:
 Proposal acceptance is not automatic. The project replies in its local ledger;
 Orchestrator records the reconciliation. Only the integrated result under
 `../spec/` is canonical and receives a contract ID/status update.
+
+Current proposal families include:
+
+- [`application_backbone/`](application_backbone/) for first-party application,
+  Document Picker, help, administration projection and transfer semantics;
+- [`first_party_extensions/`](first_party_extensions/) for host-mediated file
+  capabilities, Archive Viewer and Image Converter plugin proofs.

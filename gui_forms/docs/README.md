@@ -1,5 +1,9 @@
 # GUI.Forms documentation
 
+- [`LIFECYCLE_CONTRACT.md`](LIFECYCLE_CONTRACT.md) — authoritative portable
+  initialization, presentation, close, shutdown, retained attachment, and
+  compatibility-handle ordering under ADR-014.
+
 GUI.Forms is a portable retained GUI library under active construction. These
 documents describe the intended consumer boundary without promoting incomplete
 spike APIs to a frozen compatibility promise.

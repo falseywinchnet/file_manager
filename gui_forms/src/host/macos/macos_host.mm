@@ -803,6 +803,7 @@ private:
     std::unique_ptr<HostServices> _hostServices;
     gui_forms::SubscriptionToken _closeRequestSubscription;
     std::uint64_t _nextHostSequence;
+    BOOL _hostAttached;
     SkiaRaster _raster;
     DamageRegion _pendingDamage;
     NSMutableAttributedString* _markedText;
@@ -818,6 +819,7 @@ private:
         _semanticAccessibilityElements;
 }
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model;
+- (BOOL)initializeHost;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
 - (HostDispatchResult)dispatchHostPayload:(HostEventPayload)payload
                          timestampNanoseconds:(std::uint64_t)timestamp;
@@ -1086,6 +1088,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         _hostSession = std::make_unique<HostSession>(
             *_model, gui_forms::host::macos_capabilities(), _hostServices.get());
         _nextHostSequence = 1;
+        _hostAttached = NO;
         _lastSemanticGeneration = 0;
         _accessibilityCacheGeneration = 0;
         _semanticAccessibilityChildren = nil;
@@ -1143,18 +1146,28 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                 ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts + CJK/emoji fallback"
                 : "Skia CPU m152 · incomplete bundled font pack",
             true);
-        static_cast<void>([self dispatchHostPayload:
-            HostAttachEvent{GFSize{980.0, 680.0}, 1.0}
-                               timestampNanoseconds:host_now_nanoseconds()]);
         [[NSNotificationCenter defaultCenter]
             addObserver:self
                selector:@selector(screenParametersChanged:)
                    name:NSApplicationDidChangeScreenParametersNotification
                  object:nil];
-        [self notifyDisplaysChanged];
-        [self collectDamage];
     }
     return self;
+}
+
+- (BOOL)initializeHost {
+    if (_hostAttached == YES) return YES;
+    const NSRect bounds = self.bounds;
+    const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
+    const HostDispatchResult result = [self dispatchHostPayload:
+        HostAttachEvent{GFSize{std::max(1.0, bounds.size.width),
+                               std::max(1.0, bounds.size.height)}, scale}
+                               timestampNanoseconds:host_now_nanoseconds()];
+    if (!result.accepted()) return NO;
+    _hostAttached = YES;
+    [self notifyDisplaysChanged];
+    [self collectDamage];
+    return YES;
 }
 
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler {
@@ -1179,6 +1192,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (BOOL)requestClose {
+    if (_hostAttached == NO) return NO;
     const HostDispatchResult result = [self dispatchHostPayload:
         HostCloseRequest{HostCloseReason::user, false}
                                            timestampNanoseconds:host_now_nanoseconds()];
@@ -1186,17 +1200,20 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)notifyClosed {
+    if (_hostAttached == NO) return;
     static_cast<void>([self dispatchHostPayload:HostClosedEvent{HostCloseReason::user}
                                timestampNanoseconds:host_now_nanoseconds()]);
 }
 
 - (void)notifyActivation:(BOOL)active {
+    if (_hostAttached == NO) return;
     static_cast<void>([self dispatchHostPayload:HostActivationEvent{active == YES}
                                timestampNanoseconds:host_now_nanoseconds()]);
     [self collectDamage];
 }
 
 - (void)notifyOcclusion:(BOOL)occluded {
+    if (_hostAttached == NO) return;
     static_cast<void>([self dispatchHostPayload:HostOcclusionEvent{occluded == YES}
                                timestampNanoseconds:host_now_nanoseconds()]);
     if (occluded == YES) {
@@ -1207,6 +1224,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)notifyScaleChanged {
+    if (_hostAttached == NO) return;
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     static_cast<void>([self dispatchHostPayload:HostScaleEvent{scale}
                                timestampNanoseconds:host_now_nanoseconds()]);
@@ -1214,7 +1232,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)notifyDisplaysChanged {
-    if (_hostServices == nullptr) {
+    if (_hostAttached == NO || _hostServices == nullptr) {
         return;
     }
     HostMonitorResult monitors = _hostServices->query_monitors();
@@ -1979,8 +1997,12 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                                             options.minimum_size.height)];
         [nativeWindow setContentView:view];
         [nativeWindow center];
-        [nativeWindow makeKeyAndOrderFront:nil];
-        [application activateIgnoringOtherApps:YES];
+        if ([view initializeHost] == NO) {
+            [view prepareForShutdown];
+            [nativeWindow setDelegate:nil];
+            [nativeWindow setContentView:nil];
+            return 5;
+        }
         if (options.host_ready) {
             const std::function<void()> dispatchPending = options.dispatch_pending;
             options.host_ready(
@@ -2011,6 +2033,13 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                     return [view writeHostClipboard:text];
                 });
         }
+        // Match every host: one FIFO initialization turn runs after portable
+        // attach/service publication and before first visible presentation.
+        [view drainPostedWork];
+        if (options.dispatch_pending) options.dispatch_pending();
+        [view collectDamage];
+        [nativeWindow makeKeyAndOrderFront:nil];
+        [application activateIgnoringOtherApps:YES];
         if (options.close_after_launch_for_testing) {
             const std::uint32_t closeAttempts =
                 std::max<std::uint32_t>(1, options.close_attempts_for_testing);
@@ -2142,6 +2171,16 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             MacApplicationWindow& entry = windows[index];
             NSWindow* nativeWindow = nativeWindows[index];
             GUIFormsView* view = views[index];
+            if ([view initializeHost] == NO) {
+                for (GUIFormsView* initializedView in views) {
+                    [initializedView prepareForShutdown];
+                }
+                for (NSWindow* createdWindow in nativeWindows) {
+                    [createdWindow setDelegate:nil];
+                    [createdWindow setContentView:nil];
+                }
+                return 5;
+            }
             if (entry.options.host_ready) {
                 const std::function<void()> dispatchPending =
                     entry.options.dispatch_pending;
@@ -2169,6 +2208,9 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                         return [view writeHostClipboard:text];
                     });
             }
+            [view drainPostedWork];
+            if (entry.options.dispatch_pending) entry.options.dispatch_pending();
+            [view collectDamage];
             if (entry.owner_id.empty() && !entry.tool_window) {
                 [nativeWindow makeKeyAndOrderFront:nil];
             } else {

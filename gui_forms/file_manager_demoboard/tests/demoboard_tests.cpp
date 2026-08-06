@@ -3,6 +3,7 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -164,6 +165,7 @@ int main() {
 
     std::dynamic_pointer_cast<gui_forms::Button>(
         product->find("fm.path.matrix.current.tail"))->on_activate();
+    static_cast<void>(product->drain_posted_work());
     product->perform_layout();
     auto path_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
         product->find("fm.path.matrix.editor"));
@@ -176,6 +178,11 @@ int main() {
                 product->focused_control() == path_editor,
             "open tail must become the real public TextBox in place with caret at end");
     path_editor->set_text("$PROJECTS/N");
+    const auto completion_dispatch = product->dispatcher_snapshot();
+    require(completion_dispatch.pending == 1U &&
+                completion_dispatch.cancelled >= 1U,
+            "a newer path query must cancel the prior deferred completion generation");
+    static_cast<void>(product->drain_posted_work());
     require(completions->items().size() == 1U &&
                 completions->items().front() ==
                     "/Users/quentin/Work/Projects/North Shore/" &&
@@ -209,6 +216,7 @@ int main() {
     terminal->on_activate();
     std::dynamic_pointer_cast<gui_forms::Button>(
         product->find("fm.path.matrix.current.tail"))->on_activate();
+    static_cast<void>(product->drain_posted_work());
     path_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
         product->find("fm.path.matrix.editor"));
     path_editor->set_text("$UNKNOWN/Projects");
@@ -250,6 +258,310 @@ int main() {
                 !file_manager_demoboard::apply_capture_state(
                     *capture_product, "not-a-capture-state"),
             "capture-state entrypoint must route through public semantic actions");
+
+    auto search_capture_product = file_manager_demoboard::make_product_window();
+    require(file_manager_demoboard::apply_capture_state(
+                *search_capture_product, "search-pinned") &&
+                search_capture_product->find("fm.search.surface")->visible() &&
+                !search_capture_product->find(
+                    "fm.workspace.content_selection")->visible(),
+            "Search capture state must use the same retained surface transition");
+
+    auto search_product = file_manager_demoboard::make_product_window();
+    require(file_manager_demoboard::set_product_surface(*search_product, "search"),
+            "public surface transition must admit Search");
+    search_product->perform_layout();
+    const auto search_results =
+        std::dynamic_pointer_cast<gui_forms::CorrespondenceView>(
+            search_product->find("fm.search.results"));
+    const auto search_surface = search_product->find("fm.search.surface");
+    const auto folder_surface = search_product->find(
+        "fm.workspace.content_selection");
+    require(search_results && search_surface && folder_surface &&
+                search_surface->visible() && !folder_surface->visible() &&
+                search_results->items().size() == 7U &&
+                search_results->children().empty() &&
+                search_results->compact_height() == 45.0 &&
+                search_results->expanded_height() == 126.0 &&
+                search_results->selected_id() ==
+                    "fm.result.result-invoice-text" &&
+                search_results->pinned_id() ==
+                    "fm.result.result-invoice-text" &&
+                search_results->expanded("fm.result.result-invoice-text"),
+            "Search must expose seven virtual correspondences with one exact default pin");
+    const auto search_semantics = search_product->semantic_snapshot();
+    require(semantic_contains(search_semantics.roots, "fm.tree.view") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text.activate") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text.percentage") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text.metadata") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text.excerpt") &&
+                semantic_contains(search_semantics.roots,
+                                  "fm.result.result-invoice-text.plugins") &&
+                !semantic_contains(search_semantics.roots, "fm.selection.pane") &&
+                !semantic_contains(search_semantics.roots, "fm.folder.objects"),
+            "Search must retain the tree, expose evidence lanes, and remove Folder selection semantics");
+    require(search_results->realized_count() <= 7U,
+            "Search correspondence realization must remain bounded by its viewport");
+    const auto first_bounds = search_results->item_bounds(
+        "fm.result.result-invoice-text");
+    const auto second_bounds = search_results->item_bounds(
+        "fm.result.result-invoice-pdf");
+    require(first_bounds && second_bounds && first_bounds->height == 126.0 &&
+                second_bounds->height == 45.0 &&
+                std::abs(second_bounds->y - (first_bounds->y + first_bounds->height)) <
+                    0.01,
+            "compact and expanded correspondence geometry must share one stable row stack");
+    NullPainter search_painter;
+    const gui_forms::DamageRegion search_startup_damage =
+        search_product->take_damage();
+    search_product->paint(search_painter, search_startup_damage.bounds());
+    search_product->reset_activity_metrics();
+    require(search_product->take_damage().empty() &&
+                !search_product->needs_frame(),
+            "settled Search must retain neither idle damage nor an active frame");
+    require(search_product->perform_semantic_action(
+                "fm.result.result-pages-offline",
+                gui_forms::SemanticAction::expand),
+            "unavailable Search evidence must remain inspectable");
+    search_product->perform_layout();
+    const gui_forms::DamageRegion offline_damage = search_product->take_damage();
+    const gui_forms::Rect result_damage_bounds = offline_damage.bounds();
+    const gui_forms::Rect result_control_bounds = search_results->absolute_bounds();
+    const gui_forms::Rect result_status_bounds =
+        search_product->find("fm.status.authority")->absolute_bounds();
+    const auto contained_by = [](gui_forms::Rect inner, gui_forms::Rect outer) {
+        return inner.x >= outer.x && inner.y >= outer.y &&
+            inner.x + inner.width <= outer.x + outer.width + .01 &&
+            inner.y + inner.height <= outer.y + outer.height + .01;
+    };
+    const bool damage_contained = !offline_damage.empty() &&
+        std::all_of(offline_damage.rectangles().begin(),
+                    offline_damage.rectangles().end(),
+                    [&](gui_forms::Rect rect) {
+                        return contained_by(rect, result_control_bounds) ||
+                               contained_by(rect, result_status_bounds);
+                    });
+    require(damage_contained,
+            "correspondence expansion damage must stay inside Search and its factual status cell");
+    search_product->paint(search_painter, result_damage_bounds);
+    const auto offline_semantics = search_product->semantic_snapshot();
+    const auto* offline = find_semantic(
+        offline_semantics.roots, "fm.result.result-pages-offline");
+    require(offline && gui_forms::has_semantic_state(
+                           offline->states, gui_forms::SemanticState::expanded) &&
+                offline->description.find("source unavailable") != std::string::npos &&
+                semantic_contains(offline->children,
+                                  "fm.result.result-pages-offline.excerpt"),
+            "offline correspondence must expand with explicit availability evidence");
+    require(search_product->perform_semantic_action(
+                "fm.result.result-pages-offline",
+                gui_forms::SemanticAction::press) &&
+                search_surface->visible() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    search_product->find("fm.status.authority"))->text().find(
+                        "source volume unavailable") != std::string::npos,
+            "unavailable result activation must fail in place with an honest reason");
+    require(search_product->request_focus(search_results) &&
+                search_product->dispatch_key({gui_forms::KeyAction::down,
+                                              gui_forms::PhysicalKey::home}) &&
+                search_product->dispatch_key({gui_forms::KeyAction::down,
+                                              gui_forms::PhysicalKey::down}) &&
+                search_results->focused_id() ==
+                    "fm.result.result-invoice-pdf" &&
+                search_product->dispatch_key({gui_forms::KeyAction::down,
+                                              gui_forms::PhysicalKey::space}) &&
+                search_results->pinned_id() ==
+                    "fm.result.result-invoice-pdf",
+            "Search keyboard focus and Space pinning must be independent and deterministic");
+    require(search_product->dispatch_key({gui_forms::KeyAction::down,
+                                          gui_forms::PhysicalKey::enter}) &&
+                folder_surface->visible() && !search_surface->visible() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    search_product->find("fm.title.text"))->text().ends_with(
+                        "Orchard Study") &&
+                std::dynamic_pointer_cast<gui_forms::ObjectView>(
+                    search_product->find("fm.folder.objects"))->selected_id() ==
+                    "fm.object.search-invoice-pdf" &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    search_product->find("fm.selection.object_name"))->text() ==
+                    "Invoice 0428.pdf",
+            "Enter must activate a Search result through normal Folder navigation");
+
+    auto debounced_search = file_manager_demoboard::make_product_window();
+    const auto search_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        debounced_search->find("fm.search.editor"));
+    require(search_editor != nullptr, "Search requires the public navigation TextBox");
+    search_editor->set_text("invoice");
+    search_editor->set_text("invoice quartz");
+    require(!debounced_search->find("fm.search.surface")->visible() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    debounced_search->find("fm.status.authority"))->text().find(
+                        "Search pending") != std::string::npos,
+            "Search edits must remain deferred until the latest debounce generation");
+    static_cast<void>(debounced_search->poll_frame_schedule(
+        gui_forms::FrameClock::now() + std::chrono::seconds(1)));
+    debounced_search->perform_layout();
+    require(debounced_search->find("fm.search.surface")->visible() &&
+                !debounced_search->find("fm.workspace.content_selection")->visible() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    debounced_search->find("fm.status.summary"))->text() ==
+                    "5 of 7 results shown · 1 unavailable source" &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    debounced_search->find("fm.status.authority"))->text() ==
+                    "Local navigation ready · result generation 86",
+            "only the latest debounced query may project the Search surface");
+    debounced_search->resize({1800, 1050});
+    debounced_search->perform_layout();
+    debounced_search->perform_layout();
+    const double wide_search_width =
+        debounced_search->find("fm.search.results")->absolute_bounds().width;
+    require(wide_search_width > 1500.0,
+            "Search correspondence must fill a product window wider than startup");
+    debounced_search->resize({480, 360});
+    debounced_search->perform_layout();
+    debounced_search->perform_layout();
+    require(debounced_search->find("fm.search.results")->absolute_bounds().width >
+                430.0 &&
+                !semantic_contains(debounced_search->semantic_snapshot().roots,
+                                   "fm.selection.pane"),
+            "compact Search must preserve one useful evidence field without reintroducing Selection");
+
+    auto criteria_product = file_manager_demoboard::make_product_window();
+    require(file_manager_demoboard::set_product_surface(
+                *criteria_product, "criteria"),
+            "public surface transition must admit Criteria");
+    criteria_product->perform_layout();
+    const auto criteria_rack =
+        std::dynamic_pointer_cast<gui_forms::InstrumentRack>(
+            criteria_product->find("fm.criteria.console"));
+    const auto criteria_objects =
+        std::dynamic_pointer_cast<gui_forms::ObjectView>(
+            criteria_product->find("fm.criteria.objects"));
+    const auto criteria_apply =
+        std::dynamic_pointer_cast<gui_forms::Button>(
+            criteria_product->find("fm.criteria.apply"));
+    const auto criteria_progress =
+        std::dynamic_pointer_cast<gui_forms::ProgressBar>(
+            criteria_product->find("fm.criteria.progress"));
+    require(criteria_rack && criteria_objects && criteria_apply &&
+                criteria_progress && criteria_rack->modules().size() == 3U &&
+                criteria_objects->items().size() == 31U &&
+                criteria_objects->selected_id() ==
+                    "fm.object.obj-facade-study" &&
+                criteria_product->find("fm.workspace.content_selection")->visible() &&
+                !criteria_product->find("fm.folder.objects")->visible() &&
+                criteria_product->find("fm.selection.pane")->visible(),
+            "Criteria must retain three exact instruments, its virtual objects, and Selection");
+    const auto criteria_semantics = criteria_product->semantic_snapshot();
+    require(semantic_contains(criteria_semantics.roots,
+                              "fm.criteria.module.criteria-kind-images.enable") &&
+                semantic_contains(criteria_semantics.roots,
+                                  "fm.criteria.module.criteria-modified-2026.operator") &&
+                semantic_contains(criteria_semantics.roots,
+                                  "fm.criteria.module.criteria-content-facade.value") &&
+                semantic_contains(criteria_semantics.roots,
+                                  "fm.criteria.module.criteria-content-facade.remove") &&
+                semantic_contains(criteria_semantics.roots,
+                                  "fm.criteria.apply") &&
+                !semantic_contains(criteria_semantics.roots,
+                                   "fm.folder.objects"),
+            "Criteria controls and staged meaning must be exposed without hidden Folder semantics");
+    require(criteria_product->perform_semantic_action(
+                "fm.criteria.apply", gui_forms::SemanticAction::press) &&
+                criteria_progress->animation_enabled() &&
+                !criteria_apply->enabled(),
+            "Apply must enter one explicit pending state and reject duplicate activation");
+    const auto apply_clock = gui_forms::FrameClock::now() +
+                             std::chrono::seconds(1);
+    for (int step = 0; step < 4; ++step) {
+        static_cast<void>(criteria_product->poll_frame_schedule(
+            apply_clock + std::chrono::milliseconds(100 * step)));
+    }
+    require(!criteria_progress->animation_enabled() &&
+                criteria_progress->value() == 100.0 &&
+                criteria_objects->items().size() == 5U &&
+                criteria_objects->selected_id() ==
+                    "fm.object.obj-facade-study" &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    criteria_product->find("fm.status.summary"))->text() ==
+                    "5 objects · 3 criteria applied" &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    criteria_product->find("fm.criteria.console.title"))->text().find(
+                        "0 STAGED") != std::string::npos &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    criteria_product->find("fm.criteria.results.summary"))->text().starts_with(
+                        "5 OBJECTS") &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    criteria_product->find("fm.status.authority"))->text() ==
+                    "Local navigation ready · index 87 current",
+            "Apply must complete deterministically while preserving surviving selection");
+
+    auto criteria_edit = file_manager_demoboard::make_product_window();
+    static_cast<void>(file_manager_demoboard::set_product_surface(
+        *criteria_edit, "criteria"));
+    const auto edit_rack = std::dynamic_pointer_cast<gui_forms::InstrumentRack>(
+        criteria_edit->find("fm.criteria.console"));
+    const auto kind_value = std::dynamic_pointer_cast<gui_forms::ComboBox>(
+        criteria_edit->find("fm.criteria.module.criteria-kind-images.value"));
+    require(edit_rack && kind_value, "Criteria live editor projection is absent");
+    kind_value->set_selected_index(1U);
+    require(edit_rack->modules()[0].state ==
+                gui_forms::InstrumentModuleState::live &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    criteria_edit->find("fm.status.authority"))->text().find(
+                        "Live criterion committed") != std::string::npos,
+            "cheap choice edits must update the live projection immediately");
+    require(criteria_edit->perform_semantic_action(
+                "fm.criteria.add", gui_forms::SemanticAction::press),
+            "bounded Add menu must open through the public semantic action");
+    criteria_edit->perform_layout();
+    const auto add_button = criteria_edit->find("fm.criteria.add");
+    const auto add_popup = criteria_edit->find(
+        "fm.criteria.add.menu.popup.panel.0");
+    require(add_button && add_popup &&
+                add_popup->absolute_bounds().x >=
+                    add_button->absolute_bounds().x - 1.0 &&
+                add_popup->absolute_bounds().y >=
+                    add_button->absolute_bounds().y +
+                    add_button->absolute_bounds().height - 1.0 &&
+                criteria_edit->dispatch_key({gui_forms::KeyAction::down,
+                                             gui_forms::PhysicalKey::enter}) &&
+                edit_rack->modules().size() == 4U,
+            "bounded Add menu must keyboard-activate a genuine module template");
+    const std::string added_id = edit_rack->modules().back().stable_id;
+    require(criteria_edit->request_focus(
+                criteria_edit->find(added_id + ".remove")) &&
+                criteria_edit->perform_semantic_action(
+                    added_id + ".remove", gui_forms::SemanticAction::press) &&
+                edit_rack->modules().size() == 3U &&
+                criteria_edit->focused_control() != nullptr,
+            "module removal must mutate the model and transfer focus predictably");
+
+    auto compact_criteria = file_manager_demoboard::make_product_window();
+    compact_criteria->resize({540.0, 500.0});
+    compact_criteria->set_text_scale(2.25);
+    static_cast<void>(file_manager_demoboard::set_product_surface(
+        *compact_criteria, "criteria"));
+    compact_criteria->perform_layout();
+    compact_criteria->perform_layout();
+    const auto compact_rack =
+        std::dynamic_pointer_cast<gui_forms::InstrumentRack>(
+            compact_criteria->find("fm.criteria.console"));
+    const auto compact_first = compact_rack->module_bounds(
+        "fm.criteria.module.criteria-kind-images");
+    const auto compact_third = compact_rack->module_bounds(
+        "fm.criteria.module.criteria-content-facade");
+    require(compact_first && compact_third &&
+                compact_third->y > compact_first->y &&
+                compact_rack->content_height() >
+                    compact_rack->committed_arranged_bounds().height,
+            "Criteria must wrap and remain scroll-reachable under narrow large text");
 
     NullPainter painter;
     const gui_forms::DamageRegion startup_damage = product->take_damage();
@@ -663,7 +975,9 @@ int main() {
             "returning to 100% must restore only automatically accommodated surfaces");
 
     auto controller = file_manager_demoboard::make_controller_window(responsive.get());
-    require(controller->find("demo.surface.choice") != nullptr,
+    const auto surface_choice = std::dynamic_pointer_cast<gui_forms::ComboBox>(
+        controller->find("demo.surface.choice"));
+    require(surface_choice != nullptr,
             "controller surface selector is absent");
     require(controller->find("demo.diagnostics") != nullptr,
             "controller capability report is absent");
@@ -679,6 +993,19 @@ int main() {
             "controller semantic-sound policy toggle is absent");
     require(reduced_motion && !reduced_motion->checked(),
             "controller reduced-motion policy toggle is absent");
+    surface_choice->set_selected_index(1U);
+    require(responsive->find("fm.search.surface")->visible() &&
+                !responsive->find("fm.workspace.content_selection")->visible(),
+            "controller Search choice must reach the public product-surface transition");
+    surface_choice->set_selected_index(2U);
+    require(responsive->find("fm.criteria.surface")->visible() &&
+                responsive->find("fm.workspace.content_selection")->visible() &&
+                !responsive->find("fm.folder.objects")->visible(),
+            "controller Criteria choice must reach the public retained surface transition");
+    surface_choice->set_selected_index(0U);
+    require(!responsive->find("fm.search.surface")->visible() &&
+                responsive->find("fm.workspace.content_selection")->visible(),
+            "controller Folder choice must restore the retained Folder projection");
     text_scale->set_selected_index(4U);
     require(responsive->presentation_settings().text_scale == 2.25,
             "controller text-scale selector did not reach the product presentation contract");

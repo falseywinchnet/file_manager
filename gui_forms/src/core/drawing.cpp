@@ -453,9 +453,29 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
                 inside != primitive_hit : inside || primitive_hit;
             break;
         }
-        case PathVerb::arc:
-            include_polygon();
+        case PathVerb::arc: {
+            constexpr double degrees_to_radians =
+                0.01745329251994329576923690768489;
+            const double center_x = element.rect.x + element.rect.width * 0.5;
+            const double center_y = element.rect.y + element.rect.height * 0.5;
+            const double radius_x = element.rect.width * 0.5;
+            const double radius_y = element.rect.height * 0.5;
+            const auto point_at = [&](double degrees) {
+                const double radians = degrees * degrees_to_radians;
+                return PointF{center_x + radius_x * std::cos(radians),
+                              center_y + radius_y * std::sin(radians)};
+            };
+            const PointF start = point_at(element.start_angle);
+            if (figure.empty() || figure.back() != start) figure.push_back(start);
+            const int segments = std::max(
+                1, static_cast<int>(std::ceil(std::abs(element.sweep_angle) / 12.0)));
+            for (int index = 1; index <= segments; ++index) {
+                const double ratio = static_cast<double>(index) / segments;
+                figure.push_back(point_at(
+                    element.start_angle + element.sweep_angle * ratio));
+            }
             break;
+        }
         case PathVerb::close_figure:
             include_polygon();
             break;

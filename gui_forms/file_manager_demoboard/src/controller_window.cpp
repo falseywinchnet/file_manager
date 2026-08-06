@@ -107,6 +107,18 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
         static constexpr std::array<double, 5> scales{
             1.0, 1.25, 1.5, 2.0, 2.25};
         lifetime->subscriptions.push_back(
+            surface->selected_index_changed().subscribe(
+                *root, [product](std::optional<std::size_t> index) {
+                    if (!index) return;
+                    if (*index == 0U) {
+                        static_cast<void>(set_product_surface(*product, "folder"));
+                    } else if (*index == 1U) {
+                        static_cast<void>(set_product_surface(*product, "search"));
+                    } else if (*index == 2U) {
+                        static_cast<void>(set_product_surface(*product, "criteria"));
+                    }
+                }));
+        lifetime->subscriptions.push_back(
             text_scale->selected_index_changed().subscribe(
                 *root, [product, density = std::weak_ptr<Label>(density)](
                     std::optional<std::size_t> index) {
@@ -120,11 +132,17 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
                     }
                 }));
         lifetime->subscriptions.push_back(reset->clicked().subscribe(
-            *root, [product, selector = std::weak_ptr<ComboBox>(text_scale),
+            *root, [product,
+                    surface_selector = std::weak_ptr<ComboBox>(surface),
+                    selector = std::weak_ptr<ComboBox>(text_scale),
                     density = std::weak_ptr<Label>(density),
                     sound = std::weak_ptr<CheckBox>(sound),
                     reduced = std::weak_ptr<CheckBox>(reduced_motion)](ButtonBase&) {
                 product->set_presentation_settings({});
+                static_cast<void>(set_product_surface(*product, "folder"));
+                if (const auto choice = surface_selector.lock()) {
+                    choice->set_selected_index(0U);
+                }
                 if (const auto choice = selector.lock()) {
                     choice->set_selected_index(0U);
                 }
