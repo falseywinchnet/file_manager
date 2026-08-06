@@ -4,6 +4,7 @@
 #include "gui_forms/event.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -209,6 +210,13 @@ public:
         return pointer_pressed_ || keyboard_pressed_;
     }
     [[nodiscard]] bool focused_visual() const noexcept { return focused_; }
+    // Optional disclosure state for buttons that own a popup or retained
+    // disclosure region. Nullopt is an ordinary push button; false/true expose
+    // collapsed/expanded semantics without conflating visual pressed state.
+    [[nodiscard]] std::optional<bool> expanded_state() const noexcept {
+        return expanded_state_;
+    }
+    void set_expanded_state(std::optional<bool> expanded);
     [[nodiscard]] Event<ButtonBase&>& clicked() noexcept { return clicked_; }
     [[nodiscard]] Event<const std::string&>& text_changed() noexcept {
         return text_changed_;
@@ -241,6 +249,7 @@ private:
     bool pointer_pressed_{};
     bool keyboard_pressed_{};
     bool focused_{};
+    std::optional<bool> expanded_state_;
 };
 
 class Button : public ButtonBase {

@@ -118,12 +118,18 @@ if (args.Length == 1 && args[0] == "tooltip-live")
 }
 if (args.Length == 1 && args[0] == "native-surface")
 {
+    Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
     return RunNativeWindowSurfaceHost();
+}
+if (args.Length == 1 && args[0] == "visibility-paint")
+{
+    return RunVisibilityPaintHost();
 }
 
 var form = new Form { Name = "behaviorForm", Text = "M11d behavior", Size = new Size(640, 420) };
 using var userControl = new UserControl();
 using var pictureBox = new PictureBox();
+using var pictureImage = new Bitmap(17, 9);
 var table = new TableLayoutPanel
 {
     Name = "settingsTable",
@@ -227,6 +233,20 @@ var boundedRight = new Button { Dock = DockStyle.Fill, Margin = new Padding(0) }
 boundedTable.Controls.Add(oversizedAuto, 0, 0);
 boundedTable.Controls.Add(boundedMiddle, 1, 0);
 boundedTable.Controls.Add(boundedRight, 2, 0);
+var lateAutoSizeTable = new TableLayoutPanel
+{
+    Size = new Size(160, 40), ColumnCount = 2, RowCount = 1, Padding = new Padding(0)
+};
+lateAutoSizeTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+lateAutoSizeTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+lateAutoSizeTable.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+var lateAutoSizeLabel = new Label { AutoSize = true, Text = string.Empty, Size = Size.Empty, Margin = new Padding(0) };
+pictureBox.Size = Size.Empty;
+pictureBox.SizeMode = PictureBoxSizeMode.AutoSize;
+lateAutoSizeTable.Controls.Add(lateAutoSizeLabel, 0, 0);
+lateAutoSizeTable.Controls.Add(pictureBox, 1, 0);
+lateAutoSizeLabel.Text = "Zoom";
+pictureBox.Image = pictureImage;
 var flowProbe = new FlowLayoutPanel { Size = new Size(170, 80), Padding = new Padding(0), WrapContents = true };
 var flowFirst = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
 var flowSecond = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
@@ -332,13 +352,88 @@ using (var targetGraphics = Graphics.FromImage(targetBitmap))
     Require(targetBitmap.GetPixel(4, 4).ToArgb() == Color.Crimson.ToArgb(),
         "image draw flushes pending source drawing before sampling");
 }
+using (var transparentSource = new Bitmap(15, 15, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+using (var sourceGraphics = Graphics.FromImage(transparentSource))
+using (var transparentTarget = new Bitmap(15, 15, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+using (var targetGraphics = Graphics.FromImage(transparentTarget))
+using (var glyph = new SolidBrush(Color.White))
+{
+    sourceGraphics.Clear(Color.Transparent);
+    sourceGraphics.FillRectangle(glyph, 6, 6, 3, 3);
+    targetGraphics.Clear(Color.Transparent);
+    targetGraphics.DrawImage(transparentSource, new Rectangle(0, 0, 15, 15));
+    Require(transparentTarget.GetPixel(0, 0).A == 0 &&
+        transparentTarget.GetPixel(7, 7).A == 255,
+        "transparent image composition preserves owner-drawn glyph alpha");
+}
+using (var encodedGlyph = new System.IO.MemoryStream(Convert.FromBase64String(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4+PEjAwAIfgLUTwUv2QAAAABJRU5ErkJggg==")))
+using (var decodedGlyph = Image.FromStream(encodedGlyph))
+using (var transparentTarget = new Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+using (var targetGraphics = Graphics.FromImage(transparentTarget))
+{
+    targetGraphics.Clear(Color.Transparent);
+    targetGraphics.DrawImage(decodedGlyph, new Rectangle(0, 0, 1, 1));
+    Require(transparentTarget.GetPixel(0, 0).A == 0,
+        "decoded transparent PNG pixels remain transparent when owner-drawn");
+}
+using (var encodedMask = new System.IO.MemoryStream(Convert.FromBase64String(
+    "iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAIAAAC0tAIdAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTCtCgrAAAAATUlEQVQoU9WOwQ0AIAgDGZlNGBkbS4ghEX3qvSi0gDyImbm7qoaeQKKJUeiVEuisJANnK2Hgygq4FaCI1o58gBe6QPm1CxQrOV/4AJEBcw9Zp4gf7LYAAAAASUVORK5CYII=")))
+using (var decodedMask = new Bitmap(encodedMask))
+{
+    Require(decodedMask.GetPixel(0, 0).ToArgb() == Color.Black.ToArgb() &&
+        decodedMask.GetPixel(7, 7).ToArgb() == Color.White.ToArgb() &&
+        decodedMask.GetPixel(4, 4).R is > 0 and < 255,
+        "decoded DockPanelSuite glyph mask preserves black, white, and anti-aliased samples");
+    using var glyph = new Bitmap(decodedMask.Width, decodedMask.Height,
+        System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    var glyphData = glyph.LockBits(new Rectangle(0, 0, glyph.Width, glyph.Height),
+        System.Drawing.Imaging.ImageLockMode.WriteOnly,
+        System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+    try
+    {
+        for (var y = 0; y < glyph.Height; ++y)
+        for (var x = 0; x < glyph.Width; ++x)
+        {
+            var offset = y * glyphData.Stride + x * 4;
+            System.Runtime.InteropServices.Marshal.WriteByte(glyphData.Scan0, offset, 0xf1);
+            System.Runtime.InteropServices.Marshal.WriteByte(glyphData.Scan0, offset + 1, 0xf1);
+            System.Runtime.InteropServices.Marshal.WriteByte(glyphData.Scan0, offset + 2, 0xf1);
+            System.Runtime.InteropServices.Marshal.WriteByte(glyphData.Scan0, offset + 3,
+                decodedMask.GetPixel(x, y).B);
+        }
+    }
+    finally { glyph.UnlockBits(glyphData); }
+    using var dockButton = new Bitmap(glyph.Width, glyph.Height);
+    using (var dockGraphics = Graphics.FromImage(dockButton))
+    {
+        dockGraphics.Clear(Color.FromArgb(42, 42, 42));
+        dockGraphics.DrawImageUnscaled(glyph, 0, 0);
+    }
+    Require(dockButton.GetPixel(0, 0).R == 42 && dockButton.GetPixel(7, 7).R > 230,
+        "straight-alpha LockBits glyph composites over a dark DockPanel caption");
+}
+using (var gradientBitmap = new Bitmap(1, 256))
+using (var gradientGraphics = Graphics.FromImage(gradientBitmap))
+using (var gradient = new System.Drawing.Drawing2D.LinearGradientBrush(
+    new Rectangle(0, 0, 1, 255), Color.White, Color.Black,
+    System.Drawing.Drawing2D.LinearGradientMode.Vertical))
+using (var gradientPen = new Pen(gradient))
+{
+    gradientGraphics.DrawLine(gradientPen, 0, 0, 0, 255);
+    Require(gradientBitmap.GetPixel(0, 0).GetBrightness() > 0.9f,
+        "gradient-backed line preserves its first endpoint");
+    Require(gradientBitmap.GetPixel(0, 255).GetBrightness() < 0.1f,
+        "gradient-backed line preserves its inclusive far endpoint without wrapping");
+}
 Require(enabled.Checked && radio.Checked, "check state");
 Require(checkEvents == 1 && selectionEvents == 1 && valueEvents == 1 && radioEvents == 1, "state events");
 Require(stateProbe.TextChanges == 1 && stateProbe.EnabledChanges == 1 &&
     stateProbe.VisibleChanges == 2 && stateProbe.ForeColorChanges == 1 &&
     stateProbe.BackColorChanges == 1 && stateProbe.FontChanges == 1,
     "virtual state-change routing");
-Require(moveEvents == 1 && sizeEvents == 1 && table.ClientRectangle.Size == table.Size, "geometry events");
+Require(moveEvents == 1 && sizeEvents >= 1 && table.ClientRectangle.Size == table.Size,
+    "geometry events including retained host relayout");
 Require(table.FindForm() == form && gain.PointToScreen(Point.Empty) ==
     new Point(table.Left + gain.Left, table.Top + gain.Top), "coordinate ancestry");
 Require(menu.Items[0] == startItem && startItem.Owner == menu && startItem.Text == "Start" && Equals(startItem.Tag, "receiver"), "toolstrip state");
@@ -372,6 +467,10 @@ Require(oversizedAuto.Right <= boundedTable.ClientSize.Width &&
     boundedMiddle.Right <= boundedTable.ClientSize.Width &&
     boundedRight.Right <= boundedTable.ClientSize.Width,
     "table layout containment");
+Require(lateAutoSizeLabel.Width > 0 && lateAutoSizeLabel.Height > 0,
+    "late text invalidates label auto-size layout");
+Require(pictureBox.Width >= pictureImage.Width && pictureBox.Height >= pictureImage.Height,
+    "picture image contributes auto-size preferred dimensions");
 Require(flowFirst.Location == Point.Empty && flowSecond.Location == new Point(80, 0) &&
     flowThird.Location == new Point(0, 20), "flow layout wrapping");
 Require(listProbe.Items.Count == 2 && Equals(listProbe.Items[0], "alpha") &&
@@ -437,6 +536,28 @@ static int RunTimerHost()
     Application.Run(form);
     Require(ticks == 1 && !timer.Enabled, "timer lifecycle");
     Console.WriteLine($"timer=ticks:{ticks}|enabled:{timer.Enabled}|host:{(Application.LastHostTrace.Contains("win32-dib", StringComparison.Ordinal) ? "win32-dib" : "other")}");
+    form.Dispose();
+    return 0;
+}
+
+static int RunVisibilityPaintHost()
+{
+    var form = new Form { Name = "visibilityPaintForm", Text = "Visibility paint", Size = new Size(360, 180) };
+    var container = new Panel { Name = "visibilityContainer", Dock = DockStyle.Fill };
+    var probe = new PaintInputProbe { Name = "visibilityPaintProbe", Size = new Size(120, 42) };
+    container.Controls.Add(probe);
+    form.Controls.Add(container);
+    form.Load += (_, _) =>
+    {
+        var before = probe.Paints;
+        container.Visible = false;
+        container.Visible = true;
+        Require(probe.Paints > before,
+            "revealing an already-loaded retained subtree repaints custom controls");
+        form.BeginInvoke((Action)form.Close);
+    };
+    Application.Run(form);
+    Console.WriteLine($"visibility-paint=before-show:{probe.Paints - 1}|after-show:{probe.Paints}|subtree:repainted");
     form.Dispose();
     return 0;
 }
@@ -938,7 +1059,18 @@ static int RunMenuHost()
         Require(form.Controls.Count == baselineChildren && menu.Parent is null,
             "popup cycle detaches without retained children");
     }
-    Console.WriteLine($"menu=bounds:{menu.Bounds.X},{menu.Bounds.Y},{menu.Width},{menu.Height}|items:{menu.Items.Count}|nested:{source.DropDownItems.Count}|nested-clicked:{nestedClicked}|clicked:{clicked}|glyph-pixels:{glyphPixels}|keyboard:pass|edge:left|cycles:24");
+    var multilineMenu = new MenuProbe { Name = "multilineMenu" };
+    multilineMenu.Items.Add(new ToolStripMenuItem(
+        "OH3BHX - oh3bhx.fi\r\nReceiver: Airspy R2\r\nCoverage: 24 MHz - 1.8 GHz"));
+    multilineMenu.Show(form, new Point(24, 36));
+    Require(multilineMenu.Height >= 57,
+        "multiline menu text expands the retained row instead of painting CR/LF glyphs");
+    using var multilineRaster = multilineMenu.RenderToBitmap();
+    Require(multilineRaster.Height == multilineMenu.Height,
+        "multiline menu raster covers the expanded retained row");
+    multilineMenu.Key(Keys.Escape);
+    multilineMenu.Dispose();
+    Console.WriteLine($"menu=bounds:{menu.Bounds.X},{menu.Bounds.Y},{menu.Width},{menu.Height}|items:{menu.Items.Count}|nested:{source.DropDownItems.Count}|nested-clicked:{nestedClicked}|clicked:{clicked}|glyph-pixels:{glyphPixels}|multiline:expanded|keyboard:pass|edge:left|cycles:24");
     menu.Dispose();
     form.Dispose();
     return 0;

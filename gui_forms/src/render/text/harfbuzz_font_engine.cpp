@@ -103,13 +103,27 @@ public:
     [[nodiscard]] std::vector<Face*> candidates(FontSpec font) {
         std::vector<Face*> result;
         for (Face& face : faces) {
-            if (!face.role || *face.role == font.role) result.push_back(&face);
+            // The body face is the house text fallback for control and
+            // monospace roles. This keeps Portsmouth as the preferred control
+            // voice without turning punctuation, arrows, or localized text
+            // it does not own into missing-glyph boxes. Global CJK/emoji faces
+            // remain the last tier.
+            if (!face.role || *face.role == font.role ||
+                (font.role != FontRole::content &&
+                 *face.role == FontRole::content)) {
+                result.push_back(&face);
+            }
         }
         std::stable_sort(result.begin(), result.end(), [&](Face* left, Face* right) {
-            const int left_fallback = left->role ? 0 : 1;
-            const int right_fallback = right->role ? 0 : 1;
-            if (left_fallback != right_fallback) {
-                return left_fallback < right_fallback;
+            const auto tier = [&](Face* face) {
+                if (face->role && *face->role == font.role) return 0;
+                if (face->role && *face->role == FontRole::content) return 1;
+                return 2;
+            };
+            const int left_tier = tier(left);
+            const int right_tier = tier(right);
+            if (left_tier != right_tier) {
+                return left_tier < right_tier;
             }
             const int left_italic = left->italic == font.italic ? 0 : 1;
             const int right_italic = right->italic == font.italic ? 0 : 1;

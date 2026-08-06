@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gui_forms::host {
 
@@ -37,9 +38,22 @@ struct MacHostServiceOptions {
     bool cancel_dialogs_for_testing{};
 };
 
+// A native application may present several independent retained roots without
+// merging their models or starting a second process. Ownership is expressed by
+// stable host IDs, never native handles; adapters map it to their platform's
+// owned/tool-window relationship.
+struct MacApplicationWindow final {
+    std::string stable_id;
+    std::string owner_id;
+    std::unique_ptr<Window> model;
+    MacHostOptions options;
+    bool tool_window{};
+};
+
 [[nodiscard]] HostCapabilities macos_capabilities();
 [[nodiscard]] std::unique_ptr<HostServices> make_macos_host_services(
     MacHostServiceOptions options = {});
 int run_macos(std::unique_ptr<Window> window, MacHostOptions options = {});
+int run_macos_application(std::vector<MacApplicationWindow> windows);
 
 } // namespace gui_forms::host

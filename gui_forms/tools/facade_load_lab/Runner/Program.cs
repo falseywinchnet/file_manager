@@ -89,7 +89,10 @@ internal static class Program
             Path.GetFullPath(args[6]), Path.GetFullPath(args[7]),
             Path.GetFullPath(args[8]),
             isCollectible: !string.IsNullOrWhiteSpace(probe));
-        var entryPath = Path.Combine(extractDirectory, "retired compatibility specimen.dll");
+        var entryPath = Path.Combine(extractDirectory,
+            Path.GetFileNameWithoutExtension(bundlePath) + ".dll");
+        if (!File.Exists(entryPath))
+            entryPath = Path.Combine(extractDirectory, "retired compatibility specimen.dll");
         var assembly = context.LoadFromAssemblyPath(entryPath);
         Console.WriteLine($"entry={assembly.GetName().Name}|forms={context.FormsIdentity}");
         if (!string.IsNullOrWhiteSpace(probe))

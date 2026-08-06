@@ -104,7 +104,8 @@ typedef enum gf_event_kind {
     GF_EVENT_KEY_UP = 12,
     GF_EVENT_TEXT_INPUT = 13,
     GF_EVENT_RANGE_VALUE_CHANGED = 14,
-    GF_EVENT_RANGE_SCROLL = 15
+    GF_EVENT_RANGE_SCROLL = 15,
+    GF_EVENT_BOUNDS_CHANGED = 16
 } gf_event_kind;
 
 typedef enum gf_event_callback_result {

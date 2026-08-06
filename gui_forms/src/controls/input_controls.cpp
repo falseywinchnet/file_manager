@@ -118,6 +118,14 @@ public:
         }
     }
 
+    void on_key_preview(KeyEvent& event) override {
+        if (event.action == KeyAction::down &&
+            event.physical_key == PhysicalKey::escape) {
+            dismissed_.emit();
+            event.handled = true;
+        }
+    }
+
 private:
     Event<> dismissed_;
 };
@@ -421,9 +429,10 @@ void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
 
 double TextBox::boundary_x(Utf8Offset offset) const noexcept {
     if (layout_positions_.empty() ||
-        layout_positions_.size() != layout_offsets_.size()) {
+        layout_positions_.size() != layout_offsets_.size() ||
+        layout_text_scale_ != effective_text_scale()) {
         return static_cast<double>(store_.grapheme_index(offset).value()) *
-            font_.size * 0.55;
+            effective_font(font_).size * 0.55;
     }
     const auto found = std::lower_bound(layout_offsets_.begin(),
                                         layout_offsets_.end(), offset.value());
@@ -488,10 +497,12 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
     const double content_x = std::max(0.0,
         local_x - text_left_ + horizontal_offset_);
     if (layout_positions_.empty() ||
-        layout_positions_.size() != layout_offsets_.size()) {
+        layout_positions_.size() != layout_offsets_.size() ||
+        layout_text_scale_ != effective_text_scale()) {
+        const FontSpec font = effective_font(font_);
         const std::size_t grapheme = std::min(
             static_cast<std::size_t>(std::lround(content_x /
-                                                  (font_.size * 0.55))),
+                                                  (font.size * 0.55))),
             store_.grapheme_count().value());
         return store_.utf8_offset(GraphemeIndex(grapheme));
     }
@@ -514,6 +525,7 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
 void TextBox::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const FontSpec font = effective_font(font_);
     const double right = std::max(text_left_, bounds.width - 4.0);
     const double viewport = std::max(0.0, right - text_left_);
     const std::string presented = display_text();
@@ -523,6 +535,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         : std::string{};
     layout_positions_.clear();
     layout_offsets_.clear();
+    layout_text_scale_ = effective_text_scale();
     const std::size_t count = store_.grapheme_count().value();
     layout_positions_.reserve(count + 1U);
     layout_offsets_.reserve(count + 1U);
@@ -532,7 +545,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
         const std::size_t presentation_offset = password_protected()
             ? index * mask.size() : offset.value();
         layout_positions_.push_back(painter.measure_text_utf8(
-            std::string_view(presented).substr(0U, presentation_offset), font_).width);
+            std::string_view(presented).substr(0U, presentation_offset), font).width);
     }
     const double caret_content_x = boundary_x(selection_.caret);
     if (caret_content_x < horizontal_offset_) {
@@ -546,8 +559,8 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     const double origin_x = text_left_ - horizontal_offset_;
     const double selection_x = origin_x + boundary_x(selection_.start());
     const double selection_end_x = origin_x + boundary_x(selection_.end());
-    const double baseline = std::max(font_.size,
-        (bounds.height + font_.size) * 0.5 - 1.0);
+    const double baseline = std::max(font.size,
+        (bounds.height + font.size) * 0.5 - 1.0);
     painter.save();
     painter.clip_rect({text_left_, 2.0, viewport,
                        std::max(0.0, bounds.height - 4.0)});
@@ -557,19 +570,19 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
                            std::max(0.0, bounds.height - 6.0)}, style().accent);
     }
     if (!store_.utf8().empty()) {
-        painter.draw_text_utf8({origin_x, baseline}, presented, font_,
+        painter.draw_text_utf8({origin_x, baseline}, presented, font,
                                enabled() ? style().text : style().disabled_text);
         if (focused_ && !selection_.empty()) {
             painter.save();
             painter.clip_rect({selection_x, 3.0,
                                std::max(0.0, selection_end_x - selection_x),
                                std::max(0.0, bounds.height - 6.0)});
-            painter.draw_text_utf8({origin_x, baseline}, presented, font_,
+            painter.draw_text_utf8({origin_x, baseline}, presented, font,
                                    style().highlight);
             painter.restore();
         }
     } else if (!placeholder_.empty()) {
-        painter.draw_text_utf8({text_left_, baseline}, placeholder_, font_,
+        painter.draw_text_utf8({text_left_, baseline}, placeholder_, font,
                                style().disabled_text);
     }
     if (focused_ && caret_visible_ && selection_.empty()) {
@@ -623,6 +636,17 @@ void TextBox::on_key(KeyEvent& event) {
     }
     const bool extend = includes(event.modifiers, Modifier::shift);
     const bool command = command_modifier(event.modifiers);
+    if (event.physical_key == PhysicalKey::enter) {
+        const std::string value(text());
+        committed_.emit(value);
+        event.handled = true;
+        return;
+    }
+    if (event.physical_key == PhysicalKey::escape) {
+        cancelled_.emit();
+        event.handled = true;
+        return;
+    }
     if (command && event.physical_key == PhysicalKey::a) {
         select_all();
         event.handled = true;
@@ -815,6 +839,7 @@ void ListBox::set_items(std::vector<std::string> items) {
         }
     }
     items_ = std::move(items);
+    item_stable_ids_.clear();
     const std::vector<std::size_t> previous = selected_;
     selected_.erase(std::remove_if(selected_.begin(), selected_.end(),
         [this](std::size_t index) { return index >= items_.size(); }), selected_.end());
@@ -832,6 +857,9 @@ void ListBox::add_item(std::string item) {
     if (!validate_utf8(item).valid()) {
         throw std::invalid_argument("ListBox item must be valid UTF-8");
     }
+    // Appending without an accompanying model identity returns the collection
+    // to the deterministic index-derived identity policy.
+    item_stable_ids_.clear();
     items_.push_back(std::move(item));
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
@@ -843,6 +871,10 @@ void ListBox::remove_item(std::size_t index) {
     }
     const std::vector<std::size_t> previous = selected_;
     items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
+    if (!item_stable_ids_.empty()) {
+        item_stable_ids_.erase(item_stable_ids_.begin() +
+                               static_cast<std::ptrdiff_t>(index));
+    }
     std::vector<std::size_t> adjusted;
     for (const std::size_t selected : selected_) {
         if (selected != index) adjusted.push_back(selected > index ? selected - 1U : selected);
@@ -865,6 +897,37 @@ void ListBox::remove_item(std::size_t index) {
 
 void ListBox::clear_items() {
     set_items({});
+}
+
+void ListBox::set_item_stable_ids(std::vector<std::string> stable_ids) {
+    require_mutable();
+    if (stable_ids.size() != items_.size()) {
+        throw std::invalid_argument(
+            "ListBox stable item IDs must match the item count");
+    }
+    std::vector<std::string> sorted = stable_ids;
+    for (const std::string& stable_id : sorted) {
+        if (stable_id.empty() || !validate_utf8(stable_id).valid()) {
+            throw std::invalid_argument(
+                "ListBox stable item IDs must be nonempty valid UTF-8");
+        }
+    }
+    std::sort(sorted.begin(), sorted.end());
+    if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end()) {
+        throw std::invalid_argument("ListBox stable item IDs must be unique");
+    }
+    item_stable_ids_ = std::move(stable_ids);
+    invalidate(Dirty::semantics);
+}
+
+std::string ListBox::item_stable_id(std::size_t index) const {
+    if (index >= items_.size()) {
+        throw std::out_of_range(
+            "ListBox item stable ID index is outside the collection");
+    }
+    if (!item_stable_ids_.empty()) return item_stable_ids_[index];
+    return std::string(stable_id().value()) + ".item." +
+           std::to_string(index);
 }
 
 void ListBox::set_selection_mode(ListSelectionMode mode) {
@@ -970,8 +1033,9 @@ std::size_t ListBox::visible_row_count() const noexcept {
     if (height <= 4.0) {
         height = requested_bounds().height;
     }
+    const double row_height = item_height_ * effective_text_scale();
     return std::max<std::size_t>(1U, static_cast<std::size_t>(
-        std::floor(std::max(0.0, height - 4.0) / item_height_)));
+        std::floor(std::max(0.0, height - 4.0) / row_height)));
 }
 
 void ListBox::ensure_visible(std::size_t index) {
@@ -995,8 +1059,9 @@ std::optional<std::size_t> ListBox::index_at(Point absolute) const noexcept {
     if (!bounds.contains(absolute)) return {};
     const double local_y = absolute.y - bounds.y - 2.0;
     if (local_y < 0.0) return {};
+    const double row_height = item_height_ * effective_text_scale();
     const std::size_t index = top_index_ +
-        static_cast<std::size_t>(std::floor(local_y / item_height_));
+        static_cast<std::size_t>(std::floor(local_y / row_height));
     return index < items_.size() ? std::optional<std::size_t>{index}
                                  : std::optional<std::size_t>{};
 }
@@ -1004,33 +1069,35 @@ std::optional<std::size_t> ListBox::index_at(Point absolute) const noexcept {
 void ListBox::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const FontSpec font = effective_font(font_);
+    const double row_height = item_height_ * effective_text_scale();
     painter.save();
     painter.clip_rect({2.0, 2.0, std::max(0.0, bounds.width - 4.0),
                        std::max(0.0, bounds.height - 4.0)});
     const std::size_t visible = visible_row_count() + 1U;
     const std::size_t end = std::min(items_.size(), top_index_ + visible);
     for (std::size_t index = top_index_; index < end; ++index) {
-        const double y = 2.0 + static_cast<double>(index - top_index_) * item_height_;
+        const double y = 2.0 + static_cast<double>(index - top_index_) * row_height;
         const bool selected = std::binary_search(selected_.begin(), selected_.end(), index);
         const bool hovered = hovered_index_ == index;
         if (selected) {
-            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), item_height_},
+            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
                               focused_ ? style().accent : style().accent_light);
         } else if (hovered) {
-            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), item_height_},
+            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
                               style().face_light);
         }
-        const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), item_height_};
+        const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
         paint_row_adornment(painter, index, row, selected, focused_);
         painter.draw_text_utf8({row_text_left(),
-                                y + std::max(font_.size,
-                                             item_height_ * 0.5 + 4.0)},
-                               items_[index], font_, selected && focused_
+                                y + std::max(font.size,
+                                             row_height * 0.5 + 4.0)},
+                               items_[index], font, selected && focused_
                                    ? style().highlight
                                    : enabled() ? style().text : style().disabled_text);
         if (focused_ && active_index_ == index) {
             painter.stroke_rect({3.5, y + 1.5, std::max(0.0, bounds.width - 7.0),
-                                 std::max(0.0, item_height_ - 3.0)},
+                                 std::max(0.0, row_height - 3.0)},
                                 selected ? style().highlight : style().accent, 1.0);
         }
     }
@@ -1134,20 +1201,20 @@ std::vector<SemanticNode> ListBox::semantic_virtual_children() const {
     const Rect list_bounds = absolute_bounds();
     const std::size_t visible_count = visible_row_count();
     const std::size_t visible_end = std::min(items_.size(), top_index_ + visible_count);
-    const std::string prefix = std::string(stable_id().value()) + ".item.";
+    const double row_height = item_height_ * effective_text_scale();
     for (std::size_t index = 0; index < items_.size(); ++index) {
         SemanticNode node;
-        node.stable_id = prefix + std::to_string(index);
+        node.stable_id = item_stable_id(index);
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         node.name = items_[index];
         node.value = items_[index];
         const double row_y = list_bounds.y + 2.0 +
             (static_cast<double>(index) - static_cast<double>(top_index_)) *
-                item_height_;
+                row_height;
         node.bounds = Rect::intersection(
             {list_bounds.x + 2.0, row_y, std::max(0.0, list_bounds.width - 4.0),
-             item_height_},
+             row_height},
             list_bounds);
         if (effectively_enabled()) node.states |= SemanticState::enabled;
         node.states |= SemanticState::focusable;
@@ -1168,13 +1235,23 @@ std::vector<SemanticNode> ListBox::semantic_virtual_children() const {
 bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
                                        SemanticAction action,
                                        std::string_view) {
-    const std::string prefix = std::string(stable_id().value()) + ".item.";
-    if (!child_stable_id.starts_with(prefix)) return false;
-    const std::string_view suffix = child_stable_id.substr(prefix.size());
     std::size_t index{};
-    const auto parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(), index);
-    if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + suffix.size() ||
-        index >= items_.size()) return false;
+    if (!item_stable_ids_.empty()) {
+        const auto found = std::find(item_stable_ids_.begin(),
+                                     item_stable_ids_.end(), child_stable_id);
+        if (found == item_stable_ids_.end()) return false;
+        index = static_cast<std::size_t>(
+            std::distance(item_stable_ids_.begin(), found));
+    } else {
+        const std::string prefix = std::string(stable_id().value()) + ".item.";
+        if (!child_stable_id.starts_with(prefix)) return false;
+        const std::string_view suffix = child_stable_id.substr(prefix.size());
+        const auto parsed = std::from_chars(
+            suffix.data(), suffix.data() + suffix.size(), index);
+        if (parsed.ec != std::errc{} ||
+            parsed.ptr != suffix.data() + suffix.size() ||
+            index >= items_.size()) return false;
+    }
     if (action != SemanticAction::focus && action != SemanticAction::select &&
         action != SemanticAction::press) return false;
     if (window() != nullptr) {
@@ -1505,7 +1582,8 @@ void ComboBox::open_drop_down() {
     const Rect combo = absolute_bounds();
     const Size client = window()->client_size();
     const std::size_t rows = std::min(maximum_drop_down_items_, items_.size());
-    const double popup_height = static_cast<double>(rows) * 26.0 + 4.0;
+    const double popup_height = static_cast<double>(rows) *
+        26.0 * effective_text_scale() + 4.0;
     const double popup_y = combo.y + combo.height + popup_height <= client.height
         ? combo.y + combo.height : std::max(0.0, combo.y - popup_height);
 
@@ -1600,6 +1678,7 @@ void ComboBox::commit_popup_selection(std::size_t index) {
 void ComboBox::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const FontSpec font = effective_font(font_);
     const double button_width = std::min(24.0, bounds.width);
     painter.fill_rect({std::max(0.0, bounds.width - button_width), 1.0,
                        std::max(0.0, button_width - 1.0),
@@ -1620,9 +1699,9 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
     painter.clip_rect({5.0, 2.0,
                        std::max(0.0, bounds.width - button_width - 8.0),
                        std::max(0.0, bounds.height - 4.0)});
-    painter.draw_text_utf8({7.0, std::max(font_.size,
-                            (bounds.height + font_.size) * 0.5 - 1.0)},
-                           text, font_, selected_index_ ? style().text
+    painter.draw_text_utf8({7.0, std::max(font.size,
+                            (bounds.height + font.size) * 0.5 - 1.0)},
+                           text, font, selected_index_ ? style().text
                                                        : style().disabled_text);
     painter.restore();
     if (focused_ || dropped_down_) {

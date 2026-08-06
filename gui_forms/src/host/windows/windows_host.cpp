@@ -1420,6 +1420,8 @@ public:
         case WM_MOUSEMOVE: pointer(message, PointerAction::move, wparam, lparam); return 0;
         case WM_LBUTTONDOWN: case WM_RBUTTONDOWN: case WM_MBUTTONDOWN:
             SetFocus(hwnd_); pointer(message, PointerAction::down, wparam, lparam); return 0;
+        case WM_LBUTTONDBLCLK: case WM_RBUTTONDBLCLK: case WM_MBUTTONDBLCLK:
+            SetFocus(hwnd_); pointer(message, PointerAction::down, wparam, lparam); return 0;
         case WM_LBUTTONUP: case WM_RBUTTONUP: case WM_MBUTTONUP:
             pointer(message, PointerAction::up, wparam, lparam); return 0;
         case WM_MOUSEWHEEL: wheel(wparam, lparam); return 0;
@@ -1682,6 +1684,8 @@ private:
         event.position = client_point(lparam);
         event.modifiers = modifiers();
         event.pointer_id = 1;
+        event.click_count = message == WM_LBUTTONDBLCLK ||
+            message == WM_RBUTTONDBLCLK || message == WM_MBUTTONDBLCLK ? 2U : 1U;
         if (trace_win32_input()) {
             const auto target = model_->hit_test(event.position);
             const auto target_id = target ? target->stable_id().value() : std::string_view{"<none>"};
@@ -2197,6 +2201,137 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
         std::fflush(stdout);
     }
     if (options.final_snapshot) options.final_snapshot(metrics, host);
+    if (SUCCEEDED(com_status)) CoUninitialize();
+    return static_cast<int>(message.wParam);
+}
+
+int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
+    if (windows.empty()) return 2;
+    std::unordered_set<std::string> identities;
+    std::size_t primary_count{};
+    for (const WindowsApplicationWindow& entry : windows) {
+        if (!entry.model || entry.stable_id.empty() ||
+            !identities.insert(entry.stable_id).second ||
+            (!entry.owner_id.empty() && entry.owner_id == entry.stable_id)) {
+            return 2;
+        }
+        if (entry.owner_id.empty() && !entry.tool_window) ++primary_count;
+    }
+    for (const WindowsApplicationWindow& entry : windows) {
+        if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
+    }
+    if (primary_count != 1U) return 2;
+
+    const HRESULT com_status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    enable_best_dpi_awareness();
+    HINSTANCE instance = GetModuleHandleW(nullptr);
+    WNDCLASSEXW native_class{};
+    native_class.cbSize = sizeof(native_class);
+    native_class.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
+    native_class.lpfnWndProc = window_procedure;
+    native_class.hInstance = instance;
+    native_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    native_class.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    native_class.hbrBackground = nullptr;
+    native_class.lpszClassName = window_class_name;
+    if (RegisterClassExW(&native_class) == 0 &&
+        GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+        if (SUCCEEDED(com_status)) CoUninitialize();
+        return 3;
+    }
+
+    std::vector<std::unique_ptr<WindowsHostState>> states(windows.size());
+    std::vector<HWND> handles(windows.size(), nullptr);
+    std::size_t created_count{};
+    while (created_count < windows.size()) {
+        bool made_progress{};
+        for (std::size_t index = 0; index < windows.size(); ++index) {
+            if (handles[index] != nullptr) continue;
+            WindowsApplicationWindow& entry = windows[index];
+            HWND owner{};
+            if (!entry.owner_id.empty()) {
+                const auto owner_entry = std::find_if(
+                    windows.begin(), windows.end(),
+                    [&](const WindowsApplicationWindow& candidate) {
+                        return candidate.stable_id == entry.owner_id;
+                    });
+                const std::size_t owner_index = static_cast<std::size_t>(
+                    std::distance(windows.begin(), owner_entry));
+                owner = handles[owner_index];
+                if (owner == nullptr) continue;
+            }
+
+            WindowsHostOptions host_options = entry.options;
+            host_options.quit_thread_on_close =
+                entry.owner_id.empty() && !entry.tool_window;
+            auto state = std::make_unique<WindowsHostState>(
+                std::move(entry.model), std::move(host_options));
+            const DWORD style = entry.options.popup_window
+                ? (WS_POPUP | WS_BORDER) : WS_OVERLAPPEDWINDOW;
+            const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
+            RECT frame{0, 0,
+                       static_cast<LONG>(std::ceil(entry.options.initial_size.width)),
+                       static_cast<LONG>(std::ceil(entry.options.initial_size.height))};
+            AdjustWindowRectEx(&frame, style, FALSE, ex_style);
+            const std::wstring title = wide_from_utf8(entry.options.title);
+            HWND window = CreateWindowExW(
+                ex_style, window_class_name, title.c_str(), style, CW_USEDEFAULT,
+                CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top,
+                owner, nullptr, instance, state.get());
+            if (window == nullptr || !state->initialize(window)) {
+                if (window != nullptr) DestroyWindow(window);
+                for (HWND created : handles) {
+                    if (IsWindow(created)) DestroyWindow(created);
+                }
+                if (SUCCEEDED(com_status)) CoUninitialize();
+                return window == nullptr ? 4 : 5;
+            }
+            states[index] = std::move(state);
+            handles[index] = window;
+            ++created_count;
+            made_progress = true;
+        }
+        // A remaining ownership cycle is invalid even when a separate primary
+        // exists. Reject it before entering the message loop.
+        if (!made_progress) {
+            for (HWND created : handles) {
+                if (IsWindow(created)) DestroyWindow(created);
+            }
+            if (SUCCEEDED(com_status)) CoUninitialize();
+            return 2;
+        }
+    }
+
+    for (std::size_t index = 0; index < windows.size(); ++index) {
+        ShowWindow(handles[index], windows[index].tool_window ? SW_SHOWNOACTIVATE
+                                                              : SW_SHOWNORMAL);
+        UpdateWindow(handles[index]);
+        if (windows[index].options.close_after_launch_for_testing) {
+            PostMessageW(handles[index], WM_CLOSE, 0, 0);
+        }
+    }
+
+    MSG message{};
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+    for (HWND window : handles) if (IsWindow(window)) DestroyWindow(window);
+    for (std::size_t index = 0; index < windows.size(); ++index) {
+        const std::string metrics = states[index]->metrics_json();
+        const std::string host = states[index]->host_json();
+        if (windows[index].options.print_metrics_on_close) {
+            std::fprintf(stdout,
+                         "{\"stable_id\":\"%s\",\"window\":%s,\"host\":%s}\n",
+                         windows[index].stable_id.c_str(), metrics.c_str(),
+                         host.c_str());
+        }
+        if (windows[index].options.final_snapshot) {
+            windows[index].options.final_snapshot(metrics, host);
+        }
+    }
+    std::fflush(stdout);
+    states.clear();
     if (SUCCEEDED(com_status)) CoUninitialize();
     return static_cast<int>(message.wParam);
 }

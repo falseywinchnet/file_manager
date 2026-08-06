@@ -241,6 +241,27 @@ void test_table_growth_hidden_children_and_fixed_overflow() {
             "table styles and spans must reject degenerate configuration before mutation");
 }
 
+void test_table_cell_dock_fill_consumes_growth() {
+    auto table = make_control<TableLayoutPanel>(StableId("layout.table.fill"));
+    table->set_column_count(1U);
+    table->set_row_count(1U);
+    table->set_column_style(0U, {TableSizeMode::percent, 100.0});
+    table->set_row_style(0U, {TableSizeMode::percent, 100.0});
+    auto child = sized_button("layout.table.fill.child", 120.0, 60.0);
+    child->set_margin({});
+    child->set_dock(DockStyle::fill);
+    table->add_child(child);
+    Window window(table, {240.0, 120.0});
+    window.perform_layout();
+    require(child->arranged_bounds() == Rect{0.0, 0.0, 240.0, 120.0},
+            "a table-cell Dock=Fill child must consume its complete initial cell");
+    window.resize({640.0, 360.0});
+    window.perform_layout();
+    require(child->arranged_bounds() == Rect{0.0, 0.0, 640.0, 360.0} &&
+                child->requested_bounds() == Rect{0.0, 0.0, 120.0, 60.0},
+            "a table-cell Dock=Fill child must consume later growth without rewriting authored bounds");
+}
+
 class GridPainter final : public Painter {
 public:
     void save() override {}
@@ -451,6 +472,7 @@ int main() {
         test_flow_direction_break_visibility_and_resize();
         test_table_mixed_tracks_spans_and_lookup();
         test_table_growth_hidden_children_and_fixed_overflow();
+        test_table_cell_dock_fill_consumes_growth();
         test_table_border_paint_is_public_geometry();
         test_scaled_panel_and_group_are_public_layout_controls();
         test_default_dock_layout_all_directions_and_z_order();

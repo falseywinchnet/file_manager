@@ -173,7 +173,10 @@ public:
             sk_sp<SkTypeface> face = primary;
             if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
                 for (const RegisteredTypeface& candidate : registered_typefaces) {
-                    if (candidate.fallback && candidate.face &&
+                    const bool house_body_fallback =
+                        spec.role != FontRole::content && !candidate.fallback &&
+                        candidate.role == FontRole::content;
+                    if ((candidate.fallback || house_body_fallback) && candidate.face &&
                         candidate.face->unicharToGlyph(scalar) != 0U) {
                         face = candidate.face;
                         break;

@@ -49,6 +49,16 @@ enum class Modifier : std::uint8_t {
                                  static_cast<std::uint8_t>(right));
 }
 
+[[nodiscard]] constexpr Modifier operator&(Modifier left, Modifier right) noexcept {
+    return static_cast<Modifier>(static_cast<std::uint8_t>(left) &
+                                 static_cast<std::uint8_t>(right));
+}
+
+[[nodiscard]] constexpr bool has_modifier(Modifier modifiers,
+                                          Modifier requested) noexcept {
+    return (modifiers & requested) == requested;
+}
+
 struct PointerEvent {
     PointerAction action{PointerAction::move};
     PointerButton button{PointerButton::none};
@@ -58,6 +68,9 @@ struct PointerEvent {
     std::uint32_t pointer_id{};
     EventPhase phase{EventPhase::target};
     bool handled{};
+    // Host-normalized click cardinality. Move/wheel events report zero or one;
+    // a second native press in the platform double-click sequence reports two.
+    std::uint32_t click_count{1U};
 };
 
 struct KeyEvent {
@@ -83,6 +96,7 @@ struct PhysicalKey final {
     static constexpr std::uint32_t backspace = 0x2AU;
     static constexpr std::uint32_t tab = 0x2BU;
     static constexpr std::uint32_t space = 0x2CU;
+    static constexpr std::uint32_t f2 = 0x3BU;
     static constexpr std::uint32_t f4 = 0x3DU;
     static constexpr std::uint32_t home = 0x4AU;
     static constexpr std::uint32_t page_up = 0x4BU;

@@ -81,6 +81,10 @@ public:
     [[nodiscard]] Event<const TextSelection&>& selection_changed() noexcept {
         return selection_changed_;
     }
+    [[nodiscard]] Event<const std::string&>& committed() noexcept {
+        return committed_;
+    }
+    [[nodiscard]] Event<>& cancelled() noexcept { return cancelled_; }
 
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
@@ -122,6 +126,7 @@ private:
     TextSelection selection_{};
     std::vector<double> layout_positions_;
     std::vector<std::uint64_t> layout_offsets_;
+    double layout_text_scale_{};
     double horizontal_offset_{};
     bool read_only_{};
     char32_t password_character_{};
@@ -135,6 +140,8 @@ private:
     std::size_t history_bytes_{};
     Event<const std::string&> text_changed_;
     Event<const TextSelection&> selection_changed_;
+    Event<const std::string&> committed_;
+    Event<> cancelled_;
 
     static constexpr double text_left_ = 6.0;
     static constexpr std::size_t maximum_history_entries_ = 128U;
@@ -163,6 +170,12 @@ public:
     virtual void add_item(std::string item);
     virtual void remove_item(std::size_t index);
     virtual void clear_items();
+    // Optional stable semantic identities for model-backed rows. Calling
+    // set_items clears custom identities; supply exactly one unique, nonempty
+    // ID per item after the collection mutation. Without custom IDs the
+    // historical <list>.item.<index> identity remains in force.
+    void set_item_stable_ids(std::vector<std::string> stable_ids);
+    [[nodiscard]] std::string item_stable_id(std::size_t index) const;
     [[nodiscard]] ListSelectionMode selection_mode() const noexcept {
         return selection_mode_;
     }
@@ -216,6 +229,7 @@ private:
     [[nodiscard]] std::size_t visible_row_count() const noexcept;
 
     std::vector<std::string> items_;
+    std::vector<std::string> item_stable_ids_;
     std::vector<std::size_t> selected_;
     std::optional<std::size_t> active_index_;
     std::optional<std::size_t> anchor_index_;

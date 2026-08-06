@@ -2,6 +2,7 @@
 #include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/window.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <iostream>
@@ -100,7 +101,7 @@ void test_public_controls_render_with_role_policy() {
     RecordingPainter painter;
     window.paint(painter, {0.0, 0.0, 360.0, 180.0});
     require(painter.saves == painter.restores && painter.clips >= 6 &&
-                painter.fills >= 4 && painter.lines >= 12 &&
+                painter.fills >= 24 && painter.lines >= 6 &&
                 painter.texts.size() == 5,
             "public controls must render through retained painter commands");
     require(painter.roles[0] == FontRole::control &&
@@ -401,6 +402,28 @@ void test_public_drawing_metrics_and_control_tag() {
             "MetricsView must expose the structured runtime snapshot semantically");
 }
 
+void test_button_disclosure_semantics() {
+    auto button = make_control<Button>(StableId("button.disclosure"), "Options");
+    button->set_expanded_state(false);
+    SemanticDescriptor collapsed = button->semantic_descriptor();
+    require(!has_semantic_state(collapsed.states, SemanticState::expanded) &&
+                std::find(collapsed.actions.begin(), collapsed.actions.end(),
+                          SemanticAction::expand) != collapsed.actions.end(),
+            "collapsed disclosure button must publish an expand action");
+    std::size_t activations{};
+    auto clicked = button->clicked().subscribe(
+        [&activations](ButtonBase&) { ++activations; });
+    require(button->on_semantic_action(SemanticAction::expand, {}) &&
+                activations == 1U,
+            "semantic expand must route through the button's shared activation");
+    button->set_expanded_state(true);
+    const SemanticDescriptor expanded = button->semantic_descriptor();
+    require(has_semantic_state(expanded.states, SemanticState::expanded) &&
+                std::find(expanded.actions.begin(), expanded.actions.end(),
+                          SemanticAction::collapse) != expanded.actions.end(),
+            "expanded disclosure button must publish state and collapse action");
+}
+
 } // namespace
 
 int main() {
@@ -414,6 +437,7 @@ int main() {
         test_label_multiline_wrapping_and_alignment();
         test_picture_box_modes_registry_and_semantics();
         test_public_drawing_metrics_and_control_tag();
+        test_button_disclosure_semantics();
         std::cout << "gui_forms_basic_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

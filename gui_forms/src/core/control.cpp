@@ -24,6 +24,19 @@ Control::Control(StableId stable_id)
 
 Control::~Control() = default;
 
+double Control::effective_text_scale() const noexcept {
+    return window_ != nullptr
+        ? window_->presentation_settings().text_scale
+        : 1.0;
+}
+
+FontSpec Control::effective_font(FontSpec authored) const noexcept {
+    const double scale = effective_text_scale();
+    authored.size *= scale;
+    authored.letter_spacing *= scale;
+    return authored;
+}
+
 void Control::set_tag(std::any tag) {
     require_mutable();
     tag_ = std::move(tag);

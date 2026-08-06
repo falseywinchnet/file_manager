@@ -513,6 +513,15 @@ void ProgressBar::set_motion_policy(MotionPolicy policy) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+MotionPolicy ProgressBar::effective_motion_policy() const noexcept {
+    MotionPolicy policy = motion_policy_;
+    if (window() != nullptr &&
+        window()->presentation_settings().reduced_motion) {
+        policy.reduced = true;
+    }
+    return policy;
+}
+
 void ProgressBar::set_animation_period(FrameInterval period) {
     require_mutable();
     if (period < std::chrono::milliseconds(100)) {
@@ -535,11 +544,12 @@ bool ProgressBar::animated_style() const noexcept {
 
 void ProgressBar::update_animation_registration() {
     animation_frames_.disconnect();
-    if (window() == nullptr || !animation_enabled_ || !motion_policy_.active() ||
+    const MotionPolicy policy = effective_motion_policy();
+    if (window() == nullptr || !animation_enabled_ || !policy.active() ||
         !animated_style()) {
         return;
     }
-    const FrameInterval interval = motion_policy_.frame_interval(
+    const FrameInterval interval = policy.frame_interval(
         std::chrono::milliseconds(16));
     last_animation_frame_ = FrameClock::now();
     animation_frames_ = window()->activate_surface(
@@ -548,16 +558,25 @@ void ProgressBar::update_animation_registration() {
 
 void ProgressBar::on_attached_to_window() {
     RangeControl::on_attached_to_window();
+    if (window() != nullptr) {
+        presentation_subscription_ = window()->presentation_changed().subscribe(
+            *this, [this](const PresentationSettings&) {
+                update_animation_registration();
+                invalidate(Dirty::paint | Dirty::semantics);
+            });
+    }
     update_animation_registration();
 }
 
 void ProgressBar::on_detached_from_window() noexcept {
+    presentation_subscription_.disconnect();
     animation_frames_.disconnect();
     RangeControl::on_detached_from_window();
 }
 
 void ProgressBar::on_frame(FrameTime now) {
-    if (!animation_enabled_ || !motion_policy_.active() ||
+    const MotionPolicy policy = effective_motion_policy();
+    if (!animation_enabled_ || !policy.active() ||
         !animated_style()) {
         return;
     }
@@ -569,7 +588,7 @@ void ProgressBar::on_frame(FrameTime now) {
     animation_phase_ = period <= 0.0
         ? 0.0
         : std::fmod(animation_phase_ +
-                        elapsed * motion_policy_.speed_scale() / period,
+                        elapsed * policy.speed_scale() / period,
                     1.0);
     if (animation_phase_ < 0.0) {
         animation_phase_ += 1.0;
@@ -593,8 +612,8 @@ void ProgressBar::on_paint(Painter& painter, Rect) {
     const double ratio = normalized_value();
     Rect fill{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
               std::max(0.0, bounds.height - 4.0)};
-    const double presented_phase =
-        motion_policy_.presentation_phase(animation_phase_);
+    const MotionPolicy policy = effective_motion_policy();
+    const double presented_phase = policy.presentation_phase(animation_phase_);
     if (visual_style_ == ProgressBarVisualStyle::marquee) {
         if (orientation() == Orientation::horizontal) {
             const double band = std::max(18.0, fill.width * 0.28);
@@ -684,7 +703,7 @@ SemanticDescriptor ProgressBar::semantic_descriptor() const {
     descriptor.numeric_value = value();
     descriptor.minimum_value = minimum();
     descriptor.maximum_value = maximum();
-    if (animation_enabled_ && motion_policy_.active() &&
+    if (animation_enabled_ && effective_motion_policy().active() &&
         animated_style()) {
         descriptor.states |= SemanticState::busy;
     }

@@ -11,6 +11,8 @@ internal static unsafe class NativeDrawingBridge
         global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_IMAGE_CONTENT") == "1";
     private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<string, int>
         tracedImageDimensions = new(global::System.StringComparer.Ordinal);
+    private static int nativeSurfaceCaptureTraceCount;
+    private static int nativeSurfacePresentTraceCount;
     [StructLayout(LayoutKind.Sequential)] internal record struct Handle(uint Slot, uint Generation)
     {
         internal readonly bool IsNull => Slot == 0;
@@ -44,6 +46,11 @@ internal static unsafe class NativeDrawingBridge
     private static extern int GetApi(uint requestedVersion, ref Api api);
     [DllImport("gui_drawing_raster0", EntryPoint = "gdr_initialize", CallingConvention = CallingConvention.Cdecl)]
     private static extern int InitializeRaster();
+    [DllImport("user32.dll")]
+    private static extern nint WindowFromDC(nint device);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint SendMessageW(nint window, uint message, nint wParam, nint lParam);
+    private const uint NativeSurfacePresentedMessage = 0x83f1u;
 
     private static Api api = Load();
 
@@ -416,16 +423,102 @@ internal static unsafe class NativeDrawingBridge
             __bitmap = bitmap, __token = view.Token,
             __scan0 = (nint)(view.WritableData != null ? view.WritableData : view.Data),
             __stride = checked((int)view.RowBytes),
+            __nativeScan0 = (nint)(view.WritableData != null ? view.WritableData : view.Data),
+            __nativeStride = checked((int)view.RowBytes),
+            __lockWidth = checked((int)view.Width), __lockHeight = checked((int)view.Height),
         };
+    }
+    internal static global::System.Drawing.Imaging.BitmapData BitmapLock(
+        Handle bitmap, global::System.Drawing.Rectangle rectangle,
+        global::System.Drawing.Imaging.ImageLockMode mode,
+        global::System.Drawing.Imaging.PixelFormat format)
+    {
+        var data = BitmapLock(bitmap, mode);
+        try
+        {
+            if (rectangle.X < 0 || rectangle.Y < 0 || rectangle.Width <= 0 || rectangle.Height <= 0 ||
+                rectangle.Right > data.__lockWidth || rectangle.Bottom > data.__lockHeight)
+                throw new global::System.ArgumentOutOfRangeException(nameof(rectangle));
+            data.__lockX = rectangle.X; data.__lockY = rectangle.Y;
+            data.__lockWidth = rectangle.Width; data.__lockHeight = rectangle.Height;
+            if (format == global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb)
+            {
+                data.__scan0 = data.__nativeScan0 + rectangle.Y * data.__nativeStride + rectangle.X * 4;
+                return data;
+            }
+            if (format != global::System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+                throw new global::System.NotSupportedException("GUI.Drawing bitmap locks currently admit 32-bit ARGB and premultiplied ARGB formats.");
+            data.__stride = checked(rectangle.Width * 4);
+            data.__staging = new byte[checked(data.__stride * rectangle.Height)];
+            if (mode != global::System.Drawing.Imaging.ImageLockMode.WriteOnly)
+            {
+                fixed (byte* targetStart = data.__staging)
+                {
+                    var sourceStart = (byte*)data.__nativeScan0 + rectangle.Y * data.__nativeStride + rectangle.X * 4;
+                    for (var y = 0; y < rectangle.Height; ++y)
+                    {
+                        var source = sourceStart + y * data.__nativeStride;
+                        var target = targetStart + y * data.__stride;
+                        for (var x = 0; x < rectangle.Width; ++x)
+                        {
+                            var alpha = source[x * 4 + 3];
+                            target[x * 4] = alpha == 0 ? (byte)0 : (byte)global::System.Math.Min(255, (source[x * 4] * 255 + alpha / 2) / alpha);
+                            target[x * 4 + 1] = alpha == 0 ? (byte)0 : (byte)global::System.Math.Min(255, (source[x * 4 + 1] * 255 + alpha / 2) / alpha);
+                            target[x * 4 + 2] = alpha == 0 ? (byte)0 : (byte)global::System.Math.Min(255, (source[x * 4 + 2] * 255 + alpha / 2) / alpha);
+                            target[x * 4 + 3] = alpha;
+                        }
+                    }
+                }
+            }
+            data.__stagingPin = global::System.Runtime.InteropServices.GCHandle.Alloc(
+                data.__staging, global::System.Runtime.InteropServices.GCHandleType.Pinned);
+            data.__scan0 = data.__stagingPin.AddrOfPinnedObject();
+            data.__writeBackStraightAlpha = mode != global::System.Drawing.Imaging.ImageLockMode.ReadOnly;
+            return data;
+        }
+        catch
+        {
+            BitmapUnlock(bitmap, data);
+            throw;
+        }
     }
     internal static void BitmapUnlock(Handle bitmap,
                                       global::System.Drawing.Imaging.BitmapData data)
     {
         if (data.__bitmap != bitmap || data.__token == 0)
             throw new ArgumentException("BitmapData does not belong to this bitmap.", nameof(data));
-        Check(((delegate* unmanaged[Cdecl]<Handle, ulong, int>)Entry(54))(bitmap, data.__token));
-        data.__token = 0;
-        data.__scan0 = 0;
+        try
+        {
+            if (data.__writeBackStraightAlpha && data.__staging is not null)
+            {
+                fixed (byte* sourceStart = data.__staging)
+                {
+                    var targetStart = (byte*)data.__nativeScan0 + data.__lockY * data.__nativeStride + data.__lockX * 4;
+                    for (var y = 0; y < data.__lockHeight; ++y)
+                    {
+                        var source = sourceStart + y * data.__stride;
+                        var target = targetStart + y * data.__nativeStride;
+                        for (var x = 0; x < data.__lockWidth; ++x)
+                        {
+                            var alpha = source[x * 4 + 3];
+                            target[x * 4] = (byte)((source[x * 4] * alpha + 127) / 255);
+                            target[x * 4 + 1] = (byte)((source[x * 4 + 1] * alpha + 127) / 255);
+                            target[x * 4 + 2] = (byte)((source[x * 4 + 2] * alpha + 127) / 255);
+                            target[x * 4 + 3] = alpha;
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (data.__stagingPin.IsAllocated) data.__stagingPin.Free();
+            Check(((delegate* unmanaged[Cdecl]<Handle, ulong, int>)Entry(54))(bitmap, data.__token));
+            data.__token = 0;
+            data.__scan0 = 0;
+            data.__nativeScan0 = 0;
+            data.__staging = null;
+        }
     }
 
     internal static Handle GraphicsPathCreate()
@@ -688,10 +781,29 @@ internal static unsafe class NativeDrawingBridge
         var recorder = graphics.__recorder;
         if (target is null || recorder.IsNull) return;
         if (graphics.__executedCommands == RecorderCommandCount(recorder)) return;
+        if (graphics.__nativeSurface != 0) RefreshNativeSurfaceTarget(graphics, target);
         graphics.__executedCommands += ExecuteFrom(
             recorder, target.__BitmapHandle,
             graphics.__executedCommands);
         if (graphics.__nativeSurface != 0) PresentNativeSurface(graphics);
+    }
+
+    private static void RefreshNativeSurfaceTarget(global::System.Drawing.Graphics graphics,
+                                                    global::System.Drawing.Image target)
+    {
+        Handle refreshed;
+        Rect bounds;
+        var result = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle*, Rect*, int>)Entry(92))(
+            (nuint)graphics.__nativeSurface, graphics.__nativeSurfaceKind, &refreshed, &bounds);
+        if (result == 7) throw new PlatformNotSupportedException(
+            "Native HDC/HWND drawing is available only through the Windows adapter.");
+        Check(result);
+        Dimensions(refreshed, out var width, out var height);
+        var previous = target.__bitmap;
+        target.__bitmap = refreshed;
+        target.__width = width;
+        target.__height = height;
+        Release(ref previous);
     }
 
     internal static byte[] EncodePng(Handle bitmap)
@@ -810,6 +922,10 @@ internal static unsafe class NativeDrawingBridge
             "Native HDC/HWND drawing is available only through the Windows adapter.");
         Check(result);
         Dimensions(bitmapHandle, out var width, out var height);
+        if (global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_NATIVE_SURFACES") == "1" &&
+            global::System.Threading.Interlocked.Increment(ref nativeSurfaceCaptureTraceCount) <= 32)
+            global::System.Console.Error.WriteLine("gui-drawing-native-surface=capture|kind:" + kind +
+                "|size:" + width + "x" + height + "|thread:" + global::System.Environment.CurrentManagedThreadId);
         FacadeCallTelemetry.Observe("graphics.target-kind", kind == 0 ? "hdc" : "hwnd");
         FacadeCallTelemetry.Observe("graphics.target-dimensions", width.ToString(global::System.Globalization.CultureInfo.InvariantCulture) + "x" + height.ToString(global::System.Globalization.CultureInfo.InvariantCulture));
         var graphics = new global::System.Drawing.Graphics
@@ -833,6 +949,22 @@ internal static unsafe class NativeDrawingBridge
         if (result == 7) throw new PlatformNotSupportedException(
             "Native surface presentation is available only through the Windows adapter.");
         Check(result);
+        // A direct-GDI control is sampled into the retained tree only after its
+        // managed Graphics flush has completed. This explicit boundary prevents
+        // the polling fallback from publishing the intermediate Clear/BitBlt
+        // states that otherwise appear as white flashes or split frames.
+        if (global::System.OperatingSystem.IsWindows())
+        {
+            var window = graphics.__nativeSurfaceKind == 0
+                ? WindowFromDC(graphics.__nativeSurface)
+                : graphics.__nativeSurface;
+            if (window != 0) _ = SendMessageW(window, NativeSurfacePresentedMessage, 0, 0);
+        }
+        if (global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_NATIVE_SURFACES") == "1" &&
+            global::System.Threading.Interlocked.Increment(ref nativeSurfacePresentTraceCount) <= 64)
+            global::System.Console.Error.WriteLine("gui-drawing-native-surface=present|kind:" +
+                graphics.__nativeSurfaceKind + "|size:" + graphics.__target.Width + "x" +
+                graphics.__target.Height + "|thread:" + global::System.Environment.CurrentManagedThreadId);
     }
     internal static nint GetHdc(global::System.Drawing.Graphics graphics) =>
         AcquireHdc(graphics);

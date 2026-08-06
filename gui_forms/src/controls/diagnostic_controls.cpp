@@ -114,10 +114,11 @@ std::string MetricsView::metrics_text() const {
 void MetricsView::on_paint(Painter& painter, Rect) {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const double s = effective_text_scale();
     painter.fill_rect(bounds, style_.text);
     painter.fill_rect({0.0, 0.0, 5.0, bounds.height}, style_.accent);
-    painter.draw_text_utf8({16.0, 24.0}, title_,
-                           {FontRole::control, 12.0, 700, false},
+    painter.draw_text_utf8({16.0 * s, 24.0 * s}, title_,
+                           effective_font({FontRole::control, 12.0, 700, false}),
                            style_.face_light);
     const std::string metrics = metrics_text();
     const std::size_t split = metrics.find(" · ", metrics.size() / 2U);
@@ -125,12 +126,12 @@ void MetricsView::on_paint(Painter& painter, Rect) {
         ? metrics : metrics.substr(0U, split);
     const std::string second = split == std::string::npos
         ? std::string{} : metrics.substr(split + 3U);
-    painter.draw_text_utf8({16.0, 48.0}, first,
-                           {FontRole::content, 11.0, 400, false},
+    painter.draw_text_utf8({16.0 * s, 48.0 * s}, first,
+                           effective_font({FontRole::content, 11.0, 400, false}),
                            style_.face);
     if (!second.empty()) {
-        painter.draw_text_utf8({16.0, 68.0}, second,
-                               {FontRole::content, 11.0, 400, false},
+        painter.draw_text_utf8({16.0 * s, 68.0 * s}, second,
+                               effective_font({FontRole::content, 11.0, 400, false}),
                                style_.face);
     }
 }
@@ -223,21 +224,31 @@ void EasingPreview::set_motion_policy(MotionPolicy policy) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+MotionPolicy EasingPreview::effective_motion_policy() const noexcept {
+    MotionPolicy policy = motion_policy_;
+    if (window() != nullptr &&
+        window()->presentation_settings().reduced_motion) {
+        policy.reduced = true;
+    }
+    return policy;
+}
+
 void EasingPreview::on_frame(FrameTime now) {
-    if (!motion_policy_.active()) return;
+    if (!effective_motion_policy().active()) return;
     const AnimationSample sample = timeline_.sample(now);
     phase_ = sample.progress;
     if (sample.finished) frames_.disconnect();
 }
 
 std::string EasingPreview::motion_readout(double presented_phase) const {
-    const char* name = !motion_policy_.enabled
+    const MotionPolicy policy = effective_motion_policy();
+    const char* name = !policy.enabled
         ? "DISABLED"
-        : motion_policy_.reduced && motion_policy_.paused
+        : policy.reduced && policy.paused
             ? "REDUCED + PAUSED"
-            : motion_policy_.reduced
+            : policy.reduced
                 ? "REDUCED"
-                : motion_policy_.paused ? "PAUSED" : "LIVE";
+                : policy.paused ? "PAUSED" : "LIVE";
     char readout[96]{};
     std::snprintf(readout, sizeof(readout), "%s · %03d%%", name,
                   static_cast<int>(std::round(presented_phase * 100.0)));
@@ -247,30 +258,34 @@ std::string EasingPreview::motion_readout(double presented_phase) const {
 void EasingPreview::on_paint(Painter& painter, Rect) {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const double s = effective_text_scale();
     painter.fill_rect(bounds, style_.paper);
     painter.stroke_rect({0.5, 0.5, std::max(0.0, bounds.width - 1.0),
                          std::max(0.0, bounds.height - 1.0)},
                         style_.border, 1.0);
-    painter.draw_text_utf8({18.0, 25.0}, title_,
-                           {FontRole::control, 13.0, 700, false},
+    painter.draw_text_utf8({18.0 * s, 25.0 * s}, title_,
+                           effective_font({FontRole::control, 13.0, 700, false}),
                            style_.dark_border);
-    const double presented_phase = motion_policy_.presentation_phase(phase_);
+    const MotionPolicy policy = effective_motion_policy();
+    const double presented_phase = policy.presentation_phase(phase_);
     const std::string readout = motion_readout(presented_phase);
-    painter.draw_text_utf8({bounds.width - 150.0, 25.0}, readout,
-                           {FontRole::control, 11.0, 600, false},
-                           motion_policy_.active() ? style_.accent
+    painter.draw_text_utf8({bounds.width - 150.0 * s, 25.0 * s}, readout,
+                           effective_font({FontRole::control, 11.0, 600, false}),
+                           policy.active() ? style_.accent
                                                    : Color::rgba(211, 121, 42));
 
     const double row_height = tracks_.empty()
-        ? 0.0 : std::max(18.0, (bounds.height - 48.0) / tracks_.size());
+        ? 0.0 : std::max(18.0 * s,
+                         (bounds.height - 48.0 * s) / tracks_.size());
     const double directed = presented_phase < 0.5
         ? presented_phase * 2.0 : (1.0 - presented_phase) * 2.0;
     for (std::size_t index = 0U; index < tracks_.size(); ++index) {
-        const double y = 48.0 + static_cast<double>(index) * row_height;
-        painter.draw_text_utf8({18.0, y + 15.0}, tracks_[index].label,
-                               {FontRole::content, 11.0, 400, false}, style_.text);
-        const double track_x = 112.0;
-        const double track_width = std::max(40.0, bounds.width - 140.0);
+        const double y = 48.0 * s + static_cast<double>(index) * row_height;
+        painter.draw_text_utf8({18.0 * s, y + 15.0 * s}, tracks_[index].label,
+                               effective_font({FontRole::content, 11.0, 400, false}),
+                               style_.text);
+        const double track_x = 112.0 * s;
+        const double track_width = std::max(40.0 * s, bounds.width - 140.0 * s);
         painter.fill_rect({track_x, y + 8.0, track_width, 3.0}, style_.face);
         const double eased = std::clamp(
             apply_easing(tracks_[index].curve, directed), -0.08, 1.08);
@@ -290,18 +305,27 @@ SemanticDescriptor EasingPreview::semantic_descriptor() const {
     descriptor.role = SemanticRole::image;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
-    const double presented = motion_policy_.presentation_phase(phase_);
+    const MotionPolicy policy = effective_motion_policy();
+    const double presented = policy.presentation_phase(phase_);
     descriptor.value = motion_readout(presented);
     descriptor.numeric_value = presented;
     descriptor.minimum_value = 0.0;
     descriptor.maximum_value = 1.0;
-    if (motion_policy_.active()) descriptor.states |= SemanticState::busy;
+    if (policy.active()) descriptor.states |= SemanticState::busy;
     descriptor.exposed = true;
     return descriptor;
 }
 
 void EasingPreview::on_attached_to_window() {
     Control::on_attached_to_window();
+    if (window() != nullptr) {
+        presentation_subscription_ = window()->presentation_changed().subscribe(
+            *this, [this](const PresentationSettings&) {
+                frames_.disconnect();
+                if (effective_motion_policy().active()) register_frames();
+                invalidate(Dirty::paint | Dirty::semantics);
+            });
+    }
     const FrameTime attached = FrameClock::now();
     if (!timeline_started_) {
         timeline_.start(attached);
@@ -314,6 +338,7 @@ void EasingPreview::on_attached_to_window() {
 }
 
 void EasingPreview::on_detached_from_window() noexcept {
+    presentation_subscription_.disconnect();
     frames_.disconnect();
     if (timeline_started_) {
         const FrameTime detached = FrameClock::now();
@@ -324,8 +349,9 @@ void EasingPreview::on_detached_from_window() noexcept {
 }
 
 void EasingPreview::register_frames() {
-    if (window() == nullptr || !motion_policy_.active()) return;
-    const FrameInterval interval = motion_policy_.frame_interval(16ms);
+    const MotionPolicy policy = effective_motion_policy();
+    if (window() == nullptr || !policy.active()) return;
+    const FrameInterval interval = policy.frame_interval(16ms);
     frames_ = window()->activate_surface(
         shared_from_this(), interval, FrameClock::now() + interval);
 }

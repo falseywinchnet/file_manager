@@ -95,6 +95,34 @@ void test_cluster_fallback_is_bounded_and_absolute() {
             "an uncovered emoji ZWJ sequence must report one indivisible pack fault");
 }
 
+void test_control_navigation_symbols_stay_in_rapids() {
+    const std::vector<std::byte> rapids_regular = read_file(
+        GUI_FORMS_TEST_RAPIDS_REGULAR);
+    const std::vector<std::byte> rapids_bold = read_file(
+        GUI_FORMS_TEST_RAPIDS_BOLD);
+    const std::vector<std::byte> carlito = read_file(
+        GUI_FORMS_TEST_CARLITO_REGULAR);
+    HarfBuzzFontEngine engine;
+    const auto regular = engine.register_typeface(
+        FontRole::control, 400, false, rapids_regular);
+    const auto bold = engine.register_typeface(
+        FontRole::control, 700, false, rapids_bold);
+    const auto body = engine.register_typeface(
+        FontRole::content, 400, false, carlito);
+    require(regular && bold && body,
+            "house control/body faces must register for navigation shaping");
+    const std::string text = "Back ←  Up ↑  Forward →  Sort A→Z ▼";
+    const ShapedText normal = engine.shape(
+        text, {FontRole::control, 14.0, 400, false});
+    const ShapedText heavy = engine.shape(
+        text, {FontRole::control, 14.0, 700, false});
+    require(normal.missing_clusters == 0U && normal.runs.size() == 1U &&
+                normal.runs.front().face == *regular &&
+                heavy.missing_clusters == 0U && heavy.runs.size() == 1U &&
+                heavy.runs.front().face == *bold,
+            "navigation controls must shape wholly in Portsmouth Rapids");
+}
+
 void test_metrics_scale_and_repeat_deterministically() {
     HarfBuzzFontEngine engine;
     const std::vector<std::byte> carlito =
@@ -222,6 +250,7 @@ int main() {
     try {
         test_owned_registration_style_selection_and_ligatures();
         test_cluster_fallback_is_bounded_and_absolute();
+        test_control_navigation_symbols_stay_in_rapids();
         test_metrics_scale_and_repeat_deterministically();
         test_shared_cjk_and_emoji_fallback_across_roles();
         test_letter_spacing_is_a_shaped_layout_input();

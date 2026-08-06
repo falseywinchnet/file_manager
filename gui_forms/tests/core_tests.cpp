@@ -5,8 +5,10 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -23,12 +25,16 @@ public:
     void fill_rect(Rect, Color) override { ++draw_count; }
     void stroke_rect(Rect, Color, double) override { ++draw_count; }
     void draw_line(Point, Point, Color, double) override { ++draw_count; }
-    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override { ++draw_count; }
+    void draw_text_utf8(Point, std::string_view, FontSpec font, Color) override {
+        ++draw_count;
+        last_font = font;
+    }
     void draw_image(ImageId, Rect, double) override { ++draw_count; }
 
     std::uint64_t save_count{};
     std::uint64_t restore_count{};
     std::uint64_t draw_count{};
+    std::optional<FontSpec> last_font;
 };
 
 class ProbeControl : public Control {
@@ -72,6 +78,10 @@ public:
         focus_state = focused;
     }
 
+    void on_key(KeyEvent& event) override {
+        if (handle_key) event.handled = true;
+    }
+
     void on_activate() override {
         ++activation_count;
         invalidate(Dirty::paint);
@@ -83,8 +93,29 @@ public:
     std::uint64_t activation_count{};
     bool focus_state{};
     bool handle_preview_release{};
+    bool handle_key{};
     std::function<void()> release_callback;
     std::vector<EventPhase> phases;
+};
+
+class FontProbe final : public Control {
+public:
+    explicit FontProbe(StableId id) : Control(std::move(id)) {}
+
+    [[nodiscard]] FontSpec font() const noexcept { return authored_font_; }
+    Size measure(Size available) override {
+        const FontSpec resolved = effective_font(authored_font_);
+        return {std::min(available.width, resolved.size * 8.0),
+                std::min(available.height, resolved.size * 1.4)};
+    }
+    void on_paint(Painter& painter, Rect) override {
+        painter.draw_text_utf8({0.0, effective_font(authored_font_).size},
+                               "Scale me", effective_font(authored_font_),
+                               Color::rgba(0, 0, 0));
+    }
+
+private:
+    FontSpec authored_font_{FontRole::content, 12.0, 400, false};
 };
 
 void require(bool condition, const char* message) {
@@ -320,6 +351,131 @@ void test_damage_and_idle_metrics() {
             "machine snapshot must declare CPU-only renderer capability");
 }
 
+void test_tokenized_accelerator_runs_after_focused_route() {
+    Fixture fixture;
+    require(fixture.window->request_focus(fixture.child),
+            "accelerator test requires a focused retained target");
+    auto owner = std::make_shared<Component>();
+    std::size_t invocations{};
+    auto token = fixture.window->register_accelerator(
+        *owner, {PhysicalKey::left, Modifier::alt}, [&invocations] {
+            ++invocations;
+            return true;
+        });
+    require(token.connected() && fixture.window->dispatch_key(
+                {KeyAction::down, PhysicalKey::left, Modifier::alt}) &&
+                invocations == 1U,
+            "an exact unhandled chord must invoke its window accelerator once");
+    require(!fixture.window->dispatch_key(
+                {KeyAction::up, PhysicalKey::left, Modifier::alt}) &&
+                invocations == 1U,
+            "key release must never execute an accelerator");
+    fixture.child->handle_key = true;
+    require(fixture.window->dispatch_key(
+                {KeyAction::down, PhysicalKey::left, Modifier::alt}) &&
+                invocations == 1U,
+            "focused controls must retain precedence over global accelerators");
+    fixture.child->handle_key = false;
+    owner->dispose();
+    require(!token.connected() && !fixture.window->dispatch_key(
+                {KeyAction::down, PhysicalKey::left, Modifier::alt}) &&
+                invocations == 1U,
+            "owner disposal must deterministically revoke its accelerator");
+}
+
+void test_presentation_settings_separate_text_and_device_scale() {
+    auto label = make_control<FontProbe>(StableId("presentation.label"));
+    Window window(label, {400.0, 120.0});
+    const Size normal = label->measure({400.0, 120.0});
+    std::size_t changes{};
+    auto owner = std::make_shared<Component>();
+    auto token = window.presentation_changed().subscribe(
+        *owner, [&changes](const PresentationSettings&) { ++changes; });
+    auto popup = make_control<ProbeControl>(StableId("presentation.popup"));
+    popup->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+    auto popup_token = window.open_popup(label, popup);
+
+    window.set_scale(2.0);
+    require(window.scale() == 2.0 && label->effective_text_scale() == 1.0,
+            "device scale must not mutate logical text scale");
+    require(label->measure({400.0, 120.0}) == normal,
+            "device scale must not change retained logical measurement");
+
+    window.set_text_scale(2.0);
+    const Size enlarged = label->measure({400.0, 120.0});
+    require(window.presentation_settings().text_scale == 2.0 &&
+                label->effective_font(label->font()).size == label->font().size * 2.0 &&
+                enlarged.width > normal.width && enlarged.height > normal.height &&
+                changes == 1U,
+            "text scale must coherently affect public effective fonts and measurement");
+    require(!popup_token.connected(),
+            "text-scale changes must dismiss transient geometry resolved at the old scale");
+    window.set_text_scale(2.0);
+    require(changes == 1U,
+            "idempotent presentation mutation must not publish duplicate change events");
+
+    RecordingPainter painter;
+    window.paint(painter);
+    require(painter.last_font && painter.last_font->size == label->font().size * 2.0,
+            "paint must consume the same effective font used by measurement");
+
+    bool rejected{};
+    try {
+        window.set_text_scale(0.49);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "presentation text scale must reject values outside its contract");
+
+    bool wrong_thread_rejected{};
+    std::thread worker([&] {
+        try {
+            window.set_text_scale(1.25);
+        } catch (...) {
+            wrong_thread_rejected = true;
+        }
+    });
+    worker.join();
+    require(wrong_thread_rejected,
+            "presentation settings must retain Window UI-thread enforcement");
+    require(token.connected(), "presentation subscription must remain tokenized");
+}
+
+void test_semantic_feedback_is_clocked_bounded_and_sound_optional() {
+    auto root = make_control<ProbeControl>(StableId("feedback.root"));
+    Window window(root, {100.0, 60.0});
+    std::vector<std::uint64_t> times{10U, 10U, 12U};
+    std::size_t cursor{};
+    SemanticFeedback feedback(window, [&] { return times[cursor++]; });
+    feedback.set_maximum_records(2U);
+    const SemanticFeedbackRecord location = feedback.emit(
+        SemanticFeedbackKind::location_changed);
+    PresentationSettings muted = window.presentation_settings();
+    muted.sound_enabled = false;
+    window.set_presentation_settings(muted);
+    const SemanticFeedbackRecord option = feedback.emit(
+        SemanticFeedbackKind::option_committed);
+    const SemanticFeedbackRecord conflict = feedback.emit(
+        SemanticFeedbackKind::conflict);
+    require(location.timestamp_nanoseconds == 10U &&
+                option.timestamp_nanoseconds == 11U &&
+                conflict.timestamp_nanoseconds == 12U,
+            "feedback must normalize an injected clock to strict monotonic order");
+    require(location.cue == HostSoundCue::notification &&
+                option.cue == HostSoundCue::success &&
+                conflict.cue == HostSoundCue::warning &&
+                location.sound_enabled && !option.sound_enabled &&
+                !conflict.sound_enabled,
+            "semantic feedback must map state kinds while keeping sound policy optional");
+    require(feedback.records().size() == 2U &&
+                feedback.dropped_record_count() == 1U &&
+                feedback.records().front().sequence == 2U &&
+                feedback.trace().find("feedback=option_committed sequence=2") !=
+                    std::string::npos &&
+                feedback.trace().find("sound=off") != std::string::npos,
+            "feedback history and trace must be deterministic and bounded");
+}
+
 } // namespace
 
 int main() {
@@ -335,6 +491,9 @@ int main() {
         test_static_tree_factory();
         test_cursor_inheritance_and_override();
         test_damage_and_idle_metrics();
+        test_tokenized_accelerator_runs_after_focused_route();
+        test_presentation_settings_separate_text_and_device_scale();
+        test_semantic_feedback_is_clocked_bounded_and_sound_optional();
         std::cout << "gui_forms_core_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

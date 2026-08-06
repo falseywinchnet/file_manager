@@ -93,6 +93,7 @@ public:
     [[nodiscard]] MotionPolicy motion_policy() const noexcept {
         return motion_policy_;
     }
+    [[nodiscard]] MotionPolicy effective_motion_policy() const noexcept;
     void set_motion_policy(MotionPolicy policy);
     [[nodiscard]] double phase() const noexcept { return phase_; }
 
@@ -110,6 +111,7 @@ private:
     [[nodiscard]] std::string motion_readout(double presented_phase) const;
 
     FrameRequestToken frames_;
+    SubscriptionToken presentation_subscription_;
     AnimationTimeline timeline_;
     std::vector<EasingPreviewTrack> tracks_;
     std::string title_{"Animation timeline and easing"};

@@ -3,8 +3,8 @@ if(NOT IS_DIRECTORY "${FONT_DIRECTORY}")
 endif()
 
 set(font_manifest
-    "PortsmouthRapids.ttf|b7a98b9dc091f7319a658b1e924ecd97948ec4a1eea0a772501e893107d04f19"
-    "PortsmouthRapids-Bold.ttf|e9dd60dcd8198235fe531149e0b1ab282e28655cc2159ead6123ee398deb1f82"
+    "PortsmouthRapids.ttf|88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add"
+    "PortsmouthRapids-Bold.ttf|f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a"
     "Carlito-Regular.ttf|f6418f708baede9789daef5d458c0f53d2a888af9820e8062934e504fedc6595"
     "Carlito-Bold.ttf|bb5d20f79b82599ec72983597437373a80f2d2085fa91fc144fd74e876a594db"
     "Carlito-Italic.ttf|0b019225e58d702bfedcbd35c21696769f8ee115cb6343f84c2f240312450d1c"

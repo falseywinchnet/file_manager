@@ -44,6 +44,38 @@ private:
     Event<> closed_;
 };
 
+class AcceleratorAttachment final : public Revocable {
+public:
+    AcceleratorAttachment(Window& window, Component& owner, KeyGesture gesture,
+                          std::function<bool()> callback,
+                          AcceleratorOptions options)
+        : window_(&window), owner_(&owner), gesture_(gesture),
+          callback_(std::move(callback)), options_(options) {}
+
+    void disconnect() noexcept override {
+        if (connected_ && window_) window_->close_accelerator(*this);
+    }
+    [[nodiscard]] bool connected() const noexcept override { return connected_; }
+    [[nodiscard]] Component* owner() const noexcept { return owner_; }
+    [[nodiscard]] KeyGesture gesture() const noexcept { return gesture_; }
+    [[nodiscard]] AcceleratorOptions options() const noexcept { return options_; }
+    bool invoke() { return callback_ && callback_(); }
+    void revoke() noexcept {
+        connected_ = false;
+        window_ = nullptr;
+        owner_ = nullptr;
+        callback_ = {};
+    }
+
+private:
+    Window* window_{};
+    Component* owner_{};
+    KeyGesture gesture_{};
+    std::function<bool()> callback_;
+    AcceleratorOptions options_{};
+    bool connected_{true};
+};
+
 } // namespace detail
 
 void PopupToken::disconnect() noexcept {
@@ -59,6 +91,17 @@ bool PopupToken::connected() const noexcept {
 
 Event<>* PopupToken::closed_event() noexcept {
     return attachment_ ? &attachment_->closed() : nullptr;
+}
+
+void AcceleratorToken::disconnect() noexcept {
+    if (attachment_) {
+        attachment_->disconnect();
+        attachment_.reset();
+    }
+}
+
+bool AcceleratorToken::connected() const noexcept {
+    return attachment_ && attachment_->connected();
 }
 
 namespace {
@@ -242,6 +285,9 @@ bool Window::remove_image(ImageId image) {
 
 Window::~Window() {
     shutdown_dispatcher();
+    while (!accelerators_.empty()) {
+        accelerators_.back()->disconnect();
+    }
     while (!popups_.empty()) {
         popups_.back()->disconnect();
     }
@@ -255,6 +301,48 @@ Window::~Window() {
         detach_subtree(root_);
     }
     lifetime_->window = nullptr;
+}
+
+AcceleratorToken Window::register_accelerator(
+    Component& owner, KeyGesture gesture, std::function<bool()> callback,
+    AcceleratorOptions options) {
+    require_ui_thread("accelerator registration");
+    if (!owner.is_alive() || gesture.physical_key == 0U || !callback) {
+        throw std::invalid_argument(
+            "accelerator requires a live owner, physical key, and callback");
+    }
+    auto attachment = std::make_shared<detail::AcceleratorAttachment>(
+        *this, owner, gesture, std::move(callback), options);
+    accelerators_.push_back(attachment);
+    owner.own_revocable(attachment);
+    return AcceleratorToken(std::move(attachment));
+}
+
+void Window::close_accelerator(
+    detail::AcceleratorAttachment& accelerator) noexcept {
+    const auto found = std::find_if(accelerators_.begin(), accelerators_.end(),
+        [&accelerator](const auto& candidate) {
+            return candidate.get() == &accelerator;
+        });
+    if (found == accelerators_.end()) return;
+    (*found)->revoke();
+    accelerators_.erase(found);
+}
+
+bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
+    if (event.action != KeyAction::down) return false;
+    const auto snapshot = accelerators_;
+    for (auto iterator = snapshot.rbegin(); iterator != snapshot.rend(); ++iterator) {
+        const auto& accelerator = *iterator;
+        if (!accelerator || !accelerator->connected() ||
+            accelerator->options().before_focused_route != preemptive ||
+            accelerator->gesture().physical_key != event.physical_key ||
+            accelerator->gesture().modifiers != event.modifiers) continue;
+        Component* owner = accelerator->owner();
+        if (!owner || !owner->is_alive()) continue;
+        if (accelerator->invoke()) return true;
+    }
+    return false;
 }
 
 PopupToken Window::open_popup(const Control::Ptr& owner,
@@ -273,7 +361,12 @@ PopupToken Window::open_popup(const Control::Ptr& owner,
     if (!popup || popup->window_ != nullptr || popup->parent() || !popup->is_alive()) {
         throw std::logic_error("GUI.Forms popup must be a live detached root");
     }
-    root_->add_child(popup);
+    // Popups are window overlays, not children in the consumer's layout
+    // vocabulary. Attaching one to root_ lets a TableLayoutPanel, Flow panel,
+    // or docking root assign it an application cell and silently collapse the
+    // overlay. Keep it as a separate retained root while still registering the
+    // subtree with this Window for lifetime, focus, semantics, and dispatch.
+    attach_subtree(popup, {});
     auto attachment = std::make_shared<detail::PopupAttachment>(*this, owner, popup);
     popups_.push_back(attachment);
     owner->own_revocable(attachment);
@@ -290,10 +383,10 @@ void Window::close_popup(detail::PopupAttachment& popup) noexcept {
     const Control::Ptr overlay = (*found)->popup();
     (*found)->revoke();
     popups_.erase(found);
-    if (overlay && overlay->parent().get() == root_.get() &&
-        overlay->window_ == this && !in_lifecycle_notification_) {
+    if (overlay && !overlay->parent() && overlay->window_ == this &&
+        overlay != root_ && !in_lifecycle_notification_) {
         try {
-            static_cast<void>(root_->remove_child(overlay->runtime_id()));
+            detach_subtree(overlay);
         } catch (...) {
         }
     }
@@ -323,6 +416,11 @@ void Window::resize(Size client_size) {
     client_size_ = client_size;
     add_damage_all_planes(old_bounds);
     mark_subtree_dirty(*root_, invalidation::bounds);
+    for (const auto& popup : popups_) {
+        if (const Control::Ptr overlay = popup->popup()) {
+            mark_subtree_dirty(*overlay, invalidation::bounds);
+        }
+    }
 }
 
 void Window::set_scale(double scale) {
@@ -335,6 +433,48 @@ void Window::set_scale(double scale) {
     }
     scale_ = scale;
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
+    for (const auto& popup : popups_) {
+        if (const Control::Ptr overlay = popup->popup()) {
+            mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
+        }
+    }
+}
+
+void Window::set_presentation_settings(PresentationSettings settings) {
+    require_ui_thread("presentation settings mutation");
+    if (!std::isfinite(settings.text_scale) ||
+        settings.text_scale < 0.5 || settings.text_scale > 4.0) {
+        throw std::invalid_argument(
+            "GUI.Forms text scale must be finite and between 0.5 and 4.0");
+    }
+    if (presentation_settings_ == settings) {
+        return;
+    }
+    const bool text_scale_changed =
+        presentation_settings_.text_scale != settings.text_scale;
+    presentation_settings_ = settings;
+    // Transient overlays own geometry resolved for the opening text metrics.
+    // A text-scale transition dismisses them deterministically; reopening
+    // rebuilds rows, hit regions, focus scope, and screen-edge placement from
+    // the new logical metrics.
+    if (text_scale_changed) {
+        while (!popups_.empty()) {
+            popups_.back()->disconnect();
+        }
+    }
+    mark_subtree_dirty(*root_, invalidation::conservative_subtree);
+    for (const auto& popup : popups_) {
+        if (const Control::Ptr overlay = popup->popup()) {
+            mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
+        }
+    }
+    presentation_changed_.emit(presentation_settings_);
+}
+
+void Window::set_text_scale(double text_scale) {
+    PresentationSettings settings = presentation_settings_;
+    settings.text_scale = text_scale;
+    set_presentation_settings(settings);
 }
 
 UpdateScope Window::begin_update() {
@@ -397,6 +537,15 @@ void Window::paint(Painter& painter, Rect requested_damage) {
         paint_recursive(root_, painter, plane_bounds, plane, visited_nodes,
                         painted_controls, consumed_invalidations, chunks_rebuilt,
                         chunks_reused, commands_replayed);
+        // Window-owned popup roots are composited after application content in
+        // opening order, independent of the consumer root's layout strategy.
+        for (const auto& popup : popups_) {
+            if (const Control::Ptr overlay = popup->popup()) {
+                paint_recursive(overlay, painter, plane_bounds, plane, visited_nodes,
+                                painted_controls, consumed_invalidations,
+                                chunks_rebuilt, chunks_reused, commands_replayed);
+            }
+        }
         const Rect pending_bounds = plane_damage_[index].bounds();
         if (pending_bounds.empty() ||
             Rect::intersection(plane_bounds, pending_bounds) == pending_bounds) {
@@ -411,7 +560,13 @@ void Window::paint(Painter& painter, Rect requested_damage) {
                           paint_bounds.area(), full_window);
     update_display_cache_metrics();
 
+    const bool popup_paint_dirty = std::any_of(
+        popups_.begin(), popups_.end(), [](const auto& popup) {
+            const Control::Ptr overlay = popup->popup();
+            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::paint);
+        });
     paint_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::paint) ||
+                   popup_paint_dirty ||
                    std::any_of(plane_damage_.begin(), plane_damage_.end(),
                                [](const DamageRegion& damage) { return !damage.empty(); });
 }
@@ -442,7 +597,13 @@ DamageRegion Window::take_damage(PaintPlane plane) {
     const std::size_t index = paint_plane_index(plane);
     DamageRegion result = std::move(plane_damage_[index]);
     plane_damage_[index] = {};
+    const bool popup_paint_dirty = std::any_of(
+        popups_.begin(), popups_.end(), [](const auto& popup) {
+            const Control::Ptr overlay = popup->popup();
+            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::paint);
+        });
     paint_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::paint) ||
+                   popup_paint_dirty ||
                    std::any_of(plane_damage_.begin(), plane_damage_.end(),
                                [](const DamageRegion& damage) { return !damage.empty(); });
     return result;
@@ -672,6 +833,13 @@ Control::Ptr Window::find(std::string_view stable_id) const {
 Control::Ptr Window::hit_test(Point position) {
     require_ui_thread("hit test");
     ensure_layout(true);
+    for (auto popup = popups_.rbegin(); popup != popups_.rend(); ++popup) {
+        if (const Control::Ptr overlay = (*popup)->popup()) {
+            if (Control::Ptr target = hit_test_recursive(overlay, position)) {
+                return target;
+            }
+        }
+    }
     return hit_test_recursive(root_, position);
 }
 
@@ -1073,8 +1241,10 @@ bool Window::dispatch_key(KeyEvent event) {
     const bool forward =
         (static_cast<std::uint8_t>(event.modifiers) &
          static_cast<std::uint8_t>(Modifier::shift)) == 0U;
+    if (focus_scopes_.empty() && dispatch_accelerator(event, true)) return true;
     Control::Ptr target = focused_.lock();
     if (!target || !eligible(target)) {
+        if (dispatch_accelerator(event, false)) return true;
         return traversal_key && move_focus(forward);
     }
     const auto route = route_to(target);
@@ -1107,6 +1277,9 @@ bool Window::dispatch_key(KeyEvent event) {
                 break;
             }
         }
+    }
+    if (!event.handled && dispatch_accelerator(event, false)) {
+        return true;
     }
     if (!event.handled && traversal_key) {
         return move_focus(forward);
@@ -1306,8 +1479,7 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
         current->lifecycle_notification_ = false;
     }
     in_lifecycle_notification_ = false;
-    metrics_.set_population(root_ ? root_->subtree_size() : control->subtree_size(),
-                            stable_ids_.size());
+    metrics_.set_population(stable_ids_.size(), stable_ids_.size());
     static_cast<void>(recompute_subtree_dirty(root_));
     mark_subtree_dirty(*control, invalidation::visual_tree);
 }
@@ -1569,6 +1741,12 @@ SemanticSnapshot Window::semantic_snapshot() {
     snapshot.generation = semantic_generation_;
     append_semantic_nodes(root_, focused_.lock(), snapshot.roots,
                           snapshot.node_count);
+    for (const auto& popup : popups_) {
+        if (const Control::Ptr overlay = popup->popup()) {
+            append_semantic_nodes(overlay, focused_.lock(), snapshot.roots,
+                                  snapshot.node_count);
+        }
+    }
     return snapshot;
 }
 
@@ -1578,7 +1756,14 @@ bool Window::perform_semantic_action(std::string_view stable_id,
     require_ui_thread("semantic action");
     const Control::Ptr control = find(stable_id);
     if (!control) {
-        return dispatch_semantic_child_action(root_, stable_id, action, value);
+        if (dispatch_semantic_child_action(root_, stable_id, action, value)) {
+            return true;
+        }
+        for (auto popup = popups_.rbegin(); popup != popups_.rend(); ++popup) {
+            if (dispatch_semantic_child_action(
+                    (*popup)->popup(), stable_id, action, value)) return true;
+        }
+        return false;
     }
     if (!eligible(control)) return false;
     if (action == SemanticAction::focus) return request_focus(control);
@@ -1599,7 +1784,11 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
             if (bounds.empty()) {
                 bounds = current.requested_bounds_;
             }
-            add_damage(bounds, current.paint_plane_);
+            // Subtree invalidation is structural (visibility, attachment, or a
+            // visual-tree/layout replacement). Recompose every plane so pixels
+            // formerly occupied by a transparent control are restored from the
+            // backplane instead of surviving as stale fragments.
+            add_damage_all_planes(bounds);
             requested_damage_area += bounds.area();
         }
         for (const auto& child : current.children_) {
@@ -1634,7 +1823,7 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
 void Window::change_paint_plane(Control& control, PaintPlane plane) {
     require_ui_thread("paint-plane mutation");
     const Rect bounds = absolute_bounds_of(control);
-    add_damage(bounds, control.paint_plane_);
+    add_damage_all_planes(bounds);
     control.paint_plane_ = plane;
     control.display_chunk_.reset();
     mark_dirty(control, invalidation::paint_only);
@@ -1658,7 +1847,7 @@ void Window::add_damage_all_planes(Rect damage) {
 }
 
 void Window::add_subtree_damage(const Control::Ptr& control) {
-    add_damage(absolute_bounds_of(*control), control->paint_plane_);
+    add_damage_all_planes(absolute_bounds_of(*control));
     for (const auto& child : control->children_) {
         add_subtree_damage(child);
     }
@@ -1690,6 +1879,12 @@ void Window::ensure_layout(bool read_barrier) {
         std::uint64_t measure_visited = 0;
         std::uint64_t measured = 0;
         measure_dirty_recursive(root_, client_size_, measure_visited, measured);
+        for (const auto& popup : popups_) {
+            if (const Control::Ptr overlay = popup->popup()) {
+                measure_dirty_recursive(overlay, client_size_, measure_visited,
+                                        measured);
+            }
+        }
         metrics_.record_measure(measure_visited, measured);
 
         std::uint64_t arrange_visited = 0;
@@ -1697,17 +1892,37 @@ void Window::ensure_layout(bool read_barrier) {
         arrange_dirty_recursive(root_,
                                 {0.0, 0.0, client_size_.width, client_size_.height},
                                 arrange_visited, arranged);
+        for (const auto& popup : popups_) {
+            if (const Control::Ptr overlay = popup->popup()) {
+                arrange_dirty_recursive(
+                    overlay, overlay->requested_bounds_, arrange_visited, arranged);
+            }
+        }
         metrics_.record_arrange(arrange_visited, arranged);
 
         static_cast<void>(recompute_subtree_dirty(root_));
+        for (const auto& popup : popups_) {
+            if (const Control::Ptr overlay = popup->popup()) {
+                static_cast<void>(recompute_subtree_dirty(overlay));
+            }
+        }
         ++pass;
-    } while (has_dirty(root_->subtree_dirty_, Dirty::layout) &&
-             pass < maximum_layout_passes);
+    } while ((has_dirty(root_->subtree_dirty_, Dirty::layout) ||
+              std::any_of(popups_.begin(), popups_.end(), [](const auto& popup) {
+                  const Control::Ptr overlay = popup->popup();
+                  return overlay && has_dirty(overlay->subtree_dirty_, Dirty::layout);
+              })) && pass < maximum_layout_passes);
 
-    if (has_dirty(root_->subtree_dirty_, Dirty::layout)) {
+    const bool popup_layout_dirty = std::any_of(
+        popups_.begin(), popups_.end(), [](const auto& popup) {
+            const Control::Ptr overlay = popup->popup();
+            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::layout);
+        });
+    if (has_dirty(root_->subtree_dirty_, Dirty::layout) || popup_layout_dirty) {
         metrics_.record_pass_limit_hit();
     }
-    layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout);
+    layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
+                    popup_layout_dirty;
     hit_test_dirty_ = layout_dirty_;
     in_layout_ = false;
 }
@@ -1803,8 +2018,11 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         ++callbacks;
         const Rect new_bounds = absolute_bounds_of(*control);
         if (old_bounds != new_bounds) {
-            add_damage(old_bounds, control->paint_plane_);
-            add_damage(new_bounds, control->paint_plane_);
+            // Arrangement changes expose content below the moved control. The
+            // compositor uses one target across ordered paint planes, so both
+            // the vacated and occupied rectangles need full recomposition.
+            add_damage_all_planes(old_bounds);
+            add_damage_all_planes(new_bounds);
             paint_dirty_ = true;
             control->arranged_bounds_changed_.emit(new_bounds);
         }
@@ -1914,8 +2132,13 @@ std::uint64_t Window::display_cache_entries(const Control::Ptr& control) const n
 }
 
 void Window::update_display_cache_metrics() noexcept {
-    metrics_.set_display_cache(root_ ? display_cache_entries(root_) : 0U,
-                               display_generation_);
+    std::uint64_t entries = root_ ? display_cache_entries(root_) : 0U;
+    for (const auto& popup : popups_) {
+        if (const Control::Ptr overlay = popup->popup()) {
+            entries += display_cache_entries(overlay);
+        }
+    }
+    metrics_.set_display_cache(entries, display_generation_);
 }
 
 void Window::compact_frame_requests() noexcept {

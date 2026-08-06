@@ -35,6 +35,14 @@ enum class SemanticRole : std::uint8_t {
     date_picker,
     calendar,
     date_cell,
+    property_grid,
+    property_group,
+    property_row,
+    menu_bar,
+    menu_bar_item,
+    menu,
+    menu_item,
+    separator,
 };
 
 enum class SemanticState : std::uint32_t {
@@ -76,6 +84,7 @@ enum class SemanticAction : std::uint8_t {
     decrement,
     expand,
     collapse,
+    show_menu,
     set_value,
 };
 

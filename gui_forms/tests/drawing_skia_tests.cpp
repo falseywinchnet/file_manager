@@ -153,6 +153,33 @@ void image_attributes_clip_and_snapshot_execution() {
     CHECK(foreign_error.load() == RasterError::wrong_thread);
 }
 
+void transparent_png_channels_are_premultiplied() {
+    constexpr std::array<std::uint8_t, 70> encoded{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63, 0xf8, 0xf8, 0xf1, 0x23,
+        0x03, 0x00, 0x08, 0x7e, 0x02, 0xd4, 0x4f, 0x05,
+        0x2f, 0xd9, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    };
+    std::array<std::byte, encoded.size()> bytes{};
+    for (std::size_t index = 0; index < encoded.size(); ++index) {
+        bytes[index] = static_cast<std::byte>(encoded[index]);
+    }
+    SkiaExecutor executor;
+    DecodeResult decoded = executor.decode_png(bytes);
+    CHECK(decoded && decoded.bitmap->width() == 1U && decoded.bitmap->height() == 1U);
+    const ImageSnapshot snapshot = decoded.bitmap->snapshot();
+    CHECK(snapshot.pixels().size() == 4U);
+    CHECK(snapshot.pixels()[0] == std::byte{0} &&
+          snapshot.pixels()[1] == std::byte{0} &&
+          snapshot.pixels()[2] == std::byte{0} &&
+          snapshot.pixels()[3] == std::byte{0});
+}
+
 void gradients_and_hatches_are_native_raster_commands() {
     SkiaExecutor executor;
     Bitmap target(48, 16);
@@ -206,6 +233,7 @@ void connected_line_figures_fill_as_one_contour() {
 int main() {
     command_execution_and_png_round_trip();
     image_attributes_clip_and_snapshot_execution();
+    transparent_png_channels_are_premultiplied();
     gradients_and_hatches_are_native_raster_commands();
     connected_line_figures_fill_as_one_contour();
     return 0;

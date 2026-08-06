@@ -349,6 +349,11 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
             "ComboBox popup layer must dismiss an outside pointer press");
 
     combo->set_dropped_down(true);
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+                !combo->dropped_down() && window.focus_scope_depth() == 0U,
+            "Escape inside the popup focus scope must close ComboBox and restore focus");
+
+    combo->set_dropped_down(true);
     combo->set_visible(false);
     require(!combo->dropped_down() && !window.find("combo.field.popup.layer") &&
                 window.focus_scope_depth() == 0U,
@@ -399,6 +404,35 @@ void test_numeric_up_down_composite_edit_spinner_and_keys() {
             "NumericUpDown hexadecimal formatting must retain ordered value events");
 }
 
+void test_list_box_model_stable_item_ids() {
+    auto list = make_control<ListBox>(StableId("input.model.list"));
+    list->set_items({"Orchard Study", "North Shore", "Print Masters"});
+    list->set_item_stable_ids({"completion.orchard", "completion.north",
+                               "completion.print"});
+    Window window(list, {240.0, 90.0});
+    window.perform_layout();
+    const auto children = list->semantic_virtual_children();
+    require(children.size() == 3U &&
+                children[0].stable_id == "completion.orchard" &&
+                children[2].stable_id == "completion.print" &&
+                window.perform_semantic_action("completion.north",
+                                               SemanticAction::select) &&
+                list->selected_index() == 1U,
+            "model-backed ListBox rows must retain exact semantic identities");
+    bool duplicate_rejected{};
+    try {
+        list->set_item_stable_ids({"same", "same", "third"});
+    } catch (const std::invalid_argument&) {
+        duplicate_rejected = true;
+    }
+    require(duplicate_rejected,
+            "ListBox model identities must reject ambiguous duplicates");
+    list->add_item("Field Notes");
+    require(list->item_stable_id(0) == "input.model.list.item.0" &&
+                list->item_stable_id(3) == "input.model.list.item.3",
+            "legacy append must return the collection to index-derived IDs");
+}
+
 } // namespace
 
 int main() {
@@ -412,6 +446,7 @@ int main() {
         test_list_box_selection_navigation_and_mutation();
         test_combo_box_popup_commit_dismiss_and_owner_revocation();
         test_numeric_up_down_composite_edit_spinner_and_keys();
+        test_list_box_model_stable_item_ids();
         std::cout << "gui_forms_input_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

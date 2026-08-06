@@ -149,6 +149,13 @@ public:
         invalidate(Dirty::paint);
     }
 
+    void set_collapse_appearance(SplitFixedPanel panel, bool collapsed) {
+        if (collapse_panel_ == panel && collapsed_ == collapsed) return;
+        collapse_panel_ = panel;
+        collapsed_ = collapsed;
+        invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
+    }
+
     void on_focus_changed(bool focused) override {
         focused_ = focused;
         invalidate(invalidation::focus);
@@ -180,11 +187,43 @@ public:
                                  std::max(0.0, bounds.height - 2.0)},
                                 style.accent, 1.0);
         }
+        if (collapse_panel_ != SplitFixedPanel::none) {
+            const bool first = collapse_panel_ == SplitFixedPanel::first;
+            std::string arrow;
+            Rect tab;
+            Point text_origin;
+            if (orientation_ == Orientation::vertical) {
+                arrow = first ? (collapsed_ ? "▶" : "◀")
+                              : (collapsed_ ? "◀" : "▶");
+                tab = {0.0, std::max(0.0, (bounds.height - 34.0) * 0.5),
+                       bounds.width, std::min(34.0, bounds.height)};
+                text_origin = {std::max(0.0, (bounds.width - 7.0) * 0.5),
+                               tab.y + tab.height * 0.5 + 4.0};
+            } else {
+                arrow = first ? (collapsed_ ? "▼" : "▲")
+                              : (collapsed_ ? "▲" : "▼");
+                tab = {std::max(0.0, (bounds.width - 34.0) * 0.5), 0.0,
+                       std::min(34.0, bounds.width), bounds.height};
+                text_origin = {tab.x + tab.width * 0.5 - 4.0,
+                               std::max(7.0, bounds.height * 0.5 + 4.0)};
+            }
+            painter.fill_rect(tab, focused_ ? style.accent_light : style.face_light);
+            painter.stroke_rect({tab.x + 0.5, tab.y + 0.5,
+                                 std::max(0.0, tab.width - 1.0),
+                                 std::max(0.0, tab.height - 1.0)},
+                                focused_ ? style.accent : style.border, 1.0);
+            painter.draw_text_utf8(text_origin, arrow,
+                                   effective_font(
+                                       {FontRole::control, 8.0, 700, false}),
+                                   style.text);
+        }
     }
 
 private:
     Orientation orientation_{Orientation::vertical};
+    SplitFixedPanel collapse_panel_{SplitFixedPanel::none};
     double visible_width_{3.0};
+    bool collapsed_{};
     bool focused_{};
 };
 
@@ -957,12 +996,50 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             0.0, cell_width - horizontal_extent(item.margin));
         const double available_height = std::max(
             0.0, cell_height - vertical_extent(item.margin));
-        set_child_layout(
-            item.control,
-            {inset.left + column_offsets[item.position.column] + item.margin.left,
-             inset.top + row_offsets[item.position.row] + item.margin.top,
-             std::min(item.desired.width, available_width),
-             std::min(item.desired.height, available_height)});
+        const double cell_x = inset.left +
+            column_offsets[item.position.column] + item.margin.left;
+        const double cell_y = inset.top +
+            row_offsets[item.position.row] + item.margin.top;
+        double child_width = std::min(item.desired.width, available_width);
+        double child_height = std::min(item.desired.height, available_height);
+        double child_x = cell_x;
+        double child_y = cell_y;
+        switch (item.control->dock()) {
+        case DockStyle::fill:
+            child_width = available_width;
+            child_height = available_height;
+            break;
+        case DockStyle::top:
+            child_width = available_width;
+            break;
+        case DockStyle::bottom:
+            child_width = available_width;
+            child_y += available_height - child_height;
+            break;
+        case DockStyle::left:
+            child_height = available_height;
+            break;
+        case DockStyle::right:
+            child_x += available_width - child_width;
+            child_height = available_height;
+            break;
+        case DockStyle::none: {
+            const AnchorStyles anchor = item.control->anchor();
+            const bool left = has_anchor(anchor, AnchorStyles::left);
+            const bool right = has_anchor(anchor, AnchorStyles::right);
+            const bool top = has_anchor(anchor, AnchorStyles::top);
+            const bool bottom = has_anchor(anchor, AnchorStyles::bottom);
+            if (left && right) child_width = available_width;
+            else if (right) child_x += available_width - child_width;
+            else if (!left) child_x += (available_width - child_width) * 0.5;
+            if (top && bottom) child_height = available_height;
+            else if (bottom) child_y += available_height - child_height;
+            else if (!top) child_y += (available_height - child_height) * 0.5;
+            break;
+        }
+        }
+        set_child_layout(item.control,
+                         {child_x, child_y, child_width, child_height});
     }
     layout_overflowed_ = !overflow.empty();
     if (assign) {
@@ -1286,36 +1363,40 @@ Rect TabControl::tab_bounds(std::size_t index) const {
     if (index >= page_count()) throw std::out_of_range("TabControl tab index");
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const Size item{item_size_.width * effective_text_scale(),
+                    item_size_.height * effective_text_scale()};
     if (alignment_ == TabAlignment::top || alignment_ == TabAlignment::bottom) {
         const double y = alignment_ == TabAlignment::top
-            ? 0.0 : std::max(0.0, bounds.height - item_size_.height);
-        return {static_cast<double>(index) * item_size_.width, y,
-                item_size_.width, std::min(item_size_.height, bounds.height)};
+            ? 0.0 : std::max(0.0, bounds.height - item.height);
+        return {static_cast<double>(index) * item.width, y,
+                item.width, std::min(item.height, bounds.height)};
     }
     const double x = alignment_ == TabAlignment::left
-        ? 0.0 : std::max(0.0, bounds.width - item_size_.width);
-    return {x, static_cast<double>(index) * item_size_.height,
-            std::min(item_size_.width, bounds.width), item_size_.height};
+        ? 0.0 : std::max(0.0, bounds.width - item.width);
+    return {x, static_cast<double>(index) * item.height,
+            std::min(item.width, bounds.width), item.height};
 }
 
 Rect TabControl::display_bounds() const noexcept {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const Size item{item_size_.width * effective_text_scale(),
+                    item_size_.height * effective_text_scale()};
     switch (alignment_) {
     case TabAlignment::top:
-        return {0.0, std::min(bounds.height, item_size_.height - 1.0),
+        return {0.0, std::min(bounds.height, item.height - 1.0),
                 bounds.width,
-                std::max(0.0, bounds.height - item_size_.height + 1.0)};
+                std::max(0.0, bounds.height - item.height + 1.0)};
     case TabAlignment::bottom:
         return {0.0, 0.0, bounds.width,
-                std::max(0.0, bounds.height - item_size_.height + 1.0)};
+                std::max(0.0, bounds.height - item.height + 1.0)};
     case TabAlignment::left:
-        return {std::min(bounds.width, item_size_.width - 1.0), 0.0,
-                std::max(0.0, bounds.width - item_size_.width + 1.0),
+        return {std::min(bounds.width, item.width - 1.0), 0.0,
+                std::max(0.0, bounds.width - item.width + 1.0),
                 bounds.height};
     case TabAlignment::right:
         return {0.0, 0.0,
-                std::max(0.0, bounds.width - item_size_.width + 1.0),
+                std::max(0.0, bounds.width - item.width + 1.0),
                 bounds.height};
     }
     return bounds;
@@ -1367,6 +1448,7 @@ void TabControl::on_paint(Painter& painter, Rect) {
                          std::max(0.0, display.height - 1.0)},
                         style_.border, 1.0);
     const auto live = pages();
+    const FontSpec font = effective_font(font_);
     const std::optional<std::size_t> selected = selected_index();
     for (std::size_t index = 0U; index < live.size(); ++index) {
         Rect tab = tab_bounds(index);
@@ -1402,11 +1484,11 @@ void TabControl::on_paint(Painter& painter, Rect) {
             }
         }
         const double text_width = static_cast<double>(live[index]->text().size()) *
-                                  font_.size * 0.55;
+                                  font.size * 0.55;
         painter.draw_text_utf8(
             {tab.x + std::max(5.0, (tab.width - text_width) * 0.5),
-             tab.y + (tab.height + font_.size) * 0.5 - 2.0},
-            live[index]->text(), font_, enabled() ? style_.text
+             tab.y + (tab.height + font.size) * 0.5 - 2.0},
+            live[index]->text(), font, enabled() ? style_.text
                                                   : style_.disabled_text);
         if (active && focused_) {
             painter.stroke_rect({tab.x + 4.5, tab.y + 4.5,
@@ -1631,6 +1713,10 @@ void SplitContainer::set_first_minimum(double extent) {
     require_mutable();
     require_finite_nonnegative(extent,
                                "first panel minimum must be finite and nonnegative");
+    if (first_maximum_ && extent > *first_maximum_) {
+        throw std::invalid_argument(
+            "first panel minimum may not exceed its maximum");
+    }
     if (first_minimum_ == extent) return;
     first_minimum_ = extent;
     invalidate(invalidation::bounds);
@@ -1640,18 +1726,54 @@ void SplitContainer::set_second_minimum(double extent) {
     require_mutable();
     require_finite_nonnegative(extent,
                                "second panel minimum must be finite and nonnegative");
+    if (second_maximum_ && extent > *second_maximum_) {
+        throw std::invalid_argument(
+            "second panel minimum may not exceed its maximum");
+    }
     if (second_minimum_ == extent) return;
     second_minimum_ = extent;
     invalidate(invalidation::bounds);
 }
 
-void SplitContainer::set_first_collapsed(bool collapsed) {
+void SplitContainer::set_first_maximum(std::optional<double> extent) {
+    require_mutable();
+    if (extent) {
+        require_finite_nonnegative(*extent,
+                                   "first panel maximum must be finite and nonnegative");
+        if (*extent < first_minimum_) {
+            throw std::invalid_argument(
+                "first panel maximum may not be below its minimum");
+        }
+    }
+    if (first_maximum_ == extent) return;
+    first_maximum_ = extent;
+    invalidate(invalidation::bounds);
+}
+
+void SplitContainer::set_second_maximum(std::optional<double> extent) {
+    require_mutable();
+    if (extent) {
+        require_finite_nonnegative(*extent,
+                                   "second panel maximum must be finite and nonnegative");
+        if (*extent < second_minimum_) {
+            throw std::invalid_argument(
+                "second panel maximum may not be below its minimum");
+        }
+    }
+    if (second_maximum_ == extent) return;
+    second_maximum_ = extent;
+    invalidate(invalidation::bounds);
+}
+
+void SplitContainer::set_first_collapsed(bool collapsed,
+                                         SplitCollapseOrigin origin) {
     require_mutable();
     if (first_collapsed_ == collapsed) return;
     if (collapsed && second_collapsed_) {
         throw std::logic_error("both split panels may not be collapsed");
     }
     const double old = effective_distance_;
+    const SplitCollapseOrigin previous_origin = first_collapse_origin_;
     if (collapsed) {
         if (effective_distance_ > 0.0) remembered_distance_ = effective_distance_;
         transfer_focus_from(first_panel_);
@@ -1659,23 +1781,34 @@ void SplitContainer::set_first_collapsed(bool collapsed) {
         requested_distance_ = remembered_distance_;
     }
     first_collapsed_ = collapsed;
+    first_collapse_origin_ = collapsed ? origin : SplitCollapseOrigin::none;
+    if (!collapsed && previous_origin == SplitCollapseOrigin::automatic_accommodation &&
+        origin == SplitCollapseOrigin::user &&
+        axis_extent(committed_arranged_bounds()) <
+            automatic_collapse_threshold_) {
+        automatic_collapse_suppressed_ = true;
+    }
     first_panel_->set_visible(!collapsed);
+    static_cast<SplitterGrip&>(*splitter_).set_collapse_appearance(
+        collapse_panel_, collapse_target_is_collapsed());
     const double total = axis_extent(committed_arranged_bounds());
     effective_distance_ = collapsed ? 0.0
                                     : constrained_distance(requested_distance_, total);
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_,
-                                  SplitChangeReason::collapse};
+                                  SplitChangeReason::collapse, origin};
     splitter_changed_.emit(change);
 }
 
-void SplitContainer::set_second_collapsed(bool collapsed) {
+void SplitContainer::set_second_collapsed(bool collapsed,
+                                          SplitCollapseOrigin origin) {
     require_mutable();
     if (second_collapsed_ == collapsed) return;
     if (collapsed && first_collapsed_) {
         throw std::logic_error("both split panels may not be collapsed");
     }
     const double old = effective_distance_;
+    const SplitCollapseOrigin previous_origin = second_collapse_origin_;
     if (collapsed) {
         if (effective_distance_ > 0.0) remembered_distance_ = effective_distance_;
         transfer_focus_from(second_panel_);
@@ -1683,14 +1816,23 @@ void SplitContainer::set_second_collapsed(bool collapsed) {
         requested_distance_ = remembered_distance_;
     }
     second_collapsed_ = collapsed;
+    second_collapse_origin_ = collapsed ? origin : SplitCollapseOrigin::none;
+    if (!collapsed && previous_origin == SplitCollapseOrigin::automatic_accommodation &&
+        origin == SplitCollapseOrigin::user &&
+        axis_extent(committed_arranged_bounds()) <
+            automatic_collapse_threshold_) {
+        automatic_collapse_suppressed_ = true;
+    }
     second_panel_->set_visible(!collapsed);
+    static_cast<SplitterGrip&>(*splitter_).set_collapse_appearance(
+        collapse_panel_, collapse_target_is_collapsed());
     const double total = axis_extent(committed_arranged_bounds());
     effective_distance_ = collapsed
         ? std::max(0.0, total - splitter_width_)
         : constrained_distance(requested_distance_, total);
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_,
-                                  SplitChangeReason::collapse};
+                                  SplitChangeReason::collapse, origin};
     splitter_changed_.emit(change);
 }
 
@@ -1706,6 +1848,37 @@ void SplitContainer::set_fixed_panel(SplitFixedPanel panel) {
     if (fixed_panel_ == panel) return;
     fixed_panel_ = panel;
     invalidate(Dirty::semantics | Dirty::accessibility);
+}
+
+void SplitContainer::set_collapse_panel(SplitFixedPanel panel) {
+    require_mutable();
+    if (collapse_panel_ == panel) return;
+    collapse_panel_ = panel;
+    automatic_collapse_suppressed_ = false;
+    static_cast<SplitterGrip&>(*splitter_).set_collapse_appearance(
+        collapse_panel_, collapse_target_is_collapsed());
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics |
+               Dirty::accessibility);
+}
+
+void SplitContainer::set_automatic_collapse_threshold(double extent) {
+    require_mutable();
+    require_finite_nonnegative(
+        extent, "automatic collapse threshold must be finite and nonnegative");
+    if (automatic_collapse_threshold_ == extent) return;
+    automatic_collapse_threshold_ = extent;
+    automatic_collapse_suppressed_ = false;
+    if (extent == 0.0 && collapse_target_origin() ==
+                             SplitCollapseOrigin::automatic_accommodation) {
+        if (collapse_panel_ == SplitFixedPanel::first) {
+            set_first_collapsed(false,
+                                SplitCollapseOrigin::automatic_accommodation);
+        } else if (collapse_panel_ == SplitFixedPanel::second) {
+            set_second_collapsed(false,
+                                 SplitCollapseOrigin::automatic_accommodation);
+        }
+    }
+    invalidate(invalidation::bounds);
 }
 
 void SplitContainer::set_keyboard_increment(double increment) {
@@ -1728,6 +1901,7 @@ Size SplitContainer::measure(Size available) {
 void SplitContainer::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     const double total = axis_extent(final_bounds);
+    reconcile_automatic_collapse(total);
     const double available = std::max(0.0, total - splitter_width_);
     double desired = requested_distance_ < 0.0 ? available * 0.5
                                                : requested_distance_;
@@ -1773,6 +1947,28 @@ void SplitContainer::arrange(Rect final_bounds) {
 }
 
 void SplitContainer::on_pointer_preview(PointerEvent& event) {
+    const bool on_collapse_tab = collapse_panel_ != SplitFixedPanel::none &&
+                                 collapse_tab_bounds().contains(event.position);
+    if (event.action == PointerAction::down &&
+        event.button == PointerButton::primary && on_collapse_tab) {
+        collapse_tab_tracking_ = true;
+        pointer_tracking_ = false;
+        if (window() != nullptr) window()->request_focus(splitter_);
+        splitter_->set_pointer_capture(true);
+        event.handled = true;
+        return;
+    }
+    if (collapse_tab_tracking_) {
+        if (event.action == PointerAction::up) {
+            collapse_tab_tracking_ = false;
+            splitter_->set_pointer_capture(false);
+            if (on_collapse_tab) {
+                toggle_collapse_target(SplitCollapseOrigin::user);
+            }
+        }
+        event.handled = true;
+        return;
+    }
     if (splitter_fixed_ || first_collapsed_ || second_collapsed_) return;
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary &&
@@ -1795,9 +1991,16 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
 }
 
 void SplitContainer::on_key_preview(KeyEvent& event) {
-    if (event.action != KeyAction::down || splitter_fixed_ ||
-        first_collapsed_ || second_collapsed_ || window() == nullptr ||
+    if (event.action != KeyAction::down || window() == nullptr ||
         window()->focused_control() != splitter_) return;
+    if (collapse_panel_ != SplitFixedPanel::none &&
+        (event.physical_key == PhysicalKey::enter ||
+         event.physical_key == PhysicalKey::space)) {
+        toggle_collapse_target(SplitCollapseOrigin::user);
+        event.handled = true;
+        return;
+    }
+    if (splitter_fixed_ || first_collapsed_ || second_collapsed_) return;
     double delta{};
     if (orientation_ == Orientation::vertical) {
         if (event.physical_key == PhysicalKey::left) delta = -keyboard_increment_;
@@ -1822,8 +2025,34 @@ SemanticDescriptor SplitContainer::semantic_descriptor() const {
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     descriptor.value = std::to_string(effective_distance_);
+    if (collapse_panel_ != SplitFixedPanel::none) {
+        const bool collapsed = collapse_target_is_collapsed();
+        descriptor.description = collapsed
+            ? "Split pane collapsed; activate to restore its remembered extent"
+            : "Split pane expanded; activate to collapse it";
+        descriptor.actions = {SemanticAction::focus,
+            collapsed ? SemanticAction::expand : SemanticAction::collapse};
+        if (!collapsed) descriptor.states |= SemanticState::expanded;
+    }
     descriptor.exposed = true;
     return descriptor;
+}
+
+bool SplitContainer::on_semantic_action(SemanticAction action,
+                                        std::string_view value) {
+    if (action == SemanticAction::expand &&
+        collapse_panel_ != SplitFixedPanel::none &&
+        collapse_target_is_collapsed()) {
+        toggle_collapse_target(SplitCollapseOrigin::user);
+        return true;
+    }
+    if (action == SemanticAction::collapse &&
+        collapse_panel_ != SplitFixedPanel::none &&
+        !collapse_target_is_collapsed()) {
+        toggle_collapse_target(SplitCollapseOrigin::user);
+        return true;
+    }
+    return ContainerControl::on_semantic_action(action, value);
 }
 
 double SplitContainer::axis_extent(Rect bounds) const noexcept {
@@ -1851,7 +2080,81 @@ double SplitContainer::constrained_distance(double requested,
             : available * 0.5;
         lower = upper = compromise;
     }
+    if (first_maximum_) upper = std::min(upper, *first_maximum_);
+    if (second_maximum_) {
+        lower = std::max(lower, std::max(0.0, available - *second_maximum_));
+    }
+    if (lower > upper) {
+        double compromise = available * 0.5;
+        if (first_maximum_ && second_maximum_ &&
+            *first_maximum_ + *second_maximum_ > 0.0) {
+            compromise = available * *first_maximum_ /
+                         (*first_maximum_ + *second_maximum_);
+        }
+        lower = upper = std::clamp(compromise, 0.0, available);
+    }
     return std::clamp(requested, lower, upper);
+}
+
+Rect SplitContainer::collapse_tab_bounds() const noexcept {
+    const Rect bounds = splitter_->absolute_bounds();
+    if (orientation_ == Orientation::vertical) {
+        const double height = std::min(34.0, bounds.height);
+        return {bounds.x, bounds.y + std::max(0.0, (bounds.height - height) * 0.5),
+                bounds.width, height};
+    }
+    const double width = std::min(34.0, bounds.width);
+    return {bounds.x + std::max(0.0, (bounds.width - width) * 0.5), bounds.y,
+            width, bounds.height};
+}
+
+bool SplitContainer::collapse_target_is_collapsed() const noexcept {
+    if (collapse_panel_ == SplitFixedPanel::first) return first_collapsed_;
+    if (collapse_panel_ == SplitFixedPanel::second) return second_collapsed_;
+    return false;
+}
+
+SplitCollapseOrigin SplitContainer::collapse_target_origin() const noexcept {
+    if (collapse_panel_ == SplitFixedPanel::first) return first_collapse_origin_;
+    if (collapse_panel_ == SplitFixedPanel::second) return second_collapse_origin_;
+    return SplitCollapseOrigin::none;
+}
+
+void SplitContainer::toggle_collapse_target(SplitCollapseOrigin origin) {
+    if (collapse_panel_ == SplitFixedPanel::first) {
+        set_first_collapsed(!first_collapsed_, origin);
+    } else if (collapse_panel_ == SplitFixedPanel::second) {
+        set_second_collapsed(!second_collapsed_, origin);
+    }
+}
+
+void SplitContainer::reconcile_automatic_collapse(double total_extent) {
+    if (collapse_panel_ == SplitFixedPanel::none ||
+        automatic_collapse_threshold_ <= 0.0) return;
+    const bool constrained = total_extent < automatic_collapse_threshold_;
+    if (!constrained) {
+        automatic_collapse_suppressed_ = false;
+        if (collapse_target_origin() ==
+            SplitCollapseOrigin::automatic_accommodation) {
+            if (collapse_panel_ == SplitFixedPanel::first) {
+                set_first_collapsed(
+                    false, SplitCollapseOrigin::automatic_accommodation);
+            } else {
+                set_second_collapsed(
+                    false, SplitCollapseOrigin::automatic_accommodation);
+            }
+        }
+        return;
+    }
+    if (!automatic_collapse_suppressed_ && !collapse_target_is_collapsed()) {
+        if (collapse_panel_ == SplitFixedPanel::first) {
+            set_first_collapsed(true,
+                SplitCollapseOrigin::automatic_accommodation);
+        } else {
+            set_second_collapsed(true,
+                SplitCollapseOrigin::automatic_accommodation);
+        }
+    }
 }
 
 void SplitContainer::set_distance(double distance, SplitChangeReason reason) {

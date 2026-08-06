@@ -146,6 +146,18 @@ void test_plane_migration_damages_old_and_new_planes() {
             "paint-plane migration must discard an incompatible cached chunk");
 }
 
+void test_arrangement_recomposes_every_plane() {
+    Fixture fixture;
+    fixture.control->set_requested_bounds({30.0, 20.0, 80.0, 40.0});
+    fixture.window->perform_layout();
+    require(!fixture.window->take_damage(PaintPlane::backplane).empty(),
+            "moved control must expose and redraw its backplane");
+    require(!fixture.window->take_damage(PaintPlane::control).empty(),
+            "moved control must redraw its control plane");
+    require(!fixture.window->take_damage(PaintPlane::overlay).empty(),
+            "moved control must recompose overlays crossing its old or new bounds");
+}
+
 void test_invalid_plane_rejection_preserves_state() {
     Fixture fixture;
     const auto before = fixture.control->display_chunk_info();
@@ -191,6 +203,7 @@ int main() {
         test_plane_order_and_exposure_reuse();
         test_local_rebuild_and_generation();
         test_plane_migration_damages_old_and_new_planes();
+        test_arrangement_recomposes_every_plane();
         test_invalid_plane_rejection_preserves_state();
         test_disposal_removes_cache_entry_and_returns_idle();
         std::cout << "gui_forms_display_chunk_tests: all tests passed\n";

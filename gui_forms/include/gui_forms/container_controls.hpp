@@ -361,10 +361,18 @@ enum class SplitChangeReason : std::uint8_t {
     container_resize,
 };
 
+enum class SplitCollapseOrigin : std::uint8_t {
+    none,
+    programmatic,
+    user,
+    automatic_accommodation,
+};
+
 struct SplitChangeEvent final {
     double old_distance{};
     double new_distance{};
     SplitChangeReason reason{SplitChangeReason::programmatic};
+    SplitCollapseOrigin collapse_origin{SplitCollapseOrigin::none};
 };
 
 // The panels remain ordinary retained containers. Their stable identities are
@@ -418,14 +426,47 @@ public:
     void set_first_minimum(double extent);
     [[nodiscard]] double second_minimum() const noexcept { return second_minimum_; }
     void set_second_minimum(double extent);
+    [[nodiscard]] std::optional<double> first_maximum() const noexcept {
+        return first_maximum_;
+    }
+    void set_first_maximum(std::optional<double> extent);
+    [[nodiscard]] std::optional<double> second_maximum() const noexcept {
+        return second_maximum_;
+    }
+    void set_second_maximum(std::optional<double> extent);
     [[nodiscard]] bool first_collapsed() const noexcept { return first_collapsed_; }
-    void set_first_collapsed(bool collapsed);
+    [[nodiscard]] SplitCollapseOrigin first_collapse_origin() const noexcept {
+        return first_collapse_origin_;
+    }
+    void set_first_collapsed(
+        bool collapsed,
+        SplitCollapseOrigin origin = SplitCollapseOrigin::programmatic);
     [[nodiscard]] bool second_collapsed() const noexcept { return second_collapsed_; }
-    void set_second_collapsed(bool collapsed);
+    [[nodiscard]] SplitCollapseOrigin second_collapse_origin() const noexcept {
+        return second_collapse_origin_;
+    }
+    void set_second_collapsed(
+        bool collapsed,
+        SplitCollapseOrigin origin = SplitCollapseOrigin::programmatic);
     [[nodiscard]] bool splitter_fixed() const noexcept { return splitter_fixed_; }
     void set_splitter_fixed(bool fixed);
     [[nodiscard]] SplitFixedPanel fixed_panel() const noexcept { return fixed_panel_; }
     void set_fixed_panel(SplitFixedPanel panel);
+    // Optional seam-tab authority. Unlike fixed_panel(), this identifies the
+    // pane toggled by a compact splitter tab and may remain operable while
+    // ordinary splitter resizing is fixed.
+    [[nodiscard]] SplitFixedPanel collapse_panel() const noexcept {
+        return collapse_panel_;
+    }
+    void set_collapse_panel(SplitFixedPanel panel);
+    // Consumer-authored content threshold. Crossing below it automatically
+    // collapses collapse_panel(); crossing back restores only an automatically
+    // collapsed pane. A user restore below the threshold is honored until the
+    // composition next crosses above it.
+    [[nodiscard]] double automatic_collapse_threshold() const noexcept {
+        return automatic_collapse_threshold_;
+    }
+    void set_automatic_collapse_threshold(double extent);
     [[nodiscard]] double keyboard_increment() const noexcept {
         return keyboard_increment_;
     }
@@ -440,12 +481,19 @@ public:
     void on_pointer_preview(PointerEvent& event) override;
     void on_key_preview(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    bool on_semantic_action(SemanticAction action,
+                            std::string_view value) override;
 
 private:
     [[nodiscard]] double axis_extent(Rect bounds) const noexcept;
     [[nodiscard]] double pointer_axis(Point point) const noexcept;
     [[nodiscard]] double constrained_distance(double requested,
                                               double total_extent) const noexcept;
+    [[nodiscard]] Rect collapse_tab_bounds() const noexcept;
+    [[nodiscard]] bool collapse_target_is_collapsed() const noexcept;
+    [[nodiscard]] SplitCollapseOrigin collapse_target_origin() const noexcept;
+    void toggle_collapse_target(SplitCollapseOrigin origin);
+    void reconcile_automatic_collapse(double total_extent);
     void set_distance(double distance, SplitChangeReason reason);
     void transfer_focus_from(const std::shared_ptr<SplitterPanel>& panel);
     void update_splitter_cursor();
@@ -455,6 +503,7 @@ private:
     Control::Ptr splitter_;
     Orientation orientation_{Orientation::vertical};
     SplitFixedPanel fixed_panel_{SplitFixedPanel::none};
+    SplitFixedPanel collapse_panel_{SplitFixedPanel::none};
     double requested_distance_{-1.0};
     double effective_distance_{};
     double remembered_distance_{-1.0};
@@ -464,12 +513,19 @@ private:
     double splitter_hit_width_{9.0};
     double first_minimum_{25.0};
     double second_minimum_{25.0};
+    std::optional<double> first_maximum_;
+    std::optional<double> second_maximum_;
     double keyboard_increment_{4.0};
+    double automatic_collapse_threshold_{};
     double pointer_offset_{};
     bool first_collapsed_{};
     bool second_collapsed_{};
+    SplitCollapseOrigin first_collapse_origin_{SplitCollapseOrigin::none};
+    SplitCollapseOrigin second_collapse_origin_{SplitCollapseOrigin::none};
     bool splitter_fixed_{};
     bool pointer_tracking_{};
+    bool collapse_tab_tracking_{};
+    bool automatic_collapse_suppressed_{};
     bool tree_initialized_{};
     Event<const SplitChangeEvent&> splitter_changed_;
 };

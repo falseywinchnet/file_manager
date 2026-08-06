@@ -3,15 +3,21 @@
 The GUI.Forms Gallery bundles two Portsmouth Rapids 1.0 evaluation faces:
 
 - `PortsmouthRapids.ttf` — regular, SHA-256
-  `b7a98b9dc091f7319a658b1e924ecd97948ec4a1eea0a772501e893107d04f19`
+  `88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add`
 - `PortsmouthRapids-Bold.ttf` — bold, SHA-256
-  `e9dd60dcd8198235fe531149e0b1ab282e28655cc2159ead6123ee398deb1f82`
+  `f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a`
 
 Source: `/Users/quentinkuttenkuler/future/portsmouth/build/rapids`, supplied by
-the grand architect on 2026-08-04. Embedded metadata identifies the family as
+the grand architect, with the interface-symbol rebuild supplied 2026-08-06.
+Embedded metadata identifies the family as
 `Portsmouth Rapids`, version 1.0, and describes it as an experimental personal
 and artistic evaluation build. Full source provenance is retained in the
 FutureScope project's `portsmouth/PROJECT.md`.
+
+The 2026-08-06 faces add the protected `← ↑ → ▼` navigation/disclosure set
+requested by GUI.Forms while retaining the previous 330 cmap entries, glyph
+IDs, advances, and outlines exactly. The editable construction and acceptance
+reports live in the cited Portsmouth source project.
 
 **CANDIDATE:** Portsmouth remains admitted for titles and control chrome,
 subject to the production redistribution-rights gate.

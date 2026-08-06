@@ -112,6 +112,37 @@ void paint_relief(Painter& painter, Rect bounds, const BasicControlStyle& style,
     }
 }
 
+void fill_radio_disc(Painter& painter, double left, double top, Color color,
+                     bool inner) {
+    // Painter deliberately exposes only renderer-neutral primitives today.
+    // These one-pixel chords preserve a genuinely round 15 px WinForms radio
+    // indicator without adding an ellipse primitive to every host backend.
+    static constexpr int outer_left[] = {5, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 5};
+    static constexpr int outer_width[] = {5, 9, 11, 13, 15, 15, 15, 15, 15, 15, 15, 13, 11, 9, 5};
+    static constexpr int inner_left[] = {2, 1, 0, 0, 0, 1, 2};
+    static constexpr int inner_width[] = {3, 5, 7, 7, 7, 5, 3};
+    if (inner) {
+        for (int row = 0; row < 7; ++row) {
+            painter.fill_rect({left + 4.0 + inner_left[row], top + 4.0 + row,
+                               static_cast<double>(inner_width[row]), 1.0}, color);
+        }
+        return;
+    }
+    for (int row = 0; row < 15; ++row) {
+        painter.fill_rect({left + outer_left[row], top + row,
+                           static_cast<double>(outer_width[row]), 1.0}, color);
+    }
+}
+
+void fill_radio_face(Painter& painter, double left, double top, Color color) {
+    static constexpr int face_left[] = {5, 4, 3, 2, 1, 1, 1, 1, 1, 2, 3, 4, 5};
+    static constexpr int face_width[] = {5, 7, 9, 11, 13, 13, 13, 13, 13, 11, 9, 7, 5};
+    for (int row = 0; row < 13; ++row) {
+        painter.fill_rect({left + face_left[row], top + 1.0 + row,
+                           static_cast<double>(face_width[row]), 1.0}, color);
+    }
+}
+
 void paint_focus(Painter& painter, Rect bounds, Color color) {
     if (bounds.width > 9.0 && bounds.height > 9.0) {
         const double left = bounds.x + 4.5;
@@ -242,14 +273,18 @@ void GroupBox::set_font(FontSpec font) {
 
 void GroupBox::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
+    const FontSpec font = effective_font(font_);
+    const double caption_height = std::max(16.0, font.size + 4.0);
+    const double rule_y = std::max(10.5, caption_height * 0.66);
     painter.fill_rect(bounds, background());
-    painter.stroke_rect({0.5, 10.5, std::max(0.0, bounds.width - 1.0),
-                         std::max(0.0, bounds.height - 11.0)},
+    painter.stroke_rect({0.5, rule_y, std::max(0.0, bounds.width - 1.0),
+                         std::max(0.0, bounds.height - rule_y - 0.5)},
                         style().border, 1.0);
     const double caption_width = std::min(
-        std::max(0.0, bounds.width - 18.0), estimated_text_width(text_, font_) + 12.0);
-    painter.fill_rect({9.0, 3.0, caption_width, 16.0}, background());
-    painter.draw_text_utf8({13.0, 15.0}, text_, font_,
+        std::max(0.0, bounds.width - 18.0), estimated_text_width(text_, font) + 12.0);
+    painter.fill_rect({9.0, 1.0, caption_width, caption_height}, background());
+    painter.draw_text_utf8({13.0, std::max(font.size, rule_y + font.size * 0.36)},
+                           text_, font,
                            enabled() ? style().text : style().disabled_text);
 }
 
@@ -476,19 +511,20 @@ void Label::set_line_spacing(double spacing) {
 Size Label::measure(Size available) {
     const Rect requested = requested_bounds();
     const std::string text = display_text();
+    const FontSpec font = effective_font(font_);
     const double wrap_width = requested.width > 0.0
         ? requested.width : available.width;
-    const auto lines = label_lines(text, font_, std::max(0.0, wrap_width - 4.0),
+    const auto lines = label_lines(text, font, std::max(0.0, wrap_width - 4.0),
                                    text_wrapping_);
     double content_width{};
     for (const std::string& line : lines) {
-        content_width = std::max(content_width, estimated_text_width(line, font_));
+        content_width = std::max(content_width, estimated_text_width(line, font));
     }
     const double preferred_width = requested.width > 0.0
         ? requested.width : content_width + 4.0;
     const double preferred_height = requested.height > 0.0
         ? requested.height
-        : static_cast<double>(lines.size()) * font_.size * line_spacing_ + 4.0;
+        : static_cast<double>(lines.size()) * font.size * line_spacing_ + 4.0;
     return {std::min(available.width, preferred_width),
             std::min(available.height, preferred_height)};
 }
@@ -499,9 +535,10 @@ std::string Label::display_text() const {
 
 void Label::paint_label_text(Painter& painter, std::string_view text) const {
     const Rect arranged = committed_arranged_bounds();
-    const auto lines = label_lines(text, font_, std::max(0.0, arranged.width - 4.0),
+    const FontSpec font = effective_font(font_);
+    const auto lines = label_lines(text, font, std::max(0.0, arranged.width - 4.0),
                                    text_wrapping_);
-    const double line_height = font_.size * line_spacing_;
+    const double line_height = font.size * line_spacing_;
     const double block_height = static_cast<double>(lines.size()) * line_height;
     double top = 1.0;
     if (vertical_alignment_ == VerticalAlignment::center) {
@@ -511,16 +548,16 @@ void Label::paint_label_text(Painter& painter, std::string_view text) const {
     }
     const Color color = enabled() ? foreground_ : Color::rgba(132, 143, 153);
     for (std::size_t index = 0; index < lines.size(); ++index) {
-        const double text_width = estimated_text_width(lines[index], font_);
+        const double text_width = estimated_text_width(lines[index], font);
         double x = 2.0;
         if (alignment_ == HorizontalAlignment::center) {
             x = std::max(2.0, (arranged.width - text_width) * 0.5);
         } else if (alignment_ == HorizontalAlignment::far) {
             x = std::max(2.0, arranged.width - text_width - 2.0);
         }
-        const double baseline = top + font_.size +
+        const double baseline = top + font.size +
             static_cast<double>(index) * line_height;
-        painter.draw_text_utf8({x, baseline}, lines[index], font_, color);
+        painter.draw_text_utf8({x, baseline}, lines[index], font, color);
     }
 }
 
@@ -578,12 +615,20 @@ void ButtonBase::set_style(BasicControlStyle style) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void ButtonBase::set_expanded_state(std::optional<bool> expanded) {
+    require_mutable();
+    if (expanded_state_ == expanded) return;
+    expanded_state_ = expanded;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
 Size ButtonBase::measure(Size available) {
     const Rect requested = requested_bounds();
+    const FontSpec font = effective_font(font_);
     const double preferred_width = requested.width > 0.0
-        ? requested.width : estimated_text_width(text_, font_) + 22.0;
+        ? requested.width : estimated_text_width(text_, font) + 22.0;
     const double preferred_height = requested.height > 0.0
-        ? requested.height : std::max(24.0, font_.size + 12.0);
+        ? requested.height : std::max(24.0, font.size + 12.0);
     return {std::min(available.width, preferred_width),
             std::min(available.height, preferred_height)};
 }
@@ -607,12 +652,13 @@ void ButtonBase::paint_button_frame(Painter& painter, Rect bounds,
 
 void ButtonBase::paint_button_text(Painter& painter, Rect bounds,
                                    std::string_view text) const {
+    const FontSpec font = effective_font(font_);
     const double x = std::max(6.0,
-        (bounds.width - estimated_text_width(text, font_)) * 0.5);
-    const double y = std::max(font_.size,
-        (bounds.height + font_.size) * 0.5 - 1.0);
+        (bounds.width - estimated_text_width(text, font)) * 0.5);
+    const double y = std::max(font.size,
+        (bounds.height + font.size) * 0.5 - 1.0);
     const double offset = pressed_visual() ? 1.0 : 0.0;
-    painter.draw_text_utf8({x + offset, y + offset}, text, font_,
+    painter.draw_text_utf8({x + offset, y + offset}, text, font,
                            enabled() ? style_.text : style_.disabled_text);
 }
 
@@ -684,12 +730,23 @@ SemanticDescriptor ButtonBase::semantic_descriptor() const {
     descriptor.name = accessible_name().empty() ? text_ : accessible_name();
     descriptor.description = accessible_description();
     descriptor.actions = {SemanticAction::focus, SemanticAction::press};
+    if (expanded_state_) {
+        if (*expanded_state_) descriptor.states |= SemanticState::expanded;
+        descriptor.actions.push_back(*expanded_state_ ? SemanticAction::collapse
+                                                      : SemanticAction::expand);
+    }
     descriptor.exposed = true;
     return descriptor;
 }
 
 bool ButtonBase::on_semantic_action(SemanticAction action, std::string_view value) {
     if (action == SemanticAction::press) {
+        on_activate();
+        return true;
+    }
+    if (expanded_state_ &&
+        ((action == SemanticAction::expand && !*expanded_state_) ||
+         (action == SemanticAction::collapse && *expanded_state_))) {
         on_activate();
         return true;
     }
@@ -991,22 +1048,15 @@ void RadioButton::on_paint(Painter& painter, Rect) {
                                                         : colors.disabled_text);
         return;
     }
-    const Point outline[] = {{5.0, top}, {11.0, top}, {15.0, top + 4.0},
-                             {15.0, top + 10.0}, {11.0, top + 14.0},
-                             {5.0, top + 14.0}, {1.0, top + 10.0},
-                             {1.0, top + 4.0}, {5.0, top}};
-    for (std::size_t index = 1; index < std::size(outline); ++index) {
-        painter.draw_line(outline[index - 1], outline[index],
-                          indicator_style_ == ChoiceIndicatorStyle::modern && checked_
-                              ? colors.accent : colors.border,
-                          indicator_style_ == ChoiceIndicatorStyle::modern ? 2.0 : 1.0);
-    }
+    const Color ring = indicator_style_ == ChoiceIndicatorStyle::modern && checked_
+        ? colors.accent : colors.border;
+    fill_radio_disc(painter, 1.0, top, ring, false);
+    fill_radio_face(painter, 1.0, top, colors.paper);
     if (checked_) {
-        painter.fill_rect({indicator_style_ == ChoiceIndicatorStyle::modern ? 5.0 : 6.0,
-                           top + (indicator_style_ == ChoiceIndicatorStyle::modern ? 4.0 : 5.0),
-                           indicator_style_ == ChoiceIndicatorStyle::modern ? 7.0 : 5.0,
-                           indicator_style_ == ChoiceIndicatorStyle::modern ? 7.0 : 5.0},
-                          colors.accent);
+        fill_radio_disc(painter, 1.0, top,
+                        indicator_style_ == ChoiceIndicatorStyle::modern
+                            ? colors.accent : colors.dark_border,
+                        true);
     }
     painter.draw_text_utf8({23.0, std::max(font().size,
                               (bounds.height + font().size) * 0.5 - 1.0)},

@@ -31,6 +31,7 @@ class HostServices;
 class HostSession;
 namespace detail {
 class PopupAttachment;
+class AcceleratorAttachment;
 }
 
 class PopupToken final {
@@ -58,6 +59,60 @@ private:
     explicit PopupToken(std::shared_ptr<detail::PopupAttachment> attachment)
         : attachment_(std::move(attachment)) {}
     std::shared_ptr<detail::PopupAttachment> attachment_;
+};
+
+struct KeyGesture final {
+    std::uint32_t physical_key{};
+    Modifier modifiers{Modifier::none};
+    friend constexpr auto operator<=>(const KeyGesture&,
+                                      const KeyGesture&) = default;
+};
+
+struct AcceleratorOptions final {
+    // Application navigation gestures such as Alt+Left may preempt ordinary
+    // editor word-navigation. Active popup/focus scopes always retain first
+    // refusal so menus and modal editors remain contained.
+    bool before_focused_route{};
+};
+
+// Presentation preferences are expressed in logical UI terms and remain
+// independent from Window::scale(), which is the host/device pixel scale.
+// Keeping the axes separate prevents a 2x display from becoming a 200% text
+// request and lets headless conformance exercise either dimension explicitly.
+struct PresentationSettings final {
+    double text_scale{1.0};
+    bool high_contrast{};
+    bool reduced_motion{};
+    bool sound_enabled{true};
+    friend constexpr bool operator==(const PresentationSettings&,
+                                     const PresentationSettings&) = default;
+};
+
+class AcceleratorToken final {
+public:
+    AcceleratorToken() = default;
+    ~AcceleratorToken() { disconnect(); }
+    AcceleratorToken(AcceleratorToken&& other) noexcept
+        : attachment_(std::move(other.attachment_)) {}
+    AcceleratorToken& operator=(AcceleratorToken&& other) noexcept {
+        if (this != &other) {
+            disconnect();
+            attachment_ = std::move(other.attachment_);
+        }
+        return *this;
+    }
+    AcceleratorToken(const AcceleratorToken&) = delete;
+    AcceleratorToken& operator=(const AcceleratorToken&) = delete;
+
+    void disconnect() noexcept;
+    [[nodiscard]] bool connected() const noexcept;
+
+private:
+    friend class Window;
+    explicit AcceleratorToken(
+        std::shared_ptr<detail::AcceleratorAttachment> attachment)
+        : attachment_(std::move(attachment)) {}
+    std::shared_ptr<detail::AcceleratorAttachment> attachment_;
 };
 
 struct PointerCaptureChange final {
@@ -123,6 +178,14 @@ public:
     void resize(Size client_size);
     void set_scale(double scale);
     [[nodiscard]] double scale() const noexcept { return scale_; }
+    [[nodiscard]] const PresentationSettings& presentation_settings() const noexcept {
+        return presentation_settings_;
+    }
+    void set_presentation_settings(PresentationSettings settings);
+    void set_text_scale(double text_scale);
+    [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept {
+        return presentation_changed_;
+    }
     // Non-owning portable service seam, installed for the lifetime of a
     // HostSession. Renderer-free and headless windows may legitimately return
     // null when no host is attached.
@@ -219,6 +282,12 @@ public:
     [[nodiscard]] PopupToken open_popup(const Control::Ptr& owner,
                                         const Control::Ptr& popup,
                                         PopupOptions options = {});
+    // Window accelerators are tried only after the focused retained route
+    // declines a key, preserving editor/menu ownership of their native keys.
+    // Registrations are revoked by either the token or owner disposal.
+    [[nodiscard]] AcceleratorToken register_accelerator(
+        Component& owner, KeyGesture gesture, std::function<bool()> callback,
+        AcceleratorOptions options = {});
     [[nodiscard]] Control::Ptr pressed_control() const noexcept { return pressed_.lock(); }
 
     bool dispatch_pointer(PointerEvent event);
@@ -245,6 +314,7 @@ private:
     friend class Timer;
     friend class ToolTip;
     friend class detail::PopupAttachment;
+    friend class detail::AcceleratorAttachment;
 
     void attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent);
     void detach_subtree(const Control::Ptr& control);
@@ -255,6 +325,9 @@ private:
     void revoke_focus_scopes_for_subtree(const Control::Ptr& control) noexcept;
     void close_popups_for_subtree(const Control::Ptr& control) noexcept;
     void close_popup(detail::PopupAttachment& popup) noexcept;
+    void close_accelerator(detail::AcceleratorAttachment& accelerator) noexcept;
+    [[nodiscard]] bool dispatch_accelerator(const KeyEvent& event,
+                                            bool preemptive);
     [[nodiscard]] bool focus_allowed_by_active_scope(
         const Control::Ptr& control) const noexcept;
     [[nodiscard]] std::vector<Control::Ptr> focus_candidates(
@@ -315,6 +388,8 @@ private:
     Control::Ptr root_;
     Size client_size_{};
     double scale_{1.0};
+    PresentationSettings presentation_settings_{};
+    Event<const PresentationSettings&> presentation_changed_;
     std::unordered_map<std::string, Control::WeakPtr> stable_ids_;
     Control::WeakPtr focused_;
     struct FocusScopeState final {
@@ -333,6 +408,7 @@ private:
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
     std::vector<std::shared_ptr<detail::PopupAttachment>> popups_;
+    std::vector<std::shared_ptr<detail::AcceleratorAttachment>> accelerators_;
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;

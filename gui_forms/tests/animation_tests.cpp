@@ -262,6 +262,19 @@ void test_progress_animation_and_hidden_suspension() {
                     close_to(progress->animation_phase(), compound_phase),
                 "full motion must restore its frame lease from the retained phase");
     }
+    PresentationSettings calm = window.presentation_settings();
+    calm.reduced_motion = true;
+    progress->set_motion_policy(MotionPolicy{true, false, false});
+    window.set_presentation_settings(calm);
+    require(!progress->motion_policy().reduced &&
+                progress->effective_motion_policy().reduced &&
+                window.next_wake().has_value(),
+            "window reduced-motion preference must calm progress without overwriting local policy or stopping it");
+    calm.reduced_motion = false;
+    window.set_presentation_settings(calm);
+    require(!progress->effective_motion_policy().reduced &&
+                window.next_wake().has_value(),
+            "clearing the window preference must restore full motion in one transition");
     progress->set_overlay_style(ProgressBarOverlayStyle::none);
     require(!window.next_wake().has_value(),
             "removing the last animated progress feature must revoke its frame source");
@@ -347,6 +360,15 @@ void test_public_easing_preview_owns_scheduler_policy_and_semantics() {
                 has_semantic_state(preview->semantic_descriptor().states,
                                    SemanticState::busy),
             "EasingPreview must own all public curves, one frame lease, and busy semantics");
+
+    PresentationSettings calm = window.presentation_settings();
+    calm.reduced_motion = true;
+    window.set_presentation_settings(calm);
+    require(preview->effective_motion_policy().reduced &&
+                !preview->motion_policy().reduced && window.next_wake().has_value(),
+            "window reduced-motion preference must calm EasingPreview without replacing its authored policy");
+    calm.reduced_motion = false;
+    window.set_presentation_settings(calm);
 
     const double before = preview->phase();
     preview->set_motion_policy({true, false, true});

@@ -763,6 +763,37 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
             SkCodec::kSuccess) {
             return {.error = RasterError::decode_failed};
         }
+        // A few palette/tRNS PNGs are returned by SkCodec with straight RGB
+        // channels even though the requested destination is tagged premultiplied.
+        // Transparent WinForms theme glyphs then carry non-zero color at A=0,
+        // which becomes an opaque pale square when that raster is composited by
+        // another retained surface. Detect the impossible premultiplied values
+        // and normalize the complete decoded image exactly once.
+        auto* pixels = reinterpret_cast<std::uint8_t*>(lock.writable_data);
+        bool straight_alpha{};
+        for (std::uint32_t y = 0; y < lock.height && !straight_alpha; ++y) {
+            const auto* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
+            for (std::uint32_t x = 0; x < lock.width; ++x) {
+                const auto* pixel = row + static_cast<std::size_t>(x) * 4U;
+                const std::uint8_t alpha = pixel[3];
+                if (pixel[0] > alpha || pixel[1] > alpha || pixel[2] > alpha) {
+                    straight_alpha = true;
+                    break;
+                }
+            }
+        }
+        if (straight_alpha) {
+            for (std::uint32_t y = 0; y < lock.height; ++y) {
+                auto* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
+                for (std::uint32_t x = 0; x < lock.width; ++x) {
+                    auto* pixel = row + static_cast<std::size_t>(x) * 4U;
+                    const std::uint8_t alpha = pixel[3];
+                    pixel[0] = premultiply(pixel[0], alpha);
+                    pixel[1] = premultiply(pixel[1], alpha);
+                    pixel[2] = premultiply(pixel[2], alpha);
+                }
+            }
+        }
         unlock.release();
         return {std::move(bitmap), RasterError::none};
     } catch (const std::length_error&) {

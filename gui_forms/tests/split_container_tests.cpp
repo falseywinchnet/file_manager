@@ -188,6 +188,125 @@ void test_horizontal_orientation_and_thread_guard() {
     require(rejected, "attached split mutation must preserve UI-thread enforcement");
 }
 
+void test_seam_tab_pointer_keyboard_and_semantic_collapse() {
+    auto split = make_control<SplitContainer>(StableId("split.seam-tab"));
+    split->set_splitter_distance(270.0);
+    split->set_collapse_panel(SplitFixedPanel::second);
+    split->set_accessible_name("Inspector split");
+    Window window(split, {400.0, 180.0});
+    window.perform_layout();
+    const double remembered = split->second_panel()->arranged_bounds().width;
+
+    const Rect seam = split->splitter_control()->absolute_bounds();
+    PointerEvent down;
+    down.action = PointerAction::down;
+    down.button = PointerButton::primary;
+    down.position = {seam.x + seam.width * .5,
+                     seam.y + seam.height * .5};
+    require(window.dispatch_pointer(down) &&
+                window.captured_control() == split->splitter_control(),
+            "seam collapse tab must capture its compact activation target");
+    PointerEvent up = down;
+    up.action = PointerAction::up;
+    require(window.dispatch_pointer(up) && split->second_collapsed(),
+            "seam collapse tab activation must collapse its declared panel");
+    window.perform_layout();
+    require(!split->second_panel()->visible() &&
+                window.perform_semantic_action("split.seam-tab",
+                                               SemanticAction::expand),
+            "collapsed seam must leave the pane out of task order and expose restore");
+    window.perform_layout();
+    require(!split->second_collapsed() &&
+                near(split->second_panel()->arranged_bounds().width, remembered),
+            "semantic restore must recover the remembered pane extent");
+
+    split->set_splitter_fixed(true);
+    require(window.request_focus(split->splitter_control()) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                split->second_collapsed(),
+            "fixed splitter seam tab must remain keyboard-operable for collapse");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::space}) &&
+                !split->second_collapsed(),
+            "Space must restore a collapsed pane through the focused seam tab");
+}
+
+void test_automatic_accommodation_and_user_override() {
+    auto split = make_control<SplitContainer>(StableId("split.accommodation"));
+    split->set_splitter_distance(250.0);
+    split->set_collapse_panel(SplitFixedPanel::second);
+    split->set_automatic_collapse_threshold(360.0);
+    Window window(split, {400.0, 160.0});
+    window.perform_layout();
+    require(!split->second_collapsed(),
+            "roomy split must begin expanded above its authored threshold");
+
+    window.resize({330.0, 160.0});
+    window.perform_layout();
+    require(split->second_collapsed() &&
+                split->second_collapse_origin() ==
+                    SplitCollapseOrigin::automatic_accommodation,
+            "crossing below the threshold must record automatic collapse origin");
+
+    require(window.request_focus(split->splitter_control()) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                !split->second_collapsed(),
+            "user must be able to restore an automatically collapsed pane");
+    window.perform_layout();
+    require(!split->second_collapsed(),
+            "user restore below threshold must suppress immediate recollapse");
+
+    window.resize({400.0, 160.0});
+    window.perform_layout();
+    window.resize({330.0, 160.0});
+    window.perform_layout();
+    require(split->second_collapsed() &&
+                split->second_collapse_origin() ==
+                    SplitCollapseOrigin::automatic_accommodation,
+            "crossing above then below must re-arm automatic accommodation");
+    window.resize({400.0, 160.0});
+    window.perform_layout();
+    require(!split->second_collapsed(),
+            "room restoration must restore only an automatically collapsed pane");
+
+    split->set_second_collapsed(true, SplitCollapseOrigin::user);
+    window.resize({500.0, 160.0});
+    window.perform_layout();
+    require(split->second_collapsed() &&
+                split->second_collapse_origin() == SplitCollapseOrigin::user,
+            "room restoration must not override a user-collapsed pane");
+}
+
+void test_content_aware_maximum_extents() {
+    auto right_bounded = make_control<SplitContainer>(StableId("split.max.right"));
+    right_bounded->set_second_maximum(180.0);
+    right_bounded->set_splitter_distance(100.0);
+    Window right_window(right_bounded, {600.0, 160.0});
+    right_window.perform_layout();
+    require(near(right_bounded->second_panel()->arranged_bounds().width, 180.0),
+            "second maximum must stop a pane consuming space its content cannot use");
+    right_bounded->set_splitter_distance(0.0);
+    right_window.perform_layout();
+    require(near(right_bounded->second_panel()->arranged_bounds().width, 180.0),
+            "programmatic and pointer distances must share maximum constraints");
+
+    auto left_bounded = make_control<SplitContainer>(StableId("split.max.left"));
+    left_bounded->set_first_maximum(200.0);
+    left_bounded->set_splitter_distance(500.0);
+    Window left_window(left_bounded, {600.0, 160.0});
+    left_window.perform_layout();
+    require(near(left_bounded->first_panel()->arranged_bounds().width, 200.0),
+            "first maximum must symmetrically bound content-aware pane growth");
+
+    bool invalid_rejected{};
+    try {
+        left_bounded->set_first_maximum(10.0);
+    } catch (const std::invalid_argument&) {
+        invalid_rejected = true;
+    }
+    require(invalid_rejected,
+            "pane maximum may not contradict its declared minimum");
+}
+
 } // namespace
 
 int main() {
@@ -197,6 +316,9 @@ int main() {
         test_pane_surface_background();
         test_collapse_focus_restore_and_fixed_panel_resize();
         test_horizontal_orientation_and_thread_guard();
+        test_seam_tab_pointer_keyboard_and_semantic_collapse();
+        test_automatic_accommodation_and_user_override();
+        test_content_aware_maximum_extents();
         std::cout << "split-container-tests: pass\n";
         return 0;
     } catch (const std::exception& error) {

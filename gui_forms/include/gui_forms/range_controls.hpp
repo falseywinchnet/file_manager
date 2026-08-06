@@ -175,6 +175,7 @@ public:
     [[nodiscard]] MotionPolicy motion_policy() const noexcept {
         return motion_policy_;
     }
+    [[nodiscard]] MotionPolicy effective_motion_policy() const noexcept;
     [[nodiscard]] FrameInterval animation_period() const noexcept {
         return animation_period_;
     }
@@ -201,6 +202,7 @@ private:
     ProgressBarOverlayStyle overlay_style_{ProgressBarOverlayStyle::none};
     double stripe_width_{7.0};
     FrameRequestToken animation_frames_;
+    SubscriptionToken presentation_subscription_;
     FrameInterval animation_period_{std::chrono::milliseconds(1400)};
     FrameTime last_animation_frame_{};
     double animation_phase_{};

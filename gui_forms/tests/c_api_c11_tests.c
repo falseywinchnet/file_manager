@@ -62,6 +62,7 @@ struct m11c_context {
     unsigned dispatches;
     unsigned closing;
     unsigned closed;
+    unsigned bounds_changed;
 };
 
 struct close_cancel_context {
@@ -172,6 +173,10 @@ static uint32_t m11c_event(gf_handle sender, uint32_t event_kind, void* opaque) 
     }
     if (event_kind == GF_EVENT_FORM_CLOSED) {
         ++context->closed;
+        return GF_EVENT_CALLBACK_CONTINUE;
+    }
+    if (event_kind == GF_EVENT_BOUNDS_CHANGED) {
+        ++context->bounds_changed;
         return GF_EVENT_CALLBACK_CONTINUE;
     }
     require(0, "unexpected M11c event kind");
@@ -934,12 +939,17 @@ static void test_abi_0_4_callbacks_dispatch_and_close(void) {
     gf_event_token click = {0U, 0U};
     gf_event_token closing = {0U, 0U};
     gf_event_token closed = {0U, 0U};
+    gf_event_token bounds_changed = {0U, 0U};
     require(api.subscribe_v2(context.button, GF_EVENT_CLICKED, m11c_event,
                              &context, &click) == GF_OK &&
                 api.subscribe_v2(context.form, GF_EVENT_FORM_CLOSING, m11c_event,
                                  &context, &closing) == GF_OK &&
                 api.subscribe_v2(context.form, GF_EVENT_FORM_CLOSED, m11c_event,
-                                 &context, &closed) == GF_OK,
+                                 &context, &closed) == GF_OK &&
+                api.subscribe_v2(context.form, GF_EVENT_BOUNDS_CHANGED, m11c_event,
+                                 &context, &bounds_changed) == GF_OK &&
+                api.subscribe_v2(context.button, GF_EVENT_BOUNDS_CHANGED, m11c_event,
+                                 &context, &bounds_changed) == GF_ERROR_WRONG_HANDLE_KIND,
             "0.4 typed subscriptions failed");
     require(api.run_window(context.form,
                            GF_WINDOW_RUN_FORCE_HEADLESS |
@@ -948,6 +958,7 @@ static void test_abi_0_4_callbacks_dispatch_and_close(void) {
     uint64_t faults = 0U;
     require(context.clicks == 1U && context.dispatches == 1U &&
                 context.closing == 1U && context.closed == 1U &&
+                context.bounds_changed >= 1U &&
                 api.callback_fault_count(context.form, &faults) == GF_OK &&
                 faults == 1U,
             "0.4 callback/dispatch/lifecycle counts changed");

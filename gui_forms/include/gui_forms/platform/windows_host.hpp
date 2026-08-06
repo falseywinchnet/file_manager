@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gui_forms::host {
 
@@ -35,7 +36,16 @@ struct WindowsHostOptions final {
                        std::string_view host_json)> final_snapshot;
 };
 
+struct WindowsApplicationWindow final {
+    std::string stable_id;
+    std::string owner_id;
+    std::unique_ptr<Window> model;
+    WindowsHostOptions options;
+    bool tool_window{};
+};
+
 [[nodiscard]] HostCapabilities windows_capabilities();
 int run_windows(std::unique_ptr<Window> window, WindowsHostOptions options = {});
+int run_windows_application(std::vector<WindowsApplicationWindow> windows);
 
 } // namespace gui_forms::host

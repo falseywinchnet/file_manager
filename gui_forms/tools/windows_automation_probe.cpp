@@ -205,6 +205,16 @@ BOOL CALLBACK sample_control_surface(HWND window, LPARAM context_value) {
     return TRUE;
 }
 
+bool send_automation(HWND window, const std::string& command, DWORD_PTR& result) {
+    COPYDATASTRUCT data{};
+    data.dwData = 0x47464131U;
+    data.cbData = static_cast<DWORD>(command.size() + 1);
+    data.lpData = const_cast<char*>(command.data());
+    return SendMessageTimeoutW(window, WM_COPYDATA, 0,
+                               reinterpret_cast<LPARAM>(&data),
+                               SMTO_ABORTIFHUNG | SMTO_BLOCK, 5000, &result) != 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -280,20 +290,61 @@ int main(int argc, char** argv) {
         std::printf("surfaces=%u\n", statistics.count);
         return statistics.count == 0 ? 5 : 0;
     }
+    if (std::strcmp(argv[1], "native-click") == 0) {
+        if (argc != 4) return 2;
+        const long x = std::strtol(argv[2], nullptr, 10);
+        const long y = std::strtol(argv[3], nullptr, 10);
+        const LPARAM point = MAKELPARAM(static_cast<short>(x), static_cast<short>(y));
+        if (!PostMessageW(window, WM_MOUSEMOVE, 0, point) ||
+            !PostMessageW(window, WM_LBUTTONDOWN, MK_LBUTTON, point) ||
+            !PostMessageW(window, WM_LBUTTONUP, 0, point)) {
+            std::fprintf(stderr, "failed to post native click\n");
+            return 4;
+        }
+        std::printf("clicked=%ld,%ld\n", x, y);
+        return 0;
+    }
+    if (std::strcmp(argv[1], "native-press-capture") == 0) {
+        if (argc != 5) return 2;
+        const long x = std::strtol(argv[2], nullptr, 10);
+        const long y = std::strtol(argv[3], nullptr, 10);
+        const LPARAM point = MAKELPARAM(static_cast<short>(x), static_cast<short>(y));
+        SendMessageW(window, WM_MOUSEMOVE, 0, point);
+        SendMessageW(window, WM_LBUTTONDOWN, MK_LBUTTON, point);
+        DWORD_PTR result{};
+        const std::string capture_command =
+            std::string("GUI.Forms.Automation/1 capture ") + argv[4];
+        const bool captured = send_automation(window, capture_command, result) && result == TRUE;
+        SendMessageW(window, WM_LBUTTONUP, 0, point);
+        if (!captured) {
+            std::fprintf(stderr, "pressed-state capture failed\n");
+            return 4;
+        }
+        std::printf("pressed-capture=%ld,%ld,%s\n", x, y, argv[4]);
+        return 0;
+    }
+    if (std::strcmp(argv[1], "native-resize") == 0) {
+        if (argc != 4) return 2;
+        const int width = static_cast<int>(std::strtol(argv[2], nullptr, 10));
+        const int height = static_cast<int>(std::strtol(argv[3], nullptr, 10));
+        if (width <= 0 || height <= 0 ||
+            !SetWindowPos(window, nullptr, 0, 0, width, height,
+                          SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE)) {
+            std::fprintf(stderr, "native resize failed\n");
+            return 4;
+        }
+        UpdateWindow(window);
+        std::printf("resized=%dx%d\n", width, height);
+        return 0;
+    }
     std::string command = "GUI.Forms.Automation/1 ";
     command += argv[1];
     for (int index = 2; index < argc; ++index) {
         command += ' ';
         command += argv[index];
     }
-    COPYDATASTRUCT data{};
-    data.dwData = 0x47464131U;
-    data.cbData = static_cast<DWORD>(command.size() + 1);
-    data.lpData = command.data();
     DWORD_PTR result{};
-    if (!SendMessageTimeoutW(window, WM_COPYDATA, 0,
-                             reinterpret_cast<LPARAM>(&data),
-                             SMTO_ABORTIFHUNG | SMTO_BLOCK, 5000, &result)) {
+    if (!send_automation(window, command, result)) {
         std::fprintf(stderr, "automation command timed out\n");
         return 4;
     }

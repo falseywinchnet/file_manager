@@ -121,6 +121,11 @@ public:
     [[nodiscard]] Rect committed_arranged_bounds() const noexcept { return arranged_bounds_; }
     [[nodiscard]] Rect absolute_bounds() const;
     [[nodiscard]] Window* attached_window() const noexcept { return window_; }
+    // Resolves the authored font against the attached window's presentation
+    // text scale. Custom controls should use this for both measurement and
+    // painting so text, wrapping, hit geometry, and carets remain coherent.
+    [[nodiscard]] double effective_text_scale() const noexcept;
+    [[nodiscard]] FontSpec effective_font(FontSpec authored) const noexcept;
     [[nodiscard]] bool invoke_required() const noexcept;
     [[nodiscard]] DispatchOperation begin_invoke(std::function<void()> callback);
     // Executes inline on the owning UI thread. A worker caller blocks without

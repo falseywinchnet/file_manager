@@ -1,8 +1,8 @@
 # Demoboard status ledger
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
-Status: **specification complete; implementation not started**.
+Status: **implementation in progress; D0/D1/D2/D3 measured partial**.
 
 This is the first file a worker updates after completing the mandatory reading
 order. It reports evidence; it does not turn an unavailable parent capability
@@ -12,10 +12,10 @@ into a local implementation task.
 
 | Slice | State | Current evidence | Blocker/next action |
 |---|---|---|---|
-| DEMO-D0 package/consumer proof | not started | specification only | create opt-in public-package consumer target under explicit implementation authority |
-| DEMO-D1 shell/material | not started | copied atlas and screenshots | requires public shell/layout/material subset |
-| DEMO-D2 Folder composition | not started | fixture and control contracts | requires admitted command/tree/list/menu primitives |
-| DEMO-D3 panes/edit/responsive | not started | interaction and acceptance contracts | requires split/scroll/editor/priority-collapse primitives |
+| DEMO-D0 package/consumer proof | measured partial | opt-in native target; immutable catalogue 001/generation 86; independent product/controller roots in one owned native application session; installed `GUIForms::Controls` consumer; public-boundary and AppKit lifecycle tests | installed native host target remains open |
+| DEMO-D1 shell/material | measured partial | exact 1450×850 six-band geometry test; Sapphire/House shell; split workspace; native AppKit capture under `results/2026-08-06-d1-shell/` | custom host chrome, exact reference-size capture, responsive matrix, and reusable gradient/material roles remain open |
+| DEMO-D2 Folder composition | measured partial | public stable-ID `TreeView` and multi-select `ObjectView`; retained `MenuStrip`/`ContextMenu`; tokenized accelerators; coherent Back/Forward/Up history with selection/scroll restoration; clickable breadcrumb; shared ribbon/menu commands; session-only New Folder/Delete/Name edit; native menu semantics | provider-scale closure, full ribbon vocabulary/key tips, and object-label in-place editing remain open |
+| DEMO-D3 panes/edit/responsive | measured partial | public `PropertyList` with retained stock text/choice editors, grouped disclosures, inline accessible validation and one preview/property scroll plane; preview and whole-pane disclosure; `SplitContainer` seam-tab pointer/keyboard/semantic collapse, authored maximum extents, automatic/user origin, remembered extents and focus transfer; named 1450/1200/960/720/480/300/150 priority-collapse matrix; 100/125/150/200/225% logical-text matrix; 1800x1050 headless growth and native zoom fill; global reduced-motion cadence and semantic sound-off equivalence; current PE64 demoboard plus CPU-only Skia raster DLL; isolated-prefix Wine interaction/close smoke; F2 routes to Name; native AppKit evidence under `results/2026-08-06-d3-responsive/` | host-display-scale/high-contrast visual matrices, preview copy/drag, physical compact-size captures, and exact seam proximity treatment remain open |
 | DEMO-D4 path matrix | not started | exact fixture and state machine | requires breadcrumb/editor/popup/suggestion primitives |
 | DEMO-D5 Search correspondence | not started | seven-result fixture and geometry | requires variable-height virtualization/inspection expansion |
 | DEMO-D6 Criteria virtual folder | not started | three-module fixture | requires editable choice/property/rack composition |
@@ -41,16 +41,16 @@ before changing a row.
 |---|---|---|
 | stable shell/layout | partial | exact public controls and missing FM-W/FM-LY IDs |
 | House drawing/material | partial | admitted FM-R operations and explicit fallback/unavailable states |
-| commands/ribbon/menu | open/partial | FM-C IDs and shared-command evidence |
-| breadcrumb/path editor | open | FM-N IDs; do not build a private editor/popup stack |
-| virtual tree/object views | open | FM-O IDs and realization bounds |
-| selection PropertyList/preview host | open | FM-O11/O12 and one-scroll-plane evidence |
+| commands/ribbon/menu | partial | public `Command`/`CommandBinding`, tokenized window accelerators, retained `MenuStrip`, and `ContextMenu` cover shared state, top-level switching, disabled reasons, checks/radios, nested submenus, keyboard focus, click-away, scrolling, edge avoidance, and native semantics; split commands, key tips, and responsive ribbon overflow remain open |
+| breadcrumb/path editor | partial | clickable retained breadcrumb segments project one navigation authority; editable path mode, suggestions, validation and popup matrix remain FM-N open work |
+| virtual tree/object views | partial | public stable-ID tree/object controls, model-order multi-selection, primary/anchor/independent focus, keyboard/type select, icon/details/sort preservation, context requests, and bounded visible semantic children; provider-scale and inline label editing remain open |
+| selection PropertyList/preview host | measured partial | public grouped `PropertyList`, stable stock editors, validation, choice commits, preview header/disclosure, one-scroll-plane ownership, split-pane collapse/restore, native semantic/edit evidence; async commit/reset/default/custom editors remain open |
 | correspondence rows | open | FM-C09/C10, FM-S01, FM-LY08 |
 | criteria rack | open | FM-S02/S03 and public editor/choice composition |
 | outbound drag/external peer | open | FM-D IDs; inbound proof is not outbound proof |
 | native accessibility | open | FM-A IDs and physical publisher results |
-| HarfBuzz/FreeType/bundled body fonts | selected direction, implementation gated | FM-T IDs, pack hashes, coverage and raster profile |
-| motion/sounds | open | FM-V05–V07, fake-clock and muted equivalence |
+| HarfBuzz/FreeType/bundled body fonts | measured partial | the refreshed 349-codepoint Portsmouth Rapids regular/bold faces contain `U+2190 U+2191 U+2192 U+25BC`; HarfBuzz tests prove the full navigation string shapes in one Rapids run at regular and bold weights; Carlito/Noto remain explicit resilience and mixed-script fallback; revised-face scale/raster acceptance remains open |
+| motion/sounds | measured partial | public `SemanticFeedback` records deterministic location/pane/option/operation events through an injected monotonic clock; sound-off preserves the semantic trace with zero host gain; Window reduced motion keeps progress/easing activity live at calmer cadence; physical host cue assets/coalescing remain open |
 
 ## Evidence locations to create
 
@@ -112,4 +112,24 @@ Next action:
 - SHA-256 manifest and correction ledger in `reference/README.md`;
 - detailed project, visual, control, interaction, fixture, implementation, and
   acceptance specifications;
-- no native demoboard source, executable, test, or measured capture yet.
+- native product-shell executable, headless geometry/fixture/semantic tests,
+  public-source boundary policy, installed-controls consumer proof, and first
+  AppKit capture now exist;
+- the separate controller retained tree now runs beside the product as an owned
+  native tool window with independent close/lifetime/accessibility roots;
+- public TreeView, multi-select ObjectView, shared Command/CommandBinding,
+  tokenized accelerators, retained MenuStrip, and ContextMenu primitives now replace the former Folder-mode
+  presentation-only compositions;
+- physical AppKit evidence records an object menu plus nested checked submenu,
+  and preserves the initial accessible-but-invisible popup failure and its
+  window-owned overlay-root correction;
+- refreshed Portsmouth Rapids regular/bold faces contain the requested
+  navigation/disclosure glyphs and pass one-run HarfBuzz shaping at both weights.
+- physical AppKit dogfood records top-level keyboard menu switching, a nested
+  Move / copy submenu, Up navigation to Work, and Back restoration of the exact
+  Projects selection; headless tests cover Back/Forward/Up branch semantics.
+- D3 physical AppKit dogfood records F2 Name editing through commit, coherent
+  object/heading/property projection, complete removal of the collapsed
+  Selection subtree from accessibility order, and remembered-extent restore;
+  public and installed-consumer tests cover validation, choice commits,
+  disclosures, one-scroll ownership, and seam pointer/keyboard/semantic paths.

@@ -46,6 +46,7 @@ add_library(gui_forms_core STATIC
     src/core/resources.cpp
     src/core/semantics.cpp
     src/core/host.cpp
+    src/core/feedback.cpp
     src/core/display_chunk.cpp
     src/core/dispatcher.cpp
     src/core/component.cpp
@@ -167,10 +168,15 @@ target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 
 add_library(gui_forms_controls STATIC
     src/controls/basic_controls.cpp
+    src/controls/collection_controls.cpp
+    src/controls/commands.cpp
+    src/controls/menu_controls.cpp
+    src/controls/popup_controls.cpp
     src/controls/container_controls.cpp
     src/controls/date_time_picker.cpp
     src/controls/diagnostic_controls.cpp
     src/controls/input_controls.cpp
+    src/controls/inspection_controls.cpp
     src/controls/range_controls.cpp
     src/controls/tooltip.cpp
 )
@@ -242,18 +248,36 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
     target_link_libraries(gui_forms_file_manager_demoboard_model
         PUBLIC GUIForms::Controls)
 
+    set(GUI_FORMS_DEMOBOARD_FONTS
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Bold.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Italic.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-BoldItalic.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Regular.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Bold.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Italic.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-BoldItalic.ttf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansCJKjp-Regular.otf
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoEmoji-Regular.ttf)
+    set(GUI_FORMS_DEMOBOARD_FONT_NOTICES
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoEmoji.txt)
+
     if(GUI_FORMS_ENABLE_MACOS_HOST)
-        set(GUI_FORMS_DEMOBOARD_FONTS
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Bold.ttf
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Regular.ttf)
-        set_source_files_properties(${GUI_FORMS_DEMOBOARD_FONTS} PROPERTIES
+        set_source_files_properties(
+            ${GUI_FORMS_DEMOBOARD_FONTS}
+            ${GUI_FORMS_DEMOBOARD_FONT_NOTICES}
+            PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources/fonts")
         add_executable(gui_forms_file_manager_demoboard MACOSX_BUNDLE
             file_manager_demoboard/src/macos_main.mm
-            ${GUI_FORMS_DEMOBOARD_FONTS})
+            ${GUI_FORMS_DEMOBOARD_FONTS}
+            ${GUI_FORMS_DEMOBOARD_FONT_NOTICES})
         target_compile_options(gui_forms_file_manager_demoboard PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_file_manager_demoboard PRIVATE
             gui_forms_file_manager_demoboard_model gui_forms_host_macos)
@@ -274,6 +298,34 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             -static -static-libgcc -static-libstdc++)
         set_target_properties(gui_forms_file_manager_demoboard_windows PROPERTIES
             OUTPUT_NAME "File Manager Demoboard")
+        add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts")
+        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
+            get_filename_component(font_name "${font_file}" NAME)
+            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
+                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${font_name}")
+        endforeach()
+        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
+            get_filename_component(notice_name "${notice_file}" NAME)
+            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
+                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${notice_name}")
+        endforeach()
+    endif()
+
+    if(GUI_FORMS_BUILD_TESTS)
+        add_executable(gui_forms_file_manager_demoboard_tests
+            file_manager_demoboard/tests/demoboard_tests.cpp)
+        target_link_libraries(gui_forms_file_manager_demoboard_tests PRIVATE
+            gui_forms_file_manager_demoboard_model)
+        add_test(NAME gui_forms_file_manager_demoboard_tests
+                 COMMAND gui_forms_file_manager_demoboard_tests)
+        add_test(NAME gui_forms_file_manager_demoboard_public_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DDEMOBOARD_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/file_manager_demoboard
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_demoboard_boundaries.cmake)
     endif()
 endif()
 if(APPLE)
@@ -800,6 +852,7 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         target_compile_definitions(gui_forms_harfbuzz_font_engine_tests PRIVATE
             GUI_FORMS_TEST_RAPIDS_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
+            GUI_FORMS_TEST_RAPIDS_BOLD="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf"
             GUI_FORMS_TEST_CARLITO_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf"
             GUI_FORMS_TEST_CARLITO_BOLD="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Bold.ttf"
             GUI_FORMS_TEST_COUSINE_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Cousine-Regular.ttf"
@@ -823,12 +876,40 @@ if(GUI_FORMS_BUILD_TESTS)
     )
     add_test(NAME gui_forms_input_controls_tests COMMAND gui_forms_input_controls_tests)
 
+    add_executable(gui_forms_inspection_controls_tests
+        tests/inspection_controls_tests.cpp)
+    target_link_libraries(gui_forms_inspection_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_inspection_controls_tests
+             COMMAND gui_forms_inspection_controls_tests)
+
     add_executable(gui_forms_checked_list_box_tests
         tests/checked_list_box_tests.cpp
     )
     target_link_libraries(gui_forms_checked_list_box_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_checked_list_box_tests
              COMMAND gui_forms_checked_list_box_tests)
+
+    add_executable(gui_forms_collection_controls_tests
+        tests/collection_controls_tests.cpp)
+    target_link_libraries(gui_forms_collection_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_collection_controls_tests
+             COMMAND gui_forms_collection_controls_tests)
+
+    add_executable(gui_forms_menu_controls_tests
+        tests/menu_controls_tests.cpp)
+    target_link_libraries(gui_forms_menu_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_menu_controls_tests
+             COMMAND gui_forms_menu_controls_tests)
+
+    add_executable(gui_forms_popup_controls_tests
+        tests/popup_controls_tests.cpp)
+    target_link_libraries(gui_forms_popup_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_popup_controls_tests
+             COMMAND gui_forms_popup_controls_tests)
 
     add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
@@ -1033,6 +1114,15 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         add_test(NAME gui_forms_macos_host_close_tests
                  COMMAND gui_forms_macos_host_close_tests)
+
+        add_executable(gui_forms_macos_multi_window_tests
+            tests/macos_multi_window_tests.mm)
+        target_compile_options(gui_forms_macos_multi_window_tests PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_macos_multi_window_tests PRIVATE
+            gui_forms_host_macos
+            gui_forms_controls)
+        add_test(NAME gui_forms_macos_multi_window_tests
+                 COMMAND gui_forms_macos_multi_window_tests)
     endif()
 
     if(TARGET gui_forms_skia)

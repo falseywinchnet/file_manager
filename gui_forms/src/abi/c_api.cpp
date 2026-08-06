@@ -2245,7 +2245,8 @@ public:
              event_kind != GF_EVENT_FORM_CLOSING &&
              event_kind != GF_EVENT_FORM_CLOSED &&
              event_kind != GF_EVENT_RANGE_VALUE_CHANGED &&
-             event_kind != GF_EVENT_RANGE_SCROLL) ||
+             event_kind != GF_EVENT_RANGE_SCROLL &&
+             event_kind != GF_EVENT_BOUNDS_CHANGED) ||
             callback == nullptr || output == nullptr) {
             return fail(GF_ERROR_INVALID_ARGUMENT,
                         "subscribe_v2 requires a supported typed event, callback, and output");
@@ -2275,6 +2276,11 @@ public:
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
                         "range subscriptions require a track bar or progress bar");
         }
+        if (event_kind == GF_EVENT_BOUNDS_CHANGED &&
+            sender->kind != GF_CONTROL_FORM) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "bounds-changed subscriptions require a form control");
+        }
         auto record = std::make_shared<SubscriptionRecord>();
         record->callback_v2 = callback;
         record->context = context;
@@ -2299,6 +2305,13 @@ public:
                 [this, sender_handle](const gui_forms::RangeScrollEvent&) {
                     static_cast<void>(emit_v2(sender_handle, GF_EVENT_RANGE_SCROLL));
                 });
+        } else if (event_kind == GF_EVENT_BOUNDS_CHANGED) {
+            record->native_subscription =
+                sender->control->arranged_bounds_changed().subscribe(
+                    [this, sender_handle](const Rect&) {
+                        static_cast<void>(emit_v2(
+                            sender_handle, GF_EVENT_BOUNDS_CHANGED));
+                    });
         }
         return GF_OK;
     }

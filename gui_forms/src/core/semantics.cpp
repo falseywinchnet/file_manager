@@ -86,6 +86,14 @@ const char* semantic_role_name(SemanticRole role) noexcept {
     case SemanticRole::date_picker: return "date_picker";
     case SemanticRole::calendar: return "calendar";
     case SemanticRole::date_cell: return "date_cell";
+    case SemanticRole::property_grid: return "property_grid";
+    case SemanticRole::property_group: return "property_group";
+    case SemanticRole::property_row: return "property_row";
+    case SemanticRole::menu_bar: return "menu_bar";
+    case SemanticRole::menu_bar_item: return "menu_bar_item";
+    case SemanticRole::menu: return "menu";
+    case SemanticRole::menu_item: return "menu_item";
+    case SemanticRole::separator: return "separator";
     }
     return "generic";
 }
@@ -99,6 +107,7 @@ const char* semantic_action_name(SemanticAction action) noexcept {
     case SemanticAction::decrement: return "decrement";
     case SemanticAction::expand: return "expand";
     case SemanticAction::collapse: return "collapse";
+    case SemanticAction::show_menu: return "show_menu";
     case SemanticAction::set_value: return "set_value";
     }
     return "unknown";

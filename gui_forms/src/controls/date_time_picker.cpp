@@ -225,50 +225,53 @@ public:
     void on_paint(Painter& painter, Rect) override {
         const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                           committed_arranged_bounds().height};
-        painter.fill_rect({3.0, 3.0, std::max(0.0, bounds.width - 3.0),
-                           std::max(0.0, bounds.height - 3.0)},
+        const double s = effective_text_scale();
+        painter.fill_rect({3.0 * s, 3.0 * s,
+                           std::max(0.0, bounds.width - 3.0 * s),
+                           std::max(0.0, bounds.height - 3.0 * s)},
                           Color::rgba(30, 41, 50, 70));
-        const Rect body{0.0, 0.0, std::max(0.0, bounds.width - 3.0),
-                        std::max(0.0, bounds.height - 3.0)};
+        const Rect body{0.0, 0.0, std::max(0.0, bounds.width - 3.0 * s),
+                        std::max(0.0, bounds.height - 3.0 * s)};
         painter.fill_rect(body, style_.paper);
         painter.stroke_rect({0.5, 0.5, std::max(0.0, body.width - 1.0),
                              std::max(0.0, body.height - 1.0)},
                             style_.dark_border, 1.0);
-        painter.fill_rect({1.0, 1.0, std::max(0.0, body.width - 2.0), 38.0},
+        painter.fill_rect({1.0, 1.0, std::max(0.0, body.width - 2.0), 38.0 * s},
                           Color::rgba(43, 79, 111));
         const std::string title = provider_.month_names[display_month_ - 1U] +
                                   " " + std::to_string(display_year_);
-        painter.draw_text_utf8({74.0, 25.0}, title,
-                               {FontRole::control, 12.0, 700, false},
+        painter.draw_text_utf8({74.0 * s, 25.0 * s}, title,
+                               effective_font({FontRole::control, 12.0, 700, false}),
                                Color::rgba(255, 255, 255));
         const Color previous_color = can_change_month(-1)
             ? Color::rgba(235, 242, 247) : Color::rgba(111, 137, 157);
         const Color next_color = can_change_month(1)
             ? Color::rgba(235, 242, 247) : Color::rgba(111, 137, 157);
-        painter.draw_line({18.0, 20.0}, {23.0, 15.0}, previous_color, 1.5);
-        painter.draw_line({18.0, 20.0}, {23.0, 25.0}, previous_color, 1.5);
-        painter.draw_line({body.width - 19.0, 20.0},
-                          {body.width - 24.0, 15.0},
+        painter.draw_line({18.0 * s, 20.0 * s}, {23.0 * s, 15.0 * s}, previous_color, 1.5);
+        painter.draw_line({18.0 * s, 20.0 * s}, {23.0 * s, 25.0 * s}, previous_color, 1.5);
+        painter.draw_line({body.width - 19.0 * s, 20.0 * s},
+                          {body.width - 24.0 * s, 15.0 * s},
                           next_color, 1.5);
-        painter.draw_line({body.width - 19.0, 20.0},
-                          {body.width - 24.0, 25.0},
+        painter.draw_line({body.width - 19.0 * s, 20.0 * s},
+                          {body.width - 24.0 * s, 25.0 * s},
                           next_color, 1.5);
 
         constexpr std::array<std::string_view, 7> narrow_days{
             "S", "M", "T", "W", "T", "F", "S"};
         for (std::size_t column = 0U; column < 7U; ++column) {
-            painter.draw_text_utf8({13.0 + static_cast<double>(column) * 39.0, 58.0},
+            painter.draw_text_utf8({(13.0 + static_cast<double>(column) * 39.0) * s,
+                                    58.0 * s},
                                    narrow_days[column],
-                                   {FontRole::control, 10.0, 700, false},
+                                   effective_font({FontRole::control, 10.0, 700, false}),
                                    style_.disabled_text);
         }
         const auto dates = cell_dates();
         for (std::size_t cell = 0U; cell < dates.size(); ++cell) {
             const std::size_t row = cell / 7U;
             const std::size_t column = cell % 7U;
-            const Rect cell_bounds{5.0 + static_cast<double>(column) * 39.0,
-                                   66.0 + static_cast<double>(row) * 27.0,
-                                   37.0, 25.0};
+            const Rect cell_bounds{(5.0 + static_cast<double>(column) * 39.0) * s,
+                                   (66.0 + static_cast<double>(row) * 27.0) * s,
+                                   37.0 * s, 25.0 * s};
             const DateTimeValue date = dates[cell];
             const bool in_range = civil_in_range(date, minimum_, maximum_);
             const bool in_month = date.month == display_month_ &&
@@ -282,10 +285,10 @@ public:
                 painter.fill_rect(cell_bounds, style_.accent_light);
             }
             painter.draw_text_utf8(
-                {cell_bounds.x + (date.day < 10U ? 12.0 : 8.0),
-                 cell_bounds.y + 17.0}, std::to_string(date.day),
-                {FontRole::content, 11.0,
-                 static_cast<std::uint16_t>(selected ? 700U : 400U), false},
+                {cell_bounds.x + (date.day < 10U ? 12.0 : 8.0) * s,
+                 cell_bounds.y + 17.0 * s}, std::to_string(date.day),
+                effective_font({FontRole::content, 11.0,
+                 static_cast<std::uint16_t>(selected ? 700U : 400U), false}),
                 selected ? style_.highlight
                          : !in_range || !in_month ? style_.disabled_text
                                                   : style_.text);
@@ -296,11 +299,12 @@ public:
                                     style_.highlight, 1.0);
             }
         }
-        painter.draw_line({8.0, 231.0}, {body.width - 8.0, 231.0},
+        painter.draw_line({8.0 * s, 231.0 * s},
+                          {body.width - 8.0 * s, 231.0 * s},
                           style_.border, 1.0);
-        painter.draw_text_utf8({10.0, 248.0},
+        painter.draw_text_utf8({10.0 * s, 248.0 * s},
                                "Arrows move · Enter selects · Esc cancels",
-                               {FontRole::content, 9.0, 400, false},
+                               effective_font({FontRole::content, 9.0, 400, false}),
                                style_.disabled_text);
     }
 
@@ -323,14 +327,15 @@ public:
         }
         if (event.button != PointerButton::primary) return;
         if (event.action == PointerAction::down) {
-            if (local.y < 40.0 && local.x < 46.0) {
+            const double s = effective_text_scale();
+            if (local.y < 40.0 * s && local.x < 46.0 * s) {
                 change_month(-1);
                 pressed_cell_.reset();
                 header_pressed_ = true;
                 event.handled = true;
                 return;
             }
-            if (local.y < 40.0 && local.x > bounds.width - 49.0) {
+            if (local.y < 40.0 * s && local.x > bounds.width - 49.0 * s) {
                 change_month(1);
                 pressed_cell_.reset();
                 header_pressed_ = true;
@@ -400,6 +405,7 @@ public:
         std::vector<SemanticNode> nodes;
         const auto dates = cell_dates();
         const Rect popup = absolute_bounds();
+        const double s = effective_text_scale();
         nodes.reserve(dates.size() + 2U);
         for (const int direction : {-1, 1}) {
             SemanticNode node;
@@ -409,8 +415,10 @@ public:
             node.role = SemanticRole::button;
             node.name = direction < 0 ? "Previous month" : "Next month";
             node.bounds = direction < 0
-                ? Rect{popup.x + 4.0, popup.y + 3.0, 42.0, 34.0}
-                : Rect{popup.x + popup.width - 49.0, popup.y + 3.0, 42.0, 34.0};
+                ? Rect{popup.x + 4.0 * s, popup.y + 3.0 * s,
+                       42.0 * s, 34.0 * s}
+                : Rect{popup.x + popup.width - 49.0 * s, popup.y + 3.0 * s,
+                       42.0 * s, 34.0 * s};
             node.states = SemanticState::visible | SemanticState::focusable;
             if (can_change_month(direction)) {
                 node.states |= SemanticState::enabled;
@@ -428,9 +436,11 @@ public:
             node.value = iso_date(date);
             const std::size_t row = cell / 7U;
             const std::size_t column = cell % 7U;
-            node.bounds = {popup.x + 5.0 + static_cast<double>(column) * 39.0,
-                           popup.y + 66.0 + static_cast<double>(row) * 27.0,
-                           37.0, 25.0};
+            node.bounds = {popup.x +
+                               (5.0 + static_cast<double>(column) * 39.0) * s,
+                           popup.y +
+                               (66.0 + static_cast<double>(row) * 27.0) * s,
+                           37.0 * s, 25.0 * s};
             node.states |= SemanticState::visible | SemanticState::focusable;
             if (civil_in_range(date, minimum_, maximum_)) {
                 node.states |= SemanticState::enabled;
@@ -491,11 +501,15 @@ private:
     }
 
     [[nodiscard]] std::optional<std::size_t> cell_at(Point local) const noexcept {
-        if (local.x < 5.0 || local.y < 66.0 || local.x >= 278.0 || local.y >= 228.0) {
+        const double s = effective_text_scale();
+        if (local.x < 5.0 * s || local.y < 66.0 * s ||
+            local.x >= 278.0 * s || local.y >= 228.0 * s) {
             return {};
         }
-        const std::size_t column = static_cast<std::size_t>((local.x - 5.0) / 39.0);
-        const std::size_t row = static_cast<std::size_t>((local.y - 66.0) / 27.0);
+        const std::size_t column = static_cast<std::size_t>(
+            (local.x - 5.0 * s) / (39.0 * s));
+        const std::size_t row = static_cast<std::size_t>(
+            (local.y - 66.0 * s) / (27.0 * s));
         if (column >= 7U || row >= 6U) return {};
         return row * 7U + column;
     }
@@ -762,6 +776,7 @@ void DateTimePicker::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const FontSpec font = effective_font(font_);
     const double button_width = std::min(24.0, bounds.width);
     const double button_x = std::max(0.0, bounds.width - button_width);
     painter.fill_rect({button_x, 1.0, std::max(0.0, button_width - 1.0),
@@ -809,8 +824,8 @@ void DateTimePicker::on_paint(Painter& painter, Rect damage) {
                        std::max(0.0, button_x - text_left - 3.0),
                        std::max(0.0, bounds.height - 4.0)});
     painter.draw_text_utf8(
-        {text_left, std::max(font_.size, (bounds.height + font_.size) * 0.5 - 1.0)},
-        formatted_value(), font_,
+        {text_left, std::max(font.size, (bounds.height + font.size) * 0.5 - 1.0)},
+        formatted_value(), font,
         enabled() && (!show_check_box_ || checked_) ? style_.text
                                                     : style_.disabled_text);
     painter.restore();
@@ -889,8 +904,8 @@ void DateTimePicker::open_drop_down() {
     const Control::Ptr owner = shared_from_this();
     const Size client = window()->client_size();
     const Rect picker = absolute_bounds();
-    constexpr double width = 286.0;
-    constexpr double height = 260.0;
+    const double width = 286.0 * effective_text_scale();
+    const double height = 260.0 * effective_text_scale();
     const double x = std::clamp(picker.x, 0.0, std::max(0.0, client.width - width));
     const double below = picker.y + picker.height;
     const double y = below + height <= client.height ? below

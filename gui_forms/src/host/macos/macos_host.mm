@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <unordered_set>
 #include <utility>
 
 using gui_forms::DamageRegion;
@@ -413,6 +414,16 @@ NSString* native_accessibility_role(SemanticRole role) {
     case SemanticRole::date_picker: return NSAccessibilityComboBoxRole;
     case SemanticRole::calendar: return NSAccessibilityGroupRole;
     case SemanticRole::date_cell: return NSAccessibilityButtonRole;
+    case SemanticRole::property_grid: return NSAccessibilityGroupRole;
+    case SemanticRole::property_group: return NSAccessibilityGroupRole;
+    case SemanticRole::property_row: return NSAccessibilityStaticTextRole;
+    case SemanticRole::menu_bar: return NSAccessibilityMenuBarRole;
+    case SemanticRole::menu_bar_item: return NSAccessibilityMenuBarItemRole;
+    case SemanticRole::menu: return NSAccessibilityMenuRole;
+    case SemanticRole::menu_item: return NSAccessibilityMenuItemRole;
+    // AppKit exposes no separator role. A visual menu separator is structural,
+    // never an adjustable splitter, so retain it as a neutral group.
+    case SemanticRole::separator: return NSAccessibilityGroupRole;
     case SemanticRole::generic: return NSAccessibilityGroupRole;
     }
     return NSAccessibilityGroupRole;
@@ -957,8 +968,11 @@ private:
     }
 }
 - (BOOL)accessibilityPerformShowMenu {
-    if (_owner == nil || !semantic_has_action(_node, SemanticAction::expand)) return NO;
-    return [_owner performSemanticAction:SemanticAction::expand
+    if (_owner == nil) return NO;
+    const SemanticAction action = semantic_has_action(_node, SemanticAction::show_menu)
+        ? SemanticAction::show_menu : SemanticAction::expand;
+    if (!semantic_has_action(_node, action)) return NO;
+    return [_owner performSemanticAction:action
                                  stableId:native_string(_node.stable_id)
                                     value:nil];
 }
@@ -1008,7 +1022,8 @@ private:
                semantic_has_action(_node, SemanticAction::collapse);
     }
     if (selector == @selector(accessibilityPerformShowMenu)) {
-        return semantic_has_action(_node, SemanticAction::expand);
+        return semantic_has_action(_node, SemanticAction::show_menu) ||
+               semantic_has_action(_node, SemanticAction::expand);
     }
     if (selector == @selector(accessibilityPerformIncrement)) {
         return semantic_has_action(_node, SemanticAction::increment);
@@ -1630,6 +1645,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     input.position = [self modelPointForEvent:event];
     input.modifiers = modifiers_for(event.modifierFlags);
     input.pointer_id = 1;
+    input.click_count = static_cast<std::uint32_t>(
+        std::max<NSInteger>(1, event.clickCount));
     const GFPoint position = input.position;
     static_cast<void>([self dispatchHostPayload:std::move(input)
                                timestampNanoseconds:host_event_nanoseconds(event)]);
@@ -1828,15 +1845,23 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 
 @interface GUIFormsWindowDelegate : NSObject <NSWindowDelegate> {
     __weak GUIFormsView* _view;
+    BOOL _stopsApplicationOnClose;
+    std::function<void()> _closedHandler;
 }
-- (instancetype)initWithView:(GUIFormsView*)view;
+- (instancetype)initWithView:(GUIFormsView*)view
+      stopsApplicationOnClose:(BOOL)stopsApplicationOnClose
+                 closedHandler:(std::function<void()>)closedHandler;
 @end
 
 @implementation GUIFormsWindowDelegate
-- (instancetype)initWithView:(GUIFormsView*)view {
+- (instancetype)initWithView:(GUIFormsView*)view
+      stopsApplicationOnClose:(BOOL)stopsApplicationOnClose
+                 closedHandler:(std::function<void()>)closedHandler {
     self = [super init];
     if (self != nil) {
         _view = view;
+        _stopsApplicationOnClose = stopsApplicationOnClose;
+        _closedHandler = std::move(closedHandler);
     }
     return self;
 }
@@ -1845,6 +1870,12 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 - (void)windowWillClose:(NSNotification*)notification {
     [_view notifyClosed];
+    if (_closedHandler) {
+        auto callback = std::move(_closedHandler);
+        _closedHandler = {};
+        callback();
+    }
+    if (!_stopsApplicationOnClose) return;
     [NSApp stop:nil];
     NSEvent* wake = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
                                         location:NSZeroPoint
@@ -1939,7 +1970,9 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         GUIFormsView* view = [[GUIFormsView alloc] initWithModel:std::move(model)];
         [view installCloseRequestHandler:std::move(options.close_request)];
         GUIFormsWindowDelegate* delegate =
-            [[GUIFormsWindowDelegate alloc] initWithView:view];
+            [[GUIFormsWindowDelegate alloc] initWithView:view
+                                 stopsApplicationOnClose:YES
+                                            closedHandler:std::move(options.closed)];
         [nativeWindow setDelegate:delegate];
         [nativeWindow setTitle:[NSString stringWithUTF8String:options.title.c_str()]];
         [nativeWindow setMinSize:NSMakeSize(options.minimum_size.width,
@@ -1990,8 +2023,6 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
             });
         }
         [application run];
-        if (options.closed) options.closed();
-
         const std::string metrics = [view metricsJSON];
         const std::string host = [view hostJSON];
         if (options.print_metrics_on_close) {
@@ -2005,6 +2036,180 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         [view prepareForShutdown];
         [nativeWindow setDelegate:nil];
         [nativeWindow setContentView:nil];
+    }
+    return 0;
+}
+
+int run_macos_application(std::vector<MacApplicationWindow> windows) {
+    if (windows.empty()) return 2;
+    std::unordered_set<std::string> identities;
+    std::size_t primary_count{};
+    for (const MacApplicationWindow& entry : windows) {
+        if (!entry.model || entry.stable_id.empty() ||
+            !identities.insert(entry.stable_id).second ||
+            (!entry.owner_id.empty() && entry.owner_id == entry.stable_id)) {
+            return 2;
+        }
+        if (entry.owner_id.empty() && !entry.tool_window) ++primary_count;
+    }
+    for (const MacApplicationWindow& entry : windows) {
+        if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
+        std::string_view owner = entry.owner_id;
+        for (std::size_t depth = 0; !owner.empty(); ++depth) {
+            if (depth >= windows.size()) return 2;
+            const auto parent = std::find_if(
+                windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
+                    return candidate.stable_id == owner;
+                });
+            owner = parent->owner_id;
+        }
+    }
+    if (primary_count != 1U) return 2;
+
+    @autoreleasepool {
+        NSApplication* application = [NSApplication sharedApplication];
+        [application setActivationPolicy:NSApplicationActivationPolicyRegular];
+        install_application_menu();
+
+        NSMutableArray<NSWindow*>* nativeWindows =
+            [[NSMutableArray alloc] initWithCapacity:windows.size()];
+        NSMutableArray<GUIFormsView*>* views =
+            [[NSMutableArray alloc] initWithCapacity:windows.size()];
+        NSMutableArray<GUIFormsWindowDelegate*>* delegates =
+            [[NSMutableArray alloc] initWithCapacity:windows.size()];
+
+        for (MacApplicationWindow& entry : windows) {
+            const NSRect frame = NSMakeRect(0.0, 0.0,
+                                            entry.options.initial_size.width,
+                                            entry.options.initial_size.height);
+            NSWindowStyleMask style = NSWindowStyleMaskTitled |
+                NSWindowStyleMaskClosable | NSWindowStyleMaskResizable;
+            if (!entry.tool_window) style |= NSWindowStyleMaskMiniaturizable;
+            else style |= NSWindowStyleMaskUtilityWindow;
+            NSWindow* nativeWindow = entry.tool_window
+                ? static_cast<NSWindow*>([[NSPanel alloc]
+                      initWithContentRect:frame styleMask:style
+                                  backing:NSBackingStoreBuffered defer:NO])
+                : [[NSWindow alloc]
+                      initWithContentRect:frame styleMask:style
+                                  backing:NSBackingStoreBuffered defer:NO];
+            [nativeWindow setReleasedWhenClosed:NO];
+            GUIFormsView* view =
+                [[GUIFormsView alloc] initWithModel:std::move(entry.model)];
+            [view installCloseRequestHandler:std::move(entry.options.close_request)];
+            const BOOL primary = entry.owner_id.empty() && !entry.tool_window;
+            GUIFormsWindowDelegate* delegate =
+                [[GUIFormsWindowDelegate alloc] initWithView:view
+                                     stopsApplicationOnClose:primary
+                                                closedHandler:std::move(entry.options.closed)];
+            [nativeWindow setDelegate:delegate];
+            [nativeWindow setTitle:native_string(entry.options.title)];
+            [nativeWindow setMinSize:NSMakeSize(entry.options.minimum_size.width,
+                                                entry.options.minimum_size.height)];
+            [nativeWindow setContentView:view];
+            [nativeWindows addObject:nativeWindow];
+            [views addObject:view];
+            [delegates addObject:delegate];
+        }
+
+        for (std::size_t index = 0; index < windows.size(); ++index) {
+            MacApplicationWindow& entry = windows[index];
+            NSWindow* nativeWindow = nativeWindows[index];
+            if (entry.owner_id.empty()) {
+                [nativeWindow center];
+                continue;
+            }
+            const auto owner = std::find_if(
+                windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
+                    return candidate.stable_id == entry.owner_id;
+                });
+            const std::size_t ownerIndex = static_cast<std::size_t>(
+                std::distance(windows.begin(), owner));
+            NSWindow* ownerWindow = nativeWindows[ownerIndex];
+            [ownerWindow addChildWindow:nativeWindow ordered:NSWindowAbove];
+            NSScreen* screen = ownerWindow.screen ?: NSScreen.mainScreen;
+            NSRect frame = nativeWindow.frame;
+            const NSRect ownerFrame = ownerWindow.frame;
+            const NSRect work = screen.visibleFrame;
+            frame.origin.x = std::clamp(NSMaxX(ownerFrame) + 10.0,
+                                        NSMinX(work), NSMaxX(work) - frame.size.width);
+            frame.origin.y = std::clamp(NSMaxY(ownerFrame) - frame.size.height,
+                                        NSMinY(work), NSMaxY(work) - frame.size.height);
+            [nativeWindow setFrame:frame display:NO];
+        }
+
+        for (std::size_t index = 0; index < windows.size(); ++index) {
+            MacApplicationWindow& entry = windows[index];
+            NSWindow* nativeWindow = nativeWindows[index];
+            GUIFormsView* view = views[index];
+            if (entry.options.host_ready) {
+                const std::function<void()> dispatchPending =
+                    entry.options.dispatch_pending;
+                entry.options.host_ready(
+                    [view, dispatchPending] {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (dispatchPending) dispatchPending();
+                            [view collectDamage];
+                        });
+                    },
+                    [nativeWindow] {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [nativeWindow performClose:nil];
+                        });
+                    },
+                    [view](const HostDialogRequest& request) {
+                        return [view showHostDialog:request];
+                    },
+                    [view](const HostTooltipRequest& request) {
+                        return [view showHostTooltip:request];
+                    },
+                    [view] { [view hideHostTooltip]; },
+                    [view] { return [view readHostClipboard]; },
+                    [view](std::string_view text) {
+                        return [view writeHostClipboard:text];
+                    });
+            }
+            if (entry.owner_id.empty() && !entry.tool_window) {
+                [nativeWindow makeKeyAndOrderFront:nil];
+            } else {
+                [nativeWindow orderFront:nil];
+            }
+            if (entry.options.close_after_launch_for_testing) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [nativeWindow performClose:nil];
+                });
+            }
+        }
+        [application activateIgnoringOtherApps:YES];
+        [application run];
+
+        // Closing the primary terminates the application session. Close any
+        // surviving owned/tool windows while their independent host sessions
+        // and delegates are still intact, so each root receives one real
+        // HostClosedEvent and its callback observes the actual close point.
+        for (NSWindow* nativeWindow in nativeWindows) {
+            if (nativeWindow.isVisible) [nativeWindow close];
+        }
+
+        for (std::size_t index = 0; index < windows.size(); ++index) {
+            MacApplicationWindow& entry = windows[index];
+            GUIFormsView* view = views[index];
+            NSWindow* nativeWindow = nativeWindows[index];
+            const std::string metrics = [view metricsJSON];
+            const std::string host = [view hostJSON];
+            if (entry.options.print_metrics_on_close) {
+                std::fprintf(stdout,
+                             "{\"stable_id\":\"%s\",\"window\":%s,\"host\":%s}\n",
+                             entry.stable_id.c_str(), metrics.c_str(), host.c_str());
+            }
+            if (entry.options.final_snapshot) {
+                entry.options.final_snapshot(metrics, host);
+            }
+            [view prepareForShutdown];
+            [nativeWindow setDelegate:nil];
+            [nativeWindow setContentView:nil];
+        }
+        std::fflush(stdout);
     }
     return 0;
 }
