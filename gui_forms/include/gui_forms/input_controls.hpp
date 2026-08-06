@@ -46,6 +46,17 @@ public:
     void set_placeholder_text(std::string text);
     [[nodiscard]] bool read_only() const noexcept { return read_only_; }
     void set_read_only(bool read_only);
+    [[nodiscard]] char32_t password_character() const noexcept {
+        return password_character_;
+    }
+    void set_password_character(char32_t character);
+    [[nodiscard]] bool use_system_password_character() const noexcept {
+        return use_system_password_character_;
+    }
+    void set_use_system_password_character(bool enabled);
+    [[nodiscard]] bool password_protected() const noexcept {
+        return use_system_password_character_ || password_character_ != U'\0';
+    }
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
     [[nodiscard]] TextSelection selection() const noexcept { return selection_; }
@@ -58,6 +69,11 @@ public:
     bool redo();
     bool replace_selection(std::string_view replacement);
     bool delete_selection();
+    // Clipboard commands use the Window's portable HostServices seam. A
+    // protected field never exports its selected secret.
+    bool copy();
+    bool cut();
+    bool paste();
 
     [[nodiscard]] Event<const std::string&>& text_changed() noexcept {
         return text_changed_;
@@ -92,6 +108,9 @@ private:
                  std::string_view replacement, bool record_history = true);
     [[nodiscard]] Utf8Offset position_at(double local_x) const noexcept;
     [[nodiscard]] double boundary_x(Utf8Offset offset) const noexcept;
+    [[nodiscard]] Utf8Offset previous_word_boundary(Utf8Offset offset) const;
+    [[nodiscard]] Utf8Offset next_word_boundary(Utf8Offset offset) const;
+    [[nodiscard]] std::string display_text() const;
     void reset_caret_blink();
     void schedule_caret_blink();
     void push_history(std::deque<Snapshot>& history, Snapshot snapshot);
@@ -105,6 +124,8 @@ private:
     std::vector<std::uint64_t> layout_offsets_;
     double horizontal_offset_{};
     bool read_only_{};
+    char32_t password_character_{};
+    bool use_system_password_character_{};
     bool focused_{};
     bool selecting_{};
     bool caret_visible_{true};

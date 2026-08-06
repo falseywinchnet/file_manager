@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/animation.hpp"
 #include "gui_forms/basic_controls.hpp"
 
 #include <cstdint>
@@ -33,6 +34,13 @@ enum class ProgressBarVisualStyle : std::uint8_t {
     continuous,
     marquee,
     pulse,
+};
+
+// Orthogonal to ProgressBarVisualStyle: stripes can decorate a determinate
+// fill, while marquee remains the WinForms-compatible indeterminate mode.
+enum class ProgressBarOverlayStyle : std::uint8_t {
+    none,
+    moving_stripes,
 };
 
 struct RangeScrollEvent final {
@@ -134,10 +142,39 @@ public:
         return visual_style_;
     }
     void set_visual_style(ProgressBarVisualStyle style);
+    [[nodiscard]] ProgressBarOverlayStyle overlay_style() const noexcept {
+        return overlay_style_;
+    }
+    void set_overlay_style(ProgressBarOverlayStyle style);
+    [[nodiscard]] double stripe_width() const noexcept { return stripe_width_; }
+    void set_stripe_width(double width);
     [[nodiscard]] bool animation_enabled() const noexcept {
         return animation_enabled_;
     }
     void set_animation_enabled(bool enabled);
+    [[nodiscard]] bool animation_paused() const noexcept {
+        return motion_policy_.paused;
+    }
+    // Pause is distinct from disabling the animation feature: it revokes the
+    // frame lease while retaining the exact phase for a deterministic resume.
+    void set_animation_paused(bool paused);
+    [[nodiscard]] bool reduced_motion() const noexcept {
+        return motion_policy_.reduced;
+    }
+    // Reduced motion remains animated with a lower cadence, slower phase, and
+    // limited visual excursion. It is distinct from pause and disable.
+    void set_reduced_motion(bool reduced);
+    // Atomically applies the two orthogonal playback policies and performs at
+    // most one frame-lease transition. This avoids transient scheduling when
+    // an application changes pause and reduced-motion state together.
+    void set_motion_policy(bool paused, bool reduced_motion);
+    // Applies the complete application policy in one transaction. The
+    // enabled bit is a master playback gate and, unlike
+    // set_animation_enabled(), retains the current phase and visual feature.
+    void set_motion_policy(MotionPolicy policy);
+    [[nodiscard]] MotionPolicy motion_policy() const noexcept {
+        return motion_policy_;
+    }
     [[nodiscard]] FrameInterval animation_period() const noexcept {
         return animation_period_;
     }
@@ -161,11 +198,14 @@ private:
     [[nodiscard]] bool animated_style() const noexcept;
 
     ProgressBarVisualStyle visual_style_{ProgressBarVisualStyle::continuous};
+    ProgressBarOverlayStyle overlay_style_{ProgressBarOverlayStyle::none};
+    double stripe_width_{7.0};
     FrameRequestToken animation_frames_;
     FrameInterval animation_period_{std::chrono::milliseconds(1400)};
-    FrameTime animation_origin_{};
+    FrameTime last_animation_frame_{};
     double animation_phase_{};
     bool animation_enabled_{true};
+    MotionPolicy motion_policy_{};
 };
 
 enum class ScrollBarPart : std::uint8_t {

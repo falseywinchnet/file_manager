@@ -490,16 +490,22 @@ void CoreGraphicsRaster::draw_text_utf8(Point origin,
     CGColorRef foreground = CGColorCreateGenericRGB(
         color.red / divisor, color.green / divisor, color.blue / divisor,
         color.alpha / divisor);
-    if (string == nullptr || font == nullptr || foreground == nullptr) {
+    const double spacing = font_spec.letter_spacing;
+    CFNumberRef tracking = CFNumberCreate(kCFAllocatorDefault,
+                                           kCFNumberDoubleType, &spacing);
+    if (string == nullptr || font == nullptr || foreground == nullptr ||
+        tracking == nullptr) {
         if (string != nullptr) CFRelease(string);
         if (font != nullptr) CFRelease(font);
         if (foreground != nullptr) CGColorRelease(foreground);
+        if (tracking != nullptr) CFRelease(tracking);
         return;
     }
-    const void* keys[]{kCTFontAttributeName, kCTForegroundColorAttributeName};
-    const void* values[]{font, foreground};
+    const void* keys[]{kCTFontAttributeName, kCTForegroundColorAttributeName,
+                       kCTKernAttributeName};
+    const void* values[]{font, foreground, tracking};
     CFDictionaryRef attributes = CFDictionaryCreate(
-        kCFAllocatorDefault, keys, values, 2,
+        kCFAllocatorDefault, keys, values, 3,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFAttributedStringRef attributed = attributes == nullptr
         ? nullptr
@@ -516,6 +522,7 @@ void CoreGraphicsRaster::draw_text_utf8(Point origin,
     if (attributed != nullptr) CFRelease(attributed);
     if (attributes != nullptr) CFRelease(attributes);
     CGColorRelease(foreground);
+    CFRelease(tracking);
     CFRelease(font);
     CFRelease(string);
 }
@@ -532,10 +539,18 @@ Size CoreGraphicsRaster::measure_text_utf8(std::string_view text,
         if (font != nullptr) CFRelease(font);
         return {};
     }
-    const void* keys[]{kCTFontAttributeName};
-    const void* values[]{font};
+    const double spacing = font_spec.letter_spacing;
+    CFNumberRef tracking = CFNumberCreate(kCFAllocatorDefault,
+                                           kCFNumberDoubleType, &spacing);
+    if (tracking == nullptr) {
+        CFRelease(font);
+        CFRelease(string);
+        return {};
+    }
+    const void* keys[]{kCTFontAttributeName, kCTKernAttributeName};
+    const void* values[]{font, tracking};
     CFDictionaryRef attributes = CFDictionaryCreate(
-        kCFAllocatorDefault, keys, values, 1,
+        kCFAllocatorDefault, keys, values, 2,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFAttributedStringRef attributed = attributes == nullptr
         ? nullptr
@@ -548,6 +563,7 @@ Size CoreGraphicsRaster::measure_text_utf8(std::string_view text,
     if (line != nullptr) CFRelease(line);
     if (attributed != nullptr) CFRelease(attributed);
     if (attributes != nullptr) CFRelease(attributes);
+    CFRelease(tracking);
     CFRelease(font);
     CFRelease(string);
     return {std::max(0.0, width),

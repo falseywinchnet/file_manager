@@ -4,8 +4,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 namespace gui_forms {
@@ -15,6 +18,103 @@ void require_finite_nonnegative(double value, const char* message) {
     if (!std::isfinite(value) || value < 0.0) {
         throw std::invalid_argument(message);
     }
+}
+
+constexpr std::size_t maximum_layout_tracks = 64U;
+
+[[nodiscard]] double horizontal_extent(Insets insets) noexcept {
+    return insets.left + insets.right;
+}
+
+[[nodiscard]] double vertical_extent(Insets insets) noexcept {
+    return insets.top + insets.bottom;
+}
+
+[[nodiscard]] Size preferred_child_size(const Control::Ptr& child,
+                                        Size available) {
+    const Rect requested = child->requested_bounds();
+    const Size measure_available{
+        std::max(std::max(0.0, available.width), requested.width),
+        std::max(std::max(0.0, available.height), requested.height)};
+    Size result = child->measure(measure_available);
+    if (!std::isfinite(result.width) || result.width < 0.0) result.width = 0.0;
+    if (!std::isfinite(result.height) || result.height < 0.0) result.height = 0.0;
+    return result;
+}
+
+struct TrackSpanDemand final {
+    std::size_t start{};
+    std::size_t span{1U};
+    double required{};
+};
+
+struct TrackResolution final {
+    std::vector<double> actual;
+    double desired{};
+};
+
+[[nodiscard]] TrackResolution resolve_table_tracks(
+    std::span<const TableLayoutStyle> styles,
+    std::vector<double> minimum,
+    std::span<const TrackSpanDemand> spans,
+    double available) {
+    for (std::size_t index = 0U; index < styles.size(); ++index) {
+        if (styles[index].size_mode == TableSizeMode::absolute) {
+            minimum[index] = styles[index].size;
+        }
+    }
+    for (const TrackSpanDemand& demand : spans) {
+        const std::size_t end = std::min(styles.size(), demand.start + demand.span);
+        double current = 0.0;
+        double total_weight = 0.0;
+        for (std::size_t index = demand.start; index < end; ++index) {
+            current += minimum[index];
+            if (styles[index].size_mode != TableSizeMode::absolute) {
+                total_weight += styles[index].size_mode == TableSizeMode::percent
+                    ? styles[index].size : 1.0;
+            }
+        }
+        const double deficit = std::max(0.0, demand.required - current);
+        if (deficit <= 0.0 || total_weight <= 0.0) continue;
+        for (std::size_t index = demand.start; index < end; ++index) {
+            if (styles[index].size_mode == TableSizeMode::absolute) continue;
+            const double weight = styles[index].size_mode == TableSizeMode::percent
+                ? styles[index].size : 1.0;
+            minimum[index] += deficit * weight / total_weight;
+        }
+    }
+
+    double fixed_extent = 0.0;
+    double percent_weight = 0.0;
+    double desired_percent_extent = 0.0;
+    for (std::size_t index = 0U; index < styles.size(); ++index) {
+        if (styles[index].size_mode == TableSizeMode::percent) {
+            percent_weight += styles[index].size;
+        } else {
+            fixed_extent += minimum[index];
+        }
+    }
+    if (percent_weight > 0.0) {
+        for (std::size_t index = 0U; index < styles.size(); ++index) {
+            if (styles[index].size_mode != TableSizeMode::percent) continue;
+            desired_percent_extent = std::max(
+                desired_percent_extent,
+                minimum[index] * percent_weight / styles[index].size);
+        }
+    }
+
+    TrackResolution result;
+    result.actual.resize(styles.size());
+    const double remaining = std::max(0.0, available - fixed_extent);
+    for (std::size_t index = 0U; index < styles.size(); ++index) {
+        result.actual[index] = styles[index].size_mode == TableSizeMode::percent
+            ? (percent_weight > 0.0
+                   ? remaining * styles[index].size / percent_weight
+                   : 0.0)
+            : minimum[index];
+    }
+    result.desired = fixed_extent + desired_percent_extent;
+    return result;
 }
 
 [[nodiscard]] std::uint64_t virtual_semantic_runtime_id(
@@ -131,6 +231,16 @@ bool ContainerControl::clear_active_control() {
     return window()->request_focus({});
 }
 
+SemanticDescriptor ContainerControl::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.exposed = !descriptor.name.empty() ||
+                         !descriptor.description.empty();
+    return descriptor;
+}
+
 UserControl::UserControl(StableId stable_id)
     : ContainerControl(std::move(stable_id)) {}
 
@@ -148,6 +258,809 @@ void UserControl::on_attachment_committed() noexcept {
 
 void UserControl::on_detached_from_window() noexcept {
     attached_ = false;
+}
+
+namespace {
+
+void validate_scaled_design_size(Size size) {
+    if (!std::isfinite(size.width) || !std::isfinite(size.height) ||
+        size.width <= 0.0 || size.height <= 0.0) {
+        throw std::invalid_argument(
+            "scaled layout design size must be finite and positive");
+    }
+}
+
+void validate_scaled_design_bounds(Rect bounds) {
+    if (!std::isfinite(bounds.x) || !std::isfinite(bounds.y) ||
+        !std::isfinite(bounds.width) || !std::isfinite(bounds.height) ||
+        bounds.width < 0.0 || bounds.height < 0.0) {
+        throw std::invalid_argument(
+            "scaled layout bounds must be finite and nonnegative");
+    }
+}
+
+template <typename Parent>
+void reconcile_scaled_slots(
+    Parent& parent, std::unordered_map<std::uint64_t, Rect>& slots) {
+    std::unordered_set<std::uint64_t> retained;
+    retained.reserve(parent.children().size());
+    for (const Control::Ptr& child : parent.children()) {
+        retained.insert(child->runtime_id().value);
+    }
+    std::erase_if(slots, [&](const auto& entry) {
+        return !retained.contains(entry.first);
+    });
+}
+
+[[nodiscard]] Rect scaled_child_bounds(Size design_size, Rect bounds,
+                                       Rect final_bounds) {
+    const double scale_x = final_bounds.width / design_size.width;
+    const double scale_y = final_bounds.height / design_size.height;
+    return {bounds.x * scale_x, bounds.y * scale_y,
+            bounds.width * scale_x, bounds.height * scale_y};
+}
+
+} // namespace
+
+ScaledPanel::ScaledPanel(StableId stable_id, Size design_size)
+    : Panel(std::move(stable_id)), design_size_(design_size) {
+    validate_scaled_design_size(design_size_);
+}
+
+void ScaledPanel::set_design_size(Size size) {
+    require_mutable();
+    validate_scaled_design_size(size);
+    if (design_size_ == size) return;
+    design_size_ = size;
+    invalidate(Dirty::layout);
+}
+
+void ScaledPanel::add_at(Control::Ptr child, Rect design_bounds) {
+    require_mutable();
+    if (!child) throw std::invalid_argument("scaled layout child may not be null");
+    validate_scaled_design_bounds(design_bounds);
+    const RuntimeId id = child->runtime_id();
+    add_child(std::move(child));
+    slots_[id.value] = design_bounds;
+    invalidate(Dirty::layout);
+}
+
+void ScaledPanel::set_design_bounds(const Control& child, Rect design_bounds) {
+    require_mutable();
+    validate_scaled_design_bounds(design_bounds);
+    if (child.parent().get() != this) {
+        throw std::logic_error("scaled layout child must belong to the panel");
+    }
+    slots_[child.runtime_id().value] = design_bounds;
+    invalidate(Dirty::layout);
+}
+
+std::optional<Rect> ScaledPanel::design_bounds(const Control& child) const {
+    const auto found = slots_.find(child.runtime_id().value);
+    return found == slots_.end() ? std::nullopt
+                                : std::optional<Rect>(found->second);
+}
+
+void ScaledPanel::reconcile_slots() {
+    reconcile_scaled_slots(*this, slots_);
+}
+
+void ScaledPanel::arrange(Rect final_bounds) {
+    reconcile_slots();
+    arrange_self(final_bounds);
+    for (const Control::Ptr& child : children()) {
+        const auto slot = slots_.find(child->runtime_id().value);
+        if (slot == slots_.end()) continue;
+        set_child_layout(child,
+                         scaled_child_bounds(design_size_, slot->second,
+                                             final_bounds));
+    }
+}
+
+ScaledGroupBox::ScaledGroupBox(StableId stable_id, std::string text,
+                               Size design_size)
+    : GroupBox(std::move(stable_id), std::move(text)),
+      design_size_(design_size) {
+    validate_scaled_design_size(design_size_);
+}
+
+void ScaledGroupBox::set_design_size(Size size) {
+    require_mutable();
+    validate_scaled_design_size(size);
+    if (design_size_ == size) return;
+    design_size_ = size;
+    invalidate(Dirty::layout);
+}
+
+void ScaledGroupBox::add_at(Control::Ptr child, Rect design_bounds) {
+    require_mutable();
+    if (!child) throw std::invalid_argument("scaled layout child may not be null");
+    validate_scaled_design_bounds(design_bounds);
+    const RuntimeId id = child->runtime_id();
+    add_child(std::move(child));
+    slots_[id.value] = design_bounds;
+    invalidate(Dirty::layout);
+}
+
+void ScaledGroupBox::set_design_bounds(const Control& child, Rect design_bounds) {
+    require_mutable();
+    validate_scaled_design_bounds(design_bounds);
+    if (child.parent().get() != this) {
+        throw std::logic_error("scaled layout child must belong to the group");
+    }
+    slots_[child.runtime_id().value] = design_bounds;
+    invalidate(Dirty::layout);
+}
+
+std::optional<Rect> ScaledGroupBox::design_bounds(const Control& child) const {
+    const auto found = slots_.find(child.runtime_id().value);
+    return found == slots_.end() ? std::nullopt
+                                : std::optional<Rect>(found->second);
+}
+
+void ScaledGroupBox::reconcile_slots() {
+    reconcile_scaled_slots(*this, slots_);
+}
+
+void ScaledGroupBox::arrange(Rect final_bounds) {
+    reconcile_slots();
+    arrange_self(final_bounds);
+    for (const Control::Ptr& child : children()) {
+        const auto slot = slots_.find(child->runtime_id().value);
+        if (slot == slots_.end()) continue;
+        set_child_layout(child,
+                         scaled_child_bounds(design_size_, slot->second,
+                                             final_bounds));
+    }
+}
+
+FlowLayoutPanel::FlowLayoutPanel(StableId stable_id)
+    : ContainerControl(std::move(stable_id)) {}
+
+void FlowLayoutPanel::set_flow_direction(FlowDirection direction) {
+    require_mutable();
+    if (flow_direction_ == direction) return;
+    flow_direction_ = direction;
+    invalidate(invalidation::bounds);
+}
+
+void FlowLayoutPanel::set_wrap_contents(bool wrap) {
+    require_mutable();
+    if (wrap_contents_ == wrap) return;
+    wrap_contents_ = wrap;
+    invalidate(invalidation::bounds);
+}
+
+void FlowLayoutPanel::set_auto_size(bool auto_size) {
+    require_mutable();
+    if (auto_size_ == auto_size) return;
+    auto_size_ = auto_size;
+    invalidate(invalidation::bounds);
+}
+
+void FlowLayoutPanel::set_flow_break(const Control& child, bool flow_break) {
+    require_mutable();
+    if (child.parent().get() != this || !child.is_alive()) {
+        throw std::invalid_argument(
+            "FlowLayoutPanel flow break requires a live direct child");
+    }
+    const std::uint64_t id = child.runtime_id().value;
+    const bool previous = flow_breaks_.contains(id) && flow_breaks_.at(id);
+    if (previous == flow_break) return;
+    if (flow_break) flow_breaks_[id] = true;
+    else flow_breaks_.erase(id);
+    invalidate(invalidation::bounds);
+}
+
+bool FlowLayoutPanel::flow_break(const Control& child) const {
+    if (child.parent().get() != this || !child.is_alive()) return false;
+    const auto found = flow_breaks_.find(child.runtime_id().value);
+    return found != flow_breaks_.end() && found->second;
+}
+
+void FlowLayoutPanel::reconcile_flow_breaks() {
+    std::unordered_set<std::uint64_t> live;
+    for (const Control::Ptr& child : children()) {
+        if (child && child->is_alive() && child->parent().get() == this) {
+            live.insert(child->runtime_id().value);
+        }
+    }
+    std::erase_if(flow_breaks_, [&live](const auto& entry) {
+        return !live.contains(entry.first);
+    });
+}
+
+Size FlowLayoutPanel::layout_children(Size available, bool assign) {
+    reconcile_flow_breaks();
+    const Insets inset = padding();
+    const Size inner{std::max(0.0, available.width - horizontal_extent(inset)),
+                     std::max(0.0, available.height - vertical_extent(inset))};
+    const bool horizontal = flow_direction_ == FlowDirection::left_to_right ||
+                            flow_direction_ == FlowDirection::right_to_left;
+    const double main_limit = horizontal ? inner.width : inner.height;
+
+    struct Item final {
+        Control::Ptr control;
+        Size desired;
+        Insets margin;
+        bool break_after{};
+    };
+    struct Line final {
+        std::vector<Item> items;
+        double main{};
+        double cross{};
+    };
+
+    std::vector<Line> lines;
+    Line line;
+    const auto flush_line = [&lines, &line] {
+        if (line.items.empty()) return;
+        lines.push_back(std::move(line));
+        line = {};
+    };
+    for (const Control::Ptr& child : children()) {
+        if (!child || !child->is_alive() || !child->visible()) continue;
+        Item item{child, preferred_child_size(child, inner), child->margin(),
+                  flow_break(*child)};
+        const double item_main = horizontal
+            ? horizontal_extent(item.margin) + item.desired.width
+            : vertical_extent(item.margin) + item.desired.height;
+        const double item_cross = horizontal
+            ? vertical_extent(item.margin) + item.desired.height
+            : horizontal_extent(item.margin) + item.desired.width;
+        if (!line.items.empty() && wrap_contents_ &&
+            line.main + item_main > main_limit) {
+            flush_line();
+        }
+        line.main += item_main;
+        line.cross = std::max(line.cross, item_cross);
+        line.items.push_back(std::move(item));
+        if (line.items.back().break_after) flush_line();
+    }
+    flush_line();
+
+    double cross_origin = 0.0;
+    double content_main = 0.0;
+    for (const Line& current : lines) {
+        double main_origin = 0.0;
+        for (const Item& item : current.items) {
+            Rect slot;
+            if (horizontal) {
+                slot.width = item.desired.width;
+                slot.height = item.desired.height;
+                slot.y = inset.top + cross_origin + item.margin.top;
+                if (flow_direction_ == FlowDirection::left_to_right) {
+                    slot.x = inset.left + main_origin + item.margin.left;
+                } else {
+                    slot.x = inset.left + inner.width - main_origin -
+                             item.margin.right - item.desired.width;
+                }
+                main_origin += horizontal_extent(item.margin) + item.desired.width;
+            } else {
+                slot.width = item.desired.width;
+                slot.height = item.desired.height;
+                slot.x = inset.left + cross_origin + item.margin.left;
+                if (flow_direction_ == FlowDirection::top_down) {
+                    slot.y = inset.top + main_origin + item.margin.top;
+                } else {
+                    slot.y = inset.top + inner.height - main_origin -
+                             item.margin.bottom - item.desired.height;
+                }
+                main_origin += vertical_extent(item.margin) + item.desired.height;
+            }
+            if (assign) set_child_layout(item.control, slot);
+        }
+        content_main = std::max(content_main, current.main);
+        cross_origin += current.cross;
+    }
+    const Size content = horizontal ? Size{content_main, cross_origin}
+                                    : Size{cross_origin, content_main};
+    return {content.width + horizontal_extent(inset),
+            content.height + vertical_extent(inset)};
+}
+
+Size FlowLayoutPanel::measure(Size available) {
+    available = {std::max(0.0, available.width),
+                 std::max(0.0, available.height)};
+    if (auto_size_) {
+        const Size desired = layout_children(available, false);
+        return {std::min(available.width, desired.width),
+                std::min(available.height, desired.height)};
+    }
+    const Rect requested = requested_bounds();
+    return {std::min(available.width,
+                     requested.width > 0.0 ? requested.width : available.width),
+            std::min(available.height,
+                     requested.height > 0.0 ? requested.height : available.height)};
+}
+
+void FlowLayoutPanel::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    static_cast<void>(layout_children({final_bounds.width, final_bounds.height}, true));
+}
+
+SemanticDescriptor FlowLayoutPanel::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
+    return descriptor;
+}
+
+TableLayoutPanel::TableLayoutPanel(StableId stable_id)
+    : ContainerControl(std::move(stable_id)) {}
+
+void TableLayoutPanel::validate_style(TableLayoutStyle style) {
+    if (!std::isfinite(style.size) || style.size < 0.0 ||
+        (style.size_mode == TableSizeMode::percent && style.size <= 0.0)) {
+        throw std::invalid_argument(
+            "TableLayoutPanel style size must be finite and nonnegative; percent must be positive");
+    }
+}
+
+void TableLayoutPanel::set_column_count(std::size_t count) {
+    require_mutable();
+    if (count == 0U || count > maximum_layout_tracks) {
+        throw std::out_of_range("TableLayoutPanel column count must be 1 through 64");
+    }
+    if (column_count_ == count) return;
+    column_count_ = count;
+    column_styles_.resize(count);
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::set_row_count(std::size_t count) {
+    require_mutable();
+    if (count == 0U || count > maximum_layout_tracks) {
+        throw std::out_of_range("TableLayoutPanel row count must be 1 through 64");
+    }
+    if (row_count_ == count) return;
+    row_count_ = count;
+    row_styles_.resize(count);
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::set_grow_style(TableLayoutGrowStyle style) {
+    require_mutable();
+    if (grow_style_ == style) return;
+    grow_style_ = style;
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::set_auto_size(bool auto_size) {
+    require_mutable();
+    if (auto_size_ == auto_size) return;
+    auto_size_ = auto_size;
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::set_cell_border_style(TableCellBorderStyle style) {
+    require_mutable();
+    if (cell_border_style_ == style) return;
+    cell_border_style_ = style;
+    invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
+}
+
+void TableLayoutPanel::set_column_style(std::size_t column,
+                                        TableLayoutStyle style) {
+    require_mutable();
+    if (column >= column_count_) {
+        throw std::out_of_range("TableLayoutPanel column style index");
+    }
+    validate_style(style);
+    if (column_styles_[column] == style) return;
+    column_styles_[column] = style;
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::set_row_style(std::size_t row, TableLayoutStyle style) {
+    require_mutable();
+    if (row >= row_count_) throw std::out_of_range("TableLayoutPanel row style index");
+    validate_style(style);
+    if (row_styles_[row] == style) return;
+    row_styles_[row] = style;
+    invalidate(invalidation::bounds);
+}
+
+TableLayoutPanel::CellMetadata& TableLayoutPanel::metadata_for(
+    const Control& child) {
+    if (child.parent().get() != this || !child.is_alive()) {
+        throw std::invalid_argument(
+            "TableLayoutPanel metadata requires a live direct child");
+    }
+    return metadata_[child.runtime_id().value];
+}
+
+const TableLayoutPanel::CellMetadata* TableLayoutPanel::metadata_for(
+    const Control& child) const {
+    if (child.parent().get() != this || !child.is_alive()) return nullptr;
+    const auto found = metadata_.find(child.runtime_id().value);
+    return found == metadata_.end() ? nullptr : &found->second;
+}
+
+void TableLayoutPanel::set_cell_position(
+    const Control& child, TableLayoutCellPosition position) {
+    require_mutable();
+    if (position.column >= maximum_layout_tracks ||
+        position.row >= maximum_layout_tracks) {
+        throw std::out_of_range("TableLayoutPanel cell position exceeds 64 tracks");
+    }
+    CellMetadata& metadata = metadata_for(child);
+    if (metadata.position == position) return;
+    metadata.position = position;
+    invalidate(invalidation::bounds);
+}
+
+void TableLayoutPanel::clear_cell_position(const Control& child) {
+    require_mutable();
+    CellMetadata& metadata = metadata_for(child);
+    if (!metadata.position) return;
+    metadata.position.reset();
+    invalidate(invalidation::bounds);
+}
+
+std::optional<TableLayoutCellPosition> TableLayoutPanel::cell_position(
+    const Control& child) const {
+    if (child.parent().get() != this || !child.is_alive()) return std::nullopt;
+    if (attached_window() != nullptr) static_cast<void>(arranged_bounds());
+    const auto resolved = resolved_cells_.find(child.runtime_id().value);
+    if (resolved != resolved_cells_.end()) return resolved->second;
+    const CellMetadata* metadata = metadata_for(child);
+    return metadata == nullptr ? std::nullopt : metadata->position;
+}
+
+void TableLayoutPanel::set_column_span(const Control& child, std::size_t span) {
+    require_mutable();
+    if (span == 0U || span > maximum_layout_tracks) {
+        throw std::out_of_range("TableLayoutPanel column span must be 1 through 64");
+    }
+    CellMetadata& metadata = metadata_for(child);
+    if (metadata.column_span == span) return;
+    metadata.column_span = span;
+    invalidate(invalidation::bounds);
+}
+
+std::size_t TableLayoutPanel::column_span(const Control& child) const {
+    const CellMetadata* metadata = metadata_for(child);
+    return metadata == nullptr ? 1U : metadata->column_span;
+}
+
+void TableLayoutPanel::set_row_span(const Control& child, std::size_t span) {
+    require_mutable();
+    if (span == 0U || span > maximum_layout_tracks) {
+        throw std::out_of_range("TableLayoutPanel row span must be 1 through 64");
+    }
+    CellMetadata& metadata = metadata_for(child);
+    if (metadata.row_span == span) return;
+    metadata.row_span = span;
+    invalidate(invalidation::bounds);
+}
+
+std::size_t TableLayoutPanel::row_span(const Control& child) const {
+    const CellMetadata* metadata = metadata_for(child);
+    return metadata == nullptr ? 1U : metadata->row_span;
+}
+
+void TableLayoutPanel::reconcile_metadata() {
+    std::unordered_set<std::uint64_t> live;
+    for (const Control::Ptr& child : children()) {
+        if (child && child->is_alive() && child->parent().get() == this) {
+            live.insert(child->runtime_id().value);
+        }
+    }
+    std::erase_if(metadata_, [&live](const auto& entry) {
+        return !live.contains(entry.first);
+    });
+    std::erase_if(resolved_cells_, [&live](const auto& entry) {
+        return !live.contains(entry.first);
+    });
+}
+
+Size TableLayoutPanel::layout_children(Size available, bool assign) {
+    reconcile_metadata();
+    const Insets inset = padding();
+    const Size inner{std::max(0.0, available.width - horizontal_extent(inset)),
+                     std::max(0.0, available.height - vertical_extent(inset))};
+    std::size_t columns = column_count_;
+    std::size_t rows = row_count_;
+    std::vector<std::vector<bool>> occupied(rows,
+                                            std::vector<bool>(columns, false));
+    const auto resize_grid = [&occupied, &rows, &columns](std::size_t new_columns,
+                                                          std::size_t new_rows) {
+        if (new_columns != columns) {
+            for (auto& row : occupied) row.resize(new_columns, false);
+            columns = new_columns;
+        }
+        if (new_rows != rows) {
+            occupied.resize(new_rows, std::vector<bool>(columns, false));
+            rows = new_rows;
+        }
+    };
+    const auto region_free = [&occupied, &rows, &columns](
+        std::size_t column, std::size_t row,
+        std::size_t column_span, std::size_t row_span) {
+        if (column + column_span > columns || row + row_span > rows) return false;
+        for (std::size_t y = row; y < row + row_span; ++y) {
+            for (std::size_t x = column; x < column + column_span; ++x) {
+                if (occupied[y][x]) return false;
+            }
+        }
+        return true;
+    };
+    const auto occupy = [&occupied](std::size_t column, std::size_t row,
+                                     std::size_t column_span,
+                                     std::size_t row_span) {
+        for (std::size_t y = row; y < row + row_span; ++y) {
+            for (std::size_t x = column; x < column + column_span; ++x) {
+                occupied[y][x] = true;
+            }
+        }
+    };
+
+    struct Item final {
+        Control::Ptr control;
+        TableLayoutCellPosition position;
+        std::size_t column_span{1U};
+        std::size_t row_span{1U};
+        Size desired;
+        Insets margin;
+    };
+    std::vector<Item> resolved;
+    std::vector<Control::Ptr> automatic;
+    std::vector<Control::Ptr> overflow;
+    resolved_cells_.clear();
+    layout_overflowed_ = false;
+
+    const auto grow_to_fit = [&](TableLayoutCellPosition position,
+                                 std::size_t column_span,
+                                 std::size_t row_span) {
+        const std::size_t required_columns = position.column + column_span;
+        const std::size_t required_rows = position.row + row_span;
+        if (required_columns > maximum_layout_tracks ||
+            required_rows > maximum_layout_tracks) return false;
+        if (required_columns > columns) {
+            if (grow_style_ != TableLayoutGrowStyle::add_columns) return false;
+            resize_grid(required_columns, rows);
+        }
+        if (required_rows > rows) {
+            if (grow_style_ != TableLayoutGrowStyle::add_rows) return false;
+            resize_grid(columns, required_rows);
+        }
+        return true;
+    };
+
+    for (const Control::Ptr& child : children()) {
+        if (!child || !child->is_alive() || !child->visible()) continue;
+        const CellMetadata* metadata = std::as_const(*this).metadata_for(*child);
+        if (metadata == nullptr || !metadata->position) {
+            automatic.push_back(child);
+            continue;
+        }
+        const TableLayoutCellPosition position = *metadata->position;
+        if (!grow_to_fit(position, metadata->column_span, metadata->row_span)) {
+            overflow.push_back(child);
+            continue;
+        }
+        if (!region_free(position.column, position.row, metadata->column_span,
+                         metadata->row_span)) {
+            overflow.push_back(child);
+            continue;
+        }
+        occupy(position.column, position.row, metadata->column_span,
+               metadata->row_span);
+        resolved.push_back({child, position, metadata->column_span,
+                            metadata->row_span, {}, child->margin()});
+    }
+
+    for (const Control::Ptr& child : automatic) {
+        const CellMetadata* metadata = std::as_const(*this).metadata_for(*child);
+        const std::size_t column_span = metadata == nullptr
+            ? 1U : metadata->column_span;
+        const std::size_t row_span = metadata == nullptr ? 1U : metadata->row_span;
+        if ((column_span > columns &&
+             grow_style_ != TableLayoutGrowStyle::add_columns) ||
+            (row_span > rows && grow_style_ != TableLayoutGrowStyle::add_rows)) {
+            overflow.push_back(child);
+            continue;
+        }
+        if (column_span > columns) resize_grid(column_span, rows);
+        if (row_span > rows) resize_grid(columns, row_span);
+        std::optional<TableLayoutCellPosition> position;
+        while (!position) {
+            for (std::size_t row = 0U; row < rows && !position; ++row) {
+                for (std::size_t column = 0U; column < columns; ++column) {
+                    if (region_free(column, row, column_span, row_span)) {
+                        position = TableLayoutCellPosition{column, row};
+                        break;
+                    }
+                }
+            }
+            if (position) break;
+            if (grow_style_ == TableLayoutGrowStyle::add_rows &&
+                rows < maximum_layout_tracks) {
+                resize_grid(columns, rows + 1U);
+            } else if (grow_style_ == TableLayoutGrowStyle::add_columns &&
+                       columns < maximum_layout_tracks) {
+                resize_grid(columns + 1U, rows);
+            } else {
+                break;
+            }
+        }
+        if (!position) {
+            overflow.push_back(child);
+            continue;
+        }
+        occupy(position->column, position->row, column_span, row_span);
+        resolved.push_back({child, *position, column_span, row_span, {},
+                            child->margin()});
+    }
+
+    std::vector<TableLayoutStyle> column_styles = column_styles_;
+    std::vector<TableLayoutStyle> row_styles = row_styles_;
+    column_styles.resize(columns);
+    row_styles.resize(rows);
+    std::vector<double> column_minimum(columns, 0.0);
+    std::vector<double> row_minimum(rows, 0.0);
+    std::vector<TrackSpanDemand> column_spans;
+    std::vector<TrackSpanDemand> row_spans;
+    for (Item& item : resolved) {
+        item.desired = preferred_child_size(item.control, inner);
+        const double required_width = item.desired.width +
+                                      horizontal_extent(item.margin);
+        const double required_height = item.desired.height +
+                                       vertical_extent(item.margin);
+        if (item.column_span == 1U &&
+            column_styles[item.position.column].size_mode !=
+                TableSizeMode::absolute) {
+            column_minimum[item.position.column] = std::max(
+                column_minimum[item.position.column], required_width);
+        } else if (item.column_span > 1U) {
+            column_spans.push_back(
+                {item.position.column, item.column_span, required_width});
+        }
+        if (item.row_span == 1U &&
+            row_styles[item.position.row].size_mode != TableSizeMode::absolute) {
+            row_minimum[item.position.row] = std::max(
+                row_minimum[item.position.row], required_height);
+        } else if (item.row_span > 1U) {
+            row_spans.push_back(
+                {item.position.row, item.row_span, required_height});
+        }
+    }
+
+    const TrackResolution horizontal = resolve_table_tracks(
+        column_styles, std::move(column_minimum), column_spans, inner.width);
+    const TrackResolution vertical = resolve_table_tracks(
+        row_styles, std::move(row_minimum), row_spans, inner.height);
+    if (assign) {
+        column_widths_ = horizontal.actual;
+        row_heights_ = vertical.actual;
+    }
+    std::vector<double> column_offsets(columns + 1U, 0.0);
+    std::vector<double> row_offsets(rows + 1U, 0.0);
+    std::partial_sum(horizontal.actual.begin(), horizontal.actual.end(),
+                     column_offsets.begin() + 1);
+    std::partial_sum(vertical.actual.begin(), vertical.actual.end(),
+                     row_offsets.begin() + 1);
+
+    for (const Item& item : resolved) {
+        resolved_cells_[item.control->runtime_id().value] = item.position;
+        if (!assign) continue;
+        const double cell_width =
+            column_offsets[item.position.column + item.column_span] -
+            column_offsets[item.position.column];
+        const double cell_height =
+            row_offsets[item.position.row + item.row_span] -
+            row_offsets[item.position.row];
+        const double available_width = std::max(
+            0.0, cell_width - horizontal_extent(item.margin));
+        const double available_height = std::max(
+            0.0, cell_height - vertical_extent(item.margin));
+        set_child_layout(
+            item.control,
+            {inset.left + column_offsets[item.position.column] + item.margin.left,
+             inset.top + row_offsets[item.position.row] + item.margin.top,
+             std::min(item.desired.width, available_width),
+             std::min(item.desired.height, available_height)});
+    }
+    layout_overflowed_ = !overflow.empty();
+    if (assign) {
+        for (const Control::Ptr& child : overflow) {
+            set_child_layout(child, {inset.left, inset.top, 0.0, 0.0});
+        }
+    }
+    return {horizontal.desired + horizontal_extent(inset),
+            vertical.desired + vertical_extent(inset)};
+}
+
+Control::Ptr TableLayoutPanel::control_from_position(std::size_t column,
+                                                      std::size_t row) const {
+    if (attached_window() != nullptr) static_cast<void>(arranged_bounds());
+    for (const Control::Ptr& child : children()) {
+        if (!child || !child->is_alive() || !child->visible()) continue;
+        const auto position = resolved_cells_.find(child->runtime_id().value);
+        if (position == resolved_cells_.end()) continue;
+        const CellMetadata* metadata = metadata_for(*child);
+        const std::size_t column_span = metadata == nullptr
+            ? 1U : metadata->column_span;
+        const std::size_t row_span = metadata == nullptr ? 1U : metadata->row_span;
+        if (column >= position->second.column &&
+            column < position->second.column + column_span &&
+            row >= position->second.row && row < position->second.row + row_span) {
+            return child;
+        }
+    }
+    return {};
+}
+
+Size TableLayoutPanel::measure(Size available) {
+    available = {std::max(0.0, available.width),
+                 std::max(0.0, available.height)};
+    if (auto_size_) {
+        const Size desired = layout_children(available, false);
+        return {std::min(available.width, desired.width),
+                std::min(available.height, desired.height)};
+    }
+    const Rect requested = requested_bounds();
+    return {std::min(available.width,
+                     requested.width > 0.0 ? requested.width : available.width),
+            std::min(available.height,
+                     requested.height > 0.0 ? requested.height : available.height)};
+}
+
+void TableLayoutPanel::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    static_cast<void>(layout_children({final_bounds.width, final_bounds.height}, true));
+}
+
+void TableLayoutPanel::on_paint(Painter& painter, Rect) {
+    if (cell_border_style_ == TableCellBorderStyle::none ||
+        column_widths_.empty() || row_heights_.empty()) {
+        return;
+    }
+    const BasicControlStyle style;
+    const Insets inset = padding();
+    const double width = std::accumulate(column_widths_.begin(),
+                                         column_widths_.end(), 0.0);
+    const double height = std::accumulate(row_heights_.begin(),
+                                          row_heights_.end(), 0.0);
+    const auto draw_grid = [&](Color color, double offset) {
+        double x = inset.left;
+        painter.draw_line({x + offset, inset.top},
+                          {x + offset, inset.top + height}, color, 1.0);
+        for (double extent : column_widths_) {
+            x += extent;
+            painter.draw_line({x + offset, inset.top},
+                              {x + offset, inset.top + height}, color, 1.0);
+        }
+        double y = inset.top;
+        painter.draw_line({inset.left, y + offset},
+                          {inset.left + width, y + offset}, color, 1.0);
+        for (double extent : row_heights_) {
+            y += extent;
+            painter.draw_line({inset.left, y + offset},
+                              {inset.left + width, y + offset}, color, 1.0);
+        }
+    };
+    if (cell_border_style_ == TableCellBorderStyle::single) {
+        draw_grid(style.border, 0.0);
+    } else if (cell_border_style_ == TableCellBorderStyle::inset) {
+        draw_grid(style.dark_border, 0.0);
+        draw_grid(style.highlight, 1.0);
+    } else {
+        draw_grid(style.highlight, 0.0);
+        draw_grid(style.dark_border, 1.0);
+    }
+}
+
+SemanticDescriptor TableLayoutPanel::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
+    return descriptor;
 }
 
 TabPage::TabPage(StableId stable_id, std::string text)
@@ -433,12 +1346,12 @@ void TabControl::reconcile_pages() {
 }
 
 void TabControl::arrange(Rect final_bounds) {
-    ContainerControl::arrange(final_bounds);
+    arrange_self(final_bounds);
     reconcile_pages();
     const Rect display = display_bounds();
     const auto selected = selected_page_.lock();
     for (const auto& page : pages()) {
-        page->set_requested_bounds(display);
+        set_child_layout(page, display);
         page->set_visible(page == selected);
     }
 }
@@ -642,6 +1555,19 @@ bool TabControl::on_semantic_child_action(std::string_view child_stable_id,
 SplitterPanel::SplitterPanel(StableId stable_id)
     : ContainerControl(std::move(stable_id)) {}
 
+void SplitterPanel::set_background(Color color) {
+    require_mutable();
+    if (background_ == color) return;
+    background_ = color;
+    invalidate(invalidation::style_only);
+}
+
+void SplitterPanel::on_paint(Painter& painter, Rect) {
+    if (background_.alpha == 0U) return;
+    const Rect bounds = committed_arranged_bounds();
+    painter.fill_rect({0.0, 0.0, bounds.width, bounds.height}, background_);
+}
+
 SplitContainer::SplitContainer(StableId stable_id)
     : ContainerControl(std::move(stable_id)) {
     const std::string prefix(this->stable_id().value());
@@ -800,7 +1726,7 @@ Size SplitContainer::measure(Size available) {
 }
 
 void SplitContainer::arrange(Rect final_bounds) {
-    ContainerControl::arrange(final_bounds);
+    arrange_self(final_bounds);
     const double total = axis_extent(final_bounds);
     const double available = std::max(0.0, total - splitter_width_);
     double desired = requested_distance_ < 0.0 ? available * 0.5
@@ -821,20 +1747,20 @@ void SplitContainer::arrange(Rect final_bounds) {
         effective_distance_ + (splitter_width_ - hit_width) * 0.5,
         0.0, std::max(0.0, total - hit_width));
     if (orientation_ == Orientation::vertical) {
-        first_panel_->set_requested_bounds(
+        set_child_layout(first_panel_,
             {0.0, 0.0, effective_distance_, final_bounds.height});
-        second_panel_->set_requested_bounds(
+        set_child_layout(second_panel_,
             {effective_distance_ + splitter_width_, 0.0, second_extent,
              final_bounds.height});
-        splitter_->set_requested_bounds(
+        set_child_layout(splitter_,
             {hit_origin, 0.0, hit_width, final_bounds.height});
     } else {
-        first_panel_->set_requested_bounds(
+        set_child_layout(first_panel_,
             {0.0, 0.0, final_bounds.width, effective_distance_});
-        second_panel_->set_requested_bounds(
+        set_child_layout(second_panel_,
             {0.0, effective_distance_ + splitter_width_, final_bounds.width,
              second_extent});
-        splitter_->set_requested_bounds(
+        set_child_layout(splitter_,
             {0.0, hit_origin, final_bounds.width, hit_width});
     }
     previous_axis_extent_ = total;

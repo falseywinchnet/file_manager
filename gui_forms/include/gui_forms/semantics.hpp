@@ -49,6 +49,7 @@ enum class SemanticState : std::uint32_t {
     read_only = 1U << 7U,
     expanded = 1U << 8U,
     busy = 1U << 9U,
+    protected_content = 1U << 10U,
 };
 
 [[nodiscard]] constexpr SemanticState operator|(SemanticState left,

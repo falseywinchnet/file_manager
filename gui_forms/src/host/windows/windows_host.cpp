@@ -1,12 +1,16 @@
 #include "windows_host.hpp"
 
+#include "gui_forms/text.hpp"
+
 #include <windows.h>
 #include <windowsx.h>
 #include <wincodec.h>
 #include <commdlg.h>
 #include <shlobj.h>
+#include <usp10.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -35,6 +39,14 @@ constexpr std::size_t maximum_automation_command = 4096;
 bool trace_win32_input() noexcept {
     static const bool enabled = [] {
         const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_INPUT");
+        return value != nullptr && std::strcmp(value, "1") == 0;
+    }();
+    return enabled;
+}
+
+bool trace_win32_text() noexcept {
+    static const bool enabled = [] {
+        const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_TEXT");
         return value != nullptr && std::strcmp(value, "1") == 0;
     }();
     return enabled;
@@ -229,6 +241,279 @@ HostDialogResult native_folder_dialog(HWND owner, std::uint64_t request_id,
     value.paths.push_back(utf8_from_wide(path.data()));
     return {{}, request_id, std::move(value)};
 }
+
+UINT native_message_style(const HostMessageDialogRequest& request) noexcept {
+    UINT style = MB_APPLMODAL;
+    switch (request.buttons) {
+    case HostMessageButtons::ok: style |= MB_OK; break;
+    case HostMessageButtons::ok_cancel: style |= MB_OKCANCEL; break;
+    case HostMessageButtons::yes_no: style |= MB_YESNO; break;
+    case HostMessageButtons::yes_no_cancel: style |= MB_YESNOCANCEL; break;
+    case HostMessageButtons::retry_cancel: style |= MB_RETRYCANCEL; break;
+    }
+    switch (request.icon) {
+    case HostMessageIcon::information: style |= MB_ICONINFORMATION; break;
+    case HostMessageIcon::warning: style |= MB_ICONWARNING; break;
+    case HostMessageIcon::error: style |= MB_ICONERROR; break;
+    case HostMessageIcon::question: style |= MB_ICONQUESTION; break;
+    case HostMessageIcon::none: break;
+    }
+    const bool second =
+        (request.buttons == HostMessageButtons::ok_cancel &&
+         request.default_choice == HostDialogChoice::cancel) ||
+        (request.buttons == HostMessageButtons::yes_no &&
+         request.default_choice == HostDialogChoice::no) ||
+        (request.buttons == HostMessageButtons::yes_no_cancel &&
+         request.default_choice == HostDialogChoice::no) ||
+        (request.buttons == HostMessageButtons::retry_cancel &&
+         request.default_choice == HostDialogChoice::cancel);
+    const bool third = request.buttons == HostMessageButtons::yes_no_cancel &&
+                       request.default_choice == HostDialogChoice::cancel;
+    if (third) style |= MB_DEFBUTTON3;
+    else if (second) style |= MB_DEFBUTTON2;
+    return style;
+}
+
+HostDialogResult native_message_dialog(HWND owner, std::uint64_t request_id,
+                                       const HostMessageDialogRequest& request) {
+    const std::wstring title = wide_from_utf8(request.title);
+    const std::wstring message = wide_from_utf8(request.message);
+    const int native_result = MessageBoxW(owner, message.c_str(), title.c_str(),
+                                          native_message_style(request));
+    HostMessageDialogResult value;
+    switch (native_result) {
+    case IDOK: value.choice = HostDialogChoice::ok; break;
+    case IDCANCEL:
+        value.choice = HostDialogChoice::cancel;
+        value.outcome = HostDialogOutcome::cancelled;
+        break;
+    case IDYES: value.choice = HostDialogChoice::yes; break;
+    case IDNO: value.choice = HostDialogChoice::no; break;
+    case IDRETRY: value.choice = HostDialogChoice::retry; break;
+    default:
+        return {{HostServiceError::backend_failure}, request_id,
+                HostMessageDialogResult{}};
+    }
+    if (native_result != IDCANCEL) value.outcome = HostDialogOutcome::accepted;
+    return {{}, request_id, value};
+}
+
+HostDialogResult native_color_dialog(HWND owner, std::uint64_t request_id,
+                                     const HostColorDialogRequest& request,
+                                     std::array<COLORREF, 16>& custom_colors) {
+    const std::uint8_t red = static_cast<std::uint8_t>(request.initial_rgba >> 24U);
+    const std::uint8_t green = static_cast<std::uint8_t>(request.initial_rgba >> 16U);
+    const std::uint8_t blue = static_cast<std::uint8_t>(request.initial_rgba >> 8U);
+    CHOOSECOLORW native{};
+    native.lStructSize = sizeof(native);
+    native.hwndOwner = owner;
+    native.rgbResult = RGB(red, green, blue);
+    native.lpCustColors = custom_colors.data();
+    native.Flags = CC_ANYCOLOR | CC_FULLOPEN | CC_RGBINIT;
+    if (!ChooseColorW(&native)) {
+        const DWORD error = CommDlgExtendedError();
+        return error == 0
+            ? HostDialogResult{{}, request_id,
+                  HostColorDialogResult{HostDialogOutcome::cancelled, 0U}}
+            : HostDialogResult{{HostServiceError::backend_failure}, request_id,
+                  HostColorDialogResult{}};
+    }
+    const std::uint32_t alpha = request.allow_alpha
+        ? request.initial_rgba & 0xFFU : 0xFFU;
+    const std::uint32_t rgba =
+        (static_cast<std::uint32_t>(GetRValue(native.rgbResult)) << 24U) |
+        (static_cast<std::uint32_t>(GetGValue(native.rgbResult)) << 16U) |
+        (static_cast<std::uint32_t>(GetBValue(native.rgbResult)) << 8U) | alpha;
+    return {{}, request_id,
+            HostColorDialogResult{HostDialogOutcome::accepted, rgba}};
+}
+
+LPCWSTR native_cursor_identifier(CursorKind cursor) noexcept {
+    switch (cursor) {
+    case CursorKind::text: return IDC_IBEAM;
+    case CursorKind::hand: return IDC_HAND;
+    case CursorKind::crosshair: return IDC_CROSS;
+    case CursorKind::resize_horizontal: return IDC_SIZEWE;
+    case CursorKind::resize_vertical: return IDC_SIZENS;
+    case CursorKind::wait: return IDC_WAIT;
+    case CursorKind::forbidden: return IDC_NO;
+    case CursorKind::arrow: return IDC_ARROW;
+    }
+    return IDC_ARROW;
+}
+
+double native_monitor_scale(HMONITOR monitor) noexcept {
+    using GetDpiForMonitorFn = HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+    static const GetDpiForMonitorFn get_dpi_for_monitor = [] {
+        HMODULE library = LoadLibraryW(L"Shcore.dll");
+        if (library == nullptr) return static_cast<GetDpiForMonitorFn>(nullptr);
+        const FARPROC symbol = GetProcAddress(library, "GetDpiForMonitor");
+        GetDpiForMonitorFn function{};
+        static_assert(sizeof(function) == sizeof(symbol));
+        std::memcpy(&function, &symbol, sizeof(function));
+        return function;
+    }();
+    UINT x = 96U;
+    UINT y = 96U;
+    if (get_dpi_for_monitor == nullptr ||
+        FAILED(get_dpi_for_monitor(monitor, 0, &x, &y)) || x == 0U) {
+        return 1.0;
+    }
+    return static_cast<double>(x) / 96.0;
+}
+
+class WindowsHostServices final : public HostServices {
+public:
+    WindowsHostServices() : HostServices(windows_capabilities()) {}
+
+    void bind_owner(HWND owner) noexcept { owner_ = owner; }
+
+protected:
+    HostMonitorResult query_monitors_impl() override {
+        HostMonitorResult result;
+        const BOOL enumerated = EnumDisplayMonitors(
+            nullptr, nullptr,
+            [](HMONITOR monitor, HDC, LPRECT, LPARAM context) -> BOOL {
+                auto& monitors = *reinterpret_cast<std::vector<HostMonitor>*>(context);
+                MONITORINFOEXW info{};
+                info.cbSize = sizeof(info);
+                if (!GetMonitorInfoW(monitor, &info)) return TRUE;
+                HostMonitor value;
+                value.id = utf8_from_wide(info.szDevice);
+                if (value.id.empty()) {
+                    value.id = "win32.monitor." + std::to_string(
+                        reinterpret_cast<std::uintptr_t>(monitor));
+                }
+                value.frame = {static_cast<double>(info.rcMonitor.left),
+                               static_cast<double>(info.rcMonitor.top),
+                               static_cast<double>(info.rcMonitor.right - info.rcMonitor.left),
+                               static_cast<double>(info.rcMonitor.bottom - info.rcMonitor.top)};
+                value.work_area = {static_cast<double>(info.rcWork.left),
+                                   static_cast<double>(info.rcWork.top),
+                                   static_cast<double>(info.rcWork.right - info.rcWork.left),
+                                   static_cast<double>(info.rcWork.bottom - info.rcWork.top)};
+                value.scale = native_monitor_scale(monitor);
+                value.primary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0U;
+                monitors.push_back(std::move(value));
+                return TRUE;
+            }, reinterpret_cast<LPARAM>(&result.monitors));
+        if (!enumerated || result.monitors.empty()) {
+            result.status.error = HostServiceError::backend_failure;
+        }
+        return result;
+    }
+
+    HostServiceStatus set_cursor_impl(CursorKind cursor) override {
+        SetCursor(LoadCursorW(nullptr, native_cursor_identifier(cursor)));
+        return {};
+    }
+
+    HostServiceStatus set_pointer_capture_impl(bool captured,
+                                               std::uint64_t) override {
+        if (owner_ == nullptr) return {HostServiceError::backend_failure};
+        if (captured) {
+            SetCapture(owner_);
+            return GetCapture() == owner_ ? HostServiceStatus{}
+                                          : HostServiceStatus{HostServiceError::backend_failure};
+        }
+        if (GetCapture() == owner_ && !ReleaseCapture()) {
+            return {HostServiceError::backend_failure};
+        }
+        return {};
+    }
+
+    HostClipboardTextResult read_clipboard_text_impl() override {
+        HostClipboardTextResult result;
+        result.generation = static_cast<std::uint64_t>(GetClipboardSequenceNumber());
+        if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return result;
+        if (!OpenClipboard(owner_)) {
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        HANDLE data = GetClipboardData(CF_UNICODETEXT);
+        const wchar_t* locked = data == nullptr
+            ? nullptr : static_cast<const wchar_t*>(GlobalLock(data));
+        if (locked == nullptr) {
+            CloseClipboard();
+            result.status.error = HostServiceError::backend_failure;
+            return result;
+        }
+        result.text_utf8 = utf8_from_wide(locked);
+        result.has_text = true;
+        GlobalUnlock(data);
+        CloseClipboard();
+        return result;
+    }
+
+    HostServiceStatus write_clipboard_text_impl(std::string_view text) override {
+        const std::wstring wide = wide_from_utf8(text);
+        if (!text.empty() && wide.empty()) return {HostServiceError::invalid_utf8};
+        if (!OpenClipboard(owner_)) return {HostServiceError::backend_failure};
+        if (!EmptyClipboard()) {
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        const std::size_t bytes = (wide.size() + 1U) * sizeof(wchar_t);
+        HGLOBAL storage = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (storage == nullptr) {
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        void* destination = GlobalLock(storage);
+        if (destination == nullptr) {
+            GlobalFree(storage);
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        std::memcpy(destination, wide.c_str(), bytes);
+        GlobalUnlock(storage);
+        if (SetClipboardData(CF_UNICODETEXT, storage) == nullptr) {
+            GlobalFree(storage);
+            CloseClipboard();
+            return {HostServiceError::backend_failure};
+        }
+        CloseClipboard();
+        return {};
+    }
+
+    HostDialogResult show_dialog_impl(const HostDialogRequest& request) override {
+        return std::visit([this, &request](const auto& payload) -> HostDialogResult {
+            using Payload = std::decay_t<decltype(payload)>;
+            if constexpr (std::is_same_v<Payload, HostMessageDialogRequest>) {
+                return native_message_dialog(owner_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
+                return native_open_dialog(owner_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
+                return native_save_dialog(owner_, request.request_id, payload);
+            } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
+                return native_folder_dialog(owner_, request.request_id, payload);
+            } else {
+                return native_color_dialog(owner_, request.request_id, payload,
+                                           custom_colors_);
+            }
+        }, request.payload);
+    }
+
+    HostServiceStatus play_sound_cue_impl(
+        const HostSoundCueRequest& request) override {
+        UINT type = MB_OK;
+        switch (request.cue) {
+        case HostSoundCue::notification: type = MB_ICONASTERISK; break;
+        case HostSoundCue::success: type = MB_OK; break;
+        case HostSoundCue::warning: type = MB_ICONEXCLAMATION; break;
+        case HostSoundCue::error: type = MB_ICONHAND; break;
+        case HostSoundCue::operation_complete: type = MB_OK; break;
+        }
+        return MessageBeep(type) ? HostServiceStatus{}
+                                 : HostServiceStatus{HostServiceError::backend_failure};
+    }
+
+    void shutdown_impl() noexcept override { owner_ = nullptr; }
+
+private:
+    HWND owner_{};
+    std::array<COLORREF, 16> custom_colors_{};
+};
 
 struct TooltipPopup final {
     HWND window{};
@@ -561,52 +846,62 @@ public:
 
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override {
-        const std::wstring wide = wide_from_utf8(text);
-        if (wide.empty() || memory_dc_ == nullptr) return;
-        const wchar_t* family = font.role == FontRole::control
-            ? L"Portsmouth Rapids"
-            : font.role == FontRole::monospace ? L"Consolas" : L"Lucida Grande";
-        HFONT native_font = CreateFontW(
-            -std::max(1, static_cast<int>(std::lround(font.size * scale_))), 0, 0, 0,
-            font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-            OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH | FF_DONTCARE, family);
-        if (native_font == nullptr) return;
+        const std::vector<GdiTextRun> runs = text_runs(text, font);
+        if (runs.empty() || memory_dc_ == nullptr) return;
         const int saved = SaveDC(memory_dc_);
         apply_gdi_clip();
-        HGDIOBJ old = SelectObject(memory_dc_, native_font);
         SetTextColor(memory_dc_, RGB(color.red, color.green, color.blue));
         SetBkMode(memory_dc_, TRANSPARENT);
-        TEXTMETRICW metrics{};
-        GetTextMetricsW(memory_dc_, &metrics);
         const int baseline = logical_y(origin.y);
-        TextOutW(memory_dc_, logical_x(origin.x), baseline - metrics.tmAscent,
-                 wide.data(), static_cast<int>(wide.size()));
-        SelectObject(memory_dc_, old);
+        int x = logical_x(origin.x);
+        for (const GdiTextRun& run : runs) {
+            HFONT native_font = create_font(font, run.family.c_str());
+            if (native_font == nullptr) continue;
+            HGDIOBJ old = SelectObject(memory_dc_, native_font);
+            SetTextCharacterExtra(memory_dc_,
+                static_cast<int>(std::lround(font.letter_spacing * scale_)));
+            TEXTMETRICW metrics{};
+            SIZE measured{};
+            GetTextMetricsW(memory_dc_, &metrics);
+            const bool rendered = shape_text_run(run.text, x, baseline,
+                                                 true, measured);
+            if (trace_win32_text()) {
+                std::fprintf(stderr,
+                             "win32-text draw family=%s units=%zu rendered=%d\n",
+                             utf8_from_wide(run.family).c_str(), run.text.size(),
+                             rendered ? 1 : 0);
+            }
+            if (rendered) {
+                x += measured.cx;
+            }
+            SelectObject(memory_dc_, old);
+            DeleteObject(native_font);
+        }
         RestoreDC(memory_dc_, saved);
-        DeleteObject(native_font);
     }
 
     Size measure_text_utf8(std::string_view text, FontSpec font) override {
-        const std::wstring wide = wide_from_utf8(text);
-        if (wide.empty() || memory_dc_ == nullptr) return {0.0, font.size};
-        const wchar_t* family = font.role == FontRole::control
-            ? L"Portsmouth Rapids"
-            : font.role == FontRole::monospace ? L"Consolas" : L"Lucida Grande";
-        HFONT native_font = CreateFontW(
-            -std::max(1, static_cast<int>(std::lround(font.size * scale_))), 0, 0, 0,
-            font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-            OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-            DEFAULT_PITCH | FF_DONTCARE, family);
-        if (native_font == nullptr) return {};
-        HGDIOBJ old = SelectObject(memory_dc_, native_font);
-        SIZE measured{};
-        const BOOL accepted = GetTextExtentPoint32W(
-            memory_dc_, wide.data(), static_cast<int>(wide.size()), &measured);
-        SelectObject(memory_dc_, old);
-        DeleteObject(native_font);
-        if (!accepted) return {};
-        return {measured.cx / scale_, measured.cy / scale_};
+        const std::vector<GdiTextRun> runs = text_runs(text, font);
+        if (runs.empty() || memory_dc_ == nullptr) return {0.0, font.size};
+        const int saved = SaveDC(memory_dc_);
+        int width{};
+        int height{};
+        for (const GdiTextRun& run : runs) {
+            HFONT native_font = create_font(font, run.family.c_str());
+            if (native_font == nullptr) continue;
+            HGDIOBJ old = SelectObject(memory_dc_, native_font);
+            SetTextCharacterExtra(memory_dc_,
+                static_cast<int>(std::lround(font.letter_spacing * scale_)));
+            SIZE measured{};
+            if (shape_text_run(run.text, 0, 0, false, measured)) {
+                width += measured.cx;
+                height = std::max(height, static_cast<int>(measured.cy));
+            }
+            SelectObject(memory_dc_, old);
+            DeleteObject(native_font);
+        }
+        RestoreDC(memory_dc_, saved);
+        return {width / scale_, height / scale_};
     }
 
     void draw_image(ImageId image, Rect destination, double opacity) override {
@@ -648,6 +943,10 @@ public:
 
 private:
     struct State { double tx{}; double ty{}; Rect clip{}; };
+    struct GdiTextRun {
+        std::wstring family;
+        std::wstring text;
+    };
     struct DecodedImage {
         std::uint64_t content_hash{};
         std::uint32_t width{};
@@ -682,6 +981,281 @@ private:
             static_cast<int>(std::floor(clip.y * scale_)),
             static_cast<int>(std::ceil((clip.x + clip.width) * scale_)),
             static_cast<int>(std::ceil((clip.y + clip.height) * scale_)));
+    }
+    [[nodiscard]] static const wchar_t* primary_font_family(FontRole role) {
+        return role == FontRole::control ? L"Portsmouth Rapids"
+            : role == FontRole::monospace ? L"Cousine" : L"Carlito";
+    }
+    [[nodiscard]] HFONT create_font(FontSpec font, const wchar_t* family) const {
+        return CreateFontW(
+            -std::max(1, static_cast<int>(std::lround(font.size * scale_))),
+            0, 0, 0, font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, family);
+    }
+    [[nodiscard]] bool shape_text_run(std::wstring_view text, int x, int y,
+                                      bool draw, SIZE& measured) const {
+        if (text.empty() ||
+            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            return false;
+        }
+        const int length = static_cast<int>(text.size());
+        std::vector<SCRIPT_ITEM> source_items(text.size() + 2U);
+        int item_count{};
+        if (FAILED(ScriptItemize(text.data(), length,
+                                 static_cast<int>(source_items.size()), nullptr,
+                                 nullptr, source_items.data(), &item_count)) ||
+            item_count <= 0) {
+            return false;
+        }
+        struct PlacedItem final {
+            SCRIPT_ANALYSIS analysis{};
+            std::vector<WORD> glyphs;
+            std::vector<int> advances;
+            std::vector<GOFFSET> offsets;
+            int width{};
+        };
+        SCRIPT_CACHE cache{};
+        std::vector<PlacedItem> placed;
+        placed.reserve(static_cast<std::size_t>(item_count));
+        bool valid = true;
+        for (int item = 0; item < item_count && valid; ++item) {
+            const int start = source_items[static_cast<std::size_t>(item)].iCharPos;
+            const int end = source_items[static_cast<std::size_t>(item + 1)].iCharPos;
+            const int item_length = end - start;
+            if (item_length <= 0) continue;
+            const int capacity = item_length * 3 / 2 + 16;
+            PlacedItem output;
+            output.analysis = source_items[static_cast<std::size_t>(item)].a;
+            output.glyphs.resize(static_cast<std::size_t>(capacity));
+            std::vector<WORD> clusters(static_cast<std::size_t>(item_length));
+            std::vector<SCRIPT_VISATTR> attributes(
+                static_cast<std::size_t>(capacity));
+            int glyph_count{};
+            if (FAILED(ScriptShape(
+                    memory_dc_, &cache, text.data() + start, item_length,
+                    capacity, &output.analysis, output.glyphs.data(),
+                    clusters.data(), attributes.data(), &glyph_count)) ||
+                glyph_count <= 0) {
+                valid = false;
+                break;
+            }
+            output.glyphs.resize(static_cast<std::size_t>(glyph_count));
+            attributes.resize(static_cast<std::size_t>(glyph_count));
+            output.advances.resize(static_cast<std::size_t>(glyph_count));
+            output.offsets.resize(static_cast<std::size_t>(glyph_count));
+            ABC extent{};
+            if (FAILED(ScriptPlace(memory_dc_, &cache, output.glyphs.data(),
+                                   glyph_count, attributes.data(),
+                                   &output.analysis, output.advances.data(),
+                                   output.offsets.data(), &extent))) {
+                valid = false;
+                break;
+            }
+            const int character_extra = GetTextCharacterExtra(memory_dc_);
+            for (int glyph = 0; glyph < glyph_count; ++glyph) {
+                if (character_extra != 0 &&
+                    !(item + 1 == item_count && glyph + 1 == glyph_count)) {
+                    output.advances[static_cast<std::size_t>(glyph)] +=
+                        character_extra;
+                }
+                output.width += output.advances[static_cast<std::size_t>(glyph)];
+            }
+            placed.push_back(std::move(output));
+        }
+        TEXTMETRICW metrics{};
+        GetTextMetricsW(memory_dc_, &metrics);
+        if (valid) {
+            measured = {0, metrics.tmHeight};
+            if (draw) SetTextAlign(memory_dc_, TA_LEFT | TA_BASELINE);
+            std::vector<BYTE> levels(placed.size());
+            for (std::size_t item = 0; item < placed.size(); ++item) {
+                levels[item] = placed[item].analysis.s.uBidiLevel;
+            }
+            std::vector<int> visual_to_logical(placed.size());
+            std::vector<int> logical_to_visual(placed.size());
+            if (!placed.empty()) {
+                ScriptLayout(static_cast<int>(placed.size()), levels.data(),
+                             visual_to_logical.data(), logical_to_visual.data());
+            }
+            for (std::size_t visual = 0; visual < placed.size(); ++visual) {
+                const std::size_t logical = static_cast<std::size_t>(
+                    visual_to_logical[visual]);
+                PlacedItem& item = placed[logical];
+                if (draw && FAILED(ScriptTextOut(
+                        memory_dc_, &cache, x + measured.cx, y, 0, nullptr,
+                        &item.analysis, nullptr, 0, item.glyphs.data(),
+                        static_cast<int>(item.glyphs.size()), item.advances.data(),
+                        nullptr, item.offsets.data()))) {
+                    valid = false;
+                    break;
+                }
+                measured.cx += item.width;
+            }
+        }
+        ScriptFreeCache(&cache);
+        if (valid) return true;
+        if (!GetTextExtentPoint32W(memory_dc_, text.data(), length, &measured)) {
+            return false;
+        }
+        if (draw) SetTextAlign(memory_dc_, TA_LEFT | TA_TOP);
+        return !draw || TextOutW(memory_dc_, x, y - metrics.tmAscent,
+                                 text.data(), length);
+    }
+    [[nodiscard]] bool selected_font_shapes(std::wstring_view text) const {
+        if (text.empty() ||
+            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            return false;
+        }
+        const int length = static_cast<int>(text.size());
+        std::vector<SCRIPT_ITEM> items(text.size() + 2U);
+        int item_count{};
+        if (FAILED(ScriptItemize(text.data(), length,
+                                 static_cast<int>(items.size()), nullptr, nullptr,
+                                 items.data(), &item_count)) || item_count <= 0) {
+            return false;
+        }
+        SCRIPT_CACHE cache{};
+        bool covered = true;
+        for (int item = 0; item < item_count && covered; ++item) {
+            const int start = items[static_cast<std::size_t>(item)].iCharPos;
+            const int end = items[static_cast<std::size_t>(item + 1)].iCharPos;
+            const int item_length = end - start;
+            if (item_length <= 0) continue;
+            const int capacity = item_length * 3 / 2 + 16;
+            std::vector<WORD> glyphs(static_cast<std::size_t>(capacity));
+            std::vector<WORD> clusters(static_cast<std::size_t>(item_length));
+            std::vector<SCRIPT_VISATTR> attributes(
+                static_cast<std::size_t>(capacity));
+            int glyph_count{};
+            const HRESULT shaped = ScriptShape(
+                memory_dc_, &cache, text.data() + start, item_length, capacity,
+                &items[static_cast<std::size_t>(item)].a, glyphs.data(),
+                clusters.data(), attributes.data(), &glyph_count);
+            if (FAILED(shaped) || glyph_count <= 0) {
+                covered = false;
+                continue;
+            }
+            SCRIPT_FONTPROPERTIES properties{};
+            properties.cBytes = sizeof(properties);
+            if (FAILED(ScriptGetFontProperties(memory_dc_, &cache, &properties))) {
+                covered = false;
+                continue;
+            }
+            for (int glyph = 0; glyph < glyph_count; ++glyph) {
+                if (glyphs[static_cast<std::size_t>(glyph)] ==
+                    properties.wgDefault) {
+                    covered = false;
+                    break;
+                }
+            }
+            if (trace_win32_text()) {
+                std::fprintf(stderr,
+                             "win32-text shaped=%d glyph-count=%d default=%04x glyphs=",
+                             covered ? 1 : 0, glyph_count,
+                             static_cast<unsigned>(properties.wgDefault));
+                for (int glyph = 0; glyph < glyph_count; ++glyph) {
+                    std::fprintf(stderr, "%04x,", static_cast<unsigned>(
+                        glyphs[static_cast<std::size_t>(glyph)]));
+                }
+                std::fputc('\n', stderr);
+            }
+        }
+        ScriptFreeCache(&cache);
+        return covered;
+    }
+    [[nodiscard]] bool font_covers(HFONT font, const wchar_t* requested_family,
+                                   std::wstring_view text) const {
+        if (font == nullptr || text.empty() ||
+            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            return false;
+        }
+        const int saved = SaveDC(memory_dc_);
+        HGDIOBJ old = SelectObject(memory_dc_, font);
+        const bool shaped_coverage = selected_font_shapes(text);
+        std::vector<WORD> glyphs(text.size(), 0xffffU);
+        const DWORD count = GetGlyphIndicesW(
+            memory_dc_, text.data(), static_cast<int>(text.size()),
+            glyphs.data(), GGI_MARK_NONEXISTING_GLYPHS);
+        if (trace_win32_text()) {
+            std::array<wchar_t, LF_FACESIZE> actual_family{};
+            GetTextFaceW(memory_dc_, static_cast<int>(actual_family.size()),
+                         actual_family.data());
+            std::fprintf(stderr,
+                         "win32-text requested=%s actual=%s units=%zu glyphs=",
+                         utf8_from_wide(requested_family).c_str(),
+                         utf8_from_wide(actual_family.data()).c_str(), text.size());
+            for (const WORD glyph : glyphs) {
+                std::fprintf(stderr, "%04x,", static_cast<unsigned>(glyph));
+            }
+            std::fputc('\n', stderr);
+        }
+        SelectObject(memory_dc_, old);
+        RestoreDC(memory_dc_, saved);
+        if (shaped_coverage) return true;
+        if (count == GDI_ERROR) return false;
+        for (std::size_t index = 0; index < text.size(); ++index) {
+            const wchar_t unit = text[index];
+            if (unit == 0x200d || (unit >= 0xfe00 && unit <= 0xfe0f)) continue;
+            if (unit >= 0xd800 && unit <= 0xdbff && index + 1U < text.size() &&
+                text[index + 1U] >= 0xdc00 && text[index + 1U] <= 0xdfff) {
+                if (glyphs[index] == 0xffffU && glyphs[index + 1U] == 0xffffU) {
+                    return false;
+                }
+                ++index;
+                continue;
+            }
+            if (glyphs[index] == 0xffffU) return false;
+        }
+        return true;
+    }
+    [[nodiscard]] std::vector<GdiTextRun> text_runs(
+        std::string_view utf8, FontSpec font) const {
+        std::vector<GdiTextRun> runs;
+        if (utf8.empty() || memory_dc_ == nullptr || !validate_utf8(utf8).valid()) {
+            return runs;
+        }
+        constexpr std::array<const wchar_t*, 2> fallback_families{
+            L"Noto Sans CJK JP", L"Noto Emoji"};
+        std::array<HFONT, 3> candidates{
+            create_font(font, primary_font_family(font.role)),
+            create_font(font, fallback_families[0]),
+            create_font(font, fallback_families[1])};
+        const std::array<const wchar_t*, 3> families{
+            primary_font_family(font.role), fallback_families[0],
+            fallback_families[1]};
+        TextStore store(utf8);
+        for (std::size_t index = 0; index < store.grapheme_count().value();
+             ++index) {
+            const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
+            const std::wstring cluster = wide_from_utf8(
+                utf8.substr(range.start.value(),
+                            range.end.value() - range.start.value()));
+            if (cluster.empty()) continue;
+            std::size_t selected{};
+            bool covered{};
+            for (; selected < candidates.size(); ++selected) {
+                covered = font_covers(candidates[selected], families[selected],
+                                      cluster);
+                if (covered) break;
+            }
+            if (!covered) {
+                selected = 0U;
+            }
+            if (trace_win32_text()) {
+                std::fprintf(stderr, "win32-text selected=%s\n",
+                             utf8_from_wide(families[selected]).c_str());
+            }
+            if (!runs.empty() && runs.back().family == families[selected]) {
+                runs.back().text.append(cluster);
+            } else {
+                runs.push_back({families[selected], cluster});
+            }
+        }
+        for (HFONT candidate : candidates) {
+            if (candidate != nullptr) DeleteObject(candidate);
+        }
+        return runs;
     }
     void reset_bitmap() noexcept {
         if (memory_dc_ != nullptr && old_bitmap_ != nullptr) SelectObject(memory_dc_, old_bitmap_);
@@ -758,17 +1332,22 @@ class WindowsHostState final {
 public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
-          session_(*model_, windows_capabilities()) {}
+          services_(), session_(*model_, windows_capabilities(), &services_) {}
 
     ~WindowsHostState() {
         hide_tooltip();
         if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
         session_.shutdown();
-        if (!font_regular_path_.empty()) RemoveFontResourceExW(font_regular_path_.c_str(), FR_PRIVATE, nullptr);
-        if (!font_bold_path_.empty()) RemoveFontResourceExW(font_bold_path_.c_str(), FR_PRIVATE, nullptr);
+        services_.shutdown();
+        for (const std::wstring& path : private_font_paths_) {
+            RemoveFontResourceExW(path.c_str(), FR_PRIVATE, nullptr);
+        }
     }
 
-    void bind_window(HWND window) noexcept { hwnd_ = window; }
+    void bind_window(HWND window) noexcept {
+        hwnd_ = window;
+        services_.bind_owner(window);
+    }
 
     bool initialize(HWND window) {
         hwnd_ = window;
@@ -780,22 +1359,29 @@ public:
                            (client.bottom - client.top) / scale_};
         raster_.resize(logical, scale_);
         model_->metrics().set_renderer(
-            "Win32 DIB CPU · GDI text · WIC PNG · Rapids UI", true);
+            "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts", true);
         dispatch(HostAttachEvent{logical, scale_});
         dispatch(HostActivationEvent{GetActiveWindow() == window});
+        model_->set_dispatch_wake_handler([this] {
+            if (hwnd_ != nullptr) {
+                PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
+            }
+        });
         if (options_.host_ready) {
             options_.host_ready(
                 [this] { PostMessageW(hwnd_, managed_dispatch_message, 0, 0); },
                 [this] { PostMessageW(hwnd_, WM_CLOSE, 0, 0); },
                 [this](const HostDialogRequest& request) {
-                    return show_dialog(request);
+                    return services_.show_dialog(request);
                 },
                 [this](const HostTooltipRequest& request) {
                     return show_tooltip(request);
                 },
                 [this] { hide_tooltip(); },
-                [this] { return read_clipboard_text(); },
-                [this](std::string_view text) { return write_clipboard_text(text); });
+                [this] { return services_.read_clipboard_text(); },
+                [this](std::string_view text) {
+                    return services_.write_clipboard_text(text);
+                });
         }
         collect_damage();
         return true;
@@ -825,6 +1411,7 @@ public:
             break;
         case WM_PAINT: paint(); return 0;
         case managed_dispatch_message:
+            static_cast<void>(model_->drain_posted_work());
             if (options_.dispatch_pending) options_.dispatch_pending();
             collect_damage(); return 0;
         case WM_TIMER:
@@ -849,6 +1436,7 @@ public:
                 if (options_.closed) options_.closed();
             }
             session_.shutdown();
+            services_.shutdown();
             if (options_.quit_thread_on_close) PostQuitMessage(0);
             return 0;
         default: break;
@@ -857,7 +1445,10 @@ public:
     }
 
     std::string metrics_json() const { return model_->metrics_snapshot().to_json(); }
-    std::string host_json() const { return session_.snapshot().to_json(); }
+    std::string host_json() const {
+        return "{\"session\":" + session_.snapshot().to_json() +
+               ",\"services\":" + services_.snapshot().to_json() + "}";
+    }
 
 private:
     template <class Payload>
@@ -929,7 +1520,8 @@ private:
                      static_cast<LONG>(std::lround(request.anchor.y * scale_))};
         ClientToScreen(hwnd_, &anchor);
         RECT work{};
-        MONITORINFO monitor{sizeof(monitor)};
+        MONITORINFO monitor{};
+        monitor.cbSize = sizeof(monitor);
         if (GetMonitorInfoW(MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST),
                             &monitor)) {
             work = monitor.rcWork;
@@ -1198,8 +1790,25 @@ private:
         if (!command.starts_with(prefix)) return FALSE;
         command.erase(0, prefix.size());
         if (command == "snapshot") {
-            std::fprintf(stdout, "{\"automation\":\"snapshot\",\"window\":%s,\"host\":%s}\n",
-                         metrics_json().c_str(), host_json().c_str());
+            const DispatcherSnapshot dispatcher = model_->dispatcher_snapshot();
+            std::fprintf(
+                stdout,
+                "{\"automation\":\"snapshot\",\"window\":%s,\"host\":%s,"
+                "\"dispatcher\":{\"posted\":%llu,\"invoked\":%llu,"
+                "\"cancelled\":%llu,\"faulted\":%llu,"
+                "\"synchronous_invocations\":%llu,\"inline_invocations\":%llu,"
+                "\"marshalled_invocations\":%llu,\"pending\":%zu,"
+                "\"maximum_pending\":%zu,\"accepting\":%s}}\n",
+                metrics_json().c_str(), host_json().c_str(),
+                static_cast<unsigned long long>(dispatcher.posted),
+                static_cast<unsigned long long>(dispatcher.invoked),
+                static_cast<unsigned long long>(dispatcher.cancelled),
+                static_cast<unsigned long long>(dispatcher.faulted),
+                static_cast<unsigned long long>(dispatcher.synchronous_invocations),
+                static_cast<unsigned long long>(dispatcher.inline_invocations),
+                static_cast<unsigned long long>(dispatcher.marshalled_invocations),
+                dispatcher.pending, dispatcher.maximum_pending,
+                dispatcher.accepting ? "true" : "false");
             std::fflush(stdout);
             return TRUE;
         }
@@ -1454,10 +2063,20 @@ private:
     void load_private_fonts() {
         const std::wstring directory = executable_directory();
         if (directory.empty()) return;
-        font_regular_path_ = directory + L"fonts\\PortsmouthRapids.ttf";
-        font_bold_path_ = directory + L"fonts\\PortsmouthRapids-Bold.ttf";
-        AddFontResourceExW(font_regular_path_.c_str(), FR_PRIVATE, nullptr);
-        AddFontResourceExW(font_bold_path_.c_str(), FR_PRIVATE, nullptr);
+        constexpr std::array<const wchar_t*, 12> names{
+            L"PortsmouthRapids.ttf", L"PortsmouthRapids-Bold.ttf",
+            L"Carlito-Regular.ttf", L"Carlito-Bold.ttf",
+            L"Carlito-Italic.ttf", L"Carlito-BoldItalic.ttf",
+            L"Cousine-Regular.ttf", L"Cousine-Bold.ttf",
+            L"Cousine-Italic.ttf", L"Cousine-BoldItalic.ttf",
+            L"NotoSansCJKjp-Regular.otf", L"NotoEmoji-Regular.ttf"};
+        private_font_paths_.reserve(names.size());
+        for (const wchar_t* name : names) {
+            std::wstring path = directory + L"fonts\\" + name;
+            if (AddFontResourceExW(path.c_str(), FR_PRIVATE, nullptr) > 0) {
+                private_font_paths_.push_back(std::move(path));
+            }
+        }
     }
 
     static std::wstring executable_directory() {
@@ -1472,6 +2091,7 @@ private:
 
     std::unique_ptr<Window> model_;
     WindowsHostOptions options_;
+    WindowsHostServices services_;
     HostSession session_;
     HWND hwnd_{};
     DibPainter raster_;
@@ -1480,8 +2100,7 @@ private:
     std::uint64_t next_sequence_{1};
     wchar_t pending_high_surrogate_{};
     bool closed_{};
-    std::wstring font_regular_path_;
-    std::wstring font_bold_path_;
+    std::vector<std::wstring> private_font_paths_;
     TooltipPopup tooltip_;
 };
 
@@ -1508,8 +2127,12 @@ HostCapabilities windows_capabilities() {
                 HostCapability::pointer_input |
                 HostCapability::keyboard_input |
                 HostCapability::text_composition |
+                HostCapability::monitor_geometry |
                 HostCapability::pointer_capture |
-                HostCapability::cursor};
+                HostCapability::cursor |
+                HostCapability::clipboard |
+                HostCapability::dialogs |
+                HostCapability::sound_cues};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {

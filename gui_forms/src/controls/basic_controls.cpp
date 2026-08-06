@@ -204,6 +204,16 @@ void Panel::on_paint(Painter& painter, Rect) {
     paint_panel(painter, local_bounds());
 }
 
+SemanticDescriptor Panel::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.exposed = !descriptor.name.empty() ||
+                         !descriptor.description.empty();
+    return descriptor;
+}
+
 GroupBox::GroupBox(StableId stable_id, std::string text)
     : Panel(std::move(stable_id)), text_(std::move(text)) {
     set_border_style(BorderStyle::none);
@@ -220,6 +230,9 @@ void GroupBox::set_text(std::string text) {
 
 void GroupBox::set_font(FontSpec font) {
     require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("GroupBox font specification is invalid");
+    }
     if (font_ == font) {
         return;
     }
@@ -402,6 +415,9 @@ void Label::set_text(std::string text) {
 
 void Label::set_font(FontSpec font) {
     require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("Label font specification is invalid");
+    }
     if (font_ == font) {
         return;
     }
@@ -543,6 +559,9 @@ void ButtonBase::set_text(std::string text) {
 
 void ButtonBase::set_font(FontSpec font) {
     require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("Button font specification is invalid");
+    }
     if (font_ == font) {
         return;
     }

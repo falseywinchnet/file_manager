@@ -452,6 +452,27 @@ void ProgressBar::set_visual_style(ProgressBarVisualStyle style_value) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void ProgressBar::set_overlay_style(ProgressBarOverlayStyle style_value) {
+    require_mutable();
+    if (overlay_style_ == style_value) return;
+    overlay_style_ = style_value;
+    animation_phase_ = 0.0;
+    update_animation_registration();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ProgressBar::set_stripe_width(double width) {
+    require_mutable();
+    require_finite(width, "progress stripe width must be finite");
+    if (width < 2.0 || width > 32.0) {
+        throw std::invalid_argument(
+            "progress stripe width must be between 2 and 32 pixels");
+    }
+    if (stripe_width_ == width) return;
+    stripe_width_ = width;
+    invalidate(Dirty::paint);
+}
+
 void ProgressBar::set_animation_enabled(bool enabled_value) {
     require_mutable();
     if (animation_enabled_ == enabled_value) {
@@ -461,6 +482,33 @@ void ProgressBar::set_animation_enabled(bool enabled_value) {
     if (!animation_enabled_) {
         animation_phase_ = 0.0;
     }
+    update_animation_registration();
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ProgressBar::set_animation_paused(bool paused) {
+    MotionPolicy policy = motion_policy_;
+    policy.paused = paused;
+    set_motion_policy(policy);
+}
+
+void ProgressBar::set_reduced_motion(bool reduced) {
+    MotionPolicy policy = motion_policy_;
+    policy.reduced = reduced;
+    set_motion_policy(policy);
+}
+
+void ProgressBar::set_motion_policy(bool paused, bool reduced) {
+    MotionPolicy policy = motion_policy_;
+    policy.paused = paused;
+    policy.reduced = reduced;
+    set_motion_policy(policy);
+}
+
+void ProgressBar::set_motion_policy(MotionPolicy policy) {
+    require_mutable();
+    if (motion_policy_ == policy) return;
+    motion_policy_ = policy;
     update_animation_registration();
     invalidate(Dirty::paint | Dirty::semantics);
 }
@@ -475,24 +523,27 @@ void ProgressBar::set_animation_period(FrameInterval period) {
         return;
     }
     animation_period_ = period;
-    animation_origin_ = FrameClock::now();
+    last_animation_frame_ = FrameClock::now();
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
 bool ProgressBar::animated_style() const noexcept {
     return visual_style_ == ProgressBarVisualStyle::marquee ||
-           visual_style_ == ProgressBarVisualStyle::pulse;
+           visual_style_ == ProgressBarVisualStyle::pulse ||
+           overlay_style_ == ProgressBarOverlayStyle::moving_stripes;
 }
 
 void ProgressBar::update_animation_registration() {
     animation_frames_.disconnect();
-    if (window() == nullptr || !animation_enabled_ || !animated_style()) {
+    if (window() == nullptr || !animation_enabled_ || !motion_policy_.active() ||
+        !animated_style()) {
         return;
     }
-    constexpr FrameInterval interval = std::chrono::milliseconds(16);
-    animation_origin_ = FrameClock::now();
+    const FrameInterval interval = motion_policy_.frame_interval(
+        std::chrono::milliseconds(16));
+    last_animation_frame_ = FrameClock::now();
     animation_frames_ = window()->activate_surface(
-        shared_from_this(), interval, animation_origin_ + interval);
+        shared_from_this(), interval, last_animation_frame_ + interval);
 }
 
 void ProgressBar::on_attached_to_window() {
@@ -506,14 +557,20 @@ void ProgressBar::on_detached_from_window() noexcept {
 }
 
 void ProgressBar::on_frame(FrameTime now) {
-    if (!animation_enabled_ || !animated_style()) {
+    if (!animation_enabled_ || !motion_policy_.active() ||
+        !animated_style()) {
         return;
     }
-    const double elapsed =
-        std::chrono::duration<double>(now - animation_origin_).count();
+    const double elapsed = std::max(
+        0.0, std::chrono::duration<double>(now - last_animation_frame_).count());
+    last_animation_frame_ = now;
     const double period =
         std::chrono::duration<double>(animation_period_).count();
-    animation_phase_ = period <= 0.0 ? 0.0 : std::fmod(elapsed / period, 1.0);
+    animation_phase_ = period <= 0.0
+        ? 0.0
+        : std::fmod(animation_phase_ +
+                        elapsed * motion_policy_.speed_scale() / period,
+                    1.0);
     if (animation_phase_ < 0.0) {
         animation_phase_ += 1.0;
     }
@@ -536,17 +593,19 @@ void ProgressBar::on_paint(Painter& painter, Rect) {
     const double ratio = normalized_value();
     Rect fill{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
               std::max(0.0, bounds.height - 4.0)};
+    const double presented_phase =
+        motion_policy_.presentation_phase(animation_phase_);
     if (visual_style_ == ProgressBarVisualStyle::marquee) {
         if (orientation() == Orientation::horizontal) {
             const double band = std::max(18.0, fill.width * 0.28);
-            fill.x += (fill.width + band) * animation_phase_ - band;
+            fill.x += (fill.width + band) * presented_phase - band;
             fill.width = band;
             fill = Rect::intersection(fill, {2.0, 2.0,
                                              std::max(0.0, bounds.width - 4.0),
                                              std::max(0.0, bounds.height - 4.0)});
         } else {
             const double band = std::max(18.0, fill.height * 0.28);
-            fill.y += (fill.height + band) * (1.0 - animation_phase_) - band;
+            fill.y += (fill.height + band) * (1.0 - presented_phase) - band;
             fill.height = band;
             fill = Rect::intersection(fill, {2.0, 2.0,
                                              std::max(0.0, bounds.width - 4.0),
@@ -582,13 +641,31 @@ void ProgressBar::on_paint(Painter& painter, Rect) {
         if (visual_style_ == ProgressBarVisualStyle::pulse) {
             const double highlight_width = std::max(8.0, fill.width * 0.18);
             const double x = fill.x +
-                std::max(0.0, fill.width - highlight_width) * animation_phase_;
+                std::max(0.0, fill.width - highlight_width) * presented_phase;
             painter.fill_rect({x, fill.y, std::min(highlight_width, fill.width),
                                fill.height}, style().accent_light);
         } else {
             painter.fill_rect({fill.x, fill.y, fill.width, 3.0},
                               style().accent_light);
         }
+    }
+    if (overlay_style_ == ProgressBarOverlayStyle::moving_stripes &&
+        fill.width > 0.0 && fill.height > 0.0) {
+        // A retained clip makes the overlay reusable for both orientations and
+        // for a marquee band without allowing a diagonal to escape the fill.
+        const double pitch = stripe_width_ * 2.0;
+        const double travel = animation_enabled_
+            ? presented_phase * pitch : 0.0;
+        painter.save();
+        painter.clip_rect(fill);
+        const double begin = fill.x - fill.height - pitch + travel;
+        const double end = fill.x + fill.width + fill.height + pitch;
+        for (double x = begin; x <= end; x += pitch) {
+            painter.draw_line({x, fill.y + fill.height},
+                              {x + fill.height, fill.y},
+                              style().accent_light, stripe_width_);
+        }
+        painter.restore();
     }
 }
 
@@ -607,7 +684,10 @@ SemanticDescriptor ProgressBar::semantic_descriptor() const {
     descriptor.numeric_value = value();
     descriptor.minimum_value = minimum();
     descriptor.maximum_value = maximum();
-    if (animation_enabled_ && animated_style()) descriptor.states |= SemanticState::busy;
+    if (animation_enabled_ && motion_policy_.active() &&
+        animated_style()) {
+        descriptor.states |= SemanticState::busy;
+    }
     descriptor.exposed = true;
     return descriptor;
 }

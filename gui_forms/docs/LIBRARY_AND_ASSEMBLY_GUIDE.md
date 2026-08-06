@@ -21,7 +21,7 @@ second UI engine.
 | `gui_forms_host_macos` | AppKit translation and native window host | private platform adapter |
 | `gui_forms_host_windows` | Win32 translation and CPU DIB window host | private bounded platform adapter |
 | `gui_forms_skia` | private CPU raster adapter | never crosses the control or ABI seam |
-| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, pointer, and top-level-host experiment | ABI 0.6; not the eventual 1.0 table |
+| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, input, edit, cursor, and top-level-host experiment | ABI 0.19; not the eventual 1.0 table |
 | `gui_drawing_core` | portable geometry/color, drawing resources, state stack, paths, logical image references, and typed recording | renderer-free C++20 proving API; not frozen |
 | `gui_drawing_c_api` | generational drawing handles and command submission | independent experimental ABI 0.1; one exported negotiation symbol |
 | Gallery model/application | visible dogfood and instrumentation | example, not library authority |
@@ -37,7 +37,7 @@ The eventual consumer stack has one ownership system and several projections:
 application or trusted compatibility extension
         |
         +-- C++ RAII wrapper -------------------+
-        +-- generated C# facade (M11 experiment) --+--> ABI 0.6 --> native retained engine
+        +-- generated C# facade (M11 experiment) --+--> ABI 0.19 --> native retained engine
         +-- compiled DML handles ---------------+
                                                      |
                                                      +--> GUI.Drawing ABI 0.1 command/image-reference core
@@ -181,8 +181,9 @@ added to the base interface merely because one plugin might want it.
 
 GUI.Forms currently proves deterministic attach/detach order, one-shot
 `UserControl::loaded`, successful attachment counts, initialization batching,
-event tokens, focus/capture cleanup, and disposal. Dispatcher/timer and complete
-managed-handle unload behavior remain future gates.
+event tokens, focus/capture cleanup, disposal, UI timers, and renderer-free
+posted dispatch with shutdown revocation. Complete managed-handle unload and
+synchronous cross-thread invoke remain future gates.
 
 ## 5. Ownership and thread rules
 
@@ -193,10 +194,12 @@ managed-handle unload behavior remain future gates.
   exists.
 - Event subscriptions are tokenized. Unload revokes tokens before user teardown
   can observe half-live controls.
-- Attached control mutation occurs on the owning UI thread. Experimental ABI
-  0.4 queues `BeginInvoke` work through the selected host; blocking managed
-  `Invoke` is implemented, while cross-thread stress and deadlock policy remain
-  an explicit pre-1.0 gate.
+- Attached control mutation occurs on the owning UI thread. Public C++
+  Window/Control `BeginInvoke` queues one FIFO snapshot per host turn; the
+  generated ABI retains a separate compatibility queue with the same nested
+  next-turn rule. The facade's blocking managed `Invoke` is not yet the native
+  C++ synchronous-invoke contract; cross-thread stress and deadlock policy
+  remain explicit pre-1.0 gates.
 - Exceptions never cross the stable C ABI. Managed callback exceptions are
   caught at the facade boundary and become structured diagnostics/fault state.
 - A plugin reference leak cannot keep native callbacks, timers, or window

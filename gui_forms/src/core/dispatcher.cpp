@@ -1,0 +1,423 @@
+#include "dispatcher_state.hpp"
+
+#include "gui_forms/window.hpp"
+
+#include <algorithm>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+namespace gui_forms {
+
+namespace {
+
+bool dispatch_terminal(DispatchOperationState state) noexcept {
+    return state == DispatchOperationState::completed ||
+           state == DispatchOperationState::cancelled ||
+           state == DispatchOperationState::faulted;
+}
+
+void record_inline_invoke(
+    const std::shared_ptr<detail::DispatcherState>& state) {
+    std::scoped_lock lock(state->mutex);
+    if (!state->accepting) {
+        throw std::logic_error("GUI.Forms dispatcher is shut down");
+    }
+    ++state->synchronous_invocations;
+    ++state->inline_invocations;
+}
+
+} // namespace
+
+std::uint64_t DispatchOperation::sequence() const noexcept {
+    return work_ ? work_->sequence : 0U;
+}
+
+DispatchOperationState DispatchOperation::state() const noexcept {
+    return work_ ? work_->state.load(std::memory_order_acquire)
+                 : DispatchOperationState::invalid;
+}
+
+bool DispatchOperation::pending() const noexcept {
+    return state() == DispatchOperationState::pending;
+}
+
+bool DispatchOperation::cancel() noexcept {
+    if (!work_) return false;
+    DispatchOperationState expected = DispatchOperationState::pending;
+    const bool cancelled = work_->state.compare_exchange_strong(
+        expected, DispatchOperationState::cancelled,
+        std::memory_order_acq_rel, std::memory_order_acquire);
+    if (cancelled) work_->completion.notify_all();
+    return cancelled;
+}
+
+std::exception_ptr DispatchOperation::exception() const noexcept {
+    if (!work_) return {};
+    std::scoped_lock lock(work_->fault_mutex);
+    return work_->fault;
+}
+
+void DispatchOperation::wait_and_rethrow() const {
+    if (!work_) {
+        throw std::logic_error(
+            "GUI.Forms cannot wait for an invalid dispatch operation");
+    }
+    {
+        std::unique_lock lock(work_->completion_mutex);
+        work_->completion.wait(lock, [this] {
+            return dispatch_terminal(
+                work_->state.load(std::memory_order_acquire));
+        });
+    }
+    const DispatchOperationState final_state = state();
+    if (final_state == DispatchOperationState::completed) return;
+    if (final_state == DispatchOperationState::faulted) {
+        const std::exception_ptr fault = exception();
+        if (fault) std::rethrow_exception(fault);
+        throw std::runtime_error(
+            "GUI.Forms synchronous Invoke faulted without an exception");
+    }
+    throw DispatchCancelledError();
+}
+
+namespace detail {
+
+DispatchOperation post_dispatch(const std::shared_ptr<DispatcherState>& state,
+                                Control::WeakPtr owner,
+                                bool requires_owner,
+                                std::function<void()> callback,
+                                bool synchronous) {
+    if (!callback) {
+        throw std::invalid_argument("GUI.Forms BeginInvoke requires a callback");
+    }
+    if (!state) {
+        throw std::logic_error(
+            "GUI.Forms BeginInvoke requires an attached live dispatcher");
+    }
+
+    std::function<void()> wake;
+    std::shared_ptr<DispatchWork> work;
+    {
+        std::scoped_lock lock(state->mutex);
+        if (!state->accepting) {
+            throw std::logic_error("GUI.Forms dispatcher is shut down");
+        }
+        if (synchronous && !state->wake) {
+            throw std::logic_error(
+                "GUI.Forms worker Invoke requires a running host dispatcher");
+        }
+        if (state->queue.size() >= maximum_posted_callbacks) {
+            throw std::length_error("GUI.Forms posted callback limit reached");
+        }
+        work = std::make_shared<DispatchWork>();
+        work->sequence = state->next_sequence++;
+        if (state->next_sequence == 0U) state->next_sequence = 1U;
+        work->callback = std::move(callback);
+        work->owner = std::move(owner);
+        work->requires_owner = requires_owner;
+        work->synchronous = synchronous;
+        work->dispatcher = state;
+        state->queue.push_back(work);
+        ++state->posted;
+        if (synchronous) {
+            ++state->synchronous_invocations;
+            ++state->marshalled_invocations;
+        }
+        state->maximum_pending = std::max(state->maximum_pending,
+                                          state->queue.size());
+        if (state->wake) {
+            if (!state->wake_pending) {
+                state->wake_pending = true;
+                ++state->wake_requests;
+                wake = state->wake;
+            } else {
+                ++state->coalesced_wakes;
+            }
+        }
+    }
+    if (wake) wake();
+    return DispatchOperation(std::move(work));
+}
+
+} // namespace detail
+
+DispatchOperation Window::begin_invoke(std::function<void()> callback) {
+    return detail::post_dispatch(dispatcher_state_, {}, false,
+                                 std::move(callback));
+}
+
+DispatchOperation Window::begin_invoke(const Control::Ptr& owner,
+                                       std::function<void()> callback) {
+    if (!owner) {
+        throw std::invalid_argument(
+            "GUI.Forms owned BeginInvoke requires a control");
+    }
+    return detail::post_dispatch(dispatcher_state_, owner, true,
+                                 std::move(callback));
+}
+
+void Window::invoke(std::function<void()> callback) {
+    if (!callback) {
+        throw std::invalid_argument("GUI.Forms Invoke requires a callback");
+    }
+    if (check_access()) {
+        record_inline_invoke(dispatcher_state_);
+        callback();
+        return;
+    }
+    DispatchOperation operation = detail::post_dispatch(
+        dispatcher_state_, {}, false, std::move(callback), true);
+    operation.wait_and_rethrow();
+}
+
+void Window::invoke(const Control::Ptr& owner,
+                    std::function<void()> callback) {
+    if (!owner) {
+        throw std::invalid_argument("GUI.Forms owned Invoke requires a control");
+    }
+    if (!callback) {
+        throw std::invalid_argument("GUI.Forms Invoke requires a callback");
+    }
+    if (check_access()) {
+        if (!owner->is_alive() || owner->window_ != this) {
+            throw std::logic_error(
+                "GUI.Forms owned Invoke requires an attached live control");
+        }
+        record_inline_invoke(dispatcher_state_);
+        callback();
+        return;
+    }
+    DispatchOperation operation = detail::post_dispatch(
+        dispatcher_state_, owner, true, std::move(callback), true);
+    operation.wait_and_rethrow();
+}
+
+DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
+    require_ui_thread("posted callback drain");
+    if (maximum_callbacks == 0U ||
+        maximum_callbacks > maximum_callbacks_per_dispatch_turn) {
+        throw std::invalid_argument(
+            "GUI.Forms dispatch turn callback bound is invalid");
+    }
+
+    std::vector<std::shared_ptr<detail::DispatchWork>> turn;
+    {
+        std::scoped_lock lock(dispatcher_state_->mutex);
+        dispatcher_state_->wake_pending = false;
+        const std::size_t count = std::min(
+            maximum_callbacks, dispatcher_state_->queue.size());
+        turn.reserve(count);
+        for (std::size_t index = 0U; index < count; ++index) {
+            turn.push_back(std::move(dispatcher_state_->queue.front()));
+            dispatcher_state_->queue.pop_front();
+        }
+    }
+
+    DispatchDrainResult result;
+    for (const auto& work : turn) {
+        DispatchOperationState expected = DispatchOperationState::pending;
+        if (!work->state.compare_exchange_strong(
+                expected, DispatchOperationState::running,
+                std::memory_order_acq_rel, std::memory_order_acquire)) {
+            if (expected == DispatchOperationState::cancelled) {
+                ++result.cancelled;
+                work->callback = {};
+            }
+            continue;
+        }
+
+        const Control::Ptr owner = work->owner.lock();
+        if (work->requires_owner &&
+            (!owner || !owner->is_alive() || owner->window_ != this)) {
+            work->callback = {};
+            work->state.store(DispatchOperationState::cancelled,
+                              std::memory_order_release);
+            work->completion.notify_all();
+            ++result.cancelled;
+            continue;
+        }
+
+        try {
+            std::function<void()> callback = std::move(work->callback);
+            callback();
+            work->state.store(DispatchOperationState::completed,
+                              std::memory_order_release);
+            work->completion.notify_all();
+            ++result.invoked;
+        } catch (...) {
+            {
+                std::scoped_lock lock(work->fault_mutex);
+                work->fault = std::current_exception();
+            }
+            work->callback = {};
+            work->state.store(DispatchOperationState::faulted,
+                              std::memory_order_release);
+            work->completion.notify_all();
+            ++result.faulted;
+        }
+        metrics_.record_callback_emitted();
+    }
+
+    std::function<void()> wake;
+    {
+        std::scoped_lock lock(dispatcher_state_->mutex);
+        dispatcher_state_->invoked += result.invoked;
+        dispatcher_state_->cancelled += result.cancelled;
+        dispatcher_state_->faulted += result.faulted;
+
+        // Explicitly cancelled work that was beyond this turn's snapshot does
+        // not consume future dispatch capacity.
+        for (auto current = dispatcher_state_->queue.begin();
+             current != dispatcher_state_->queue.end();) {
+            if ((*current)->state.load(std::memory_order_acquire) ==
+                DispatchOperationState::cancelled) {
+                (*current)->callback = {};
+                current = dispatcher_state_->queue.erase(current);
+                ++dispatcher_state_->cancelled;
+                ++result.cancelled;
+            } else {
+                ++current;
+            }
+        }
+
+        result.remaining = dispatcher_state_->queue.size();
+        if (dispatcher_state_->accepting && result.remaining != 0U &&
+            dispatcher_state_->wake && !dispatcher_state_->wake_pending) {
+            dispatcher_state_->wake_pending = true;
+            ++dispatcher_state_->wake_requests;
+            wake = dispatcher_state_->wake;
+        }
+        result.wake_requested = dispatcher_state_->wake_pending;
+    }
+    if (wake) wake();
+    return result;
+}
+
+DispatcherSnapshot Window::dispatcher_snapshot() const noexcept {
+    if (!dispatcher_state_) return {};
+    std::scoped_lock lock(dispatcher_state_->mutex);
+    return {
+        dispatcher_state_->posted,
+        dispatcher_state_->invoked,
+        dispatcher_state_->cancelled,
+        dispatcher_state_->faulted,
+        dispatcher_state_->wake_requests,
+        dispatcher_state_->coalesced_wakes,
+        dispatcher_state_->synchronous_invocations,
+        dispatcher_state_->inline_invocations,
+        dispatcher_state_->marshalled_invocations,
+        dispatcher_state_->queue.size(),
+        dispatcher_state_->maximum_pending,
+        dispatcher_state_->accepting,
+        dispatcher_state_->wake_pending,
+    };
+}
+
+void Window::set_dispatch_wake_handler(std::function<void()> wake_handler) {
+    require_ui_thread("dispatcher wake-handler mutation");
+    std::function<void()> wake;
+    {
+        std::scoped_lock lock(dispatcher_state_->mutex);
+        if (!wake_handler) {
+            const bool synchronous_waiter = std::any_of(
+                dispatcher_state_->queue.begin(),
+                dispatcher_state_->queue.end(),
+                [](const auto& work) {
+                    return work->synchronous &&
+                           work->state.load(std::memory_order_acquire) ==
+                               DispatchOperationState::pending;
+                });
+            if (synchronous_waiter) {
+                throw std::logic_error(
+                    "GUI.Forms cannot remove a host wake handler while a "
+                    "synchronous Invoke is pending");
+            }
+        }
+        dispatcher_state_->wake = std::move(wake_handler);
+        dispatcher_state_->wake_pending = false;
+        if (dispatcher_state_->accepting && !dispatcher_state_->queue.empty() &&
+            dispatcher_state_->wake) {
+            dispatcher_state_->wake_pending = true;
+            ++dispatcher_state_->wake_requests;
+            wake = dispatcher_state_->wake;
+        }
+    }
+    if (wake) wake();
+}
+
+void Window::shutdown_dispatcher() noexcept {
+    if (!dispatcher_state_) return;
+    std::deque<std::shared_ptr<detail::DispatchWork>> pending;
+    {
+        std::scoped_lock lock(dispatcher_state_->mutex);
+        if (!dispatcher_state_->accepting) return;
+        dispatcher_state_->accepting = false;
+        dispatcher_state_->wake_pending = false;
+        dispatcher_state_->wake = {};
+        pending.swap(dispatcher_state_->queue);
+    }
+    std::uint64_t cancelled = 0U;
+    for (const auto& work : pending) {
+        DispatchOperationState expected = DispatchOperationState::pending;
+        if (work->state.compare_exchange_strong(
+                expected, DispatchOperationState::cancelled,
+                std::memory_order_acq_rel, std::memory_order_acquire)) {
+            work->callback = {};
+            work->completion.notify_all();
+            ++cancelled;
+        }
+    }
+    if (cancelled != 0U) {
+        std::scoped_lock lock(dispatcher_state_->mutex);
+        dispatcher_state_->cancelled += cancelled;
+    }
+}
+
+bool Control::invoke_required() const noexcept {
+    std::shared_ptr<detail::DispatcherState> state;
+    {
+        std::scoped_lock lock(dispatcher_mutex_);
+        state = dispatcher_state_;
+    }
+    return state && std::this_thread::get_id() != state->ui_thread;
+}
+
+DispatchOperation Control::begin_invoke(std::function<void()> callback) {
+    std::shared_ptr<detail::DispatcherState> state;
+    {
+        std::scoped_lock lock(dispatcher_mutex_);
+        state = dispatcher_state_;
+    }
+    return detail::post_dispatch(state, weak_from_this(), true,
+                                 std::move(callback));
+}
+
+void Control::invoke(std::function<void()> callback) {
+    if (!callback) {
+        throw std::invalid_argument("GUI.Forms Invoke requires a callback");
+    }
+    std::shared_ptr<detail::DispatcherState> state;
+    {
+        std::scoped_lock lock(dispatcher_mutex_);
+        state = dispatcher_state_;
+    }
+    if (!state) {
+        throw std::logic_error(
+            "GUI.Forms Invoke requires an attached live dispatcher");
+    }
+    if (std::this_thread::get_id() == state->ui_thread) {
+        if (!is_alive()) {
+            throw std::logic_error(
+                "GUI.Forms Invoke requires an attached live control");
+        }
+        record_inline_invoke(state);
+        callback();
+        return;
+    }
+    DispatchOperation operation = detail::post_dispatch(
+        state, weak_from_this(), true, std::move(callback), true);
+    operation.wait_and_rethrow();
+}
+
+} // namespace gui_forms

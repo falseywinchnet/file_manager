@@ -15,12 +15,14 @@ The private adapter in `src/host/windows/` provides:
 - an ordinary resizable Win32 top-level window targeting `_WIN32_WINNT=0x0601`;
 - runtime-loaded DPI-awareness calls, with a Windows 7-compatible DPI fallback;
 - top-down 32-bit DIB presentation with software alpha blending;
-- GDI text using privately loaded Portsmouth Rapids faces for control chrome
-  and Lucida Grande/Consolas role fallbacks for field and monospace text;
+- Uniscribe itemization/shaping/placement with GDI glyph output, using privately
+  loaded Portsmouth Rapids, Carlito, Cousine, Noto Sans CJK JP, and monochrome
+  Noto Emoji faces; fallback selection is grapheme-safe and measurement uses
+  the same placed glyph advances as drawing;
 - WIC decoding of the core's already-validated PNG-only image resources;
 - pointer, wheel, keyboard, UTF-16/UTF-8 committed text, native pointer capture,
   cursor, resize, scale, activation, scheduled wake, and close translation;
-- the same protocol-v4 `HostSession` ordering and metrics used by headless and
+- the same protocol-v5 `HostSession` ordering and metrics used by headless and
   AppKit adapters; and
 - an opt-in bounded `WM_COPYDATA` automation channel keyed by stable control ID.
 
@@ -47,7 +49,8 @@ The output directory contains:
 
 - `GUI.Forms Gallery.exe` — statically linked C++ runtime, PE32+ x86-64;
 - `gui_forms_windows_probe.exe` — opt-in automation client; and
-- `fonts/PortsmouthRapids*.ttf` — privately loaded Gallery faces.
+- `fonts/` — exact-hash Portsmouth Rapids, Carlito, Cousine, Noto Sans CJK JP,
+  and monochrome Noto Emoji faces plus their notices.
 
 ## Wine smoke and instrumentation
 
@@ -74,6 +77,18 @@ the process is launched with `--automation`; commands are capped at 4096 bytes,
 accept only the versioned prefix `GUI.Forms.Automation/1`, and resolve controls
 through the retained stable-ID registry.
 
+The complete-showcase fallback gate additionally runs:
+
+```sh
+gui_forms/tools/run_windows_showcase_text_smoke.sh \
+  /Users/quentinkuttenkuler/file_manager/gui_forms/build-windows-x64-strict
+```
+
+It requires actual selection of both Noto fallback faces, a non-default
+astral-plane rocket glyph, successful glyph-index output, a captured framebuffer,
+and a clean native close. `GUI_FORMS_TRACE_WIN32_TEXT=1` emits requested/actual
+face and glyph identifiers but never field contents.
+
 ## Accessibility boundary
 
 **OBSERVED:** Wine publishes the top-level custom-rendered window, but this
@@ -83,9 +98,10 @@ stable-ID channel is the current test seam, and framebuffer capture supplies a
 visual oracle without coordinate guessing.
 
 **NOT YET IMPLEMENTED:** MSAA `IAccessible`, UI Automation providers,
-accessibility semantic snapshots, TSF/IME composition, native clipboard and
-OLE drag/drop, monitor enumeration, occlusion, dialogs, and menus. The host does
-not advertise the accessibility capability bit. A future accessibility round
+TSF/IME composition, OLE drag/drop, occlusion notifications, and native menu
+publication. Clipboard, monitor geometry, common dialogs, sound cues, and the
+bounded stable-ID automation channel are implemented. The host does not
+advertise the accessibility capability bit. A future accessibility round
 must publish one retained semantic tree to both MSAA/UIA and the deterministic
 snapshot interface; it must not create an unrelated automation-only control
 model.

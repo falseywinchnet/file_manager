@@ -1,6 +1,6 @@
 # Current GUI.Forms API reference
 
-Status: **OBSERVED C++/C ABI 0.x surface as of 2026-08-05**. This is a concise
+Status: **OBSERVED C++/C ABI 0.x surface as of 2026-08-06**. This is a concise
 consumer map, not a stability guarantee. The completeness matrix, header files,
 and executable tests remain authoritative if this summary disagrees with code.
 
@@ -56,8 +56,39 @@ archive is measured on macOS arm64; Windows x64 packaging remains open.
   subscription without creating a visual ownership edge.
 
 Core control events are synchronous on the UI thread that caused the mutation;
-the event template does not imply background delivery. Experimental ABI 0.6
-adds an explicit host queue for `BeginInvoke`-shaped work, described below.
+the event template does not imply background delivery.
+
+### UI dispatcher and `DispatchOperation`
+
+- `Window::begin_invoke(callback)` posts window-owned work from any thread;
+- `Control::begin_invoke(callback)` posts owner-scoped work and cancels it if
+  the control is detached or disposed before its turn;
+- `Control::invoke_required()` and `Window::invoke_required()` expose retained
+  UI-thread affinity without permitting cross-thread mutation;
+- `Window::invoke(callback)` and `Control::invoke(callback)` execute inline on
+  the UI thread. From a worker they enqueue one synchronous operation, wake the
+  running host, and block that worker until completion without a nested pump;
+- worker `invoke` rethrows the callback's original exception. Owner detach or
+  dispatcher shutdown wakes the worker with `DispatchCancelledError`; an
+  unhosted worker call is rejected instead of waiting indefinitely;
+- a dispatch turn consumes one FIFO snapshot. Work posted by a callback remains
+  deferred until the next host turn rather than becoming reentrant;
+- dropping the returned `DispatchOperation` does not cancel fire-and-forget
+  work. `cancel()` is explicit, thread-safe, and effective only while pending;
+- callback faults are isolated, retained on the operation as
+  `std::exception_ptr`, and do not suppress later work;
+- the queue is bounded at 4096 pending callbacks and one turn at 1024 callbacks;
+  wake requests coalesce while a wake is already pending; and
+- Window/host shutdown synchronously rejects new work and cancels every pending
+  operation. AppKit, Win32/Wine, and the explicit headless pump all drain the
+  same renderer-free dispatcher.
+
+Synchronization-context projection, a `BackgroundWorker` component, and nested
+`DoEvents` are not implemented by this slice. UI-thread code that synchronously
+waits on a worker which is itself waiting in `invoke` remains an application
+deadlock; GUI.Forms deliberately does not conceal it with reentrant pumping.
+The generated C ABI retains its separate compatibility queue, but now uses the
+same one-snapshot/next-turn rule for nested `BeginInvoke` callbacks.
 
 ### `Timer`
 
@@ -69,7 +100,7 @@ adds an explicit host queue for `BeginInvoke`-shaped work, described below.
 - rendering occlusion does not suspend component time, while disabled timers
   publish no wake; and
 - stop, component disposal, and Window shutdown synchronously revoke future
-  callbacks. This is not a background worker or general posted dispatcher.
+  callbacks. This is not a background worker.
 
 ## Unicode text and shaping foundation
 
@@ -120,6 +151,8 @@ Every control has a nonempty immutable `StableId` and a process-local
 - requested, arranged, committed-arranged, and absolute bounds;
 - retained `visible`, `enabled`, `focusable`, `allow_drop`, and inherited
   cursor state;
+- application-owned `Tag` storage with exact `std::any` type retention and
+  synchronous release during disposal;
 - effective visibility/enabled/input eligibility queries;
 - `PaintPlane` selection and display-chunk information.
 
@@ -193,6 +226,40 @@ Paints none/line/sunken/raised retained panel surfaces.
 Adds caption text and font over `Panel`. Radio grouping uses logical retained
 containers; full caption-aware child layout remains later work.
 
+### `ScaledPanel` and `ScaledGroupBox`
+
+These public retained containers place children in a caller-declared logical
+design coordinate space and scale each child slot into the current arranged
+bounds. `add_at`, `set_design_bounds`, and `design_bounds` own the reusable
+mapping; nested composition, runtime slot mutation, detachment cleanup, and
+finite/nonnegative validation are tested. They are deterministic proportional
+layout controls, not a substitute for Dock/Anchor, DPI policy, or the flow/table
+families.
+
+### Retained layout inputs
+
+Every `Control` exposes finite, nonnegative `Margin` and `Padding` in logical
+pixels. A parent layout container assigns a private retained layout slot; this
+does not overwrite the child's authored requested bounds, so preferred-size
+measurement remains stable across repeated layout and resize.
+
+### `FlowLayoutPanel`
+
+Orders visible children left-to-right, right-to-left, top-down, or bottom-up.
+It honors physical child margins and container padding, optional wrapping,
+per-child `FlowBreak`, and `AutoSize`. Hidden children leave no gap. Flow is a
+deterministic retained layout family, not a CSS flexbox implementation.
+
+### `TableLayoutPanel`
+
+Owns bounded row and column tracks with absolute, auto-size, and weighted
+percent sizing. It supports explicit or deterministic row-major automatic cell
+placement, row/column spans, fixed/AddRows/AddColumns growth policy, cell and
+position lookup, physical margins/padding, optional cell borders, resolved
+track inspection, overflow reporting, and `AutoSize`. Hidden children release
+their occupied cells. Alignment/stretch policy, Dock/Anchor integration, and
+DML/C ABI projection remain open.
+
 ### `Label`
 
 Text, font, foreground, horizontal alignment, synchronous `text_changed`,
@@ -221,6 +288,53 @@ Boolean checked state, logical `group_name`, automatic same-container exclusion,
 Single retained link, visited state, link styling, and button-like activation.
 External navigation is application policy and is not performed by the control.
 
+## Motion and animation
+
+`AnimationTimeline` samples a validated delay/duration/iteration/direction/
+easing specification against caller-supplied monotonic frame times. `pause()`
+retains the exact sampled phase and `resume()` rebases suspended time, so no
+hidden catch-up or restart is introduced.
+
+`MotionPolicy` keeps three application facts independent: `enabled`, `paused`,
+and `reduced`. `active()` is true whenever the source is enabled and unpaused;
+reduced motion remains active with a minimum 100 ms cadence, a `0.35` speed
+scale where the control owns phase accumulation, and half-width centered visual
+excursion. Controls accept the complete policy atomically so compound changes
+cannot briefly publish duplicate frame leases or become order-dependent. Only
+pause and disable are quiescent.
+
+### `EasingPreview`
+
+`EasingPreview` is a public owner-scheduled animation control rather than
+showcase-private paint code. It owns an `AnimationTimeline`, one bounded frame
+lease, a complete atomic `MotionPolicy`, configurable one-to-32 labeled easing
+tracks, retained drawing, and image/busy/numeric semantics. Hidden-page
+suspension and pause/reduced/full transitions use the same scheduler contract as
+other active surfaces.
+
+## Diagnostic and owner-drawn controls
+
+### `DrawingSurface`
+
+`DrawingSurface` exposes a renderer-neutral owner-paint callback over the public
+`Painter` vocabulary. The callback receives local bounds and damage, and can be
+made hit-test visible explicitly. It publishes image semantics when named. It
+does not expose a renderer or platform graphics context.
+
+### `MetricsView`
+
+`MetricsView` renders a titled, styled snapshot of the owning `Window` metrics
+and exposes the same structured text through group semantics. The application
+does not need to subclass `Control` to show runtime diagnostics.
+
+### Complete Showcase consumer boundary
+
+The independent Complete Showcase is required to be ordinary application
+composition over public GUI.Forms types. It contains no local control subclass.
+A configured CMake policy test rejects `class` or `struct` inheritance in the
+showcase implementation so layout, painting, animation, diagnostics, input, or
+semantic behavior cannot be hidden as demo-only evidence.
+
 ## Range controls
 
 ### `RangeControl`
@@ -243,7 +357,10 @@ This is a GUI.Forms range control, not yet the complete stock WinForms facade.
 Horizontal/vertical blocks and continuous determinate display plus bounded
 marquee and pulse animation through active-surface deadlines. It is
 nonfocusable, does not intercept hit testing, becomes scheduler-quiescent when
-paused or effectively hidden, and publishes numeric or busy semantics.
+paused, disabled by application policy, or effectively hidden, and publishes
+numeric or busy semantics. Reduced motion remains busy and visibly animated at
+the calmer public policy cadence/speed/excursion without resetting phase. The
+older pause and reduced setters delegate to the same atomic policy transaction.
 
 ## Nonvisual providers
 
@@ -294,8 +411,9 @@ reported as `unsupported`, not simulated silently.
 
 The bounded Windows adapter implements native window lifecycle, translated
 pointer/keyboard input, CPU DIB presentation, stable-ID automation, capture,
-and close under both Wine and the cross-compiled PE64 lane. Remaining Windows
-services and the Wayland/X11 adapters are not implemented yet.
+clipboard, monitor geometry, sound cues, five common-dialog families, and close
+under both Wine and the cross-compiled PE64 lane. Physical-Windows dogfood and
+the Wayland/X11 adapters are not implemented yet.
 
 ## Experimental C ABI 0.x
 
@@ -305,7 +423,7 @@ Include:
 #include <gui_forms/c_api.h>
 ```
 
-`gf_get_api_v0` negotiates a size-prefixed `gf_api_v0` table. ABI 0.6 preserves
+`gf_get_api_v0` negotiates a size-prefixed `gf_api_v0` table. ABI 0.19 preserves
 the 0.1 prefix: generational handles, errors, generic creation, lifetime,
 component state, stable ID, visibility, bounds, child add/remove, and generic
 state-change subscription. Its appended operations add kinded creation,
@@ -314,9 +432,11 @@ and a length-delimited final host trace. ABI 0.4 additionally provides typed
 tokenized click/form-lifecycle subscriptions, queued host dispatch, requested
 close, and callback-fault counts. `run_window` accepts explicit automation-
 close, force-headless, and automation-activate flags; ordinary callers use the
-default. ABI 0.5 adds bounded PNG-backed retained raster leaves; ABI 0.6 adds
-pointer subscriptions used by owner-drawn controls. These raster operations do
-not yet constitute GUI.Drawing.
+default. Additive 0.5–0.19 operations cover retained raster leaves, pointer,
+choice/range state, keys/composed text, capture, host dialogs/tooltips,
+selection/caret/edit/history, clipboard, unencoded paint surfaces,
+renderer-authoritative bounds, form key preview, and cursor roles. These raster
+operations do not constitute GUI.Drawing.
 
 Typed callbacks return continue, cancel, or faulted. `FormClosing` cancellation
 prevents native close; faults are counted and do not cross the ABI. Dispatch
@@ -346,7 +466,7 @@ other hosts return explicit unsupported results. The table exposes distinct
 stale-handle, wrong-kind, wrong-thread, disposed, buffer, version, and limit
 results; no exception crosses the boundary. The shared library exports no
 other symbol. This ABI is experimental and deliberately not merged with the
-GUI.Forms ABI 0.6 table.
+GUI.Forms ABI 0.19 table.
 
 ## Compatibility laboratory
 
@@ -358,7 +478,7 @@ deferred. Component-model rows retain separate runtime ownership.
 
 A generated replacement surface now resolves 1,104/1,104 required identities:
 797 Forms rows and 307 Drawing rows. The generated `Control`
-hot path uses ABI 0.6 for construction, name/text, enabled/visible, bounds, parenting,
+hot path uses the ABI 0.x prefix for construction, name/text, enabled/visible, bounds, parenting,
 deterministic subtree disposal, callbacks, UI dispatch, and top-level host
 projection. Generated `Application.Run(Form)` and `Run(ApplicationContext)`
 enter the deterministic headless host or the compiled platform host. A

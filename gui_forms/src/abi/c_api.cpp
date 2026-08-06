@@ -784,6 +784,7 @@ struct ControlRecord final {
     std::deque<DispatchRecord> dispatch_queue;
     std::uint32_t dispatch_depth{};
     std::uint32_t managed_callback_depth{};
+    bool dispatch_wake_pending{};
     std::function<void()> host_wake;
     std::function<void()> host_close;
     std::function<gui_forms::HostDialogResult(
@@ -796,6 +797,7 @@ struct ControlRecord final {
     std::string last_dialog_path;
     std::uint64_t callback_faults{};
     std::uint64_t dispatches{};
+    std::uint64_t dispatch_turns{};
     bool close_requested{};
     bool host_running{};
     std::uint64_t external_references{1};
@@ -1025,8 +1027,9 @@ public:
         }
         const auto value = record->control->cursor();
         *cursor_kind = value.has_value()
-            ? static_cast<std::uint32_t>(*value) + GF_CURSOR_ARROW
-            : GF_CURSOR_INHERIT;
+            ? static_cast<std::uint32_t>(*value) +
+                  static_cast<std::uint32_t>(GF_CURSOR_ARROW)
+            : static_cast<std::uint32_t>(GF_CURSOR_INHERIT);
         return GF_OK;
     }
 
@@ -1770,6 +1773,7 @@ public:
             record->close_requested = false;
             record->callback_faults = 0;
             record->dispatches = 0;
+            record->dispatch_turns = 0;
         }
         auto reset = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
             record.get(), [this, record](ControlRecord*) { finish_host(record); });
@@ -1910,7 +1914,18 @@ public:
                     timestamp++));
             }
         }
-        pump_pending(record);
+        bool dispatch_quiescent = false;
+        for (std::size_t turn = 0U;
+             turn < gui_forms::maximum_posted_callbacks; ++turn) {
+            pump_pending(record);
+            std::scoped_lock lock(mutex_);
+            dispatch_quiescent = record->dispatch_queue.empty();
+            if (dispatch_quiescent) break;
+        }
+        if (!dispatch_quiescent) {
+            return fail(GF_ERROR_INTERNAL,
+                        "headless BeginInvoke queue did not reach quiescence");
+        }
         gui_forms::HostCloseRequest close{
             gui_forms::HostCloseReason::application, false};
         close.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
@@ -2486,8 +2501,18 @@ public:
                 return fail(GF_ERROR_WRONG_HANDLE_KIND,
                             "begin_invoke requires a control rooted in a top-level form");
             }
+            if (root->dispatch_queue.size() >=
+                gui_forms::maximum_posted_callbacks) {
+                return fail(GF_ERROR_INVALID_ARGUMENT,
+                            "begin_invoke reached the posted callback bound");
+            }
             root->dispatch_queue.push_back({callback, context});
-            wake = root->host_wake;
+            if (root->dispatch_depth == 0U &&
+                root->managed_callback_depth == 0U &&
+                !root->dispatch_wake_pending && root->host_wake) {
+                root->dispatch_wake_pending = true;
+                wake = root->host_wake;
+            }
         }
         if (wake) wake();
         return GF_OK;
@@ -2580,7 +2605,9 @@ private:
                         --root->managed_callback_depth;
                     }
                     if (root->managed_callback_depth == 0U &&
-                        !root->dispatch_queue.empty()) {
+                        !root->dispatch_queue.empty() &&
+                        !root->dispatch_wake_pending && root->host_wake) {
+                        root->dispatch_wake_pending = true;
                         wake = root->host_wake;
                     }
                 }
@@ -2605,6 +2632,7 @@ private:
     void pump_pending(const std::shared_ptr<ControlRecord>& root) {
         {
             std::scoped_lock lock(mutex_);
+            root->dispatch_wake_pending = false;
             if (root->dispatch_depth != 0U || root->managed_callback_depth != 0U) {
                 return;
             }
@@ -2612,24 +2640,33 @@ private:
         }
         auto dispatch_guard = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
             root.get(), [this, root](ControlRecord*) {
-                std::scoped_lock lock(mutex_);
-                if (root->dispatch_depth > 0U) --root->dispatch_depth;
-            });
-        for (;;) {
-            std::deque<DispatchRecord> pending;
-            {
-                std::scoped_lock lock(mutex_);
-                pending.swap(root->dispatch_queue);
-            }
-            if (pending.empty()) return;
-            for (const DispatchRecord& dispatch : pending) {
-                const std::uint32_t result = dispatch.callback(dispatch.context, 0U);
-                std::scoped_lock lock(mutex_);
-                ++root->dispatches;
-                if (result == GF_EVENT_CALLBACK_FAULTED ||
-                    result > GF_EVENT_CALLBACK_FAULTED) {
-                    ++root->callback_faults;
+                std::function<void()> wake;
+                {
+                    std::scoped_lock lock(mutex_);
+                    if (root->dispatch_depth > 0U) --root->dispatch_depth;
+                    if (root->dispatch_depth == 0U &&
+                        root->managed_callback_depth == 0U &&
+                        !root->dispatch_queue.empty() &&
+                        !root->dispatch_wake_pending && root->host_wake) {
+                        root->dispatch_wake_pending = true;
+                        wake = root->host_wake;
+                    }
                 }
+                if (wake) wake();
+            });
+        std::deque<DispatchRecord> pending;
+        {
+            std::scoped_lock lock(mutex_);
+            pending.swap(root->dispatch_queue);
+            if (!pending.empty()) ++root->dispatch_turns;
+        }
+        for (const DispatchRecord& dispatch : pending) {
+            const std::uint32_t result = dispatch.callback(dispatch.context, 0U);
+            std::scoped_lock lock(mutex_);
+            ++root->dispatches;
+            if (result == GF_EVENT_CALLBACK_FAULTED ||
+                result > GF_EVENT_CALLBACK_FAULTED) {
+                ++root->callback_faults;
             }
         }
     }
@@ -2638,6 +2675,7 @@ private:
         std::deque<DispatchRecord> pending;
         {
             std::scoped_lock lock(mutex_);
+            root->dispatch_wake_pending = false;
             pending.swap(root->dispatch_queue);
         }
         for (const DispatchRecord& dispatch : pending) {
@@ -2673,7 +2711,9 @@ private:
             root->host_tooltip_hide = std::move(tooltip_hide);
             root->host_clipboard_read = std::move(clipboard_read);
             root->host_clipboard_write = std::move(clipboard_write);
-            should_wake = !root->dispatch_queue.empty();
+            should_wake = !root->dispatch_queue.empty() &&
+                !root->dispatch_wake_pending;
+            if (should_wake) root->dispatch_wake_pending = true;
             should_close = root->close_requested;
             published_wake = root->host_wake;
             published_close = root->host_close;
@@ -2692,6 +2732,7 @@ private:
         root->host_tooltip_hide = {};
         root->host_clipboard_read = {};
         root->host_clipboard_write = {};
+        root->dispatch_wake_pending = false;
         root->host_running = false;
     }
 
@@ -2749,6 +2790,7 @@ private:
         std::scoped_lock lock(mutex_);
         return "{\"callback_faults\":" + std::to_string(root->callback_faults) +
                ",\"dispatches\":" + std::to_string(root->dispatches) +
+               ",\"dispatch_turns\":" + std::to_string(root->dispatch_turns) +
                ",\"close_requested\":" +
                std::string(root->close_requested ? "true" : "false") + "}";
     }

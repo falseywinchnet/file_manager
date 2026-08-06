@@ -24,6 +24,8 @@ public:
     [[nodiscard]] Control::Ptr active_control() const noexcept;
     bool request_active_control(const Control::Ptr& control);
     bool clear_active_control();
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+
 };
 
 // A retained composition root with a one-shot lifetime load notification and
@@ -49,6 +51,203 @@ private:
     std::uint64_t attachment_count_{};
     bool loaded_{};
     bool attached_{};
+};
+
+// Absolute authored layout expressed in a fixed design coordinate space and
+// scaled into the arranged bounds. Child ownership remains ordinary retained
+// Control ownership; authored slots survive host resize without subclasses.
+class ScaledPanel : public Panel {
+public:
+    explicit ScaledPanel(StableId stable_id, Size design_size = {1.0, 1.0});
+
+    [[nodiscard]] Size design_size() const noexcept { return design_size_; }
+    void set_design_size(Size size);
+    void add_at(Control::Ptr child, Rect design_bounds);
+    void set_design_bounds(const Control& child, Rect design_bounds);
+    [[nodiscard]] std::optional<Rect> design_bounds(const Control& child) const;
+    void arrange(Rect final_bounds) override;
+
+private:
+    void reconcile_slots();
+    Size design_size_;
+    std::unordered_map<std::uint64_t, Rect> slots_;
+};
+
+class ScaledGroupBox final : public GroupBox {
+public:
+    explicit ScaledGroupBox(StableId stable_id, std::string text = {},
+                            Size design_size = {1.0, 1.0});
+
+    [[nodiscard]] Size design_size() const noexcept { return design_size_; }
+    void set_design_size(Size size);
+    void add_at(Control::Ptr child, Rect design_bounds);
+    void set_design_bounds(const Control& child, Rect design_bounds);
+    [[nodiscard]] std::optional<Rect> design_bounds(const Control& child) const;
+    void arrange(Rect final_bounds) override;
+
+private:
+    void reconcile_slots();
+    Size design_size_;
+    std::unordered_map<std::uint64_t, Rect> slots_;
+};
+
+enum class FlowDirection : std::uint8_t {
+    left_to_right,
+    right_to_left,
+    top_down,
+    bottom_up,
+};
+
+// Retained WinForms-style flow layout. Child order is visual-tree order;
+// margins are physical, FlowDirection controls the main axis, and FlowBreak
+// terminates the current row/column without changing child ownership.
+class FlowLayoutPanel final : public ContainerControl {
+public:
+    explicit FlowLayoutPanel(StableId stable_id);
+
+    [[nodiscard]] FlowDirection flow_direction() const noexcept {
+        return flow_direction_;
+    }
+    void set_flow_direction(FlowDirection direction);
+    [[nodiscard]] bool wrap_contents() const noexcept { return wrap_contents_; }
+    void set_wrap_contents(bool wrap);
+    [[nodiscard]] bool auto_size() const noexcept { return auto_size_; }
+    void set_auto_size(bool auto_size);
+    void set_flow_break(const Control& child, bool flow_break);
+    [[nodiscard]] bool flow_break(const Control& child) const;
+
+    [[nodiscard]] Size measure(Size available) override;
+    void arrange(Rect final_bounds) override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+
+private:
+    [[nodiscard]] Size layout_children(Size available, bool assign);
+    void reconcile_flow_breaks();
+
+    std::unordered_map<std::uint64_t, bool> flow_breaks_;
+    FlowDirection flow_direction_{FlowDirection::left_to_right};
+    bool wrap_contents_{true};
+    bool auto_size_{};
+};
+
+enum class TableSizeMode : std::uint8_t {
+    absolute,
+    percent,
+    auto_size,
+};
+
+struct TableLayoutStyle final {
+    TableSizeMode size_mode{TableSizeMode::auto_size};
+    double size{};
+    friend constexpr bool operator==(const TableLayoutStyle&,
+                                     const TableLayoutStyle&) = default;
+};
+
+struct TableLayoutCellPosition final {
+    std::size_t column{};
+    std::size_t row{};
+    friend constexpr bool operator==(const TableLayoutCellPosition&,
+                                     const TableLayoutCellPosition&) = default;
+};
+
+enum class TableLayoutGrowStyle : std::uint8_t {
+    fixed_size,
+    add_rows,
+    add_columns,
+};
+
+enum class TableCellBorderStyle : std::uint8_t {
+    none,
+    single,
+    inset,
+    outset,
+};
+
+// Deterministic retained table layout with absolute, percent, and auto tracks.
+// Explicit cells and spans coexist with row-major automatic placement. Track
+// growth is bounded and overflow is reported instead of silently overlapping.
+class TableLayoutPanel final : public ContainerControl {
+public:
+    explicit TableLayoutPanel(StableId stable_id);
+
+    [[nodiscard]] std::size_t column_count() const noexcept {
+        return column_count_;
+    }
+    void set_column_count(std::size_t count);
+    [[nodiscard]] std::size_t row_count() const noexcept { return row_count_; }
+    void set_row_count(std::size_t count);
+    [[nodiscard]] TableLayoutGrowStyle grow_style() const noexcept {
+        return grow_style_;
+    }
+    void set_grow_style(TableLayoutGrowStyle style);
+    [[nodiscard]] bool auto_size() const noexcept { return auto_size_; }
+    void set_auto_size(bool auto_size);
+    [[nodiscard]] TableCellBorderStyle cell_border_style() const noexcept {
+        return cell_border_style_;
+    }
+    void set_cell_border_style(TableCellBorderStyle style);
+
+    [[nodiscard]] std::span<const TableLayoutStyle> column_styles() const noexcept {
+        return column_styles_;
+    }
+    [[nodiscard]] std::span<const TableLayoutStyle> row_styles() const noexcept {
+        return row_styles_;
+    }
+    void set_column_style(std::size_t column, TableLayoutStyle style);
+    void set_row_style(std::size_t row, TableLayoutStyle style);
+
+    void set_cell_position(const Control& child,
+                           TableLayoutCellPosition position);
+    void clear_cell_position(const Control& child);
+    [[nodiscard]] std::optional<TableLayoutCellPosition> cell_position(
+        const Control& child) const;
+    void set_column_span(const Control& child, std::size_t span);
+    [[nodiscard]] std::size_t column_span(const Control& child) const;
+    void set_row_span(const Control& child, std::size_t span);
+    [[nodiscard]] std::size_t row_span(const Control& child) const;
+    [[nodiscard]] Control::Ptr control_from_position(std::size_t column,
+                                                     std::size_t row) const;
+
+    [[nodiscard]] std::span<const double> column_widths() const noexcept {
+        return column_widths_;
+    }
+    [[nodiscard]] std::span<const double> row_heights() const noexcept {
+        return row_heights_;
+    }
+    [[nodiscard]] bool layout_overflowed() const noexcept {
+        return layout_overflowed_;
+    }
+
+    [[nodiscard]] Size measure(Size available) override;
+    void arrange(Rect final_bounds) override;
+    void on_paint(Painter& painter, Rect local_damage) override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+
+private:
+    struct CellMetadata final {
+        std::optional<TableLayoutCellPosition> position;
+        std::size_t column_span{1U};
+        std::size_t row_span{1U};
+    };
+
+    [[nodiscard]] CellMetadata& metadata_for(const Control& child);
+    [[nodiscard]] const CellMetadata* metadata_for(const Control& child) const;
+    void reconcile_metadata();
+    [[nodiscard]] Size layout_children(Size available, bool assign);
+    static void validate_style(TableLayoutStyle style);
+
+    std::unordered_map<std::uint64_t, CellMetadata> metadata_;
+    std::unordered_map<std::uint64_t, TableLayoutCellPosition> resolved_cells_;
+    std::vector<TableLayoutStyle> column_styles_{TableLayoutStyle{}};
+    std::vector<TableLayoutStyle> row_styles_{TableLayoutStyle{}};
+    std::vector<double> column_widths_;
+    std::vector<double> row_heights_;
+    std::size_t column_count_{1U};
+    std::size_t row_count_{1U};
+    TableLayoutGrowStyle grow_style_{TableLayoutGrowStyle::add_rows};
+    TableCellBorderStyle cell_border_style_{TableCellBorderStyle::none};
+    bool auto_size_{};
+    bool layout_overflowed_{};
 };
 
 enum class TabAlignment : std::uint8_t {
@@ -140,7 +339,7 @@ private:
     std::unordered_map<std::uint64_t, Control::WeakPtr> remembered_focus_;
     BasicControlStyle style_;
     Size item_size_{120.0, 30.0};
-    FontSpec font_{FontRole::control, 11.0, 600, false};
+    FontSpec font_{FontRole::control, 11.0, 600, false, 0.24};
     TabAlignment alignment_{TabAlignment::top};
     TabAppearance appearance_{TabAppearance::normal};
     bool pointer_engaged_{};
@@ -173,6 +372,16 @@ struct SplitChangeEvent final {
 class SplitterPanel final : public ContainerControl {
 public:
     explicit SplitterPanel(StableId stable_id);
+
+    // A SplitterPanel is the allocated pane surface, not merely an invisible
+    // child owner. Painting the background from its committed bounds keeps the
+    // visual allocation truthful while the splitter is moving.
+    [[nodiscard]] Color background() const noexcept { return background_; }
+    void set_background(Color color);
+    void on_paint(Painter& painter, Rect local_damage) override;
+
+private:
+    Color background_{Color::rgba(0, 0, 0, 0)};
 };
 
 // A retained two-pane composition with one physical splitter. The painted seam

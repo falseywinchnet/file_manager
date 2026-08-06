@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -88,8 +89,19 @@ struct FontSpec {
     double size{13.0};
     std::uint16_t weight{400};
     bool italic{};
+    // Additional logical pixels inserted between shaped grapheme clusters.
+    // This is a layout input: painters and measurement must apply the same
+    // value. Zero preserves the typeface's native spacing.
+    double letter_spacing{};
     friend constexpr bool operator==(const FontSpec&, const FontSpec&) = default;
 };
+
+[[nodiscard]] inline bool valid_font_spec(FontSpec font) noexcept {
+    return std::isfinite(font.size) && font.size > 0.0 &&
+           std::isfinite(font.letter_spacing) &&
+           font.letter_spacing >= -font.size * 0.25 &&
+           font.letter_spacing <= font.size;
+}
 
 struct ImageId {
     std::uint64_t value{};
@@ -120,7 +132,9 @@ public:
         for (const unsigned char byte : text) {
             if ((byte & 0xc0U) != 0x80U) ++scalars;
         }
-        return {static_cast<double>(scalars) * font.size * 0.55,
+        const double tracking = scalars > 1U
+            ? static_cast<double>(scalars - 1U) * font.letter_spacing : 0.0;
+        return {static_cast<double>(scalars) * font.size * 0.55 + tracking,
                 font.size * 1.2};
     }
     virtual void draw_image(ImageId image,

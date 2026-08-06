@@ -157,6 +157,47 @@ void test_full_subtree_invalidation_is_explicit() {
             "full-subtree traversal count must equal the six retained controls");
 }
 
+void test_damage_take_commits_layout_generated_geometry_damage() {
+    auto root = make_control<CountingControl>(StableId("damage.layout.root"));
+    root->set_padding({10.0, 10.0, 10.0, 10.0});
+    auto fill = make_control<CountingControl>(StableId("damage.layout.fill"));
+    fill->set_requested_bounds({0.0, 0.0, 20.0, 20.0});
+    fill->set_dock(DockStyle::fill);
+    auto top = make_control<CountingControl>(StableId("damage.layout.top"));
+    top->set_requested_bounds({0.0, 0.0, 20.0, 24.0});
+    top->set_dock(DockStyle::top);
+    auto left = make_control<CountingControl>(StableId("damage.layout.left"));
+    left->set_requested_bounds({0.0, 0.0, 50.0, 20.0});
+    left->set_dock(DockStyle::left);
+    root->add_child(fill);
+    root->add_child(top);
+    root->add_child(left);
+    Window window(root, {300.0, 180.0});
+    window.perform_layout();
+    NullPainter painter;
+    DamageRegion initial = window.take_damage();
+    window.paint(painter, initial.bounds());
+    const Rect old_top = top->arranged_bounds();
+    const Rect old_fill = fill->arranged_bounds();
+
+    left->set_visible(false);
+    DamageRegion geometry_damage = window.take_damage();
+    const Rect new_top = top->arranged_bounds();
+    const Rect new_fill = fill->arranged_bounds();
+    require(new_top.x < old_top.x && new_top.width > old_top.width &&
+                new_fill.x < old_fill.x && new_fill.width > old_fill.width,
+            "taking host damage must commit sibling geometry released by hidden Dock");
+    const Rect bounds = geometry_damage.bounds();
+    require(bounds.x <= new_top.x &&
+                bounds.x + bounds.width >= old_top.x + old_top.width &&
+                bounds.y <= new_fill.y &&
+                bounds.y + bounds.height >= old_fill.y + old_fill.height,
+            "host damage must cover both old and newly arranged docked sibling pixels");
+    window.paint(painter, geometry_damage.bounds());
+    require(!window.needs_frame(),
+            "one host paint transaction must consume layout-generated damage completely");
+}
+
 void test_reentrant_layout_is_bounded() {
     auto root = make_control<ReentrantLayoutControl>(StableId("typed.reentrant"));
     root->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
@@ -273,6 +314,7 @@ int main() {
         test_typed_effect_vocabulary();
         test_affected_path_layout();
         test_full_subtree_invalidation_is_explicit();
+        test_damage_take_commits_layout_generated_geometry_damage();
         test_reentrant_layout_is_bounded();
         test_paint_metrics_report_chunk_work();
         test_declared_mutation_guard();

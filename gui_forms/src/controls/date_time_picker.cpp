@@ -54,6 +54,21 @@ DateTimeValue civil_from_days(std::int64_t serial, DateTimeValue time) noexcept 
             static_cast<std::uint8_t>(requested)) != 0U;
 }
 
+[[nodiscard]] constexpr DateTimeValue civil_part(DateTimeValue value) noexcept {
+    value.hour = 0U;
+    value.minute = 0U;
+    value.second = 0U;
+    value.millisecond = 0U;
+    return value;
+}
+
+[[nodiscard]] constexpr bool civil_in_range(DateTimeValue value,
+                                             DateTimeValue minimum,
+                                             DateTimeValue maximum) noexcept {
+    const DateTimeValue date = civil_part(value);
+    return date >= civil_part(minimum) && date <= civil_part(maximum);
+}
+
 [[nodiscard]] std::string padded(unsigned value, unsigned digits) {
     char buffer[32]{};
     std::snprintf(buffer, sizeof(buffer), digits == 2U ? "%02u" : "%04u", value);
@@ -226,16 +241,18 @@ public:
         painter.draw_text_utf8({74.0, 25.0}, title,
                                {FontRole::control, 12.0, 700, false},
                                Color::rgba(255, 255, 255));
-        painter.draw_line({18.0, 20.0}, {23.0, 15.0},
-                          Color::rgba(235, 242, 247), 1.5);
-        painter.draw_line({18.0, 20.0}, {23.0, 25.0},
-                          Color::rgba(235, 242, 247), 1.5);
+        const Color previous_color = can_change_month(-1)
+            ? Color::rgba(235, 242, 247) : Color::rgba(111, 137, 157);
+        const Color next_color = can_change_month(1)
+            ? Color::rgba(235, 242, 247) : Color::rgba(111, 137, 157);
+        painter.draw_line({18.0, 20.0}, {23.0, 15.0}, previous_color, 1.5);
+        painter.draw_line({18.0, 20.0}, {23.0, 25.0}, previous_color, 1.5);
         painter.draw_line({body.width - 19.0, 20.0},
                           {body.width - 24.0, 15.0},
-                          Color::rgba(235, 242, 247), 1.5);
+                          next_color, 1.5);
         painter.draw_line({body.width - 19.0, 20.0},
                           {body.width - 24.0, 25.0},
-                          Color::rgba(235, 242, 247), 1.5);
+                          next_color, 1.5);
 
         constexpr std::array<std::string_view, 7> narrow_days{
             "S", "M", "T", "W", "T", "F", "S"};
@@ -253,7 +270,7 @@ public:
                                    66.0 + static_cast<double>(row) * 27.0,
                                    37.0, 25.0};
             const DateTimeValue date = dates[cell];
-            const bool in_range = date >= minimum_ && date <= maximum_;
+            const bool in_range = civil_in_range(date, minimum_, maximum_);
             const bool in_month = date.month == display_month_ &&
                                   date.year == display_year_;
             const bool selected = date.year == selected_.year &&
@@ -322,8 +339,8 @@ public:
             }
             if (const auto cell = cell_at(local)) {
                 const DateTimeValue date = cell_dates()[*cell];
-                if (date >= minimum_ && date <= maximum_) {
-                    selected_ = date;
+                if (civil_in_range(date, minimum_, maximum_)) {
+                    selected_ = std::clamp(date, minimum_, maximum_);
                     pressed_cell_ = cell;
                     invalidate(Dirty::paint | Dirty::semantics);
                     event.handled = true;
@@ -383,7 +400,24 @@ public:
         std::vector<SemanticNode> nodes;
         const auto dates = cell_dates();
         const Rect popup = absolute_bounds();
-        nodes.reserve(dates.size());
+        nodes.reserve(dates.size() + 2U);
+        for (const int direction : {-1, 1}) {
+            SemanticNode node;
+            node.stable_id = std::string(stable_id().value()) +
+                (direction < 0 ? ".previous_month" : ".next_month");
+            node.runtime_id = virtual_runtime_id(node.stable_id);
+            node.role = SemanticRole::button;
+            node.name = direction < 0 ? "Previous month" : "Next month";
+            node.bounds = direction < 0
+                ? Rect{popup.x + 4.0, popup.y + 3.0, 42.0, 34.0}
+                : Rect{popup.x + popup.width - 49.0, popup.y + 3.0, 42.0, 34.0};
+            node.states = SemanticState::visible | SemanticState::focusable;
+            if (can_change_month(direction)) {
+                node.states |= SemanticState::enabled;
+                node.actions = {SemanticAction::press};
+            }
+            nodes.push_back(std::move(node));
+        }
         for (std::size_t cell = 0U; cell < dates.size(); ++cell) {
             const DateTimeValue date = dates[cell];
             SemanticNode node;
@@ -398,7 +432,7 @@ public:
                            popup.y + 66.0 + static_cast<double>(row) * 27.0,
                            37.0, 25.0};
             node.states |= SemanticState::visible | SemanticState::focusable;
-            if (date >= minimum_ && date <= maximum_) {
+            if (civil_in_range(date, minimum_, maximum_)) {
                 node.states |= SemanticState::enabled;
                 node.actions = {SemanticAction::select, SemanticAction::press};
             }
@@ -415,13 +449,26 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view) override {
+        const std::string prefix(this->stable_id().value());
+        if (action == SemanticAction::press &&
+            stable_id == prefix + ".previous_month") {
+            if (!can_change_month(-1)) return false;
+            change_month(-1);
+            return true;
+        }
+        if (action == SemanticAction::press &&
+            stable_id == prefix + ".next_month") {
+            if (!can_change_month(1)) return false;
+            change_month(1);
+            return true;
+        }
         if (action != SemanticAction::select && action != SemanticAction::press) {
             return false;
         }
         for (const DateTimeValue date : cell_dates()) {
             if (date_stable_id(date) != stable_id) continue;
-            if (date < minimum_ || date > maximum_) return false;
-            selected_ = date;
+            if (!civil_in_range(date, minimum_, maximum_)) return false;
+            selected_ = std::clamp(date, minimum_, maximum_);
             invalidate(Dirty::paint | Dirty::semantics);
             if (action == SemanticAction::press) committed_.emit(selected_);
             return true;
@@ -454,7 +501,9 @@ private:
     }
 
     void move_selection(int days) {
-        const DateTimeValue next = std::clamp(add_days(selected_, days), minimum_, maximum_);
+        const DateTimeValue candidate = add_days(selected_, days);
+        if (!civil_in_range(candidate, minimum_, maximum_)) return;
+        const DateTimeValue next = std::clamp(candidate, minimum_, maximum_);
         if (next == selected_) return;
         selected_ = next;
         display_year_ = next.year;
@@ -462,7 +511,7 @@ private:
         invalidate(Dirty::paint | Dirty::semantics);
     }
 
-    void change_month(int direction) {
+    [[nodiscard]] DateTimeValue month_candidate(int direction) const noexcept {
         int month_index = display_year_ * 12 + static_cast<int>(display_month_) - 1 + direction;
         std::int32_t year = month_index >= 0 ? month_index / 12
             : static_cast<std::int32_t>((month_index - 11) / 12);
@@ -471,7 +520,17 @@ private:
         next.year = year;
         next.month = static_cast<std::uint8_t>(month);
         next.day = std::min(next.day, days_in_month(next.year, next.month));
-        next = std::clamp(next, minimum_, maximum_);
+        return std::clamp(next, minimum_, maximum_);
+    }
+
+    [[nodiscard]] bool can_change_month(int direction) const noexcept {
+        const DateTimeValue next = month_candidate(direction);
+        return next.year != display_year_ || next.month != display_month_;
+    }
+
+    void change_month(int direction) {
+        const DateTimeValue next = month_candidate(direction);
+        if (next.year == display_year_ && next.month == display_month_) return;
         selected_ = next;
         display_year_ = next.year;
         display_month_ = next.month;
@@ -670,8 +729,8 @@ void DateTimePicker::set_dropped_down(bool dropped_down) {
 
 void DateTimePicker::set_font(FontSpec font) {
     require_mutable();
-    if (!std::isfinite(font.size) || font.size <= 0.0) {
-        throw std::invalid_argument("DateTimePicker font must be finite and positive");
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("DateTimePicker font specification is invalid");
     }
     if (font_ == font) return;
     font_ = font;
@@ -820,7 +879,9 @@ void DateTimePicker::on_focus_changed(bool focused) {
 
 void DateTimePicker::step_days(int days) {
     if (show_check_box_ && !checked_) set_checked(true);
-    set_value(std::clamp(add_days(value_, days), minimum_, maximum_));
+    const DateTimeValue candidate = add_days(value_, days);
+    if (!civil_in_range(candidate, minimum_, maximum_)) return;
+    set_value(std::clamp(candidate, minimum_, maximum_));
 }
 
 void DateTimePicker::open_drop_down() {
@@ -925,6 +986,9 @@ SemanticDescriptor DateTimePicker::semantic_descriptor() const {
     if (dropped_down_) descriptor.states |= SemanticState::expanded;
     descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
                           SemanticAction::decrement, SemanticAction::set_value};
+    if (show_check_box_) {
+        descriptor.actions.push_back(SemanticAction::press);
+    }
     if (!show_up_down_) {
         descriptor.actions.push_back(dropped_down_ ? SemanticAction::collapse
                                                    : SemanticAction::expand);
@@ -946,6 +1010,10 @@ bool DateTimePicker::on_semantic_action(SemanticAction action,
         step_days(-1);
         return true;
     }
+    if (action == SemanticAction::press && show_check_box_) {
+        set_checked(!checked_);
+        return true;
+    }
     if (action == SemanticAction::expand && !show_up_down_) {
         set_dropped_down(true);
         return dropped_down_;
@@ -959,6 +1027,7 @@ bool DateTimePicker::on_semantic_action(SemanticAction action,
         if (!parse_iso_date(value, parsed) || parsed < minimum_ || parsed > maximum_) {
             return false;
         }
+        if (show_check_box_ && !checked_) set_checked(true);
         set_value(parsed);
         return true;
     }

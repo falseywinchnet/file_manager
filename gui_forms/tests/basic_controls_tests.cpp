@@ -1,4 +1,5 @@
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/window.hpp"
 
 #include <array>
@@ -72,6 +73,7 @@ void click(Window& window, const Control::Ptr& control) {
 
 void test_public_controls_render_with_role_policy() {
     auto panel = make_control<Panel>(StableId("controls.panel"));
+    panel->set_accessible_name("Public panel group");
     panel->set_requested_bounds({0.0, 0.0, 360.0, 180.0});
     panel->set_border_style(BorderStyle::line);
     auto group = make_control<GroupBox>(StableId("controls.group"), "Reusable controls");
@@ -106,6 +108,10 @@ void test_public_controls_render_with_role_policy() {
             "group/control titles and field labels must preserve typography roles");
     require(window.hit_test(center(label)) == group,
             "noninteractive Label must not intercept its logical container");
+    require(panel->semantic_descriptor().role == SemanticRole::group &&
+                panel->semantic_descriptor().name == "Public panel group" &&
+                panel->semantic_descriptor().exposed,
+            "a named public Panel must expose stock group semantics");
 }
 
 void test_button_pointer_and_keyboard_activation() {
@@ -338,6 +344,63 @@ void test_picture_box_modes_registry_and_semantics() {
             "PictureBox must never submit a stale ImageId to a renderer");
 }
 
+void test_public_drawing_metrics_and_control_tag() {
+    std::weak_ptr<int> released_anchor;
+    {
+        auto tagged = make_control<Panel>(StableId("controls.tagged"));
+        auto anchor = std::make_shared<int>(42);
+        released_anchor = anchor;
+        tagged->set_tag(anchor);
+        anchor.reset();
+        const auto* retained =
+            std::any_cast<std::shared_ptr<int>>(&tagged->tag());
+        require(retained != nullptr && **retained == 42,
+                "Control Tag must retain exact type-erased application metadata");
+        tagged->dispose();
+    }
+    require(released_anchor.expired(),
+            "control disposal must release Tag-owned application lifetime");
+
+    auto root = make_control<Panel>(StableId("controls.diagnostics.root"));
+    auto drawing = make_control<DrawingSurface>(
+        StableId("controls.diagnostics.drawing"));
+    drawing->set_requested_bounds({0.0, 0.0, 120.0, 60.0});
+    drawing->set_accessible_name("Public owner drawing");
+    std::uint64_t callback_count = 0U;
+    Rect callback_bounds;
+    Rect callback_damage;
+    drawing->set_paint_callback(
+        [&](Painter& painter, Rect bounds, Rect damage) {
+            ++callback_count;
+            callback_bounds = bounds;
+            callback_damage = damage;
+            painter.fill_rect(bounds, Color::rgba(1, 2, 3));
+        });
+    auto metrics = make_control<MetricsView>(
+        StableId("controls.diagnostics.metrics"), "Runtime proof");
+    metrics->set_requested_bounds({0.0, 60.0, 240.0, 90.0});
+    root->add_child(drawing);
+    root->add_child(metrics);
+    Window window(root, {240.0, 150.0});
+    window.perform_layout();
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 240.0, 150.0});
+    require(callback_count == 1U &&
+                callback_bounds == Rect{0.0, 0.0, 120.0, 60.0} &&
+                !callback_damage.empty() && painter.fills >= 4U,
+            "DrawingSurface must invoke public owner paint with retained bounds and damage");
+    require(!drawing->hit_test_visible() &&
+                !drawing->hit_test_local({10.0, 10.0}) &&
+                drawing->semantic_descriptor().role == SemanticRole::image &&
+                drawing->semantic_descriptor().exposed,
+            "DrawingSurface must default to input-transparent image semantics");
+    const SemanticDescriptor metrics_semantics = metrics->semantic_descriptor();
+    require(metrics_semantics.role == SemanticRole::group &&
+                metrics_semantics.name == "Runtime proof" &&
+                metrics_semantics.value.find("controls") != std::string::npos,
+            "MetricsView must expose the structured runtime snapshot semantically");
+}
+
 } // namespace
 
 int main() {
@@ -350,6 +413,7 @@ int main() {
         test_wrong_thread_property_mutation_is_rejected();
         test_label_multiline_wrapping_and_alignment();
         test_picture_box_modes_registry_and_semantics();
+        test_public_drawing_metrics_and_control_tag();
         std::cout << "gui_forms_basic_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

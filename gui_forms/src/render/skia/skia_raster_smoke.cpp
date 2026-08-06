@@ -29,6 +29,32 @@ void write_u32(std::span<std::byte> destination, std::uint32_t value) {
     destination[3] = static_cast<std::byte>(value);
 }
 
+std::vector<std::byte> read_file(const char* path) {
+    std::ifstream stream(path, std::ios::binary | std::ios::ate);
+    if (!stream) return {};
+    const std::streamsize length = stream.tellg();
+    if (length <= 0) return {};
+    std::vector<std::byte> bytes(static_cast<std::size_t>(length));
+    stream.seekg(0);
+    stream.read(reinterpret_cast<char*>(bytes.data()), length);
+    return stream ? bytes : std::vector<std::byte>{};
+}
+
+std::size_t ink_pixels(const std::uint8_t* pixels, std::size_t row_bytes,
+                       int scale, int left, int top, int right, int bottom) {
+    std::size_t count{};
+    for (int y = top * scale; y < bottom * scale; ++y) {
+        const std::uint8_t* row = pixels + static_cast<std::size_t>(y) * row_bytes;
+        for (int x = left * scale; x < right * scale; ++x) {
+            const std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
+            if (pixel[0] != 241U || pixel[1] != 238U || pixel[2] != 226U) {
+                ++count;
+            }
+        }
+    }
+    return count;
+}
+
 } // namespace
 
 int main() {
@@ -57,21 +83,20 @@ int main() {
         return 1;
     }
 
-    std::ifstream font_file(GUI_FORMS_TEST_CONTROL_FONT, std::ios::binary | std::ios::ate);
-    if (!font_file) {
+    const std::vector<std::byte> font_bytes =
+        read_file(GUI_FORMS_TEST_CONTROL_FONT);
+    const std::vector<std::byte> cjk_bytes =
+        read_file(GUI_FORMS_TEST_CJK_FONT);
+    const std::vector<std::byte> emoji_bytes =
+        read_file(GUI_FORMS_TEST_EMOJI_FONT);
+    if (font_bytes.empty() || cjk_bytes.empty() || emoji_bytes.empty()) {
         std::fputs("failed to open bundled control font\n", stderr);
         return 2;
     }
-    const auto font_size = font_file.tellg();
-    if (font_size <= 0) {
-        std::fputs("bundled control font is empty\n", stderr);
-        return 3;
-    }
-    std::vector<std::byte> font_bytes(static_cast<std::size_t>(font_size));
-    font_file.seekg(0);
-    font_file.read(reinterpret_cast<char*>(font_bytes.data()), font_size);
-    if (!font_file ||
-        !raster.register_typeface(gui_forms::FontRole::control, 400, false, font_bytes)) {
+    if (!raster.register_typeface(
+            gui_forms::FontRole::control, 400, false, font_bytes) ||
+        !raster.register_fallback_typeface(400, false, cjk_bytes) ||
+        !raster.register_fallback_typeface(400, false, emoji_bytes)) {
         std::fputs("Skia rejected the bundled Portsmouth Rapids face\n", stderr);
         return 4;
     }
@@ -104,6 +129,12 @@ int main() {
                           gui_forms::FontSpec{}, gui_forms::Color::rgba(255, 255, 255));
     raster.draw_image(loaded.image, gui_forms::Rect{130.0, 8.0, 20.0, 20.0}, 1.0);
     raster.draw_image(raw.image, gui_forms::Rect{130.0, 32.0, 20.0, 20.0}, 1.0);
+    raster.draw_text_utf8(gui_forms::Point{8.0, 82.0}, "日本語",
+                          {gui_forms::FontRole::control, 24.0, 400, false},
+                          gui_forms::Color::rgba(30, 42, 54));
+    raster.draw_text_utf8(gui_forms::Point{112.0, 82.0}, "🚀",
+                          {gui_forms::FontRole::control, 24.0, 400, false},
+                          gui_forms::Color::rgba(30, 42, 54));
     raster.end_frame();
 
     const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());
@@ -116,6 +147,16 @@ int main() {
         std::fputs("Skia raster RGBA byte-order contract changed\n", stderr);
         return 8;
     }
+    const std::size_t cjk_ink = ink_pixels(
+        pixels, raster.row_bytes(), 2, 6, 55, 104, 92);
+    const std::size_t emoji_ink = ink_pixels(
+        pixels, raster.row_bytes(), 2, 108, 55, 158, 92);
+    if (cjk_ink < 50U || emoji_ink < 20U) {
+        std::fprintf(stderr,
+                     "registered fallback shaped without raster ink: cjk=%zu emoji=%zu\n",
+                     cjk_ink, emoji_ink);
+        return 9;
+    }
     std::uint64_t checksum = 1469598103934665603ULL;
     for (std::size_t offset = 0; offset < raster.byte_size(); offset += 97) {
         checksum ^= pixels[offset];
@@ -123,7 +164,7 @@ int main() {
     }
     if (checksum == 1469598103934665603ULL) {
         std::fputs("Skia raster surface remained empty\n", stderr);
-        return 9;
+        return 10;
     }
     std::printf("{\"renderer\":\"skia-cpu\",\"width\":%u,\"height\":%u,"
                 "\"bytes\":%zu,\"checksum\":%llu}\n",

@@ -17,7 +17,9 @@ DisplayChunkInfo DisplayChunk::info() const noexcept {
 }
 
 void RecordingPainter::save() {
-    commands_.push_back({.operation = DisplayOperation::save});
+    DisplayCommand command;
+    command.operation = DisplayOperation::save;
+    commands_.push_back(std::move(command));
     ++save_depth_;
 }
 
@@ -25,36 +27,51 @@ void RecordingPainter::restore() {
     if (save_depth_ == 0U) {
         throw std::logic_error("GUI.Forms display chunk restored without a matching save");
     }
-    commands_.push_back({.operation = DisplayOperation::restore});
+    DisplayCommand command;
+    command.operation = DisplayOperation::restore;
+    commands_.push_back(std::move(command));
     --save_depth_;
 }
 
 void RecordingPainter::translate(Point offset) {
-    commands_.push_back({.operation = DisplayOperation::translate, .first = offset});
+    DisplayCommand command;
+    command.operation = DisplayOperation::translate;
+    command.first = offset;
+    commands_.push_back(std::move(command));
 }
 
 void RecordingPainter::clip_rect(Rect rect) {
-    commands_.push_back({.operation = DisplayOperation::clip_rect, .rect = rect});
+    DisplayCommand command;
+    command.operation = DisplayOperation::clip_rect;
+    command.rect = rect;
+    commands_.push_back(std::move(command));
 }
 
 void RecordingPainter::fill_rect(Rect rect, Color color) {
-    commands_.push_back(
-        {.operation = DisplayOperation::fill_rect, .rect = rect, .color = color});
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_rect;
+    command.rect = rect;
+    command.color = color;
+    commands_.push_back(std::move(command));
 }
 
 void RecordingPainter::stroke_rect(Rect rect, Color color, double width) {
-    commands_.push_back({.operation = DisplayOperation::stroke_rect,
-                         .rect = rect,
-                         .color = color,
-                         .scalar = width});
+    DisplayCommand command;
+    command.operation = DisplayOperation::stroke_rect;
+    command.rect = rect;
+    command.color = color;
+    command.scalar = width;
+    commands_.push_back(std::move(command));
 }
 
 void RecordingPainter::draw_line(Point from, Point to, Color color, double width) {
-    commands_.push_back({.operation = DisplayOperation::draw_line,
-                         .first = from,
-                         .second = to,
-                         .color = color,
-                         .scalar = width});
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_line;
+    command.first = from;
+    command.second = to;
+    command.color = color;
+    command.scalar = width;
+    commands_.push_back(std::move(command));
 }
 
 void RecordingPainter::draw_text_utf8(Point origin,
@@ -85,10 +102,12 @@ Size RecordingPainter::measure_text_utf8(std::string_view text,
 }
 
 void RecordingPainter::draw_image(ImageId image, Rect destination, double opacity) {
-    commands_.push_back({.operation = DisplayOperation::draw_image,
-                         .rect = destination,
-                         .image = image,
-                         .scalar = opacity});
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_image;
+    command.rect = destination;
+    command.image = image;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
 }
 
 std::shared_ptr<const DisplayChunk> RecordingPainter::finish(

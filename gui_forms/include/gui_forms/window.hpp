@@ -2,6 +2,7 @@
 
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
+#include "gui_forms/dispatcher.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
 #include "gui_forms/resources.hpp"
@@ -12,6 +13,7 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,6 +27,8 @@ namespace gui_forms {
 class UpdateScope;
 class Timer;
 class ToolTip;
+class HostServices;
+class HostSession;
 namespace detail {
 class PopupAttachment;
 }
@@ -119,6 +123,12 @@ public:
     void resize(Size client_size);
     void set_scale(double scale);
     [[nodiscard]] double scale() const noexcept { return scale_; }
+    // Non-owning portable service seam, installed for the lifetime of a
+    // HostSession. Renderer-free and headless windows may legitimately return
+    // null when no host is attached.
+    [[nodiscard]] HostServices* host_services() const noexcept {
+        return host_services_;
+    }
 
     [[nodiscard]] UpdateScope begin_update();
     void perform_layout();
@@ -143,6 +153,21 @@ public:
     [[nodiscard]] bool occluded() const noexcept { return occluded_; }
     [[nodiscard]] bool check_access() const noexcept;
     void verify_access(std::string_view operation = "window access");
+    [[nodiscard]] bool invoke_required() const noexcept { return !check_access(); }
+    [[nodiscard]] DispatchOperation begin_invoke(std::function<void()> callback);
+    [[nodiscard]] DispatchOperation begin_invoke(
+        const Control::Ptr& owner, std::function<void()> callback);
+    // Synchronous Invoke never starts a nested message pump. UI-thread calls
+    // execute inline; worker calls require an installed running host wake seam.
+    void invoke(std::function<void()> callback);
+    void invoke(const Control::Ptr& owner, std::function<void()> callback);
+    [[nodiscard]] DispatchDrainResult drain_posted_work(
+        std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn);
+    [[nodiscard]] DispatcherSnapshot dispatcher_snapshot() const noexcept;
+    // Host adapters install a thread-safe wake primitive. Installing a handler
+    // after work was queued immediately publishes one coalesced wake.
+    void set_dispatch_wake_handler(std::function<void()> wake);
+    void shutdown_dispatcher() noexcept;
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
     [[nodiscard]] ImageLoadResult load_bgra32_premultiplied(
@@ -214,6 +239,7 @@ public:
                                  std::string_view value = {});
 
 private:
+    friend class HostSession;
     friend class Control;
     friend class UpdateScope;
     friend class Timer;
@@ -241,6 +267,7 @@ private:
     void unregister_subtree(const Control::Ptr& control);
     void mark_dirty(Control& control, Dirty dirty);
     void mark_subtree_dirty(Control& control, Dirty dirty);
+    void mark_child_layout_slot(Control& control);
     void change_paint_plane(Control& control, PaintPlane plane);
     void add_damage(Rect damage, PaintPlane plane);
     void add_damage_all_planes(Rect damage);
@@ -317,6 +344,7 @@ private:
     std::vector<std::shared_ptr<detail::ScheduledFrameRequest>> frame_requests_;
     std::shared_ptr<detail::WindowLifetime> lifetime_;
     std::thread::id ui_thread_;
+    std::shared_ptr<detail::DispatcherState> dispatcher_state_;
     std::uint64_t update_depth_{};
     bool layout_dirty_{true};
     bool paint_dirty_{true};
@@ -327,6 +355,7 @@ private:
     bool second_layout_pass_requested_{};
     bool occluded_{};
     std::uint64_t semantic_generation_{1U};
+    HostServices* host_services_{};
 };
 
 class UpdateScope {

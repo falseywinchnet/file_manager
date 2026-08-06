@@ -19,7 +19,8 @@ HostCapabilities headless_capabilities() {
                 HostCapability::cursor |
                 HostCapability::clipboard |
                 HostCapability::typed_drag_destination |
-                HostCapability::dialogs};
+                HostCapability::dialogs |
+                HostCapability::sound_cues};
 }
 
 HeadlessHostServices::HeadlessHostServices()
@@ -95,14 +96,29 @@ HostDialogResult HeadlessHostServices::show_dialog_impl(
     return result;
 }
 
+HostServiceStatus HeadlessHostServices::play_sound_cue_impl(
+    const HostSoundCueRequest& request) {
+    std::ostringstream line;
+    line << "sound=" << host_sound_cue_name(request.cue)
+         << " timestamp=" << request.timestamp_nanoseconds
+         << " gain=" << request.gain << '\n';
+    sound_trace_ += line.str();
+    return {};
+}
+
 void HeadlessHostServices::shutdown_impl() noexcept {
     clipboard_text_.clear();
     clipboard_has_text_ = false;
     dialog_results_.clear();
+    sound_trace_.clear();
 }
 
 HeadlessHost::HeadlessHost(Window& window)
-    : services_(), session_(window, headless_capabilities(), &services_) {
+    : window_(&window), services_(),
+      session_(window, headless_capabilities(), &services_) {
+    window.set_dispatch_wake_handler([this] {
+        dispatcher_wake_pending_.store(true, std::memory_order_release);
+    });
     observation_ = session_.observed().subscribe(
         [this](const HostEvent& event, const HostDispatchResult& result) {
             const HostSessionSnapshot snapshot = session_.snapshot();
@@ -131,6 +147,12 @@ HeadlessHost::HeadlessHost(Window& window)
                  << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
             trace_ += line.str();
         });
+}
+
+DispatchDrainResult HeadlessHost::pump_dispatcher(
+    std::size_t maximum_callbacks) {
+    dispatcher_wake_pending_.store(false, std::memory_order_release);
+    return window_->drain_posted_work(maximum_callbacks);
 }
 
 HostDispatchResult HeadlessHost::dispatch(HostEventPayload payload,

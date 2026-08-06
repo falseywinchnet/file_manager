@@ -8,7 +8,9 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -47,366 +49,15 @@ BasicControlStyle showcase_style() {
     return style;
 }
 
-class LayoutPanel : public Panel {
-public:
-    LayoutPanel(StableId stable_id, Size design_size)
-        : Panel(std::move(stable_id)), design_size_(design_size) {}
+using LayoutPanel = ScaledPanel;
+using LayoutGroup = ScaledGroupBox;
 
-    void add_at(Control::Ptr child, Rect design_bounds) {
-        items_.push_back({child, design_bounds});
-        add_child(std::move(child));
-    }
+using Surface = ScaledPanel;
 
-    void arrange(Rect final_bounds) override {
-        const double scale_x = design_size_.width <= 0.0
-            ? 1.0 : final_bounds.width / design_size_.width;
-        const double scale_y = design_size_.height <= 0.0
-            ? 1.0 : final_bounds.height / design_size_.height;
-        for (const Item& item : items_) {
-            if (const Control::Ptr child = item.control.lock()) {
-                child->set_requested_bounds({item.bounds.x * scale_x,
-                                             item.bounds.y * scale_y,
-                                             item.bounds.width * scale_x,
-                                             item.bounds.height * scale_y});
-            }
-        }
-        Panel::arrange(final_bounds);
-    }
+using EasingBoard = EasingPreview;
 
-private:
-    struct Item final {
-        Control::WeakPtr control;
-        Rect bounds;
-    };
-
-    Size design_size_;
-    std::vector<Item> items_;
-};
-
-class LayoutGroup final : public GroupBox {
-public:
-    LayoutGroup(StableId stable_id, std::string title, Size design_size)
-        : GroupBox(std::move(stable_id), std::move(title)),
-          design_size_(design_size) {}
-
-    void add_at(Control::Ptr child, Rect design_bounds) {
-        items_.push_back({child, design_bounds});
-        add_child(std::move(child));
-    }
-
-    void arrange(Rect final_bounds) override {
-        const double scale_x = design_size_.width <= 0.0
-            ? 1.0 : final_bounds.width / design_size_.width;
-        const double scale_y = design_size_.height <= 0.0
-            ? 1.0 : final_bounds.height / design_size_.height;
-        for (const Item& item : items_) {
-            if (const Control::Ptr child = item.control.lock()) {
-                child->set_requested_bounds({item.bounds.x * scale_x,
-                                             item.bounds.y * scale_y,
-                                             item.bounds.width * scale_x,
-                                             item.bounds.height * scale_y});
-            }
-        }
-        GroupBox::arrange(final_bounds);
-    }
-
-private:
-    struct Item final {
-        Control::WeakPtr control;
-        Rect bounds;
-    };
-
-    Size design_size_;
-    std::vector<Item> items_;
-};
-
-enum class SurfaceKind : std::uint8_t {
-    header,
-    sidebar,
-    page,
-    status,
-    animation,
-};
-
-class Surface final : public LayoutPanel {
-public:
-    Surface(StableId stable_id, Size design_size, SurfaceKind kind)
-        : LayoutPanel(std::move(stable_id), design_size), kind_(kind) {
-        set_background(kind == SurfaceKind::page || kind == SurfaceKind::animation
-                           ? canvas : paper);
-    }
-
-    void on_paint(Painter& painter, Rect damage) override {
-        const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                          committed_arranged_bounds().height};
-        switch (kind_) {
-        case SurfaceKind::header:
-            painter.fill_rect(bounds, shell_blue);
-            painter.fill_rect({0.0, 0.0, bounds.width, 4.0}, shell_blue_light);
-            painter.fill_rect({0.0, bounds.height - 2.0, bounds.width, 2.0},
-                              shell_blue_dark);
-            break;
-        case SurfaceKind::sidebar:
-            painter.fill_rect(bounds, Color::rgba(220, 229, 237));
-            painter.draw_line({bounds.width - 1.0, 0.0},
-                              {bounds.width - 1.0, bounds.height}, rule, 1.0);
-            break;
-        case SurfaceKind::page:
-            painter.fill_rect(bounds, canvas);
-            break;
-        case SurfaceKind::status:
-            painter.fill_rect(bounds, Color::rgba(225, 232, 238));
-            painter.draw_line({0.0, 0.0}, {bounds.width, 0.0}, rule, 1.0);
-            break;
-        case SurfaceKind::animation:
-            painter.fill_rect(bounds, paper);
-            painter.stroke_rect({0.5, 0.5, std::max(0.0, bounds.width - 1.0),
-                                 std::max(0.0, bounds.height - 1.0)}, rule, 1.0);
-            break;
-        }
-        static_cast<void>(damage);
-    }
-
-private:
-    SurfaceKind kind_;
-};
-
-class EasingBoard final : public Control {
-public:
-    explicit EasingBoard(StableId stable_id)
-        : Control(std::move(stable_id)) {}
-
-    void set_paused(bool paused) {
-        require_mutable();
-        if (paused_ == paused) {
-            return;
-        }
-        paused_ = paused;
-        if (paused_) {
-            frames_.disconnect();
-        } else {
-            start_ = FrameClock::now();
-            register_frames();
-        }
-        invalidate(Dirty::paint | Dirty::semantics);
-    }
-
-    [[nodiscard]] bool paused() const noexcept { return paused_; }
-
-    void on_frame(FrameTime now) override {
-        const double elapsed = std::chrono::duration<double>(now - start_).count();
-        phase_ = std::fmod(std::max(0.0, elapsed) / 2.4, 1.0);
-    }
-
-    void on_paint(Painter& painter, Rect) override {
-        const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                          committed_arranged_bounds().height};
-        painter.fill_rect(bounds, paper);
-        painter.stroke_rect({0.5, 0.5, std::max(0.0, bounds.width - 1.0),
-                             std::max(0.0, bounds.height - 1.0)}, rule, 1.0);
-        painter.draw_text_utf8({18.0, 25.0},
-                               "TIMELINE AND EASING LAB",
-                               {FontRole::control, 13.0, 700, false}, shell_blue_dark);
-        painter.draw_text_utf8({bounds.width - 120.0, 25.0},
-                               paused_ ? "PAUSED" : "LIVE · 60 Hz",
-                               {FontRole::control, 11.0, 600, false},
-                               paused_ ? orange : green);
-
-        constexpr std::array<std::pair<EasingCurve, std::string_view>, 8> curves{{
-            {EasingCurve::linear, "Linear"},
-            {EasingCurve::ease_in, "Ease in"},
-            {EasingCurve::ease_out, "Ease out"},
-            {EasingCurve::ease_in_out, "Ease in/out"},
-            {EasingCurve::smooth_step, "Smooth step"},
-            {EasingCurve::back_out, "Back out"},
-            {EasingCurve::bounce_out, "Bounce"},
-            {EasingCurve::elastic_out, "Elastic"},
-        }};
-        const double directed = phase_ < 0.5 ? phase_ * 2.0 : (1.0 - phase_) * 2.0;
-        for (std::size_t index = 0; index < curves.size(); ++index) {
-            const double y = 48.0 + static_cast<double>(index) * 34.0;
-            painter.draw_text_utf8({18.0, y + 15.0}, curves[index].second,
-                                   {FontRole::content, 11.0, 400, false}, muted);
-            const double track_x = 112.0;
-            const double track_width = std::max(40.0, bounds.width - 140.0);
-            painter.fill_rect({track_x, y + 8.0, track_width, 3.0},
-                              Color::rgba(210, 219, 227));
-            const double eased = std::clamp(
-                apply_easing(curves[index].first, directed), -0.08, 1.08);
-            const double x = track_x + eased * std::max(0.0, track_width - 14.0);
-            const Color color = index < 3U ? accent : index < 6U ? violet : orange;
-            painter.fill_rect({x, y + 2.0, 14.0, 14.0}, color);
-            painter.stroke_rect({x + 0.5, y + 2.5, 13.0, 13.0},
-                                shell_blue_dark, 1.0);
-        }
-    }
-
-protected:
-    void on_attached_to_window() override {
-        Control::on_attached_to_window();
-        start_ = FrameClock::now();
-        register_frames();
-    }
-
-    void on_detached_from_window() noexcept override {
-        frames_.disconnect();
-        Control::on_detached_from_window();
-    }
-
-private:
-    void register_frames() {
-        if (window() == nullptr || paused_) {
-            return;
-        }
-        constexpr FrameInterval interval = 16ms;
-        frames_ = window()->activate_surface(
-            shared_from_this(), interval, FrameClock::now() + interval);
-    }
-
-    FrameRequestToken frames_;
-    FrameTime start_{};
-    double phase_{};
-    bool paused_{};
-};
-
-class DiagnosticsCard final : public Control {
-public:
-    explicit DiagnosticsCard(StableId stable_id)
-        : Control(std::move(stable_id)) {}
-
-    void on_paint(Painter& painter, Rect) override {
-        const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                          committed_arranged_bounds().height};
-        painter.fill_rect(bounds, Color::rgba(28, 39, 50));
-        painter.fill_rect({0.0, 0.0, 5.0, bounds.height}, green);
-        painter.draw_text_utf8({16.0, 24.0}, "RETAINED RUNTIME",
-                               {FontRole::control, 12.0, 700, false},
-                               Color::rgba(226, 238, 246));
-        if (window() == nullptr) {
-            return;
-        }
-        const MetricsSnapshot metrics = window()->metrics_snapshot();
-        char line[256]{};
-        std::snprintf(line, sizeof(line),
-                      "%llu controls   %llu paints   %llu chunks reused   %llu inputs",
-                      static_cast<unsigned long long>(metrics.control_count),
-                      static_cast<unsigned long long>(metrics.paint_passes),
-                      static_cast<unsigned long long>(metrics.display_chunks_reused),
-                      static_cast<unsigned long long>(metrics.input_events));
-        painter.draw_text_utf8({16.0, 48.0}, line,
-                               {FontRole::content, 11.0, 400, false},
-                               Color::rgba(175, 203, 221));
-        std::snprintf(line, sizeof(line),
-                      "%llu active surfaces   %llu focus scopes   damage %.0f px",
-                      static_cast<unsigned long long>(metrics.active_surface_count),
-                      static_cast<unsigned long long>(metrics.focus_scope_depth),
-                      metrics.painted_damage_area);
-        painter.draw_text_utf8({16.0, 68.0}, line,
-                               {FontRole::content, 11.0, 400, false},
-                               Color::rgba(175, 203, 221));
-    }
-};
-
-class DrawingEffectsBoard final : public Control {
-public:
-    explicit DrawingEffectsBoard(StableId stable_id)
-        : Control(std::move(stable_id)) {
-        set_accessible_name("Renderer-neutral drawing primitive composition");
-        set_accessible_description(
-            "Nested clipping, translation, fills, strokes, lines, and text");
-    }
-
-    void on_paint(Painter& painter, Rect) override {
-        const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                          committed_arranged_bounds().height};
-        painter.fill_rect(bounds, Color::rgba(26, 39, 52));
-        painter.fill_rect({0.0, 0.0, bounds.width, 4.0}, accent);
-        painter.draw_text_utf8({18.0, 27.0}, "RETAINED PAINTER COMPOSITION",
-                               {FontRole::control, 12.0, 700, false},
-                               Color::rgba(230, 240, 247));
-        painter.draw_text_utf8({18.0, 48.0},
-                               "save · clip · translate · fill · stroke · line · UTF-8",
-                               {FontRole::content, 10.0, 400, false},
-                               Color::rgba(164, 192, 211));
-
-        painter.save();
-        painter.clip_rect({18.0, 62.0, std::max(0.0, bounds.width - 36.0),
-                           std::max(0.0, bounds.height - 78.0)});
-        painter.translate({18.0, 62.0});
-        const double width = std::max(1.0, bounds.width - 36.0);
-        for (std::size_t index = 0; index < 12U; ++index) {
-            const double x = static_cast<double>(index) * width / 11.0;
-            const Color color = index % 3U == 0U ? accent
-                : index % 3U == 1U ? green : orange;
-            painter.draw_line({0.0, 66.0}, {x, 0.0}, color, 1.5);
-        }
-        painter.fill_rect({20.0, 20.0, 92.0, 38.0}, Color::rgba(43, 82, 112));
-        painter.stroke_rect({20.5, 20.5, 91.0, 37.0},
-                            Color::rgba(211, 228, 239), 1.0);
-        painter.fill_rect({126.0, 12.0, 72.0, 54.0}, violet);
-        painter.stroke_rect({126.5, 12.5, 71.0, 53.0},
-                            Color::rgba(234, 220, 244), 1.0);
-        painter.fill_rect({212.0, 28.0, 118.0, 22.0}, green);
-        painter.restore();
-    }
-
-    [[nodiscard]] bool hit_test_local(Point) const override { return false; }
-
-    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
-        SemanticDescriptor descriptor;
-        descriptor.role = SemanticRole::image;
-        descriptor.name = accessible_name();
-        descriptor.description = accessible_description();
-        descriptor.exposed = true;
-        return descriptor;
-    }
-};
-
-class TimerMotionBoard final : public Panel {
-public:
-    explicit TimerMotionBoard(StableId stable_id) : Panel(std::move(stable_id)) {
-        set_background(Color::rgba(247, 249, 251));
-        set_border_style(BorderStyle::line);
-    }
-
-    void initialize_control_tree() {
-        target_ = make_control<Button>(
-            StableId(std::string(stable_id().value()) + ".target"),
-            "Moving tooltip target");
-        target_->set_visual_style(ButtonVisualStyle::accent);
-        target_->set_style(showcase_style());
-        add_child(target_);
-    }
-
-    void set_phase(double phase) {
-        require_mutable();
-        phase_ = std::clamp(phase, 0.0, 1.0);
-        invalidate(Dirty::arrange | Dirty::paint | Dirty::semantics);
-    }
-
-    [[nodiscard]] std::shared_ptr<Button> target() const noexcept { return target_; }
-
-    void arrange(Rect final_bounds) override {
-        const double travel = std::max(0.0, final_bounds.width - 196.0);
-        const double eased = 0.5 - std::cos(phase_ * 6.283185307179586) * 0.5;
-        target_->set_requested_bounds({14.0 + travel * eased, 39.0, 168.0, 34.0});
-        Panel::arrange(final_bounds);
-    }
-
-    void on_paint(Painter& painter, Rect damage) override {
-        Panel::on_paint(painter, damage);
-        const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                          committed_arranged_bounds().height};
-        painter.draw_text_utf8({14.0, 23.0}, "WINDOW-QUEUE MOTION · 4 Hz",
-                               {FontRole::control, 10.0, 700, false}, muted);
-        painter.draw_line({14.0, 84.0}, {std::max(14.0, bounds.width - 14.0), 84.0},
-                          rule, 1.0);
-    }
-
-private:
-    std::shared_ptr<Button> target_;
-    double phase_{};
-};
+using DiagnosticsCard = MetricsView;
+using DrawingEffectsBoard = DrawingSurface;
 
 struct ShowcaseContext final {
     std::vector<Control::Ptr> pages;
@@ -414,6 +65,7 @@ struct ShowcaseContext final {
     std::vector<SubscriptionToken> subscriptions;
     std::shared_ptr<Label> status;
     std::shared_ptr<EasingBoard> easing;
+    std::shared_ptr<Button> motion_pause;
     std::vector<std::shared_ptr<ProgressBar>> animated_progress;
     ComponentContainer components;
     std::shared_ptr<Timer> ui_timer;
@@ -421,13 +73,68 @@ struct ShowcaseContext final {
     std::shared_ptr<Label> timer_status;
     std::shared_ptr<ProgressBar> timer_progress;
     std::shared_ptr<TrackBar> timer_interval;
-    std::shared_ptr<TimerMotionBoard> timer_motion;
+    std::shared_ptr<ScaledPanel> timer_motion;
+    std::shared_ptr<Button> timer_motion_target;
     std::shared_ptr<Button> timer_start;
     std::shared_ptr<Button> timer_stop;
     std::shared_ptr<Button> tooltip_show_disabled;
     std::shared_ptr<Button> tooltip_disabled_target;
+    std::shared_ptr<Label> dispatcher_status;
+    std::shared_ptr<Button> dispatcher_invoke;
+    std::vector<DispatchOperation> dispatcher_operations;
+    std::thread dispatcher_worker;
+    std::string dispatcher_trace;
+    std::uint64_t dispatcher_batch{};
+    std::shared_ptr<Label> host_services_status;
+    std::shared_ptr<TextBox> clipboard_editor;
     std::uint64_t timer_ticks{};
+    std::uint64_t next_host_request_id{1U};
     std::size_t selected_page{};
+    std::string last_dialog_acceptance{"No accepted dialog value yet"};
+    bool live_motion{true};
+    bool user_paused{};
+    bool reduced_motion{};
+
+    ~ShowcaseContext() {
+        if (dispatcher_worker.joinable()) dispatcher_worker.join();
+    }
+
+    [[nodiscard]] MotionPolicy motion_policy() const noexcept {
+        return {live_motion, user_paused, reduced_motion};
+    }
+
+    void update_motion_status() {
+        if (!status) return;
+        const MotionPolicy policy = motion_policy();
+        if (!policy.enabled) {
+            status->set_text("Motion disabled · zero animation wakeups");
+        } else if (policy.paused && policy.reduced) {
+            status->set_text(
+                "Reduced motion + paused · phase retained · zero animation wakeups");
+        } else if (policy.paused) {
+            status->set_text("Motion paused · phase retained · zero animation wakeups");
+        } else if (policy.reduced) {
+            status->set_text(
+                "Reduced motion · low cadence · limited excursion · animation active");
+        } else {
+            status->set_text("Full motion · continuous retained animation active");
+        }
+    }
+
+    void apply_motion_policy() {
+        const MotionPolicy policy = motion_policy();
+        if (easing) easing->set_motion_policy(policy);
+        for (const auto& progress : animated_progress) {
+            progress->set_motion_policy(policy);
+        }
+        if (motion_pause) {
+            motion_pause->set_enabled(live_motion);
+            motion_pause->set_text(!live_motion ? "Motion disabled"
+                                                   : user_paused ? "Resume motion"
+                                                                 : "Pause motion");
+        }
+        update_motion_status();
+    }
 
     void select_page(std::size_t index) {
         if (index >= pages.size()) {
@@ -447,31 +154,17 @@ struct ShowcaseContext final {
             if (selected_page == 11U) ui_timer->start();
             else if (ui_timer->enabled()) ui_timer->stop();
         }
-        static constexpr std::array<std::string_view, 12> names{
+        static constexpr std::array<std::string_view, 16> names{
             "Control spectrum", "Ranges and progress", "Containers and focus",
             "Animation laboratory", "States and diagnostics", "Text and input",
             "Collections and popups", "Values and spinners",
             "Images and drawing", "Tabs and pages", "Checked collections",
-            "Timing and tooltips"};
+            "Timing and tooltips", "Dates and calendar",
+            "Dialogs and host services", "Retained layout panels",
+            "Dock and anchor"};
         status->set_text(std::string(names[index]) +
                          "  ·  public GUI.Forms behavior  ·  CPU retained renderer");
     }
-};
-
-class ShowcaseRoot final : public LayoutPanel {
-public:
-    ShowcaseRoot(StableId stable_id, std::shared_ptr<ShowcaseContext> context)
-        : LayoutPanel(std::move(stable_id), {1280.0, 820.0}),
-          context_(std::move(context)) {
-        set_background(canvas);
-    }
-
-    [[nodiscard]] std::shared_ptr<ShowcaseContext> context() const noexcept {
-        return context_;
-    }
-
-private:
-    std::shared_ptr<ShowcaseContext> context_;
 };
 
 std::shared_ptr<Label> label(std::string id, std::string text,
@@ -490,8 +183,29 @@ std::shared_ptr<LayoutGroup> group(std::string id, std::string title,
                                              std::move(title), design_size);
     control->set_background(paper);
     control->set_style(showcase_style());
-    control->set_font({FontRole::control, 12.0, 700, false});
+    control->set_font({FontRole::control, 12.0, 700, false, 0.24});
     return control;
+}
+
+DateTimeFormatProvider french_date_provider() {
+    DateTimeFormatProvider provider =
+        DateTimeFormatProvider::english_united_states();
+    provider.month_names = {
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"};
+    provider.abbreviated_month_names = {
+        "janv.", "févr.", "mars", "avr.", "mai", "juin",
+        "juil.", "août", "sept.", "oct.", "nov.", "déc."};
+    provider.day_names = {
+        "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"};
+    provider.abbreviated_day_names = {
+        "dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."};
+    provider.long_date_pattern = "dddd d MMMM yyyy";
+    provider.short_date_pattern = "dd/MM/yyyy";
+    provider.time_pattern = "HH:mm";
+    provider.am_designator.clear();
+    provider.pm_designator.clear();
+    return provider;
 }
 
 void add_control_spectrum(const std::shared_ptr<Surface>& page,
@@ -577,13 +291,61 @@ void add_control_spectrum(const std::shared_ptr<Surface>& page,
     title->set_font({FontRole::control, 19.0, 700, false});
     typography->add_at(title, {24.0, 38.0, 420.0, 30.0});
     auto content = label("showcase.controls.type.content",
-                         "Lucida-style content role: editable and field text remains quiet and readable.",
+        "Carlito body specimen: editable and field text stays quiet, clear, and host-independent.",
                          12.0, 400, ink);
-    typography->add_at(content, {24.0, 76.0, 760.0, 24.0});
+    content->set_text_wrapping(TextWrapping::word);
+    content->set_vertical_alignment(VerticalAlignment::near);
+    typography->add_at(content, {24.0, 76.0, 430.0, 48.0});
     auto center = label("showcase.controls.type.center", "Centered label", 12.0, 600, accent);
     center->set_alignment(HorizontalAlignment::center);
-    typography->add_at(center, {24.0, 108.0, 250.0, 24.0});
-    static_cast<void>(context);
+    typography->add_at(center, {24.0, 118.0, 250.0, 20.0});
+
+    typography->add_at(label("showcase.controls.sound.title",
+                             "SEMANTIC SOUND CUES · OPTIONAL HOST", 11.0, 700,
+                             shell_blue_dark), {500.0, 34.0, 390.0, 22.0});
+    const std::array<std::pair<HostSoundCue, std::string_view>, 4> cues{{
+        {HostSoundCue::notification, "Notice"},
+        {HostSoundCue::success, "Success"},
+        {HostSoundCue::warning, "Warning"},
+        {HostSoundCue::error, "Error"},
+    }};
+    auto sound_enabled = make_control<CheckBox>(
+        StableId("showcase.controls.sound.enabled"), "Sound enabled");
+    sound_enabled->set_checked(true);
+    sound_enabled->set_indicator_style(ChoiceIndicatorStyle::modern);
+    typography->add_at(sound_enabled, {500.0, 108.0, 160.0, 26.0});
+    for (std::size_t index = 0U; index < cues.size(); ++index) {
+        auto cue_button = make_control<Button>(
+            StableId("showcase.controls.sound." + std::to_string(index)),
+            std::string(cues[index].second));
+        cue_button->set_visual_style(index == 3U ? ButtonVisualStyle::standard
+                                                : ButtonVisualStyle::command);
+        typography->add_at(cue_button,
+                           {500.0 + static_cast<double>(index) * 98.0,
+                            64.0, 88.0, 32.0});
+        const HostSoundCue cue = cues[index].first;
+        const std::weak_ptr<CheckBox> weak_enabled = sound_enabled;
+        context->subscriptions.push_back(cue_button->clicked().subscribe(
+            *typography, [weak_enabled, cue, context](ButtonBase& source) {
+                HostServices* services = source.attached_window() == nullptr
+                    ? nullptr : source.attached_window()->host_services();
+                HostServiceStatus result{HostServiceError::unsupported};
+                if (services != nullptr) {
+                    const auto now = std::chrono::steady_clock::now()
+                        .time_since_epoch();
+                    const auto stamp = std::chrono::duration_cast<
+                        std::chrono::nanoseconds>(now).count();
+                    const auto enabled = weak_enabled.lock();
+                    result = services->play_sound_cue(
+                        {cue, enabled && enabled->checked() ? 0.72 : 0.0,
+                         static_cast<std::uint64_t>(stamp)});
+                }
+                context->status->set_text(
+                    std::string("Sound cue ") + host_sound_cue_name(cue) +
+                    " · " + host_service_error_name(result.error) +
+                    " · visual meaning remains complete when muted");
+            }));
+    }
 }
 
 void add_ranges(const std::shared_ptr<Surface>& page,
@@ -651,25 +413,33 @@ void add_ranges(const std::shared_ptr<Surface>& page,
         }));
 
     auto progress_group = group("showcase.ranges.progress",
-                                "ProgressBar · blocks, continuous, marquee, pulse",
+                                "ProgressBar · blocks, continuous, marquee, pulse, moving stripes",
                                 {930.0, 280.0});
     page->add_at(progress_group, {24.0, 340.0, 930.0, 280.0});
-    for (std::size_t index = 0; index < 4U; ++index) {
+    for (std::size_t index = 0; index < 5U; ++index) {
         auto caption = label("showcase.ranges.progress.caption." + std::to_string(index),
                              index == 0U ? "Blocks" : index == 1U ? "Continuous"
-                                 : index == 2U ? "Marquee" : "Pulse", 11.0, 600, muted);
+                                 : index == 2U ? "Marquee" : index == 3U ? "Pulse"
+                                 : "Moving stripes", 11.0, 600, muted);
         progress_group->add_at(caption,
-                               {24.0, 38.0 + static_cast<double>(index) * 52.0,
+                               {24.0, 36.0 + static_cast<double>(index) * 45.0,
                                 110.0, 24.0});
         auto progress = make_control<ProgressBar>(
             StableId("showcase.ranges.progress." + std::to_string(index)));
         progress->set_accessible_name(index == 0U ? "Blocks progress"
             : index == 1U ? "Continuous progress"
-            : index == 2U ? "Marquee progress" : "Pulse progress");
-        progress->set_visual_style(static_cast<ProgressBarVisualStyle>(index));
+            : index == 2U ? "Marquee progress" : index == 3U ? "Pulse progress"
+            : "Moving striped progress");
+        progress->set_visual_style(index < 4U
+            ? static_cast<ProgressBarVisualStyle>(index)
+            : ProgressBarVisualStyle::continuous);
+        if (index == 4U) {
+            progress->set_overlay_style(ProgressBarOverlayStyle::moving_stripes);
+            progress->set_animation_period(std::chrono::milliseconds(750));
+        }
         progress->set_value(64.0);
         progress_group->add_at(progress,
-                               {135.0, 40.0 + static_cast<double>(index) * 52.0,
+                               {155.0, 38.0 + static_cast<double>(index) * 45.0,
                                 700.0, 24.0});
         if (index >= 2U) {
             context->animated_progress.push_back(progress);
@@ -694,16 +464,8 @@ void add_containers(const std::shared_ptr<Surface>& page,
     split->set_first_minimum(180.0);
     split->set_second_minimum(280.0);
     page->add_at(split, {24.0, 100.0, 930.0, 430.0});
-    auto first_background = make_control<Panel>(
-        StableId("showcase.containers.first.background"));
-    first_background->set_background(Color::rgba(225, 235, 243));
-    first_background->set_requested_bounds({0.0, 0.0, 310.0, 430.0});
-    split->first_panel()->add_child(first_background);
-    auto second_background = make_control<Panel>(
-        StableId("showcase.containers.second.background"));
-    second_background->set_background(paper);
-    second_background->set_requested_bounds({0.0, 0.0, 620.0, 430.0});
-    split->second_panel()->add_child(second_background);
+    split->first_panel()->set_background(Color::rgba(225, 235, 243));
+    split->second_panel()->set_background(paper);
 
     auto first_title = label("showcase.containers.first.title", "NAVIGATION PANE", 13.0, 700,
                              shell_blue_dark);
@@ -759,10 +521,398 @@ void add_containers(const std::shared_ptr<Surface>& page,
             }
         }));
 
-    auto note = label("showcase.containers.note",
-                      "The splitter is the public SplitContainer—not demo-painted geometry.",
-                      11.0, 600, green);
-    page->add_at(note, {26.0, 552.0, 700.0, 24.0});
+    auto base_container = make_control<ContainerControl>(
+        StableId("showcase.containers.base"));
+    base_container->set_accessible_name("Base ContainerControl specimen");
+    page->add_at(base_container, {24.0, 548.0, 450.0, 82.0});
+    auto base_face = make_control<Panel>(
+        StableId("showcase.containers.base.face"));
+    base_face->set_background(Color::rgba(232, 239, 245));
+    base_face->set_border_style(BorderStyle::line);
+    base_face->set_dock(DockStyle::fill);
+    base_container->add_child(base_face);
+    auto base_copy = label(
+        "showcase.containers.base.copy",
+        "ContainerControl · active descendant + retained child composition",
+        11.0, 600, shell_blue_dark);
+    base_copy->set_requested_bounds({14.0, 12.0, 390.0, 24.0});
+    base_face->add_child(base_copy);
+    auto base_focus = make_control<Button>(
+        StableId("showcase.containers.base.focus"), "Focus descendant");
+    base_focus->set_requested_bounds({14.0, 42.0, 150.0, 28.0});
+    base_face->add_child(base_focus);
+    const std::weak_ptr<ContainerControl> weak_base = base_container;
+    const std::weak_ptr<Button> weak_base_focus = base_focus;
+    context->subscriptions.push_back(base_focus->clicked().subscribe(
+        *base_container, [weak_base, weak_base_focus](ButtonBase&) {
+            const auto container = weak_base.lock();
+            const auto focus = weak_base_focus.lock();
+            if (container && focus) {
+                static_cast<void>(container->request_active_control(focus));
+            }
+        }));
+
+    auto user_control = make_control<UserControl>(
+        StableId("showcase.containers.user"));
+    user_control->set_accessible_name("UserControl lifecycle specimen");
+    page->add_at(user_control, {488.0, 548.0, 466.0, 82.0});
+    auto user_face = make_control<Panel>(
+        StableId("showcase.containers.user.face"));
+    user_face->set_background(Color::rgba(238, 244, 236));
+    user_face->set_border_style(BorderStyle::line);
+    user_face->set_dock(DockStyle::fill);
+    user_control->add_child(user_face);
+    auto user_status = label(
+        "showcase.containers.user.status",
+        "UserControl · awaiting one-shot Loaded lifecycle",
+        11.0, 600, green);
+    user_status->set_requested_bounds({14.0, 12.0, 420.0, 24.0});
+    user_face->add_child(user_status);
+    auto user_action = make_control<Button>(
+        StableId("showcase.containers.user.action"), "Reusable child action");
+    user_action->set_visual_style(ButtonVisualStyle::command);
+    user_action->set_requested_bounds({14.0, 42.0, 178.0, 28.0});
+    user_face->add_child(user_action);
+    const std::weak_ptr<Label> weak_user_status = user_status;
+    context->subscriptions.push_back(user_control->loaded().subscribe(
+        *user_control, [weak_user_status] {
+            if (const auto status = weak_user_status.lock()) {
+                status->set_text(
+                    "UserControl · Loaded fired once · attachment committed");
+            }
+        }));
+}
+
+void add_layout_panels(const std::shared_ptr<Surface>& page,
+                       const std::shared_ptr<ShowcaseContext>& context) {
+    page->add_at(label("showcase.layout.heading", "RETAINED LAYOUT PANELS", 22.0,
+                       700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
+    page->add_at(label(
+                     "showcase.layout.lead",
+                     "Preferred bounds remain authored data while flow and table containers assign independent retained slots.",
+                     12.0, 400, muted),
+                 {26.0, 52.0, 920.0, 24.0});
+
+    auto flow_group = group(
+        "showcase.layout.flow.group",
+        "FlowLayoutPanel · four directions · wrap · physical margins · FlowBreak",
+        {930.0, 218.0});
+    page->add_at(flow_group, {24.0, 92.0, 930.0, 218.0});
+    constexpr std::array<std::pair<FlowDirection, std::string_view>, 4> directions{{
+        {FlowDirection::left_to_right, "Left to right + break"},
+        {FlowDirection::right_to_left, "Right to left"},
+        {FlowDirection::top_down, "Top down"},
+        {FlowDirection::bottom_up, "Bottom up"},
+    }};
+    for (std::size_t index = 0U; index < directions.size(); ++index) {
+        auto card = group(
+            "showcase.layout.flow.card." + std::to_string(index),
+            std::string(directions[index].second), {210.0, 156.0});
+        flow_group->add_at(card,
+                           {18.0 + static_cast<double>(index) * 224.0,
+                            40.0, 210.0, 156.0});
+        auto flow = make_control<FlowLayoutPanel>(
+            StableId("showcase.layout.flow." + std::to_string(index)));
+        flow->set_accessible_name(std::string(directions[index].second) +
+                                  " flow layout");
+        flow->set_flow_direction(directions[index].first);
+        flow->set_padding({5.0, 5.0, 5.0, 5.0});
+        card->add_at(flow, {6.0, 26.0, 198.0, 122.0});
+        std::shared_ptr<Button> break_item;
+        for (std::size_t item_index = 0U; item_index < 5U; ++item_index) {
+            auto item = make_control<Button>(
+                StableId("showcase.layout.flow." + std::to_string(index) +
+                         ".item." + std::to_string(item_index)),
+                std::string(1U, static_cast<char>('A' + item_index)));
+            item->set_visual_style(item_index % 2U == 0U
+                                       ? ButtonVisualStyle::command
+                                       : ButtonVisualStyle::standard);
+            item->set_requested_bounds(
+                {0.0, 0.0,
+                 index < 2U ? 48.0 + static_cast<double>(item_index % 2U) * 10.0
+                            : 52.0,
+                 index < 2U ? 26.0 : 19.0});
+            item->set_margin({3.0, 2.0, 3.0, 2.0});
+            flow->add_child(item);
+            if (item_index == 1U) break_item = item;
+        }
+        if (index == 0U && break_item) flow->set_flow_break(*break_item, true);
+    }
+
+    auto table_group = group(
+        "showcase.layout.table.group",
+        "TableLayoutPanel · absolute + auto + weighted percent tracks · spans + automatic placement",
+        {930.0, 292.0});
+    page->add_at(table_group, {24.0, 330.0, 930.0, 292.0});
+    auto table = make_control<TableLayoutPanel>(
+        StableId("showcase.layout.table"));
+    table->set_accessible_name("Mixed-track table layout specimen");
+    table->set_padding({6.0, 6.0, 6.0, 6.0});
+    table->set_column_count(4U);
+    table->set_row_count(3U);
+    table->set_column_style(0U, {TableSizeMode::absolute, 140.0});
+    table->set_column_style(1U, {TableSizeMode::auto_size, 0.0});
+    table->set_column_style(2U, {TableSizeMode::percent, 1.0});
+    table->set_column_style(3U, {TableSizeMode::percent, 2.0});
+    table->set_row_style(0U, {TableSizeMode::absolute, 42.0});
+    table->set_row_style(1U, {TableSizeMode::auto_size, 0.0});
+    table->set_row_style(2U, {TableSizeMode::percent, 1.0});
+    table->set_cell_border_style(TableCellBorderStyle::inset);
+    table_group->add_at(table, {18.0, 38.0, 894.0, 218.0});
+
+    auto table_header = label(
+        "showcase.layout.table.header",
+        "AUTHORED PREFERRED SIZE  →  RETAINED CELL SLOT  →  COMMITTED BOUNDS",
+        12.0, 700, shell_blue_dark);
+    table_header->set_requested_bounds({0.0, 0.0, 720.0, 26.0});
+    table_header->set_margin({8.0, 7.0, 8.0, 5.0});
+    table->add_child(table_header);
+    table->set_cell_position(*table_header, {0U, 0U});
+    table->set_column_span(*table_header, 4U);
+
+    auto absolute = label("showcase.layout.table.absolute", "Absolute · 140 px",
+                          11.0, 600, ink);
+    absolute->set_requested_bounds({0.0, 0.0, 112.0, 24.0});
+    table->add_child(absolute);
+    table->set_cell_position(*absolute, {0U, 1U});
+
+    auto automatic = make_control<Button>(
+        StableId("showcase.layout.table.auto"), "Auto content");
+    automatic->set_visual_style(ButtonVisualStyle::accent);
+    automatic->set_requested_bounds({0.0, 0.0, 128.0, 30.0});
+    table->add_child(automatic);
+    table->set_cell_position(*automatic, {1U, 1U});
+
+    auto percent_one = make_control<CheckBox>(
+        StableId("showcase.layout.table.percent.one"), "Percent · 1 share");
+    percent_one->set_checked(true);
+    percent_one->set_indicator_style(ChoiceIndicatorStyle::modern);
+    percent_one->set_requested_bounds({0.0, 0.0, 140.0, 28.0});
+    table->add_child(percent_one);
+    table->set_cell_position(*percent_one, {2U, 1U});
+
+    auto percent_two = make_control<TrackBar>(
+        StableId("showcase.layout.table.percent.two"));
+    percent_two->set_accessible_name("Percent two-share cell slider");
+    percent_two->set_visual_style(TrackBarVisualStyle::filled);
+    percent_two->set_value(68.0);
+    percent_two->set_requested_bounds({0.0, 0.0, 230.0, 30.0});
+    table->add_child(percent_two);
+    table->set_cell_position(*percent_two, {3U, 1U});
+
+    auto span_note = label(
+        "showcase.layout.table.span",
+        "ColumnSpan = 2 · lookup covers both cells",
+        11.0, 600, green);
+    span_note->set_requested_bounds({0.0, 0.0, 260.0, 28.0});
+    table->add_child(span_note);
+    table->set_cell_position(*span_note, {0U, 2U});
+    table->set_column_span(*span_note, 2U);
+
+    auto auto_placed = make_control<Button>(
+        StableId("showcase.layout.table.auto.placed"), "Auto-placed cell");
+    auto_placed->set_visual_style(ButtonVisualStyle::command);
+    auto_placed->set_requested_bounds({0.0, 0.0, 136.0, 30.0});
+    table->add_child(auto_placed);
+
+    auto table_progress = make_control<ProgressBar>(
+        StableId("showcase.layout.table.progress"));
+    table_progress->set_value(76.0);
+    table_progress->set_requested_bounds({0.0, 0.0, 230.0, 24.0});
+    table->add_child(table_progress);
+
+    auto note = label(
+        "showcase.layout.note",
+        "Resize proof is framework-owned: authored bounds never become the parent-assigned slot.",
+        11.0, 600, green);
+    page->add_at(note, {26.0, 624.0, 800.0, 22.0});
+    static_cast<void>(context);
+}
+
+void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
+                         const std::shared_ptr<ShowcaseContext>& context) {
+    page->add_at(label("showcase.dock.heading", "DOCK AND ANCHOR", 22.0, 700,
+                       shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
+    page->add_at(label(
+                     "showcase.dock.lead",
+                     "Base Control layout owns z-ordered docking, padded client consumption, compound edge anchors, and runtime rebasing.",
+                     12.0, 400, muted),
+                 {26.0, 52.0, 920.0, 24.0});
+
+    auto dock_group = group(
+        "showcase.dock.group",
+        "Dock · Left + Top + Top + Right + Bottom + Fill · z-order commands",
+        {930.0, 260.0});
+    page->add_at(dock_group, {24.0, 92.0, 930.0, 260.0});
+    auto dock_canvas = make_control<Panel>(StableId("showcase.dock.canvas"));
+    dock_canvas->set_accessible_name("Dock layout specimen");
+    dock_canvas->set_background(Color::rgba(238, 243, 247));
+    dock_canvas->set_border_style(BorderStyle::sunken);
+    dock_canvas->set_padding({8.0, 8.0, 8.0, 8.0});
+    dock_group->add_at(dock_canvas, {18.0, 38.0, 610.0, 190.0});
+
+    auto fill = make_control<Button>(StableId("showcase.dock.fill"),
+                                     "Fill · remaining client");
+    fill->set_visual_style(ButtonVisualStyle::accent);
+    fill->set_requested_bounds({0.0, 0.0, 80.0, 30.0});
+    fill->set_dock(DockStyle::fill);
+    auto bottom = make_control<Button>(StableId("showcase.dock.bottom"),
+                                       "Bottom · 26 px");
+    bottom->set_requested_bounds({0.0, 0.0, 100.0, 26.0});
+    bottom->set_dock(DockStyle::bottom);
+    auto right = make_control<Button>(StableId("showcase.dock.right"),
+                                      "Right");
+    right->set_requested_bounds({0.0, 0.0, 76.0, 30.0});
+    right->set_dock(DockStyle::right);
+    auto top_second = make_control<Button>(
+        StableId("showcase.dock.top.second"), "Top B · z-order");
+    top_second->set_visual_style(ButtonVisualStyle::command);
+    top_second->set_requested_bounds({0.0, 0.0, 100.0, 25.0});
+    top_second->set_dock(DockStyle::top);
+    auto top_first = make_control<Button>(
+        StableId("showcase.dock.top.first"), "Top A · topmost");
+    top_first->set_visual_style(ButtonVisualStyle::command);
+    top_first->set_requested_bounds({0.0, 0.0, 100.0, 25.0});
+    top_first->set_dock(DockStyle::top);
+    auto left = make_control<Button>(StableId("showcase.dock.left"), "Left");
+    left->set_requested_bounds({0.0, 0.0, 82.0, 30.0});
+    left->set_dock(DockStyle::left);
+    dock_canvas->add_child(fill);
+    dock_canvas->add_child(bottom);
+    dock_canvas->add_child(right);
+    dock_canvas->add_child(top_second);
+    dock_canvas->add_child(top_first);
+    dock_canvas->add_child(left);
+
+    auto toggle_left = make_control<Button>(
+        StableId("showcase.dock.toggle-left"), "Hide left edge");
+    toggle_left->set_visual_style(ButtonVisualStyle::accent);
+    dock_group->add_at(toggle_left, {652.0, 52.0, 236.0, 34.0});
+    auto swap_top = make_control<Button>(
+        StableId("showcase.dock.swap-top"), "Bring Top B to front");
+    dock_group->add_at(swap_top, {652.0, 98.0, 236.0, 34.0});
+    auto dock_note = label(
+        "showcase.dock.note",
+        "Hidden docked controls consume zero extent. SetChildIndex changes edge order without rewriting preferred bounds.",
+        11.0, 600, green);
+    dock_note->set_text_wrapping(TextWrapping::word);
+    dock_note->set_vertical_alignment(VerticalAlignment::near);
+    dock_group->add_at(dock_note, {652.0, 148.0, 238.0, 70.0});
+
+    const std::weak_ptr<Button> weak_left = left;
+    const std::weak_ptr<Button> weak_toggle = toggle_left;
+    const std::weak_ptr<ShowcaseContext> weak_context = context;
+    context->subscriptions.push_back(toggle_left->clicked().subscribe(
+        *page, [weak_left, weak_toggle, weak_context](ButtonBase&) {
+            const auto left = weak_left.lock();
+            const auto toggle = weak_toggle.lock();
+            if (!left || !toggle) return;
+            left->set_visible(!left->visible());
+            toggle->set_text(left->visible() ? "Hide left edge"
+                                             : "Restore left edge");
+            if (const auto context = weak_context.lock()) {
+                context->status->set_text(
+                    left->visible()
+                        ? "Dock · left edge restored · fill contracted"
+                        : "Dock · hidden edge released · fill expanded");
+            }
+        }));
+    const std::weak_ptr<Panel> weak_dock_canvas = dock_canvas;
+    const std::weak_ptr<Button> weak_top_first = top_first;
+    const std::weak_ptr<Button> weak_top_second = top_second;
+    const std::weak_ptr<Button> weak_swap = swap_top;
+    auto top_b_front = std::make_shared<bool>(false);
+    context->subscriptions.push_back(swap_top->clicked().subscribe(
+        *page, [weak_dock_canvas, weak_top_first, weak_top_second, weak_swap,
+                weak_context, top_b_front](ButtonBase&) {
+            const auto canvas = weak_dock_canvas.lock();
+            const auto first = weak_top_first.lock();
+            const auto second = weak_top_second.lock();
+            const auto swap = weak_swap.lock();
+            if (!canvas || !first || !second || !swap) return;
+            *top_b_front = !*top_b_front;
+            static_cast<void>(canvas->set_child_index(
+                (*top_b_front ? second : first)->runtime_id(), 0U));
+            swap->set_text(*top_b_front ? "Bring Top A to front"
+                                       : "Bring Top B to front");
+            if (const auto context = weak_context.lock()) {
+                context->status->set_text(
+                    *top_b_front ? "Dock · Top B now consumes the edge first"
+                                 : "Dock · Top A now consumes the edge first");
+            }
+        }));
+
+    auto anchor_group = group(
+        "showcase.anchor.group",
+        "Anchor · fixed · stretch · centered · bottom-right · live parent resize",
+        {930.0, 250.0});
+    page->add_at(anchor_group, {24.0, 374.0, 930.0, 250.0});
+    auto anchor_canvas = make_control<Panel>(StableId("showcase.anchor.canvas"));
+    anchor_canvas->set_accessible_name("Compound anchor specimen");
+    anchor_canvas->set_background(Color::rgba(247, 249, 251));
+    anchor_canvas->set_border_style(BorderStyle::line);
+    anchor_canvas->set_padding({8.0, 8.0, 8.0, 8.0});
+    anchor_group->add_at(anchor_canvas, {18.0, 38.0, 600.0, 170.0});
+
+    auto fixed = make_control<Button>(StableId("showcase.anchor.fixed"),
+                                      "Left + Top");
+    fixed->set_requested_bounds({18.0, 16.0, 126.0, 28.0});
+    auto stretch = make_control<Button>(StableId("showcase.anchor.stretch"),
+                                        "Left + Right · stretches");
+    stretch->set_visual_style(ButtonVisualStyle::accent);
+    stretch->set_requested_bounds({18.0, 56.0, 280.0, 28.0});
+    stretch->set_anchor(AnchorStyles::left | AnchorStyles::right |
+                        AnchorStyles::top);
+    auto centered = make_control<Button>(StableId("showcase.anchor.centered"),
+                                         "No edges · centered");
+    centered->set_requested_bounds({190.0, 106.0, 152.0, 28.0});
+    centered->set_anchor(AnchorStyles::none);
+    auto bottom_right = make_control<Button>(
+        StableId("showcase.anchor.bottom-right"), "Right + Bottom");
+    bottom_right->set_visual_style(ButtonVisualStyle::command);
+    bottom_right->set_requested_bounds({424.0, 126.0, 142.0, 28.0});
+    bottom_right->set_anchor(AnchorStyles::right | AnchorStyles::bottom);
+    anchor_canvas->add_child(fixed);
+    anchor_canvas->add_child(stretch);
+    anchor_canvas->add_child(centered);
+    anchor_canvas->add_child(bottom_right);
+
+    auto resize = make_control<Button>(StableId("showcase.anchor.resize"),
+                                       "Expand specimen");
+    resize->set_visual_style(ButtonVisualStyle::accent);
+    anchor_group->add_at(resize, {758.0, 54.0, 150.0, 34.0});
+    auto anchor_note = label(
+        "showcase.anchor.note",
+        "Runtime size and Anchor changes rebase from committed geometry. Authored bounds remain queryable and unchanged.",
+        11.0, 600, green);
+    anchor_note->set_text_wrapping(TextWrapping::word);
+    anchor_note->set_vertical_alignment(VerticalAlignment::near);
+    anchor_group->add_at(anchor_note, {758.0, 104.0, 150.0, 104.0});
+
+    const std::weak_ptr<ScaledGroupBox> weak_anchor_group = anchor_group;
+    const std::weak_ptr<Panel> weak_anchor_canvas = anchor_canvas;
+    const std::weak_ptr<Button> weak_resize = resize;
+    auto expanded = std::make_shared<bool>(false);
+    context->subscriptions.push_back(resize->clicked().subscribe(
+        *page, [weak_anchor_group, weak_anchor_canvas, weak_resize,
+                weak_context, expanded](ButtonBase&) {
+            const auto group = weak_anchor_group.lock();
+            const auto canvas = weak_anchor_canvas.lock();
+            const auto resize = weak_resize.lock();
+            if (!group || !canvas || !resize) return;
+            *expanded = !*expanded;
+            group->set_design_bounds(*canvas,
+                *expanded ? Rect{18.0, 38.0, 730.0, 190.0}
+                          : Rect{18.0, 38.0, 600.0, 170.0});
+            resize->set_text(*expanded ? "Restore specimen"
+                                      : "Expand specimen");
+            if (const auto context = weak_context.lock()) {
+                context->status->set_text(
+                    *expanded
+                        ? "Anchor · parent expanded · stretch/right/center updated"
+                        : "Anchor · parent restored from retained design slot");
+            }
+        }));
 }
 
 void add_animation(const std::shared_ptr<Surface>& page,
@@ -773,6 +923,18 @@ void add_animation(const std::shared_ptr<Surface>& page,
                        "Eight public easing curves, alternate direction, retained frame scheduling, hidden-page suspension.",
                        12.0, 400, muted), {26.0, 52.0, 900.0, 24.0});
     auto easing = make_control<EasingBoard>(StableId("showcase.animation.easing"));
+    easing->set_title("TIMELINE AND EASING LAB");
+    easing->set_style(showcase_style());
+    easing->set_tracks({
+        {EasingCurve::linear, "Linear", accent},
+        {EasingCurve::ease_in, "Ease in", accent},
+        {EasingCurve::ease_out, "Ease out", accent},
+        {EasingCurve::ease_in_out, "Ease in/out", violet},
+        {EasingCurve::smooth_step, "Smooth step", violet},
+        {EasingCurve::back_out, "Back out", violet},
+        {EasingCurve::bounce_out, "Bounce", orange},
+        {EasingCurve::elastic_out, "Elastic", orange},
+    });
     page->add_at(easing, {24.0, 92.0, 930.0, 340.0});
     context->easing = easing;
 
@@ -782,21 +944,14 @@ void add_animation(const std::shared_ptr<Surface>& page,
     auto pause = make_control<Button>(StableId("showcase.animation.pause"), "Pause motion");
     pause->set_visual_style(ButtonVisualStyle::accent);
     controls->add_at(pause, {24.0, 42.0, 160.0, 36.0});
+    context->motion_pause = pause;
     const std::weak_ptr<ShowcaseContext> weak_context = context;
-    const std::weak_ptr<Button> weak_pause = pause;
     context->subscriptions.push_back(pause->clicked().subscribe(
-        *easing, [weak_context, weak_pause](ButtonBase&) {
+        *easing, [weak_context](ButtonBase&) {
             const auto context = weak_context.lock();
-            const auto pause = weak_pause.lock();
-            if (!context || !pause) {
-                return;
-            }
-            const bool paused = !context->easing->paused();
-            context->easing->set_paused(paused);
-            for (const auto& progress : context->animated_progress) {
-                progress->set_animation_enabled(!paused);
-            }
-            pause->set_text(paused ? "Resume motion" : "Pause motion");
+            if (!context || !context->live_motion) return;
+            context->user_paused = !context->user_paused;
+            context->apply_motion_policy();
         }));
     auto copy = label("showcase.animation.policy",
                       "Animation is deadline-driven and quiescent when hidden or paused. No perpetual redraw loop.",
@@ -806,6 +961,13 @@ void add_animation(const std::shared_ptr<Surface>& page,
                                           "Reduced-motion substitution");
     reduced->set_indicator_style(ChoiceIndicatorStyle::toggle);
     controls->add_at(reduced, {24.0, 96.0, 310.0, 28.0});
+    context->subscriptions.push_back(reduced->checked_changed().subscribe(
+        *easing, [weak_context](bool enabled) {
+            if (const auto context = weak_context.lock()) {
+                context->reduced_motion = enabled;
+                context->apply_motion_policy();
+            }
+        }));
 }
 
 void add_states(const std::shared_ptr<Surface>& page,
@@ -862,18 +1024,138 @@ void add_states(const std::shared_ptr<Surface>& page,
     lifecycle->add_at(cursor_note, {24.0, 142.0, 390.0, 42.0});
 
     auto diagnostics = make_control<DiagnosticsCard>(StableId("showcase.states.diagnostics"));
+    diagnostics->set_title("RETAINED RUNTIME");
+    BasicControlStyle diagnostics_style = showcase_style();
+    diagnostics_style.text = Color::rgba(28, 39, 50);
+    diagnostics_style.face = Color::rgba(175, 203, 221);
+    diagnostics_style.face_light = Color::rgba(226, 238, 246);
+    diagnostics_style.accent = green;
+    diagnostics->set_style(diagnostics_style);
     page->add_at(diagnostics, {494.0, 226.0, 460.0, 240.0});
-    auto completeness = group("showcase.states.coverage", "Coverage contract",
-                              {930.0, 134.0});
-    page->add_at(completeness, {24.0, 488.0, 930.0, 134.0});
-    auto coverage = label("showcase.states.coverage.copy",
-                          "LIVE: public controls, visual variants, focus, capture, split panes, timelines, active surfaces, semantic snapshots, native accessibility.\n"
-                          "OPEN: data-bound virtual collections and tree/grid families.",
-                          11.0, 400, ink);
-    coverage->set_text_wrapping(TextWrapping::word);
-    coverage->set_vertical_alignment(VerticalAlignment::near);
-    completeness->add_at(coverage, {24.0, 42.0, 860.0, 58.0});
-    static_cast<void>(context);
+    auto dispatcher = group(
+        "showcase.states.dispatcher", "UI dispatcher · posted, bounded, cancellable",
+        {930.0, 134.0});
+    page->add_at(dispatcher, {24.0, 488.0, 930.0, 134.0});
+    auto post = make_control<Button>(StableId("showcase.dispatcher.post"),
+                                     "Post A · B · C → D");
+    post->set_visual_style(ButtonVisualStyle::accent);
+    auto cancel = make_control<Button>(StableId("showcase.dispatcher.cancel"),
+                                       "Post then cancel");
+    auto invoke = make_control<Button>(StableId("showcase.dispatcher.invoke"),
+                                       "Worker Invoke");
+    context->dispatcher_invoke = invoke;
+    dispatcher->add_at(post, {22.0, 40.0, 174.0, 36.0});
+    dispatcher->add_at(cancel, {208.0, 40.0, 154.0, 36.0});
+    dispatcher->add_at(invoke, {374.0, 40.0, 170.0, 36.0});
+    context->dispatcher_status = label(
+        "showcase.dispatcher.status",
+        "Ready · BeginInvoke never executes inside the click callback",
+        11.0, 600, green);
+    context->dispatcher_status->set_text_wrapping(TextWrapping::word);
+    context->dispatcher_status->set_vertical_alignment(VerticalAlignment::near);
+    dispatcher->add_at(context->dispatcher_status, {566.0, 36.0, 328.0, 58.0});
+
+    const std::weak_ptr<ShowcaseContext> weak_context = context;
+    context->subscriptions.push_back(post->clicked().subscribe(
+        *post, [weak_context](ButtonBase& source) {
+            const auto context = weak_context.lock();
+            if (!context) return;
+            ++context->dispatcher_batch;
+            context->dispatcher_trace.clear();
+            context->dispatcher_operations.clear();
+            context->dispatcher_status->set_text(
+                "Click returned · batch " +
+                std::to_string(context->dispatcher_batch) + " is pending");
+            const auto append = [weak_context](char value) {
+                if (const auto context = weak_context.lock()) {
+                    context->dispatcher_trace.push_back(value);
+                }
+            };
+            context->dispatcher_operations.push_back(source.begin_invoke(
+                [append] { append('A'); }));
+            context->dispatcher_operations.push_back(source.begin_invoke(
+                [weak_context, append] {
+                    append('B');
+                    if (const auto context = weak_context.lock()) {
+                        context->dispatcher_operations.push_back(
+                            context->dispatcher_status->begin_invoke(
+                                [weak_context, append] {
+                                    append('D');
+                                    if (const auto state = weak_context.lock()) {
+                                        const DispatcherSnapshot snapshot =
+                                            state->dispatcher_status
+                                                ->attached_window()
+                                                ->dispatcher_snapshot();
+                                        state->dispatcher_status->set_text(
+                                            "Turn 2 committed · order " +
+                                            state->dispatcher_trace +
+                                            " · invoked " +
+                                            std::to_string(snapshot.invoked) +
+                                            " · faults " +
+                                            std::to_string(snapshot.faulted));
+                                    }
+                                }));
+                    }
+                }));
+            context->dispatcher_operations.push_back(source.begin_invoke(
+                [weak_context, append] {
+                    append('C');
+                    if (const auto context = weak_context.lock()) {
+                        context->dispatcher_status->set_text(
+                            "Turn 1 committed · order " +
+                            context->dispatcher_trace +
+                            " · nested D remains posted");
+                    }
+                }));
+        }));
+    context->subscriptions.push_back(cancel->clicked().subscribe(
+        *cancel, [weak_context](ButtonBase& source) {
+            const auto context = weak_context.lock();
+            if (!context) return;
+            context->dispatcher_operations.clear();
+            DispatchOperation operation = source.begin_invoke([weak_context] {
+                if (const auto state = weak_context.lock()) {
+                    state->dispatcher_status->set_text(
+                        "ERROR · cancelled callback executed");
+                }
+            });
+            const std::uint64_t sequence = operation.sequence();
+            const bool cancelled = operation.cancel();
+            context->dispatcher_operations.push_back(std::move(operation));
+            context->dispatcher_status->set_text(
+                "Cancelled posted operation #" + std::to_string(sequence) +
+                (cancelled ? " before dispatch" : " too late"));
+        }));
+    context->subscriptions.push_back(invoke->clicked().subscribe(
+        *invoke, [weak_context](ButtonBase&) {
+            const auto context = weak_context.lock();
+            if (!context || !context->dispatcher_invoke->enabled()) return;
+            context->dispatcher_invoke->set_enabled(false);
+            context->dispatcher_status->set_text(
+                "Worker blocked · no nested pump · waiting for UI turn");
+            if (context->dispatcher_worker.joinable()) {
+                context->dispatcher_worker.join();
+            }
+            context->dispatcher_worker = std::thread([weak_context] {
+                const auto context = weak_context.lock();
+                if (!context) return;
+                try {
+                    context->dispatcher_status->invoke([weak_context] {
+                        if (const auto state = weak_context.lock()) {
+                            const DispatcherSnapshot snapshot =
+                                state->dispatcher_status->attached_window()
+                                    ->dispatcher_snapshot();
+                            state->dispatcher_status->set_text(
+                                "Worker released after UI callback · marshalled " +
+                                std::to_string(snapshot.marshalled_invocations));
+                            state->dispatcher_invoke->set_enabled(true);
+                        }
+                    });
+                } catch (const DispatchCancelledError&) {
+                    // Window shutdown is the terminal owner of this worker.
+                }
+            });
+        }));
 }
 
 void add_text_input(const std::shared_ptr<Surface>& page,
@@ -881,12 +1163,12 @@ void add_text_input(const std::shared_ptr<Surface>& page,
     page->add_at(label("showcase.text.heading", "TEXT AND INPUT", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 500.0, 34.0});
     page->add_at(label("showcase.text.lead",
-                       "Unicode editing, directional selection, captured drag, caret deadlines, replacement ranges, and history.",
+                       "Unicode editing, word navigation, host clipboard commands, protected text, captured drag, caret deadlines, and history.",
                        12.0, 400, muted), {26.0, 52.0, 900.0, 24.0});
 
     auto editing = group("showcase.text.editing", "Editable TextBox states",
-                         {930.0, 274.0});
-    page->add_at(editing, {24.0, 92.0, 930.0, 274.0});
+                         {930.0, 290.0});
+    page->add_at(editing, {24.0, 92.0, 930.0, 290.0});
     editing->add_at(label("showcase.text.primary.caption", "Primary field", 11.0,
                           600, muted), {24.0, 42.0, 130.0, 24.0});
     auto primary = make_control<TextBox>(StableId("showcase.text.primary"));
@@ -909,9 +1191,19 @@ void add_text_input(const std::shared_ptr<Surface>& page,
     read_only->set_read_only(true);
     editing->add_at(read_only, {154.0, 144.0, 700.0, 36.0});
 
+    editing->add_at(label("showcase.text.password.caption", "Protected", 11.0,
+                          600, muted), {24.0, 204.0, 130.0, 24.0});
+    auto password = make_control<TextBox>(StableId("showcase.text.password"),
+                                           "Portsmouth-Ω-2026");
+    password->set_accessible_name("Protected credential field");
+    password->set_accessible_description(
+        "Password text is editable but excluded from paint traces, clipboard export, and semantic values.");
+    password->set_use_system_password_character(true);
+    editing->add_at(password, {154.0, 198.0, 700.0, 36.0});
+
     auto state = label("showcase.text.state", "Selection: empty · History: clean",
                        11.0, 600, green);
-    editing->add_at(state, {154.0, 202.0, 700.0, 26.0});
+    editing->add_at(state, {154.0, 250.0, 700.0, 26.0});
     const std::weak_ptr<TextBox> weak_primary = primary;
     const std::weak_ptr<Label> weak_state = state;
     const auto update_state = [weak_primary, weak_state] {
@@ -932,22 +1224,23 @@ void add_text_input(const std::shared_ptr<Surface>& page,
         *state, [update_state](const TextSelection&) { update_state(); }));
 
     auto commands = group("showcase.text.commands", "Programmatic editing surface",
-                          {930.0, 210.0});
-    page->add_at(commands, {24.0, 390.0, 930.0, 210.0});
-    const std::array<std::pair<std::string_view, double>, 4> command_specs{{
-        {"Select all", 24.0}, {"Replace selection", 206.0},
-        {"Undo", 430.0}, {"Redo", 612.0},
+                          {930.0, 216.0});
+    page->add_at(commands, {24.0, 404.0, 930.0, 216.0});
+    const std::array<std::pair<std::size_t, std::string_view>, 7> command_specs{{
+        {0U, "Select all"}, {4U, "Copy"}, {5U, "Cut"}, {6U, "Paste"},
+        {1U, "Replace"}, {2U, "Undo"}, {3U, "Redo"},
     }};
-    std::vector<std::shared_ptr<Button>> command_buttons;
-    for (std::size_t index = 0; index < command_specs.size(); ++index) {
+    std::array<std::shared_ptr<Button>, 7> command_buttons;
+    for (std::size_t position = 0; position < command_specs.size(); ++position) {
+        const std::size_t index = command_specs[position].first;
         auto button = make_control<Button>(
             StableId("showcase.text.command." + std::to_string(index)),
-            std::string(command_specs[index].first));
+            std::string(command_specs[position].second));
         button->set_visual_style(index == 1U ? ButtonVisualStyle::accent
                                              : ButtonVisualStyle::standard);
-        commands->add_at(button, {command_specs[index].second, 42.0,
-                                  index == 1U ? 196.0 : 154.0, 36.0});
-        command_buttons.push_back(button);
+        commands->add_at(button,
+            {24.0 + static_cast<double>(position) * 126.0, 42.0, 114.0, 36.0});
+        command_buttons[index] = button;
     }
     context->subscriptions.push_back(command_buttons[0]->clicked().subscribe(
         *primary, [weak_primary](ButtonBase&) {
@@ -967,12 +1260,44 @@ void add_text_input(const std::shared_ptr<Surface>& page,
         *primary, [weak_primary](ButtonBase&) {
             if (const auto field = weak_primary.lock()) static_cast<void>(field->redo());
         }));
+    auto clipboard_status = label(
+        "showcase.text.clipboard.status",
+        "Clipboard: select text, then use buttons or Cmd/Ctrl+C, X, V",
+        11.0, 600, green);
+    commands->add_at(clipboard_status, {24.0, 92.0, 830.0, 26.0});
+    const std::weak_ptr<Label> weak_clipboard_status = clipboard_status;
+    const auto update_clipboard_status =
+        [weak_primary, weak_clipboard_status](std::string_view command,
+                                              bool accepted) {
+            if (const auto status = weak_clipboard_status.lock()) {
+                const auto field = weak_primary.lock();
+                status->set_text(std::string("Clipboard ") + std::string(command) +
+                    (accepted ? " · accepted" : " · unavailable or empty") +
+                    (field ? " · " + std::to_string(field->text().size()) +
+                                 " UTF-8 bytes retained" : std::string{}));
+            }
+        };
+    context->subscriptions.push_back(command_buttons[4]->clicked().subscribe(
+        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
+            const auto field = weak_primary.lock();
+            update_clipboard_status("copy", field && field->copy());
+        }));
+    context->subscriptions.push_back(command_buttons[5]->clicked().subscribe(
+        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
+            const auto field = weak_primary.lock();
+            update_clipboard_status("cut", field && field->cut());
+        }));
+    context->subscriptions.push_back(command_buttons[6]->clicked().subscribe(
+        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
+            const auto field = weak_primary.lock();
+            update_clipboard_status("paste", field && field->paste());
+        }));
     auto guarantee = label("showcase.text.guarantee",
-                           "All editing state lives in public GUI.Forms TextBox + TextStore. The host only normalizes pointer, key, and text events.",
+                           "TextBox + TextStore own editing. HostServices only transports bounded UTF-8 clipboard data; protected fields never export values.",
                            11.0, 600, shell_blue_dark);
     guarantee->set_text_wrapping(TextWrapping::word);
     guarantee->set_vertical_alignment(VerticalAlignment::near);
-    commands->add_at(guarantee, {24.0, 104.0, 830.0, 60.0});
+    commands->add_at(guarantee, {24.0, 132.0, 830.0, 52.0});
 }
 
 void add_collections(const std::shared_ptr<Surface>& page,
@@ -1192,6 +1517,42 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
     page->add_at(primitives, {494.0, 404.0, 460.0, 220.0});
     auto board = make_control<DrawingEffectsBoard>(
         StableId("showcase.images.drawing.board"));
+    board->set_accessible_name("Renderer-neutral drawing primitive composition");
+    board->set_accessible_description(
+        "Nested clipping, translation, fills, strokes, lines, and text");
+    board->set_paint_callback([](Painter& painter, Rect bounds, Rect) {
+        const double board_width = bounds.width;
+        const double board_height = bounds.height;
+        painter.fill_rect(bounds,
+                          Color::rgba(26, 39, 52));
+        painter.fill_rect({0.0, 0.0, board_width, 4.0}, accent);
+        painter.draw_text_utf8({18.0, 27.0}, "RETAINED PAINTER COMPOSITION",
+                               {FontRole::control, 12.0, 700, false},
+                               Color::rgba(230, 240, 247));
+        painter.draw_text_utf8(
+            {18.0, 48.0},
+            "save · clip · translate · fill · stroke · line · UTF-8",
+            {FontRole::content, 10.0, 400, false},
+            Color::rgba(164, 192, 211));
+        painter.save();
+        painter.clip_rect({18.0, 62.0, board_width - 36.0, board_height - 78.0});
+        painter.translate({18.0, 62.0});
+        const double width = board_width - 36.0;
+        for (std::size_t index = 0; index < 12U; ++index) {
+            const double x = static_cast<double>(index) * width / 11.0;
+            const Color color = index % 3U == 0U ? accent
+                : index % 3U == 1U ? green : orange;
+            painter.draw_line({0.0, 66.0}, {x, 0.0}, color, 1.5);
+        }
+        painter.fill_rect({20.0, 20.0, 92.0, 38.0}, Color::rgba(43, 82, 112));
+        painter.stroke_rect({20.5, 20.5, 91.0, 37.0},
+                            Color::rgba(211, 228, 239), 1.0);
+        painter.fill_rect({126.0, 12.0, 72.0, 54.0}, violet);
+        painter.stroke_rect({126.5, 12.5, 71.0, 53.0},
+                            Color::rgba(234, 220, 244), 1.0);
+        painter.fill_rect({212.0, 28.0, 118.0, 22.0}, green);
+        painter.restore();
+    });
     primitives->add_at(board, {20.0, 38.0, 420.0, 158.0});
     static_cast<void>(context);
 }
@@ -1478,8 +1839,24 @@ void add_timing_and_tooltips(const std::shared_ptr<Surface>& page,
     context->timer_progress->set_value(0.0);
     context->timer_progress->set_accessible_name("Timer cycle");
     timer_group->add_at(context->timer_progress, {22.0, 164.0, 564.0, 24.0});
-    context->timer_motion = make_control<TimerMotionBoard>(
-        StableId("showcase.timing.motion"));
+    context->timer_motion = make_control<ScaledPanel>(
+        StableId("showcase.timing.motion"), Size{294.0, 170.0});
+    context->timer_motion->set_background(Color::rgba(247, 249, 251));
+    context->timer_motion->set_border_style(BorderStyle::line);
+    context->timer_motion->add_at(
+        label("showcase.timing.motion.caption", "WINDOW-QUEUE MOTION · 4 Hz",
+              10.0, 700, muted),
+        {14.0, 8.0, 266.0, 24.0});
+    auto motion_rule = make_control<Panel>(
+        StableId("showcase.timing.motion.rule"));
+    motion_rule->set_background(rule);
+    context->timer_motion->add_at(motion_rule, {14.0, 84.0, 266.0, 1.0});
+    context->timer_motion_target = make_control<Button>(
+        StableId("showcase.timing.motion.target"), "Moving tooltip target");
+    context->timer_motion_target->set_visual_style(ButtonVisualStyle::accent);
+    context->timer_motion_target->set_style(showcase_style());
+    context->timer_motion->add_at(
+        context->timer_motion_target, {14.0, 39.0, 168.0, 34.0});
     timer_group->add_at(context->timer_motion, {612.0, 38.0, 294.0, 170.0});
     auto cadence = label("showcase.timing.cadence.note",
                          "Late deadlines coalesce to one ordered tick; no catch-up burst and no hidden paint control.",
@@ -1525,15 +1902,440 @@ void add_timing_and_tooltips(const std::shared_ptr<Surface>& page,
     tips_group->add_at(proof, {628.0, 44.0, 270.0, 126.0});
 }
 
+void add_dates_and_calendar(const std::shared_ptr<Surface>& page,
+                            const std::shared_ptr<ShowcaseContext>& context) {
+    page->add_at(label("showcase.date.heading", "DATES AND CALENDAR", 22.0,
+                       700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
+    page->add_at(label(
+        "showcase.date.lead",
+        "Validated civil time, caller-owned formats, nullable and spinner modes, retained popup focus, and semantic date cells.",
+        12.0, 400, muted), {26.0, 52.0, 920.0, 24.0});
+
+    const DateTimeValue specimen{2026, 8U, 5U, 14U, 7U, 9U, 125U};
+    auto formats = group("showcase.date.formats",
+                         "Formatting · four modes and an owned provider",
+                         {930.0, 180.0});
+    page->add_at(formats, {24.0, 92.0, 930.0, 180.0});
+    const std::array<std::string_view, 4> captions{
+        "Long date", "Short date", "Time", "Custom"};
+    for (std::size_t index = 0U; index < captions.size(); ++index) {
+        const double column = index % 2U == 0U ? 22.0 : 474.0;
+        const double row = index < 2U ? 40.0 : 102.0;
+        formats->add_at(label("showcase.date.format.caption." + std::to_string(index),
+                              std::string(captions[index]), 10.0, 700,
+                              shell_blue_dark),
+                        {column, row, 86.0, 22.0});
+        auto picker = make_control<DateTimePicker>(
+            StableId("showcase.date.format." + std::to_string(index)));
+        picker->set_style(showcase_style());
+        picker->set_value(specimen);
+        picker->set_accessible_name(std::string(captions[index]) + " picker");
+        if (index == 1U) {
+            picker->set_format(DateTimePickerFormat::short_date);
+        } else if (index == 2U) {
+            picker->set_format(DateTimePickerFormat::time);
+        } else if (index == 3U) {
+            picker->set_custom_format("yyyy-MM-dd '·' HH:mm");
+            picker->set_format(DateTimePickerFormat::custom);
+        }
+        formats->add_at(picker, {column + 92.0, row - 5.0, 320.0, 30.0});
+    }
+
+    auto modes = group("showcase.date.modes",
+                       "Modes and states · nullable, spinner, provider, disabled",
+                       {930.0, 180.0});
+    page->add_at(modes, {24.0, 290.0, 930.0, 180.0});
+
+    auto optional = make_control<DateTimePicker>(
+        StableId("showcase.date.optional"));
+    optional->set_style(showcase_style());
+    optional->set_value(specimen);
+    optional->set_format(DateTimePickerFormat::short_date);
+    optional->set_show_check_box(true);
+    optional->set_checked(false);
+    optional->set_accessible_name("Optional unchecked date");
+    modes->add_at(label("showcase.date.optional.caption", "Optional value", 10.0,
+                        700, shell_blue_dark), {22.0, 40.0, 106.0, 22.0});
+    modes->add_at(optional, {132.0, 35.0, 284.0, 30.0});
+
+    auto spinner = make_control<DateTimePicker>(
+        StableId("showcase.date.spinner"));
+    spinner->set_style(showcase_style());
+    spinner->set_value(specimen);
+    spinner->set_format(DateTimePickerFormat::short_date);
+    spinner->set_show_up_down(true);
+    spinner->set_accessible_name("Date spinner");
+    modes->add_at(label("showcase.date.spinner.caption", "Up/down date", 10.0,
+                        700, shell_blue_dark), {474.0, 40.0, 106.0, 22.0});
+    modes->add_at(spinner, {584.0, 35.0, 320.0, 30.0});
+
+    auto provider = make_control<DateTimePicker>(
+        StableId("showcase.date.provider"));
+    provider->set_style(showcase_style());
+    provider->set_value(specimen);
+    provider->set_format_provider(french_date_provider());
+    provider->set_accessible_name("Caller-owned French date provider");
+    modes->add_at(label("showcase.date.provider.caption", "Owned provider", 10.0,
+                        700, shell_blue_dark), {22.0, 102.0, 106.0, 22.0});
+    modes->add_at(provider, {132.0, 97.0, 284.0, 30.0});
+
+    auto disabled = make_control<DateTimePicker>(
+        StableId("showcase.date.disabled"));
+    disabled->set_style(showcase_style());
+    disabled->set_value(specimen);
+    disabled->set_custom_format("MMM d, yyyy");
+    disabled->set_format(DateTimePickerFormat::custom);
+    disabled->set_enabled(false);
+    disabled->set_accessible_name("Disabled date picker");
+    modes->add_at(label("showcase.date.disabled.caption", "Disabled state", 10.0,
+                        700, shell_blue_dark), {474.0, 102.0, 106.0, 22.0});
+    modes->add_at(disabled, {584.0, 97.0, 320.0, 30.0});
+
+    auto lifecycle = group("showcase.date.lifecycle",
+                           "Popup lifecycle · commit, cancel, bounds, semantics",
+                           {930.0, 138.0});
+    page->add_at(lifecycle, {24.0, 488.0, 930.0, 138.0});
+    auto primary = make_control<DateTimePicker>(
+        StableId("showcase.date.primary"));
+    primary->set_style(showcase_style());
+    primary->set_value(specimen);
+    primary->set_range({2026, 8U, 1U}, {2026, 8U, 31U, 23U, 59U, 59U, 999U});
+    primary->set_accessible_name("Bounded appointment date");
+    lifecycle->add_at(primary, {22.0, 38.0, 310.0, 31.0});
+
+    auto previous = make_control<Button>(
+        StableId("showcase.date.previous"), "Previous day");
+    auto next = make_control<Button>(StableId("showcase.date.next"), "Next day");
+    auto open = make_control<Button>(StableId("showcase.date.open"), "Open calendar");
+    open->set_visual_style(ButtonVisualStyle::accent);
+    lifecycle->add_at(previous, {352.0, 38.0, 138.0, 32.0});
+    lifecycle->add_at(next, {504.0, 38.0, 124.0, 32.0});
+    lifecycle->add_at(open, {642.0, 38.0, 164.0, 32.0});
+    auto status = label("showcase.date.status",
+                        "Ready · August 1–31, 2026 · F4 or Alt+Down opens",
+                        10.0, 600, green);
+    status->set_text_wrapping(TextWrapping::word);
+    status->set_vertical_alignment(VerticalAlignment::near);
+    lifecycle->add_at(status, {22.0, 86.0, 884.0, 34.0});
+
+    const std::weak_ptr<DateTimePicker> weak_primary = primary;
+    const std::weak_ptr<Label> weak_status = status;
+    const auto publish_value = [weak_primary, weak_status](std::string_view verb) {
+        const auto picker = weak_primary.lock();
+        const auto message = weak_status.lock();
+        if (picker && message) {
+            message->set_text(std::string(verb) + " · " +
+                              picker->formatted_value() +
+                              " · retained focus restored");
+        }
+    };
+    context->subscriptions.push_back(primary->value_changed().subscribe(
+        *status, [publish_value](DateTimeValue) { publish_value("Committed"); }));
+    context->subscriptions.push_back(primary->drop_down_changed().subscribe(
+        *status, [weak_status](bool expanded) {
+            if (const auto message = weak_status.lock()) {
+                message->set_text(expanded
+                    ? "Calendar open · arrows navigate · Enter commits · Esc cancels"
+                    : "Calendar closed · popup and focus scope revoked");
+            }
+        }));
+    context->subscriptions.push_back(optional->checked_changed().subscribe(
+        *status, [weak_status](bool checked) {
+            if (const auto message = weak_status.lock()) {
+                message->set_text(checked
+                    ? "Optional date enabled · value retained"
+                    : "Optional date unchecked · value retained but inactive");
+            }
+        }));
+    context->subscriptions.push_back(previous->clicked().subscribe(
+        *primary, [weak_primary](ButtonBase&) {
+            if (const auto picker = weak_primary.lock()) {
+                picker->set_value(add_days(picker->value(), -1));
+            }
+        }));
+    context->subscriptions.push_back(next->clicked().subscribe(
+        *primary, [weak_primary](ButtonBase&) {
+            if (const auto picker = weak_primary.lock()) {
+                picker->set_value(add_days(picker->value(), 1));
+            }
+        }));
+    context->subscriptions.push_back(open->clicked().subscribe(
+        *primary, [weak_primary](ButtonBase&) {
+            if (const auto picker = weak_primary.lock()) {
+                picker->set_dropped_down(true);
+            }
+        }));
+}
+
+void add_dialogs_and_host_services(
+    const std::shared_ptr<Surface>& page,
+    const std::shared_ptr<ShowcaseContext>& context) {
+    page->add_at(label("showcase.host.heading", "DIALOGS AND HOST SERVICES", 22.0,
+                       700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
+    page->add_at(label(
+        "showcase.host.lead",
+        "One portable contract for modal results, clipboard, monitor geometry, and semantic sound across native hosts.",
+        12.0, 400, muted), {26.0, 52.0, 900.0, 24.0});
+
+    auto messages = group("showcase.host.messages",
+                          "Message dialogs · buttons, icons, default choices",
+                          {930.0, 132.0});
+    page->add_at(messages, {24.0, 92.0, 930.0, 132.0});
+    struct MessageCase final {
+        std::string_view label;
+        HostMessageButtons buttons;
+        HostMessageIcon icon;
+        HostDialogChoice default_choice;
+    };
+    constexpr std::array<MessageCase, 4> message_cases{{
+        {"Information · OK", HostMessageButtons::ok,
+         HostMessageIcon::information, HostDialogChoice::ok},
+        {"Warning · OK/Cancel", HostMessageButtons::ok_cancel,
+         HostMessageIcon::warning, HostDialogChoice::cancel},
+        {"Question · Yes/No", HostMessageButtons::yes_no,
+         HostMessageIcon::question, HostDialogChoice::yes},
+        {"Error · Retry/Cancel", HostMessageButtons::retry_cancel,
+         HostMessageIcon::error, HostDialogChoice::retry},
+    }};
+
+    const auto publish_dialog_result = [context](const HostDialogResult& result) {
+        if (!context->host_services_status) return;
+        if (!result.status.accepted()) {
+            context->host_services_status->set_text(
+                std::string("Host rejected request · ") +
+                host_service_error_name(result.status.error));
+            return;
+        }
+        std::visit([context](const auto& value) {
+            using Value = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Value, HostMessageDialogResult>) {
+                const std::string detail = std::string("Message ") +
+                    host_dialog_outcome_name(value.outcome) + " · " +
+                    host_dialog_choice_name(value.choice);
+                if (value.outcome == HostDialogOutcome::accepted) {
+                    context->last_dialog_acceptance = detail;
+                }
+                context->host_services_status->set_text(
+                    value.outcome == HostDialogOutcome::cancelled
+                        ? detail + " · preserved: " + context->last_dialog_acceptance
+                        : detail);
+            } else if constexpr (std::is_same_v<Value, HostPathDialogResult>) {
+                if (value.outcome == HostDialogOutcome::accepted) {
+                    context->last_dialog_acceptance =
+                        std::to_string(value.paths.size()) + " path" +
+                        (value.paths.size() == 1U ? "" : "s") + " · " +
+                        value.paths.front();
+                    context->host_services_status->set_text(
+                        "Accepted · " + context->last_dialog_acceptance);
+                } else {
+                    context->host_services_status->set_text(
+                        "Cancelled · preserved: " + context->last_dialog_acceptance);
+                }
+            } else {
+                if (value.outcome == HostDialogOutcome::accepted) {
+                    char encoded[16]{};
+                    std::snprintf(encoded, sizeof(encoded), "#%08X", value.rgba);
+                    context->last_dialog_acceptance =
+                        std::string("color ") + encoded;
+                    context->host_services_status->set_text(
+                        "Accepted · " + context->last_dialog_acceptance);
+                } else {
+                    context->host_services_status->set_text(
+                        "Cancelled · preserved: " + context->last_dialog_acceptance);
+                }
+            }
+        }, result.payload);
+    };
+
+    const auto invoke_dialog = [context, publish_dialog_result](
+                                   ButtonBase& source,
+                                   HostDialogRequestPayload payload) {
+        HostServices* services = source.attached_window() == nullptr
+            ? nullptr : source.attached_window()->host_services();
+        if (services == nullptr) {
+            HostDialogResult unavailable;
+            unavailable.status.error = HostServiceError::unsupported;
+            publish_dialog_result(unavailable);
+            return;
+        }
+        HostDialogRequest request;
+        request.request_id = context->next_host_request_id++;
+        request.owner_id = std::string(source.stable_id().value());
+        request.payload = std::move(payload);
+        publish_dialog_result(services->show_dialog(request));
+    };
+
+    for (std::size_t index = 0U; index < message_cases.size(); ++index) {
+        const MessageCase value = message_cases[index];
+        auto button = make_control<Button>(
+            StableId("showcase.host.message." + std::to_string(index)),
+            std::string(value.label));
+        button->set_visual_style(index == 2U ? ButtonVisualStyle::accent
+                                             : ButtonVisualStyle::command);
+        messages->add_at(button, {24.0 + static_cast<double>(index) * 220.0,
+                                  44.0, 202.0, 42.0});
+        context->subscriptions.push_back(button->clicked().subscribe(
+            *messages, [invoke_dialog, value](ButtonBase& source) {
+                HostMessageDialogRequest request;
+                request.title = "GUI.Forms message contract";
+                request.message = "This modal result travels through the portable HostServices boundary.";
+                request.buttons = value.buttons;
+                request.icon = value.icon;
+                request.default_choice = value.default_choice;
+                invoke_dialog(source, std::move(request));
+            }));
+    }
+
+    auto paths = group("showcase.host.paths",
+                       "Path and color dialogs · typed requests and cancel preservation",
+                       {930.0, 142.0});
+    page->add_at(paths, {24.0, 242.0, 930.0, 142.0});
+    const std::array<std::string_view, 5> path_labels{
+        "Open file", "Open multiple", "Save file", "Choose folder", "Choose color"};
+    for (std::size_t index = 0U; index < path_labels.size(); ++index) {
+        auto button = make_control<Button>(
+            StableId("showcase.host.dialog." + std::to_string(index)),
+            std::string(path_labels[index]));
+        button->set_visual_style(index == 4U ? ButtonVisualStyle::accent
+                                             : ButtonVisualStyle::standard);
+        paths->add_at(button, {24.0 + static_cast<double>(index) * 176.0,
+                              44.0, 158.0, 40.0});
+        context->subscriptions.push_back(button->clicked().subscribe(
+            *paths, [invoke_dialog, index](ButtonBase& source) {
+                if (index <= 1U) {
+                    HostOpenFileDialogRequest request;
+                    request.title = index == 0U ? "Open one fixture" : "Open fixture set";
+                    request.filters = {{"Text and logs", {"txt", "log"}},
+                                       {"PNG images", {"png"}}};
+                    request.allow_multiple = index == 1U;
+                    invoke_dialog(source, std::move(request));
+                } else if (index == 2U) {
+                    HostSaveFileDialogRequest request;
+                    request.title = "Save GUI.Forms evidence";
+                    request.suggested_name = "gui-forms-evidence";
+                    request.default_extension = "txt";
+                    request.filters = {{"Text evidence", {"txt"}}};
+                    request.confirm_overwrite = true;
+                    invoke_dialog(source, std::move(request));
+                } else if (index == 3U) {
+                    invoke_dialog(source, HostFolderDialogRequest{
+                        "Choose an evidence directory", {}});
+                } else {
+                    invoke_dialog(source, HostColorDialogRequest{
+                        "Choose an accent color", 0x2774B8FFU, false});
+                }
+            }));
+    }
+    paths->add_at(label("showcase.host.paths.note",
+                        "Cancel never overwrites the last accepted path, choice, or color.",
+                        11.0, 400, muted), {24.0, 98.0, 700.0, 24.0});
+
+    auto services_group = group(
+        "showcase.host.services",
+        "Host services · clipboard, monitors, completion cue",
+        {930.0, 224.0});
+    page->add_at(services_group, {24.0, 402.0, 930.0, 224.0});
+    context->clipboard_editor = make_control<TextBox>(
+        StableId("showcase.host.clipboard.editor"));
+    context->clipboard_editor->set_text("GUI.Forms clipboard probe Ω");
+    context->clipboard_editor->set_accessible_name("Clipboard probe text");
+    services_group->add_at(context->clipboard_editor, {24.0, 42.0, 432.0, 32.0});
+
+    const std::array<std::string_view, 5> service_labels{
+        "Copy to host", "Paste from host", "Inspect monitors",
+        "Completion cue", "Warning cue"};
+    for (std::size_t index = 0U; index < service_labels.size(); ++index) {
+        auto button = make_control<Button>(
+            StableId("showcase.host.service." + std::to_string(index)),
+            std::string(service_labels[index]));
+        button->set_visual_style(ButtonVisualStyle::command);
+        services_group->add_at(button,
+            {24.0 + static_cast<double>(index) * 176.0, 88.0, 158.0, 36.0});
+        context->subscriptions.push_back(button->clicked().subscribe(
+            *services_group, [context, index](ButtonBase& source) {
+                HostServices* services = source.attached_window() == nullptr
+                    ? nullptr : source.attached_window()->host_services();
+                if (services == nullptr) {
+                    context->host_services_status->set_text(
+                        "Host service unavailable · portable control remains responsive");
+                    return;
+                }
+                if (index == 0U) {
+                    const HostServiceStatus result = services->write_clipboard_text(
+                        context->clipboard_editor->text());
+                    context->host_services_status->set_text(
+                        std::string("Clipboard write · ") +
+                        host_service_error_name(result.error));
+                } else if (index == 1U) {
+                    const HostClipboardTextResult result =
+                        services->read_clipboard_text();
+                    if (result.status.accepted() && result.has_text) {
+                        context->clipboard_editor->set_text(result.text_utf8);
+                    }
+                    context->host_services_status->set_text(
+                        std::string("Clipboard read · ") +
+                        host_service_error_name(result.status.error) +
+                        (result.has_text ? " · text restored" : " · empty"));
+                } else if (index == 2U) {
+                    const HostMonitorResult result = services->query_monitors();
+                    if (!result.status.accepted() || result.monitors.empty()) {
+                        context->host_services_status->set_text(
+                            std::string("Monitor query · ") +
+                            host_service_error_name(result.status.error));
+                    } else {
+                        const auto primary = std::find_if(
+                            result.monitors.begin(), result.monitors.end(),
+                            [](const HostMonitor& monitor) { return monitor.primary; });
+                        const HostMonitor& monitor = primary == result.monitors.end()
+                            ? result.monitors.front() : *primary;
+                        context->host_services_status->set_text(
+                            "Monitors " + std::to_string(result.monitors.size()) +
+                            " · primary " + monitor.id + " · scale " +
+                            std::to_string(monitor.scale));
+                    }
+                } else {
+                    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+                    const auto stamp = std::chrono::duration_cast<
+                        std::chrono::nanoseconds>(now).count();
+                    const HostSoundCue cue = index == 3U
+                        ? HostSoundCue::operation_complete : HostSoundCue::warning;
+                    const HostServiceStatus result = services->play_sound_cue(
+                        {cue, 0.72, static_cast<std::uint64_t>(stamp)});
+                    context->host_services_status->set_text(
+                        std::string("Sound ") + host_sound_cue_name(cue) +
+                        " · " + host_service_error_name(result.error));
+                }
+            }));
+    }
+    context->host_services_status = label(
+        "showcase.host.status",
+        "Ready · native host results remain typed, bounded, and owner-modal",
+        11.0, 600, green);
+    context->host_services_status->set_text_wrapping(TextWrapping::word);
+    context->host_services_status->set_vertical_alignment(VerticalAlignment::near);
+    services_group->add_at(context->host_services_status,
+                           {24.0, 142.0, 872.0, 56.0});
+}
+
 } // namespace
 
 ShowcaseTree build_showcase_tree() {
     auto context = std::make_shared<ShowcaseContext>();
-    auto root = make_control<ShowcaseRoot>(StableId("showcase.root"), context);
+    auto root = make_control<ScaledPanel>(StableId("showcase.root"),
+                                          Size{1280.0, 820.0});
+    root->set_background(canvas);
+    root->set_tag(context);
 
     auto header = make_control<Surface>(StableId("showcase.header"),
-                                        Size{1280.0, 88.0}, SurfaceKind::header);
+                                        Size{1280.0, 88.0});
+    header->set_background(shell_blue);
     root->add_at(header, {0.0, 0.0, 1280.0, 88.0});
+    auto header_light = make_control<Panel>(StableId("showcase.header.light-rule"));
+    header_light->set_background(shell_blue_light);
+    header->add_at(header_light, {0.0, 0.0, 1280.0, 4.0});
+    auto header_dark = make_control<Panel>(StableId("showcase.header.dark-rule"));
+    header_dark->set_background(shell_blue_dark);
+    header->add_at(header_dark, {0.0, 86.0, 1280.0, 2.0});
     auto title = label("showcase.header.title", "GUI.FORMS COMPLETE SHOWCASE",
                        24.0, 700, Color::rgba(255, 255, 255));
     title->set_font({FontRole::control, 24.0, 700, false});
@@ -1548,24 +2350,31 @@ ShowcaseTree build_showcase_tree() {
     header->add_at(build, {930.0, 30.0, 310.0, 26.0});
 
     auto sidebar = make_control<Surface>(StableId("showcase.sidebar"),
-                                         Size{238.0, 694.0}, SurfaceKind::sidebar);
+                                         Size{238.0, 694.0});
+    sidebar->set_background(Color::rgba(220, 229, 237));
     root->add_at(sidebar, {0.0, 88.0, 238.0, 694.0});
+    auto sidebar_rule = make_control<Panel>(StableId("showcase.sidebar.rule"));
+    sidebar_rule->set_background(rule);
+    sidebar->add_at(sidebar_rule, {237.0, 0.0, 1.0, 694.0});
     auto nav_title = label("showcase.sidebar.title", "SHOWCASE INDEX", 12.0, 700,
                            shell_blue_dark);
     sidebar->add_at(nav_title, {20.0, 22.0, 190.0, 24.0});
-    const std::array<std::string_view, 12> page_names{
+    const std::array<std::string_view, 16> page_names{
         "01  Controls", "02  Ranges", "03  Containers",
         "04  Animation", "05  States", "06  Text & Input",
         "07  Collections", "08  Values", "09  Images & Drawing",
-        "10  Tabs & Pages", "11  Checked Lists", "12  Timing & ToolTips"};
+        "10  Tabs & Pages", "11  Checked Lists", "12  Timing & ToolTips",
+        "13  Dates & Calendar", "14  Dialogs & Services",
+        "15  Layout Panels", "16  Dock & Anchor"};
     for (std::size_t index = 0; index < page_names.size(); ++index) {
         auto navigation = make_control<Button>(
             StableId("showcase.navigation." + std::to_string(index)),
             std::string(page_names[index]));
+        navigation->set_font({FontRole::control, 12.0, 400, false, 0.24});
         navigation->set_visual_style(ButtonVisualStyle::command);
         navigation->set_style(showcase_style());
-        sidebar->add_at(navigation, {16.0, 58.0 + static_cast<double>(index) * 46.0,
-                                     205.0, 35.0});
+        sidebar->add_at(navigation, {16.0, 54.0 + static_cast<double>(index) * 33.0,
+                                     205.0, 30.0});
         context->navigation.push_back(navigation);
     }
     auto proof = label("showcase.sidebar.proof",
@@ -1573,7 +2382,7 @@ ShowcaseTree build_showcase_tree() {
                        11.0, 600, muted);
     proof->set_text_wrapping(TextWrapping::word);
     proof->set_vertical_alignment(VerticalAlignment::near);
-    sidebar->add_at(proof, {20.0, 614.0, 196.0, 30.0});
+    sidebar->add_at(proof, {20.0, 606.0, 196.0, 38.0});
     auto live = make_control<CheckBox>(StableId("showcase.sidebar.live"),
                                        "Live animation");
     live->set_checked(true);
@@ -1581,12 +2390,14 @@ ShowcaseTree build_showcase_tree() {
     sidebar->add_at(live, {20.0, 662.0, 190.0, 28.0});
 
     auto content = make_control<Surface>(StableId("showcase.content"),
-                                         Size{1042.0, 650.0}, SurfaceKind::page);
+                                         Size{1042.0, 650.0});
+    content->set_background(canvas);
     root->add_at(content, {238.0, 88.0, 1042.0, 650.0});
     for (std::size_t index = 0; index < page_names.size(); ++index) {
         auto page = make_control<Surface>(
             StableId("showcase.page." + std::to_string(index)),
-            Size{1000.0, 660.0}, SurfaceKind::page);
+            Size{1000.0, 660.0});
+        page->set_background(canvas);
         page->set_visible(index == 0U);
         content->add_at(page, {20.0, 0.0, 1000.0, 650.0});
         context->pages.push_back(page);
@@ -1607,10 +2418,22 @@ ShowcaseTree build_showcase_tree() {
                             context);
     add_timing_and_tooltips(std::static_pointer_cast<Surface>(context->pages[11]),
                             context);
+    add_dates_and_calendar(std::static_pointer_cast<Surface>(context->pages[12]),
+                           context);
+    add_dialogs_and_host_services(
+        std::static_pointer_cast<Surface>(context->pages[13]), context);
+    add_layout_panels(std::static_pointer_cast<Surface>(context->pages[14]),
+                      context);
+    add_dock_and_anchor(std::static_pointer_cast<Surface>(context->pages[15]),
+                        context);
 
     auto status_surface = make_control<Surface>(StableId("showcase.status"),
-                                                Size{1042.0, 44.0}, SurfaceKind::status);
+                                                Size{1042.0, 44.0});
+    status_surface->set_background(Color::rgba(225, 232, 238));
     root->add_at(status_surface, {238.0, 738.0, 1042.0, 44.0});
+    auto status_rule = make_control<Panel>(StableId("showcase.status.rule"));
+    status_rule->set_background(rule);
+    status_surface->add_at(status_rule, {0.0, 0.0, 1042.0, 1.0});
     context->status = label("showcase.status.text", "", 11.0, 600, shell_blue_dark);
     status_surface->add_at(context->status, {18.0, 10.0, 980.0, 24.0});
 
@@ -1630,21 +2453,23 @@ ShowcaseTree build_showcase_tree() {
             if (!context) {
                 return;
             }
-            if (context->easing) {
-                context->easing->set_paused(!enabled);
-            }
-            for (const auto& progress : context->animated_progress) {
-                progress->set_animation_enabled(enabled);
-            }
+            context->live_motion = enabled;
+            context->apply_motion_policy();
         }));
+    context->apply_motion_policy();
     context->select_page(0U);
     return {root};
 }
 
 void initialize_showcase_runtime(Window& window) {
-    const auto root = std::dynamic_pointer_cast<ShowcaseRoot>(window.root());
+    const auto root = std::dynamic_pointer_cast<ScaledPanel>(window.root());
     if (!root) throw std::logic_error("showcase runtime requires its retained root");
-    const auto context = root->context();
+    const auto* retained_context =
+        std::any_cast<std::shared_ptr<ShowcaseContext>>(&root->tag());
+    if (retained_context == nullptr || !*retained_context) {
+        throw std::logic_error("showcase runtime requires a retained context tag");
+    }
+    const auto context = *retained_context;
     if (context->ui_timer) return;
 
     context->ui_timer = std::make_shared<Timer>(window, 250ms);
@@ -1670,7 +2495,7 @@ void initialize_showcase_runtime(Window& window) {
         context->tooltip_disabled_target,
         "This action is disabled because no compatible device is selected.");
     context->tooltips->set_tool_tip(
-        context->timer_motion->target(),
+        context->timer_motion_target,
         "The overlay re-anchors when this retained target moves on UI Timer ticks.");
     for (const auto& navigation : context->navigation) {
         context->tooltips->set_tool_tip(
@@ -1686,7 +2511,12 @@ void initialize_showcase_runtime(Window& window) {
             ++context->timer_ticks;
             const double cycle = static_cast<double>(context->timer_ticks % 20U) / 19.0;
             context->timer_progress->set_value(cycle * 100.0);
-            context->timer_motion->set_phase(cycle);
+            constexpr double travel = 98.0;
+            const double eased =
+                0.5 - std::cos(cycle * 6.283185307179586) * 0.5;
+            context->timer_motion->set_design_bounds(
+                *context->timer_motion_target,
+                {14.0 + travel * eased, 39.0, 168.0, 34.0});
             context->timer_status->set_text(
                 "Running · tick " + std::to_string(context->timer_ticks) +
                 " · " + std::to_string(

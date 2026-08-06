@@ -685,10 +685,11 @@ Progress through the M4b grapheme/shaping-seam slice:
   the same transaction contract. The C11 ABI contract, 28 native tests,
   generated facade build, and managed behavior probes pass on arm64 macOS and
   Wine.
-- **OPEN:** history coalescing and public command/query coverage,
-  HarfBuzz/FreeType shaping and fallback, word/line navigation, multiline
-  layout, password policy, bidi, multi-stage IME, caret timing, accessible text
-  ranges, and the M4 exit gate remain open. Evidence:
+- **OPEN:** history coalescing, multiline layout, bidi/culture, multi-stage IME
+  composition/candidate geometry, accessible editable text ranges, and the M4
+  exit gate remain open. HarfBuzz/FreeType shaping/fallback, pragmatic
+  word/line navigation, protected-value policy, clipboard, and retained caret
+  timing are implemented and measured. Evidence:
   `experiments/M4A_UNICODE_TEXT_STORE.md`,
   `experiments/M4B_GRAPHEME_SHAPING_SEAM.md`, and the ABI 0.11–0.15 C/managed
   field contracts.
@@ -783,7 +784,7 @@ Progress through M6c:
 Sequencing note after M6c:
 
 - **GIVEN (2026-08-04):** the grand architect advances a bounded Windows host
-  proving round next. This is permitted because host protocol version 4 and its
+  proving round next. This was permitted because host protocol version 4 and its
   headless/AppKit traces are already normative enough to act as the translation
   oracle.
 - **MEASURED:** W0-W4 pass for the bounded Win32/Wine Gallery slice: PE64
@@ -794,6 +795,10 @@ Sequencing note after M6c:
 - **OPEN:** this completed elevation does not pull M11 managed-facade work, retired compatibility specimen
   unchanged-binary loading, TSF, OLE, UIA/MSAA, Windows packaging, physical
   Windows dogfood, or the full M12 exit gate forward implicitly.
+- **MEASURED ADDITIVE HOST UPDATE (2026-08-05):** protocol v5 preserves that
+  event-translation baseline and adds only the bounded semantic sound-cue
+  capability. Headless trace/counter and AppKit playback gates pass; a Windows
+  sound adapter and physical Windows/Wine cue gate remain open.
 
 ### M7 — collection, command, modal, data, and advanced controls
 
@@ -932,8 +937,8 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   the Win32 DIB host under Wine. AppKit compiles against the same platform-
   neutral wake/close/dispatch seam; the renderer-neutral suite passes 19/19.
 - **OPEN:** behavioral implementation for the remaining generated calls,
-  broader typed mouse/key/paint/timer coverage, cross-thread blocking `Invoke`
-  stress and deadlock policy, exact close reasons, accessibility publication,
+  broader typed mouse/key/paint/timer coverage, generated-facade `Invoke`
+  projection and sustained producer stress, exact close reasons, accessibility publication,
   default/single-file binding, dynamic usage traces, ABI freeze, and unchanged-
   binary execution remain M11/M12 gates. Evidence:
   `experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md` and
@@ -1015,12 +1020,20 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   publication remain open. Evidence:
   `experiments/M11H_RETAINED_FOCUS_SCOPES.md`.
 - **MEASURED PARTIAL M11h / complete-showcase controls:** a second independent
-  native demonstration now covers twelve retained pages and at least 140 public
+  native demonstration now covers fifteen retained pages and at least 180 public
   controls without changing the File Manager mockup demo. Public animation
   timelines/easing, visual variants, multiline Label layout, single-line
   TextBox, ListBox, ComboBox, NumericUpDown, H/V ScrollBar, PictureBox,
   TabControl/TabPage, CheckedListBox, Timer, ToolTip, and an
   owner-tokenized root popup controller are backed by headless conformance.
+  **DESIGN CORRECTION 2026-08-06:** this evidence is valid only when the board
+  consumes the public library. Eight local subclasses had hidden proportional
+  layout, drawing, easing, diagnostics, timer motion, and root lifetime behavior
+  inside the demonstration. They were removed. Public `ScaledPanel`,
+  `ScaledGroupBox`, `DrawingSurface`, `EasingPreview`, `MetricsView`, and
+  `Control::Tag` now own those reusable contracts, while timer motion composes
+  public controls and design-space slots. A source-policy test rejects any
+  future showcase-local class or struct inheritance.
   PictureBox covers all five canonical sizing policies over the validated,
   window-owned image registry; removal now retires cached display chunks rather
   than replaying stale generational IDs. Native dogfood proves mixed-script fallback,
@@ -1032,12 +1045,44 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   target-anchored retained tooltip overlays. Renderer-free semantic snapshots, stock adapters, virtual
   list rows, compound boundaries, action routing, and a stable-ID-reconciled
   AppKit accessibility publisher are now measured by headless and live
-  automation dogfood. The native suite passes 42 tests; a fresh Skia/host-free
-  configuration builds the core/control/input libraries and passes nine focused
-  renderer-free tests. Multiline/password/IME/clipboard commands, editable
-  semantic text ranges, editable combo/binding/type search, UIA/AT-SPI publication, and the wider
-  control catalogue remain open. Evidence:
+  automation dogfood. A subsequent polish slice adds renderer-neutral tracked
+  text, pinned HarfBuzz/FreeType and exact-hash Portsmouth/Carlito/Cousine plus
+  role-independent Noto CJK/emoji fallback packaging, semantic host sound cues,
+  public orthogonal enable/pause/reduced motion policy with low-cadence,
+  limited-excursion reduced animation, a phase-preserving reusable timeline, atomic progress
+  policy, retained AppKit deadline source and repeated hidden-activation plus
+  disarm/quiescent-gap/rearm host proof. AppKit presentation no longer requests
+  the next draw from inside `drawRect`; the native gate requires actual paints
+  as well as scheduler callbacks,
+  visibly live split-pane reallocation, and a retained DateTimePicker/calendar
+  popup with semantic optional-value activation and range-aware virtual month
+  buttons. The fifteenth page dogfoods public FlowLayoutPanel and
+  TableLayoutPanel: four flow directions, wrap/break, margins/padding,
+  absolute/auto/weighted-percent tracks, automatic placement, spans, borders,
+  and retained layout slots that preserve authored preferred bounds. The same
+  board now proves a renderer-free UI dispatcher: thread-safe Window/Control
+  `BeginInvoke`, synchronous Window/Control `Invoke`, one FIFO snapshot per turn,
+  nested next-turn deferral, explicit and owner-lifetime cancellation, fault
+  isolation/propagation, queue and turn bounds, concurrent-producer ordering,
+  shutdown revocation, phase ordering, and structured telemetry. AppKit executes
+  async, nested, and blocking worker work on its UI thread; Win32/Wine publishes
+  completed, cancelled, and marshalled-invoke evidence.
+  A further
+  host-services page covers common dialogs, cancellation
+  preservation, clipboard, monitors, and every sound cue; Win32 now attaches the
+  same protocol-v5 service seam as AppKit/headless and Wine proves native
+  MessageBox/ChooseColor modal cleanup. The native suite passes 48 tests,
+  including the public-consumer source policy; a fresh Skia/HarfBuzz/host-free
+  configuration builds the core/control/input libraries and passes 36
+  renderer-free tests. Multiline/bidi/IME, editable semantic text ranges,
+  editable combo/binding/type search, synchronization-context/BackgroundWorker
+  projection, generated-facade `Invoke`, UIA/AT-SPI publication, and the wider
+  control catalogue, Windows HarfBuzz/FreeType raster integration, and broader
+  calendar culture remain open. Evidence:
   `experiments/M11H_COMPLETE_SHOWCASE_TEXT_COLLECTIONS.md`.
+  Dialog/host evidence:
+  `experiments/M11H_DIALOGS_AND_HOST_SERVICES.md`.
+  Dispatcher evidence: `experiments/M11H_UI_DISPATCHER.md`.
 
 Current bounded M11 rounds:
 
@@ -1171,9 +1216,9 @@ Windows preflight after M6c:
 - **MEASURED:** the bounded W0-W4 host/toolchain gates now pass under Wine. See
   `docs/WINDOWS_WINE_HOST.md` and the preserved original preflight in
   `experiments/WINDOWS_ORACLE_PREFLIGHT.md`.
-- **OPEN:** Win32 UI Automation publication, remaining Windows
-  services, physical Windows dogfood, the M11 managed facade, and the later
-  unchanged-binary dogfood gate.
+- **OPEN:** Win32 UI Automation publication, TSF/OLE integration, physical
+  Windows dogfood, and the later unchanged-binary dogfood gate. The protocol-v5
+  clipboard/monitor/dialog/sound services and managed facade are measured.
 
 ## 6. Work that may run in parallel
 

@@ -1,5 +1,9 @@
 #include "skia_raster.hpp"
 
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+#include "harfbuzz_font_engine.hpp"
+#endif
+
 #include "include/codec/SkCodec.h"
 #include "include/codec/SkPngDecoder.h"
 #include "include/core/SkCanvas.h"
@@ -60,7 +64,11 @@ public:
         FontRole role;
         std::uint16_t weight;
         bool italic;
+        bool fallback{};
         sk_sp<SkTypeface> face;
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        FontFaceId text_face;
+#endif
     };
 
     struct DecodedImage final {
@@ -84,6 +92,9 @@ public:
     };
     std::unordered_map<std::uint64_t, DecodedImage> images;
     std::vector<RegisteredTypeface> registered_typefaces;
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    text::HarfBuzzFontEngine text_engine;
+#endif
     Size logical_size{};
     double scale{1.0};
     int save_floor{1};
@@ -106,7 +117,8 @@ public:
         const RegisteredTypeface* registered = nullptr;
         int registered_distance = std::numeric_limits<int>::max();
         for (const RegisteredTypeface& candidate : registered_typefaces) {
-            if (candidate.role != spec.role || candidate.italic != spec.italic) {
+            if (candidate.fallback || candidate.role != spec.role ||
+                candidate.italic != spec.italic) {
                 continue;
             }
             const int distance = std::abs(static_cast<int>(candidate.weight) -
@@ -134,6 +146,15 @@ public:
         return face;
     }
 
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    [[nodiscard]] sk_sp<SkTypeface> typeface(FontFaceId id) const {
+        for (const RegisteredTypeface& candidate : registered_typefaces) {
+            if (candidate.text_face == id) return candidate.face;
+        }
+        return nullptr;
+    }
+#endif
+
     [[nodiscard]] std::vector<TextRun> text_runs(std::string_view text,
                                                  FontSpec spec) const {
         std::vector<TextRun> runs;
@@ -150,6 +171,15 @@ public:
             const char* const scalar_start = cursor;
             const SkUnichar scalar = SkUTF::NextUTF8(&cursor, end);
             sk_sp<SkTypeface> face = primary;
+            if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
+                for (const RegisteredTypeface& candidate : registered_typefaces) {
+                    if (candidate.fallback && candidate.face &&
+                        candidate.face->unicharToGlyph(scalar) != 0U) {
+                        face = candidate.face;
+                        break;
+                    }
+                }
+            }
             if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
                 face = fonts->matchFamilyStyleCharacter(
                     nullptr, style, nullptr, 0, scalar);
@@ -191,7 +221,35 @@ bool SkiaRaster::register_typeface(FontRole role,
     if (!face) {
         return false;
     }
-    impl_->registered_typefaces.push_back({role, weight, italic, std::move(face)});
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    const std::optional<FontFaceId> text_face =
+        impl_->text_engine.register_typeface(role, weight, italic, encoded);
+    if (!text_face) return false;
+    impl_->registered_typefaces.push_back(
+        {role, weight, italic, false, std::move(face), *text_face});
+#else
+    impl_->registered_typefaces.push_back(
+        {role, weight, italic, false, std::move(face)});
+#endif
+    return true;
+}
+
+bool SkiaRaster::register_fallback_typeface(
+    std::uint16_t weight, bool italic, std::span<const std::byte> encoded) {
+    if (encoded.empty()) return false;
+    sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
+    sk_sp<SkTypeface> face = impl_->fonts->makeFromData(std::move(data));
+    if (!face) return false;
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    const std::optional<FontFaceId> text_face =
+        impl_->text_engine.register_fallback_typeface(weight, italic, encoded);
+    if (!text_face) return false;
+    impl_->registered_typefaces.push_back(
+        {FontRole::content, weight, italic, true, std::move(face), *text_face});
+#else
+    impl_->registered_typefaces.push_back(
+        {FontRole::content, weight, italic, true, std::move(face)});
+#endif
     return true;
 }
 
@@ -450,6 +508,35 @@ void SkiaRaster::draw_text_utf8(Point origin,
                                 FontSpec font_spec,
                                 Color color) {
     if (SkCanvas* canvas = impl_->canvas(); canvas && !text.empty()) {
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        const text::ShapedText shaped = impl_->text_engine.shape(text, font_spec);
+        const SkPaint paint = make_paint(color);
+        for (const text::ShapedFontRun& run : shaped.runs) {
+            const sk_sp<SkTypeface> face = impl_->typeface(run.face);
+            if (!face || run.glyphs.empty()) continue;
+            SkFont font(face, static_cast<SkScalar>(font_spec.size));
+            font.setEdging(SkFont::Edging::kAntiAlias);
+            font.setSubpixel(true);
+            std::vector<SkGlyphID> glyphs;
+            std::vector<SkPoint> positions;
+            std::vector<std::uint32_t> clusters;
+            glyphs.reserve(run.glyphs.size());
+            positions.reserve(run.glyphs.size());
+            clusters.reserve(run.glyphs.size());
+            for (const text::ShapedGlyph& glyph : run.glyphs) {
+                glyphs.push_back(static_cast<SkGlyphID>(glyph.glyph.value));
+                positions.push_back({glyph.x, glyph.y});
+                clusters.push_back(static_cast<std::uint32_t>(glyph.cluster.value()));
+            }
+            canvas->drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
+                               SkSpan<const SkPoint>(positions),
+                               SkSpan<const std::uint32_t>(clusters),
+                               SkSpan<const char>(text.data(), text.size()),
+                               {static_cast<SkScalar>(origin.x),
+                                static_cast<SkScalar>(origin.y)},
+                               font, paint);
+        }
+#else
         SkScalar x = static_cast<SkScalar>(origin.x);
         const SkPaint paint = make_paint(color);
         for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
@@ -460,12 +547,17 @@ void SkiaRaster::draw_text_utf8(Point origin,
                                    x, static_cast<SkScalar>(origin.y), font, paint);
             x += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
         }
+#endif
     }
 }
 
 Size SkiaRaster::measure_text_utf8(std::string_view text,
                                    FontSpec font_spec) {
     if (text.empty()) return {0.0, font_spec.size};
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    const text::ShapedText shaped = impl_->text_engine.shape(text, font_spec);
+    return {std::max(0.0, shaped.width), std::max(0.0, shaped.height)};
+#else
     double width{};
     double height{};
     for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
@@ -478,6 +570,7 @@ Size SkiaRaster::measure_text_utf8(std::string_view text,
             static_cast<double>(metrics.fDescent - metrics.fAscent));
     }
     return {std::max(0.0, width), std::max(0.0, height)};
+#endif
 }
 
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {

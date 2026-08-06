@@ -1,4 +1,5 @@
 #include "gui_forms/window.hpp"
+#include "dispatcher_state.hpp"
 #include "display_chunk.hpp"
 #include "frame_scheduler.hpp"
 
@@ -152,7 +153,8 @@ bool dispatch_semantic_child_action(Control::Ptr control,
 Window::Window(Control::Ptr root, Size client_size)
     : root_(std::move(root)), client_size_(client_size),
       lifetime_(std::make_shared<detail::WindowLifetime>()),
-      ui_thread_(std::this_thread::get_id()) {
+      ui_thread_(std::this_thread::get_id()),
+      dispatcher_state_(std::make_shared<detail::DispatcherState>(ui_thread_)) {
     lifetime_->window = this;
     if (!root_) {
         throw std::invalid_argument("GUI.Forms window requires a retained root control");
@@ -239,6 +241,7 @@ bool Window::remove_image(ImageId image) {
 }
 
 Window::~Window() {
+    shutdown_dispatcher();
     while (!popups_.empty()) {
         popups_.back()->disconnect();
     }
@@ -415,6 +418,11 @@ void Window::paint(Painter& painter, Rect requested_damage) {
 
 DamageRegion Window::take_damage() {
     require_ui_thread("damage mutation");
+    // Hosts request damage before entering their native paint transaction.
+    // Commit layout first so geometry changes discovered during arrange are
+    // included in that same transaction instead of becoming stranded after
+    // the host has already consumed the old region.
+    ensure_layout(true);
     DamageRegion result;
     for (DamageRegion& plane : plane_damage_) {
         for (const Rect rect : plane.rectangles()) {
@@ -430,6 +438,7 @@ DamageRegion Window::take_damage(PaintPlane plane) {
     if (!is_valid_paint_plane(plane)) {
         throw std::invalid_argument("invalid paint plane");
     }
+    ensure_layout(true);
     const std::size_t index = paint_plane_index(plane);
     DamageRegion result = std::move(plane_damage_[index]);
     plane_damage_[index] = {};
@@ -1252,6 +1261,10 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
     std::function<void(const Control::Ptr&, const Control::WeakPtr&)> attach =
         [&](const Control::Ptr& current, const Control::WeakPtr& current_parent) {
             current->window_ = this;
+            {
+                std::scoped_lock lock(current->dispatcher_mutex_);
+                current->dispatcher_state_ = dispatcher_state_;
+            }
             current->parent_ = current_parent;
             current->lifecycle_notification_ = true;
             controls.push_back(current);
@@ -1270,6 +1283,10 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
     } catch (...) {
         for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
             (*current)->window_ = nullptr;
+            {
+                std::scoped_lock lock((*current)->dispatcher_mutex_);
+                (*current)->dispatcher_state_.reset();
+            }
         }
         for (auto current = notified.rbegin(); current != notified.rend(); ++current) {
             (*current)->on_detached_from_window();
@@ -1311,6 +1328,10 @@ void Window::detach_subtree(const Control::Ptr& control) {
         current->lifecycle_notification_ = true;
         controls.push_back(current);
         current->window_ = nullptr;
+        {
+            std::scoped_lock lock(current->dispatcher_mutex_);
+            current->dispatcher_state_.reset();
+        }
         for (const auto& child : current->children_) {
             detach(child);
         }
@@ -1342,6 +1363,10 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
         current->lifecycle_notification_ = true;
         controls.push_back(current);
         current->window_ = nullptr;
+        {
+            std::scoped_lock lock(current->dispatcher_mutex_);
+            current->dispatcher_state_.reset();
+        }
         for (const auto& child : current->children_) {
             detach(child);
         }
@@ -1519,6 +1544,22 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     } else {
         metrics_.record_dirty_mark(0.0);
     }
+}
+
+void Window::mark_child_layout_slot(Control& control) {
+    require_ui_thread("child layout-slot mutation");
+    constexpr Dirty effects = Dirty::arrange | Dirty::hit_test |
+                              Dirty::semantics | Dirty::accessibility;
+    control.dirty_ |= effects;
+    control.subtree_dirty_ |= effects;
+    for (auto ancestor = control.parent(); ancestor;
+         ancestor = ancestor->parent()) {
+        ancestor->subtree_dirty_ |= effects;
+    }
+    layout_dirty_ = true;
+    hit_test_dirty_ = true;
+    ++semantic_generation_;
+    if (semantic_generation_ == 0U) ++semantic_generation_;
 }
 
 SemanticSnapshot Window::semantic_snapshot() {
@@ -1769,7 +1810,9 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         }
     }
     for (const auto& child : control->children_) {
-        arrange_dirty_recursive(child, child->requested_bounds_, visited_nodes, callbacks);
+        arrange_dirty_recursive(
+            child, child->layout_slot_.value_or(child->requested_bounds_),
+            visited_nodes, callbacks);
     }
 }
 

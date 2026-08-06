@@ -76,6 +76,12 @@ struct prehost_dispatch_context {
     unsigned close_when_dispatched;
 };
 
+struct nested_dispatch_context {
+    gf_handle form;
+    unsigned order;
+    unsigned cancelled;
+};
+
 struct pointer_context {
     unsigned moves;
     unsigned downs;
@@ -114,6 +120,27 @@ static uint32_t prehost_dispatch(void* opaque, uint32_t cancelled) {
     if (context->close_when_dispatched != 0U) {
         require(api.request_close(context->form) == GF_OK,
                 "pre-host dispatch could not request close");
+    }
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
+static uint32_t nested_dispatch_second(void* opaque, uint32_t cancelled) {
+    struct nested_dispatch_context* context =
+        (struct nested_dispatch_context*)opaque;
+    context->cancelled += cancelled != 0U ? 1U : 0U;
+    if (cancelled == 0U) context->order = context->order * 10U + 2U;
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
+static uint32_t nested_dispatch_first(void* opaque, uint32_t cancelled) {
+    struct nested_dispatch_context* context =
+        (struct nested_dispatch_context*)opaque;
+    context->cancelled += cancelled != 0U ? 1U : 0U;
+    if (cancelled == 0U) {
+        context->order = context->order * 10U + 1U;
+        require(api.begin_invoke(context->form, nested_dispatch_second,
+                                 context) == GF_OK,
+                "nested BeginInvoke could not post its next-turn callback");
     }
     return GF_EVENT_CALLBACK_CONTINUE;
 }
@@ -959,6 +986,29 @@ static void test_abi_0_4_prehost_dispatch_and_disposal_cancellation(void) {
             "disposing a pre-host queue did not cancel it exactly once");
 }
 
+static void test_abi_0_4_nested_dispatch_turns(void) {
+    struct nested_dispatch_context context;
+    memset(&context, 0, sizeof(context));
+    require(api.control_create_kind(GF_CONTROL_FORM,
+                                    text("abi.dispatch.nested"),
+                                    &context.form) == GF_OK &&
+                api.begin_invoke(context.form, nested_dispatch_first,
+                                 &context) == GF_OK &&
+                api.run_window(context.form,
+                               GF_WINDOW_RUN_FORCE_HEADLESS) == GF_OK,
+            "nested dispatcher fixture failed");
+    uint64_t required = 0U;
+    char trace[4096] = {0};
+    require(context.order == 12U && context.cancelled == 0U &&
+                api.last_host_trace(context.form, trace, sizeof(trace),
+                                    &required) == GF_OK &&
+                strstr(trace, "\"dispatches\":2") != NULL &&
+                strstr(trace, "\"dispatch_turns\":2") != NULL,
+            "nested BeginInvoke must remain deferred to a second host turn");
+    require(api.dispose(context.form) == GF_OK,
+            "nested dispatcher form disposal failed");
+}
+
 static void test_abi_0_4_close_cancellation(void) {
     gf_handle form = {0U, 0U};
     gf_event_token closing = {0U, 0U};
@@ -1048,6 +1098,7 @@ int main(void) {
     test_abi_0_3_headless_window();
     test_abi_0_4_callbacks_dispatch_and_close();
     test_abi_0_4_prehost_dispatch_and_disposal_cancellation();
+    test_abi_0_4_nested_dispatch_turns();
     test_abi_0_4_close_cancellation();
     test_abi_0_6_pointer_delivery();
     test_abi_0_7_checked_state_and_transparent_input();

@@ -1,5 +1,6 @@
 #include "gui_forms/input_controls.hpp"
 
+#include "gui_forms/host.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -31,6 +32,72 @@ namespace {
 
 [[nodiscard]] bool command_modifier(Modifier value) noexcept {
     return includes(value, Modifier::control) || includes(value, Modifier::meta);
+}
+
+enum class WordClass : std::uint8_t {
+    spacing,
+    word,
+    punctuation,
+};
+
+[[nodiscard]] bool unicode_spacing(char32_t value) noexcept {
+    return value == U' ' || (value >= U'\t' && value <= U'\r') ||
+           value == U'\u0085' || value == U'\u00a0' || value == U'\u1680' ||
+           (value >= U'\u2000' && value <= U'\u200a') ||
+           value == U'\u2028' || value == U'\u2029' || value == U'\u202f' ||
+           value == U'\u205f' || value == U'\u3000';
+}
+
+[[nodiscard]] bool unicode_punctuation_or_symbol(char32_t value) noexcept {
+    if (value < U'\u0080') {
+        return !((value >= U'a' && value <= U'z') ||
+                 (value >= U'A' && value <= U'Z') ||
+                 (value >= U'0' && value <= U'9') || value == U'_');
+    }
+    return (value >= U'\u2000' && value <= U'\u206f') ||
+           (value >= U'\u2190' && value <= U'\u2bff') ||
+           (value >= U'\u3001' && value <= U'\u303f') ||
+           (value >= U'\ufe10' && value <= U'\ufe1f') ||
+           (value >= U'\ufe30' && value <= U'\ufe4f') ||
+           (value >= U'\uff01' && value <= U'\uff0f') ||
+           (value >= U'\uff1a' && value <= U'\uff20') ||
+           (value >= U'\uff3b' && value <= U'\uff40') ||
+           (value >= U'\uff5b' && value <= U'\uff65') ||
+           (value >= U'\U0001f000' && value <= U'\U0001faff');
+}
+
+[[nodiscard]] WordClass word_class(char32_t value) noexcept {
+    if (unicode_spacing(value)) return WordClass::spacing;
+    return unicode_punctuation_or_symbol(value)
+        ? WordClass::punctuation : WordClass::word;
+}
+
+[[nodiscard]] bool valid_password_character(char32_t value) noexcept {
+    return value == U'\0' ||
+        (value >= U' ' && value <= U'\U0010ffff' &&
+         !(value >= static_cast<char32_t>(0xd800U) &&
+           value <= static_cast<char32_t>(0xdfffU)) &&
+         value != U'\u2028' && value != U'\u2029');
+}
+
+[[nodiscard]] std::string utf8_scalar(char32_t value) {
+    std::string result;
+    if (value <= U'\u007f') {
+        result.push_back(static_cast<char>(value));
+    } else if (value <= U'\u07ff') {
+        result.push_back(static_cast<char>(0xc0U | (value >> 6U)));
+        result.push_back(static_cast<char>(0x80U | (value & 0x3fU)));
+    } else if (value <= U'\uffff') {
+        result.push_back(static_cast<char>(0xe0U | (value >> 12U)));
+        result.push_back(static_cast<char>(0x80U | ((value >> 6U) & 0x3fU)));
+        result.push_back(static_cast<char>(0x80U | (value & 0x3fU)));
+    } else {
+        result.push_back(static_cast<char>(0xf0U | (value >> 18U)));
+        result.push_back(static_cast<char>(0x80U | ((value >> 12U) & 0x3fU)));
+        result.push_back(static_cast<char>(0x80U | ((value >> 6U) & 0x3fU)));
+        result.push_back(static_cast<char>(0x80U | (value & 0x3fU)));
+    }
+    return result;
 }
 
 class DropDownLayer final : public Panel {
@@ -152,10 +219,34 @@ void TextBox::set_read_only(bool read_only) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void TextBox::set_password_character(char32_t character) {
+    require_mutable();
+    if (!valid_password_character(character)) {
+        throw std::invalid_argument(
+            "TextBox password character must be one printable Unicode scalar");
+    }
+    if (password_character_ == character) return;
+    password_character_ = character;
+    layout_positions_.clear();
+    layout_offsets_.clear();
+    horizontal_offset_ = 0.0;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
+void TextBox::set_use_system_password_character(bool enabled_value) {
+    require_mutable();
+    if (use_system_password_character_ == enabled_value) return;
+    use_system_password_character_ = enabled_value;
+    layout_positions_.clear();
+    layout_offsets_.clear();
+    horizontal_offset_ = 0.0;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
 void TextBox::set_font(FontSpec font) {
     require_mutable();
-    if (!std::isfinite(font.size) || font.size <= 0.0) {
-        throw std::invalid_argument("TextBox font size must be finite and positive");
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("TextBox font specification is invalid");
     }
     if (font_ == font) {
         return;
@@ -285,6 +376,34 @@ bool TextBox::delete_selection() {
     return !selection_.empty() && replace_selection({});
 }
 
+bool TextBox::copy() {
+    require_mutable();
+    if (selection_.empty() || password_protected() || window() == nullptr ||
+        window()->host_services() == nullptr) {
+        return false;
+    }
+    return window()->host_services()->write_clipboard_text(selected_text()).accepted();
+}
+
+bool TextBox::cut() {
+    require_mutable();
+    if (read_only_ || password_protected() || selection_.empty() || !copy()) {
+        return false;
+    }
+    return delete_selection();
+}
+
+bool TextBox::paste() {
+    require_mutable();
+    if (read_only_ || window() == nullptr || window()->host_services() == nullptr) {
+        return false;
+    }
+    const HostClipboardTextResult result =
+        window()->host_services()->read_clipboard_text();
+    return result.status.accepted() && result.has_text &&
+        replace_selection(result.text_utf8);
+}
+
 void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
     if (selection_ == selection) {
         if (reveal_caret) {
@@ -312,6 +431,57 @@ double TextBox::boundary_x(Utf8Offset offset) const noexcept {
         ? layout_offsets_.size() - 1U
         : static_cast<std::size_t>(std::distance(layout_offsets_.begin(), found));
     return layout_positions_[index];
+}
+
+Utf8Offset TextBox::previous_word_boundary(Utf8Offset offset) const {
+    if (offset.value() == 0U) return offset;
+    Utf8Offset cursor = store_.previous_grapheme_boundary(offset);
+    WordClass category = word_class(store_.scalar_at(cursor));
+    while (cursor.value() > 0U) {
+        const Utf8Offset previous = store_.previous_grapheme_boundary(cursor);
+        if (word_class(store_.scalar_at(previous)) != category) break;
+        cursor = previous;
+    }
+    if (category == WordClass::spacing && cursor.value() > 0U) {
+        cursor = store_.previous_grapheme_boundary(cursor);
+        category = word_class(store_.scalar_at(cursor));
+        while (cursor.value() > 0U) {
+            const Utf8Offset previous = store_.previous_grapheme_boundary(cursor);
+            if (word_class(store_.scalar_at(previous)) != category) break;
+            cursor = previous;
+        }
+    }
+    return cursor;
+}
+
+Utf8Offset TextBox::next_word_boundary(Utf8Offset offset) const {
+    const Utf8Offset end = store_.utf8_size();
+    if (offset == end) return end;
+    WordClass category = word_class(store_.scalar_at(offset));
+    Utf8Offset cursor = offset;
+    while (cursor != end && word_class(store_.scalar_at(cursor)) == category) {
+        cursor = store_.next_grapheme_boundary(cursor);
+    }
+    if (category != WordClass::spacing) {
+        while (cursor != end &&
+               word_class(store_.scalar_at(cursor)) == WordClass::spacing) {
+            cursor = store_.next_grapheme_boundary(cursor);
+        }
+    }
+    return cursor;
+}
+
+std::string TextBox::display_text() const {
+    if (!password_protected()) return std::string(store_.utf8());
+    const char32_t mask = use_system_password_character_
+        ? U'\u2022' : password_character_;
+    const std::string encoded = utf8_scalar(mask);
+    std::string result;
+    result.reserve(encoded.size() * store_.grapheme_count().value());
+    for (std::size_t index = 0U; index < store_.grapheme_count().value(); ++index) {
+        result += encoded;
+    }
+    return result;
 }
 
 Utf8Offset TextBox::position_at(double local_x) const noexcept {
@@ -346,6 +516,11 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     const Rect bounds = local_bounds();
     const double right = std::max(text_left_, bounds.width - 4.0);
     const double viewport = std::max(0.0, right - text_left_);
+    const std::string presented = display_text();
+    const std::string mask = password_protected()
+        ? utf8_scalar(use_system_password_character_ ? U'\u2022'
+                                                     : password_character_)
+        : std::string{};
     layout_positions_.clear();
     layout_offsets_.clear();
     const std::size_t count = store_.grapheme_count().value();
@@ -354,8 +529,10 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     for (std::size_t index = 0; index <= count; ++index) {
         const Utf8Offset offset = store_.utf8_offset(GraphemeIndex(index));
         layout_offsets_.push_back(offset.value());
+        const std::size_t presentation_offset = password_protected()
+            ? index * mask.size() : offset.value();
         layout_positions_.push_back(painter.measure_text_utf8(
-            store_.utf8().substr(0U, offset.value()), font_).width);
+            std::string_view(presented).substr(0U, presentation_offset), font_).width);
     }
     const double caret_content_x = boundary_x(selection_.caret);
     if (caret_content_x < horizontal_offset_) {
@@ -380,14 +557,14 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
                            std::max(0.0, bounds.height - 6.0)}, style().accent);
     }
     if (!store_.utf8().empty()) {
-        painter.draw_text_utf8({origin_x, baseline}, store_.utf8(), font_,
+        painter.draw_text_utf8({origin_x, baseline}, presented, font_,
                                enabled() ? style().text : style().disabled_text);
         if (focused_ && !selection_.empty()) {
             painter.save();
             painter.clip_rect({selection_x, 3.0,
                                std::max(0.0, selection_end_x - selection_x),
                                std::max(0.0, bounds.height - 6.0)});
-            painter.draw_text_utf8({origin_x, baseline}, store_.utf8(), font_,
+            painter.draw_text_utf8({origin_x, baseline}, presented, font_,
                                    style().highlight);
             painter.restore();
         }
@@ -451,6 +628,21 @@ void TextBox::on_key(KeyEvent& event) {
         event.handled = true;
         return;
     }
+    if (command && event.physical_key == PhysicalKey::c) {
+        static_cast<void>(copy());
+        event.handled = true;
+        return;
+    }
+    if (command && event.physical_key == PhysicalKey::x) {
+        static_cast<void>(cut());
+        event.handled = true;
+        return;
+    }
+    if (command && event.physical_key == PhysicalKey::v) {
+        static_cast<void>(paste());
+        event.handled = true;
+        return;
+    }
     if (command && event.physical_key == PhysicalKey::z) {
         event.handled = includes(event.modifiers, Modifier::shift) ? redo() : undo();
         return;
@@ -461,10 +653,21 @@ void TextBox::on_key(KeyEvent& event) {
     }
     if (event.physical_key == PhysicalKey::left ||
         event.physical_key == PhysicalKey::right) {
+        const bool line_navigation = includes(event.modifiers, Modifier::meta);
+        const bool word_navigation = !line_navigation &&
+            (includes(event.modifiers, Modifier::control) ||
+             includes(event.modifiers, Modifier::alt));
         Utf8Offset next = selection_.caret;
         if (!extend && !selection_.empty()) {
             next = event.physical_key == PhysicalKey::left
                 ? selection_.start() : selection_.end();
+        } else if (line_navigation) {
+            next = event.physical_key == PhysicalKey::left
+                ? Utf8Offset(0U) : store_.utf8_size();
+        } else if (word_navigation) {
+            next = event.physical_key == PhysicalKey::left
+                ? previous_word_boundary(selection_.caret)
+                : next_word_boundary(selection_.caret);
         } else {
             next = event.physical_key == PhysicalKey::left
                 ? store_.previous_grapheme_boundary(selection_.caret)
@@ -489,9 +692,23 @@ void TextBox::on_key(KeyEvent& event) {
         if (!selection_.empty()) {
             event.handled = delete_selection();
         } else {
-            const Utf8Offset other = event.physical_key == PhysicalKey::backspace
-                ? store_.previous_grapheme_boundary(selection_.caret)
-                : store_.next_grapheme_boundary(selection_.caret);
+            const bool line_deletion = includes(event.modifiers, Modifier::meta);
+            const bool word_deletion = !line_deletion &&
+                (includes(event.modifiers, Modifier::control) ||
+                 includes(event.modifiers, Modifier::alt));
+            Utf8Offset other;
+            if (line_deletion) {
+                other = event.physical_key == PhysicalKey::backspace
+                    ? Utf8Offset(0U) : store_.utf8_size();
+            } else if (word_deletion) {
+                other = event.physical_key == PhysicalKey::backspace
+                    ? previous_word_boundary(selection_.caret)
+                    : next_word_boundary(selection_.caret);
+            } else {
+                other = event.physical_key == PhysicalKey::backspace
+                    ? store_.previous_grapheme_boundary(selection_.caret)
+                    : store_.next_grapheme_boundary(selection_.caret);
+            }
             event.handled = replace(std::min(other, selection_.caret),
                                     std::max(other, selection_.caret), {});
         }
@@ -557,10 +774,11 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::text_box;
     descriptor.name = accessible_name();
-    descriptor.value = std::string(text());
+    descriptor.value = password_protected() ? std::string{} : std::string(text());
     descriptor.description = accessible_description().empty()
         ? placeholder_ : accessible_description();
     if (read_only_) descriptor.states |= SemanticState::read_only;
+    if (password_protected()) descriptor.states |= SemanticState::protected_content;
     descriptor.actions = {SemanticAction::focus};
     if (!read_only_) descriptor.actions.push_back(SemanticAction::set_value);
     descriptor.exposed = true;
@@ -739,8 +957,8 @@ void ListBox::set_item_height(double height) {
 
 void ListBox::set_font(FontSpec font) {
     require_mutable();
-    if (!std::isfinite(font.size) || font.size <= 0.0) {
-        throw std::invalid_argument("ListBox font size must be finite and positive");
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("ListBox font specification is invalid");
     }
     if (font_ == font) return;
     font_ = font;
@@ -1264,8 +1482,8 @@ void ComboBox::set_maximum_drop_down_items(std::size_t count) {
 
 void ComboBox::set_font(FontSpec font) {
     require_mutable();
-    if (!std::isfinite(font.size) || font.size <= 0.0) {
-        throw std::invalid_argument("ComboBox font size must be finite and positive");
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("ComboBox font specification is invalid");
     }
     if (font_ == font) return;
     font_ = font;
@@ -1632,13 +1850,14 @@ void NumericUpDown::step(int direction) {
 }
 
 void NumericUpDown::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
     const double button_width = std::min(22.0, std::max(0.0, final_bounds.width));
-    if (editor_) editor_->set_requested_bounds(
-        {0.0, 0.0, std::max(0.0, final_bounds.width - button_width), final_bounds.height});
-    if (spinner_) spinner_->set_requested_bounds(
-        {std::max(0.0, final_bounds.width - button_width), 0.0,
-         button_width, final_bounds.height});
-    Panel::arrange(final_bounds);
+    if (editor_) set_child_layout(
+        editor_, {0.0, 0.0, std::max(0.0, final_bounds.width - button_width),
+                  final_bounds.height});
+    if (spinner_) set_child_layout(
+        spinner_, {std::max(0.0, final_bounds.width - button_width), 0.0,
+                   button_width, final_bounds.height});
 }
 
 void NumericUpDown::on_key_preview(KeyEvent& event) {

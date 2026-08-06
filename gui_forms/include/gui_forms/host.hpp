@@ -36,6 +36,7 @@ enum class HostCapability : std::uint64_t {
     font_discovery = 1ULL << 14U,
     accessibility = 1ULL << 15U,
     typed_drag_source = 1ULL << 16U,
+    sound_cues = 1ULL << 17U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,
@@ -52,7 +53,7 @@ enum class HostCapability : std::uint64_t {
 }
 
 struct HostCapabilities final {
-    static constexpr std::uint32_t current_protocol_version = 4;
+    static constexpr std::uint32_t current_protocol_version = 5;
 
     std::uint32_t protocol_version{current_protocol_version};
     std::string platform{"unknown"};
@@ -92,6 +93,23 @@ struct HostServiceStatus final {
     [[nodiscard]] bool accepted() const noexcept {
         return error == HostServiceError::none;
     }
+};
+
+// Semantic one-shot cues. Controls never select native files or platform
+// sound identifiers; adapters map these meanings to their local presentation.
+enum class HostSoundCue : std::uint8_t {
+    notification,
+    success,
+    warning,
+    error,
+    operation_complete,
+};
+
+struct HostSoundCueRequest final {
+    HostSoundCue cue{HostSoundCue::notification};
+    double gain{1.0};
+    // Caller-supplied monotonic time makes coalescing reproducible headlessly.
+    std::uint64_t timestamp_nanoseconds{};
 };
 
 struct HostMonitorResult final {
@@ -250,6 +268,10 @@ struct HostServicesSnapshot final {
     std::uint64_t dialog_requests{};
     std::uint64_t dialog_completions{};
     std::uint64_t dialog_cancellations{};
+    std::uint64_t sound_requests{};
+    std::uint64_t sound_playbacks{};
+    std::uint64_t sound_coalesced{};
+    std::uint64_t sound_muted{};
     std::uint32_t modal_depth{};
     std::uint32_t maximum_modal_depth{};
     std::uint64_t rejected_requests{};
@@ -282,6 +304,8 @@ public:
     [[nodiscard]] HostClipboardTextResult read_clipboard_text();
     [[nodiscard]] HostServiceStatus write_clipboard_text(std::string_view text_utf8);
     [[nodiscard]] HostDialogResult show_dialog(const HostDialogRequest& request);
+    [[nodiscard]] HostServiceStatus play_sound_cue(
+        const HostSoundCueRequest& request);
     void shutdown() noexcept;
 
     [[nodiscard]] HostServicesSnapshot snapshot() const;
@@ -299,6 +323,8 @@ protected:
         std::string_view text_utf8) = 0;
     [[nodiscard]] virtual HostDialogResult show_dialog_impl(
         const HostDialogRequest& request) = 0;
+    [[nodiscard]] virtual HostServiceStatus play_sound_cue_impl(
+        const HostSoundCueRequest& request) = 0;
     virtual void shutdown_impl() noexcept {}
 
 private:
@@ -308,6 +334,8 @@ private:
     HostServicesSnapshot snapshot_;
     Event<const HostModalTransition&> modal_changed_;
     std::vector<std::uint64_t> modal_stack_;
+    std::optional<HostSoundCue> last_sound_cue_;
+    std::uint64_t last_sound_timestamp_{};
 };
 
 enum class HostCloseReason : std::uint8_t {
@@ -458,5 +486,6 @@ private:
     const HostDialogRequestPayload& payload) noexcept;
 [[nodiscard]] const char* host_dialog_outcome_name(HostDialogOutcome outcome) noexcept;
 [[nodiscard]] const char* host_dialog_choice_name(HostDialogChoice choice) noexcept;
+[[nodiscard]] const char* host_sound_cue_name(HostSoundCue cue) noexcept;
 
 } // namespace gui_forms

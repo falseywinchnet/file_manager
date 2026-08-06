@@ -86,6 +86,11 @@ void test_live_pointer_and_keyboard_resize() {
     move.position = {181.0, 70.0};
     require(window.dispatch_pointer(move) && near(split->splitter_distance(), 180.0),
             "splitter must update continuously during pointer movement");
+    window.perform_layout();
+    require(near(split->first_panel()->arranged_bounds().width, 180.0) &&
+                near(split->second_panel()->arranged_bounds().x, 183.0) &&
+                near(split->second_panel()->arranged_bounds().width, 217.0),
+            "pointer movement must commit both pane allocations before release");
 
     PointerEvent up = move;
     up.action = PointerAction::up;
@@ -108,6 +113,17 @@ void test_live_pointer_and_keyboard_resize() {
     const double fixed = split->splitter_distance();
     require(!window.dispatch_key(right) && near(split->splitter_distance(), fixed),
             "fixed splitters must reject keyboard mutation");
+}
+
+void test_pane_surface_background() {
+    auto split = make_control<SplitContainer>(StableId("split.surface"));
+    const Color first = Color::rgba(225, 235, 243);
+    const Color second = Color::rgba(250, 250, 250);
+    split->first_panel()->set_background(first);
+    split->second_panel()->set_background(second);
+    require(split->first_panel()->background() == first &&
+                split->second_panel()->background() == second,
+            "splitter panels must own their allocation-filling surface color");
 }
 
 void test_collapse_focus_restore_and_fixed_panel_resize() {
@@ -178,6 +194,7 @@ int main() {
     try {
         test_stable_tree_and_constrained_geometry();
         test_live_pointer_and_keyboard_resize();
+        test_pane_surface_background();
         test_collapse_focus_restore_and_fixed_panel_resize();
         test_horizontal_orientation_and_thread_guard();
         std::cout << "split-container-tests: pass\n";

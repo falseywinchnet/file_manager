@@ -13,11 +13,39 @@ demo-private visual substitute does not close a framework row.
 
 ## Implemented and measured
 
+- **OBSERVED DESIGN CORRECTION, 2026-08-06:** the board still contained eight
+  local `Control` subclasses (`LayoutPanel`, `LayoutGroup`, `Surface`,
+  `EasingBoard`, `DiagnosticsCard`, `DrawingEffectsBoard`, `TimerMotionBoard`,
+  and `ShowcaseRoot`). That was invalid framework evidence: reusable layout,
+  painting, scheduling, diagnostics, and lifetime behavior existed only in the
+  demonstration. All eight were removed. GUI.Forms now publicly owns
+  `ScaledPanel`, `ScaledGroupBox`, `DrawingSurface`, `EasingPreview`,
+  `MetricsView`, and `Control::Tag`; timer motion is ordinary public-control
+  composition. A CMake source-policy gate rejects all showcase-local class or
+  struct inheritance, including default-private inheritance.
+- Public-control promotion passes focused ownership/layout/drawing/metrics/
+  easing tests, the complete-showcase interaction suite, native 48/48,
+  renderer-free 36/36, strict Win64 compilation, and the Wine host-services
+  smoke. Live AppKit dogfood visually verified the rebuilt public
+  `EasingPreview`, `MetricsView`, `DrawingSurface`, scaled shell, and moving
+  timer target. No demo-only control behavior remains.
+
 - Public animation timeline with eight easing curves, delay, iteration,
-  direction, exact endpoints, retained deadlines, pause, and hidden-surface
-  quiescence.
+  direction, exact endpoints, retained deadlines, phase-preserving
+  `pause(time)` / `resume(time)`, repeated-transition idempotence, and
+  hidden-surface quiescence.
 - Public visual variants for Button, CheckBox, RadioButton, TrackBar, and
   ProgressBar, including marquee and pulse animation.
+- Progress animation now consumes a public orthogonal `MotionPolicy`:
+  application enablement, user pause, and reduced-motion accommodation are
+  retained independently and applied in one lease transaction. Determinate
+  values remain live; reduced motion stays animated at low cadence, slower
+  accumulated phase, and limited excursion; pause and disable relinquish the
+  continuous-frame subscription.
+- Public font specifications carry bounded renderer-neutral letter spacing.
+  HarfBuzz applies it between shaped clusters and across fallback runs, while
+  CoreText and GDI consume the same logical value. Small Portsmouth control text
+  uses an optical-spacing policy rather than demo-private string changes.
 - Public Label explicit-line and word wrapping, horizontal/vertical alignment,
   and bounded line spacing.
 - Public single-line TextBox with grapheme-safe directional selection,
@@ -63,7 +91,19 @@ demo-private visual substitute does not close a framework row.
   retained overlays, semantic tooltip nodes, multiple providers, and owner
   revocation. Accessible target relations and the Help/Error providers remain
   open.
-- Separate twelve-page `GUI.Forms Complete Showcase` native app and a headless
+- Host protocol v5 adds bounded semantic sound cues (`notification`, `success`,
+  `warning`, `error`, and `operation_complete`) with gain validation,
+  deterministic coalescing/mute counters, renderer-free headless traces, and an
+  AppKit adapter. The showcase exposes explicit cue buttons and preserves the
+  same visual meaning when sound is disabled; it adds no automatic hover noise.
+- Public `DateTimePicker` owns validated Gregorian values and ranges, four
+  formatting modes with a caller-owned provider, optional checkbox and spinner
+  forms, a retained calendar popup, contained focus, keyboard/pointer/semantic
+  commit and cancel, stable virtual date-cell semantics, semantic optional-value
+  activation, range-aware semantic month buttons, and synchronous popup cleanup.
+  Its disposal gate exposed FIFO resource revocation as incorrect; component-owned
+  work now disconnects in reverse acquisition order.
+- Separate fifteen-page `GUI.Forms Complete Showcase` native app and a headless
   interaction fixture that traverses all pages and exercises slider drag,
   linked progress, split collapse/restore, animation quiescence, TextBox edit
   and history, ListBox state, ComboBox popup lifecycle, UI Timer cadence and
@@ -90,32 +130,26 @@ cmake --build build -j 8
 ctest --test-dir build --output-on-failure
 ```
 
-Result after adding the timing/tooltip provider round:
-**42/42 pass** on the
-local macOS/AppleClang build.
+Result after the typography, sound, reduced-motion, split-surface,
+DateTimePicker, and reverse-revocation round: **45/45 pass** on the local
+macOS/AppleClang build.
 
 Fresh renderer-free build:
 
 ```sh
-cmake -S . -B /tmp/gui-forms-core-only.R5LDMK \
+cmake -S . -B build-renderer-free-polish \
   -DGUI_FORMS_ENABLE_SKIA=OFF \
+  -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF \
   -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
   -DGUI_FORMS_ENABLE_WINDOWS_HOST=OFF \
   -DGUI_FORMS_BUILD_GALLERY=OFF \
   -DGUI_FORMS_BUILD_TESTS=ON
-cmake --build /tmp/gui-forms-core-only.R5LDMK --target \
-  gui_forms_core_tests gui_forms_basic_controls_tests \
-  gui_forms_input_controls_tests gui_forms_range_controls_tests \
-  gui_forms_tab_control_tests gui_forms_semantic_tests \
-  gui_forms_frame_scheduler_tests gui_forms_timer_tests \
-  gui_forms_tooltip_tests -j 8
-ctest --test-dir /tmp/gui-forms-core-only.R5LDMK \
-  -R 'gui_forms_(core|basic_controls|input_controls|range_controls|tab_control|semantic|frame_scheduler|timer|tooltip)_tests' \
-  --output-on-failure
+cmake --build build-renderer-free-polish -j 8
+ctest --test-dir build-renderer-free-polish --output-on-failure
 ```
 
-Result: core, controls, and tests build without Skia or native hosts; **9/9
-focused tests pass**.
+Result: core, controls, and tests build without Skia, HarfBuzz, or native hosts;
+**34/34 tests pass**.
 
 An Address/Undefined Sanitizer build at `/tmp/gui-forms-asan.FtGdfq` ran the
 Timer, ToolTip, and complete-showcase interaction binaries cleanly. AppleClang
@@ -124,13 +158,46 @@ memory and undefined-behavior checks completed without findings.
 
 ## Native dogfood observations
 
-- All twelve pages render without the prior fixed-child scaling overflow.
+- All fifteen pages render without the prior fixed-child scaling overflow.
+- The dates board proves exact long/short/time/custom formatting, an owned French
+  provider, optional and spinner forms, disabled state, bounded date stepping,
+  and retained calendar commit/cancel. Native accessibility toggles the optional
+  value and drives enabled month navigation; a single-month range publishes dimmed,
+  disabled month buttons and rejects activation.
+- The host-services board drives all five common-dialog request families,
+  cancellation preservation, clipboard, monitor geometry, and the complete
+  semantic sound-cue set through the public host boundary. Live AppKit proves
+  physical Escape cancellation and owner restoration; Wine proves native
+  MessageBox/ChooseColor cancellation and exact modal cleanup. Evidence:
+  `experiments/M11H_DIALOGS_AND_HOST_SERVICES.md`.
+- The states board now drives the public UI dispatcher without executing work
+  inside its click callback. Wine records one `A/B/C` FIFO snapshot followed by
+  nested `D` on the next host turn (`posted=4`, `invoked=4`, `pending=0`), then
+  a separately posted operation cancelled before execution (`cancelled=1`,
+  `faulted=0`), then a worker `Invoke` completing on the UI thread
+  (`synchronous_invocations=1`, `marshalled_invocations=1`). AppKit separately
+  proves worker-originated async, nested, and synchronous callbacks execute on
+  the UI thread and the original synchronous fault returns to the worker. Evidence:
+  `experiments/M11H_UI_DISPATCHER.md`.
 - Label wrapping removed sidebar, container-copy, and coverage clipping.
 - TextBox accepted `Hello Ω GUI.Forms`, painted continuous drag selection,
   replaced the selected range, and restored it through Undo.
-- Mixed Japanese and emoji initially painted tofu; the shared Skia fallback
-  correction removed it. This negative observation is retained because it
-  changed renderer behavior rather than demo content.
+- Mixed Japanese and emoji initially painted tofu. A shared, role-independent
+  fallback registry plus exact-hash Noto Sans CJK JP removed Japanese tofu.
+  Current Noto COLRv1 then shaped the rocket with zero missing clusters but
+  painted no pixels in the admitted CPU Skia/FreeType build, so that candidate
+  is **REJECTED** for this pack. Pinned Noto Emoji Regular 1.05 monochrome
+  renders real fallback ink. The HarfBuzz test proves Japanese and rocket
+  coverage across control/content/monospace roles without tripling face bytes;
+  the Skia smoke separately fails if either fallback shapes without raster ink.
+  Live AppKit crop inspection proves `á`, Greek, Japanese, and the rocket in
+  one field. The strict Win32 adapter now uses Uniscribe itemization,
+  `ScriptShape`/`ScriptPlace`, and glyph-index output over its privately loaded
+  faces; a Wine capture proves Japanese plus the monochrome rocket, while a
+  gated content-free trace requires actual Noto face selection, a non-default
+  astral glyph, and successful drawing. These negative observations are
+  retained because they changed renderer and pack behavior rather than demo
+  content.
 - ListBox initially scrolled preselected items to row zero before first arrange;
   visibility reconciliation moved to arrange and the initial viewport is now
   stable.
@@ -141,6 +208,96 @@ memory and undefined-behavior checks completed without findings.
 - Horizontal and vertical scroll bars render within their retained bounds;
   native value automation synchronizes the public pair, and headless dragging
   updates before pointer release.
+- The split-container board initially dragged the real seam while fixed demo
+  background children obscured pane allocation. Pane-owned paint removed that
+  false surface: live drag now visibly reallocates both panels before release.
+- Reduced motion initially stopped Motion Lab and left pause/global-live in
+  conflicting states, requiring repeated toggles. A later live pass disproved
+  the shallow `next_wake` assertion, and AppKit scheduled wakes were
+  default-run-loop-mode only. Live-off now disables the page command without
+  destroying the independent pause latch; Live-on restores the exact retained
+  transport state, every compound state writes one coherent status, and AppKit
+  registers its wake in common modes. Eight consecutive pause/resume cycles must
+  advance rendered marker geometry; the native host test cancels and replaces
+  an active-surface lease and requires autonomous post-rearm ticks. The first
+  reduced-motion substitute still advanced in visible 4 Hz jumps, which made
+  otherwise-correct pause/resume transitions look broken. The intermediate
+  policy replaced it with one wake-free retained frame and passed an exact
+  stability gate. **REJECTED 2026-08-06:** direct user observation established
+  that this made “reduced” functionally indistinguishable from “stopped.” The
+  later corrective policy is recorded below; this negative result is retained
+  rather than rewritten as success.
+- **OBSERVED then MEASURED FIX, 2026-08-05:** the easing board's phase retention
+  hid a second defect in the reusable `ProgressBar`: showcase pause called
+  `set_animation_enabled(false)`, which reset phase, and re-registration rebased
+  the first resumed frame to zero. Reduced motion also overwrote the model phase
+  with its representative value. `ProgressBar` now keeps feature enablement,
+  pause, and reduced presentation as three orthogonal states. Pause revokes the
+  lease without changing phase; resume advances from that phase; reduced motion
+  paints a stable `0.5` substitute without mutating the retained phase. Focused
+  tests cover the first resumed frame, eight repeated lease replacements, exact
+  active-surface counts, and phase preservation across pause/reduced/full
+  transitions. Live AppKit stress dogfood completed ten full-motion, eight
+  reduced-mode, and eight master-gate transitions, then demonstrated autonomous
+  frame movement after a single reduced-mode exit.
+- **OBSERVED then MEASURED CORE/HOST FIX, 2026-08-05:** foreground dogfood still
+  reported incoherent pause/resume behavior. The showcase had accumulated its
+  own phase instead of consuming the public timeline, changed ProgressBar pause
+  and reduced flags in two lease-producing calls, froze reduced mode on a
+  random frame, and allowed back/elastic markers to escape the board. Motion Lab
+  now consumes the reusable pause/resume timeline and applies ProgressBar
+  policy atomically,
+  presents reduced mode at an exact `0.5` phase, publishes the phase readout,
+  and bounds overshoot geometry. AppKit uses one retained re-armable main-queue
+  deadline source rather than destroying/recreating timer objects. Sixteen core
+  pause/resume cycles, six native semantic transition cycles, autonomous native
+  lease-replacement ticks, 46 native tests, 35
+  renderer-free tests, strict Win64 construction, and the Wine motion/services
+  sequence pass. **HYPOTHESIS:** the foreground presentation defect is closed;
+  final direct user observation remains the visual acceptance gate because an
+  automation client that covers the window correctly triggers host occlusion.
+- **OBSERVED then MEASURED COMPOUND-POLICY FIX, 2026-08-05:** direct dogfood
+  found that pause/resume was still visually order-dependent. The four-value
+  enum had collapsed three independent facts; with reduced motion selected,
+  Pause changed presentation from the fixed representative frame to the stale
+  retained phase, and Resume changed it back. `MotionPolicy` now retains
+  `enabled`, `paused`, and `reduced` independently. Pausing or resuming while
+  reduced leaves geometry at exact phase `0.5`; leaving reduced while paused
+  reveals the retained phase without starting a wake; only the fully active
+  combination owns a frame lease. The master gate preserves the pause latch
+  instead of silently rewriting it. Sixteen compound ProgressBar cycles,
+  eight full showcase pause/resume cycles, and eight native AppKit
+  disarm/quiescent-gap/rearm cycles pass. The rebuilt native board exposes
+  `REDUCED + PAUSED` explicitly and resumes from each state with one
+  unambiguous action.
+- **OBSERVED then MEASURED APPKIT PRESENTATION FIX, 2026-08-06:** direct native
+  dogfood disproved scheduler-only acceptance: one run emitted 7,459 active-
+  surface callbacks but presented only two frames. `drawRect` synchronously
+  called `collectDamage`, and AppKit retained the dirty bit without enqueueing
+  the next draw requested from inside the active paint transaction. The host now
+  completes presentation, rearms the retained deadline source, and collects the
+  next damage from that main-queue wake. The native regression begins with a
+  scheduled surface hidden, reveals it after the host has gone quiescent, then
+  requires both autonomous ticks and actual paints through eight disarm/rearm
+  cycles. Rebuilt-app dogfood visibly held pause at an exact phase, resumed on
+  one click, held reduced motion at 50%, preserved pause/resume while reduced,
+  and restored continuous motion on one reduced-mode exit.
+- **OBSERVED then MEASURED REDUCED-MOTION CORRECTION, 2026-08-06:** direct user
+  observation rejected the wake-free fixed frame: reduced motion was simply
+  stopped. `MotionPolicy::active()` now excludes only pause and disable.
+  Reduced sources retain one lease at a minimum 100 ms cadence; ProgressBar
+  advances at `0.35` phase speed and admitted reduced presentations use a
+  centered half-width excursion. Reduced animated progress retains busy
+  semantics. Focused tests fail on a frozen reduced frame, prove real geometry
+  and phase advancement, prove pause stability/no-wake behavior, and repeat the
+  compound master/reduced/pause transition matrix. Live AppKit comparison
+  measured 45% → 62% over 650 ms in reduced mode, an unchanged 37% across a
+  650 ms reduced+paused interval, and 58% after one Resume. Native 47/47,
+  renderer-free 36/36, strict Win64, and Wine motion/services gates pass. Wine
+  now sees active surfaces in reduced mode and zero only while paused. The
+  rebuilt showcase remains open on the Animation page for direct inspection.
+- **OBSERVED USER ACCEPTANCE, 2026-08-06:** direct inspection accepted the Dates
+  & Calendar page visually. No calendar-specific change was made in this round.
 - The image page visibly distinguishes all five sizing modes and three opacity
   levels. AppKit publishes eight stable image elements with intrinsic `128 x 80`
   values, and the clipped drawing-composition board remains renderer-neutral.
@@ -176,9 +333,12 @@ memory and undefined-behavior checks completed without findings.
 ## Honest open boundary
 
 This is not “all WinForms” and not toolkit 1.0. Still open include multiline,
-password, clipboard command binding and full IME/preedit TextBox behavior;
-editable/data-bound/owner-drawn ComboBox and large data sources; scroll bars,
-  date controls, menus/tool strips, tree/list/grid, tab/layout families,
-validation, posted-dispatcher breadth, editable semantic
+bidi/culture, history coalescing, accessible editable ranges, and full
+IME/preedit/candidate-geometry TextBox behavior;
+editable/data-bound/owner-drawn ComboBox and large data sources; advanced
+calendar/date culture breadth, menus/tool strips, tree/list/grid, remaining
+tab/layout families,
+validation, synchronous invoke/synchronization-context projection, editable semantic
 text ranges, UI Automation/AT-SPI publishers, DML/C ABI projections, independent native secondary windows,
-Windows/Wine showcase dogfood, Linux host work, and sustained performance/soak.
+Windows HarfBuzz/FreeType raster integration and showcase dogfood, Linux host
+work, and sustained performance/soak.

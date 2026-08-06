@@ -39,8 +39,12 @@ void Component::on_dispose() noexcept {}
 
 void Component::revoke_owned_work() noexcept {
     auto owned = std::exchange(owned_revocables_, {});
-    for (const auto& weak : owned) {
-        if (auto revocable = weak.lock()) {
+    // Revocables form an acquisition stack. Later observations commonly
+    // depend on earlier resources (for example a popup-closed subscription
+    // observing its popup attachment), so tear them down in strict reverse
+    // order and never allow a resource callback into a disposing owner.
+    for (auto item = owned.rbegin(); item != owned.rend(); ++item) {
+        if (auto revocable = item->lock()) {
             revocable->disconnect();
         }
     }

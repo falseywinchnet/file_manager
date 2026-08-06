@@ -90,6 +90,7 @@ public:
     void set_style(BasicControlStyle style);
 
     void on_paint(Painter& painter, Rect local_damage) override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 protected:
     [[nodiscard]] Rect local_bounds() const noexcept;
@@ -115,7 +116,7 @@ public:
 
 private:
     std::string text_;
-    FontSpec font_{FontRole::control, 12.0, 600, false};
+    FontSpec font_{FontRole::control, 12.0, 600, false, 0.24};
 };
 
 class PictureBox : public Panel {
@@ -231,7 +232,7 @@ protected:
 
 private:
     std::string text_;
-    FontSpec font_{FontRole::control, 12.0, 400, false};
+    FontSpec font_{FontRole::control, 12.0, 400, false, 0.24};
     BasicControlStyle style_;
     Event<ButtonBase&> clicked_;
     Event<const std::string&> text_changed_;

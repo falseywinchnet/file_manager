@@ -58,6 +58,25 @@ BOOL CALLBACK list_visible_windows(HWND window, LPARAM) {
     return TRUE;
 }
 
+struct OwnedDialogSearch final {
+    HWND owner{};
+    HWND dialog{};
+};
+
+BOOL CALLBACK find_owned_dialog(HWND window, LPARAM context_value) {
+    auto& context = *reinterpret_cast<OwnedDialogSearch*>(context_value);
+    if (!IsWindowVisible(window) || GetWindow(window, GW_OWNER) != context.owner) {
+        return TRUE;
+    }
+    wchar_t class_name[32]{};
+    if (GetClassNameW(window, class_name, 32) != 0 &&
+        std::wcscmp(class_name, L"#32770") == 0) {
+        context.dialog = window;
+        return FALSE;
+    }
+    return TRUE;
+}
+
 bool capture_client_bitmap(HWND window, const std::wstring& path) {
     RECT client{};
     if (!GetClientRect(window, &client)) return false;
@@ -226,6 +245,24 @@ int main(int argc, char** argv) {
             return 4;
         }
         std::printf("posted=WM_CLOSE\n");
+        return 0;
+    }
+    if (std::strcmp(argv[1], "dismiss-dialog") == 0) {
+        OwnedDialogSearch search{window, nullptr};
+        EnumWindows(find_owned_dialog, reinterpret_cast<LPARAM>(&search));
+        if (search.dialog == nullptr) {
+            std::fprintf(stderr, "owned native dialog not found\n");
+            return 4;
+        }
+        HWND cancel = GetDlgItem(search.dialog, IDCANCEL);
+        if (!PostMessageW(search.dialog, WM_COMMAND,
+                          MAKEWPARAM(IDCANCEL, BN_CLICKED),
+                          reinterpret_cast<LPARAM>(cancel))) {
+            std::fprintf(stderr, "failed to invoke native dialog cancellation\n");
+            return 4;
+        }
+        std::printf("dismissed=%p owner=%p\n", static_cast<void*>(search.dialog),
+                    static_cast<void*>(window));
         return 0;
     }
     if (std::strcmp(argv[1], "native-capture") == 0) {

@@ -1,5 +1,6 @@
 #include "gui_forms/animation.hpp"
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
 
@@ -68,6 +69,43 @@ void test_timeline_delay_repeat_direction_and_finish() {
             "finite alternate timeline must finish at its directed endpoint");
 }
 
+void test_timeline_pause_resume_retains_phase_without_catch_up() {
+    AnimationSpec specification;
+    specification.duration = 1000ms;
+    specification.infinite = true;
+    AnimationTimeline timeline(specification);
+    const FrameTime start{};
+    timeline.start(start);
+    require(close_to(timeline.sample(start + 250ms).progress, 0.25),
+            "timeline must advance before suspension");
+
+    timeline.pause(start + 250ms);
+    require(timeline.running() && timeline.paused() &&
+                close_to(timeline.sample(start + 5s).progress, 0.25),
+            "paused timeline must retain its exact phase at arbitrary sample times");
+    timeline.pause(start + 10s);
+    require(close_to(timeline.sample(start + 20s).progress, 0.25),
+            "repeated pause must be idempotent");
+
+    timeline.resume(start + 1250ms);
+    require(timeline.running() && !timeline.paused() &&
+                close_to(timeline.sample(start + 1250ms).progress, 0.25) &&
+                close_to(timeline.sample(start + 1500ms).progress, 0.5),
+            "resume must rebase suspended time and continue from the retained phase");
+    timeline.resume(start + 2s);
+    require(close_to(timeline.sample(start + 1750ms).progress, 0.75),
+            "repeated resume must be idempotent");
+
+    for (std::size_t cycle = 0U; cycle < 16U; ++cycle) {
+        const FrameTime pause_at = start + 1750ms + 100ms * cycle;
+        const double before = timeline.sample(pause_at).progress;
+        timeline.pause(pause_at);
+        timeline.resume(pause_at + 40ms);
+        require(close_to(timeline.sample(pause_at + 40ms).progress, before),
+                "every pause/resume cycle must preserve its boundary phase");
+    }
+}
+
 void test_invalid_timeline_contract() {
     bool duration_rejected = false;
     bool iterations_rejected = false;
@@ -89,6 +127,24 @@ void test_invalid_timeline_contract() {
     }
     require(duration_rejected && iterations_rejected,
             "timeline must reject degenerate duration and finite iteration count");
+}
+
+void test_reduced_motion_remains_active_and_calm() {
+    constexpr MotionPolicy reduced{true, false, true};
+    static_assert(reduced.active());
+    static_assert(!reduced.quiescent());
+    static_assert(reduced.frame_interval(16ms) == 100ms);
+    static_assert(reduced.speed_scale() == 0.35);
+    static_assert(reduced.presentation_phase(0.0) == 0.25);
+    static_assert(reduced.presentation_phase(1.0) == 0.75);
+
+    constexpr MotionPolicy paused_reduced{true, true, true};
+    constexpr MotionPolicy disabled_reduced{false, false, true};
+    static_assert(paused_reduced.quiescent());
+    static_assert(disabled_reduced.quiescent());
+    require(reduced.active() && paused_reduced.quiescent() &&
+                disabled_reduced.quiescent(),
+            "reduced motion must remain active; only pause and disable may quiesce it");
 }
 
 void test_progress_animation_and_hidden_suspension() {
@@ -118,6 +174,151 @@ void test_progress_animation_and_hidden_suspension() {
     progress->set_visual_style(ProgressBarVisualStyle::continuous);
     require(!window.next_wake().has_value(),
             "static progress style must revoke its retained frame source");
+
+    progress->set_overlay_style(ProgressBarOverlayStyle::moving_stripes);
+    require(window.next_wake().has_value(),
+            "moving stripes must animate a determinate progress style");
+    progress->set_animation_enabled(false);
+    require(!window.next_wake().has_value() && progress->animation_phase() == 0.0,
+            "disabled stripe motion must paint statically without an idle wake");
+    progress->set_animation_enabled(true);
+    progress->on_frame(FrameClock::now() + 325ms);
+    const double retained_phase = progress->animation_phase();
+    progress->set_animation_paused(true);
+    require(!window.next_wake().has_value() &&
+                close_to(progress->animation_phase(), retained_phase),
+            "paused progress motion must revoke its lease without destroying phase");
+    progress->set_animation_paused(false);
+    require(window.next_wake().has_value() &&
+                close_to(progress->animation_phase(), retained_phase),
+            "resumed progress motion must retain phase before its next frame");
+    progress->on_frame(*window.next_wake());
+    require(progress->animation_phase() > retained_phase,
+            "the first resumed frame must advance from the retained phase");
+    const double pre_reduced_phase = progress->animation_phase();
+    progress->set_reduced_motion(true);
+    progress->set_value(73.0);
+    require(window.next_wake().has_value() &&
+                close_to(progress->animation_phase(), pre_reduced_phase) &&
+                close_to(progress->value(), 73.0) &&
+                has_semantic_state(progress->semantic_descriptor().states,
+                                   SemanticState::busy),
+            "reduced motion must retain animation and state updates without resetting phase");
+    progress->on_frame(*window.next_wake());
+    const double reduced_phase = progress->animation_phase();
+    require(reduced_phase > pre_reduced_phase &&
+                reduced_phase - pre_reduced_phase < 0.05,
+            "reduced progress motion must advance visibly at its calmer speed");
+    progress->set_reduced_motion(false);
+    require(window.next_wake().has_value() &&
+                close_to(progress->animation_phase(), reduced_phase),
+            "leaving reduced motion must retain the reduced timeline position");
+    const std::uint64_t requests_before_batch =
+        window.metrics_snapshot().scheduled_frame_requests;
+    progress->set_motion_policy(true, true);
+    require(!window.next_wake().has_value(),
+            "batched pause plus reduced motion must quiesce without a transient lease");
+    progress->set_motion_policy(false, false);
+    require(window.next_wake().has_value() &&
+                window.metrics_snapshot().scheduled_frame_requests ==
+                    requests_before_batch + 1U,
+            "batched live policy must publish exactly one replacement lease");
+
+    const double phase_before_master_gate = progress->animation_phase();
+    progress->set_motion_policy(MotionPolicy{false, false, false});
+    require(!window.next_wake().has_value() &&
+                progress->motion_policy() == MotionPolicy{false, false, false} &&
+                close_to(progress->animation_phase(), phase_before_master_gate) &&
+                !has_semantic_state(progress->semantic_descriptor().states,
+                                    SemanticState::busy),
+            "a disabled application motion policy must revoke its lease without mutating phase");
+    progress->set_motion_policy(MotionPolicy{true, false, false});
+    require(window.next_wake().has_value() &&
+                close_to(progress->animation_phase(), phase_before_master_gate) &&
+                has_semantic_state(progress->semantic_descriptor().states,
+                                   SemanticState::busy),
+            "re-enabling the application motion policy must resume from retained phase");
+
+    for (std::size_t cycle = 0U; cycle < 16U; ++cycle) {
+        progress->set_motion_policy(MotionPolicy{true, true, true});
+        const double compound_phase = progress->animation_phase();
+        require(!window.next_wake().has_value() && progress->animation_paused() &&
+                    progress->reduced_motion() &&
+                    !has_semantic_state(progress->semantic_descriptor().states,
+                                        SemanticState::busy),
+                "compound pause plus reduced motion must remain a single quiescent policy");
+        progress->set_motion_policy(MotionPolicy{true, false, true});
+        require(window.next_wake().has_value() &&
+                    close_to(progress->animation_phase(), compound_phase) &&
+                    has_semantic_state(progress->semantic_descriptor().states,
+                                       SemanticState::busy),
+                "resuming while reduced must arm one calm animation lease");
+        progress->set_motion_policy(MotionPolicy{true, true, false});
+        require(!window.next_wake().has_value() &&
+                    close_to(progress->animation_phase(), compound_phase),
+                "leaving reduced motion while paused must retain the suspended phase");
+        progress->set_motion_policy(MotionPolicy{true, false, false});
+        require(window.next_wake().has_value() &&
+                    close_to(progress->animation_phase(), compound_phase),
+                "full motion must restore its frame lease from the retained phase");
+    }
+    progress->set_overlay_style(ProgressBarOverlayStyle::none);
+    require(!window.next_wake().has_value(),
+            "removing the last animated progress feature must revoke its frame source");
+}
+
+class StripePainter final : public Painter {
+public:
+    void save() override { ++saves; }
+    void restore() override { ++restores; }
+    void translate(Point) override {}
+    void clip_rect(Rect bounds) override { clip = bounds; }
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point from, Point to, Color, double width) override {
+        ++lines;
+        if (close_to(width, 6.0)) {
+            ++stripe_lines;
+            line_width = width;
+            if (from.y <= to.y) slopes_down = false;
+        }
+    }
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+
+    int saves{};
+    int restores{};
+    int lines{};
+    int stripe_lines{};
+    Rect clip{};
+    double line_width{};
+    bool slopes_down{true};
+};
+
+void test_progress_stripes_are_clipped_and_configurable() {
+    auto progress = make_control<ProgressBar>(StableId("animation.stripes"));
+    progress->set_requested_bounds({0.0, 0.0, 200.0, 24.0});
+    progress->set_value(50.0);
+    progress->set_overlay_style(ProgressBarOverlayStyle::moving_stripes);
+    progress->set_stripe_width(6.0);
+    Window window(progress, {200.0, 24.0});
+    window.perform_layout();
+    StripePainter painter;
+    progress->on_paint(painter, {0.0, 0.0, 200.0, 24.0});
+    require(painter.saves == 1 && painter.restores == 1 &&
+                painter.stripe_lines > 1 &&
+                painter.clip == Rect{2.0, 2.0, 98.0, 20.0} &&
+                close_to(painter.line_width, 6.0) && painter.slopes_down,
+            "striped progress must clip diagonal bands to the determinate fill");
+
+    bool narrow_rejected = false;
+    try {
+        progress->set_stripe_width(1.0);
+    } catch (const std::invalid_argument&) {
+        narrow_rejected = true;
+    }
+    require(narrow_rejected && close_to(progress->stripe_width(), 6.0),
+            "stripe geometry must reject unusable widths without mutation");
 }
 
 void test_visual_style_round_trips() {
@@ -136,15 +337,60 @@ void test_visual_style_round_trips() {
             "public control visual variants must retain exact state");
 }
 
+void test_public_easing_preview_owns_scheduler_policy_and_semantics() {
+    auto preview = make_control<EasingPreview>(
+        StableId("animation.public.preview"));
+    preview->set_requested_bounds({0.0, 0.0, 500.0, 340.0});
+    preview->set_title("Public easing proof");
+    Window window(preview, {500.0, 340.0});
+    require(preview->tracks().size() == 8U && window.next_wake().has_value() &&
+                has_semantic_state(preview->semantic_descriptor().states,
+                                   SemanticState::busy),
+            "EasingPreview must own all public curves, one frame lease, and busy semantics");
+
+    const double before = preview->phase();
+    preview->set_motion_policy({true, false, true});
+    require(window.next_wake().has_value() && preview->phase() == before,
+            "reduced EasingPreview motion must retain phase and remain scheduled");
+    preview->on_frame(FrameClock::now() + 300ms);
+    require(preview->phase() > before &&
+                preview->semantic_descriptor().numeric_value.has_value(),
+            "public EasingPreview frames must advance reusable timeline state");
+
+    preview->set_motion_policy({true, true, true});
+    require(!window.next_wake().has_value() &&
+                !has_semantic_state(preview->semantic_descriptor().states,
+                                    SemanticState::busy),
+            "paused EasingPreview motion must revoke its lease and busy state");
+    preview->set_tracks({
+        {EasingCurve::linear, "Linear only", Color::rgba(20, 80, 140)},
+    });
+    require(preview->tracks().size() == 1U &&
+                preview->tracks().front().label == "Linear only",
+            "EasingPreview track collection must be reusable application configuration");
+    bool empty_tracks_rejected = false;
+    try {
+        preview->set_tracks({});
+    } catch (const std::invalid_argument&) {
+        empty_tracks_rejected = true;
+    }
+    require(empty_tracks_rejected,
+            "EasingPreview must reject an empty conformance surface");
+}
+
 } // namespace
 
 int main() {
     try {
         test_easing_endpoints_and_curves();
         test_timeline_delay_repeat_direction_and_finish();
+        test_timeline_pause_resume_retains_phase_without_catch_up();
         test_invalid_timeline_contract();
+        test_reduced_motion_remains_active_and_calm();
         test_progress_animation_and_hidden_suspension();
+        test_progress_stripes_are_clipped_and_configurable();
         test_visual_style_round_trips();
+        test_public_easing_preview_owns_scheduler_policy_and_semantics();
         std::cout << "gui_forms_animation_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

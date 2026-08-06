@@ -112,7 +112,7 @@ inline constexpr std::array<NodeSpec, 49> gallery_nodes {{
     {"gallery.diagnostics.input", "gallery.diagnostics", NodeKind::label, LayoutKind::none, "input / focus / activation", ordinary, 4, 0, 20, 0.0, 0.0, 0.0},
     {"gallery.diagnostics.flush", "gallery.diagnostics", NodeKind::label, LayoutKind::none, "wake / ticks / active", ordinary, 5, 0, 20, 0.0, 0.0, 0.0},
     {"gallery.diagnostics.present", "gallery.diagnostics", NodeKind::label, LayoutKind::none, "present / worst", ordinary, 6, 0, 20, 0.0, 0.0, 0.0},
-    {"gallery.diagnostics.font", "gallery.diagnostics", NodeKind::label, LayoutKind::none, "Controls: Portsmouth Rapids 1.0; Fields: Lucida Grande.", ordinary, 7, 0, 52, 0.0, 0.0, 0.0},
+    {"gallery.diagnostics.font", "gallery.diagnostics", NodeKind::label, LayoutKind::none, "Controls: Portsmouth Rapids 1.0; Fields: Carlito body specimen.", ordinary, 7, 0, 52, 0.0, 0.0, 0.0},
     {"gallery.semantic-root", "gallery.root", NodeKind::panel, LayoutKind::none, "Optional semantics attach here", no_flags, 99, 0, 0, 0.0, 0.0, 0.0},
 }};
 

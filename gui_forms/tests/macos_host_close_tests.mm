@@ -4,11 +4,102 @@
 
 #include "gui_forms/gui_forms.hpp"
 
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
+#include <string>
+#include <thread>
 
 namespace {
+
+class FrameProbe final : public gui_forms::Control {
+public:
+    explicit FrameProbe(gui_forms::StableId stable_id)
+        : Control(std::move(stable_id)) {}
+
+    void on_frame(gui_forms::FrameTime) override { ++ticks; }
+    void on_paint(gui_forms::Painter&, gui_forms::Rect) override { ++paints; }
+
+    std::uint64_t ticks{};
+    std::uint64_t paints{};
+};
+
+struct RearmProbeState final {
+    std::shared_ptr<FrameProbe> root;
+    gui_forms::Window* window{};
+    gui_forms::FrameRequestToken* initial{};
+    gui_forms::FrameRequestToken replacement;
+    std::function<void()> wake;
+    std::function<void()> request_close;
+    std::array<std::uint64_t, 8> ticks_before{};
+    std::array<std::uint64_t, 8> ticks_at_rearm{};
+    std::array<std::uint64_t, 8> ticks_after{};
+    std::size_t cycle{};
+    std::uint64_t successful_cycles{};
+    std::uint64_t quiescent_gap_failures{};
+    gui_forms::DispatchOperation worker_dispatch;
+    gui_forms::DispatchOperation nested_dispatch;
+    std::string dispatch_trace;
+    bool worker_required_invoke{};
+    bool worker_ran_on_ui_thread{};
+    bool nested_ran_on_ui_thread{};
+    bool synchronous_worker_required_invoke{};
+    bool synchronous_ran_on_ui_thread{};
+    bool synchronous_returned{};
+    std::string synchronous_fault;
+};
+
+void run_rearm_cycle(const std::shared_ptr<RearmProbeState>& state) {
+    const std::size_t current = state->cycle;
+    state->ticks_before[current] = state->root->ticks;
+    if (current == 0U) {
+        state->initial->disconnect();
+    } else {
+        state->replacement.disconnect();
+    }
+    state->wake();
+    const std::shared_ptr<RearmProbeState> retained_state = state;
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, 12 * NSEC_PER_MSEC),
+        dispatch_get_main_queue(), ^{
+            retained_state->ticks_at_rearm[current] =
+                retained_state->root->ticks;
+            if (retained_state->ticks_at_rearm[current] !=
+                retained_state->ticks_before[current]) {
+                ++retained_state->quiescent_gap_failures;
+            }
+            retained_state->replacement =
+                retained_state->window->activate_surface(
+                    retained_state->root, std::chrono::milliseconds(10),
+                    gui_forms::FrameClock::now() +
+                        std::chrono::milliseconds(10));
+            retained_state->wake();
+            dispatch_after(
+                dispatch_time(DISPATCH_TIME_NOW, 70 * NSEC_PER_MSEC),
+                dispatch_get_main_queue(), ^{
+                    retained_state->ticks_after[current] =
+                        retained_state->root->ticks;
+                    if (retained_state->ticks_after[current] >
+                        retained_state->ticks_at_rearm[current]) {
+                        ++retained_state->successful_cycles;
+                    }
+                    ++retained_state->cycle;
+                    if (retained_state->cycle ==
+                        retained_state->ticks_before.size()) {
+                        retained_state->request_close();
+                        retained_state->request_close();
+                        return;
+                    }
+                    dispatch_after(
+                        dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
+                        dispatch_get_main_queue(), ^{
+                            run_rearm_cycle(retained_state);
+                        });
+                });
+        });
+}
 
 bool test_isolated_macos_services() {
     constexpr const char* pasteboard_name = "local.gui_forms.m3b.test";
@@ -113,20 +204,26 @@ int main() {
             gui_forms::HostCapability::dialogs)) {
         return 4;
     }
-    auto root = gui_forms::make_control<gui_forms::Control>(
+    auto root = gui_forms::make_control<FrameProbe>(
         gui_forms::StableId("host.close.root"));
+    auto surface = gui_forms::make_control<FrameProbe>(
+        gui_forms::StableId("host.close.surface"));
+    surface->set_visible(false);
+    surface->set_requested_bounds({0.0, 0.0, 320.0, 180.0});
+    root->add_child(surface);
     auto window = std::make_unique<gui_forms::Window>(root,
                                                       gui_forms::Size{320.0, 180.0});
+    gui_forms::Window* const live_window = window.get();
     auto active = window->activate_surface(
-        root, std::chrono::milliseconds(10),
+        surface, std::chrono::milliseconds(10),
         gui_forms::FrameClock::now() + std::chrono::milliseconds(10));
+    std::shared_ptr<RearmProbeState> rearm_state;
+    std::thread synchronous_worker;
     gui_forms::host::MacHostOptions options;
     options.title = "GUI.Forms Close Test";
     options.initial_size = {320.0, 180.0};
     options.minimum_size = {320.0, 180.0};
     options.print_metrics_on_close = false;
-    options.close_after_launch_for_testing = true;
-    options.close_attempts_for_testing = 2;
     std::uint64_t close_requests = 0;
     std::string final_host_snapshot;
     options.close_request = [&close_requests](gui_forms::HostCloseRequest& request) {
@@ -137,11 +234,67 @@ int main() {
                                                     std::string_view host) {
         final_host_snapshot.assign(host);
     };
+    options.host_ready = [&](auto wake, auto request_close, auto, auto, auto,
+                             auto, auto) {
+        // Exercise the exact transport used by pause/resume: disconnect the
+        // last active lease, force the host to disarm, then publish a new
+        // lease and wake it again. Repeating the transition catches a host
+        // source that reports a logically live model but remains disarmed.
+        rearm_state = std::make_shared<RearmProbeState>();
+        rearm_state->root = surface;
+        rearm_state->window = live_window;
+        rearm_state->initial = &active;
+        rearm_state->wake = std::move(wake);
+        rearm_state->request_close = std::move(request_close);
+        std::thread worker([state = rearm_state] {
+            state->worker_required_invoke = state->root->invoke_required();
+            state->worker_dispatch = state->root->begin_invoke([state] {
+                state->worker_ran_on_ui_thread =
+                    !state->root->invoke_required();
+                state->dispatch_trace += 'A';
+                state->nested_dispatch = state->root->begin_invoke([state] {
+                    state->nested_ran_on_ui_thread =
+                        !state->root->invoke_required();
+                    state->dispatch_trace += 'B';
+                });
+            });
+        });
+        worker.join();
+        synchronous_worker = std::thread([state = rearm_state] {
+            state->synchronous_worker_required_invoke =
+                state->root->invoke_required();
+            state->root->invoke([state] {
+                state->synchronous_ran_on_ui_thread =
+                    !state->root->invoke_required();
+            });
+            state->synchronous_returned = true;
+            try {
+                state->window->invoke([] {
+                    throw std::runtime_error("native synchronous fault");
+                });
+            } catch (const std::runtime_error& error) {
+                state->synchronous_fault = error.what();
+            }
+        });
+        const std::shared_ptr<RearmProbeState> scheduled_state = rearm_state;
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+            dispatch_get_main_queue(), ^{
+                surface->set_visible(true);
+                scheduled_state->wake();
+                dispatch_after(
+                    dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+                    dispatch_get_main_queue(), ^{
+                        run_rearm_cycle(scheduled_state);
+                    });
+            });
+    };
     const int result = gui_forms::host::run_macos(std::move(window), std::move(options));
+    if (synchronous_worker.joinable()) synchronous_worker.join();
     if (result != 0) {
         return result;
     }
-    if (active.connected()) {
+    if (!rearm_state || active.connected() || rearm_state->replacement.connected()) {
         return 3;
     }
     if (close_requests != 2) {
@@ -152,6 +305,40 @@ int main() {
         final_host_snapshot.find("\"monitor_count\":1") == std::string::npos ||
         final_host_snapshot.find("\"pointer_capture\"") == std::string::npos) {
         return 7;
+    }
+    if (rearm_state->ticks_before.front() == 0 ||
+        rearm_state->ticks_after.back() <= rearm_state->ticks_before.front() + 2U ||
+        rearm_state->root->paints < 4U ||
+        rearm_state->successful_cycles != rearm_state->ticks_before.size() ||
+        rearm_state->quiescent_gap_failures != 0U ||
+        !rearm_state->worker_required_invoke ||
+        !rearm_state->worker_ran_on_ui_thread ||
+        !rearm_state->nested_ran_on_ui_thread ||
+        !rearm_state->synchronous_worker_required_invoke ||
+        !rearm_state->synchronous_ran_on_ui_thread ||
+        !rearm_state->synchronous_returned ||
+        rearm_state->synchronous_fault != "native synchronous fault" ||
+        rearm_state->dispatch_trace != "AB" ||
+        rearm_state->worker_dispatch.state() !=
+            gui_forms::DispatchOperationState::completed ||
+        rearm_state->nested_dispatch.state() !=
+            gui_forms::DispatchOperationState::completed) {
+        std::cerr << "AppKit scheduled wake did not autonomously advance after "
+                     "repeated active-surface replacement: before="
+                  << rearm_state->ticks_before.front()
+                  << " after=" << rearm_state->ticks_after.back()
+                  << " paints=" << rearm_state->root->paints
+                  << " successful_cycles=" << rearm_state->successful_cycles
+                  << " quiescent_gap_failures="
+                  << rearm_state->quiescent_gap_failures << '\n';
+        for (std::size_t cycle = 0; cycle < rearm_state->ticks_before.size();
+             ++cycle) {
+            std::cerr << "  cycle=" << cycle
+                      << " before=" << rearm_state->ticks_before[cycle]
+                      << " rearm=" << rearm_state->ticks_at_rearm[cycle]
+                      << " after=" << rearm_state->ticks_after[cycle] << '\n';
+        }
+        return 8;
     }
     std::cout << "macos_capabilities=" << capabilities.to_json()
               << " close_requests=" << close_requests << '\n';

@@ -1,0 +1,464 @@
+#include "gui_forms/basic_controls.hpp"
+#include "gui_forms/container_controls.hpp"
+#include "gui_forms/window.hpp"
+
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <stdexcept>
+#include <thread>
+
+namespace {
+
+using namespace gui_forms;
+
+void require(bool condition, const char* message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+bool near(double left, double right, double tolerance = 0.001) {
+    return std::abs(left - right) <= tolerance;
+}
+
+std::shared_ptr<Button> sized_button(std::string id, double width,
+                                     double height) {
+    auto button = make_control<Button>(StableId(std::move(id)), "Item");
+    button->set_requested_bounds({0.0, 0.0, width, height});
+    button->set_margin({0.0, 0.0, 0.0, 0.0});
+    return button;
+}
+
+void test_margin_padding_validation_and_retained_slots() {
+    auto flow = make_control<FlowLayoutPanel>(StableId("layout.flow.slots"));
+    flow->set_accessible_name("Wrapping flow specimen");
+    flow->set_padding({5.0, 5.0, 5.0, 5.0});
+    auto first = sized_button("layout.flow.first", 40.0, 20.0);
+    auto second = sized_button("layout.flow.second", 50.0, 20.0);
+    auto third = sized_button("layout.flow.third", 30.0, 20.0);
+    first->set_margin({2.0, 1.0, 3.0, 1.0});
+    second->set_margin({4.0, 1.0, 4.0, 1.0});
+    third->set_margin({3.0, 2.0, 3.0, 2.0});
+    flow->add_child(first);
+    flow->add_child(second);
+    flow->add_child(third);
+    const Rect first_preferred = first->requested_bounds();
+    const Rect second_preferred = second->requested_bounds();
+    const Rect third_preferred = third->requested_bounds();
+
+    Window window(flow, {120.0, 100.0});
+    window.perform_layout();
+    require(first->arranged_bounds() == Rect{7.0, 6.0, 40.0, 20.0} &&
+                second->arranged_bounds() == Rect{54.0, 6.0, 50.0, 20.0} &&
+                third->arranged_bounds() == Rect{8.0, 29.0, 30.0, 20.0},
+            "flow layout must honor physical margins, padding, and wrap thresholds");
+    require(first->requested_bounds() == first_preferred &&
+                second->requested_bounds() == second_preferred &&
+                third->requested_bounds() == third_preferred,
+            "parent-assigned layout slots must never overwrite authored preferred bounds");
+    require(window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+            "layout-slot publication must converge within the bounded layout pipeline");
+    require(flow->semantic_descriptor().role == SemanticRole::group &&
+                flow->semantic_descriptor().exposed &&
+                window.semantic_snapshot().to_json().find(
+                    "Wrapping flow specimen") != std::string::npos,
+            "named flow layouts must publish one retained semantic group");
+
+    bool margin_rejected = false;
+    bool padding_rejected = false;
+    try {
+        first->set_margin({-1.0, 0.0, 0.0, 0.0});
+    } catch (const std::invalid_argument&) {
+        margin_rejected = true;
+    }
+    try {
+        flow->set_padding({0.0, 0.0, INFINITY, 0.0});
+    } catch (const std::invalid_argument&) {
+        padding_rejected = true;
+    }
+    require(margin_rejected && padding_rejected,
+            "margin and padding must reject negative or nonfinite geometry");
+}
+
+void test_flow_direction_break_visibility_and_resize() {
+    auto flow = make_control<FlowLayoutPanel>(StableId("layout.flow.policy"));
+    auto first = sized_button("layout.flow.policy.first", 40.0, 20.0);
+    auto second = sized_button("layout.flow.policy.second", 40.0, 20.0);
+    auto third = sized_button("layout.flow.policy.third", 40.0, 20.0);
+    flow->add_child(first);
+    flow->add_child(second);
+    flow->add_child(third);
+    flow->set_flow_break(*first, true);
+    Window window(flow, {100.0, 100.0});
+    window.perform_layout();
+    require(first->arranged_bounds().y == 0.0 &&
+                second->arranged_bounds().y == 20.0 &&
+                third->arranged_bounds().y == 20.0,
+            "FlowBreak must terminate one row while retaining later child order");
+
+    flow->set_flow_break(*first, false);
+    flow->set_flow_direction(FlowDirection::right_to_left);
+    window.perform_layout();
+    require(first->arranged_bounds().x == 60.0 &&
+                second->arranged_bounds().x == 20.0 &&
+                third->arranged_bounds().x == 60.0 &&
+                third->arranged_bounds().y == 20.0,
+            "right-to-left flow must mirror each wrapped row without reversing ownership");
+
+    second->set_visible(false);
+    window.perform_layout();
+    require(first->arranged_bounds().x == 60.0 &&
+                third->arranged_bounds().x == 20.0 &&
+                third->arranged_bounds().y == 0.0,
+            "hidden flow children must consume neither main-axis nor wrap space");
+
+    second->set_visible(true);
+    flow->set_flow_direction(FlowDirection::bottom_up);
+    flow->set_wrap_contents(false);
+    window.perform_layout();
+    require(first->arranged_bounds().y == 80.0 &&
+                second->arranged_bounds().y == 60.0 &&
+                third->arranged_bounds().y == 40.0,
+            "bottom-up no-wrap flow must allocate one deterministic vertical column");
+
+    bool wrong_thread_rejected = false;
+    std::thread worker([&] {
+        try {
+            flow->set_wrap_contents(true);
+        } catch (const std::logic_error&) {
+            wrong_thread_rejected = true;
+        }
+    });
+    worker.join();
+    require(wrong_thread_rejected,
+            "attached flow policy mutation must retain UI-thread enforcement");
+}
+
+void test_table_mixed_tracks_spans_and_lookup() {
+    auto table = make_control<TableLayoutPanel>(StableId("layout.table.mixed"));
+    table->set_accessible_name("Mixed table specimen");
+    table->set_padding({5.0, 5.0, 5.0, 5.0});
+    table->set_column_count(4U);
+    table->set_row_count(2U);
+    table->set_column_style(0U, {TableSizeMode::absolute, 40.0});
+    table->set_column_style(1U, {TableSizeMode::auto_size, 0.0});
+    table->set_column_style(2U, {TableSizeMode::percent, 1.0});
+    table->set_column_style(3U, {TableSizeMode::percent, 2.0});
+    table->set_row_style(0U, {TableSizeMode::auto_size, 0.0});
+    table->set_row_style(1U, {TableSizeMode::percent, 1.0});
+    table->set_cell_border_style(TableCellBorderStyle::single);
+
+    auto first = sized_button("layout.table.first", 30.0, 20.0);
+    auto second = sized_button("layout.table.second", 60.0, 30.0);
+    auto spanning = sized_button("layout.table.spanning", 200.0, 30.0);
+    auto automatic = sized_button("layout.table.automatic", 40.0, 20.0);
+    table->add_child(first);
+    table->add_child(second);
+    table->add_child(spanning);
+    table->add_child(automatic);
+    table->set_cell_position(*first, {0U, 0U});
+    table->set_cell_position(*second, {1U, 0U});
+    table->set_cell_position(*spanning, {1U, 1U});
+    table->set_column_span(*spanning, 3U);
+
+    const Rect spanning_preferred = spanning->requested_bounds();
+    Window window(table, {400.0, 160.0});
+    window.perform_layout();
+    const auto widths = table->column_widths();
+    const auto heights = table->row_heights();
+    require(widths.size() == 4U && heights.size() == 2U &&
+                near(widths[0], 40.0) && near(widths[1], 85.0) &&
+                near(widths[2], 88.333333) && near(widths[3], 176.666667) &&
+                near(heights[0], 30.0) && near(heights[1], 120.0),
+            "table tracks must resolve absolute, auto, and weighted percent sizes deterministically");
+    require(first->arranged_bounds() == Rect{5.0, 5.0, 30.0, 20.0} &&
+                second->arranged_bounds() == Rect{45.0, 5.0, 60.0, 30.0} &&
+                spanning->arranged_bounds() == Rect{45.0, 35.0, 200.0, 30.0},
+            "table cells and a three-column span must place preferred child sizes at cell origins");
+    require(table->cell_position(*automatic) ==
+                std::optional(TableLayoutCellPosition{2U, 0U}) &&
+                table->control_from_position(3U, 1U) == spanning &&
+                table->column_span(*spanning) == 3U &&
+                spanning->requested_bounds() == spanning_preferred,
+            "table lookup must expose automatic cells, span occupancy, and retained preferred bounds");
+    require(!table->layout_overflowed() &&
+                window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+            "mixed table layout must converge without overflow or bounded-pass failure");
+    require(table->semantic_descriptor().role == SemanticRole::group &&
+                table->semantic_descriptor().exposed,
+            "named table layouts must expose their child geometry as a semantic group");
+
+    table->set_auto_size(true);
+    const Size desired = table->measure({1000.0, 1000.0});
+    require(near(desired.width, 330.0) && near(desired.height, 70.0),
+            "auto-sized table measurement must preserve percent ratios while satisfying content minima");
+}
+
+void test_table_growth_hidden_children_and_fixed_overflow() {
+    auto table = make_control<TableLayoutPanel>(StableId("layout.table.growth"));
+    table->set_column_count(2U);
+    table->set_row_count(1U);
+    table->set_grow_style(TableLayoutGrowStyle::add_rows);
+    auto first = sized_button("layout.table.growth.first", 30.0, 20.0);
+    auto second = sized_button("layout.table.growth.second", 30.0, 20.0);
+    auto third = sized_button("layout.table.growth.third", 30.0, 20.0);
+    table->add_child(first);
+    table->add_child(second);
+    table->add_child(third);
+    Window window(table, {120.0, 80.0});
+    window.perform_layout();
+    require(table->row_heights().size() == 2U &&
+                table->cell_position(*third) ==
+                    std::optional(TableLayoutCellPosition{0U, 1U}),
+            "AddRows must create the minimum runtime track for automatic overflow");
+
+    second->set_visible(false);
+    window.perform_layout();
+    require(table->row_heights().size() == 1U &&
+                table->cell_position(*third) ==
+                    std::optional(TableLayoutCellPosition{1U, 0U}),
+            "hidden table children must release occupancy and collapse runtime tracks");
+
+    second->set_visible(true);
+    table->set_grow_style(TableLayoutGrowStyle::fixed_size);
+    window.perform_layout();
+    require(table->layout_overflowed() && third->arranged_bounds().empty() &&
+                !table->cell_position(*third),
+            "fixed tables must report overflow and assign no overlapping slot");
+
+    bool invalid_style_rejected = false;
+    bool invalid_span_rejected = false;
+    try {
+        table->set_column_style(0U, {TableSizeMode::percent, 0.0});
+    } catch (const std::invalid_argument&) {
+        invalid_style_rejected = true;
+    }
+    try {
+        table->set_row_span(*first, 0U);
+    } catch (const std::out_of_range&) {
+        invalid_span_rejected = true;
+    }
+    require(invalid_style_rejected && invalid_span_rejected,
+            "table styles and spans must reject degenerate configuration before mutation");
+}
+
+class GridPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override { ++lines; }
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+    std::size_t lines{};
+};
+
+void test_table_border_paint_is_public_geometry() {
+    auto table = make_control<TableLayoutPanel>(StableId("layout.table.paint"));
+    table->set_column_count(2U);
+    table->set_row_count(2U);
+    table->set_cell_border_style(TableCellBorderStyle::inset);
+    Window window(table, {100.0, 60.0});
+    window.perform_layout();
+    GridPainter painter;
+    table->on_paint(painter, {0.0, 0.0, 100.0, 60.0});
+    require(painter.lines == 12U,
+            "inset table borders must render two retained passes over every grid edge");
+}
+
+void test_scaled_panel_and_group_are_public_layout_controls() {
+    auto root = make_control<ScaledPanel>(StableId("layout.scaled.root"),
+                                          Size{100.0, 100.0});
+    auto child = sized_button("layout.scaled.child", 30.0, 40.0);
+    root->add_at(child, {10.0, 20.0, 30.0, 40.0});
+    auto group = make_control<ScaledGroupBox>(
+        StableId("layout.scaled.group"), "Scaled group", Size{50.0, 50.0});
+    auto grouped = sized_button("layout.scaled.grouped", 10.0, 10.0);
+    const Rect child_preferred = child->requested_bounds();
+    const Rect grouped_preferred = grouped->requested_bounds();
+    group->add_at(grouped, {5.0, 10.0, 20.0, 15.0});
+    root->add_at(group, {50.0, 0.0, 50.0, 100.0});
+
+    Window window(root, {200.0, 100.0});
+    window.perform_layout();
+    require(child->arranged_bounds() == Rect{20.0, 20.0, 60.0, 40.0} &&
+                group->arranged_bounds() == Rect{100.0, 0.0, 100.0, 100.0} &&
+                grouped->arranged_bounds() == Rect{10.0, 20.0, 40.0, 30.0},
+            "scaled public layouts must project authored slots through nested design spaces");
+    require(child->requested_bounds() == child_preferred &&
+                grouped->requested_bounds() == grouped_preferred,
+            "scaled layout must publish retained slots without overwriting authored bounds");
+    require(root->design_bounds(*child) ==
+                std::optional(Rect{10.0, 20.0, 30.0, 40.0}) &&
+                group->design_bounds(*grouped) ==
+                std::optional(Rect{5.0, 10.0, 20.0, 15.0}),
+            "scaled layouts must retain queryable authored geometry");
+
+    root->set_design_bounds(*child, {20.0, 10.0, 40.0, 20.0});
+    window.perform_layout();
+    require(child->arranged_bounds() == Rect{40.0, 10.0, 80.0, 20.0},
+            "runtime slot mutation must relayout without a custom subclass");
+    static_cast<void>(root->remove_child(child->runtime_id()));
+    window.perform_layout();
+    require(!root->design_bounds(*child),
+            "scaled layouts must revoke detached child metadata deterministically");
+
+    bool invalid_size_rejected = false;
+    bool foreign_child_rejected = false;
+    try {
+        root->set_design_size({0.0, 100.0});
+    } catch (const std::invalid_argument&) {
+        invalid_size_rejected = true;
+    }
+    try {
+        root->set_design_bounds(*child, {0.0, 0.0, 1.0, 1.0});
+    } catch (const std::logic_error&) {
+        foreign_child_rejected = true;
+    }
+    require(invalid_size_rejected && foreign_child_rejected,
+            "scaled layouts must reject degenerate spaces and foreign slot mutation");
+}
+
+void test_default_dock_layout_all_directions_and_z_order() {
+    auto root = make_control<Panel>(StableId("layout.dock.root"));
+    root->set_padding({10.0, 10.0, 10.0, 10.0});
+    auto fill = sized_button("layout.dock.fill", 10.0, 10.0);
+    auto bottom = sized_button("layout.dock.bottom", 10.0, 25.0);
+    auto right = sized_button("layout.dock.right", 40.0, 10.0);
+    auto top = sized_button("layout.dock.top", 10.0, 20.0);
+    auto left = sized_button("layout.dock.left", 30.0, 10.0);
+    fill->set_dock(DockStyle::fill);
+    bottom->set_dock(DockStyle::bottom);
+    right->set_dock(DockStyle::right);
+    top->set_dock(DockStyle::top);
+    left->set_dock(DockStyle::left);
+    root->add_child(fill);
+    root->add_child(bottom);
+    root->add_child(right);
+    root->add_child(top);
+    root->add_child(left);
+
+    Window window(root, {300.0, 200.0});
+    window.perform_layout();
+    require(left->arranged_bounds() == Rect{10.0, 10.0, 30.0, 180.0} &&
+                top->arranged_bounds() == Rect{40.0, 10.0, 250.0, 20.0} &&
+                right->arranged_bounds() == Rect{250.0, 30.0, 40.0, 160.0} &&
+                bottom->arranged_bounds() == Rect{40.0, 165.0, 210.0, 25.0} &&
+                fill->arranged_bounds() == Rect{40.0, 30.0, 210.0, 135.0},
+            "Dock must consume the padded client rectangle in topmost-first z order");
+    require(fill->requested_bounds() == Rect{0.0, 0.0, 10.0, 10.0} &&
+                left->requested_bounds() == Rect{0.0, 0.0, 30.0, 10.0} &&
+                window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+            "Dock slots must preserve preferred bounds and converge");
+
+    left->set_visible(false);
+    window.perform_layout();
+    require(top->arranged_bounds() == Rect{10.0, 10.0, 280.0, 20.0} &&
+                fill->arranged_bounds() == Rect{10.0, 30.0, 240.0, 135.0},
+            "hidden docked controls must consume no client extent");
+
+    auto order_root = make_control<Panel>(StableId("layout.dock.order.root"));
+    auto first = sized_button("layout.dock.order.first", 10.0, 20.0);
+    auto second = sized_button("layout.dock.order.second", 10.0, 30.0);
+    first->set_dock(DockStyle::top);
+    second->set_dock(DockStyle::top);
+    order_root->add_child(first);
+    order_root->add_child(second);
+    Window order_window(order_root, {100.0, 100.0});
+    order_window.perform_layout();
+    require(second->arranged_bounds().y == 0.0 &&
+                first->arranged_bounds().y == 30.0,
+            "topmost docked sibling must consume its edge first");
+    require(order_root->set_child_index(first->runtime_id(), 0U),
+            "dock z-order specimen must accept child-index mutation");
+    order_window.perform_layout();
+    require(first->arranged_bounds().y == 0.0 &&
+                second->arranged_bounds().y == 20.0,
+            "Dock order must update deterministically after SetChildIndex");
+}
+
+void test_compound_anchor_resize_runtime_rebase_and_validation() {
+    auto root = make_control<Panel>(StableId("layout.anchor.root"));
+    root->set_padding({10.0, 10.0, 10.0, 10.0});
+    auto fixed = sized_button("layout.anchor.fixed", 50.0, 20.0);
+    fixed->set_requested_bounds({20.0, 20.0, 50.0, 20.0});
+    auto stretch = sized_button("layout.anchor.stretch", 100.0, 20.0);
+    stretch->set_requested_bounds({20.0, 50.0, 100.0, 20.0});
+    stretch->set_anchor(AnchorStyles::left | AnchorStyles::right |
+                        AnchorStyles::top);
+    auto bottom_right = sized_button("layout.anchor.bottom-right", 50.0, 20.0);
+    bottom_right->set_requested_bounds({130.0, 60.0, 50.0, 20.0});
+    bottom_right->set_anchor(AnchorStyles::right | AnchorStyles::bottom);
+    auto centered = sized_button("layout.anchor.centered", 50.0, 20.0);
+    centered->set_requested_bounds({75.0, 40.0, 50.0, 20.0});
+    centered->set_anchor(AnchorStyles::none);
+    root->add_child(fixed);
+    root->add_child(stretch);
+    root->add_child(bottom_right);
+    root->add_child(centered);
+    Window window(root, {200.0, 100.0});
+    window.perform_layout();
+
+    window.resize({300.0, 150.0});
+    window.perform_layout();
+    require(fixed->arranged_bounds() == Rect{20.0, 20.0, 50.0, 20.0} &&
+                stretch->arranged_bounds() == Rect{20.0, 50.0, 200.0, 20.0} &&
+                bottom_right->arranged_bounds() == Rect{230.0, 110.0, 50.0, 20.0} &&
+                centered->arranged_bounds() == Rect{125.0, 65.0, 50.0, 20.0},
+            "compound Anchor flags must retain edge distances, stretch, or center per axis");
+    require(stretch->requested_bounds() == Rect{20.0, 50.0, 100.0, 20.0},
+            "Anchor resize must not rewrite the authored preferred rectangle");
+
+    fixed->set_anchor(AnchorStyles::right | AnchorStyles::bottom);
+    window.resize({350.0, 180.0});
+    window.perform_layout();
+    require(fixed->arranged_bounds() == Rect{70.0, 50.0, 50.0, 20.0},
+            "runtime Anchor mutation must rebase from current arranged geometry");
+
+    bottom_right->set_requested_bounds({200.0, 90.0, 60.0, 25.0});
+    window.perform_layout();
+    require(bottom_right->arranged_bounds() == Rect{200.0, 90.0, 60.0, 25.0},
+            "authored bounds mutation must reset an established anchor baseline");
+    window.resize({370.0, 190.0});
+    window.perform_layout();
+    require(bottom_right->arranged_bounds() == Rect{220.0, 100.0, 60.0, 25.0},
+            "rebased right/bottom anchors must follow later parent resize deltas");
+
+    bool invalid_dock_rejected = false;
+    bool invalid_anchor_rejected = false;
+    try {
+        fixed->set_dock(static_cast<DockStyle>(255U));
+    } catch (const std::invalid_argument&) {
+        invalid_dock_rejected = true;
+    }
+    try {
+        fixed->set_anchor(static_cast<AnchorStyles>(0x80U));
+    } catch (const std::invalid_argument&) {
+        invalid_anchor_rejected = true;
+    }
+    require(invalid_dock_rejected && invalid_anchor_rejected &&
+                window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+            "Dock/Anchor must reject unknown values and remain convergence-bounded");
+}
+
+} // namespace
+
+int main() {
+    try {
+        test_margin_padding_validation_and_retained_slots();
+        test_flow_direction_break_visibility_and_resize();
+        test_table_mixed_tracks_spans_and_lookup();
+        test_table_growth_hidden_children_and_fixed_overflow();
+        test_table_border_paint_is_public_geometry();
+        test_scaled_panel_and_group_are_public_layout_controls();
+        test_default_dock_layout_all_directions_and_z_order();
+        test_compound_anchor_resize_runtime_rebase_and_validation();
+        std::cout << "layout-panel-tests: pass\n";
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
+        std::cerr << "layout-panel-tests: fail: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
+}

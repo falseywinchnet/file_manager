@@ -24,6 +24,9 @@ public:
                                          std::uint16_t weight,
                                          bool italic,
                                          std::span<const std::byte> encoded);
+    [[nodiscard]] bool register_fallback_typeface(
+        std::uint16_t weight, bool italic,
+        std::span<const std::byte> encoded);
     [[nodiscard]] bool synchronize_images(const ImageRegistry& registry);
     [[nodiscard]] const void* pixels() const noexcept;
     [[nodiscard]] std::size_t row_bytes() const noexcept;

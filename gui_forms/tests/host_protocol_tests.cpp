@@ -216,7 +216,8 @@ void test_capabilities_and_normalized_dispatch() {
                                       HostCapability::cursor |
                                       HostCapability::clipboard |
                                       HostCapability::typed_drag_destination |
-                                      HostCapability::dialogs),
+                                      HostCapability::dialogs |
+                                      HostCapability::sound_cues),
             "headless host must report every implemented normalized input capability");
     require(capabilities.to_json().find("\"scale_notifications\"") !=
                 std::string::npos,
@@ -247,6 +248,42 @@ void test_capabilities_and_normalized_dispatch() {
     require(fixture.host.dispatch(std::move(text), 4).handled &&
                 fixture.probe->last_text == "é",
             "committed UTF-8 host text must retain bytes and handling result");
+}
+
+void test_semantic_sound_cues_are_bounded_and_deterministic() {
+    Fixture fixture;
+    auto& services = static_cast<host::HeadlessHostServices&>(
+        fixture.host.services());
+    require(fixture.window.host_services() == &services,
+            "an active host session must expose its portable services to controls");
+
+    constexpr std::uint64_t start = 1'000'000'000U;
+    require(services.play_sound_cue(
+                {HostSoundCue::notification, 0.8, start}).accepted() &&
+            services.play_sound_cue(
+                {HostSoundCue::notification, 0.8, start + 10'000'000U}).accepted() &&
+            services.play_sound_cue(
+                {HostSoundCue::success, 0.0, start + 70'000'000U}).accepted(),
+            "valid semantic cues, coalesced bursts, and muted presentation must succeed");
+    const HostServicesSnapshot snapshot = services.snapshot();
+    require(snapshot.sound_requests == 3U && snapshot.sound_playbacks == 1U &&
+                snapshot.sound_coalesced == 1U && snapshot.sound_muted == 1U &&
+                services.sound_trace() ==
+                    "sound=notification timestamp=1000000000 gain=0.8\n",
+            "headless sound accounting and adapter trace must be exact");
+    require(services.play_sound_cue(
+                {HostSoundCue::warning, 1.0, start - 1U}).error ==
+                    HostServiceError::invalid_argument,
+            "sound timestamps must remain monotonic across cue identities");
+
+    HostServiceStatus wrong_thread;
+    std::thread worker([&] {
+        wrong_thread = services.play_sound_cue(
+            {HostSoundCue::error, 1.0, start + 100'000'000U});
+    });
+    worker.join();
+    require(wrong_thread.error == HostServiceError::wrong_thread,
+            "sound cues must preserve host-service UI-thread enforcement");
 }
 
 void test_typed_dialog_requests_and_results() {
@@ -748,6 +785,7 @@ void test_headless_trace_is_byte_deterministic() {
 int main() {
     try {
         test_capabilities_and_normalized_dispatch();
+        test_semantic_sound_cues_are_bounded_and_deterministic();
         test_typed_dialog_requests_and_results();
         test_typed_drag_destination_routing_and_bounds();
         test_nested_modal_order_owner_suppression_and_limit();

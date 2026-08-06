@@ -210,7 +210,9 @@ gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
                                      0, 0, snapshot.width, snapshot.height,
                                      converted.data(), &info, DIB_RGB_COLORS, SRCCOPY);
     if (window_surface) ReleaseDC(window, device);
-    if (copied == GDI_ERROR) throw std::runtime_error("StretchDIBits failed");
+    if (copied == static_cast<int>(GDI_ERROR)) {
+        throw std::runtime_error("StretchDIBits failed");
+    }
     return GD_OK;
 }
 

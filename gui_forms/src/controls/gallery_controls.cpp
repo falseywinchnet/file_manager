@@ -313,7 +313,7 @@ public:
     {
         painter.draw_text_utf8({2.0, 14.0}, "Controls: Portsmouth Rapids 1.0",
                                {FontRole::content, 10.0, 400, false}, ink);
-        painter.draw_text_utf8({2.0, 30.0}, "Fields: Lucida Grande",
+        painter.draw_text_utf8({2.0, 30.0}, "Fields: Carlito body specimen",
                                {FontRole::content, 10.0, 400, false}, disabled_ink);
     }
 };

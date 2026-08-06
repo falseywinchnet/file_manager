@@ -1,5 +1,6 @@
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/window.hpp"
+#include "headless_host.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -147,6 +148,122 @@ void test_placeholder_and_validation() {
     require(invalid, "TextBox must reject selections outside its text store");
 }
 
+void test_word_navigation_and_deletion() {
+    auto field = make_control<TextBox>(StableId("input.words"),
+                                       "alpha  日本語, bravo");
+    field->set_requested_bounds({0.0, 0.0, 260.0, 30.0});
+    Window window(field, {260.0, 30.0});
+    require(window.request_focus(field), "word-navigation fixture must focus");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::home}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                     Modifier::control}) &&
+                field->selection().caret == Utf8Offset(7U),
+            "Ctrl+Right must cross one word and its following spaces");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::control | Modifier::shift}) &&
+                field->selected_text() == "日本語",
+            "Ctrl+Shift+Right must extend by one Unicode word without splitting graphemes");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::control}) &&
+                field->selection().empty() &&
+                field->selection().caret == Utf8Offset(16U),
+            "unshifted word navigation must first collapse a directional selection");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::alt}) &&
+                field->selection().caret == Utf8Offset(18U),
+            "Alt+Right must share the deterministic cross-platform word policy");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::backspace,
+                                     Modifier::control}) &&
+                field->text() == "alpha  日本語, ",
+            "Ctrl+Backspace must remove a complete word as one undoable edit");
+    require(field->undo() && field->text() == "alpha  日本語, bravo",
+            "word deletion must participate in ordinary TextBox history");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::left,
+                                 Modifier::meta}) &&
+                field->selection().caret == Utf8Offset(0U),
+            "Meta+Left must provide deterministic single-line start navigation");
+}
+
+void test_clipboard_commands_and_protected_text() {
+    auto root = make_control<Panel>(StableId("input.clipboard.root"));
+    auto field = make_control<TextBox>(StableId("input.clipboard"), "alpha bravo");
+    field->set_requested_bounds({0.0, 0.0, 240.0, 30.0});
+    root->add_child(field);
+    auto password = make_control<TextBox>(StableId("input.password"),
+                                          "sëcret🚀");
+    password->set_requested_bounds({0.0, 40.0, 240.0, 30.0});
+    password->set_accessible_name("Protected credential");
+    password->set_use_system_password_character(true);
+    root->add_child(password);
+    Window window(root, {260.0, 90.0});
+    host::HeadlessHost host(window);
+    HostServices& services = host.services();
+
+    require(window.request_focus(field), "clipboard fixture must focus TextBox");
+    field->select(Utf8Offset(0U), Utf8Offset(5U));
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::c,
+                                 Modifier::control}),
+            "Ctrl+C must be consumed by the focused TextBox");
+    HostClipboardTextResult clipboard = services.read_clipboard_text();
+    require(clipboard.status.accepted() && clipboard.has_text &&
+                clipboard.text_utf8 == "alpha",
+            "copy must use the portable HostServices clipboard seam");
+
+    field->select(Utf8Offset(6U), Utf8Offset(11U));
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::x,
+                                 Modifier::meta}) && field->text() == "alpha ",
+            "Cmd/Ctrl+X must copy then remove the selected range");
+    require(services.write_clipboard_text("Ω paste").accepted(),
+            "clipboard fixture must install Unicode paste content");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::v,
+                                 Modifier::control}) &&
+                field->text() == "alpha Ω paste",
+            "Ctrl+V must replace selection from portable UTF-8 clipboard data");
+    field->set_read_only(true);
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::v,
+                                 Modifier::control}) &&
+                field->text() == "alpha Ω paste",
+            "read-only paste must be consumed without mutating text");
+
+    require(services.write_clipboard_text("sentinel").accepted() &&
+                window.request_focus(password),
+            "protected-field fixture must retain a sentinel clipboard");
+    password->select_all();
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 260.0, 90.0});
+    require(painter.painted_text.find("sëcret🚀") == std::string::npos &&
+                painter.painted_text.find("•") != std::string::npos,
+            "protected TextBox paint must emit mask glyphs and never secret text");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::c,
+                                 Modifier::meta}) && !password->copy(),
+            "protected copy must be consumed and reject programmatic export");
+    clipboard = services.read_clipboard_text();
+    require(clipboard.text_utf8 == "sentinel",
+            "protected copy must leave existing clipboard content untouched");
+    const SemanticDescriptor descriptor = password->semantic_descriptor();
+    const std::string semantic_json = window.semantic_snapshot().to_json();
+    require(descriptor.value.empty() &&
+                has_semantic_state(descriptor.states,
+                                   SemanticState::protected_content) &&
+                semantic_json.find("sëcret🚀") == std::string::npos,
+            "protected semantics must identify protection without leaking the value");
+    password->set_use_system_password_character(false);
+    password->set_password_character(U'*');
+    RecordingPainter custom_mask;
+    window.paint(custom_mask, {0.0, 0.0, 260.0, 90.0});
+    require(custom_mask.painted_text.find("*******") != std::string::npos,
+            "custom password character must preserve one mask per grapheme");
+    bool invalid_mask = false;
+    try {
+        password->set_password_character(static_cast<char32_t>(0xd800U));
+    } catch (const std::invalid_argument&) {
+        invalid_mask = true;
+    }
+    require(invalid_mask,
+            "password mask must reject invalid Unicode scalar values");
+}
+
 void test_list_box_selection_navigation_and_mutation() {
     auto list = make_control<ListBox>(StableId("input.list"));
     list->set_items({"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"});
@@ -290,6 +407,8 @@ int main() {
         test_keyboard_text_input_and_read_only();
         test_pointer_drag_paint_and_caret_deadline();
         test_placeholder_and_validation();
+        test_word_navigation_and_deletion();
+        test_clipboard_commands_and_protected_text();
         test_list_box_selection_navigation_and_mutation();
         test_combo_box_popup_commit_dismiss_and_owner_revocation();
         test_numeric_up_down_composite_edit_spinner_and_keys();

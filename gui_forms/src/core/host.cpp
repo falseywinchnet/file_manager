@@ -283,7 +283,7 @@ bool valid_dialog_result(const HostDialogRequest& request,
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 17> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 18> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -301,6 +301,7 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::font_discovery, "font_discovery"},
         {HostCapability::accessibility, "accessibility"},
         {HostCapability::typed_drag_source, "typed_drag_source"},
+        {HostCapability::sound_cues, "sound_cues"},
     }};
     std::ostringstream output;
     output << "{\"protocol_version\":" << protocol_version
@@ -357,6 +358,10 @@ std::string HostServicesSnapshot::to_json() const {
            << ",\"dialog_requests\":" << dialog_requests
            << ",\"dialog_completions\":" << dialog_completions
            << ",\"dialog_cancellations\":" << dialog_cancellations
+           << ",\"sound_requests\":" << sound_requests
+           << ",\"sound_playbacks\":" << sound_playbacks
+           << ",\"sound_coalesced\":" << sound_coalesced
+           << ",\"sound_muted\":" << sound_muted
            << ",\"modal_depth\":" << modal_depth
            << ",\"maximum_modal_depth\":" << maximum_modal_depth
            << ",\"rejected_requests\":" << rejected_requests
@@ -549,6 +554,44 @@ HostDialogResult HostServices::show_dialog(const HostDialogRequest& request) {
     return result;
 }
 
+HostServiceStatus HostServices::play_sound_cue(
+    const HostSoundCueRequest& request) {
+    HostServiceStatus status = validate_request(HostCapability::sound_cues);
+    if (!status.accepted()) return status;
+    ++snapshot_.sound_requests;
+    if (!std::isfinite(request.gain) || request.gain < 0.0 ||
+        request.gain > 1.0 || request.timestamp_nanoseconds == 0U ||
+        (last_sound_timestamp_ != 0U &&
+         request.timestamp_nanoseconds < last_sound_timestamp_)) {
+        status.error = HostServiceError::invalid_argument;
+        ++snapshot_.rejected_requests;
+        return status;
+    }
+    constexpr std::uint64_t coalescing_window_nanoseconds = 50'000'000U;
+    const bool coalesced = last_sound_cue_ == request.cue &&
+        last_sound_timestamp_ != 0U &&
+        request.timestamp_nanoseconds - last_sound_timestamp_ <=
+            coalescing_window_nanoseconds;
+    last_sound_cue_ = request.cue;
+    last_sound_timestamp_ = request.timestamp_nanoseconds;
+    if (request.gain == 0.0) {
+        ++snapshot_.sound_muted;
+        return status;
+    }
+    if (coalesced) {
+        ++snapshot_.sound_coalesced;
+        return status;
+    }
+    try {
+        status = play_sound_cue_impl(request);
+    } catch (...) {
+        status.error = HostServiceError::backend_failure;
+    }
+    if (status.accepted()) ++snapshot_.sound_playbacks;
+    else ++snapshot_.rejected_requests;
+    return status;
+}
+
 void HostServices::shutdown() noexcept {
     if (snapshot_.shutdown || std::this_thread::get_id() != ui_thread_) {
         return;
@@ -567,6 +610,10 @@ HostSession::HostSession(Window& window,
     : window_(&window), services_(services), ui_thread_(std::this_thread::get_id()) {
     snapshot_.capabilities = std::move(capabilities);
     if (services_ != nullptr) {
+        if (window.host_services_ != nullptr && window.host_services_ != services_) {
+            throw std::logic_error("GUI.Forms Window already has an active host service seam");
+        }
+        window.host_services_ = services_;
         capture_observation_ = window.pointer_capture_changed().subscribe(
             [this](const PointerCaptureChange& change) {
                 if (!snapshot_.shutdown && services_ != nullptr) {
@@ -693,6 +740,7 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
             } else if constexpr (std::is_same_v<Payload, HostClosedEvent>) {
                 snapshot_.closed = true;
                 snapshot_.active = false;
+                window_->shutdown_dispatcher();
                 window_->cancel_frame_requests();
                 window_->release_pointer();
                 window_->cancel_drag();
@@ -710,9 +758,11 @@ void HostSession::shutdown() noexcept {
     }
     snapshot_.active = false;
     if (window_ != nullptr) {
+        window_->shutdown_dispatcher();
         window_->cancel_frame_requests();
         window_->release_pointer();
         window_->cancel_drag();
+        if (window_->host_services_ == services_) window_->host_services_ = nullptr;
     }
     snapshot_.shutdown = true;
 }
@@ -765,6 +815,17 @@ const char* host_service_error_name(HostServiceError error) noexcept {
     case HostServiceError::modal_limit: return "modal_limit";
     case HostServiceError::backend_failure: return "backend_failure";
     case HostServiceError::after_shutdown: return "after_shutdown";
+    }
+    return "unknown";
+}
+
+const char* host_sound_cue_name(HostSoundCue cue) noexcept {
+    switch (cue) {
+    case HostSoundCue::notification: return "notification";
+    case HostSoundCue::success: return "success";
+    case HostSoundCue::warning: return "warning";
+    case HostSoundCue::error: return "error";
+    case HostSoundCue::operation_complete: return "operation_complete";
     }
     return "unknown";
 }

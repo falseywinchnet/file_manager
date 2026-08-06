@@ -4,6 +4,7 @@
 #include "display_chunk.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <stdexcept>
 
@@ -22,6 +23,96 @@ Control::Control(StableId stable_id)
       stable_id_(std::move(stable_id)) {}
 
 Control::~Control() = default;
+
+void Control::set_tag(std::any tag) {
+    require_mutable();
+    tag_ = std::move(tag);
+}
+
+namespace {
+
+void validate_insets(Insets value, const char* message) {
+    if (!std::isfinite(value.left) || !std::isfinite(value.top) ||
+        !std::isfinite(value.right) || !std::isfinite(value.bottom) ||
+        value.left < 0.0 || value.top < 0.0 || value.right < 0.0 ||
+        value.bottom < 0.0) {
+        throw std::invalid_argument(message);
+    }
+}
+
+[[nodiscard]] Rect client_rect(Size size, Insets padding) noexcept {
+    return {padding.left, padding.top,
+            std::max(0.0, size.width - padding.left - padding.right),
+            std::max(0.0, size.height - padding.top - padding.bottom)};
+}
+
+[[nodiscard]] bool valid_dock(DockStyle dock) noexcept {
+    switch (dock) {
+    case DockStyle::none:
+    case DockStyle::top:
+    case DockStyle::bottom:
+    case DockStyle::left:
+    case DockStyle::right:
+    case DockStyle::fill:
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool valid_anchor(AnchorStyles anchor) noexcept {
+    constexpr std::uint8_t valid =
+        static_cast<std::uint8_t>(AnchorStyles::top) |
+        static_cast<std::uint8_t>(AnchorStyles::bottom) |
+        static_cast<std::uint8_t>(AnchorStyles::left) |
+        static_cast<std::uint8_t>(AnchorStyles::right);
+    return (static_cast<std::uint8_t>(anchor) & ~valid) == 0U;
+}
+
+[[nodiscard]] Rect anchored_bounds(Rect reference, Rect old_client,
+                                   Rect new_client, AnchorStyles anchor) noexcept {
+    const double left = reference.x - old_client.x;
+    const double right = old_client.x + old_client.width -
+                         (reference.x + reference.width);
+    const double top = reference.y - old_client.y;
+    const double bottom = old_client.y + old_client.height -
+                          (reference.y + reference.height);
+    const bool anchored_left = has_anchor(anchor, AnchorStyles::left);
+    const bool anchored_right = has_anchor(anchor, AnchorStyles::right);
+    const bool anchored_top = has_anchor(anchor, AnchorStyles::top);
+    const bool anchored_bottom = has_anchor(anchor, AnchorStyles::bottom);
+
+    Rect result = reference;
+    if (anchored_left && anchored_right) {
+        result.x = new_client.x + left;
+        result.width = std::max(0.0, new_client.width - left - right);
+    } else if (anchored_right) {
+        result.x = new_client.x + new_client.width - right - reference.width;
+    } else if (anchored_left) {
+        result.x = new_client.x + left;
+    } else {
+        const double offset = reference.x + reference.width * 0.5 -
+                              (old_client.x + old_client.width * 0.5);
+        result.x = new_client.x + new_client.width * 0.5 + offset -
+                   reference.width * 0.5;
+    }
+
+    if (anchored_top && anchored_bottom) {
+        result.y = new_client.y + top;
+        result.height = std::max(0.0, new_client.height - top - bottom);
+    } else if (anchored_bottom) {
+        result.y = new_client.y + new_client.height - bottom - reference.height;
+    } else if (anchored_top) {
+        result.y = new_client.y + top;
+    } else {
+        const double offset = reference.y + reference.height * 0.5 -
+                              (old_client.y + old_client.height * 0.5);
+        result.y = new_client.y + new_client.height * 0.5 + offset -
+                   reference.height * 0.5;
+    }
+    return result;
+}
+
+} // namespace
 
 void Control::add_child(Ptr child) {
     require_mutable();
@@ -65,6 +156,8 @@ void Control::add_child(Ptr child) {
     }
 
     child->parent_ = weak_from_this();
+    child->layout_slot_.reset();
+    child->anchor_reference_.reset();
     children_.push_back(child);
     if (window_) {
         try {
@@ -105,6 +198,8 @@ Control::Ptr Control::remove_child(RuntimeId child_id) {
     if (removed->parent_.lock().get() == this) {
         removed->parent_.reset();
     }
+    removed->layout_slot_.reset();
+    removed->anchor_reference_.reset();
     if (window_) {
         static_cast<void>(window_->recompute_subtree_dirty(window_->root_));
     }
@@ -149,7 +244,101 @@ void Control::set_requested_bounds(Rect bounds) {
         return;
     }
     requested_bounds_ = bounds;
+    anchor_reference_.reset();
     invalidate_declared(invalidation::bounds);
+}
+
+void Control::set_child_layout(const Ptr& child, Rect bounds) {
+    require_mutable();
+    if (!child || !child->is_alive() || child->parent().get() != this) {
+        throw std::invalid_argument(
+            "GUI.Forms child layout requires a live direct child");
+    }
+    if (!std::isfinite(bounds.x) || !std::isfinite(bounds.y) ||
+        !std::isfinite(bounds.width) || !std::isfinite(bounds.height) ||
+        bounds.width < 0.0 || bounds.height < 0.0) {
+        throw std::invalid_argument(
+            "GUI.Forms child layout bounds must be finite and nonnegative");
+    }
+    if (child->layout_slot_ == bounds) return;
+    child->layout_slot_ = bounds;
+    if (window_ != nullptr) {
+        window_->mark_child_layout_slot(*child);
+    } else {
+        constexpr Dirty effects = Dirty::arrange | Dirty::hit_test |
+                                  Dirty::semantics | Dirty::accessibility;
+        child->dirty_ |= effects;
+        child->subtree_dirty_ |= effects;
+        for (Ptr ancestor = child->parent(); ancestor;
+             ancestor = ancestor->parent()) {
+            ancestor->subtree_dirty_ |= effects;
+        }
+    }
+}
+
+void Control::arrange_self(Rect final_bounds) noexcept {
+    arranged_bounds_ = final_bounds;
+}
+
+void Control::set_margin(Insets margin) {
+    require_mutable();
+    validate_insets(margin, "GUI.Forms margin must be finite and nonnegative");
+    if (margin_ == margin) return;
+    margin_ = margin;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::hit_test |
+               Dirty::semantics | Dirty::accessibility);
+}
+
+void Control::set_padding(Insets padding) {
+    require_mutable();
+    validate_insets(padding, "GUI.Forms padding must be finite and nonnegative");
+    if (padding_ == padding) return;
+    padding_ = padding;
+    invalidate(invalidation::bounds);
+}
+
+void Control::set_dock(DockStyle dock) {
+    require_mutable();
+    if (!valid_dock(dock)) {
+        throw std::invalid_argument("GUI.Forms DockStyle value is invalid");
+    }
+    if (dock_ == dock) return;
+    dock_ = dock;
+    anchor_reference_.reset();
+    if (dock_ == DockStyle::none) {
+        if (const Ptr owner = parent(); owner && owner->window_ != nullptr &&
+            (owner->arranged_bounds_.width > 0.0 ||
+             owner->arranged_bounds_.height > 0.0) &&
+            (arranged_bounds_.width > 0.0 || arranged_bounds_.height > 0.0)) {
+            anchor_reference_ = AnchorReference{
+                arranged_bounds_,
+                client_rect({owner->arranged_bounds_.width,
+                             owner->arranged_bounds_.height}, owner->padding_)};
+        }
+    }
+    invalidate(invalidation::bounds);
+}
+
+void Control::set_anchor(AnchorStyles anchor) {
+    require_mutable();
+    if (!valid_anchor(anchor)) {
+        throw std::invalid_argument("GUI.Forms AnchorStyles contains unknown flags");
+    }
+    if (anchor_ == anchor) return;
+    anchor_ = anchor;
+    anchor_reference_.reset();
+    if (dock_ == DockStyle::none) {
+        if (const Ptr owner = parent(); owner && owner->window_ != nullptr &&
+            (owner->arranged_bounds_.width > 0.0 ||
+             owner->arranged_bounds_.height > 0.0) &&
+            (arranged_bounds_.width > 0.0 || arranged_bounds_.height > 0.0)) {
+            anchor_reference_ = AnchorReference{
+                arranged_bounds_,
+                client_rect({owner->arranged_bounds_.width,
+                             owner->arranged_bounds_.height}, owner->padding_)};
+        }
+    }
+    invalidate(invalidation::bounds);
 }
 
 Rect Control::arranged_bounds() const {
@@ -439,7 +628,80 @@ Size Control::measure(Size available) {
 }
 
 void Control::arrange(Rect final_bounds) {
-    arranged_bounds_ = final_bounds;
+    arrange_self(final_bounds);
+    if (children_.empty()) return;
+
+    const Rect client = client_rect({final_bounds.width, final_bounds.height},
+                                    padding_);
+    Rect remaining = client;
+    // Child index zero is topmost. The vector stores that control last, so
+    // reverse traversal gives WinForms-style z-order-sensitive docking.
+    for (auto iterator = children_.rbegin(); iterator != children_.rend();
+         ++iterator) {
+        const Ptr& child = *iterator;
+        if (!child || !child->is_alive() || !child->visible_ ||
+            child->dock_ == DockStyle::none) {
+            continue;
+        }
+        const Size desired = child->measure({remaining.width, remaining.height});
+        const double width = child->requested_bounds_.width > 0.0
+            ? child->requested_bounds_.width : desired.width;
+        const double height = child->requested_bounds_.height > 0.0
+            ? child->requested_bounds_.height : desired.height;
+        Rect slot = remaining;
+        switch (child->dock_) {
+        case DockStyle::top: {
+            const double extent = std::clamp(height, 0.0, remaining.height);
+            slot.height = extent;
+            remaining.y += extent;
+            remaining.height -= extent;
+            break;
+        }
+        case DockStyle::bottom: {
+            const double extent = std::clamp(height, 0.0, remaining.height);
+            slot.y = remaining.y + remaining.height - extent;
+            slot.height = extent;
+            remaining.height -= extent;
+            break;
+        }
+        case DockStyle::left: {
+            const double extent = std::clamp(width, 0.0, remaining.width);
+            slot.width = extent;
+            remaining.x += extent;
+            remaining.width -= extent;
+            break;
+        }
+        case DockStyle::right: {
+            const double extent = std::clamp(width, 0.0, remaining.width);
+            slot.x = remaining.x + remaining.width - extent;
+            slot.width = extent;
+            remaining.width -= extent;
+            break;
+        }
+        case DockStyle::fill:
+            remaining = {remaining.x, remaining.y, 0.0, 0.0};
+            break;
+        case DockStyle::none:
+            break;
+        }
+        child->anchor_reference_.reset();
+        set_child_layout(child, slot);
+    }
+
+    for (const Ptr& child : children_) {
+        if (!child || !child->is_alive() || !child->visible_ ||
+            child->dock_ != DockStyle::none) {
+            continue;
+        }
+        if (!child->anchor_reference_) {
+            child->anchor_reference_ = AnchorReference{
+                child->requested_bounds_, client};
+        }
+        set_child_layout(
+            child, anchored_bounds(child->anchor_reference_->bounds,
+                                   child->anchor_reference_->client,
+                                   client, child->anchor_));
+    }
 }
 
 void Control::on_paint(Painter&, Rect) {}
@@ -525,6 +787,7 @@ void Control::on_dispose() noexcept {
     initialization_depth_ = 0;
     pending_initialization_dirty_ = Dirty::none;
     pending_initialization_subtree_ = false;
+    tag_.reset();
     Ptr self = weak_from_this().lock();
     if (window_ && self) {
         window_->dispose_subtree(self);

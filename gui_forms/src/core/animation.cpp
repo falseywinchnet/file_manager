@@ -108,11 +108,32 @@ void AnimationTimeline::set_specification(AnimationSpec specification) {
 
 void AnimationTimeline::start(FrameTime start_time) noexcept {
     start_time_ = start_time;
+    pause_time_ = start_time;
     running_ = true;
+    paused_ = false;
+}
+
+void AnimationTimeline::pause(FrameTime pause_time) noexcept {
+    if (!running_ || paused_) {
+        return;
+    }
+    pause_time_ = std::max(pause_time, start_time_);
+    paused_ = true;
+}
+
+void AnimationTimeline::resume(FrameTime resume_time) noexcept {
+    if (!running_ || !paused_) {
+        return;
+    }
+    const FrameTime effective_resume = std::max(resume_time, pause_time_);
+    start_time_ += effective_resume - pause_time_;
+    pause_time_ = effective_resume;
+    paused_ = false;
 }
 
 void AnimationTimeline::stop() noexcept {
     running_ = false;
+    paused_ = false;
 }
 
 AnimationSample AnimationTimeline::sample(FrameTime now) const noexcept {
@@ -120,7 +141,8 @@ AnimationSample AnimationTimeline::sample(FrameTime now) const noexcept {
     if (!running_) {
         return result;
     }
-    const FrameInterval elapsed = now - start_time_;
+    const FrameTime sample_time = paused_ ? pause_time_ : now;
+    const FrameInterval elapsed = sample_time - start_time_;
     if (elapsed < specification_.delay) {
         result.progress = directed_progress(specification_.direction, 0U, 0.0);
         result.eased_progress = apply_easing(specification_.easing, result.progress);

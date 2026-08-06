@@ -53,6 +53,8 @@ using gui_forms::HostMonitor;
 using gui_forms::HostMonitorResult;
 using gui_forms::HostServiceError;
 using gui_forms::HostServiceStatus;
+using gui_forms::HostSoundCue;
+using gui_forms::HostSoundCueRequest;
 using gui_forms::HostServices;
 using gui_forms::HostSession;
 using gui_forms::HostShutdownEvent;
@@ -325,9 +327,12 @@ static std::string utf8_string(id value) {
 
 static bool register_bundle_typeface(SkiaRaster& raster,
                                      NSString* resource_name,
-                                     std::uint16_t weight) {
+                                     gui_forms::FontRole role,
+                                     std::uint16_t weight,
+                                     bool italic = false,
+                                     NSString* extension = @"ttf") {
     NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
-                                        withExtension:@"ttf"
+                                        withExtension:extension
                                          subdirectory:@"fonts"];
     if (url == nil) {
         return false;
@@ -339,8 +344,26 @@ static bool register_bundle_typeface(SkiaRaster& raster,
         return false;
     }
     const auto* bytes = static_cast<const std::byte*>(data.bytes);
-    return raster.register_typeface(gui_forms::FontRole::control, weight, false,
+    return raster.register_typeface(role, weight, italic,
                                     std::span<const std::byte>(bytes, data.length));
+}
+
+static bool register_bundle_fallback_typeface(SkiaRaster& raster,
+                                              NSString* resource_name,
+                                              NSString* extension,
+                                              std::uint16_t weight = 400,
+                                              bool italic = false) {
+    NSURL* url = [[NSBundle mainBundle] URLForResource:resource_name
+                                        withExtension:extension
+                                         subdirectory:@"fonts"];
+    if (url == nil) return false;
+    NSData* data = [NSData dataWithContentsOfURL:url
+                                        options:NSDataReadingMappedIfSafe
+                                          error:nil];
+    if (data == nil || data.length == 0) return false;
+    const auto* bytes = static_cast<const std::byte*>(data.bytes);
+    return raster.register_fallback_typeface(
+        weight, italic, std::span<const std::byte>(bytes, data.length));
 }
 
 namespace {
@@ -608,12 +631,40 @@ protected:
                                {@"Cancel", HostDialogChoice::cancel}};
                     break;
                 }
-                for (const auto& [title, choice] : buttons) {
+                NSButton* defaultButton = nil;
+                NSModalResponse cancelResponse = 0;
+                for (std::size_t index = 0U; index < buttons.size(); ++index) {
+                    const auto& [title, choice] = buttons[index];
                     NSButton* button = [alert addButtonWithTitle:title];
-                    button.keyEquivalent = choice == payload.default_choice ? @"\r" : @"";
+                    // Keep cancellation and default activation independent:
+                    // Escape must always reach an admitted cancel choice, while
+                    // the window's default cell preserves Return even when
+                    // Cancel itself is the declared default.
+                    button.keyEquivalent = choice == HostDialogChoice::cancel
+                        ? @"\e" : @"";
+                    if (choice == payload.default_choice) defaultButton = button;
+                    if (choice == HostDialogChoice::cancel) {
+                        cancelResponse = NSAlertFirstButtonReturn +
+                            static_cast<NSModalResponse>(index);
+                    }
+                }
+                if (defaultButton != nil) {
+                    alert.window.defaultButtonCell = defaultButton.cell;
                 }
                 schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
+                id escapeMonitor = nil;
+                if (cancelResponse != 0) {
+                    escapeMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:
+                        NSEventMaskKeyDown handler:^NSEvent* (NSEvent* event) {
+                            if (event.keyCode == 53U) {
+                                [NSApp stopModalWithCode:cancelResponse];
+                                return nil;
+                            }
+                            return event;
+                        }];
+                }
                 const NSModalResponse response = [alert runModal];
+                if (escapeMonitor != nil) [NSEvent removeMonitor:escapeMonitor];
                 HostMessageDialogResult value;
                 const NSInteger index = response - NSAlertFirstButtonReturn;
                 if (index >= 0 && static_cast<std::size_t>(index) < buttons.size()) {
@@ -702,6 +753,26 @@ protected:
         }, request.payload);
     }
 
+    HostServiceStatus play_sound_cue_impl(
+        const HostSoundCueRequest& request) override {
+        NSString* name = @"Ping";
+        switch (request.cue) {
+        case HostSoundCue::notification: name = @"Ping"; break;
+        case HostSoundCue::success: name = @"Glass"; break;
+        case HostSoundCue::warning: name = @"Funk"; break;
+        case HostSoundCue::error: name = @"Basso"; break;
+        case HostSoundCue::operation_complete: name = @"Pop"; break;
+        }
+        NSSound* sound = [NSSound soundNamed:name];
+        if (sound == nil) {
+            NSBeep();
+            return {};
+        }
+        sound.volume = static_cast<float>(request.gain);
+        return [sound play] ? HostServiceStatus{}
+                            : HostServiceStatus{HostServiceError::backend_failure};
+    }
+
     void shutdown_impl() noexcept override {
         pasteboard_ = nil;
     }
@@ -726,7 +797,7 @@ private:
     NSMutableAttributedString* _markedText;
     NSRange _selectedRange;
     NSTrackingArea* _trackingArea;
-    NSTimer* _wakeTimer;
+    dispatch_source_t _wakeSource;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -747,8 +818,9 @@ private:
 - (void)notifyDisplaysChanged;
 - (void)screenParametersChanged:(NSNotification*)notification;
 - (void)collectDamage;
+- (void)drainPostedWork;
 - (void)armWakeTimer;
-- (void)scheduledWake:(NSTimer*)timer;
+- (void)scheduledWake;
 - (void)prepareForShutdown;
 - (HostDialogResult)showHostDialog:(const HostDialogRequest&)request;
 - (HostClipboardTextResult)readHostClipboard;
@@ -835,6 +907,10 @@ private:
 }
 - (BOOL)isAccessibilityExpanded {
     return gui_forms::has_semantic_state(_node.states, SemanticState::expanded);
+}
+- (BOOL)isAccessibilityProtectedContent {
+    return gui_forms::has_semantic_state(
+        _node.states, SemanticState::protected_content);
 }
 - (id)accessibilityValue {
     if (_node.role == SemanticRole::check_box ||
@@ -1001,15 +1077,56 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
         _selectedRange = NSMakeRange(NSNotFound, 0);
+        _wakeSource = dispatch_source_create(
+            DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+        __weak GUIFormsView* weakSelf = self;
+        dispatch_source_set_event_handler(_wakeSource, ^{
+            GUIFormsView* strongSelf = weakSelf;
+            if (strongSelf != nil) {
+                [strongSelf scheduledWake];
+            }
+        });
+        dispatch_resume(_wakeSource);
+        dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
+                                  DISPATCH_TIME_FOREVER, 0);
+        _model->set_dispatch_wake_handler([weakSelf] {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                GUIFormsView* strongSelf = weakSelf;
+                if (strongSelf != nil) [strongSelf drainPostedWork];
+            });
+        });
         [self setWantsLayer:NO];
         [self registerForDraggedTypes:@[
             NSPasteboardTypeString, NSPasteboardTypeFileURL, @"public.data"]];
-        const bool regular = register_bundle_typeface(_raster, @"PortsmouthRapids", 400);
-        const bool bold = register_bundle_typeface(_raster, @"PortsmouthRapids-Bold", 700);
+        const bool fonts_ready =
+            register_bundle_typeface(_raster, @"PortsmouthRapids",
+                                     gui_forms::FontRole::control, 400) &&
+            register_bundle_typeface(_raster, @"PortsmouthRapids-Bold",
+                                     gui_forms::FontRole::control, 700) &&
+            register_bundle_typeface(_raster, @"Carlito-Regular",
+                                     gui_forms::FontRole::content, 400) &&
+            register_bundle_typeface(_raster, @"Carlito-Bold",
+                                     gui_forms::FontRole::content, 700) &&
+            register_bundle_typeface(_raster, @"Carlito-Italic",
+                                     gui_forms::FontRole::content, 400, true) &&
+            register_bundle_typeface(_raster, @"Carlito-BoldItalic",
+                                     gui_forms::FontRole::content, 700, true) &&
+            register_bundle_typeface(_raster, @"Cousine-Regular",
+                                     gui_forms::FontRole::monospace, 400) &&
+            register_bundle_typeface(_raster, @"Cousine-Bold",
+                                     gui_forms::FontRole::monospace, 700) &&
+            register_bundle_typeface(_raster, @"Cousine-Italic",
+                                     gui_forms::FontRole::monospace, 400, true) &&
+            register_bundle_typeface(_raster, @"Cousine-BoldItalic",
+                                     gui_forms::FontRole::monospace, 700, true) &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoSansCJKjp-Regular", @"otf") &&
+            register_bundle_fallback_typeface(
+                _raster, @"NotoEmoji-Regular", @"ttf");
         _model->metrics().set_renderer(
-            regular && bold
-                ? "Skia CPU m152 · PNG registry · Rapids UI"
-                : "Skia CPU m152 · PNG · font fallback",
+            fonts_ready
+                ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts + CJK/emoji fallback"
+                : "Skia CPU m152 · incomplete bundled font pack",
             true);
         static_cast<void>([self dispatchHostPayload:
             HostAttachEvent{GFSize{980.0, 680.0}, 1.0}
@@ -1182,16 +1299,19 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)viewWillMoveToWindow:(NSWindow*)newWindow {
-    if (newWindow == nil && _wakeTimer != nil) {
-        [_wakeTimer invalidate];
-        _wakeTimer = nil;
+    if (newWindow == nil && _wakeSource != nil) {
+        dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
+                                  DISPATCH_TIME_FOREVER, 0);
     }
     [super viewWillMoveToWindow:newWindow];
 }
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [_wakeTimer invalidate];
+    if (_wakeSource != nil) {
+        dispatch_source_cancel(_wakeSource);
+        _wakeSource = nil;
+    }
     [self hideHostTooltip];
     if (_hostSession != nullptr) {
         _hostSession->shutdown();
@@ -1344,37 +1464,45 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     [self armWakeTimer];
 }
 
+- (void)drainPostedWork {
+    if (!_model) return;
+    static_cast<void>(_model->drain_posted_work());
+    [self collectDamage];
+}
+
 - (void)armWakeTimer {
-    [_wakeTimer invalidate];
-    _wakeTimer = nil;
-    if (!_model) {
+    if (!_model || _wakeSource == nil) {
         return;
     }
     const auto wake = _model->next_wake();
     if (!wake) {
+        dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
+                                  DISPATCH_TIME_FOREVER, 0);
         return;
     }
     const auto now = std::chrono::steady_clock::now();
-    const NSTimeInterval delay = std::max(
-        0.001, std::chrono::duration<double>(*wake - now).count());
-    _wakeTimer = [NSTimer scheduledTimerWithTimeInterval:delay
-                                                  target:self
-                                                selector:@selector(scheduledWake:)
-                                                userInfo:nil
-                                                 repeats:NO];
+    const auto delay = std::max(std::chrono::milliseconds(1),
+                                std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    *wake - now));
+    const auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        delay).count();
+    dispatch_source_set_timer(
+        _wakeSource,
+        dispatch_time(DISPATCH_TIME_NOW, static_cast<std::int64_t>(nanoseconds)),
+        DISPATCH_TIME_FOREVER,
+        static_cast<std::uint64_t>(std::chrono::microseconds(250).count() * 1000));
 }
 
-- (void)scheduledWake:(NSTimer*)timer {
-    if (timer != _wakeTimer) {
-        return;
-    }
-    _wakeTimer = nil;
+- (void)scheduledWake {
     [self collectDamage];
 }
 
 - (void)prepareForShutdown {
-    [_wakeTimer invalidate];
-    _wakeTimer = nil;
+    if (_wakeSource != nil) {
+        dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
+                                  DISPATCH_TIME_FOREVER, 0);
+    }
+    if (_model) _model->shutdown_dispatcher();
     if (_hostSession) {
         static_cast<void>([self dispatchHostPayload:HostShutdownEvent{}
                                    timestampNanoseconds:host_now_nanoseconds()]);
@@ -1481,7 +1609,13 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
     _model->metrics().record_present(static_cast<std::uint64_t>(elapsed.count()));
-    [self collectDamage];
+    // Do not collect the next model invalidation from inside AppKit's paint
+    // transaction. setNeedsDisplayInRect: may leave the view dirty without
+    // enqueueing a second draw when invoked synchronously by drawRect:, which
+    // lets animation callbacks advance while the last raster remains frozen.
+    // The retained deadline source owns the next poll; arm it after presenting
+    // and collect damage from its main-queue callback.
+    [self armWakeTimer];
 }
 
 - (GFPoint)modelPointForEvent:(NSEvent*)event {
@@ -1770,7 +1904,8 @@ HostCapabilities macos_capabilities() {
                 HostCapability::cursor |
                 HostCapability::clipboard |
                 HostCapability::typed_drag_destination |
-                HostCapability::dialogs};
+                HostCapability::dialogs |
+                HostCapability::sound_cues};
 }
 
 std::unique_ptr<HostServices> make_macos_host_services(MacHostServiceOptions options) {

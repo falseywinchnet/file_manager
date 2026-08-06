@@ -95,7 +95,7 @@ form gallery.root {
       label gallery.diagnostics.flush { text: "wake / ticks / active"; }
       label gallery.diagnostics.present { text: "present / worst"; }
       label gallery.diagnostics.font {
-        text: "Controls: Portsmouth Rapids 1.0; Fields: Lucida Grande.";
+        text: "Controls: Portsmouth Rapids 1.0; Fields: Carlito body specimen.";
       }
     }
   }
