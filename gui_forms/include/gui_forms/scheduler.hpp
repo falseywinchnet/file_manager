@@ -39,6 +39,9 @@ struct FramePollResult final {
     // throwing request is disconnected so one bad animated surface cannot
     // repeatedly escape through a native timer callback or starve its peers.
     std::uint64_t callback_faults{};
+    // A callback that polls recursively cannot enter another delivery turn.
+    // Work remains scheduled for the next host poll.
+    bool reentrant_poll_deferred{};
     bool damage_pending{};
     bool suppressed_by_occlusion{};
     std::optional<FrameTime> next_wake;

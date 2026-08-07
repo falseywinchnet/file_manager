@@ -249,6 +249,31 @@ outsets in damage while retaining parent-client clipping.
 
 ## Containers
 
+### `ScrollableControl` and `ScrollProperties`
+
+`Panel` and `ContainerControl` share a renderer-neutral retained scrolling
+base. `AutoScroll`, `AutoScrollMargin`, `AutoScrollMinSize`, and positive
+internal position determine a two-axis logical content extent; the familiar
+`AutoScrollPosition` view reports its negative display origin. Child requested
+bounds remain authored content coordinates and never drift across scroll or
+layout. `DisplayRectangle` and `viewport_rectangle` expose the logical display
+and clipped child viewport.
+
+Horizontal and vertical `ScrollProperties` expose enabled/visible, min/max,
+effective large/small change, and value state. Automatic mode owns range and
+visibility; manual mode accepts authored axes. Classic arrow, page, and thumb
+input shares captured retained state with wheel fallback and semantic
+increment/decrement/set-value actions. Scrollbar chrome is an overlay outside
+the child viewport, so descendants cannot paint or receive hits through it.
+`scroll_control_into_view` honors each target's `AutoScrollOffset`; resize
+clamps stale positions and removes unnecessary bars. Each real input mutation
+retains an exact event revision, WinForms `ScrollEventType`, orientation, and
+old/new values. ABI subscribers and the generated facade consume that one
+native record; reading it from a managed callback never recursively enters
+layout. Exact RTL mirroring,
+scaling/DPI oracle cases, drag-edge autoscroll, virtual anchoring, and repeated
+button timing remain open.
+
 ### `ContainerControl`
 
 - `contains_descendant` tests retained logical containment;
@@ -261,9 +286,9 @@ outsets in damage while retaining parent-client clipping.
 - `validate` and constrained `validate_children` use the same retained
   cancellable transaction and exact WinForms flag values.
 
-Container mnemonic traversal is inherited from `Control`. Scaling, scrolling,
-protected managed override projection, and the rest of key preprocessing remain
-separate work.
+Container mnemonic traversal and retained scrolling are inherited. Scaling,
+complete protected managed override projection, and the rest of key
+preprocessing remain separate work.
 
 ### `UserControl`
 
@@ -279,7 +304,8 @@ An attach attempt that later rolls back cannot erase an already observed
 
 ### `Panel`
 
-Properties: `BorderStyle`, background, and provisional `BasicControlStyle`.
+Properties: `BorderStyle`, background, provisional `BasicControlStyle`, and the
+full `ScrollableControl` family.
 Paints none/line/sunken/raised retained panel surfaces.
 
 ### `GroupBox`
@@ -617,15 +643,105 @@ default update mode only through the no-options Add overload.
 `BindingContext` preserves same-window manager identity and eagerly removes a
 disposed source.
 
-Stock descriptors currently cover base `Name`, `Visible`, and `Enabled`;
-TextBox/Label/ButtonBase `Text`; CheckBox/RadioButton `Checked`; range and
-NumericUpDown `Value`; and noneditable ComboBox `Text` and `SelectedIndex`.
+`Control::property_descriptor(s)` exposes inert, deterministic value snapshots;
+`property_value`, `set_property_value`, `reset_property`,
+`should_serialize_property`, and `subscribe_property_changed` use the same
+native registrations as binding. Descriptors include authored name,
+typed scalar/Point/Size/Rect/Insets/Color/Font/Image/enum/object/collection kind,
+category/description, default, declared dirty effects,
+local/subtree effect scope, serialization visibility, browse/bind/reset, and
+change-notification facts. Optional bounded `converter_name` and `editor_name`
+fields are inert service identities; executable callbacks never enter the
+descriptor snapshot.
+Executable access is live/UI-thread guarded, conversion precedes setters,
+change tokens are owner-revoked, and mutations retain the existing nested
+`BeginInit`/`EndInit` effect union.
+
+`Control::property_value_origin` reports `defaulted`, `local`, `inherited`,
+`ambient`, or `computed` independently of `ShouldSerialize`. An explicit
+registration origin provider wins; otherwise a readable property with a
+default compares its typed live/default values, and a readable property without
+a default is computed. Label Font and ForeColor provide exact inherited/local
+origins across override and reset.
+
+`PropertyEnumDescriptor` provides a shared immutable type name, at most 256
+bounded UTF-8 choices, 256-byte type/choice names, and a flags policy.
+Descriptor-aware conversion accepts canonical numeric or
+case-insensitive named values, comma/vertical-bar flags, and rejects unknown
+names/bits/types before mutation. Diagnostic value strings are not a DML source
+format.
+
+Stock descriptors currently cover base `Name`, `Visible`, `Enabled`,
+`AutoSize`, `CausesValidation`, Bounds/MinimumSize/MaximumSize, Margin/Padding,
+AutoScrollOffset, Dock/Anchor/AutoSizeMode, TabIndex/TabStop, AllowDrop,
+HitTestTransparent, and accessibility text; TextBox/Label/ButtonBase `Text`;
+CheckBox/RadioButton `Checked`; range and NumericUpDown `Value`; and
+noneditable ComboBox `Text`, `SelectedIndex`, and content-serialized `Items`.
+`Items` is a homogeneous immutable text collection with truthful reset and
+change observation, but deliberately is not a scalar binding target. Label adds inherited
+Font/ForeColor override/reset, PictureBox adds Image/SizeMode/ImageOpacity, and
+Button adds Font/Image. Properties without a truthful change event are
+inspectable/settable/resettable but explicitly non-bindable.
+
+Native `PropertyGrid` projects these browsable descriptors with stable IDs and
+categorized/alphabetical sorting. Boolean, text/integer, number, finite
+non-flags enum, flags enum, and Color properties use retained CheckBox,
+TextBox, NumericUpDown, ComboBox, FlagsValueEditor, and ColorValueEditor
+controls. The flags editor owns a CheckedListBox popup through Window
+popup/focus-scope tokens. The color editor combines ordinary TextBox behavior
+with an alpha-aware swatch, canonical `#RRGGBBAA`, invalid state, cancellation,
+and typed failure reporting. Point, Size,
+Rect, Insets, Color, and Font values expose expandable typed child paths such
+as `Bounds.X`, `Padding.Left`, and `Font.Italic`. Immutable objects and
+homogeneous collections recurse through member/index paths such as
+`Settings.Endpoint.Host` and `Items[2]`; collection insert/remove/move rebuild
+one snapshot through `insert_collection_item`, `remove_collection_item`, and
+`move_collection_item`. Trees are bounded to depth 8, 256 members per object,
+4,096 items per collection, and 8,192 total nodes. A child edit reconstructs every typed ancestor and passes through
+the owning registered setter. Image/resource/null values remain read-only.
+Commits normalize from
+the getter, expose typed change/error events, and preserve the complete parent
+on invalid conversion. Each resettable parent owns a real retained Reset button
+whose enabled state follows `ShouldSerialize`; activation uses the real reset
+contract and resynchronizes every child. Truthfully observable properties
+refresh automatically;
+`refresh_properties()` is explicit for the rest. Selection is weak and
+callback-time target or grid disposal is contained. This is a native partial
+tooling control, not yet a managed WinForms PropertyGrid facade. Evidence:
+`experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md` and
+`experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md` and
+`experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md` and
+`experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md` and
+`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
+
+`PropertyValueConverterRegistry` supplies canonical named format/parse services
+plus optional kind mappings. `PropertyEditorRegistry` supplies named factories
+which donate one unattached retained control, a non-emitting synchronization
+operation, a tokenized typed commit connector, and an optional tokenized input
+failure connector. Both registries are
+instance-owned by PropertyGrid rather than mutable process globals. Consumers
+may replace or deliberately share them. `PropertyList::replace_editor` retains
+the ordinary row ownership, scroll/focus layout, semantics, and disposal laws;
+invalid factories do not acquire ownership. Defaults map number to
+NumericUpDown, flags enums to FlagsValueEditor, and Color to
+ColorValueEditor/`color-hex`, while explicit descriptor service names permit specialized
+editors without adding a switch case to PropertyGrid.
 OnValidation subscribes to its target's cancellable validation event, commits
 before focus loss, and cancels prevent-mode focus when parse/transfer fails.
 Nested data members, sort/filter, arbitrary culture providers, managed-object
 reflection, BindingNavigator, and DataGridView remain open. Evidence:
 `experiments/M12P5_BINDING_CURRENCY_KERNEL.md` and
-`experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`.
+`experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`. Heterogeneous dictionary,
+nullable-specialized, and modal-editor values, framework-wide stock registration
+and change events, atomic multi-owner rollback, DML, and managed descriptor
+projection remain open; see
+`experiments/M12P15_PROPERTY_METADATA_CENTER.md`,
+`experiments/M12P16_COMPOUND_PROPERTY_VALUES.md`,
+`experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md`, and
+`experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md`, and
+`experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md`, and
+`experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md`, and
+`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
 
 ## Nonvisual providers
 
@@ -829,6 +945,14 @@ surfaces continue. Native scheduler callbacks contain any residual C++
 exception instead of allowing it to cross an AppKit block or Win32 timer
 callback.
 
+One outer `poll_frame_schedule` owns a strong, fixed due set. Stop, restart,
+peer cancellation, owner disposal, and callback-created requests are safe;
+new requests are admitted on the next host poll even when already due. A
+recursive poll delivers no callbacks and reports
+`FramePollResult::reentrant_poll_deferred`; the current next wake remains
+visible. `MetricsSnapshot::reentrant_frame_polls_deferred` counts this bounded
+deferral for diagnostics and future host availability projection.
+
 `Window` is not yet a reusable `Form` control or public top-level-window facade.
 Platform window creation lives in private host adapters.
 
@@ -867,7 +991,7 @@ Include:
 #include <gui_forms/c_api.h>
 ```
 
-`gf_get_api_v0` negotiates a size-prefixed `gf_api_v0` table. ABI 0.19 preserves
+`gf_get_api_v0` negotiates a size-prefixed `gf_api_v0` table. ABI 0.21 preserves
 the 0.1 prefix: generational handles, errors, generic creation, lifetime,
 component state, stable ID, visibility, bounds, child add/remove, and generic
 state-change subscription. Its appended operations add kinded creation,
@@ -882,11 +1006,47 @@ selection/caret/edit/history, clipboard, unencoded paint surfaces,
 renderer-authoritative bounds, form key preview, and cursor roles. These raster
 operations do not constitute GUI.Drawing.
 
+ABI 0.20 adds renderer-neutral retained scrolling: `Control.AutoScrollOffset`,
+automatic viewport/margin/minimum-size/position mutation, complete axis state,
+manual axis projection, and `ScrollControlIntoView`. The returned snapshot
+contains positive internal position plus negative-origin display and clipped
+viewport rectangles, along with the last real scroll event and its monotonic
+revision; generated WinForms properties and `Scroll` delivery consume that
+state rather than maintaining a second managed layout engine.
+
+ABI 0.21 adds renderer-neutral per-control layout transactions:
+`suspend_layout`, `resume_layout`, `perform_control_layout`, and
+`get_layout_state`. The snapshot reports nested depth, deferred state, and
+monotonic requested/committed revisions. A suspended subtree retains its last
+committed geometry and does not block runnable siblings; final resume or a
+later explicit/read-barrier flush commits through the same bounded scheduler.
+The generated facade uses this state for exact `SuspendLayout`, `ResumeLayout`,
+`PerformLayout`, and `LayoutEventArgs` behavior rather than a managed-only
+counter.
+
+Custom native layout controls use `snapshot_layout_children()` and
+`is_current_layout_child()` around application-overridable measurement. The
+framework applies the same snapshot/revalidation law in Window recursion,
+AutoSize/Dock/Anchor, FlowLayoutPanel, TableLayoutPanel, scrolling extent,
+Card, and MasterDetailView. Callback-time removal, reparenting, disposal, or
+addition therefore cannot invalidate a traversal or assign a slot through a
+former parent; additions remain dirty for a following bounded pass.
+
+Callback-bearing paint, hit-test, semantic, semantic-action, popup, and bulk
+validation traversals use the same strong-identity arbitration law. Semantic
+snapshots retry after a declared generation change and reject recursive or
+four-pass nonconvergent construction. Hit testing also retries at most four
+times and never returns a target disposed by its own local hit callback.
+`MetricsSnapshot::callback_arbitration_retries` and
+`callback_arbitration_limit_hits` make stabilization and pathological callback
+churn visible to diagnostics and future host availability projection.
+
 Typed callbacks return continue, cancel, or faulted. `FormClosing` cancellation
 prevents native close; faults are counted and do not cross the ABI. Dispatch
 callbacks run on the owning host thread or receive `cancelled=1` during host
-shutdown. The current typed event set is `Clicked`, `FormClosing`, and
-`FormClosed`; it is not the final 1.0 event record.
+shutdown. The current typed event set is `Clicked`, `FormClosing`, `FormClosed`,
+range value/scroll, form bounds change, and retained-container `Scroll`; it is
+not the final 1.0 event record.
 
 The C++ `gui_forms::abi0` wrapper demonstrates table negotiation, RAII handles,
 copy retain/release, moves, disposal, and status-to-exception translation.
@@ -910,7 +1070,7 @@ other hosts return explicit unsupported results. The table exposes distinct
 stale-handle, wrong-kind, wrong-thread, disposed, buffer, version, and limit
 results; no exception crosses the boundary. The shared library exports no
 other symbol. This ABI is experimental and deliberately not merged with the
-GUI.Forms ABI 0.19 table.
+GUI.Forms ABI 0.21 table.
 
 ## Compatibility laboratory
 
@@ -941,7 +1101,9 @@ than closure. See `../planning/GUI_DRAWING_REVISION_PLAN.md`.
   and undo;
 - grid/complete-toolstrip/background-worker
   control families;
-- property metadata/default/reset/serialization registry;
+- arbitrary object/collection property metadata, complete stock change events,
+  DML/managed descriptor projection, custom property editors, and atomic
+  multi-property rollback;
 - accessibility publisher and complete semantic tree;
 - DML parser/compiler/designer;
 - stable ABI 1.0, behavior-complete generated C# assembly, analyzer, and NuGet packages;

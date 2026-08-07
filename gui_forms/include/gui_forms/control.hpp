@@ -164,6 +164,16 @@ struct ControlValidationEvent final {
     bool cancel{};
 };
 
+// Renderer-neutral snapshot of a WinForms-style per-control layout
+// transaction. Requested and committed revisions make deferred work
+// observable without exposing a platform layout engine.
+struct LayoutTransactionState final {
+    std::uint32_t suspend_depth{};
+    bool deferred{};
+    std::uint64_t requested_revision{};
+    std::uint64_t committed_revision{};
+};
+
 // WinForms-compatible mnemonic text is renderer-neutral retained state. A
 // single '&' marks the following Unicode scalar; '&&' displays one literal
 // ampersand. Matching currently applies Unicode identity plus ASCII case
@@ -403,6 +413,14 @@ public:
     }
     [[nodiscard]] virtual Size get_preferred_size(Size proposed);
 
+    // Per-control layout transactions are independent from Window update
+    // scopes. Nested suspension preserves committed geometry; the final
+    // ResumeLayout(true) performs at most one bounded retained flush.
+    void suspend_layout();
+    void resume_layout(bool perform_layout = true);
+    void perform_layout();
+    [[nodiscard]] LayoutTransactionState layout_transaction_state() const noexcept;
+
     [[nodiscard]] bool visible() const noexcept { return visible_; }
     void set_visible(bool visible);
     [[nodiscard]] bool enabled() const noexcept { return enabled_; }
@@ -495,6 +513,21 @@ public:
     [[nodiscard]] const ControlBindingsCollection& data_bindings() const;
     [[nodiscard]] bool has_bindable_property(std::string_view name) const;
     [[nodiscard]] std::vector<std::string> bindable_property_names() const;
+    [[nodiscard]] std::optional<PropertyDescriptor> property_descriptor(
+        std::string_view name) const;
+    [[nodiscard]] std::vector<PropertyDescriptor> property_descriptors() const;
+    [[nodiscard]] std::optional<BindingValue> property_value(
+        std::string_view name) const;
+    void set_property_value(std::string_view name, BindingValue value);
+    [[nodiscard]] SubscriptionToken subscribe_property_changed(
+        std::string_view name, Component& owner, std::function<void()> changed);
+    // Returns false only when the named property does not exist or has no
+    // declared reset path. A supported reset may be a no-op when already at
+    // its default, matching deterministic ShouldSerialize behavior.
+    bool reset_property(std::string_view name);
+    [[nodiscard]] bool should_serialize_property(std::string_view name) const;
+    [[nodiscard]] PropertyValueOrigin property_value_origin(
+        std::string_view name) const;
 
     [[nodiscard]] virtual Size measure(Size available);
     virtual void arrange(Rect final_bounds);
@@ -538,6 +571,13 @@ public:
 protected:
     [[nodiscard]] Window* window() const noexcept { return window_; }
     void require_mutable() const;
+    // Layout is allowed to invoke application-overridable measurement. Such a
+    // callback may legally mutate the retained tree, so layout authors must
+    // iterate a strong identity snapshot and revalidate each identity before
+    // publishing geometry. Children added during a callback are deliberately
+    // picked up by the next bounded layout pass.
+    [[nodiscard]] std::vector<Ptr> snapshot_layout_children() const;
+    [[nodiscard]] bool is_current_layout_child(const Ptr& child) const noexcept;
     // Publish a parent-owned arranged slot without destroying the child's
     // authored/requested bounds. Every retained layout family uses this seam;
     // it is protected because application absolute positioning is expressed
@@ -568,6 +608,9 @@ protected:
     virtual void on_attached_to_window();
     virtual void on_attachment_committed() noexcept;
     virtual void on_detached_from_window() noexcept;
+    // Derived disposal hooks that retain child controls must finish through
+    // this base implementation; it owns the mutation-free child detach path.
+    void on_dispose() noexcept override;
 
 private:
     friend class Window;
@@ -591,7 +634,6 @@ private:
         std::string_view name) const;
     [[nodiscard]] std::uint64_t subtree_size() const noexcept;
     void verify_dispose_thread() override;
-    void on_dispose() noexcept override;
 
     static std::atomic<std::uint64_t> next_runtime_id_;
     RuntimeId runtime_id_;
@@ -669,6 +711,10 @@ private:
     std::uint64_t initialization_depth_{};
     bool pending_initialization_subtree_{};
     bool lifecycle_notification_{};
+    std::uint32_t layout_suspend_depth_{};
+    bool layout_deferred_{};
+    std::uint64_t layout_requested_revision_{};
+    std::uint64_t layout_committed_revision_{};
 };
 
 template <typename ControlType, typename... Arguments>

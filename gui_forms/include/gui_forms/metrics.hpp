@@ -59,12 +59,15 @@ struct MetricsSnapshot {
     std::uint64_t flush_count{};
     std::uint64_t read_barrier_flushes{};
     std::uint64_t bounded_pass_limit_hits{};
+    std::uint64_t callback_arbitration_retries{};
+    std::uint64_t callback_arbitration_limit_hits{};
     std::uint64_t scheduled_frame_requests{};
     std::uint64_t scheduler_wakes{};
     std::uint64_t frame_deadlines_fired{};
     std::uint64_t active_surface_ticks{};
     std::uint64_t frame_requests_coalesced{};
     std::uint64_t frame_callback_faults{};
+    std::uint64_t reentrant_frame_polls_deferred{};
     std::uint64_t active_surface_count{};
     std::uint64_t maximum_active_surface_count{};
     std::uint64_t occlusion_suspensions{};
@@ -121,11 +124,13 @@ public:
     void leave_update_scope() noexcept;
     void record_flush(bool read_barrier) noexcept;
     void record_pass_limit_hit() noexcept;
+    void record_callback_arbitration_retry(bool limit_hit) noexcept;
     void record_frame_request() noexcept;
     void record_frame_poll(std::uint64_t deadlines_fired,
                            std::uint64_t active_surface_ticks,
                            std::uint64_t coalesced_requests) noexcept;
     void record_frame_callback_fault() noexcept;
+    void record_reentrant_frame_poll() noexcept;
     void set_active_surface_count(std::size_t count) noexcept;
     void record_occlusion_transition(bool occluded) noexcept;
     void record_occluded_frame_poll() noexcept;

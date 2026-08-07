@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -19,6 +20,20 @@ void require(bool condition, const char* message) {
 bool near(double left, double right, double tolerance = 0.001) {
     return std::abs(left - right) <= tolerance;
 }
+
+class MeasureMutationControl final : public Control {
+public:
+    explicit MeasureMutationControl(StableId id) : Control(std::move(id)) {}
+
+    Size measure(Size available) override {
+        ++measure_count;
+        if (callback) callback();
+        return is_alive() ? Control::measure(available) : Size{};
+    }
+
+    std::function<void()> callback;
+    std::uint64_t measure_count{};
+};
 
 std::shared_ptr<Button> sized_button(std::string id, double width,
                                      double height) {
@@ -131,6 +146,68 @@ void test_flow_direction_break_visibility_and_resize() {
     worker.join();
     require(wrong_thread_rejected,
             "attached flow policy mutation must retain UI-thread enforcement");
+}
+
+void test_layout_panels_revalidate_snapshot_after_measure_callback() {
+    {
+        auto flow = make_control<FlowLayoutPanel>(
+            StableId("layout.flow.mutation"));
+        auto mutator = make_control<MeasureMutationControl>(
+            StableId("layout.flow.mutation.mutator"));
+        auto removed = make_control<MeasureMutationControl>(
+            StableId("layout.flow.mutation.removed"));
+        mutator->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+        removed->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+        flow->add_child(mutator);
+        flow->add_child(removed);
+        Window window(flow, {160.0, 80.0});
+        window.perform_layout();
+        mutator->measure_count = 0U;
+        removed->measure_count = 0U;
+        bool removed_once{};
+        mutator->callback = [&] {
+            if (removed_once) return;
+            removed_once = true;
+            static_cast<void>(flow->remove_child(removed->runtime_id()));
+        };
+        flow->set_flow_direction(FlowDirection::right_to_left);
+        window.perform_layout();
+        require(removed_once && removed->measure_count == 0U &&
+                    !removed->attached() && !removed->parent() &&
+                    window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "flow layout must not measure or assign an identity removed by an earlier callback");
+    }
+
+    {
+        auto table = make_control<TableLayoutPanel>(
+            StableId("layout.table.mutation"));
+        table->set_column_count(2U);
+        table->set_row_count(1U);
+        auto mutator = make_control<MeasureMutationControl>(
+            StableId("layout.table.mutation.mutator"));
+        auto removed = make_control<MeasureMutationControl>(
+            StableId("layout.table.mutation.removed"));
+        mutator->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+        removed->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+        table->add_child(mutator);
+        table->add_child(removed);
+        Window window(table, {160.0, 80.0});
+        window.perform_layout();
+        mutator->measure_count = 0U;
+        removed->measure_count = 0U;
+        bool removed_once{};
+        mutator->callback = [&] {
+            if (removed_once) return;
+            removed_once = true;
+            static_cast<void>(table->remove_child(removed->runtime_id()));
+        };
+        table->set_column_style(0U, {TableSizeMode::absolute, 60.0});
+        window.perform_layout();
+        require(removed_once && removed->measure_count == 0U &&
+                    !removed->attached() && !removed->parent() &&
+                    window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "table layout must remove stale resolved items before invoking their measure callback");
+    }
 }
 
 void test_table_mixed_tracks_spans_and_lookup() {
@@ -470,6 +547,7 @@ int main() {
     try {
         test_margin_padding_validation_and_retained_slots();
         test_flow_direction_break_visibility_and_resize();
+        test_layout_panels_revalidate_snapshot_after_measure_callback();
         test_table_mixed_tracks_spans_and_lookup();
         test_table_growth_hidden_children_and_fixed_overflow();
         test_table_cell_dock_fill_consumes_growth();

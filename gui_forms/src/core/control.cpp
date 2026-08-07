@@ -1,12 +1,14 @@
 #include "gui_forms/control.hpp"
 
 #include "gui_forms/binding.hpp"
+#include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 #include "display_chunk.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 
 namespace gui_forms {
@@ -26,6 +28,69 @@ namespace {
         static_cast<std::uint8_t>(GetChildAtPointSkip::disabled) |
         static_cast<std::uint8_t>(GetChildAtPointSkip::transparent);
     return (static_cast<std::uint8_t>(value) & ~all) == 0U;
+}
+
+[[nodiscard]] constexpr bool valid_binding_value_kind(
+    BindingValueKind value) noexcept {
+    return value == BindingValueKind::null ||
+        value == BindingValueKind::boolean ||
+        value == BindingValueKind::signed_integer ||
+        value == BindingValueKind::unsigned_integer ||
+        value == BindingValueKind::number ||
+        value == BindingValueKind::text ||
+        value == BindingValueKind::point ||
+        value == BindingValueKind::size ||
+        value == BindingValueKind::rectangle ||
+        value == BindingValueKind::insets ||
+        value == BindingValueKind::color ||
+        value == BindingValueKind::font ||
+        value == BindingValueKind::image ||
+        value == BindingValueKind::enumeration ||
+        value == BindingValueKind::object ||
+        value == BindingValueKind::collection;
+}
+
+std::shared_ptr<const PropertyEnumDescriptor> dock_style_property_enum() {
+    static const auto value = std::make_shared<const PropertyEnumDescriptor>(
+        PropertyEnumDescriptor{
+            "System.Windows.Forms.DockStyle",
+            {{"None", 0}, {"Top", 1}, {"Bottom", 2}, {"Left", 3},
+             {"Right", 4}, {"Fill", 5}},
+            false});
+    return value;
+}
+
+std::shared_ptr<const PropertyEnumDescriptor> anchor_styles_property_enum() {
+    static const auto value = std::make_shared<const PropertyEnumDescriptor>(
+        PropertyEnumDescriptor{
+            "System.Windows.Forms.AnchorStyles",
+            {{"None", 0}, {"Top", 1}, {"Bottom", 2}, {"Left", 4},
+             {"Right", 8}},
+            true});
+    return value;
+}
+
+std::shared_ptr<const PropertyEnumDescriptor> auto_size_mode_property_enum() {
+    static const auto value = std::make_shared<const PropertyEnumDescriptor>(
+        PropertyEnumDescriptor{
+            "System.Windows.Forms.AutoSizeMode",
+            {{"GrowAndShrink", 0}, {"GrowOnly", 1}},
+            false});
+    return value;
+}
+
+BindingValue current_enum_property_value(
+    std::shared_ptr<const PropertyEnumDescriptor> enumeration,
+    std::int64_t value) {
+    PropertyDescriptor descriptor;
+    descriptor.kind = BindingValueKind::enumeration;
+    descriptor.enumeration = std::move(enumeration);
+    const auto normalized = convert_property_value(BindingValue{value}, descriptor);
+    if (!normalized) {
+        throw std::logic_error(
+            "GUI.Forms retained enum state is outside its property schema");
+    }
+    return *normalized;
 }
 
 [[nodiscard]] Size unconstrained_if_zero(Size proposed) {
@@ -145,7 +210,9 @@ Control::Control(StableId stable_id)
     : runtime_id_{next_runtime_id_.fetch_add(1, std::memory_order_relaxed)},
       stable_id_(std::move(stable_id)), name_(stable_id_.value()) {
     define_bindable_property({
-        "Name", BindingValueKind::text,
+        {"Name", BindingValueKind::text, "Design",
+         "Stable authoring name used by inspection and generated surfaces.",
+         BindingValue{name_}, Dirty::semantics | Dirty::accessibility},
         [this] { return BindingValue{name_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::text);
@@ -155,9 +222,11 @@ Control::Control(StableId stable_id)
         [this](Component& owner, std::function<void()> changed) {
             return name_changed_.subscribe(owner,
                 [changed = std::move(changed)](const std::string&) { changed(); });
-        }});
+        }, {}, {}});
     define_bindable_property({
-        "Visible", BindingValueKind::boolean,
+        {"Visible", BindingValueKind::boolean, "Behavior",
+         "Whether this control participates in retained presentation and input.",
+         BindingValue{true}, invalidation::visibility, true},
         [this] { return BindingValue{visible_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(
@@ -168,9 +237,11 @@ Control::Control(StableId stable_id)
         [this](Component& owner, std::function<void()> changed) {
             return visible_changed_.subscribe(owner,
                 [changed = std::move(changed)](bool) { changed(); });
-        }});
+        }, {}, {}});
     define_bindable_property({
-        "Enabled", BindingValueKind::boolean,
+        {"Enabled", BindingValueKind::boolean, "Behavior",
+         "Whether this control can receive ordinary user input.",
+         BindingValue{true}, invalidation::enabled},
         [this] { return BindingValue{enabled_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(
@@ -181,7 +252,284 @@ Control::Control(StableId stable_id)
         [this](Component& owner, std::function<void()> changed) {
             return enabled_changed_.subscribe(owner,
                 [changed = std::move(changed)](bool) { changed(); });
-        }});
+        }, {}, {}});
+    define_bindable_property({
+        {"AutoSize", BindingValueKind::boolean, "Layout",
+         "Whether retained measurement determines this control's size.",
+         BindingValue{false}, Dirty::measure | Dirty::arrange |
+             Dirty::hit_test | Dirty::semantics | Dirty::accessibility},
+        [this] { return BindingValue{auto_size()}; },
+        [this](const BindingValue& value) {
+            set_auto_size(std::get<bool>(value));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return auto_size_changed_.subscribe(owner,
+                [changed = std::move(changed)](bool) { changed(); });
+        }, {}, {}});
+    define_bindable_property({
+        {"CausesValidation", BindingValueKind::boolean, "Behavior",
+         "Whether moving focus from this control initiates validation.",
+         BindingValue{true}, Dirty::none},
+        [this] { return BindingValue{causes_validation_}; },
+        [this](const BindingValue& value) {
+            set_causes_validation(std::get<bool>(value));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return causes_validation_changed_.subscribe(owner,
+                [changed = std::move(changed)](bool) { changed(); });
+        }, {}, {}});
+
+    auto register_structural = [this](
+        PropertyDescriptor descriptor,
+        PropertyRegistration::Getter get,
+        PropertyRegistration::Setter set) {
+        descriptor.bindable = false;
+        define_bindable_property({
+            std::move(descriptor), std::move(get), std::move(set), {}, {}, {}});
+    };
+
+    PropertyDescriptor bounds;
+    bounds.name = "Bounds";
+    bounds.kind = BindingValueKind::rectangle;
+    bounds.category = "Layout";
+    bounds.description = "Authored logical bounds before parent layout.";
+    bounds.default_value = BindingValue{Rect{}};
+    bounds.invalidation_effects = invalidation::bounds;
+    register_structural(
+        std::move(bounds),
+        [this] { return BindingValue{requested_bounds_}; },
+        [this](const BindingValue& value) {
+            set_requested_bounds(std::get<Rect>(value));
+        });
+
+    PropertyDescriptor minimum_size;
+    minimum_size.name = "MinimumSize";
+    minimum_size.kind = BindingValueKind::size;
+    minimum_size.category = "Layout";
+    minimum_size.description = "Minimum retained layout size.";
+    minimum_size.default_value = BindingValue{Size{}};
+    minimum_size.invalidation_effects = invalidation::bounds;
+    register_structural(
+        std::move(minimum_size),
+        [this] { return BindingValue{minimum_size_}; },
+        [this](const BindingValue& value) {
+            set_minimum_size(std::get<Size>(value));
+        });
+
+    PropertyDescriptor maximum_size;
+    maximum_size.name = "MaximumSize";
+    maximum_size.kind = BindingValueKind::size;
+    maximum_size.category = "Layout";
+    maximum_size.description =
+        "Maximum retained layout size; zero dimensions are unbounded.";
+    maximum_size.default_value = BindingValue{Size{}};
+    maximum_size.invalidation_effects = invalidation::bounds;
+    register_structural(
+        std::move(maximum_size),
+        [this] { return BindingValue{maximum_size_}; },
+        [this](const BindingValue& value) {
+            set_maximum_size(std::get<Size>(value));
+        });
+
+    PropertyDescriptor margin;
+    margin.name = "Margin";
+    margin.kind = BindingValueKind::insets;
+    margin.category = "Layout";
+    margin.description = "External logical spacing requested from a layout owner.";
+    margin.default_value = BindingValue{Insets{3.0, 3.0, 3.0, 3.0}};
+    margin.invalidation_effects = Dirty::measure | Dirty::arrange |
+        Dirty::hit_test | Dirty::semantics | Dirty::accessibility;
+    register_structural(
+        std::move(margin),
+        [this] { return BindingValue{margin_}; },
+        [this](const BindingValue& value) {
+            set_margin(std::get<Insets>(value));
+        });
+
+    PropertyDescriptor padding;
+    padding.name = "Padding";
+    padding.kind = BindingValueKind::insets;
+    padding.category = "Layout";
+    padding.description = "Internal logical spacing around child content.";
+    padding.default_value = BindingValue{Insets{}};
+    padding.invalidation_effects = invalidation::bounds;
+    register_structural(
+        std::move(padding),
+        [this] { return BindingValue{padding_}; },
+        [this](const BindingValue& value) {
+            set_padding(std::get<Insets>(value));
+        });
+
+    PropertyDescriptor auto_scroll_offset;
+    auto_scroll_offset.name = "AutoScrollOffset";
+    auto_scroll_offset.kind = BindingValueKind::point;
+    auto_scroll_offset.category = "Layout";
+    auto_scroll_offset.description =
+        "Logical offset used when revealing this control in a scroll owner.";
+    auto_scroll_offset.default_value = BindingValue{Point{}};
+    auto_scroll_offset.invalidation_effects =
+        Dirty::semantics | Dirty::accessibility;
+    register_structural(
+        std::move(auto_scroll_offset),
+        [this] { return BindingValue{auto_scroll_offset_}; },
+        [this](const BindingValue& value) {
+            set_auto_scroll_offset(std::get<Point>(value));
+        });
+
+    PropertyDescriptor dock;
+    dock.name = "Dock";
+    dock.kind = BindingValueKind::enumeration;
+    dock.category = "Layout";
+    dock.description = "Edge or fill participation in parent layout.";
+    dock.default_value = BindingValue{PropertyEnumValue{
+        "System.Windows.Forms.DockStyle", "None", 0}};
+    dock.invalidation_effects = invalidation::bounds;
+    dock.enumeration = dock_style_property_enum();
+    register_structural(
+        std::move(dock),
+        [this] {
+            return current_enum_property_value(
+                dock_style_property_enum(),
+                static_cast<std::int64_t>(dock_));
+        },
+        [this](const BindingValue& value) {
+            set_dock(static_cast<DockStyle>(
+                std::get<PropertyEnumValue>(value).value));
+        });
+
+    PropertyDescriptor anchor;
+    anchor.name = "Anchor";
+    anchor.kind = BindingValueKind::enumeration;
+    anchor.category = "Layout";
+    anchor.description = "Flags retaining distances to parent client edges.";
+    anchor.default_value = BindingValue{PropertyEnumValue{
+        "System.Windows.Forms.AnchorStyles", "Top, Left", 5}};
+    anchor.invalidation_effects = invalidation::bounds;
+    anchor.enumeration = anchor_styles_property_enum();
+    register_structural(
+        std::move(anchor),
+        [this] {
+            return current_enum_property_value(
+                anchor_styles_property_enum(),
+                static_cast<std::int64_t>(anchor_));
+        },
+        [this](const BindingValue& value) {
+            set_anchor(static_cast<AnchorStyles>(
+                std::get<PropertyEnumValue>(value).value));
+        });
+
+    PropertyDescriptor auto_size_mode;
+    auto_size_mode.name = "AutoSizeMode";
+    auto_size_mode.kind = BindingValueKind::enumeration;
+    auto_size_mode.category = "Layout";
+    auto_size_mode.description = "Whether automatic sizing may shrink.";
+    auto_size_mode.default_value = BindingValue{PropertyEnumValue{
+        "System.Windows.Forms.AutoSizeMode", "GrowOnly", 1}};
+    auto_size_mode.invalidation_effects = Dirty::measure | Dirty::arrange |
+        Dirty::hit_test | Dirty::semantics | Dirty::accessibility;
+    auto_size_mode.enumeration = auto_size_mode_property_enum();
+    register_structural(
+        std::move(auto_size_mode),
+        [this] {
+            return current_enum_property_value(
+                auto_size_mode_property_enum(),
+                static_cast<std::int64_t>(auto_size_mode_));
+        },
+        [this](const BindingValue& value) {
+            set_auto_size_mode(static_cast<AutoSizeMode>(
+                std::get<PropertyEnumValue>(value).value));
+        });
+
+    PropertyDescriptor tab_index;
+    tab_index.name = "TabIndex";
+    tab_index.kind = BindingValueKind::unsigned_integer;
+    tab_index.category = "Behavior";
+    tab_index.description = "Keyboard traversal order within the retained tree.";
+    tab_index.default_value = BindingValue{std::uint64_t{0}};
+    tab_index.invalidation_effects = Dirty::semantics | Dirty::accessibility;
+    register_structural(
+        std::move(tab_index),
+        [this] { return BindingValue{static_cast<std::uint64_t>(tab_index_)}; },
+        [this](const BindingValue& value) {
+            const std::uint64_t index = std::get<std::uint64_t>(value);
+            if (index > std::numeric_limits<std::uint32_t>::max()) {
+                throw std::out_of_range("GUI.Forms TabIndex exceeds UInt32");
+            }
+            set_tab_index(static_cast<std::uint32_t>(index));
+        });
+
+    PropertyDescriptor tab_stop;
+    tab_stop.name = "TabStop";
+    tab_stop.kind = BindingValueKind::boolean;
+    tab_stop.category = "Behavior";
+    tab_stop.description = "Whether keyboard traversal may focus this control.";
+    tab_stop.default_value = BindingValue{true};
+    tab_stop.invalidation_effects = Dirty::semantics | Dirty::accessibility;
+    register_structural(
+        std::move(tab_stop),
+        [this] { return BindingValue{tab_stop_}; },
+        [this](const BindingValue& value) {
+            set_tab_stop(std::get<bool>(value));
+        });
+
+    PropertyDescriptor allow_drop;
+    allow_drop.name = "AllowDrop";
+    allow_drop.kind = BindingValueKind::boolean;
+    allow_drop.category = "Behavior";
+    allow_drop.description = "Whether this control may receive drag data.";
+    allow_drop.default_value = BindingValue{false};
+    allow_drop.invalidation_effects = Dirty::semantics | Dirty::hit_test;
+    register_structural(
+        std::move(allow_drop),
+        [this] { return BindingValue{allow_drop_}; },
+        [this](const BindingValue& value) {
+            set_allow_drop(std::get<bool>(value));
+        });
+
+    PropertyDescriptor hit_test_transparent;
+    hit_test_transparent.name = "HitTestTransparent";
+    hit_test_transparent.kind = BindingValueKind::boolean;
+    hit_test_transparent.category = "Behavior";
+    hit_test_transparent.description =
+        "Whether ordinary pointer routing passes through this control.";
+    hit_test_transparent.default_value = BindingValue{false};
+    hit_test_transparent.invalidation_effects =
+        Dirty::hit_test | Dirty::semantics | Dirty::accessibility;
+    hit_test_transparent.browsable = false;
+    register_structural(
+        std::move(hit_test_transparent),
+        [this] { return BindingValue{hit_test_transparent_}; },
+        [this](const BindingValue& value) {
+            set_hit_test_transparent(std::get<bool>(value));
+        });
+
+    PropertyDescriptor accessible_name;
+    accessible_name.name = "AccessibleName";
+    accessible_name.kind = BindingValueKind::text;
+    accessible_name.category = "Accessibility";
+    accessible_name.description = "Authored assistive name override.";
+    accessible_name.default_value = BindingValue{std::string{}};
+    accessible_name.invalidation_effects = Dirty::semantics;
+    register_structural(
+        std::move(accessible_name),
+        [this] { return BindingValue{accessible_name_}; },
+        [this](const BindingValue& value) {
+            set_accessible_name(std::get<std::string>(value));
+        });
+
+    PropertyDescriptor accessible_description;
+    accessible_description.name = "AccessibleDescription";
+    accessible_description.kind = BindingValueKind::text;
+    accessible_description.category = "Accessibility";
+    accessible_description.description = "Authored assistive description.";
+    accessible_description.default_value = BindingValue{std::string{}};
+    accessible_description.invalidation_effects = Dirty::semantics;
+    register_structural(
+        std::move(accessible_description),
+        [this] { return BindingValue{accessible_description_}; },
+        [this](const BindingValue& value) {
+            set_accessible_description(std::get<std::string>(value));
+        });
 }
 
 Control::~Control() = default;
@@ -268,20 +616,68 @@ void Control::set_tag(std::any tag) {
 }
 
 void Control::define_bindable_property(BindableProperty property) {
-    const std::string canonical = canonical_binding_name(property.name);
-    if (!property.readable && !property.writable) {
+    PropertyDescriptor& descriptor = property.descriptor;
+    const std::string canonical = canonical_binding_name(descriptor.name);
+    const auto first = descriptor.name.find_first_not_of(" \t\r\n");
+    const auto last = descriptor.name.find_last_not_of(" \t\r\n");
+    descriptor.name = descriptor.name.substr(first, last - first + 1U);
+    if (!descriptor.readable && !descriptor.writable) {
         throw std::invalid_argument(
-            "GUI.Forms bindable property must be readable or writable");
+            "GUI.Forms property must be readable or writable");
     }
-    if (property.readable && !property.get) {
+    if (!valid_binding_value_kind(descriptor.kind)) {
         throw std::invalid_argument(
-            "GUI.Forms readable bindable property requires a getter");
+            "GUI.Forms property value kind is invalid");
     }
-    if (property.writable && !property.set) {
+    if ((descriptor.kind == BindingValueKind::enumeration) !=
+        static_cast<bool>(descriptor.enumeration) ||
+        (descriptor.enumeration &&
+         !valid_property_enum_descriptor(*descriptor.enumeration))) {
         throw std::invalid_argument(
-            "GUI.Forms writable bindable property requires a setter");
+            "GUI.Forms enumeration property requires one valid enum descriptor");
     }
-    property.name = canonical;
+    if (!validate_utf8(descriptor.converter_name).valid() ||
+        !validate_utf8(descriptor.editor_name).valid() ||
+        descriptor.converter_name.size() > 256U ||
+        descriptor.editor_name.size() > 256U) {
+        throw std::invalid_argument(
+            "GUI.Forms property service names must be bounded valid UTF-8");
+    }
+    if (descriptor.readable && !property.get) {
+        throw std::invalid_argument(
+            "GUI.Forms readable property requires a getter");
+    }
+    if (descriptor.writable && !property.set) {
+        throw std::invalid_argument(
+            "GUI.Forms writable property requires a setter");
+    }
+    if (descriptor.serialization_visibility !=
+            PropertySerializationVisibility::hidden &&
+        descriptor.serialization_visibility !=
+            PropertySerializationVisibility::visible &&
+        descriptor.serialization_visibility !=
+            PropertySerializationVisibility::content) {
+        throw std::invalid_argument(
+            "GUI.Forms property serialization visibility is invalid");
+    }
+    if (without_dirty(descriptor.invalidation_effects,
+                      invalidation::conservative_subtree) != Dirty::none) {
+        throw std::invalid_argument(
+            "GUI.Forms property declares unknown invalidation effects");
+    }
+    if (descriptor.default_value) {
+        const auto converted = convert_property_value(
+            *descriptor.default_value, descriptor);
+        if (!converted) {
+            throw std::invalid_argument(
+                "GUI.Forms property default cannot convert to its declared kind");
+        }
+        descriptor.default_value = *converted;
+    }
+    descriptor.resettable = static_cast<bool>(property.reset) ||
+        (descriptor.writable && descriptor.default_value.has_value());
+    descriptor.change_notifications =
+        static_cast<bool>(property.connect_changed);
     // Derived stock controls may replace a base descriptor when they own a
     // more specific implementation of the same canonical property.
     bindable_properties_.insert_or_assign(canonical, std::move(property));
@@ -290,7 +686,9 @@ void Control::define_bindable_property(BindableProperty property) {
 const BindableProperty* Control::find_bindable_property(
     std::string_view name) const {
     const auto found = bindable_properties_.find(canonical_binding_name(name));
-    return found == bindable_properties_.end() ? nullptr : &found->second;
+    return found == bindable_properties_.end() ||
+            !found->second.descriptor.bindable
+        ? nullptr : &found->second;
 }
 
 bool Control::has_bindable_property(std::string_view name) const {
@@ -301,10 +699,148 @@ std::vector<std::string> Control::bindable_property_names() const {
     std::vector<std::string> result;
     result.reserve(bindable_properties_.size());
     for (const auto& [name, property] : bindable_properties_) {
-        static_cast<void>(property);
-        result.push_back(name);
+        static_cast<void>(name);
+        if (property.descriptor.bindable) {
+            result.push_back(property.descriptor.name);
+        }
     }
     return result;
+}
+
+std::optional<PropertyDescriptor> Control::property_descriptor(
+    std::string_view name) const {
+    const auto found = bindable_properties_.find(canonical_binding_name(name));
+    if (found == bindable_properties_.end()) return std::nullopt;
+    return found->second.descriptor;
+}
+
+std::vector<PropertyDescriptor> Control::property_descriptors() const {
+    std::vector<PropertyDescriptor> result;
+    result.reserve(bindable_properties_.size());
+    for (const auto& [name, property] : bindable_properties_) {
+        static_cast<void>(name);
+        result.push_back(property.descriptor);
+    }
+    return result;
+}
+
+std::optional<BindingValue> Control::property_value(std::string_view name) const {
+    if (!is_alive()) {
+        throw std::logic_error("GUI.Forms cannot query a disposed control property");
+    }
+    if (window_) window_->require_ui_thread("control property query");
+    const auto found = bindable_properties_.find(canonical_binding_name(name));
+    if (found == bindable_properties_.end() ||
+        !found->second.descriptor.readable || !found->second.get) {
+        return std::nullopt;
+    }
+    const auto getter = found->second.get;
+    return getter();
+}
+
+void Control::set_property_value(std::string_view name, BindingValue value) {
+    require_mutable();
+    const std::string canonical = canonical_binding_name(name);
+    const auto found = bindable_properties_.find(canonical);
+    if (found == bindable_properties_.end()) {
+        throw std::invalid_argument("GUI.Forms property is not registered: " +
+                                    canonical);
+    }
+    const PropertyRegistration registration = found->second;
+    if (!registration.descriptor.writable || !registration.set) {
+        throw std::logic_error("GUI.Forms property is read-only: " +
+                               registration.descriptor.name);
+    }
+    const auto converted = convert_property_value(
+        value, registration.descriptor);
+    if (!converted) {
+        throw std::invalid_argument(
+            "GUI.Forms property value cannot convert to its declared kind: " +
+            registration.descriptor.name);
+    }
+    registration.set(*converted);
+}
+
+SubscriptionToken Control::subscribe_property_changed(
+    std::string_view name, Component& owner, std::function<void()> changed) {
+    require_mutable();
+    const std::string canonical = canonical_binding_name(name);
+    const auto found = bindable_properties_.find(canonical);
+    if (found == bindable_properties_.end()) {
+        throw std::invalid_argument("GUI.Forms property is not registered: " +
+                                    canonical);
+    }
+    const auto connector = found->second.connect_changed;
+    return connector && changed
+        ? connector(owner, std::move(changed)) : SubscriptionToken{};
+}
+
+bool Control::reset_property(std::string_view name) {
+    require_mutable();
+    const auto found = bindable_properties_.find(canonical_binding_name(name));
+    if (found == bindable_properties_.end()) return false;
+    const PropertyRegistration registration = found->second;
+    if (registration.reset) {
+        registration.reset();
+        return true;
+    }
+    if (!registration.descriptor.writable || !registration.set ||
+        !registration.descriptor.default_value) {
+        return false;
+    }
+    registration.set(*registration.descriptor.default_value);
+    return true;
+}
+
+bool Control::should_serialize_property(std::string_view name) const {
+    if (!is_alive()) {
+        throw std::logic_error(
+            "GUI.Forms cannot inspect a disposed control property");
+    }
+    if (window_) window_->require_ui_thread("control property inspection");
+    const std::string canonical = canonical_binding_name(name);
+    const auto found = bindable_properties_.find(canonical);
+    if (found == bindable_properties_.end()) {
+        throw std::invalid_argument("GUI.Forms property is not registered: " +
+                                    canonical);
+    }
+    const PropertyRegistration registration = found->second;
+    if (registration.descriptor.serialization_visibility ==
+        PropertySerializationVisibility::hidden) {
+        return false;
+    }
+    if (registration.should_serialize) {
+        return registration.should_serialize();
+    }
+    if (!registration.descriptor.readable || !registration.get) return false;
+    if (!registration.descriptor.default_value) return true;
+    return registration.get() != *registration.descriptor.default_value;
+}
+
+PropertyValueOrigin Control::property_value_origin(
+    std::string_view name) const {
+    if (!is_alive()) {
+        throw std::logic_error(
+            "GUI.Forms cannot inspect a disposed control property");
+    }
+    if (window_) {
+        window_->require_ui_thread("control property origin inspection");
+    }
+    const std::string canonical = canonical_binding_name(name);
+    const auto found = bindable_properties_.find(canonical);
+    if (found == bindable_properties_.end()) {
+        throw std::invalid_argument("GUI.Forms property is not registered: " +
+                                    canonical);
+    }
+    const PropertyRegistration registration = found->second;
+    if (registration.origin) return registration.origin();
+    if (registration.descriptor.readable && registration.get &&
+        registration.descriptor.default_value) {
+        return registration.get() == *registration.descriptor.default_value
+            ? PropertyValueOrigin::defaulted
+            : PropertyValueOrigin::local;
+    }
+    return PropertyValueOrigin::computed;
 }
 
 ControlBindingsCollection& Control::data_bindings() {
@@ -804,6 +1340,56 @@ Rect Control::arranged_bounds() const {
     return arranged_bounds_;
 }
 
+void Control::suspend_layout() {
+    require_mutable();
+    if (layout_suspend_depth_ == std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("GUI.Forms layout suspension depth overflow");
+    }
+    if (layout_suspend_depth_ == 0U &&
+        has_dirty(subtree_dirty_, Dirty::layout)) {
+        layout_deferred_ = true;
+        ++layout_requested_revision_;
+        if (layout_requested_revision_ == 0U) ++layout_requested_revision_;
+    }
+    ++layout_suspend_depth_;
+}
+
+void Control::resume_layout(bool perform_pending_layout) {
+    require_mutable();
+    // WinForms tolerates an unmatched ResumeLayout. Keeping that behavior is
+    // important for generated/designer code which may unwind conditionally.
+    if (layout_suspend_depth_ == 0U) return;
+    --layout_suspend_depth_;
+    if (layout_suspend_depth_ != 0U || !perform_pending_layout ||
+        !layout_deferred_) {
+        return;
+    }
+    if (window_ != nullptr) {
+        window_->ensure_layout(false);
+    }
+}
+
+void Control::perform_layout() {
+    require_mutable();
+    // A suspended request is revisioned by the ordinary invalidation path so
+    // every suspended ancestor observes the same mutation exactly once.
+    if (layout_suspend_depth_ == 0U) {
+        ++layout_requested_revision_;
+        if (layout_requested_revision_ == 0U) ++layout_requested_revision_;
+    }
+    layout_deferred_ = true;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::hit_test |
+               Dirty::semantics | Dirty::accessibility);
+    if (window_ != nullptr && layout_suspend_depth_ == 0U) {
+        window_->ensure_layout(false);
+    }
+}
+
+LayoutTransactionState Control::layout_transaction_state() const noexcept {
+    return {layout_suspend_depth_, layout_deferred_, layout_requested_revision_,
+            layout_committed_revision_};
+}
+
 Rect Control::absolute_bounds() const {
     if (window_) {
         window_->ensure_layout(true);
@@ -1151,6 +1737,14 @@ void Control::invalidate(Dirty requested_dirty) {
     dirty_ |= requested_dirty;
     for (Control* current = this; current != nullptr;) {
         current->subtree_dirty_ |= requested_dirty;
+        if (has_dirty(requested_dirty, Dirty::layout) &&
+            current->layout_suspend_depth_ != 0U) {
+            current->layout_deferred_ = true;
+            ++current->layout_requested_revision_;
+            if (current->layout_requested_revision_ == 0U) {
+                ++current->layout_requested_revision_;
+            }
+        }
         const auto visual_parent = current->parent_.lock();
         current = visual_parent.get();
     }
@@ -1176,6 +1770,14 @@ void Control::invalidate_subtree(Dirty requested_dirty) {
     std::function<void(Control&)> apply = [&](Control& control) {
         control.dirty_ |= requested_dirty;
         control.subtree_dirty_ |= requested_dirty;
+        if (has_dirty(requested_dirty, Dirty::layout) &&
+            control.layout_suspend_depth_ != 0U) {
+            control.layout_deferred_ = true;
+            ++control.layout_requested_revision_;
+            if (control.layout_requested_revision_ == 0U) {
+                ++control.layout_requested_revision_;
+            }
+        }
         for (const auto& child : control.children_) {
             apply(*child);
         }
@@ -1184,6 +1786,14 @@ void Control::invalidate_subtree(Dirty requested_dirty) {
     for (auto visual_parent = parent(); visual_parent;
          visual_parent = visual_parent->parent()) {
         visual_parent->subtree_dirty_ |= requested_dirty;
+        if (has_dirty(requested_dirty, Dirty::layout) &&
+            visual_parent->layout_suspend_depth_ != 0U) {
+            visual_parent->layout_deferred_ = true;
+            ++visual_parent->layout_requested_revision_;
+            if (visual_parent->layout_requested_revision_ == 0U) {
+                ++visual_parent->layout_requested_revision_;
+            }
+        }
     }
 }
 
@@ -1237,9 +1847,12 @@ Size Control::measure(Size available) {
     if (auto_size_) {
         double content_width = padding_.left + padding_.right;
         double content_height = padding_.top + padding_.bottom;
-        for (const Ptr& child : children_) {
-            if (!child || !child->is_alive() || !child->visible_) continue;
+        const std::vector<Ptr> retained = snapshot_layout_children();
+        for (const Ptr& child : retained) {
+            if (!is_current_layout_child(child) || !child->visible_) continue;
             const Size child_desired = child->get_preferred_size(available);
+            if (!is_alive()) return {};
+            if (!is_current_layout_child(child) || !child->visible_) continue;
             content_width = std::max(
                 content_width,
                 std::max(0.0, child->requested_bounds_.x) +
@@ -1270,6 +1883,8 @@ void Control::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     if (children_.empty()) return;
 
+    const std::vector<Ptr> retained = snapshot_layout_children();
+
     const Rect viewport = child_viewport_rectangle();
     const Rect client{
         viewport.x + padding_.left,
@@ -1279,14 +1894,19 @@ void Control::arrange(Rect final_bounds) {
     Rect remaining = client;
     // Child index zero is topmost. The vector stores that control last, so
     // reverse traversal gives WinForms-style z-order-sensitive docking.
-    for (auto iterator = children_.rbegin(); iterator != children_.rend();
+    for (auto iterator = retained.rbegin(); iterator != retained.rend();
          ++iterator) {
         const Ptr& child = *iterator;
-        if (!child || !child->is_alive() || !child->visible_ ||
+        if (!is_current_layout_child(child) || !child->visible_ ||
             child->dock_ == DockStyle::none) {
             continue;
         }
         const Size desired = child->measure({remaining.width, remaining.height});
+        if (!is_alive()) return;
+        if (!is_current_layout_child(child) || !child->visible_ ||
+            child->dock_ == DockStyle::none) {
+            continue;
+        }
         const double width = child->auto_size()
             ? (child->auto_size_mode_ == AutoSizeMode::grow_only
                    ? std::max(child->requested_bounds_.width, desired.width)
@@ -1339,8 +1959,8 @@ void Control::arrange(Rect final_bounds) {
         set_child_layout(child, slot);
     }
 
-    for (const Ptr& child : children_) {
-        if (!child || !child->is_alive() || !child->visible_ ||
+    for (const Ptr& child : retained) {
+        if (!is_current_layout_child(child) || !child->visible_ ||
             child->dock_ != DockStyle::none) {
             continue;
         }
@@ -1348,6 +1968,11 @@ void Control::arrange(Rect final_bounds) {
         if (child->auto_size()) {
             const Size preferred = child->get_preferred_size(
                 {client.width, client.height});
+            if (!is_alive()) return;
+            if (!is_current_layout_child(child) || !child->visible_ ||
+                child->dock_ != DockStyle::none) {
+                continue;
+            }
             if (child->auto_size_mode_ == AutoSizeMode::grow_only) {
                 authored.width = std::max(authored.width, preferred.width);
                 authored.height = std::max(authored.height, preferred.height);
@@ -1367,6 +1992,15 @@ void Control::arrange(Rect final_bounds) {
                                    child->anchor_reference_->client,
                                    client, child->anchor_));
     }
+}
+
+std::vector<Control::Ptr> Control::snapshot_layout_children() const {
+    return children_;
+}
+
+bool Control::is_current_layout_child(const Ptr& child) const noexcept {
+    return child && child->is_alive() && child->parent_.lock().get() == this &&
+           child->window_ == window_;
 }
 
 void Control::on_paint(Painter&, Rect) {}

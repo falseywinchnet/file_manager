@@ -9,12 +9,13 @@ using System.Threading;
 namespace System.Windows.Forms;
 
 internal enum NativeChange { None, Name, Text, Visible, Enabled, Bounds, Tree }
-internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4, RangeValueChanged = 14, RangeScroll = 15, BoundsChanged = 16 }
+internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4, RangeValueChanged = 14, RangeScroll = 15, BoundsChanged = 16, Scroll = 17 }
 internal readonly record struct NativePointer(uint Kind, double X, double Y, double WheelDelta, uint Button);
 internal readonly record struct NativeKey(uint Kind, uint PhysicalKey, uint Modifiers, bool Repeat);
 internal readonly record struct NativeFieldEdit(string Text, int Anchor, int Caret, bool Changed, bool CanUndo, bool CanRedo);
 internal readonly record struct NativeScrollAxis(bool Enabled, bool Visible, int Minimum, int Maximum, int LargeChange, int SmallChange, int Value);
-internal readonly record struct NativeScrollState(bool AutoScroll, global::System.Drawing.Point Position, global::System.Drawing.Size Margin, global::System.Drawing.Size MinimumContentSize, global::System.Drawing.Rectangle DisplayRectangle, global::System.Drawing.Rectangle ViewportRectangle, NativeScrollAxis Horizontal, NativeScrollAxis Vertical);
+internal readonly record struct NativeScrollState(bool AutoScroll, global::System.Drawing.Point Position, global::System.Drawing.Size Margin, global::System.Drawing.Size MinimumContentSize, global::System.Drawing.Rectangle DisplayRectangle, global::System.Drawing.Rectangle ViewportRectangle, NativeScrollAxis Horizontal, NativeScrollAxis Vertical, ulong EventRevision, uint EventType, uint EventOrientation, int EventOldValue, int EventNewValue);
+internal readonly record struct NativeLayoutState(uint SuspendDepth, bool Deferred, ulong RequestedRevision, ulong CommittedRevision);
 
 internal sealed unsafe class NativeControlBridge : IDisposable
 {
@@ -33,7 +34,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct Point { internal double X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct Size { internal double Width, Height; }
     [StructLayout(LayoutKind.Sequential)] private struct ScrollAxisState { internal uint Enabled, Visible; internal double Minimum, Maximum, LargeChange, SmallChange, Value; }
-    [StructLayout(LayoutKind.Sequential)] private struct ScrollState { internal uint AutoScroll; internal Point Position; internal Size Margin, MinimumContentSize; internal Rect DisplayRectangle, ViewportRectangle; internal ScrollAxisState Horizontal, Vertical; }
+    [StructLayout(LayoutKind.Sequential)] private struct ScrollState { internal uint AutoScroll; internal Point Position; internal Size Margin, MinimumContentSize; internal Rect DisplayRectangle, ViewportRectangle; internal ScrollAxisState Horizontal, Vertical; internal ulong EventRevision; internal uint EventType, EventOrientation; internal double EventOldValue, EventNewValue; }
+    [StructLayout(LayoutKind.Sequential)] private struct LayoutState { internal uint SuspendDepth, Deferred; internal ulong RequestedRevision, CommittedRevision; }
     [StructLayout(LayoutKind.Sequential)] private struct FieldEditResult { internal ulong Anchor, Caret, Revision; internal uint Changed, CanUndo, CanRedo; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfoHeader { internal uint Size; internal int Width, Height; internal ushort Planes, BitCount; internal uint Compression, SizeImage; internal int XPelsPerMeter, YPelsPerMeter; internal uint ClrUsed, ClrImportant; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfo { internal BitmapInfoHeader Header; internal uint Color; }
@@ -64,6 +66,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint SetAutoScrollOffset, SetAutoScroll, SetAutoScrollMargin;
         internal nint SetAutoScrollMinSize, SetAutoScrollPosition, GetScrollState;
         internal nint SetScrollAxisState, ScrollControlIntoView;
+        internal nint SuspendLayout, ResumeLayout, PerformControlLayout, GetLayoutState;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -200,7 +203,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal event Func<NativeKey, bool>? KeyPreviewRaised;
     internal event Action<string, bool, int, int>? TextRaised;
 
-    private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName)
+    private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName, bool scrollable)
     {
         this.handle = handle;
         this.stableId = stableId;
@@ -218,6 +221,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         if (kind is 4u or 5u or 11u or 14u) SubscribeTyped(NativeEvent.Clicked);
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); SubscribeTyped(NativeEvent.BoundsChanged); }
         if (kind == 10u) { SubscribeTyped(NativeEvent.RangeScroll); SubscribeTyped(NativeEvent.RangeValueChanged); }
+        if (scrollable) SubscribeTyped(NativeEvent.Scroll);
         SubscribePointer();
         if (kind == 1u) SubscribeKeyPreview();
         if (kind is 6u or 8u or 9u or 16u or 18u) { SubscribeKey(); SubscribeText(); }
@@ -265,7 +269,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         fixed (byte* data = bytes)
             Check(((delegate* unmanaged[Cdecl]<uint, StringView, Handle*, int>)api.ControlCreateKind)(kind, new StringView { Data = data, Size = (ulong)bytes.Length }, &value));
         if (traceControls) Console.Error.WriteLine($"facade-control=create|id={stableId}|type={managedType.FullName}|kind={kind}");
-        return new NativeControlBridge(new SafeControlHandle(value), kind, stableId, managedType.FullName ?? managedType.Name);
+        return new NativeControlBridge(new SafeControlHandle(value), kind, stableId, managedType.FullName ?? managedType.Name, typeof(ScrollableControl).IsAssignableFrom(managedType));
     }
 
     private void EnsureAlive() { if (IsDisposed) throw new global::System.InvalidOperationException("GUI.Forms control is disposed."); }
@@ -288,9 +292,13 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void SetAutoScrollMargin(global::System.Drawing.Size value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Size, int>)api.SetAutoScrollMargin)(handle.Value, new Size { Width = value.Width, Height = value.Height })); }
     internal void SetAutoScrollMinSize(global::System.Drawing.Size value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Size, int>)api.SetAutoScrollMinSize)(handle.Value, new Size { Width = value.Width, Height = value.Height })); }
     internal void SetAutoScrollPosition(global::System.Drawing.Point value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Point, int>)api.SetAutoScrollPosition)(handle.Value, new Point { X = value.X, Y = value.Y })); }
-    internal NativeScrollState GetScrollState() { EnsureAlive(); ScrollState value; Check(((delegate* unmanaged[Cdecl]<Handle, ScrollState*, int>)api.GetScrollState)(handle.Value, &value)); static NativeScrollAxis Axis(ScrollAxisState axis) => new(axis.Enabled != 0, axis.Visible != 0, (int)global::System.Math.Round(axis.Minimum), (int)global::System.Math.Round(axis.Maximum), (int)global::System.Math.Round(axis.LargeChange), (int)global::System.Math.Round(axis.SmallChange), (int)global::System.Math.Round(axis.Value)); return new(value.AutoScroll != 0, new global::System.Drawing.Point((int)global::System.Math.Round(value.Position.X), (int)global::System.Math.Round(value.Position.Y)), new global::System.Drawing.Size((int)global::System.Math.Round(value.Margin.Width), (int)global::System.Math.Round(value.Margin.Height)), new global::System.Drawing.Size((int)global::System.Math.Round(value.MinimumContentSize.Width), (int)global::System.Math.Round(value.MinimumContentSize.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.DisplayRectangle.X), (int)global::System.Math.Round(value.DisplayRectangle.Y), (int)global::System.Math.Round(value.DisplayRectangle.Width), (int)global::System.Math.Round(value.DisplayRectangle.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.ViewportRectangle.X), (int)global::System.Math.Round(value.ViewportRectangle.Y), (int)global::System.Math.Round(value.ViewportRectangle.Width), (int)global::System.Math.Round(value.ViewportRectangle.Height)), Axis(value.Horizontal), Axis(value.Vertical)); }
+    internal NativeScrollState GetScrollState() { EnsureAlive(); ScrollState value; Check(((delegate* unmanaged[Cdecl]<Handle, ScrollState*, int>)api.GetScrollState)(handle.Value, &value)); static NativeScrollAxis Axis(ScrollAxisState axis) => new(axis.Enabled != 0, axis.Visible != 0, (int)global::System.Math.Round(axis.Minimum), (int)global::System.Math.Round(axis.Maximum), (int)global::System.Math.Round(axis.LargeChange), (int)global::System.Math.Round(axis.SmallChange), (int)global::System.Math.Round(axis.Value)); return new(value.AutoScroll != 0, new global::System.Drawing.Point((int)global::System.Math.Round(value.Position.X), (int)global::System.Math.Round(value.Position.Y)), new global::System.Drawing.Size((int)global::System.Math.Round(value.Margin.Width), (int)global::System.Math.Round(value.Margin.Height)), new global::System.Drawing.Size((int)global::System.Math.Round(value.MinimumContentSize.Width), (int)global::System.Math.Round(value.MinimumContentSize.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.DisplayRectangle.X), (int)global::System.Math.Round(value.DisplayRectangle.Y), (int)global::System.Math.Round(value.DisplayRectangle.Width), (int)global::System.Math.Round(value.DisplayRectangle.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.ViewportRectangle.X), (int)global::System.Math.Round(value.ViewportRectangle.Y), (int)global::System.Math.Round(value.ViewportRectangle.Width), (int)global::System.Math.Round(value.ViewportRectangle.Height)), Axis(value.Horizontal), Axis(value.Vertical), value.EventRevision, value.EventType, value.EventOrientation, (int)global::System.Math.Round(value.EventOldValue), (int)global::System.Math.Round(value.EventNewValue)); }
     internal void SetScrollAxisState(bool vertical, NativeScrollAxis value) { EnsureAlive(); var state = new ScrollAxisState { Enabled = value.Enabled ? 1u : 0u, Visible = value.Visible ? 1u : 0u, Minimum = value.Minimum, Maximum = value.Maximum, LargeChange = value.LargeChange, SmallChange = value.SmallChange, Value = value.Value }; Check(((delegate* unmanaged[Cdecl]<Handle, uint, ScrollAxisState, int>)api.SetScrollAxisState)(handle.Value, vertical ? 1u : 0u, state)); }
     internal void ScrollControlIntoView(NativeControlBridge child) { EnsureAlive(); if (child is null) throw new global::System.ArgumentNullException(nameof(child)); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.ScrollControlIntoView)(handle.Value, child.handle.Value)); }
+    internal void SuspendLayout() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.SuspendLayout)(handle.Value)); }
+    internal void ResumeLayout(bool performLayout) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.ResumeLayout)(handle.Value, performLayout ? 1u : 0u)); }
+    internal void PerformControlLayout() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.PerformControlLayout)(handle.Value)); }
+    internal NativeLayoutState GetLayoutState() { EnsureAlive(); LayoutState value; Check(((delegate* unmanaged[Cdecl]<Handle, LayoutState*, int>)api.GetLayoutState)(handle.Value, &value)); return new(value.SuspendDepth, value.Deferred != 0, value.RequestedRevision, value.CommittedRevision); }
 
     internal void AddChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=add|parent={stableId}|parent-type={managedTypeName}|child={child.stableId}|child-type={child.managedTypeName}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.AddChild)(handle.Value, child.handle.Value)); }
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
@@ -1061,8 +1069,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(20, ref value));
-        if (value.AbiVersion != 20 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0) throw new InvalidOperationException("GUI.Forms ABI 0.20 table is incomplete.");
+        Check(GetApi(21, ref value));
+        if (value.AbiVersion != 21 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0 || value.SuspendLayout == 0 || value.ResumeLayout == 0 || value.PerformControlLayout == 0 || value.GetLayoutState == 0) throw new InvalidOperationException("GUI.Forms ABI 0.21 table is incomplete.");
         return value;
     }
     private static void Check(int result)

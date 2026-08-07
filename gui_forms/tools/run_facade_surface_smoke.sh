@@ -44,7 +44,7 @@ GUI_FORMS_FORCE_HEADLESS=1 GUI_FORMS_AUTOMATION_ACTIVATE=1 \
   DYLD_LIBRARY_PATH="$mac_build" \
   dotnet "$smoke_output/GuiForms.FacadeSmoke.dll"
 behavior_host_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-host.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding split-container lifecycle-order; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container lifecycle-order; do
   GUI_FORMS_FORCE_HEADLESS=1 DYLD_LIBRARY_PATH="$mac_build" \
     dotnet "$behavior_output/GuiForms.FacadeBehaviorSmoke.dll" "$behavior_mode" \
     >>"$behavior_host_log"
@@ -54,6 +54,9 @@ rg -q 'form-semantics=tab:nested\|accept:ordered\|cancel:ordered\|active-control
 rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|cancelled:true\|detached:true\|focus-restored:true\|loads:1\|closed:1' "$behavior_host_log"
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_host_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_host_log"
+rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink' "$behavior_host_log"
+rg -q 'layout-transactions=nested:coalesced\|committed:stable\|args:exact\|reentry:bounded\|resume-false:deferred\|unmatched:no-op\|fault:recoverable' "$behavior_host_log"
+rg -q 'scroll-panel=retained:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_host_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_host_log"
 rg -q 'lifecycle-order=load>input>closing>closed' "$behavior_host_log"
 unlink "$behavior_host_log"
@@ -113,7 +116,7 @@ rg -q 'callbacks=click:1\|dispatch:1\|closing:1\|closed:1\|faults:1' "$wine_log"
 unlink "$wine_log"
 
 behavior_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-wine.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding split-container lifecycle-order; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container lifecycle-order; do
   (cd "$behavior_output" && GUI_FORMS_FORCE_HEADLESS=1 WINEDEBUG=-all \
     "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
     GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$behavior_wine_log" 2>&1
@@ -123,9 +126,40 @@ rg -q 'form-semantics=tab:nested\|accept:ordered\|cancel:ordered\|active-control
 rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|cancelled:true\|detached:true\|focus-restored:true\|loads:1\|closed:1' "$behavior_wine_log"
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_wine_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_wine_log"
+rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink' "$behavior_wine_log"
+rg -q 'layout-transactions=nested:coalesced\|committed:stable\|args:exact\|reentry:bounded\|resume-false:deferred\|unmatched:no-op\|fault:recoverable' "$behavior_wine_log"
+rg -q 'scroll-panel=retained:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_wine_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_wine_log"
 rg -q 'lifecycle-order=load>input>closing>closed\|handle-created:1\|handle-destroyed:1\|early-close:suppressed' "$behavior_wine_log"
 unlink "$behavior_wine_log"
+
+scroll_live_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-scroll-live.XXXXXX")
+(cd "$behavior_output" && MVK_CONFIG_LOG_LEVEL=0 WINEDEBUG=-all \
+  "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
+  GuiForms.FacadeBehaviorSmoke.dll scroll-panel-live >"$scroll_live_log" 2>&1) &
+scroll_live_pid=$!
+attempt=0
+until GUI_FORMS_AUTOMATION_TITLE='GUI.Forms Scroll Event' WINEDEBUG=-all \
+  "$wine_binary" "$windows_build/gui_forms_windows_probe.exe" snapshot \
+    >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 80 ]; then
+    kill "$scroll_live_pid" 2>/dev/null || true
+    wait "$scroll_live_pid" 2>/dev/null || true
+    echo "managed scroll event surface did not publish its automation window" >&2
+    exit 1
+  fi
+  sleep 0.25
+done
+GUI_FORMS_AUTOMATION_TITLE='GUI.Forms Scroll Event' WINEDEBUG=-all \
+  "$wine_binary" "$windows_build/gui_forms_windows_probe.exe" \
+  click-at scrollViewport 232 112 >/dev/null
+GUI_FORMS_AUTOMATION_TITLE='GUI.Forms Scroll Event' WINEDEBUG=-all \
+  "$wine_binary" "$windows_build/gui_forms_windows_probe.exe" close >/dev/null
+wait "$scroll_live_pid"
+cat "$scroll_live_log"
+rg -q 'scroll-panel-live=events:1\|type:SmallIncrement\|orientation:vertical\|position:12' "$scroll_live_log"
+unlink "$scroll_live_log"
 
 paint_lease_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-paint-lease-wine.XXXXXX")
 for behavior_mode in native-surface native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage; do

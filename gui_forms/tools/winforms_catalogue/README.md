@@ -26,10 +26,25 @@ masked bounds, preferred/min/max/AutoSize sizing, client/window transforms,
 direct-child filtering, nested tab traversal, and topmost-first collection
 semantics. True portable screen origin/multi-monitor conversion remains host
 contract work rather than being inferred from AppKit or Win32.
+M12-P10 promotes the bounded scrolling family: `ScrollableControl`,
+`ScrollProperties`, horizontal/vertical properties, exact scroll enums/events,
+`Control.AutoScrollOffset`, automatic/manual axes, viewport/display geometry,
+and control reveal. RTL/scaling and exhaustive independent WinForms ordering
+remain explicitly open.
+M12-P11 promotes per-control layout transactions: nested `SuspendLayout`, both
+`ResumeLayout` forms, both `PerformLayout` forms, exact `LayoutEventArgs`
+payloads, committed geometry while suspended, retained ABI 0.21 state, bounded
+re-entry, and fault recovery. Exhaustive independent WinForms event ordering
+and designer-scale convergence remain explicitly open.
 The generator deliberately leaves arbitrary managed IDataErrorInfo/reflection,
 true nested object traversal, Help TopicId/raw enum projection, protected
 disposal/site shapes, and unproved constructors partial or missing rather than
 inferring closure from the public type name.
+
+M12-P20 adds native instance-owned converter/editor registries and retained
+custom-editor ownership, but deliberately promotes no managed `PropertyGrid`,
+`GridItem`, `TypeConverter`, or component-editor row. Those identities remain
+missing until their exact generated facade behavior is projected and measured.
 
 ```sh
 python3 tools/winforms_catalogue/generate_catalogue.py \

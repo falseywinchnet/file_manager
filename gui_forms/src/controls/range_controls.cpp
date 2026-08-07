@@ -248,7 +248,9 @@ void paint_progress_laser(Painter& painter, Rect fill, Rect interior,
 RangeControl::RangeControl(StableId stable_id)
     : Control(std::move(stable_id)) {
     define_bindable_property({
-        "Value", BindingValueKind::number,
+        {"Value", BindingValueKind::number, "Behavior",
+         "Current value within the retained range.", BindingValue{0.0},
+         Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{value_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::number);
@@ -258,7 +260,7 @@ RangeControl::RangeControl(StableId stable_id)
         [this](Component& owner, std::function<void()> changed) {
             return value_changed_.subscribe(owner,
                 [changed = std::move(changed)](double) { changed(); });
-        }});
+        }, {}, {}});
 }
 
 double RangeControl::normalized_value() const noexcept {

@@ -109,6 +109,7 @@ bool AcceleratorToken::connected() const noexcept {
 namespace {
 
 constexpr std::uint32_t maximum_layout_passes = 4;
+constexpr std::uint32_t maximum_semantic_snapshot_passes = 4;
 
 [[nodiscard]] std::optional<char32_t> physical_mnemonic(
     std::uint32_t physical_key) noexcept {
@@ -145,20 +146,38 @@ bool single_allowed_effect(DragEffect effect, DragEffect allowed) noexcept {
            has_drag_effect(allowed, effect);
 }
 
+[[nodiscard]] bool current_semantic_identity(
+    const Control::Ptr& control, const Control* expected_parent,
+    const Window* owner) noexcept {
+    return control && control->is_alive() &&
+           control->attached_window() == owner &&
+           control->parent().get() == expected_parent;
+}
+
 void append_semantic_nodes(const Control::Ptr& control,
+                           const Control* expected_parent,
+                           const Window* owner,
                            const Control::Ptr& focused,
                            std::vector<SemanticNode>& destination,
                            std::size_t& count) {
-    if (!control || !control->effectively_visible()) return;
+    if (!current_semantic_identity(control, expected_parent, owner) ||
+        !control->effectively_visible()) return;
     SemanticDescriptor descriptor = control->semantic_descriptor();
+    if (!current_semantic_identity(control, expected_parent, owner)) return;
     control->apply_provider_semantics(descriptor);
     std::vector<SemanticNode> descendants;
     if (!descriptor.exposed || descriptor.include_descendants) {
-        for (const Control::Ptr& child : control->children()) {
-            append_semantic_nodes(child, focused, descendants, count);
+        const std::vector<Control::Ptr> children(control->children().begin(),
+                                                 control->children().end());
+        for (const Control::Ptr& child : children) {
+            if (!current_semantic_identity(child, control.get(), owner)) continue;
+            append_semantic_nodes(child, control.get(), owner, focused,
+                                  descendants, count);
         }
+        if (!current_semantic_identity(control, expected_parent, owner)) return;
         std::vector<SemanticNode> virtual_children =
             control->semantic_virtual_children();
+        if (!current_semantic_identity(control, expected_parent, owner)) return;
         count += virtual_children.size();
         descendants.insert(descendants.end(),
                             std::make_move_iterator(virtual_children.begin()),
@@ -181,6 +200,7 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.minimum_value = descriptor.minimum_value;
     node.maximum_value = descriptor.maximum_value;
     node.bounds = control->absolute_bounds();
+    if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
     if (control->effectively_enabled()) node.states |= SemanticState::enabled;
     node.states |= SemanticState::visible;
@@ -198,10 +218,16 @@ bool dispatch_semantic_child_action(Control::Ptr control,
                                     std::string_view value) {
     if (!control || !control->effectively_visible() ||
         !control->effectively_enabled()) return false;
+    Window* const owner = control->attached_window();
     if (control->on_semantic_child_action(stable_id, action, value)) return true;
+    if (!control->is_alive() || control->attached_window() != owner) return false;
     const std::vector<Control::Ptr> children(control->children().begin(),
                                              control->children().end());
     for (const Control::Ptr& child : children) {
+        if (!child || !child->is_alive() || child->parent() != control ||
+            child->attached_window() != owner) {
+            continue;
+        }
         if (dispatch_semantic_child_action(child, stable_id, action, value)) return true;
     }
     return false;
@@ -667,6 +693,9 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
             theme_->resolve(ControlVisualRole::window,
                             backplane_context).material);
         candidate.restore();
+        std::vector<Control::Ptr> popup_roots;
+        popup_roots.reserve(popups_.size());
+        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
         for (std::size_t index = 0; index < paint_plane_count; ++index) {
             const PaintPlane plane = static_cast<PaintPlane>(index);
             Rect plane_bounds = paint_bounds;
@@ -680,8 +709,8 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
                             chunks_reused, commands_replayed);
             // Window-owned popup roots are composited after application content
             // in opening order, independent of consumer layout.
-            for (const auto& popup : popups_) {
-                if (const Control::Ptr overlay = popup->popup()) {
+            for (const Control::Ptr& overlay : popup_roots) {
+                if (overlay && overlay->is_alive() && overlay->window_ == this) {
                     paint_recursive(overlay, candidate, plane_bounds, plane,
                                     visited_nodes, painted_controls,
                                     consumed_invalidations, chunks_rebuilt,
@@ -938,6 +967,20 @@ FrameRequestToken Window::schedule_ui_timer(
 
 FramePollResult Window::poll_frame_schedule(FrameTime now) {
     require_ui_thread("frame schedule polling");
+    if (in_frame_poll_) {
+        metrics_.record_reentrant_frame_poll();
+        FramePollResult deferred;
+        deferred.reentrant_poll_deferred = true;
+        deferred.damage_pending = needs_frame();
+        deferred.suppressed_by_occlusion = occluded_;
+        deferred.next_wake = next_wake();
+        return deferred;
+    }
+    in_frame_poll_ = true;
+    struct Reset final {
+        bool& value;
+        ~Reset() { value = false; }
+    } reset{in_frame_poll_};
     compact_frame_requests();
 
     FramePollResult result;
@@ -1082,15 +1125,28 @@ Control::Ptr Window::find(std::string_view stable_id) const {
 
 Control::Ptr Window::hit_test(Point position) {
     require_ui_thread("hit test");
-    ensure_layout(true);
-    for (auto popup = popups_.rbegin(); popup != popups_.rend(); ++popup) {
-        if (const Control::Ptr overlay = (*popup)->popup()) {
-            if (Control::Ptr target = hit_test_recursive(overlay, position)) {
-                return target;
+    for (std::uint32_t pass = 0U;
+         pass < maximum_semantic_snapshot_passes; ++pass) {
+        ensure_layout(true);
+        const std::uint64_t generation = semantic_generation_;
+        Control::Ptr target;
+        std::vector<Control::Ptr> popup_roots;
+        popup_roots.reserve(popups_.size());
+        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
+        for (auto popup = popup_roots.rbegin(); popup != popup_roots.rend();
+             ++popup) {
+            if (const Control::Ptr& overlay = *popup;
+                overlay && overlay->is_alive() && overlay->window_ == this) {
+                target = hit_test_recursive(overlay, position);
+                if (target) break;
             }
         }
+        if (!target) target = hit_test_recursive(root_, position);
+        if (generation == semantic_generation_) return target;
+        metrics_.record_callback_arbitration_retry(
+            pass + 1U == maximum_semantic_snapshot_passes);
     }
-    return hit_test_recursive(root_, position);
+    return {};
 }
 
 bool Window::request_focus(const Control::Ptr& control) {
@@ -1416,9 +1472,12 @@ bool Window::validate_children(const Control::Ptr& container,
     bool accepted = true;
     std::function<void(const Control::Ptr&, bool)> visit =
         [&](const Control::Ptr& parent, bool direct) {
-            for (const Control::Ptr& child : parent->children()) {
+            const std::vector<Control::Ptr> children(parent->children().begin(),
+                                                     parent->children().end());
+            for (const Control::Ptr& child : children) {
                 if (!child || !child->is_alive() ||
-                    child->attached_window() != this) continue;
+                    child->attached_window() != this ||
+                    child->parent() != parent) continue;
                 bool selected = true;
                 if (has_validation_constraint(
                         constraints, ValidationConstraints::selectable)) {
@@ -1444,6 +1503,10 @@ bool Window::validate_children(const Control::Ptr& container,
                     if (valid) ++validation_succeeded_;
                     else ++validation_cancelled_;
                     accepted = valid && accepted;
+                }
+                if (!child->is_alive() || child->attached_window() != this ||
+                    child->parent() != parent) {
+                    continue;
                 }
                 if (!has_validation_constraint(
                         constraints, ValidationConstraints::immediate_children)) {
@@ -2534,6 +2597,7 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     metrics_.record_mutation();
 
     if (has_dirty(requested_dirty, Dirty::layout)) {
+        note_suspended_layout_request(control);
         for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
             ancestor->dirty_ |= Dirty::measure | Dirty::arrange;
             ancestor->subtree_dirty_ |= Dirty::measure | Dirty::arrange;
@@ -2572,6 +2636,7 @@ void Window::mark_child_layout_slot(Control& control) {
     constexpr Dirty effects = Dirty::arrange | Dirty::hit_test |
                               Dirty::semantics | Dirty::accessibility;
     control.dirty_ |= effects;
+    note_suspended_layout_request(control);
     control.subtree_dirty_ |= effects;
     for (auto ancestor = control.parent(); ancestor;
          ancestor = ancestor->parent()) {
@@ -2585,18 +2650,41 @@ void Window::mark_child_layout_slot(Control& control) {
 
 SemanticSnapshot Window::semantic_snapshot() {
     require_ui_thread("semantic snapshot");
-    ensure_layout(true);
-    SemanticSnapshot snapshot;
-    snapshot.generation = semantic_generation_;
-    append_semantic_nodes(root_, focused_.lock(), snapshot.roots,
-                          snapshot.node_count);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
-            append_semantic_nodes(overlay, focused_.lock(), snapshot.roots,
+    if (in_semantic_snapshot_) {
+        throw std::logic_error("GUI.Forms rejects recursive semantic snapshots");
+    }
+    in_semantic_snapshot_ = true;
+    struct Reset final {
+        bool& value;
+        ~Reset() { value = false; }
+    } reset{in_semantic_snapshot_};
+
+    for (std::uint32_t pass = 0U;
+         pass < maximum_semantic_snapshot_passes; ++pass) {
+        ensure_layout(true);
+        const std::uint64_t generation = semantic_generation_;
+        SemanticSnapshot snapshot;
+        snapshot.generation = generation;
+        const Control::Ptr focused = focused_.lock();
+        std::vector<Control::Ptr> roots{root_};
+        roots.reserve(1U + popups_.size());
+        for (const auto& popup : popups_) roots.push_back(popup->popup());
+        for (const Control::Ptr& root : roots) {
+            if (!root || !root->is_alive() || root->window_ != this ||
+                root->parent()) {
+                continue;
+            }
+            append_semantic_nodes(root, nullptr, this, focused, snapshot.roots,
                                   snapshot.node_count);
         }
+        if (generation == semantic_generation_) {
+            return snapshot;
+        }
+        metrics_.record_callback_arbitration_retry(
+            pass + 1U == maximum_semantic_snapshot_passes);
     }
-    return snapshot;
+    throw std::runtime_error(
+        "GUI.Forms semantic snapshot did not converge within four passes");
 }
 
 bool Window::perform_semantic_action(std::string_view stable_id,
@@ -2612,9 +2700,13 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         if (dispatch_semantic_child_action(root_, stable_id, action, value)) {
             return true;
         }
-        for (auto popup = popups_.rbegin(); popup != popups_.rend(); ++popup) {
+        std::vector<Control::Ptr> popup_roots;
+        popup_roots.reserve(popups_.size());
+        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
+        for (auto popup = popup_roots.rbegin(); popup != popup_roots.rend();
+             ++popup) {
             if (dispatch_semantic_child_action(
-                    (*popup)->popup(), stable_id, action, value)) return true;
+                    *popup, stable_id, action, value)) return true;
         }
         return false;
     }
@@ -2632,6 +2724,14 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
     std::function<void(Control&)> apply = [&](Control& current) {
         current.dirty_ |= requested_dirty;
         current.subtree_dirty_ |= requested_dirty;
+        if (has_dirty(requested_dirty, Dirty::layout) &&
+            current.layout_suspend_depth_ != 0U) {
+            current.layout_deferred_ = true;
+            ++current.layout_requested_revision_;
+            if (current.layout_requested_revision_ == 0U) {
+                ++current.layout_requested_revision_;
+            }
+        }
         if (has_dirty(requested_dirty, Dirty::paint)) {
             Rect bounds = paint_damage_bounds_of(current);
             if (bounds.empty()) {
@@ -2653,6 +2753,13 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
         ancestor->subtree_dirty_ |= requested_dirty;
         if (has_dirty(requested_dirty, Dirty::layout)) {
             ancestor->dirty_ |= Dirty::measure | Dirty::arrange;
+            if (ancestor->layout_suspend_depth_ != 0U) {
+                ancestor->layout_deferred_ = true;
+                ++ancestor->layout_requested_revision_;
+                if (ancestor->layout_requested_revision_ == 0U) {
+                    ++ancestor->layout_requested_revision_;
+                }
+            }
         }
     }
     metrics_.record_mutation();
@@ -2780,60 +2887,91 @@ void Window::ensure_layout(bool read_barrier) {
         return;
     }
 
+    const auto any_runnable_layout = [this]() {
+        if (has_runnable_layout_dirty(root_)) return true;
+        return std::any_of(popups_.begin(), popups_.end(),
+                           [this](const auto& popup) {
+            return has_runnable_layout_dirty(popup->popup());
+        });
+    };
+    if (!any_runnable_layout()) return;
+
     metrics_.record_flush(read_barrier);
     in_layout_ = true;
-    std::uint32_t pass = 0;
-    do {
-        second_layout_pass_requested_ = false;
-        std::uint64_t measure_visited = 0;
-        std::uint64_t measured = 0;
-        measure_dirty_recursive(root_, client_size_, measure_visited, measured);
-        for (const auto& popup : popups_) {
-            if (const Control::Ptr overlay = popup->popup()) {
-                measure_dirty_recursive(overlay, client_size_, measure_visited,
-                                        measured);
+    try {
+        std::uint32_t pass = 0;
+        do {
+            second_layout_pass_requested_ = false;
+            std::uint64_t measure_visited = 0;
+            std::uint64_t measured = 0;
+            measure_dirty_recursive(root_, client_size_, measure_visited, measured);
+            for (const auto& popup : popups_) {
+                if (const Control::Ptr overlay = popup->popup()) {
+                    measure_dirty_recursive(overlay, client_size_, measure_visited,
+                                            measured);
+                }
             }
-        }
-        metrics_.record_measure(measure_visited, measured);
+            metrics_.record_measure(measure_visited, measured);
 
-        std::uint64_t arrange_visited = 0;
-        std::uint64_t arranged = 0;
-        arrange_dirty_recursive(root_,
-                                {0.0, 0.0, client_size_.width, client_size_.height},
-                                arrange_visited, arranged);
-        for (const auto& popup : popups_) {
-            if (const Control::Ptr overlay = popup->popup()) {
-                arrange_dirty_recursive(
-                    overlay, overlay->requested_bounds_, arrange_visited, arranged);
+            std::uint64_t arrange_visited = 0;
+            std::uint64_t arranged = 0;
+            arrange_dirty_recursive(
+                root_, {0.0, 0.0, client_size_.width, client_size_.height},
+                arrange_visited, arranged);
+            for (const auto& popup : popups_) {
+                if (const Control::Ptr overlay = popup->popup()) {
+                    arrange_dirty_recursive(overlay, overlay->requested_bounds_,
+                                            arrange_visited, arranged);
+                }
             }
-        }
-        metrics_.record_arrange(arrange_visited, arranged);
+            metrics_.record_arrange(arrange_visited, arranged);
 
+            static_cast<void>(recompute_subtree_dirty(root_));
+            for (const auto& popup : popups_) {
+                if (const Control::Ptr overlay = popup->popup()) {
+                    static_cast<void>(recompute_subtree_dirty(overlay));
+                }
+            }
+            commit_layout_requests_recursive(root_);
+            for (const auto& popup : popups_) {
+                commit_layout_requests_recursive(popup->popup());
+            }
+            ++pass;
+        } while (any_runnable_layout() && pass < maximum_layout_passes);
+
+        const bool popup_layout_dirty = std::any_of(
+            popups_.begin(), popups_.end(), [](const auto& popup) {
+                const Control::Ptr overlay = popup->popup();
+                return overlay &&
+                    has_dirty(overlay->subtree_dirty_, Dirty::layout);
+            });
+        if (any_runnable_layout()) {
+            metrics_.record_pass_limit_hit();
+        }
+        layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
+                        popup_layout_dirty;
+        hit_test_dirty_ = layout_dirty_;
+        in_layout_ = false;
+    } catch (...) {
+        // A user layout callback may fail. Preserve dirty state for an
+        // explicit later retry and always release the re-entry guard.
         static_cast<void>(recompute_subtree_dirty(root_));
         for (const auto& popup : popups_) {
             if (const Control::Ptr overlay = popup->popup()) {
                 static_cast<void>(recompute_subtree_dirty(overlay));
             }
         }
-        ++pass;
-    } while ((has_dirty(root_->subtree_dirty_, Dirty::layout) ||
-              std::any_of(popups_.begin(), popups_.end(), [](const auto& popup) {
-                  const Control::Ptr overlay = popup->popup();
-                  return overlay && has_dirty(overlay->subtree_dirty_, Dirty::layout);
-              })) && pass < maximum_layout_passes);
-
-    const bool popup_layout_dirty = std::any_of(
-        popups_.begin(), popups_.end(), [](const auto& popup) {
-            const Control::Ptr overlay = popup->popup();
-            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::layout);
-        });
-    if (has_dirty(root_->subtree_dirty_, Dirty::layout) || popup_layout_dirty) {
-        metrics_.record_pass_limit_hit();
+        layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
+            std::any_of(popups_.begin(), popups_.end(), [](const auto& popup) {
+                const Control::Ptr overlay = popup->popup();
+                return overlay &&
+                    has_dirty(overlay->subtree_dirty_, Dirty::layout);
+            });
+        hit_test_dirty_ = layout_dirty_;
+        second_layout_pass_requested_ = false;
+        in_layout_ = false;
+        throw;
     }
-    layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
-                    popup_layout_dirty;
-    hit_test_dirty_ = layout_dirty_;
-    in_layout_ = false;
 }
 
 void Window::leave_update_scope() {
@@ -2863,28 +3001,42 @@ std::vector<Control::Ptr> Window::route_to(const Control::Ptr& target) const {
 
 Control::Ptr Window::hit_test_recursive(const Control::Ptr& control,
                                         Point window_position) const {
-    if (!eligible(control)) {
+    if (!eligible(control) || control->window_ != this) {
         return {};
     }
+    Control* const retained_parent = control->parent_.lock().get();
     const Rect bounds = absolute_bounds_of(*control);
     if (!bounds.contains(window_position)) {
         return {};
     }
     const Rect local_child_viewport = control->child_viewport_rectangle();
+    if (!control->is_alive() || control->window_ != this ||
+        control->parent_.lock().get() != retained_parent) {
+        return {};
+    }
     const Rect child_viewport{bounds.x + local_child_viewport.x,
                               bounds.y + local_child_viewport.y,
                               local_child_viewport.width,
                               local_child_viewport.height};
     if (child_viewport.contains(window_position)) {
-        for (auto child = control->children_.rbegin();
-             child != control->children_.rend(); ++child) {
+        const std::vector<Control::Ptr> children = control->children_;
+        for (auto child = children.rbegin(); child != children.rend(); ++child) {
+            if (!*child || !(*child)->is_alive() ||
+                (*child)->parent_.lock().get() != control.get() ||
+                (*child)->window_ != this) {
+                continue;
+            }
             if (auto target = hit_test_recursive(*child, window_position)) {
+                if (!target->is_alive() || target->window_ != this) continue;
                 return target;
             }
         }
     }
     const Point local{window_position.x - bounds.x, window_position.y - bounds.y};
-    return !control->hit_test_transparent_ && control->hit_test_local(local)
+    const bool hit = !control->hit_test_transparent_ &&
+                     control->hit_test_local(local);
+    return hit && eligible(control) && control->window_ == this &&
+            control->parent_.lock().get() == retained_parent
         ? control : Control::Ptr{};
 }
 
@@ -2892,7 +3044,8 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
                                      Size available,
                                      std::uint64_t& visited_nodes,
                                      std::uint64_t& callbacks) {
-    if (!has_dirty(control->subtree_dirty_, Dirty::measure)) {
+    if (!control || control->layout_suspend_depth_ != 0U ||
+        !has_dirty(control->subtree_dirty_, Dirty::measure)) {
         return;
     }
     ++visited_nodes;
@@ -2906,13 +3059,27 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
                                                : available.width,
         control->requested_bounds_.height > 0.0 ? control->requested_bounds_.height
                                                 : available.height};
-    for (const auto& child : control->children_) {
+    const std::vector<Control::Ptr> retained = control->children_;
+    for (const auto& child : retained) {
+        if (!child || !child->is_alive() ||
+            child->parent_.lock().get() != control.get() ||
+            child->window_ != this) {
+            continue;
+        }
         measure_dirty_recursive(child, child_available, visited_nodes, callbacks);
     }
+    if (!control->is_alive() || control->window_ != this) return;
     if (has_dirty(control->dirty_, Dirty::measure)) {
         control->clear_dirty(Dirty::measure);
-        static_cast<void>(control->measure(available));
+        try {
+            static_cast<void>(control->measure(available));
+        } catch (...) {
+            control->dirty_ |= Dirty::measure | Dirty::arrange;
+            control->subtree_dirty_ |= Dirty::measure | Dirty::arrange;
+            throw;
+        }
         ++callbacks;
+        if (!control->is_alive() || control->window_ != this) return;
     }
 }
 
@@ -2920,7 +3087,8 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
                                      Rect final_bounds,
                                      std::uint64_t& visited_nodes,
                                      std::uint64_t& callbacks) {
-    if (!has_dirty(control->subtree_dirty_, Dirty::arrange)) {
+    if (!control || control->layout_suspend_depth_ != 0U ||
+        !has_dirty(control->subtree_dirty_, Dirty::arrange)) {
         return;
     }
     ++visited_nodes;
@@ -2933,8 +3101,15 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         const Rect old_bounds = visual_bounds_of(
             *control, control->last_painted_visual_outsets_);
         control->clear_dirty(Dirty::arrange | Dirty::hit_test);
-        control->arrange(final_bounds);
+        try {
+            control->arrange(final_bounds);
+        } catch (...) {
+            control->dirty_ |= Dirty::arrange | Dirty::hit_test;
+            control->subtree_dirty_ |= Dirty::arrange | Dirty::hit_test;
+            throw;
+        }
         ++callbacks;
+        if (!control->is_alive() || control->window_ != this) return;
         const Rect new_bounds = visual_bounds_of(*control,
                                                   control->visual_outsets());
         if (old_bounds != new_bounds) {
@@ -2948,10 +3123,57 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
             control->arranged_bounds_changed_.emit(new_bounds);
         }
     }
-    for (const auto& child : control->children_) {
+    const std::vector<Control::Ptr> retained = control->children_;
+    for (const auto& child : retained) {
+        if (!child || !child->is_alive() ||
+            child->parent_.lock().get() != control.get() ||
+            child->window_ != this) {
+            continue;
+        }
         arrange_dirty_recursive(
             child, child->layout_slot_.value_or(child->requested_bounds_),
             visited_nodes, callbacks);
+    }
+}
+
+bool Window::has_runnable_layout_dirty(
+    const Control::Ptr& control) const noexcept {
+    if (!control || control->layout_suspend_depth_ != 0U ||
+        !has_dirty(control->subtree_dirty_, Dirty::layout)) {
+        return false;
+    }
+    if (has_dirty(control->dirty_, Dirty::layout)) return true;
+    return std::any_of(control->children_.begin(), control->children_.end(),
+                       [this](const Control::Ptr& child) {
+        return has_runnable_layout_dirty(child);
+    });
+}
+
+void Window::note_suspended_layout_request(Control& control) noexcept {
+    for (Control* current = &control; current != nullptr;) {
+        if (current->layout_suspend_depth_ != 0U) {
+            current->layout_deferred_ = true;
+            ++current->layout_requested_revision_;
+            if (current->layout_requested_revision_ == 0U) {
+                ++current->layout_requested_revision_;
+            }
+        }
+        const Control::Ptr parent = current->parent_.lock();
+        current = parent.get();
+    }
+}
+
+void Window::commit_layout_requests_recursive(
+    const Control::Ptr& control) noexcept {
+    if (!control || control->layout_suspend_depth_ != 0U) return;
+    for (const auto& child : control->children_) {
+        commit_layout_requests_recursive(child);
+    }
+    if (!has_dirty(control->subtree_dirty_, Dirty::layout) &&
+        control->layout_deferred_) {
+        control->layout_committed_revision_ =
+            control->layout_requested_revision_;
+        control->layout_deferred_ = false;
     }
 }
 
@@ -2991,15 +3213,24 @@ void Window::paint_recursive(const Control::Ptr& control,
                              std::uint64_t& chunks_reused,
                              std::uint64_t& commands_replayed) {
     ++visited_nodes;
-    if (!control->is_alive() || !control->visible_) {
+    if (!control->is_alive() || control->window_ != this || !control->visible_) {
         clear_paint_dirty_subtree(control);
         return;
     }
+    Control* const retained_parent = control->parent_.lock().get();
     const Rect bounds = absolute_bounds_of(*control);
     const Insets current_outsets = control->visual_outsets();
+    if (!control->is_alive() || control->window_ != this ||
+        control->parent_.lock().get() != retained_parent) {
+        return;
+    }
     const Rect visual_bounds = visual_bounds_of(*control, current_outsets);
     const Rect paint_intersection = Rect::intersection(visual_bounds, window_damage);
     const Rect local_child_viewport = control->child_viewport_rectangle();
+    if (!control->is_alive() || control->window_ != this ||
+        control->parent_.lock().get() != retained_parent) {
+        return;
+    }
     const Rect child_viewport{bounds.x + local_child_viewport.x,
                               bounds.y + local_child_viewport.y,
                               local_child_viewport.width,
@@ -3020,7 +3251,15 @@ void Window::paint_recursive(const Control::Ptr& control,
             control->clear_dirty(Dirty::paint);
             detail::RecordingPainter recorder;
             control->on_paint(recorder, logical_bounds);
+            if (!control->is_alive() || control->window_ != this ||
+                control->parent_.lock().get() != retained_parent) {
+                return;
+            }
             control->on_paint_overlay(recorder, logical_bounds);
+            if (!control->is_alive() || control->window_ != this ||
+                control->parent_.lock().get() != retained_parent) {
+                return;
+            }
             control->display_chunk_ = recorder.finish(++display_generation_, plane,
                                                       logical_bounds);
             ++chunks_rebuilt;
@@ -3044,11 +3283,22 @@ void Window::paint_recursive(const Control::Ptr& control,
     }
 
     if (!child_intersection.empty()) {
-        for (const auto& child : control->children_) {
+        const std::vector<Control::Ptr> children = control->children_;
+        for (const auto& child : children) {
+            if (!child || !child->is_alive() ||
+                child->parent_.lock().get() != control.get() ||
+                child->window_ != this) {
+                continue;
+            }
             paint_recursive(child, painter, child_intersection, plane, visited_nodes,
                             painted_controls, consumed_invalidations, chunks_rebuilt,
                             chunks_reused, commands_replayed);
         }
+    }
+
+    if (!control->is_alive() || control->window_ != this ||
+        control->parent_.lock().get() != retained_parent) {
+        return;
     }
 
     Dirty paint_summary = control->dirty_ & Dirty::paint;

@@ -327,6 +327,7 @@ public:
     [[nodiscard]] Event<bool>& drop_down_changed() noexcept {
         return drop_down_changed_;
     }
+    [[nodiscard]] Event<>& items_changed() noexcept { return items_changed_; }
 
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
@@ -362,6 +363,7 @@ private:
     SubscriptionToken popup_revocation_;
     Event<std::optional<std::size_t>> selected_index_changed_;
     Event<bool> drop_down_changed_;
+    Event<> items_changed_;
     bool closing_popup_{};
 };
 

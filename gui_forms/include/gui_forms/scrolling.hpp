@@ -159,6 +159,12 @@ public:
     [[nodiscard]] bool get_scroll_state(std::uint32_t bit) const noexcept;
     void set_scroll_state(std::uint32_t bit, bool value);
     [[nodiscard]] Event<ScrollEvent&>& scroll() noexcept { return scroll_event_; }
+    [[nodiscard]] std::optional<ScrollEvent> last_scroll_event() const noexcept {
+        return last_scroll_event_;
+    }
+    [[nodiscard]] std::uint64_t scroll_event_revision() const noexcept {
+        return scroll_event_revision_;
+    }
     [[nodiscard]] ScrollSnapshot scroll_snapshot() const noexcept;
 
     bool scroll_to(Point position,
@@ -235,6 +241,8 @@ private:
     ScrollProperties horizontal_scroll_;
     ScrollProperties vertical_scroll_;
     Event<ScrollEvent&> scroll_event_;
+    std::optional<ScrollEvent> last_scroll_event_;
+    std::uint64_t scroll_event_revision_{};
     Size auto_scroll_margin_{};
     Size auto_scroll_min_size_{};
     Size content_extent_{};

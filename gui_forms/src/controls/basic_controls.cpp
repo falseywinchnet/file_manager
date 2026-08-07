@@ -13,6 +13,29 @@
 namespace gui_forms {
 namespace {
 
+std::shared_ptr<const PropertyEnumDescriptor> picture_box_size_mode_enum() {
+    static const auto value = std::make_shared<const PropertyEnumDescriptor>(
+        PropertyEnumDescriptor{
+            "System.Windows.Forms.PictureBoxSizeMode",
+            {{"Normal", 0}, {"StretchImage", 1}, {"AutoSize", 2},
+             {"CenterImage", 3}, {"Zoom", 4}},
+            false});
+    return value;
+}
+
+BindingValue picture_box_size_mode_value(PictureBoxSizeMode mode) {
+    PropertyDescriptor descriptor;
+    descriptor.kind = BindingValueKind::enumeration;
+    descriptor.enumeration = picture_box_size_mode_enum();
+    const auto normalized = convert_property_value(
+        BindingValue{static_cast<std::int64_t>(mode)}, descriptor);
+    if (!normalized) {
+        throw std::logic_error(
+            "GUI.Forms retained PictureBoxSizeMode is outside its property schema");
+    }
+    return *normalized;
+}
+
 [[nodiscard]] double estimated_text_width(std::string_view text,
                                           FontSpec font) noexcept {
     std::size_t scalars{};
@@ -451,6 +474,59 @@ SemanticDescriptor GroupBox::semantic_descriptor() const {
 
 PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_background(Color::rgba(255, 255, 255));
+    PropertyDescriptor image;
+    image.name = "Image";
+    image.kind = BindingValueKind::image;
+    image.category = "Appearance";
+    image.description = "Generational image resource displayed by this control.";
+    image.default_value = BindingValue{ImageId{}};
+    image.invalidation_effects = Dirty::measure | Dirty::paint | Dirty::semantics;
+    define_bindable_property({
+        std::move(image),
+        [this] { return BindingValue{image_}; },
+        [this](const BindingValue& value) {
+            set_image(std::get<ImageId>(value));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return image_changed_.subscribe(owner,
+                [changed = std::move(changed)](ImageId) { changed(); });
+        },
+        [this] { clear_image(); },
+        [this] { return image_.value != 0U; }});
+
+    PropertyDescriptor size_mode;
+    size_mode.name = "SizeMode";
+    size_mode.kind = BindingValueKind::enumeration;
+    size_mode.category = "Appearance";
+    size_mode.description = "Image placement and scaling policy.";
+    size_mode.default_value = BindingValue{PropertyEnumValue{
+        "System.Windows.Forms.PictureBoxSizeMode", "Normal", 0}};
+    size_mode.invalidation_effects =
+        Dirty::measure | Dirty::paint | Dirty::semantics;
+    size_mode.bindable = false;
+    size_mode.enumeration = picture_box_size_mode_enum();
+    define_bindable_property({
+        std::move(size_mode),
+        [this] { return picture_box_size_mode_value(size_mode_); },
+        [this](const BindingValue& value) {
+            set_size_mode(static_cast<PictureBoxSizeMode>(
+                std::get<PropertyEnumValue>(value).value));
+        }, {}, {}, {}});
+
+    PropertyDescriptor opacity;
+    opacity.name = "ImageOpacity";
+    opacity.kind = BindingValueKind::number;
+    opacity.category = "Appearance";
+    opacity.description = "Image opacity from zero through one.";
+    opacity.default_value = BindingValue{1.0};
+    opacity.invalidation_effects = Dirty::paint | Dirty::semantics;
+    opacity.bindable = false;
+    define_bindable_property({
+        std::move(opacity),
+        [this] { return BindingValue{image_opacity_}; },
+        [this](const BindingValue& value) {
+            set_image_opacity(std::get<double>(value));
+        }, {}, {}, {}});
 }
 
 void PictureBox::set_image(ImageId image) {
@@ -590,7 +666,9 @@ SemanticDescriptor PictureBox::semantic_descriptor() const {
 Label::Label(StableId stable_id, std::string text)
     : Control(std::move(stable_id)), text_(std::move(text)) {
     define_bindable_property({
-        "Text", BindingValueKind::text,
+        {"Text", BindingValueKind::text, "Appearance",
+         "Text displayed by the label.", BindingValue{std::string{}},
+         invalidation::text_content},
         [this] { return BindingValue{text_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::text);
@@ -600,6 +678,48 @@ Label::Label(StableId stable_id, std::string text)
         [this](Component& owner, std::function<void()> changed) {
             return text_changed_.subscribe(owner,
                 [changed = std::move(changed)](const std::string&) { changed(); });
+        }, {}, {}});
+
+    PropertyDescriptor font;
+    font.name = "Font";
+    font.kind = BindingValueKind::font;
+    font.category = "Appearance";
+    font.description =
+        "Effective font; reset resumes inherited theme typography.";
+    font.invalidation_effects = Dirty::measure | Dirty::paint | Dirty::semantics;
+    font.bindable = false;
+    define_bindable_property({
+        std::move(font),
+        [this] { return BindingValue{this->font()}; },
+        [this](const BindingValue& value) {
+            set_font(std::get<FontSpec>(value));
+        }, {},
+        [this] { clear_font(); },
+        [this] { return has_font_override(); },
+        [this] {
+            return has_font_override() ? PropertyValueOrigin::local
+                                       : PropertyValueOrigin::inherited;
+        }});
+
+    PropertyDescriptor foreground;
+    foreground.name = "ForeColor";
+    foreground.kind = BindingValueKind::color;
+    foreground.category = "Appearance";
+    foreground.description =
+        "Effective text color; reset resumes inherited theme color.";
+    foreground.invalidation_effects = Dirty::paint | Dirty::semantics;
+    foreground.bindable = false;
+    define_bindable_property({
+        std::move(foreground),
+        [this] { return BindingValue{this->foreground()}; },
+        [this](const BindingValue& value) {
+            set_foreground(std::get<Color>(value));
+        }, {},
+        [this] { clear_foreground(); },
+        [this] { return has_foreground_override(); },
+        [this] {
+            return has_foreground_override() ? PropertyValueOrigin::local
+                                             : PropertyValueOrigin::inherited;
         }});
 }
 
@@ -822,7 +942,9 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     set_focusable(true);
     set_cursor(CursorKind::hand);
     define_bindable_property({
-        "Text", BindingValueKind::text,
+        {"Text", BindingValueKind::text, "Appearance",
+         "Text displayed by the button.", BindingValue{std::string{}},
+         invalidation::text_content},
         [this] { return BindingValue{text_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::text);
@@ -832,6 +954,41 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
         [this](Component& owner, std::function<void()> changed) {
             return text_changed_.subscribe(owner,
                 [changed = std::move(changed)](const std::string&) { changed(); });
+        }, {}, {}});
+
+    PropertyDescriptor font;
+    font.name = "Font";
+    font.kind = BindingValueKind::font;
+    font.category = "Appearance";
+    font.description = "Font used for button measurement and painting.";
+    font.default_value = BindingValue{
+        FontSpec{FontRole::control, 12.0, 400, false, 0.24}};
+    font.invalidation_effects = Dirty::measure | Dirty::paint | Dirty::semantics;
+    font.bindable = false;
+    define_bindable_property({
+        std::move(font),
+        [this] { return BindingValue{font_}; },
+        [this](const BindingValue& value) {
+            set_font(std::get<FontSpec>(value));
+        }, {}, {}, {}});
+
+    PropertyDescriptor image;
+    image.name = "Image";
+    image.kind = BindingValueKind::image;
+    image.category = "Appearance";
+    image.description = "Direct generational image resource for button content.";
+    image.default_value = BindingValue{ImageId{}};
+    image.invalidation_effects = Dirty::measure | Dirty::paint | Dirty::semantics;
+    image.bindable = false;
+    define_bindable_property({
+        std::move(image),
+        [this] { return BindingValue{image_}; },
+        [this](const BindingValue& value) {
+            set_image(std::get<ImageId>(value));
+        }, {},
+        [this] { clear_image(); },
+        [this] {
+            return image_.value != 0U || image_index_ >= 0 || !image_key_.empty();
         }});
 }
 
@@ -1513,7 +1670,9 @@ CheckBox::CheckBox(StableId stable_id, std::string text)
     set_text_alignment(ContentAlignment::middle_left);
     set_image_alignment(ContentAlignment::middle_left);
     define_bindable_property({
-        "Checked", BindingValueKind::boolean,
+        {"Checked", BindingValueKind::boolean, "Behavior",
+         "Whether the check box is in a checked state.", BindingValue{false},
+         Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{checked()}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::boolean);
@@ -1523,7 +1682,7 @@ CheckBox::CheckBox(StableId stable_id, std::string text)
         [this](Component& owner, std::function<void()> changed) {
             return checked_changed_.subscribe(owner,
                 [changed = std::move(changed)](bool) { changed(); });
-        }});
+        }, {}, {}});
 }
 
 void CheckBox::set_check_state(CheckState state) {
@@ -1707,7 +1866,9 @@ RadioButton::RadioButton(StableId stable_id, std::string text)
     set_text_alignment(ContentAlignment::middle_left);
     set_image_alignment(ContentAlignment::middle_left);
     define_bindable_property({
-        "Checked", BindingValueKind::boolean,
+        {"Checked", BindingValueKind::boolean, "Behavior",
+         "Whether the radio button is selected within its group.",
+         BindingValue{false}, Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{checked_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::boolean);
@@ -1717,7 +1878,7 @@ RadioButton::RadioButton(StableId stable_id, std::string text)
         [this](Component& owner, std::function<void()> changed) {
             return checked_changed_.subscribe(owner,
                 [changed = std::move(changed)](bool) { changed(); });
-        }});
+        }, {}, {}});
 }
 
 void RadioButton::set_checked_without_exclusion(bool checked_value) {

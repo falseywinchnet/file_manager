@@ -86,6 +86,10 @@ if (args.Length == 1 && args[0] == "control-geometry")
 {
     return RunControlGeometrySemantics();
 }
+if (args.Length == 1 && args[0] == "layout-transactions")
+{
+    return RunLayoutTransactionSemantics();
+}
 if (args.Length == 1 && args[0] == "split-container")
 {
     return RunSplitContainerSemantics();
@@ -97,6 +101,10 @@ if (args.Length == 1 && args[0] == "dialog-key-live")
 if (args.Length == 1 && args[0] == "scroll-panel")
 {
     return RunScrollablePanelHost();
+}
+if (args.Length == 1 && args[0] == "scroll-panel-live")
+{
+    return RunScrollablePanelLiveHost();
 }
 if (args.Length == 1 && args[0] == "numeric-edit")
 {
@@ -1042,6 +1050,69 @@ static int RunControlGeometrySemantics()
     return 0;
 }
 
+static int RunLayoutTransactionSemantics()
+{
+    using var probe = new TransactionLayoutProbe
+    {
+        Name = "layoutTransactionProbe",
+        Size = new Size(240, 120),
+    };
+    using var fill = new Panel { Name = "layoutFill", Dock = DockStyle.Fill };
+    probe.Controls.Add(fill);
+    probe.PerformLayout();
+    probe.Reset();
+
+    probe.SuspendLayout();
+    probe.SuspendLayout();
+    probe.Padding = new Padding(4);
+    probe.Padding = new Padding(8, 6, 10, 12);
+    probe.PerformLayout(fill, "Bounds");
+    Require(probe.Layouts == 0,
+        "nested SuspendLayout must preserve the managed committed layout");
+    probe.ResumeLayout(true);
+    Require(probe.Layouts == 0,
+        "an inner ResumeLayout must not run a managed layout pass");
+
+    probe.Reentries = 2;
+    probe.ResumeLayout(true);
+    Require(probe.Layouts == 3,
+        "re-entrant PerformLayout requests must become bounded deferred passes");
+    Require(ReferenceEquals(probe.FirstAffectedControl, fill) &&
+            probe.FirstAffectedProperty == "Bounds",
+        "PerformLayout(Control,string) must preserve the triggering arguments");
+    Require(fill.Bounds == new Rectangle(8, 6, 222, 102),
+        "the final coalesced pass must publish docked geometry");
+
+    var committedPasses = probe.Layouts;
+    probe.SuspendLayout();
+    probe.Padding = new Padding(3);
+    probe.PerformLayout(fill, "Padding");
+    probe.ResumeLayout(false);
+    Require(probe.Layouts == committedPasses,
+        "ResumeLayout(false) must not dispatch a stale cached layout event");
+    probe.PerformLayout(fill, "Explicit");
+    Require(probe.Layouts == committedPasses + 1 &&
+            fill.Bounds == new Rectangle(3, 3, 234, 114),
+        "an explicit later PerformLayout must flush current geometry once");
+    probe.ResumeLayout(true);
+    Require(probe.Layouts == committedPasses + 1,
+        "an unmatched ResumeLayout must be a no-op");
+
+    var beforeFault = probe.Layouts;
+    probe.ThrowNext = true;
+    var faultObserved = false;
+    try { probe.PerformLayout(fill, "Fault"); }
+    catch (InvalidOperationException) { faultObserved = true; }
+    Require(faultObserved && probe.Layouts == beforeFault + 1,
+        "a layout callback fault must propagate exactly once");
+    probe.PerformLayout(fill, "Recovery");
+    Require(probe.Layouts == beforeFault + 2,
+        "a layout callback fault must not wedge later layout");
+
+    Console.WriteLine("layout-transactions=nested:coalesced|committed:stable|args:exact|reentry:bounded|resume-false:deferred|unmatched:no-op|fault:recoverable");
+    return 0;
+}
+
 static int RunDialogKeyLiveHost()
 {
     var form = new Form { Name = "dialogKeyLive", Text = "Dialog key routing", Size = new Size(360, 180) };
@@ -1073,15 +1144,91 @@ static int RunScrollablePanelHost()
     var lower = new Button { Name = "lowerSetting", Text = "Lower", Bounds = new Rectangle(8, 260, 100, 24) };
     panel.Controls.Add(upper);
     panel.Controls.Add(lower);
-    Require(lower.Top == 260, "scroll fixture begins below viewport");
+    var authoredUpper = upper.Bounds;
+    var authoredLower = lower.Bounds;
+    Require(lower.Top == 260 && panel.VerticalScroll.Visible &&
+        panel.DisplayRectangle.Height >= lower.Bottom,
+        "scroll fixture begins below a measured automatic viewport");
     panel.Wheel(-120);
-    Require(lower.Top == 212 && upper.Top == -40, "scroll wheel translates retained child content");
+    Require(panel.AutoScrollPosition.Y == -48 && lower.Bounds == authoredLower &&
+        upper.Bounds == authoredUpper && panel.DisplayRectangle.Y == -48,
+        "scroll wheel moves the viewport without mutating authored child bounds");
     for (var index = 0; index < 12; ++index) panel.Wheel(-120);
-    Require(lower.Bottom <= panel.Height, "scroll wheel reaches final retained setting");
+    var maximumPosition = -panel.AutoScrollPosition.Y;
+    Require(maximumPosition > 48 && lower.Bottom - maximumPosition <= panel.Height,
+        "scroll wheel reaches the final retained setting");
     panel.Wheel(120);
-    Require(lower.Top < 212, "scroll wheel reverses deterministically");
-    Console.WriteLine("scroll-panel=hidden:260|step:48|reached:true|reverse:true");
+    Require(-panel.AutoScrollPosition.Y < maximumPosition &&
+        lower.Bounds == authoredLower, "scroll wheel reverses deterministically");
+
+    lower.AutoScrollOffset = new Point(3, 5);
+    panel.AutoScrollPosition = Point.Empty;
+    panel.ScrollControlIntoView(lower);
+    Require(panel.AutoScrollPosition.X == 0 && panel.AutoScrollPosition.Y < 0 &&
+        lower.Bounds == authoredLower,
+        "ScrollControlIntoView honors the child reveal offset without geometry drift");
+
+    panel.AutoScroll = false;
+    panel.VerticalScroll.Maximum = 250;
+    panel.VerticalScroll.LargeChange = 50;
+    panel.VerticalScroll.SmallChange = 1;
+    panel.VerticalScroll.Visible = true;
+    panel.VerticalScroll.Value = 80;
+    Require(panel.VerticalScroll.Enabled && panel.VerticalScroll.Visible &&
+        panel.VerticalScroll.Minimum == 0 && panel.VerticalScroll.Maximum == 250 &&
+        panel.VerticalScroll.LargeChange == 50 &&
+        panel.VerticalScroll.SmallChange == 1 && panel.VerticalScroll.Value == 80,
+        "manual ScrollProperties round-trip through the retained ABI");
+
+    var eventArgs = new ScrollEventArgs(ScrollEventType.ThumbTrack, 12, 34,
+        ScrollOrientation.VerticalScroll);
+    eventArgs.NewValue = 35;
+    var eventCalls = 0;
+    ScrollEventArgs? delivered = null;
+    panel.Scroll += (_, args) => { ++eventCalls; delivered = args; };
+    panel.RaiseScroll(eventArgs);
+    Require(eventArgs.Type == ScrollEventType.ThumbTrack &&
+        eventArgs.OldValue == 12 && eventArgs.NewValue == 35 &&
+        eventArgs.ScrollOrientation == ScrollOrientation.VerticalScroll &&
+        eventCalls == 1 && ReferenceEquals(delivered, eventArgs),
+        "ScrollEventArgs preserves exact event vocabulary and mutable new value");
+    Console.WriteLine("scroll-panel=retained:true|step:48|reached:true|reverse:true|into-view:true|manual-axis:true|event-args:true|event-delivery:true");
     panel.Dispose();
+    return 0;
+}
+
+static int RunScrollablePanelLiveHost()
+{
+    var form = new Form
+    {
+        Name = "scrollLiveForm",
+        Text = "GUI.Forms Scroll Event",
+        ClientSize = new Size(260, 160),
+    };
+    var panel = new Panel
+    {
+        Name = "scrollViewport",
+        AutoScroll = true,
+        Bounds = new Rectangle(10, 10, 240, 120),
+    };
+    panel.Controls.Add(new Button
+    {
+        Name = "scrollLiveContent",
+        Text = "Below viewport",
+        Bounds = new Rectangle(8, 260, 120, 24),
+    });
+    form.Controls.Add(panel);
+    var calls = 0;
+    ScrollEventArgs? delivered = null;
+    panel.Scroll += (_, args) => { ++calls; delivered = args; };
+    Application.Run(form);
+    Require(calls == 1 && delivered is not null &&
+        delivered.Type == ScrollEventType.SmallIncrement &&
+        delivered.ScrollOrientation == ScrollOrientation.VerticalScroll &&
+        delivered.NewValue > delivered.OldValue && panel.AutoScrollPosition.Y < 0,
+        "physical scrollbar input must cross ABI 0.20 into one managed Scroll event");
+    Console.WriteLine($"scroll-panel-live=events:{calls}|type:{delivered!.Type}|orientation:vertical|position:{-panel.AutoScrollPosition.Y}");
+    form.Dispose();
     return 0;
 }
 
@@ -2421,6 +2568,40 @@ sealed class LayoutProbe : Panel
     }
 }
 
+sealed class TransactionLayoutProbe : Panel
+{
+    internal int Layouts { get; private set; }
+    internal int Reentries { get; set; }
+    internal bool ThrowNext { get; set; }
+    internal Control? FirstAffectedControl { get; private set; }
+    internal string? FirstAffectedProperty { get; private set; }
+
+    internal void Reset()
+    {
+        Layouts = 0;
+        FirstAffectedControl = null;
+        FirstAffectedProperty = null;
+    }
+
+    protected override void OnLayout(LayoutEventArgs e)
+    {
+        ++Layouts;
+        FirstAffectedControl ??= e.AffectedControl;
+        FirstAffectedProperty ??= e.AffectedProperty;
+        if (ThrowNext)
+        {
+            ThrowNext = false;
+            throw new InvalidOperationException("intentional layout fault");
+        }
+        base.OnLayout(e);
+        if (Reentries > 0)
+        {
+            --Reentries;
+            PerformLayout(this, "Reentrant");
+        }
+    }
+}
+
 sealed class DialogKeyProbe : Form
 {
     internal bool Route(Keys keys) => ProcessDialogKey(keys);
@@ -2697,6 +2878,7 @@ sealed class ScrollProbe : Panel
 {
     internal void Wheel(int delta) =>
         OnMouseWheel(new MouseEventArgs(MouseButtons.None, 0, Width / 2, Height / 2, delta));
+    internal void RaiseScroll(ScrollEventArgs args) => OnScroll(args);
 }
 
 sealed class SplitContainerProbe : SplitContainer

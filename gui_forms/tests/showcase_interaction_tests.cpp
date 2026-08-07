@@ -296,6 +296,61 @@ void test_binding_source_showcase_runtime() {
         window.find("showcase.values.binding.gain"));
     const auto status = std::dynamic_pointer_cast<Label>(
         window.find("showcase.values.binding.status"));
+    const auto property_grid = std::dynamic_pointer_cast<PropertyGrid>(
+        window.find("showcase.values.property-grid"));
+    const auto inspected_numeric = std::dynamic_pointer_cast<NumericUpDown>(
+        window.find("showcase.values.numeric.1"));
+    const auto value_editor = property_grid
+        ? std::dynamic_pointer_cast<NumericUpDown>(property_grid->editor("Value"))
+        : std::shared_ptr<NumericUpDown>{};
+    const auto bounds_x_editor = property_grid
+        ? std::dynamic_pointer_cast<NumericUpDown>(
+              property_grid->editor("Bounds.X"))
+        : std::shared_ptr<NumericUpDown>{};
+    require(property_grid && inspected_numeric && value_editor &&
+                bounds_x_editor && bounds_x_editor->visible() &&
+                property_grid->selected_object() == inspected_numeric &&
+                property_grid->selected_origin("Value") ==
+                    PropertyValueOrigin::local,
+            "showcase must dogfood the public metadata-driven PropertyGrid against a stock compound control");
+    require(window.request_focus(value_editor->editor()),
+            "showcase PropertyGrid numeric editor must expose its ordinary retained text focus target");
+    value_editor->set_value(4.5);
+    require(inspected_numeric->value() == 4.5,
+            "showcase PropertyGrid numeric factory must commit through the inspected NumericUpDown's registered Value property");
+    const auto items_target = std::dynamic_pointer_cast<ComboBox>(
+        window.find("showcase.values.items-target"));
+    click(window, window.find("showcase.values.inspect-items"));
+    require(items_target && property_grid->selected_object() == items_target &&
+                property_grid->property_expanded("Items") == true &&
+                std::dynamic_pointer_cast<TextBox>(
+                    property_grid->editor("Items[1]"))->text() == "FM",
+            "showcase must expose the stock ComboBox.Items collection through the same recursive PropertyGrid");
+    click(window, window.find("showcase.values.add-item"));
+    require(items_target->items().size() == 4U &&
+                items_target->items().back() == "CW" &&
+                std::dynamic_pointer_cast<TextBox>(
+                    property_grid->editor("Items[3]"))->text() == "CW",
+            "showcase collection command must mutate the real stock Items property rather than a local display model");
+    click(window, window.find("showcase.values.inspect-numeric"));
+    require(property_grid->selected_object() == inspected_numeric,
+            "showcase inspector target switching must restore the stock numeric specimen without stale collection rows");
+    const auto inspection_status = std::dynamic_pointer_cast<Label>(
+        window.find("showcase.values.status"));
+    click(window, window.find("showcase.values.inspect-style"));
+    const auto color_editor = std::dynamic_pointer_cast<ColorValueEditor>(
+        property_grid->editor("ForeColor"));
+    const auto flags_editor = std::dynamic_pointer_cast<FlagsValueEditor>(
+        property_grid->editor("Anchor"));
+    require(inspection_status &&
+                property_grid->selected_object() == inspection_status &&
+                color_editor && color_editor->editor() && flags_editor,
+            "showcase Style inspection must dogfood the reusable color and flags editor services");
+    color_editor->editor()->set_text("#245A92FF");
+    require(window.request_focus(color_editor->editor()) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                inspection_status->foreground() == Color::rgba(36, 90, 146),
+            "showcase color dogfood must commit through the stock Label ForeColor descriptor");
     require(editor && enabled && gain && status &&
                 editor->text() == "Local index" && enabled->checked() &&
                 gain->value() == 28.0 &&

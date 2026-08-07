@@ -78,12 +78,18 @@ std::string MetricsSnapshot::to_json() const {
            << "\"flush_count\":" << flush_count << ','
            << "\"read_barrier_flushes\":" << read_barrier_flushes << ','
            << "\"bounded_pass_limit_hits\":" << bounded_pass_limit_hits << ','
+           << "\"callback_arbitration_retries\":"
+           << callback_arbitration_retries << ','
+           << "\"callback_arbitration_limit_hits\":"
+           << callback_arbitration_limit_hits << ','
            << "\"scheduled_frame_requests\":" << scheduled_frame_requests << ','
            << "\"scheduler_wakes\":" << scheduler_wakes << ','
            << "\"frame_deadlines_fired\":" << frame_deadlines_fired << ','
            << "\"active_surface_ticks\":" << active_surface_ticks << ','
            << "\"frame_requests_coalesced\":" << frame_requests_coalesced << ','
            << "\"frame_callback_faults\":" << frame_callback_faults << ','
+           << "\"reentrant_frame_polls_deferred\":"
+           << reentrant_frame_polls_deferred << ','
            << "\"active_surface_count\":" << active_surface_count << ','
            << "\"maximum_active_surface_count\":" << maximum_active_surface_count << ','
            << "\"occlusion_suspensions\":" << occlusion_suspensions << ','
@@ -241,6 +247,10 @@ void Metrics::record_flush(bool read_barrier) noexcept {
     }
 }
 void Metrics::record_pass_limit_hit() noexcept { ++values_.bounded_pass_limit_hits; }
+void Metrics::record_callback_arbitration_retry(bool limit_hit) noexcept {
+    ++values_.callback_arbitration_retries;
+    if (limit_hit) ++values_.callback_arbitration_limit_hits;
+}
 void Metrics::record_frame_request() noexcept { ++values_.scheduled_frame_requests; }
 void Metrics::record_frame_poll(std::uint64_t deadlines_fired,
                                 std::uint64_t active_surface_ticks,
@@ -254,6 +264,9 @@ void Metrics::record_frame_poll(std::uint64_t deadlines_fired,
 }
 void Metrics::record_frame_callback_fault() noexcept {
     ++values_.frame_callback_faults;
+}
+void Metrics::record_reentrant_frame_poll() noexcept {
+    ++values_.reentrant_frame_polls_deferred;
 }
 void Metrics::set_active_surface_count(std::size_t count) noexcept {
     values_.active_surface_count = static_cast<std::uint64_t>(count);

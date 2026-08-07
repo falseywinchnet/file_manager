@@ -261,11 +261,66 @@ def classify_forms(owner: str, member: str) -> tuple[str, str]:
     }:
         return "measured_partial", "M11h-P1 generated nominal surface and physical Wine gate prove invalid rectangle construction, protected notification, and public event delivery"
     if owner in {
+        "System.Windows.Forms.LayoutEventArgs",
+        "System.Windows.Forms.LayoutEventHandler",
+    }:
+        return "measured_partial", "M12-P11 native transaction, ABI 0.21, and generated-facade gates prove affected component/control/property arguments, nested suspension, committed geometry, deferred resume, and bounded re-entry; exhaustive independent WinForms event ordering remains open"
+    if owner == "System.Windows.Forms.Control" and (
+        member == "Layout" or member.startswith((
+            "OnLayout(",
+            "PerformLayout(",
+            "ResumeLayout(",
+            "SuspendLayout(",
+        ))
+    ):
+        return "measured_partial", "M12-P11 retained per-control transaction and ABI 0.21 preserve committed geometry under nested suspension, allow runnable siblings, carry exact managed layout arguments, defer ResumeLayout(false), and bound re-entrant passes; exhaustive independent WinForms event ordering remains open"
+    if owner in {
         "System.Windows.Forms.AutoSizeMode",
         "System.Windows.Forms.BoundsSpecified",
         "System.Windows.Forms.GetChildAtPointSkip",
     }:
         return "measured_partial", "M12-P9 publishes the exact enum values and rejects undefined flag bits at retained and generated mutation boundaries"
+    if owner == "System.Windows.Forms.Control" and member.startswith(
+        "AutoScrollOffset."
+    ):
+        return "measured_partial", "M12-P10 retains per-control reveal offset through native C++, ABI 0.20, and the generated facade; nested dock/RTL oracle breadth remains open"
+    if owner in {
+        "System.Windows.Forms.ScrollProperties",
+        "System.Windows.Forms.HScrollProperties",
+        "System.Windows.Forms.VScrollProperties",
+        "System.Windows.Forms.ScrollEventArgs",
+        "System.Windows.Forms.ScrollEventHandler",
+        "System.Windows.Forms.ScrollEventType",
+        "System.Windows.Forms.ScrollOrientation",
+        "const System.Windows.Forms.ScrollableControl",
+    }:
+        return "measured_partial", "M12-P10 native, C11 ABI 0.20, and generated-facade gates prove exact axis defaults/ranges/clamping, event vocabulary/arguments, state constants, ownership, and automatic/manual mutation; full independent WinForms oracle parity remains open"
+    if owner == "System.Windows.Forms.ScrollableControl" and (
+        member == "" or member.startswith((
+            "AdjustFormScrollbars(",
+            "AutoScroll.",
+            "AutoScrollMargin.",
+            "AutoScrollMinSize.",
+            "AutoScrollPosition.",
+            "DisplayRectangle.get",
+            "GetScrollState(",
+            "HorizontalScroll.get",
+            "HScroll.",
+            "OnLayout(",
+            "OnMouseWheel(",
+            "OnScroll(",
+            "Scroll",
+            "ScrollableControl(",
+            "ScrollControlIntoView(",
+            "ScrollToControl(",
+            "SetAutoScrollMargin(",
+            "SetDisplayRectLocation(",
+            "SetScrollState(",
+            "VerticalScroll.get",
+            "VScroll.",
+        ))
+    ):
+        return "measured_partial", "M12-P10 retained two-axis layout, ABI 0.20, and generated-facade gates prove non-destructive viewport projection, bar interdependence, manual axes, line/page/thumb input, nested wheel behavior, clipping, semantics, resize clamping, and control reveal; RTL, scaling, and exhaustive event-order oracle work remain"
     if owner == "System.Windows.Forms.Control" and member.startswith((
         "AutoSize.",
         "AutoSizeChanged",

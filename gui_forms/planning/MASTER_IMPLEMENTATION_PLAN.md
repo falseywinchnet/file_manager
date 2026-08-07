@@ -811,7 +811,9 @@ Deliver in independent packages/slices:
 - data binding/currency/format-parse pipeline;
 - DataGridView model, virtualization, selection, styles, editing hosts, custom
   cells/columns;
-- PropertyGrid after descriptor/editor contracts are proven;
+- PropertyGrid after descriptor/editor contracts are proven; the bounded native
+  metadata/stock-editor slice is measured in M12-P17, while managed projection,
+  nested collections, custom editors, and designer breadth remain;
 - SDR custom-control porting laboratory. GUI.Forms-native docking or map
   equivalents remain separately admitted parent-use candidates, not M7 or retired compatibility specimen
   bridge exit requirements.
@@ -1001,6 +1003,172 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   `ScrollableControl.DockPadding` wrapper now projects into retained `Padding`
   and immediately relayouts docked children. Native, host, and Wine facade gates
   cover round trip, inheritance reset, fill insets, and mutation relayout.
+- **MEASURED PARTIAL M12-P10 / scrolling:** experimental ABI 0.20 projects the
+  native retained two-axis `ScrollableControl` model: automatic viewport,
+  margin, minimum-size and position state; manual `ScrollProperties` axes;
+  per-control reveal offsets; display/viewport rectangles; and
+  `ScrollControlIntoView`. Panel and ContainerControl share non-destructive
+  authored geometry, clipped scroll chrome, captured thumb input, nested wheel
+  fallback, and virtual scrollbar semantics. Real scroll input retains one
+  revisioned event record and crosses ABI 0.20 into the generated standard
+  `Scroll` event without callback-time layout reentry. Native, C11,
+  generated-facade, renderer-free, sanitizer, Win64, and Wine gates pass.
+  RTL/scaling, drag-edge autoscroll, virtualization anchoring, and
+  exhaustive independent WinForms event-order comparison remain open. Evidence:
+  `experiments/M12P10_RETAINED_SCROLLING_SUBSTRATE.md`.
+- **MEASURED PARTIAL M12-P11 / layout transactions:** `Control` now owns
+  renderer-neutral nested suspension and deferred/requested/committed layout
+  revisions. Suspended subtrees retain committed geometry without blocking
+  runnable siblings; final resume, explicit perform, and post-scope read
+  barriers share the bounded `Window` scheduler. Failed native or managed
+  layout callbacks restore dirty work and release re-entry guards. Experimental
+  ABI 0.21 projects the transaction, while the generated facade implements both
+  `PerformLayout` and `ResumeLayout` overloads plus exact `LayoutEventArgs`
+  affected-object/property payloads and an eight-pass re-entry bound. Large
+  designer graphs, mutation/disposal within layout, exhaustive independent
+  WinForms ordering, and DML reorder policy remain open. Evidence:
+  `experiments/M12P11_LAYOUT_TRANSACTIONS.md`.
+- **MEASURED PARTIAL M12-P12 / mutation-safe layout:** layout traversal now
+  snapshots strong child identities and revalidates live parent/window
+  membership before callbacks and slot commits. Window recursion, base
+  AutoSize/Dock/Anchor, Flow, Table, scrolling extent, Card, and MasterDetail
+  therefore tolerate removal, same-window reparenting, callback-target
+  disposal, and callback-driven addition without invalid iterators or stale
+  geometry. A 1,024-leaf suspended construction corpus commits in at most two
+  arrange passes with no bounded-pass hit. Randomized mixed-tree mutation,
+  public convergence availability, independent ordering, and DML reorder
+  policy remain open. Evidence:
+  `experiments/M12P12_MUTATION_SAFE_LAYOUT.md`.
+- **MEASURED PARTIAL M12-P13 / callback arbitration:** paint, hit testing,
+  semantic projection/action routing, popup-root arbitration, and bulk
+  validation now snapshot strong identities and revalidate live parent/window
+  membership around application callbacks. Semantic projection discards a
+  mixed-generation candidate and retries at most four times; hit testing uses
+  the same stabilization bound. Metrics expose arbitration retry and limit-hit
+  counts. Focused removal, addition, self-disposal, oscillation, underlying-hit,
+  paint-lease, popup, semantic, damage, and validation gates pass. Randomized
+  mixed callback mutation, frame-request mutation, managed protected callback
+  projection, and physical-host reentry remain open. Evidence:
+  `experiments/M12P13_CALLBACK_ARBITRATION.md`.
+- **MEASURED PARTIAL M12-P14 / frame polling:** the existing strong request
+  snapshot already made timer stop/restart/dispose mutation safe. A new
+  exception-safe poll guard now prevents an `OnFrame` or Timer callback from
+  recursively delivering peers or callback-created already-due work. Nested
+  polls return a deferred result; new work remains connected for the next host
+  turn. Public result state and metrics expose reentrant deferral. Focused
+  scheduler, timer, range, animation, dispatcher, and showcase interaction
+  gates pass; the exact scheduler/timer/animation center also passes
+  renderer-free and ASan/UBSan, and affected libraries cross-compile for
+  Win64. Physical-host nested-message-loop reentry remains.
+  Evidence: `experiments/M12P14_FRAME_POLL_ARBITRATION.md`.
+- **MEASURED PARTIAL M12-P15 / property metadata center:** one native
+  renderer-neutral registration now serves binding and public property
+  inspection without exposing executable callbacks. Value-only descriptors
+  publish authored names, scalar kinds/defaults, categories/descriptions,
+  browse/bind/serialize/reset/change capabilities, and exact declared dirty
+  effects. Generic conversion, get/set, default or authored reset,
+  authored/fallback `ShouldSerialize`, deterministic enumeration, tokenized
+  change observation, live/UI-thread enforcement, and existing nested
+  initialization batching pass across normal, renderer-free, ASan/UBSan, and
+  Win64 gates. Current bindable stock properties plus AutoSize and
+  CausesValidation are migrated. Compound/resource types, ambient/inherited
+  origin, framework-wide coverage, atomic rollback, DML/managed projection,
+  localization, and undeclared-effect diagnostics remain. Evidence:
+  `experiments/M12P15_PROPERTY_METADATA_CENTER.md`.
+- **MEASURED PARTIAL M12-P16 / compound property values:** the same native
+  property and binding value domain now retains Point, Size, Rect, Insets,
+  Color, FontSpec, generational ImageId, and finite named/flags enum values.
+  Shared immutable enum schemas provide type identity and bounded choices;
+  descriptor-aware conversion normalizes names/flags and rejects nonfinite
+  geometry, unknown names/bits, and mismatched enum types before calling a
+  setter. Base geometry/spacing/Dock/Anchor/AutoSizeMode/traversal/drag/
+  accessibility plus visible Label/PictureBox/Button font/color/image
+  properties use real retained setters and deterministic reset. Inherited
+  Label appearance serializes only local overrides. No diagnostic spelling is
+  a DML grammar. Normal, renderer-free, warnings-as-errors ASan/UBSan, and
+  Win64 gates pass. Collection/content values, origin metadata, truthful
+  change events for all properties, atomic rollback, complete stock coverage,
+  DML/managed projection, localization, and class-level descriptor storage
+  measurement remain. Evidence:
+  `experiments/M12P16_COMPOUND_PROPERTY_VALUES.md`.
+- **MEASURED PARTIAL M12-P17 / metadata-driven PropertyGrid:** property
+  registrations now report exact defaulted/local/inherited/ambient/computed
+  value origins independently of `ShouldSerialize`; inherited Label appearance
+  proves override/reset authorship. A public native PropertyGrid weakly selects
+  any retained Control, projects deterministic categorized/alphabetical rows,
+  routes Boolean/scalar/finite-enum values to stock editors, refreshes truthful
+  change notifications, preserves targets on invalid edits, and uses actual
+  reset contracts. The Complete Showcase edits a live NumericUpDown through
+  the public grid. Hostile tests prove selected-object retirement and
+  synchronous inspector disposal during a target callback; compound controls
+  now finish through the base mutation-free child disposal path. Normal,
+  renderer-free, warnings-as-errors ASan/UBSan, and Win64 gates pass.
+  Collection/content/nested values, custom editor factories, visible reset and
+  context-menu UI, multiple selection, DML, and managed PropertyGrid projection
+  remain. Evidence: `experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md`.
+- **MEASURED PARTIAL M12-P18 / expandable compound properties:** native
+  PropertyGrid now expands Point, Size, Rect, Insets, Color, and FontSpec into
+  stable retained child paths. Leaf commits convert one bounded field,
+  reconstruct the typed parent, and invoke the real registered setter; invalid
+  width/channel/font edits preserve the complete live value and report the
+  precise path. PropertyList owns validated row hierarchy, descendant
+  visibility/layout, disclosure hit testing, and expand/collapse semantics.
+  Each resettable parent now owns a stock retained Reset button whose enablement
+  follows ShouldSerialize and whose activation resynchronizes the parent and
+  every child. Native macOS accessibility dogfood edited Bounds.X, reset Value,
+  and reset Bounds; normal, renderer-free, warnings-as-errors ASan/UBSan, and
+  Win64 gates pass. Arbitrary nested objects/collections, editor/type-converter
+  factories, flags/resource specializations, multiple selection, modal editors,
+  DML, and managed PropertyGrid projection remain. Evidence:
+  `experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md`.
+- **MEASURED PARTIAL M12-P19 / nested values and collections:** the property
+  value domain now includes structurally comparable immutable object and
+  homogeneous collection snapshots with explicit UTF-8, uniqueness, depth,
+  member/item, and total-node bounds. Native PropertyGrid recursively projects
+  typed member/index paths, reconstructs every immutable ancestor through the
+  owning setter, preserves read-only members, refreshes same-shape edits without
+  retiring the active editor, and atomically inserts/removes/moves collection
+  items. Stock `ComboBox.Items` is a content-serialized, resettable,
+  change-observed collection property and the Complete Showcase dogfoods its
+  expansion and insertion. Normal, renderer-free, warnings-as-errors
+  ASan/UBSan, Win64, public-showcase-policy, and native accessibility gates pass.
+  Arbitrary editor/type-converter factories, dictionaries/heterogeneous values,
+  nullable specializations, multiple selection, modal component editors, DML,
+  and managed PropertyGrid projection remain. Evidence:
+  `experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md`.
+- **MEASURED PARTIAL M12-P20 / converter and retained-editor services:** inert
+  property descriptors now carry optional bounded converter/editor service
+  identities without executable callbacks. Instance-owned
+  `PropertyValueConverterRegistry` and `PropertyEditorRegistry` provide
+  canonical registration, kind defaults, deterministic replacement, bounded
+  parsing, and typed tokenized commit. Factories donate ordinary unattached
+  retained controls; PropertyList attaches before retiring the stock editor and
+  preserves its scroll, focus-reveal, semantic, ownership, and disposal laws.
+  PropertyGrid contains factory faults as row diagnostics, synchronizes live
+  values without feedback, and defaults numeric values—including expandable
+  geometry leaves—to NumericUpDown. An explicit percent converter/stepper and
+  the Complete Showcase prove service selection and real-setter commit. Normal,
+  renderer-free, warnings-as-errors ASan/UBSan, and Win64 focused gates pass.
+  Flags/color/resource/date/path
+  specializations, standard values/culture, nested member service metadata,
+  modal/drop-down editor services, multiple selection, DML, and managed
+  PropertyGrid projection remain. Evidence:
+  `experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md`.
+- **MEASURED PARTIAL M12-P21 / specialized flags and color editors:** the P20
+  service seam now donates public retained `FlagsValueEditor` and
+  `ColorValueEditor` controls rather than adding PropertyGrid type branches.
+  Flags use a tokenized Window popup/focus scope with a CheckedListBox and typed
+  immediate bit commits. Color uses an ordinary TextBox, checker/swatch,
+  canonical alpha-aware hex, invalid semantics, cancellation, and an optional
+  tokenized editor-failure connector routed to PropertyGrid's exact-path error
+  channel. Enum schema names/choice count are explicitly bounded. The Complete
+  Showcase Style target dogfoods Anchor and Label ForeColor. Normal,
+  renderer-free, warnings-as-errors ASan/UBSan, Win64, and Wine focused gates
+  pass; the 48-cycle slider-to-Animation regression remains green. Resource,
+  nullable/date/duration/path/command and modal editors, standard values/culture,
+  nested-member services, multiple selection, DML, and managed projection
+  remain. Evidence:
+  `experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
 - **MEASURED PARTIAL M11h / FM-LY05:** the public retained control library now
   owns split-pane geometry and input rather than leaving it to a consumer:
   stable panel/seam identities, distinct thin paint and enlarged hit target,

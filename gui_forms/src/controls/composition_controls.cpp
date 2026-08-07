@@ -171,23 +171,46 @@ Size Card::measure(Size available) {
     double width{};
     double height = vertical;
     unsigned sections{};
-    if (header_) {
-        const Size desired = header_->measure({inner_width, layout.header_extent});
-        width = std::max(width, desired.width);
-        height += std::max(layout.header_extent, desired.height);
-        ++sections;
+    const Control::Ptr retained_header = header_;
+    const Control::Ptr retained_body = body_;
+    const Control::Ptr retained_footer = footer_;
+    if (retained_header && is_current_layout_child(retained_header)) {
+        const Size desired = retained_header->measure(
+            {inner_width, layout.header_extent});
+        if (!is_alive()) return {};
+        if (header_ != retained_header ||
+            !is_current_layout_child(retained_header)) {
+            invalidate(Dirty::measure | Dirty::arrange);
+        } else {
+            width = std::max(width, desired.width);
+            height += std::max(layout.header_extent, desired.height);
+            ++sections;
+        }
     }
-    if (body_) {
-        const Size desired = body_->measure({inner_width, available.height});
-        width = std::max(width, desired.width);
-        height += desired.height;
-        ++sections;
+    if (retained_body && is_current_layout_child(retained_body)) {
+        const Size desired = retained_body->measure(
+            {inner_width, available.height});
+        if (!is_alive()) return {};
+        if (body_ != retained_body || !is_current_layout_child(retained_body)) {
+            invalidate(Dirty::measure | Dirty::arrange);
+        } else {
+            width = std::max(width, desired.width);
+            height += desired.height;
+            ++sections;
+        }
     }
-    if (footer_) {
-        const Size desired = footer_->measure({inner_width, layout.footer_extent});
-        width = std::max(width, desired.width);
-        height += std::max(layout.footer_extent, desired.height);
-        ++sections;
+    if (retained_footer && is_current_layout_child(retained_footer)) {
+        const Size desired = retained_footer->measure(
+            {inner_width, layout.footer_extent});
+        if (!is_alive()) return {};
+        if (footer_ != retained_footer ||
+            !is_current_layout_child(retained_footer)) {
+            invalidate(Dirty::measure | Dirty::arrange);
+        } else {
+            width = std::max(width, desired.width);
+            height += std::max(layout.footer_extent, desired.height);
+            ++sections;
+        }
     }
     if (sections > 1U) height += layout.section_gap * (sections - 1U);
     const Rect requested = requested_bounds();
@@ -621,8 +644,30 @@ Size MasterDetailView::measure(Size available) {
     configure_split();
     const MasterDetailLayout layout = effective_master_detail_layout();
     const MasterDetailDisplayMode mode = resolve_display_mode(available);
-    const Size master_desired = master_ ? master_->measure(available) : Size{};
-    const Size detail_desired = detail_ ? detail_->measure(available) : Size{};
+    const Control::Ptr retained_master = master_;
+    const Control::Ptr retained_detail = detail_;
+    Size master_desired;
+    Size detail_desired;
+    if (retained_master && retained_master->is_alive() &&
+        retained_master->parent() == split_->first_panel()) {
+        master_desired = retained_master->measure(available);
+        if (!is_alive()) return {};
+        if (master_ != retained_master || !retained_master->is_alive() ||
+            retained_master->parent() != split_->first_panel()) {
+            master_desired = {};
+            invalidate(Dirty::measure | Dirty::arrange);
+        }
+    }
+    if (retained_detail && retained_detail->is_alive() &&
+        retained_detail->parent() == split_->second_panel()) {
+        detail_desired = retained_detail->measure(available);
+        if (!is_alive()) return {};
+        if (detail_ != retained_detail || !retained_detail->is_alive() ||
+            retained_detail->parent() != split_->second_panel()) {
+            detail_desired = {};
+            invalidate(Dirty::measure | Dirty::arrange);
+        }
+    }
     if (mode == MasterDetailDisplayMode::master_only) return master_desired;
     if (mode == MasterDetailDisplayMode::detail_only) return detail_desired;
     if (layout.orientation == Orientation::vertical) {

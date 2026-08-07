@@ -21,7 +21,7 @@ second UI engine.
 | `gui_forms_host_macos` | AppKit translation and native window host | private platform adapter |
 | `gui_forms_host_windows` | Win32 translation and CPU DIB window host | private bounded platform adapter |
 | `gui_forms_skia` | private CPU raster adapter | never crosses the control or ABI seam |
-| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, input, edit, cursor, and top-level-host experiment | ABI 0.19; not the eventual 1.0 table |
+| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, input, edit, cursor, scrolling, layout transactions, and top-level-host experiment | ABI 0.21; not the eventual 1.0 table |
 | `gui_drawing_core` | portable geometry/color, drawing resources, state stack, paths, logical image references, and typed recording | renderer-free C++20 proving API; not frozen |
 | `gui_drawing_c_api` | generational drawing handles and command submission | independent experimental ABI 0.1; one exported negotiation symbol |
 | Gallery model/application | visible dogfood and instrumentation | example, not library authority |
@@ -37,7 +37,7 @@ The eventual consumer stack has one ownership system and several projections:
 application or trusted compatibility extension
         |
         +-- C++ RAII wrapper -------------------+
-        +-- generated C# facade (M11 experiment) --+--> ABI 0.19 --> native retained engine
+        +-- generated C# facade (M11 experiment) --+--> ABI 0.21 --> native retained engine
         +-- compiled DML handles ---------------+
                                                      |
                                                      +--> GUI.Drawing ABI 0.1 command/image-reference core
@@ -113,6 +113,36 @@ exceptions are contained at the trampoline, reported through
 `Application.ThreadException`, and counted natively. Deterministic headless and
 Win32/Wine runs produce the same one-per-stage lifecycle counts. See
 `../experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md`.
+
+**MEASURED M12-P15/P16/P17/P18/P19/P20/P21 native property substrate:** GUI.Forms now separates
+inert public property descriptors from private executable registrations. The
+typed value domain includes scalars, geometry, spacing, color, font,
+generational images, finite named/flags enums, bounded immutable objects, and
+homogeneous collections; defaults, reset/
+ShouldSerialize, exact dirty scope, deterministic inspection, and tokenized
+changes use real retained setters. Base layout properties and visible
+Label/PictureBox/Button appearance properties are registered. Exact defaulted,
+local, inherited, ambient, and computed origins are independent of serialization
+policy. Native `PropertyGrid` dogfoods the descriptors through stock typed
+editors, live refresh, validation, weak selection, expandable geometry/spacing/
+color/font fields, recursive member/index paths, atomic collection insert/remove/
+move, real retained Reset controls, and instance-owned converter/editor
+registries. Numeric values use a retained NumericUpDown factory; inert
+descriptor service names can select reusable custom formatting and editors
+without placing callbacks in metadata. FlagsValueEditor owns a tokenized
+multi-select CheckedListBox popup; ColorValueEditor owns canonical alpha-aware
+text, swatch, invalid-state, cancel, and typed failure behavior. Field edits reconstruct every immutable
+ancestor and never parse its diagnostic display string. Stock `ComboBox.Items`
+dogfoods the content-collection contract. This is the native
+schema/tooling foundation for compiled DML and managed descriptors, not a DML
+parser or ABI projection; diagnostic value strings are not serialized source.
+See `../experiments/M12P15_PROPERTY_METADATA_CENTER.md` and
+`../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md` and
+`../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md` and
+`../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md` and
+`../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md` and
+`../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md` and
+`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
 
 **MEASURED compatibility-laboratory evidence:** a consumer compiled against the
 authentic strong-named .NET 10 `System.Windows.Forms` reference can resolve in a

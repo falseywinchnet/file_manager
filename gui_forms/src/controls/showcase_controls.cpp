@@ -1431,11 +1431,105 @@ void add_values(const std::shared_ptr<Surface>& page,
                            260.0, 36.0});
         values.push_back(numeric);
     }
-    auto status = label("showcase.values.status", "Edit a value or use arrows, wheel, and spinner buttons.",
-                        11.0, 600, green);
-    group_box->add_at(status, {500.0, 44.0, 380.0, 80.0});
+    auto inspector = make_control<PropertyGrid>(
+        StableId("showcase.values.property-grid"));
+    inspector->set_accessible_name("Decimal control property grid");
+    inspector->set_selected_object(values[1]);
+    static_cast<void>(inspector->set_property_expanded("Bounds", true));
+    auto items_target = make_control<ComboBox>(
+        StableId("showcase.values.items-target"));
+    items_target->set_accessible_name("Inspectable mode collection");
+    items_target->set_items({"AM", "FM", "WFM"});
+    items_target->set_selected_index(1U);
+    group_box->add_at(items_target, {486.0, 34.0, 174.0, 30.0});
+    auto inspect_numeric = make_control<Button>(
+        StableId("showcase.values.inspect-numeric"), "Numeric");
+    auto inspect_items = make_control<Button>(
+        StableId("showcase.values.inspect-items"), "Items");
+    auto inspect_style = make_control<Button>(
+        StableId("showcase.values.inspect-style"), "Style");
+    auto add_item = make_control<Button>(
+        StableId("showcase.values.add-item"), "Add CW");
+    inspect_numeric->set_visual_style(ButtonVisualStyle::command);
+    inspect_items->set_visual_style(ButtonVisualStyle::command);
+    inspect_style->set_visual_style(ButtonVisualStyle::command);
+    add_item->set_visual_style(ButtonVisualStyle::command);
+    group_box->add_at(inspect_numeric, {668.0, 34.0, 58.0, 30.0});
+    group_box->add_at(inspect_items, {732.0, 34.0, 50.0, 30.0});
+    group_box->add_at(inspect_style, {788.0, 34.0, 54.0, 30.0});
+    group_box->add_at(add_item, {848.0, 34.0, 50.0, 30.0});
+    group_box->add_at(inspector, {486.0, 72.0, 420.0, 222.0});
+    auto status = label("showcase.values.status",
+                        "PropertyGrid uses instance-owned converter/editor services.",
+                        10.5, 600, green);
+    group_box->add_at(status, {494.0, 306.0, 404.0, 34.0});
     status->set_text_wrapping(TextWrapping::word);
     status->set_vertical_alignment(VerticalAlignment::near);
+    const std::weak_ptr<PropertyGrid> weak_inspector = inspector;
+    const std::weak_ptr<NumericUpDown> weak_numeric = values[1];
+    const std::weak_ptr<ComboBox> weak_items_target = items_target;
+    const std::weak_ptr<Label> weak_inspection_status = status;
+    context->subscriptions.push_back(inspect_numeric->clicked().subscribe(
+        *status, [weak_inspector, weak_numeric, weak_inspection_status](ButtonBase&) {
+            const auto grid = weak_inspector.lock();
+            const auto numeric = weak_numeric.lock();
+            if (!grid || !numeric) return;
+            grid->set_selected_object(numeric);
+            static_cast<void>(grid->set_property_expanded("Bounds", true));
+            if (const auto status = weak_inspection_status.lock()) {
+                status->set_text(
+                    "PropertyGrid · retained NumericUpDown factory and typed commit");
+            }
+        }));
+    context->subscriptions.push_back(inspect_items->clicked().subscribe(
+        *status, [weak_inspector, weak_items_target,
+                  weak_inspection_status](ButtonBase&) {
+            const auto grid = weak_inspector.lock();
+            const auto combo = weak_items_target.lock();
+            if (!grid || !combo) return;
+            grid->set_selected_object(combo);
+            static_cast<void>(grid->set_property_expanded("Items", true));
+            if (Window* window = grid->attached_window()) {
+                static_cast<void>(window->request_focus(grid->editor("Items[0]")));
+            }
+            if (const auto status = weak_inspection_status.lock()) {
+                status->set_text(
+                    "PropertyGrid · ComboBox.Items immutable collection expanded");
+            }
+        }));
+    context->subscriptions.push_back(inspect_style->clicked().subscribe(
+        *status, [weak_inspector, weak_inspection_status](ButtonBase&) {
+            const auto grid = weak_inspector.lock();
+            const auto status = weak_inspection_status.lock();
+            if (!grid || !status) return;
+            grid->set_selected_object(status);
+            static_cast<void>(grid->set_property_expanded("ForeColor", true));
+            status->set_text(
+                "PropertyGrid · flags popup and canonical color editor services");
+        }));
+    context->subscriptions.push_back(add_item->clicked().subscribe(
+        *status, [weak_inspector, weak_items_target,
+                  weak_inspection_status](ButtonBase&) {
+            const auto grid = weak_inspector.lock();
+            const auto combo = weak_items_target.lock();
+            if (!grid || !combo) return;
+            if (grid->selected_object() != combo) grid->set_selected_object(combo);
+            static_cast<void>(grid->set_property_expanded("Items", true));
+            const bool added = grid->insert_collection_item(
+                "Items", combo->items().size(), BindingValue{std::string("CW")});
+            if (added) {
+                if (Window* window = grid->attached_window()) {
+                    static_cast<void>(window->request_focus(grid->editor(
+                        "Items[" +
+                        std::to_string(combo->items().size() - 1U) + "]")));
+                }
+            }
+            if (const auto status = weak_inspection_status.lock()) {
+                status->set_text(added
+                    ? "PropertyGrid · inserted CW through ComboBox.Items setter"
+                    : "PropertyGrid · Items insertion rejected truthfully");
+            }
+        }));
     for (std::size_t index = 0; index < values.size(); ++index) {
         const std::weak_ptr<Label> weak_status = status;
         context->subscriptions.push_back(values[index]->value_changed().subscribe(
@@ -1445,14 +1539,21 @@ void add_values(const std::shared_ptr<Surface>& page,
                                      " committed " + std::to_string(value) +
                                      " · event emitted after value and editor synchronization");
                 }
-            }));
+        }));
     }
-    auto note = label("showcase.values.note",
-                      "Intermediate invalid text does not corrupt Value. Enter restores the last valid formatted value.",
-                      12.0, 400, ink);
-    note->set_text_wrapping(TextWrapping::word);
-    note->set_vertical_alignment(VerticalAlignment::near);
-    group_box->add_at(note, {500.0, 154.0, 380.0, 80.0});
+    const std::weak_ptr<Label> weak_property_status = status;
+    context->subscriptions.push_back(
+        inspector->property_value_changed().subscribe(
+            *status, [weak_property_status](
+                         const PropertyGridValueChange& change) {
+                if (const auto label = weak_property_status.lock()) {
+                    label->set_text(
+                        "PropertyGrid committed " + change.property_name +
+                        " · origin " +
+                        std::string(property_value_origin_name(change.origin)) +
+                        (change.reset ? " · reset" : ""));
+                }
+            }));
 
     auto binding = group("showcase.values.binding",
                          "BindingSource · currency, edit, conversion, two-way controls",

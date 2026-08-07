@@ -568,6 +568,10 @@ private:
                                  Rect final_bounds,
                                  std::uint64_t& visited_nodes,
                                  std::uint64_t& callbacks);
+    [[nodiscard]] bool has_runnable_layout_dirty(
+        const Control::Ptr& control) const noexcept;
+    void note_suspended_layout_request(Control& control) noexcept;
+    void commit_layout_requests_recursive(const Control::Ptr& control) noexcept;
     [[nodiscard]] Dirty recompute_subtree_dirty(const Control::Ptr& control) noexcept;
     void clear_layout_dirty_subtree(const Control::Ptr& control) noexcept;
     void clear_paint_dirty_subtree(const Control::Ptr& control) noexcept;
@@ -652,6 +656,7 @@ private:
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};
     std::vector<std::shared_ptr<detail::ScheduledFrameRequest>> frame_requests_;
+    bool in_frame_poll_{};
     std::shared_ptr<detail::WindowLifetime> lifetime_;
     std::thread::id ui_thread_;
     std::shared_ptr<detail::DispatcherState> dispatcher_state_;
@@ -693,6 +698,7 @@ private:
     std::function<void()> paint_wake_handler_;
     bool paint_wake_pending_{};
     std::uint64_t semantic_generation_{1U};
+    bool in_semantic_snapshot_{};
     HostServices* host_services_{};
 };
 

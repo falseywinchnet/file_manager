@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -43,6 +44,19 @@ public:
         throw std::runtime_error("intentional frame callback fault");
     }
 
+    std::uint64_t frame_calls{};
+};
+
+class ReentrantFrameControl final : public Control {
+public:
+    explicit ReentrantFrameControl(StableId id) : Control(std::move(id)) {}
+
+    void on_frame(FrameTime now) override {
+        ++frame_calls;
+        if (callback) callback(now);
+    }
+
+    std::function<void(FrameTime)> callback;
     std::uint64_t frame_calls{};
 };
 
@@ -167,6 +181,43 @@ void test_throwing_frame_callback_isolated_and_disconnected() {
     require(later.callback_faults == 0U && later.active_surface_ticks == 1U &&
                 throwing->frame_calls == 1U && good.connected(),
             "a faulted frame request must not crash or retry on later native timer turns");
+}
+
+void test_frame_callbacks_use_fixed_due_set_and_defer_nested_poll() {
+    auto root = make_control<Control>(StableId("scheduler.reentry.root"));
+    auto controller = make_control<ReentrantFrameControl>(
+        StableId("scheduler.reentry.controller"));
+    auto cancelled = make_control<ReentrantFrameControl>(
+        StableId("scheduler.reentry.cancelled"));
+    auto admitted_next = make_control<ReentrantFrameControl>(
+        StableId("scheduler.reentry.next"));
+    root->add_child(controller);
+    root->add_child(cancelled);
+    root->add_child(admitted_next);
+    Window window(root, {160.0, 90.0});
+    const FrameTime due = FrameTime{} + 20ms;
+    FrameRequestToken cancelled_request;
+    FrameRequestToken next_request;
+    FramePollResult nested;
+    controller->callback = [&](FrameTime now) {
+        cancelled_request.disconnect();
+        next_request = window.schedule_paint(admitted_next, now);
+        nested = window.poll_frame_schedule(now);
+    };
+    auto controller_request = window.schedule_paint(controller, due);
+    cancelled_request = window.schedule_paint(cancelled, due);
+
+    const FramePollResult first = window.poll_frame_schedule(due);
+    require(first.deadlines_fired == 1U && controller->frame_calls == 1U &&
+                cancelled->frame_calls == 0U && admitted_next->frame_calls == 0U &&
+                nested.reentrant_poll_deferred && next_request.connected() &&
+                first.next_wake == due,
+            "frame callbacks must cancel later peers and admit new due work only to the next poll");
+    const FramePollResult second = window.poll_frame_schedule(due);
+    require(second.deadlines_fired == 1U && admitted_next->frame_calls == 1U &&
+                !next_request.connected() &&
+                window.metrics_snapshot().reentrant_frame_polls_deferred == 1U,
+            "a deferred nested poll must preserve one next-turn delivery and diagnostic");
 }
 
 void test_owner_disposal_revokes_active_surface() {
@@ -315,6 +366,7 @@ int main() {
         test_same_target_deadlines_coalesce();
         test_active_surface_skips_catch_up_bursts();
         test_throwing_frame_callback_isolated_and_disconnected();
+        test_frame_callbacks_use_fixed_due_set_and_defer_nested_poll();
         test_owner_disposal_revokes_active_surface();
         test_occlusion_pauses_and_rebases_active_surface();
         test_thirty_tick_band_stays_localized();

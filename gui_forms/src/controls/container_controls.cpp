@@ -578,10 +578,13 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
         lines.push_back(std::move(line));
         line = {};
     };
-    for (const Control::Ptr& child : children()) {
-        if (!child || !child->is_alive() || !child->visible()) continue;
-        Item item{child, preferred_child_size(child, inner), child->margin(),
-                  flow_break(*child)};
+    const std::vector<Control::Ptr> retained = snapshot_layout_children();
+    for (const Control::Ptr& child : retained) {
+        if (!is_current_layout_child(child) || !child->visible()) continue;
+        const Size desired = preferred_child_size(child, inner);
+        if (!is_alive()) return {};
+        if (!is_current_layout_child(child) || !child->visible()) continue;
+        Item item{child, desired, child->margin(), flow_break(*child)};
         const double item_main = horizontal
             ? horizontal_extent(item.margin) + item.desired.width
             : vertical_extent(item.margin) + item.desired.height;
@@ -628,7 +631,9 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
                 }
                 main_origin += vertical_extent(item.margin) + item.desired.height;
             }
-            if (assign) set_child_layout(item.control, slot);
+            if (assign && is_current_layout_child(item.control)) {
+                set_child_layout(item.control, slot);
+            }
         }
         content_main = std::max(content_main, current.main);
         cross_origin += current.cross;
@@ -907,8 +912,9 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
         return true;
     };
 
-    for (const Control::Ptr& child : children()) {
-        if (!child || !child->is_alive() || !child->visible()) continue;
+    const std::vector<Control::Ptr> retained = snapshot_layout_children();
+    for (const Control::Ptr& child : retained) {
+        if (!is_current_layout_child(child) || !child->visible()) continue;
         const CellMetadata* metadata = std::as_const(*this).metadata_for(*child);
         if (metadata == nullptr || !metadata->position) {
             automatic.push_back(child);
@@ -982,7 +988,18 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     std::vector<TrackSpanDemand> column_spans;
     std::vector<TrackSpanDemand> row_spans;
     for (Item& item : resolved) {
+        if (!is_current_layout_child(item.control) ||
+            !item.control->visible()) {
+            item.control.reset();
+            continue;
+        }
         item.desired = preferred_child_size(item.control, inner);
+        if (!is_alive()) return {};
+        if (!is_current_layout_child(item.control) ||
+            !item.control->visible()) {
+            item.control.reset();
+            continue;
+        }
         const double required_width = item.desired.width +
                                       horizontal_extent(item.margin);
         const double required_height = item.desired.height +
@@ -1022,6 +1039,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
                      row_offsets.begin() + 1);
 
     for (const Item& item : resolved) {
+        if (!item.control || !is_current_layout_child(item.control)) continue;
         resolved_cells_[item.control->runtime_id().value] = item.position;
         if (!assign) continue;
         const double cell_width =
@@ -1082,7 +1100,9 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     layout_overflowed_ = !overflow.empty();
     if (assign) {
         for (const Control::Ptr& child : overflow) {
-            set_child_layout(child, {inset.left, inset.top, 0.0, 0.0});
+            if (is_current_layout_child(child)) {
+                set_child_layout(child, {inset.left, inset.top, 0.0, 0.0});
+            }
         }
     }
     return {horizontal.desired + horizontal_extent(inset),

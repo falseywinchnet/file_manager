@@ -41,6 +41,7 @@ extern "C" {
 #define GF_ABI_VERSION_0_18 UINT32_C(0x00000012)
 #define GF_ABI_VERSION_0_19 UINT32_C(0x00000013)
 #define GF_ABI_VERSION_0_20 UINT32_C(0x00000014)
+#define GF_ABI_VERSION_0_21 UINT32_C(0x00000015)
 
 #define GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED UINT32_C(1)
 
@@ -92,7 +93,19 @@ typedef struct gf_scroll_state {
     gf_rect viewport_rectangle;
     gf_scroll_axis_state horizontal;
     gf_scroll_axis_state vertical;
+    uint64_t event_revision;
+    uint32_t event_type;
+    uint32_t event_orientation;
+    double event_old_value;
+    double event_new_value;
 } gf_scroll_state;
+
+typedef struct gf_layout_state {
+    uint32_t suspend_depth;
+    uint32_t deferred;
+    uint64_t requested_revision;
+    uint64_t committed_revision;
+} gf_layout_state;
 
 typedef struct gf_field_edit_result {
     uint64_t anchor_utf8;
@@ -137,7 +150,8 @@ typedef enum gf_event_kind {
     GF_EVENT_TEXT_INPUT = 13,
     GF_EVENT_RANGE_VALUE_CHANGED = 14,
     GF_EVENT_RANGE_SCROLL = 15,
-    GF_EVENT_BOUNDS_CHANGED = 16
+    GF_EVENT_BOUNDS_CHANGED = 16,
+    GF_EVENT_SCROLL = 17
 } gf_event_kind;
 
 typedef enum gf_event_callback_result {
@@ -436,6 +450,12 @@ typedef struct gf_api_v0 {
                                        uint32_t orientation,
                                        gf_scroll_axis_state state);
     gf_result (*scroll_control_into_view)(gf_handle control, gf_handle child);
+
+    /* ABI 0.21 additions: retained per-control layout transactions. */
+    gf_result (*suspend_layout)(gf_handle control);
+    gf_result (*resume_layout)(gf_handle control, uint32_t perform_layout);
+    gf_result (*perform_control_layout)(gf_handle control);
+    gf_result (*get_layout_state)(gf_handle control, gf_layout_state* state);
 } gf_api_v0;
 
 /*

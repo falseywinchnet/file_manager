@@ -2,9 +2,11 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -50,6 +52,69 @@ struct Fixture final {
     std::shared_ptr<BindingSource> source;
 };
 
+class PropertyProbe final : public Control {
+public:
+    explicit PropertyProbe(StableId stable_id) : Control(std::move(stable_id)) {
+        PropertyDescriptor level;
+        level.name = "Level";
+        level.kind = BindingValueKind::signed_integer;
+        level.category = "Data";
+        level.description = "Probe level with an authored reset policy.";
+        level.default_value = BindingValue{std::int64_t{3}};
+        level.invalidation_effects = Dirty::paint | Dirty::semantics;
+        level.bindable = false;
+        define_bindable_property({
+            std::move(level),
+            [this] { return BindingValue{level_}; },
+            [this](const BindingValue& value) {
+                level_ = std::get<std::int64_t>(value);
+                invalidate(Dirty::paint | Dirty::semantics);
+            },
+            {},
+            [this] {
+                level_ = 3;
+                invalidate(Dirty::paint | Dirty::semantics);
+            },
+            [this] { return level_ > 3; }});
+
+        PropertyDescriptor revision;
+        revision.name = "Revision";
+        revision.kind = BindingValueKind::unsigned_integer;
+        revision.category = "Diagnostics";
+        revision.description = "Read-only retained revision.";
+        revision.serialization_visibility =
+            PropertySerializationVisibility::hidden;
+        revision.writable = false;
+        revision.browsable = false;
+        revision.bindable = false;
+        define_bindable_property({
+            std::move(revision),
+            [this] { return BindingValue{revision_}; },
+            {}, {}, {}, {}});
+    }
+
+    [[nodiscard]] std::int64_t level() const noexcept { return level_; }
+
+private:
+    std::int64_t level_{3};
+    std::uint64_t revision_{11};
+};
+
+class InvalidPropertyProbe final : public Control {
+public:
+    explicit InvalidPropertyProbe(StableId stable_id)
+        : Control(std::move(stable_id)) {
+        PropertyDescriptor invalid;
+        invalid.name = "Invalid";
+        invalid.kind = BindingValueKind::number;
+        invalid.default_value = BindingValue{std::string("not-a-number")};
+        define_bindable_property({
+            std::move(invalid),
+            [] { return BindingValue{0.0}; },
+            [](const BindingValue&) {}, {}, {}, {}});
+    }
+};
+
 void test_value_conversion_is_strict_and_invariant() {
     require(binding_value_kind(BindingValue{}) == BindingValueKind::null &&
                 binding_value_to_bool(std::string("TRUE")) == true &&
@@ -62,6 +127,398 @@ void test_value_conversion_is_strict_and_invariant() {
                 !binding_value_to_signed(2.5) &&
                 canonical_binding_name("  DataMember  ") == "datamember",
             "binding conversion must reject partial, negative-unsigned, and fractional-integer input");
+    require(binding_value_kind(BindingValue{Point{1.0, 2.0}}) ==
+                BindingValueKind::point &&
+                binding_value_kind(BindingValue{Size{3.0, 4.0}}) ==
+                    BindingValueKind::size &&
+                binding_value_kind(BindingValue{Rect{1.0, 2.0, 3.0, 4.0}}) ==
+                    BindingValueKind::rectangle &&
+                binding_value_kind(BindingValue{Insets{1.0, 2.0, 3.0, 4.0}}) ==
+                    BindingValueKind::insets &&
+                binding_value_kind(BindingValue{Color::rgba(1, 2, 3, 4)}) ==
+                    BindingValueKind::color &&
+                binding_value_kind(BindingValue{FontSpec{}}) ==
+                    BindingValueKind::font &&
+                binding_value_kind(BindingValue{ImageId{9}}) ==
+                    BindingValueKind::image &&
+                binding_value_to_string(BindingValue{
+                    Color::rgba(1, 2, 3, 4)}) == "#01020304" &&
+                !convert_binding_value(
+                    BindingValue{Point{
+                        std::numeric_limits<double>::quiet_NaN(), 0.0}},
+                    BindingValueKind::point),
+            "property values must retain typed geometry, color, font, image, and finite-value validation");
+}
+
+void test_nested_property_values_are_bounded_immutable_and_structural() {
+    const auto make_endpoint = [] {
+        return make_property_object("Endpoint", {
+            {"Host", "Server host", BindingValue{std::string("127.0.0.1")}},
+            {"Port", "Server port", BindingValue{std::uint64_t{5555}}},
+        });
+    };
+    const PropertyObjectValue first_endpoint = make_endpoint();
+    const PropertyObjectValue second_endpoint = make_endpoint();
+    const PropertyCollectionValue first_items = make_property_collection(
+        "String", BindingValueKind::text,
+        {BindingValue{std::string("Local")},
+         BindingValue{std::string("Archive")}});
+    const PropertyCollectionValue second_items = make_property_collection(
+        "String", BindingValueKind::text,
+        {BindingValue{std::string("Local")},
+         BindingValue{std::string("Archive")}});
+    require(first_endpoint == second_endpoint && first_items == second_items &&
+                first_endpoint.data() != second_endpoint.data() &&
+                first_items.data() != second_items.data() &&
+                binding_value_kind(BindingValue{first_endpoint}) ==
+                    BindingValueKind::object &&
+                binding_value_kind(BindingValue{first_items}) ==
+                    BindingValueKind::collection &&
+                valid_property_value_tree(BindingValue{first_endpoint}) &&
+                valid_property_value_tree(BindingValue{first_items}),
+            "nested property snapshots must compare structurally without sharing mutable storage");
+
+    const PropertyCollectionValue converted = make_property_collection(
+        "Double", BindingValueKind::number,
+        {BindingValue{std::string("1.25")}, BindingValue{std::int64_t{2}}});
+    const auto converted_items = property_collection_items(converted);
+    require(converted_items.size() == 2U &&
+                std::get<double>(converted_items[0]) == 1.25 &&
+                std::get<double>(converted_items[1]) == 2.0,
+            "homogeneous property collections must normalize every item to their declared kind");
+
+    bool duplicate_rejected{};
+    bool heterogeneous_rejected{};
+    bool depth_rejected{};
+    try {
+        static_cast<void>(make_property_object("Duplicate", {
+            {"Name", {}, BindingValue{std::string("A")}},
+            {"name", {}, BindingValue{std::string("B")}},
+        }));
+    } catch (const std::invalid_argument&) {
+        duplicate_rejected = true;
+    }
+    try {
+        static_cast<void>(make_property_collection(
+            "Double", BindingValueKind::number,
+            {BindingValue{std::string("1")},
+             BindingValue{std::string("not a number")}}));
+    } catch (const std::invalid_argument&) {
+        heterogeneous_rejected = true;
+    }
+    try {
+        BindingValue nested{std::string("leaf")};
+        for (std::size_t depth = 0U;
+             depth <= maximum_property_value_depth; ++depth) {
+            nested = BindingValue{make_property_object(
+                "Node", {{"Child", {}, std::move(nested)}})};
+        }
+    } catch (const std::invalid_argument&) {
+        depth_rejected = true;
+    }
+    require(duplicate_rejected && heterogeneous_rejected && depth_rejected,
+            "nested property construction must reject ambiguous names, failed homogeneous conversion, and over-depth trees");
+}
+
+void test_property_metadata_defaults_reset_and_serialization() {
+    auto editor = make_control<TextBox>(StableId("property.editor"), "Seed");
+    const auto text = editor->property_descriptor(" text ");
+    require(text && text->name == "Text" &&
+                text->kind == BindingValueKind::text &&
+                text->category == "Appearance" && text->readable &&
+                text->writable && text->browsable && text->bindable &&
+                text->resettable && text->change_notifications &&
+                text->default_value ==
+                    std::optional<BindingValue>{std::string{}} &&
+                has_dirty(text->invalidation_effects, Dirty::measure) &&
+                has_dirty(text->invalidation_effects, Dirty::paint) &&
+                !text->invalidates_subtree &&
+                editor->property_descriptor("Visible")->invalidates_subtree,
+            "stock property metadata must expose presentation name, type, default, reset, and exact declared effects");
+    require(editor->property_value("TEXT") ==
+                std::optional<BindingValue>{std::string("Seed")} &&
+                editor->should_serialize_property("Text"),
+            "property lookup must be canonical while retaining typed current state");
+    Component observer;
+    std::size_t text_changes{};
+    auto changed = editor->subscribe_property_changed(
+        "Text", observer, [&] { ++text_changes; });
+    editor->set_property_value("text", std::uint64_t{42});
+    require(editor->text() == "42" && editor->reset_property("TEXT") &&
+                editor->text().empty() &&
+                !editor->should_serialize_property("Text") &&
+                changed.connected() && text_changes == 2U,
+            "generic mutation, reset, and tokenized observation must use the real typed control property path");
+
+    auto range = make_control<TrackBar>(StableId("property.range"));
+    range->set_value(25.0);
+    bool invalid_value_rejected = false;
+    try {
+        range->set_property_value("Value", std::string("not-a-number"));
+    } catch (const std::invalid_argument&) {
+        invalid_value_rejected = true;
+    }
+    require(invalid_value_rejected && range->value() == 25.0,
+            "failed generic conversion must leave the retained property unchanged");
+
+    const auto names = editor->bindable_property_names();
+    require(names == std::vector<std::string>{
+                "AutoSize", "CausesValidation", "Enabled", "Name", "Text",
+                "Visible"},
+            "bindable property enumeration must be deterministic and retain authored casing");
+    const auto descriptors = editor->property_descriptors();
+    require(descriptors.size() == 21U &&
+                descriptors.front().name == "AccessibleDescription" &&
+                descriptors.back().name == "Visible",
+            "property descriptor snapshots must follow deterministic canonical order");
+
+    const auto bounds = editor->property_descriptor("Bounds");
+    const auto dock = editor->property_descriptor("Dock");
+    const auto anchor = editor->property_descriptor("Anchor");
+    require(bounds && bounds->kind == BindingValueKind::rectangle &&
+                !bounds->bindable && bounds->resettable &&
+                dock && dock->kind == BindingValueKind::enumeration &&
+                dock->enumeration && !dock->enumeration->flags &&
+                dock->enumeration->choices.size() == 6U &&
+                anchor && anchor->enumeration && anchor->enumeration->flags,
+            "compound and enum descriptors must expose typed schema without pretending unsupported change binding");
+
+    editor->set_property_value("Bounds", Rect{4.0, 5.0, 120.0, 32.0});
+    editor->set_property_value("Margin", Insets{1.0, 2.0, 3.0, 4.0});
+    editor->set_property_value("Dock", std::string("Fill"));
+    editor->set_property_value("Anchor", std::string("Bottom | Right"));
+    editor->set_property_value("AutoSizeMode", std::string("GrowAndShrink"));
+    require(editor->requested_bounds() == Rect{4.0, 5.0, 120.0, 32.0} &&
+                editor->margin() == Insets{1.0, 2.0, 3.0, 4.0} &&
+                editor->dock() == DockStyle::fill &&
+                editor->anchor() ==
+                    (AnchorStyles::bottom | AnchorStyles::right) &&
+                editor->auto_size_mode() == AutoSizeMode::grow_and_shrink &&
+                std::get<PropertyEnumValue>(
+                    *editor->property_value("Anchor")).name ==
+                    "Bottom, Right" &&
+                editor->should_serialize_property("Bounds") &&
+                editor->should_serialize_property("Dock"),
+            "generic property access must drive real retained compound, enum, and flags behavior");
+
+    bool bad_enum_rejected = false;
+    bool bad_geometry_rejected = false;
+    try {
+        editor->set_property_value("Dock", std::string("Floating"));
+    } catch (const std::invalid_argument&) {
+        bad_enum_rejected = true;
+    }
+    try {
+        editor->set_property_value("Bounds", Rect{0.0, 0.0, -1.0, 2.0});
+    } catch (const std::invalid_argument&) {
+        bad_geometry_rejected = true;
+    }
+    require(bad_enum_rejected && bad_geometry_rejected &&
+                editor->dock() == DockStyle::fill &&
+                editor->requested_bounds() == Rect{4.0, 5.0, 120.0, 32.0},
+            "invalid enum and geometry values must fail before retained state mutation");
+    require(editor->reset_property("Bounds") &&
+                editor->reset_property("Margin") &&
+                editor->reset_property("Dock") &&
+                editor->reset_property("Anchor") &&
+                editor->reset_property("AutoSizeMode") &&
+                editor->requested_bounds() == Rect{} &&
+                editor->margin() == Insets{3.0, 3.0, 3.0, 3.0} &&
+                editor->dock() == DockStyle::none &&
+                editor->anchor() ==
+                    (AnchorStyles::top | AnchorStyles::left) &&
+                editor->auto_size_mode() == AutoSizeMode::grow_only &&
+                !editor->should_serialize_property("Bounds"),
+            "compound and enum defaults must reset through the same typed retained setter path");
+
+    auto probe = make_control<PropertyProbe>(StableId("property.probe"));
+    require(probe->property_descriptor("Level").has_value() &&
+                !probe->has_bindable_property("Level") &&
+                !probe->should_serialize_property("Level") &&
+                probe->property_value_origin("Level") ==
+                    PropertyValueOrigin::defaulted,
+            "inspection properties may deliberately remain outside data binding");
+    probe->set_property_value("Level", std::string("2"));
+    require(probe->level() == 2 &&
+                !probe->should_serialize_property("Level") &&
+                probe->property_value_origin("Level") ==
+                    PropertyValueOrigin::local,
+            "authored ShouldSerialize policy and local value origin must remain independent");
+    probe->set_property_value("Level", std::int64_t{7});
+    require(probe->should_serialize_property("Level") &&
+                probe->reset_property("Level") && probe->level() == 3,
+            "custom reset and serialization callbacks must be executable through the same registry");
+    const auto revision = probe->property_descriptor("Revision");
+    require(revision && !revision->writable && !revision->browsable &&
+                revision->serialization_visibility ==
+                    PropertySerializationVisibility::hidden &&
+                !probe->should_serialize_property("Revision") &&
+                probe->property_value_origin("Revision") ==
+                    PropertyValueOrigin::computed &&
+                !probe->reset_property("Revision"),
+            "read-only hidden metadata must never acquire an accidental reset or serialized value");
+
+    bool invalid_default_rejected = false;
+    try {
+        static_cast<void>(make_control<InvalidPropertyProbe>(
+            StableId("property.invalid")));
+    } catch (const std::invalid_argument&) {
+        invalid_default_rejected = true;
+    }
+    require(invalid_default_rejected,
+            "property registration must reject a default incompatible with its declared kind");
+}
+
+void test_property_enum_schema_bounds_and_unicode() {
+    PropertyEnumDescriptor descriptor{
+        "FixtureFlags", {{"None", 0}, {"Alpha", 1}, {"Beta", 2}}, true};
+    require(valid_property_enum_descriptor(descriptor),
+            "a bounded UTF-8 flags schema must be valid");
+
+    descriptor.choices.resize(maximum_property_enum_choices + 1U,
+                              {"Choice", 1});
+    require(!valid_property_enum_descriptor(descriptor),
+            "enum schemas must reject collections beyond the public bound");
+
+    descriptor = {"FixtureFlags", {{std::string(257U, 'x'), 1}}, true};
+    require(!valid_property_enum_descriptor(descriptor),
+            "enum schemas must reject unbounded choice names");
+
+    descriptor = {std::string("Fixture\xFF", 8U), {{"Alpha", 1}}, true};
+    require(!valid_property_enum_descriptor(descriptor),
+            "enum schemas must reject invalid UTF-8 type identity");
+}
+
+void test_property_mutation_initialization_thread_and_lifetime_guards() {
+    auto root = make_control<Panel>(StableId("property.root"));
+    auto editor = make_control<TextBox>(StableId("property.guarded"));
+    root->add_child(editor);
+    Window window(root, {320.0, 120.0});
+
+    std::vector<std::pair<Dirty, bool>> completions;
+    auto completed = editor->initialization_completed().subscribe(
+        [&](Dirty dirty, bool subtree) {
+            completions.emplace_back(dirty, subtree);
+        });
+    editor->begin_init();
+    editor->set_property_value("Text", std::string("batched"));
+    editor->set_property_value("Visible", false);
+    require(completions.empty() && editor->initializing(),
+            "generic property setters must participate in retained initialization batching");
+    editor->end_init();
+    require(completions.size() == 1U && completions.front().second &&
+                has_dirty(completions.front().first, Dirty::measure) &&
+                has_dirty(completions.front().first, Dirty::paint) &&
+                editor->text() == "batched" && !editor->visible(),
+            "the final EndInit must publish one union of real setter effects");
+
+    bool query_rejected = false;
+    bool mutation_rejected = false;
+    std::thread worker([&] {
+        try {
+            static_cast<void>(editor->property_value("Text"));
+        } catch (const std::logic_error&) {
+            query_rejected = true;
+        }
+        try {
+            editor->set_property_value("Text", std::string("wrong-thread"));
+        } catch (const std::logic_error&) {
+            mutation_rejected = true;
+        }
+    });
+    worker.join();
+    require(query_rejected && mutation_rejected && editor->text() == "batched",
+            "attached generic property reads and writes must enforce UI-thread ownership");
+
+    editor->dispose();
+    bool disposed_query_rejected = false;
+    bool disposed_reset_rejected = false;
+    try {
+        static_cast<void>(editor->property_value("Text"));
+    } catch (const std::logic_error&) {
+        disposed_query_rejected = true;
+    }
+    try {
+        static_cast<void>(editor->reset_property("Text"));
+    } catch (const std::logic_error&) {
+        disposed_reset_rejected = true;
+    }
+    require(disposed_query_rejected && disposed_reset_rejected &&
+                editor->property_descriptor("Text").has_value(),
+            "disposed controls must reject executable property access while retaining inert metadata inspection");
+    static_cast<void>(completed);
+}
+
+void test_visual_property_values_drive_stock_controls() {
+    auto label = make_control<Label>(StableId("property.label"), "Metadata");
+    const FontSpec inherited_font = label->font();
+    const Color inherited_color = label->foreground();
+    require(label->property_descriptor("Font")->kind ==
+                BindingValueKind::font &&
+                label->property_descriptor("ForeColor")->kind ==
+                    BindingValueKind::color &&
+                !label->should_serialize_property("Font") &&
+                !label->should_serialize_property("ForeColor"),
+            "inherited visual properties must expose their effective value without serializing an absent override");
+    const FontSpec authored{FontRole::content, 15.0, 650, true, 0.2};
+    const Color authored_color = Color::rgba(12, 34, 56, 220);
+    label->set_property_value("Font", authored);
+    label->set_property_value("ForeColor", authored_color);
+    require(label->font() == authored && label->foreground() == authored_color &&
+                label->should_serialize_property("Font") &&
+                label->should_serialize_property("ForeColor") &&
+                label->reset_property("Font") &&
+                label->reset_property("ForeColor") &&
+                label->font() == inherited_font &&
+                label->foreground() == inherited_color,
+            "font and color overrides must reset to live theme inheritance rather than a copied fallback");
+
+    auto picture = make_control<PictureBox>(StableId("property.picture"));
+    Component observer;
+    std::size_t image_changes{};
+    auto changed = picture->subscribe_property_changed(
+        "Image", observer, [&] { ++image_changes; });
+    picture->set_property_value("Image", std::uint64_t{42});
+    picture->set_property_value("SizeMode", std::string("Zoom"));
+    picture->set_property_value("ImageOpacity", 0.375);
+    require(picture->image() == ImageId{42} &&
+                picture->size_mode() == PictureBoxSizeMode::zoom &&
+                picture->image_opacity() == 0.375 && image_changes == 1U &&
+                picture->should_serialize_property("Image") &&
+                picture->should_serialize_property("SizeMode") &&
+                changed.connected(),
+            "image identity, image policy, opacity, and tokenized change notification must share the typed registry");
+    require(picture->reset_property("Image") &&
+                picture->reset_property("SizeMode") &&
+                picture->reset_property("ImageOpacity") &&
+                picture->image() == ImageId{} &&
+                picture->size_mode() == PictureBoxSizeMode::normal &&
+                picture->image_opacity() == 1.0 && image_changes == 2U,
+            "visual resource properties must have deterministic default reset behavior");
+
+    auto root = make_control<Panel>(StableId("property.visual.root"));
+    root->add_child(picture);
+    Window window(root, {200.0, 120.0});
+    auto source = std::make_shared<BindingSource>(window);
+    source->set_records({
+        {"property.visual.record", {{"image", std::uint64_t{77}}}},
+    });
+    const auto image_binding = picture->data_bindings().add(
+        "Image", source, "image");
+    require(image_binding && picture->image() == ImageId{77},
+            "Binding must use descriptor-aware unsigned-to-ImageId conversion rather than scalar-only conversion");
+
+    auto button = make_control<Button>(StableId("property.button"), "Run");
+    button->set_property_value("Font", authored);
+    button->set_property_value("Image", ImageId{7});
+    require(button->font() == authored && button->image() == ImageId{7} &&
+                button->reset_property("Font") &&
+                button->reset_property("Image") &&
+                button->font() ==
+                    FontSpec{FontRole::control, 12.0, 400, false, 0.24} &&
+                button->image() == ImageId{},
+            "button visual values must use the same compound default/reset center");
+    static_cast<void>(image_binding);
 }
 
 void test_multi_control_two_way_currency_and_event_order() {
@@ -401,6 +858,11 @@ void test_choice_numeric_defaults_manager_transfer_and_completion_order() {
 int main() {
     try {
         test_value_conversion_is_strict_and_invariant();
+        test_nested_property_values_are_bounded_immutable_and_structural();
+        test_property_enum_schema_bounds_and_unicode();
+        test_property_metadata_defaults_reset_and_serialization();
+        test_property_mutation_initialization_thread_and_lifetime_guards();
+        test_visual_property_values_drive_stock_controls();
         test_multi_control_two_way_currency_and_event_order();
         test_update_modes_suspension_and_explicit_transfers();
         test_format_parse_failure_rollback_and_completion();

@@ -330,6 +330,29 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     combo->set_requested_bounds({20.0, 20.0, 220.0, 32.0});
     root->add_child(combo);
     Window window(root, {300.0, 220.0});
+    const auto items_descriptor = combo->property_descriptor("Items");
+    Component items_observer;
+    std::size_t item_changes{};
+    auto items_changed = combo->subscribe_property_changed(
+        "Items", items_observer, [&item_changes] { ++item_changes; });
+    const PropertyCollectionValue replacement = make_property_collection(
+        "String", BindingValueKind::text,
+        {BindingValue{std::string("One")}, BindingValue{std::string("Two")}});
+    combo->set_property_value("Items", replacement);
+    require(items_descriptor &&
+                items_descriptor->kind == BindingValueKind::collection &&
+                items_descriptor->serialization_visibility ==
+                    PropertySerializationVisibility::content &&
+                !items_descriptor->bindable && items_descriptor->resettable &&
+                items_descriptor->change_notifications &&
+                combo->items().size() == 2U && combo->items()[1] == "Two" &&
+                items_changed.connected() && item_changes == 1U &&
+                combo->reset_property("Items") && combo->items().empty() &&
+                item_changes == 2U,
+            "ComboBox.Items must be a truthful content-serialized collection property with reset and change observation");
+    combo->set_items({"Low latency", "Balanced", "High fidelity", "Archive"});
+    require(item_changes == 3U,
+            "ordinary ComboBox collection mutation must use the same Items change contract as generic property access");
     RecordingPainter initial_painter;
     const DamageRegion initial_damage = window.take_damage();
     window.paint(initial_painter, initial_damage.bounds());

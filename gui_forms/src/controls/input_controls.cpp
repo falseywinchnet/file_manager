@@ -184,7 +184,9 @@ TextBox::TextBox(StableId stable_id, std::string text)
     set_cursor(CursorKind::text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
     define_bindable_property({
-        "Text", BindingValueKind::text,
+        {"Text", BindingValueKind::text, "Appearance",
+         "Editable UTF-8 text content.", BindingValue{std::string{}},
+         invalidation::text_content},
         [this] { return BindingValue{std::string(store_.utf8())}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(value, BindingValueKind::text);
@@ -194,7 +196,7 @@ TextBox::TextBox(StableId stable_id, std::string text)
         [this](Component& owner, std::function<void()> changed) {
             return text_changed_.subscribe(owner,
                 [changed = std::move(changed)](const std::string&) { changed(); });
-        }});
+        }, {}, {}});
 }
 
 void TextBox::set_text(std::string text) {
@@ -1546,8 +1548,53 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_border_style(BorderStyle::sunken);
     set_focusable(true);
     set_cursor(CursorKind::hand);
+    PropertyDescriptor items_descriptor;
+    items_descriptor.name = "Items";
+    items_descriptor.kind = BindingValueKind::collection;
+    items_descriptor.category = "Data";
+    items_descriptor.description =
+        "Ordered text items presented by the drop-down.";
+    items_descriptor.default_value = BindingValue{make_property_collection(
+        "String", BindingValueKind::text, {})};
+    items_descriptor.invalidation_effects =
+        Dirty::measure | Dirty::paint | Dirty::semantics;
+    items_descriptor.serialization_visibility =
+        PropertySerializationVisibility::content;
+    items_descriptor.bindable = false;
     define_bindable_property({
-        "SelectedIndex", BindingValueKind::signed_integer,
+        std::move(items_descriptor),
+        [this] {
+            std::vector<BindingValue> values;
+            values.reserve(items_.size());
+            for (const std::string& item : items_) values.emplace_back(item);
+            return BindingValue{make_property_collection(
+                "String", BindingValueKind::text, std::move(values))};
+        },
+        [this](const BindingValue& value) {
+            const auto* collection =
+                std::get_if<PropertyCollectionValue>(&value);
+            if (!collection || !*collection ||
+                collection->item_kind() != BindingValueKind::text) {
+                throw std::invalid_argument(
+                    "ComboBox.Items requires a homogeneous text collection");
+            }
+            std::vector<std::string> items;
+            const auto values = property_collection_items(*collection);
+            items.reserve(values.size());
+            for (const BindingValue& item : values) {
+                items.push_back(std::get<std::string>(item));
+            }
+            set_items(std::move(items));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return items_changed_.subscribe(owner, std::move(changed));
+        },
+        [this] { set_items({}); },
+        [this] { return !items_.empty(); }});
+    define_bindable_property({
+        {"SelectedIndex", BindingValueKind::signed_integer, "Behavior",
+         "Zero-based selected item index, or -1 when no item is selected.",
+         BindingValue{std::int64_t{-1}}, Dirty::paint | Dirty::semantics},
         [this] {
             return BindingValue{selected_index_
                 ? static_cast<std::int64_t>(*selected_index_)
@@ -1575,9 +1622,11 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
             return selected_index_changed_.subscribe(owner,
                 [changed = std::move(changed)](
                     std::optional<std::size_t>) { changed(); });
-        }});
+        }, {}, {}});
     define_bindable_property({
-        "Text", BindingValueKind::text,
+        {"Text", BindingValueKind::text, "Appearance",
+         "Text of the selected item, or empty when no item is selected.",
+         BindingValue{std::string{}}, Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{std::string(selected_text())}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(
@@ -1596,7 +1645,9 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
             return selected_index_changed_.subscribe(owner,
                 [changed = std::move(changed)](
                     std::optional<std::size_t>) { changed(); });
-        }});
+        },
+        [this] { set_selected_index(std::nullopt); },
+        [this] { return selected_index_.has_value(); }});
 }
 
 void ComboBox::set_items(std::vector<std::string> items) {
@@ -1606,13 +1657,16 @@ void ComboBox::set_items(std::vector<std::string> items) {
             throw std::invalid_argument("ComboBox items must be valid UTF-8");
         }
     }
+    if (items_ == items) return;
     items_ = std::move(items);
     if (selected_index_ && *selected_index_ >= items_.size()) {
         selected_index_.reset();
         selected_index_changed_.emit(selected_index_);
+        if (!is_alive()) return;
     }
     if (popup_list_) popup_list_->set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    items_changed_.emit();
 }
 
 void ComboBox::add_item(std::string item) {
@@ -1623,6 +1677,7 @@ void ComboBox::add_item(std::string item) {
     items_.push_back(std::move(item));
     if (popup_list_) popup_list_->set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    items_changed_.emit();
 }
 
 void ComboBox::set_selected_index(std::optional<std::size_t> index) {
@@ -1942,7 +1997,9 @@ NumericUpDown::NumericUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
     set_border_style(BorderStyle::line);
     set_background(style().paper);
     define_bindable_property({
-        "Value", BindingValueKind::number,
+        {"Value", BindingValueKind::number, "Behavior",
+         "Current numeric value.", BindingValue{0.0},
+         Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{value_}; },
         [this](const BindingValue& value) {
             const auto converted = convert_binding_value(
@@ -1956,7 +2013,7 @@ NumericUpDown::NumericUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
         [this](Component& owner, std::function<void()> changed) {
             return value_changed_.subscribe(owner,
                 [changed = std::move(changed)](double) { changed(); });
-        }});
+        }, {}, {}});
 }
 
 void NumericUpDown::initialize_control_tree() {

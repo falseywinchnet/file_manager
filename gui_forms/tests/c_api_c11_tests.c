@@ -50,6 +50,15 @@ static uint32_t count_click_callback(gf_handle sender, uint32_t event_kind,
     return GF_EVENT_CALLBACK_CONTINUE;
 }
 
+static uint32_t count_scroll_callback(gf_handle sender, uint32_t event_kind,
+                                      void* opaque) {
+    unsigned* calls = (unsigned*)opaque;
+    (void)sender;
+    require(event_kind == GF_EVENT_SCROLL, "scroll callback event kind changed");
+    ++*calls;
+    return GF_EVENT_CALLBACK_CONTINUE;
+}
+
 struct worker_context {
     gf_handle control;
     gf_result result;
@@ -220,7 +229,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_20, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_21, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -260,15 +269,72 @@ static void test_version_negotiation(void) {
                 api.get_scroll_state != NULL &&
                 api.set_scroll_axis_state != NULL &&
                 api.scroll_control_into_view != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_20,
+                api.suspend_layout != NULL && api.resume_layout != NULL &&
+                api.perform_control_layout != NULL &&
+                api.get_layout_state != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_21,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000015), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000016), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_21_layout_transactions(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle child = {0U, 0U};
+    gf_layout_state state;
+    memset(&state, 0, sizeof(state));
+    require(api.control_create_kind(GF_CONTROL_FORM, text("abi.layout.form"),
+                                    &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.layout.child"),
+                                        &child) == GF_OK &&
+                api.set_bounds(form, (gf_rect){0.0, 0.0, 200.0, 120.0}) == GF_OK &&
+                api.set_bounds(child, (gf_rect){10.0, 10.0, 40.0, 30.0}) == GF_OK &&
+                api.add_child(form, child) == GF_OK,
+            "0.21 layout transaction fixtures failed");
+    require(api.suspend_layout(child) == GF_OK &&
+                api.suspend_layout(child) == GF_OK &&
+                api.set_bounds(child,
+                               (gf_rect){24.0, 18.0, 58.0, 36.0}) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.suspend_depth == 2U && state.deferred == 1U &&
+                state.requested_revision > state.committed_revision,
+            "0.21 nested suspension did not retain deferred native state");
+    require(api.resume_layout(child, 1U) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.suspend_depth == 1U && state.deferred == 1U,
+            "0.21 inner resume incorrectly committed layout");
+    require(api.resume_layout(child, 1U) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.suspend_depth == 0U && state.deferred == 1U,
+            "0.21 detached final resume discarded pending layout");
+    require(api.run_window(form, GF_WINDOW_RUN_FORCE_HEADLESS) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.suspend_depth == 0U && state.deferred == 0U &&
+                state.requested_revision == state.committed_revision,
+            "0.21 attached layout did not commit the retained transaction");
+    require(api.suspend_layout(child) == GF_OK &&
+                api.perform_control_layout(child) == GF_OK &&
+                api.resume_layout(child, 0U) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.suspend_depth == 0U && state.deferred == 1U,
+            "0.21 ResumeLayout(false) lost deferred layout state");
+    require(api.perform_control_layout(child) == GF_OK &&
+                api.run_window(form, GF_WINDOW_RUN_FORCE_HEADLESS) == GF_OK &&
+                api.get_layout_state(child, &state) == GF_OK &&
+                state.deferred == 0U &&
+                state.requested_revision == state.committed_revision,
+            "0.21 explicit PerformLayout did not flush deferred state");
+    require(api.resume_layout(child, 2U) == GF_ERROR_INVALID_ARGUMENT &&
+                api.get_layout_state(child, NULL) == GF_ERROR_INVALID_ARGUMENT,
+            "0.21 layout ABI accepted invalid arguments");
+    require(api.dispose(form) == GF_OK,
+            "0.21 layout transaction disposal failed");
 }
 
 static void test_abi_0_19_cursor_contract(void) {
@@ -299,6 +365,8 @@ static void test_abi_0_20_scrollable_control_contract(void) {
     gf_handle form = {0U, 0U};
     gf_handle panel = {0U, 0U};
     gf_handle content = {0U, 0U};
+    gf_event_token scroll_token = {0U, 0U};
+    unsigned scroll_calls = 0U;
     gf_scroll_state state;
     memset(&state, 0, sizeof(state));
     require(api.control_create_kind(GF_CONTROL_FORM, text("abi.scroll.form"),
@@ -318,6 +386,9 @@ static void test_abi_0_20_scrollable_control_contract(void) {
                                            (gf_point){3.0, 5.0}) == GF_OK &&
                 api.add_child(panel, content) == GF_OK &&
                 api.add_child(form, panel) == GF_OK &&
+                api.subscribe_v2(panel, GF_EVENT_SCROLL,
+                                 count_scroll_callback, &scroll_calls,
+                                 &scroll_token) == GF_OK &&
                 api.set_auto_scroll_margin(panel,
                                            (gf_size){5.0, 7.0}) == GF_OK &&
                 api.set_auto_scroll(panel, 1U) == GF_OK &&
@@ -327,7 +398,8 @@ static void test_abi_0_20_scrollable_control_contract(void) {
                 state.auto_scroll == 1U && state.horizontal.visible == 1U &&
                 state.vertical.visible == 1U &&
                 state.viewport_rectangle.width == 84.0 &&
-                state.viewport_rectangle.height == 64.0,
+                state.viewport_rectangle.height == 64.0 &&
+                state.event_revision == 0U && scroll_calls == 0U,
             "0.20 automatic viewport state did not cross the ABI");
     require(api.set_auto_scroll_position(panel,
                                          (gf_point){50.0, 40.0}) == GF_OK &&
@@ -336,9 +408,10 @@ static void test_abi_0_20_scrollable_control_contract(void) {
                 state.display_rectangle.x == -50.0 &&
                 state.display_rectangle.y == -40.0,
             "0.20 automatic position did not round-trip");
-    require(api.scroll_control_into_view(panel, content) == GF_OK &&
+    require(api.set_auto_scroll_position(panel, (gf_point){0.0, 0.0}) == GF_OK &&
+                api.scroll_control_into_view(panel, content) == GF_OK &&
                 api.get_scroll_state(panel, &state) == GF_OK &&
-                state.position.x >= 0.0 && state.position.y >= 0.0,
+                state.position.x > 0.0 && state.position.y > 0.0,
             "0.20 ScrollControlIntoView did not preserve a valid viewport");
     require(api.set_auto_scroll(panel, 0U) == GF_OK &&
                 api.set_scroll_axis_state(
@@ -351,6 +424,9 @@ static void test_abi_0_20_scrollable_control_contract(void) {
             "0.20 manual ScrollProperties state did not round-trip");
     require(api.get_scroll_state(content, &state) ==
                 GF_ERROR_WRONG_HANDLE_KIND &&
+                api.subscribe_v2(content, GF_EVENT_SCROLL,
+                                 count_scroll_callback, &scroll_calls,
+                                 &scroll_token) == GF_ERROR_WRONG_HANDLE_KIND &&
                 api.set_auto_scroll(panel, 2U) == GF_ERROR_INVALID_ARGUMENT &&
                 api.set_auto_scroll_margin(panel,
                                            (gf_size){-1.0, 0.0}) ==
@@ -1175,6 +1251,7 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_21_layout_transactions();
     test_abi_0_20_scrollable_control_contract();
     test_abi_0_19_cursor_contract();
     test_abi_0_18_form_key_preview_contract();

@@ -1147,12 +1147,23 @@ public:
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
                         "get_scroll_state requires a scrollable control");
         }
-        if (scrollable->attached()) {
-            static_cast<void>(scrollable->arranged_bounds());
-        } else {
-            const Rect requested = scrollable->requested_bounds();
-            scrollable->arrange(
-                {0.0, 0.0, requested.width, requested.height});
+        bool inside_managed_callback = false;
+        {
+            std::scoped_lock lock(mutex_);
+            inside_managed_callback =
+                root_record_locked(record)->managed_callback_depth != 0U;
+        }
+        // A typed callback observes the state produced by the native input
+        // turn.  It must not recursively enter retained layout merely to read
+        // the event payload; ordinary reads retain the layout read barrier.
+        if (!inside_managed_callback) {
+            if (scrollable->attached()) {
+                static_cast<void>(scrollable->arranged_bounds());
+            } else {
+                const Rect requested = scrollable->requested_bounds();
+                scrollable->arrange(
+                    {0.0, 0.0, requested.width, requested.height});
+            }
         }
         const gui_forms::ScrollSnapshot snapshot = scrollable->scroll_snapshot();
         const auto axis = [](const gui_forms::ScrollAxisSnapshot& source) {
@@ -1161,6 +1172,8 @@ public:
                 source.minimum, source.maximum, source.large_change,
                 source.small_change, source.value};
         };
+        const std::optional<gui_forms::ScrollEvent> last =
+            scrollable->last_scroll_event();
         *state = {
             snapshot.auto_scroll ? 1U : 0U,
             {snapshot.position.x, snapshot.position.y},
@@ -1173,7 +1186,12 @@ public:
             {snapshot.viewport_rectangle.x, snapshot.viewport_rectangle.y,
              snapshot.viewport_rectangle.width,
              snapshot.viewport_rectangle.height},
-            axis(snapshot.horizontal), axis(snapshot.vertical)};
+            axis(snapshot.horizontal), axis(snapshot.vertical),
+            scrollable->scroll_event_revision(),
+            last ? static_cast<std::uint32_t>(last->type) : 0U,
+            last ? static_cast<std::uint32_t>(last->orientation) : 0U,
+            last ? last->old_value : 0.0,
+            last ? last->new_value : 0.0};
         return GF_OK;
     }
 
@@ -1228,7 +1246,61 @@ public:
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
                         "ScrollControlIntoView requires a scrollable control");
         }
+        if (scrollable->attached()) {
+            static_cast<void>(scrollable->arranged_bounds());
+        } else {
+            const Rect requested = scrollable->requested_bounds();
+            scrollable->arrange(
+                {0.0, 0.0, requested.width, requested.height});
+        }
         scrollable->scroll_control_into_view(child->control);
+        return GF_OK;
+    }
+
+    gf_result suspend_layout(gf_handle handle) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        record->control->suspend_layout();
+        return GF_OK;
+    }
+
+    gf_result resume_layout(gf_handle handle, std::uint32_t perform_layout) {
+        if (perform_layout > 1U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "resume_layout requires a Boolean perform flag");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        record->control->resume_layout(perform_layout != 0U);
+        return GF_OK;
+    }
+
+    gf_result perform_control_layout(gf_handle handle) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        record->control->perform_layout();
+        return GF_OK;
+    }
+
+    gf_result get_layout_state(gf_handle handle, gf_layout_state* state) {
+        if (state == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_layout_state requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const gui_forms::LayoutTransactionState snapshot =
+            record->control->layout_transaction_state();
+        *state = {snapshot.suspend_depth, snapshot.deferred ? 1U : 0U,
+                  snapshot.requested_revision, snapshot.committed_revision};
         return GF_OK;
     }
 
@@ -1986,6 +2058,10 @@ public:
         const bool auto_activate =
             (flags & GF_WINDOW_RUN_AUTOMATION_ACTIVATE) != 0U;
         const bool popup = (flags & GF_WINDOW_RUN_POPUP) != 0U;
+        // These remain part of the renderer-neutral launch contract even when
+        // this build contains only the headless host.
+        static_cast<void>(auto_close);
+        static_cast<void>(popup);
         const std::string title = record->text.empty()
             ? std::string("GUI.Forms Managed Surface") : record->text;
 
@@ -2463,7 +2539,8 @@ public:
              event_kind != GF_EVENT_FORM_CLOSED &&
              event_kind != GF_EVENT_RANGE_VALUE_CHANGED &&
              event_kind != GF_EVENT_RANGE_SCROLL &&
-             event_kind != GF_EVENT_BOUNDS_CHANGED) ||
+             event_kind != GF_EVENT_BOUNDS_CHANGED &&
+             event_kind != GF_EVENT_SCROLL) ||
             callback == nullptr || output == nullptr) {
             return fail(GF_ERROR_INVALID_ARGUMENT,
                         "subscribe_v2 requires a supported typed event, callback, and output");
@@ -2488,6 +2565,8 @@ public:
         }
         const auto range =
             std::dynamic_pointer_cast<gui_forms::RangeControl>(sender->control);
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(sender->control);
         if ((event_kind == GF_EVENT_RANGE_VALUE_CHANGED ||
              event_kind == GF_EVENT_RANGE_SCROLL) && !range) {
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
@@ -2497,6 +2576,10 @@ public:
             sender->kind != GF_CONTROL_FORM) {
             return fail(GF_ERROR_WRONG_HANDLE_KIND,
                         "bounds-changed subscriptions require a form control");
+        }
+        if (event_kind == GF_EVENT_SCROLL && !scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "scroll subscriptions require a scrollable control");
         }
         auto record = std::make_shared<SubscriptionRecord>();
         record->callback_v2 = callback;
@@ -2529,6 +2612,11 @@ public:
                         static_cast<void>(emit_v2(
                             sender_handle, GF_EVENT_BOUNDS_CHANGED));
                     });
+        } else if (event_kind == GF_EVENT_SCROLL) {
+            record->native_subscription = scrollable->scroll().subscribe(
+                [this, sender_handle](gui_forms::ScrollEvent&) {
+                    static_cast<void>(emit_v2(sender_handle, GF_EVENT_SCROLL));
+                });
         }
         return GF_OK;
     }
@@ -3380,6 +3468,22 @@ gf_result api_scroll_control_into_view(gf_handle handle,
         return registry().scroll_control_into_view(handle, child);
     });
 }
+gf_result api_suspend_layout(gf_handle handle) noexcept {
+    return translate([&] { return registry().suspend_layout(handle); });
+}
+gf_result api_resume_layout(gf_handle handle,
+                            std::uint32_t perform_layout) noexcept {
+    return translate([&] {
+        return registry().resume_layout(handle, perform_layout);
+    });
+}
+gf_result api_perform_control_layout(gf_handle handle) noexcept {
+    return translate([&] { return registry().perform_control_layout(handle); });
+}
+gf_result api_get_layout_state(gf_handle handle,
+                               gf_layout_state* state) noexcept {
+    return translate([&] { return registry().get_layout_state(handle, state); });
+}
 gf_result api_run_window(gf_handle handle, std::uint32_t flags) noexcept {
     return translate([&] { return registry().run_window(handle, flags); });
 }
@@ -3605,7 +3709,8 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_17 &&
         requested_version != GF_ABI_VERSION_0_18 &&
         requested_version != GF_ABI_VERSION_0_19 &&
-        requested_version != GF_ABI_VERSION_0_20) {
+        requested_version != GF_ABI_VERSION_0_20 &&
+        requested_version != GF_ABI_VERSION_0_21) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -3681,6 +3786,10 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_get_scroll_state,
         &api_set_scroll_axis_state,
         &api_scroll_control_into_view,
+        &api_suspend_layout,
+        &api_resume_layout,
+        &api_perform_control_layout,
+        &api_get_layout_state,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

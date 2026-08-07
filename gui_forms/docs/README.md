@@ -41,6 +41,22 @@ spike APIs to a frozen compatibility promise.
 - [`../experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md`](../experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md)
   — 796/796 compiled facade identities and the first native ABI-backed managed
   control/property/tree/disposal spine on host .NET and Wine.
+- [`../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md`](../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md)
+  — exact property value origins plus the native metadata-driven PropertyGrid,
+  typed stock editors, reset/validation, hostile callback disposal, and native
+  showcase dogfood.
+- [`../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md`](../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md)
+  — expandable typed geometry/spacing/color/font fields, precise property-path
+  mutation, real retained Reset controls, semantics, and native dogfood.
+- [`../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md`](../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md)
+  — bounded immutable object/collection values, recursive member/index editing,
+  atomic collection mutations, stock ComboBox.Items, and native dogfood.
+- [`../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md`](../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md)
+  — instance-owned TypeConverter/editor analogues, retained custom-editor
+  ownership, default NumericUpDown inspection, and typed commit dogfood.
+- [`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`](../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md)
+  — retained multi-select flags popup, alpha-aware color field/swatch,
+  bounded failure routing, and native-neutral portability gates.
 - [`../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md`](../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md)
   — managed `Application.Run(Form)`, additive ABI 0.3 host projection,
   deterministic headless evidence, and a captured Win32/Wine surface.
@@ -72,6 +88,13 @@ spike APIs to a frozen compatibility promise.
   — exact geometry flags, masked bounds, preferred/AutoSize sizing,
   direct-child filtering, nested traversal, and coherent topmost-first ordering
   across the retained core and generated facade.
+- [`../experiments/M12P15_PROPERTY_METADATA_CENTER.md`](../experiments/M12P15_PROPERTY_METADATA_CENTER.md)
+  — native renderer-neutral property descriptors, typed access, defaults,
+  reset/serialization policy, tokenized changes, declared effects, and
+  initialization/thread/lifetime gates.
+- [`../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md`](../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md)
+  — geometry/spacing/color/font/image/enum property values, finite shared enum
+  schemas, descriptor-aware conversion, and real layout/visual registrations.
 - [`../experiments/M4A_UNICODE_TEXT_STORE.md`](../experiments/M4A_UNICODE_TEXT_STORE.md)
   — strict UTF-8, typed positions, atomic edits, Unicode line indexing, style
   spans, and deterministic corpus evidence.

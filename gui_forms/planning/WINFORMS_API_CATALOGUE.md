@@ -24,9 +24,9 @@ A `partial_native` row means only that a corresponding retained GUI.Forms/GUI.Dr
 | `System.Drawing` | `partial_native` | 1138 |
 | `System.Drawing` | `platform_extension_partial` | 17 |
 | `System.Windows.Forms` | `excluded` | 1265 |
-| `System.Windows.Forms` | `measured_partial` | 398 |
-| `System.Windows.Forms` | `missing` | 9937 |
-| `System.Windows.Forms` | `partial_native` | 2933 |
+| `System.Windows.Forms` | `measured_partial` | 494 |
+| `System.Windows.Forms` | `missing` | 9850 |
+| `System.Windows.Forms` | `partial_native` | 2924 |
 | `System.Windows.Forms` | `platform_extension_review` | 42 |
 
 ## Families

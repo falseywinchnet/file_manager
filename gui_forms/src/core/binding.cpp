@@ -5,8 +5,10 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <charconv>
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <locale>
 #include <set>
@@ -15,6 +17,78 @@
 #include <utility>
 
 namespace gui_forms {
+
+std::string_view property_value_origin_name(
+    PropertyValueOrigin origin) noexcept {
+    switch (origin) {
+    case PropertyValueOrigin::defaulted: return "default";
+    case PropertyValueOrigin::local: return "local";
+    case PropertyValueOrigin::inherited: return "inherited";
+    case PropertyValueOrigin::ambient: return "ambient";
+    case PropertyValueOrigin::computed: return "computed";
+    }
+    return "computed";
+}
+
+struct PropertyValueFactoryAccess final {
+    static PropertyObjectValue object(
+        std::shared_ptr<const PropertyObjectData> data) {
+        return PropertyObjectValue(std::move(data));
+    }
+    static PropertyCollectionValue collection(
+        std::shared_ptr<const PropertyCollectionData> data) {
+        return PropertyCollectionValue(std::move(data));
+    }
+};
+
+PropertyObjectValue::operator bool() const noexcept {
+    return static_cast<bool>(data_);
+}
+
+std::string_view PropertyObjectValue::type_name() const noexcept {
+    return data_ ? std::string_view(data_->type_name) : std::string_view{};
+}
+
+std::span<const PropertyObjectMember> PropertyObjectValue::members() const noexcept {
+    return data_ ? std::span<const PropertyObjectMember>(data_->members)
+                 : std::span<const PropertyObjectMember>{};
+}
+
+bool operator==(const PropertyObjectValue& left,
+                const PropertyObjectValue& right) noexcept {
+    if (left.data_ == right.data_) return true;
+    return left.data_ && right.data_ &&
+        left.data_->type_name == right.data_->type_name &&
+        left.data_->members == right.data_->members;
+}
+
+PropertyCollectionValue::operator bool() const noexcept {
+    return static_cast<bool>(data_);
+}
+
+std::string_view PropertyCollectionValue::item_type_name() const noexcept {
+    return data_ ? std::string_view(data_->item_type_name) : std::string_view{};
+}
+
+BindingValueKind PropertyCollectionValue::item_kind() const noexcept {
+    return data_ ? data_->item_kind : BindingValueKind::null;
+}
+
+std::span<const BindingValue> property_collection_items(
+    const PropertyCollectionValue& value) noexcept {
+    return value.data() ? std::span<const BindingValue>(value.data()->items)
+                        : std::span<const BindingValue>{};
+}
+
+bool operator==(const PropertyCollectionValue& left,
+                const PropertyCollectionValue& right) noexcept {
+    if (left.data_ == right.data_) return true;
+    return left.data_ && right.data_ &&
+        left.data_->item_type_name == right.data_->item_type_name &&
+        left.data_->item_kind == right.data_->item_kind &&
+        left.data_->items == right.data_->items;
+}
+
 namespace {
 
 void bump(std::uint64_t& value) noexcept {
@@ -112,6 +186,202 @@ void validate_options(const BindingOptions& options) {
     }
 }
 
+std::string_view trimmed(std::string_view value) noexcept {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1U);
+}
+
+bool ascii_name_equal(std::string_view left, std::string_view right) noexcept {
+    left = trimmed(left);
+    right = trimmed(right);
+    if (left.size() != right.size()) return false;
+    for (std::size_t index = 0; index < left.size(); ++index) {
+        auto fold = [](unsigned char byte) noexcept {
+            return byte >= 'A' && byte <= 'Z'
+                ? static_cast<unsigned char>(byte + ('a' - 'A')) : byte;
+        };
+        if (fold(static_cast<unsigned char>(left[index])) !=
+            fold(static_cast<unsigned char>(right[index]))) return false;
+    }
+    return true;
+}
+
+const PropertyEnumChoice* enum_choice_by_name(
+    const PropertyEnumDescriptor& descriptor, std::string_view name) noexcept {
+    const auto found = std::find_if(
+        descriptor.choices.begin(), descriptor.choices.end(),
+        [name](const PropertyEnumChoice& choice) {
+            return ascii_name_equal(choice.name, name);
+        });
+    return found == descriptor.choices.end() ? nullptr : &*found;
+}
+
+const PropertyEnumChoice* enum_choice_by_value(
+    const PropertyEnumDescriptor& descriptor, std::int64_t value) noexcept {
+    const auto found = std::find_if(
+        descriptor.choices.begin(), descriptor.choices.end(),
+        [value](const PropertyEnumChoice& choice) {
+            return choice.value == value;
+        });
+    return found == descriptor.choices.end() ? nullptr : &*found;
+}
+
+std::optional<std::int64_t> enum_numeric_value(
+    const BindingValue& value,
+    const PropertyEnumDescriptor& descriptor) noexcept {
+    if (const auto* item = std::get_if<PropertyEnumValue>(&value)) {
+        return item->type_name == descriptor.type_name
+            ? std::optional<std::int64_t>{item->value} : std::nullopt;
+    }
+    if (const auto* item = std::get_if<std::int64_t>(&value)) return *item;
+    if (const auto* item = std::get_if<std::uint64_t>(&value)) {
+        return *item <= static_cast<std::uint64_t>(
+                            std::numeric_limits<std::int64_t>::max())
+            ? std::optional<std::int64_t>{static_cast<std::int64_t>(*item)}
+            : std::nullopt;
+    }
+    if (const auto* item = std::get_if<double>(&value)) {
+        if (!std::isfinite(*item) || std::trunc(*item) != *item ||
+            *item < static_cast<double>(std::numeric_limits<std::int64_t>::min()) ||
+            *item > static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+            return std::nullopt;
+        }
+        return static_cast<std::int64_t>(*item);
+    }
+    if (const auto* item = std::get_if<std::string>(&value)) {
+        if (!descriptor.flags) {
+            const PropertyEnumChoice* choice = enum_choice_by_name(
+                descriptor, *item);
+            return choice ? std::optional<std::int64_t>{choice->value}
+                          : std::nullopt;
+        }
+        std::uint64_t combined{};
+        std::size_t offset{};
+        bool saw_choice = false;
+        while (offset <= item->size()) {
+            const std::size_t separator = item->find_first_of(",|", offset);
+            const std::string_view token = trimmed(std::string_view(*item).substr(
+                offset, separator == std::string::npos
+                    ? std::string::npos : separator - offset));
+            if (token.empty()) return std::nullopt;
+            const PropertyEnumChoice* choice = enum_choice_by_name(
+                descriptor, token);
+            if (!choice || choice->value < 0) return std::nullopt;
+            combined |= static_cast<std::uint64_t>(choice->value);
+            saw_choice = true;
+            if (separator == std::string::npos) break;
+            offset = separator + 1U;
+        }
+        return saw_choice && combined <= static_cast<std::uint64_t>(
+                                         std::numeric_limits<std::int64_t>::max())
+            ? std::optional<std::int64_t>{static_cast<std::int64_t>(combined)}
+            : std::nullopt;
+    }
+    return std::nullopt;
+}
+
+std::optional<PropertyEnumValue> normalize_enum_value(
+    const BindingValue& value,
+    const PropertyEnumDescriptor& descriptor) {
+    const auto numeric = enum_numeric_value(value, descriptor);
+    if (!numeric) return std::nullopt;
+    if (const PropertyEnumChoice* exact = enum_choice_by_value(
+            descriptor, *numeric)) {
+        return PropertyEnumValue{
+            descriptor.type_name, exact->name, exact->value};
+    }
+    if (!descriptor.flags || *numeric < 0) return std::nullopt;
+    std::uint64_t allowed{};
+    for (const PropertyEnumChoice& choice : descriptor.choices) {
+        if (choice.value > 0) {
+            allowed |= static_cast<std::uint64_t>(choice.value);
+        }
+    }
+    const auto bits = static_cast<std::uint64_t>(*numeric);
+    if ((bits & ~allowed) != 0U) return std::nullopt;
+    std::string name;
+    for (const PropertyEnumChoice& choice : descriptor.choices) {
+        if (choice.value <= 0 ||
+            !std::has_single_bit(static_cast<std::uint64_t>(choice.value)) ||
+            (bits & static_cast<std::uint64_t>(choice.value)) == 0U) continue;
+        if (!name.empty()) name += ", ";
+        name += choice.name;
+    }
+    if (name.empty()) name = std::to_string(*numeric);
+    return PropertyEnumValue{descriptor.type_name, std::move(name), *numeric};
+}
+
+bool valid_nested_kind(BindingValueKind kind) noexcept {
+    return kind == BindingValueKind::boolean ||
+        kind == BindingValueKind::signed_integer ||
+        kind == BindingValueKind::unsigned_integer ||
+        kind == BindingValueKind::number ||
+        kind == BindingValueKind::text ||
+        kind == BindingValueKind::point ||
+        kind == BindingValueKind::size ||
+        kind == BindingValueKind::rectangle ||
+        kind == BindingValueKind::insets ||
+        kind == BindingValueKind::color ||
+        kind == BindingValueKind::font ||
+        kind == BindingValueKind::image ||
+        kind == BindingValueKind::enumeration ||
+        kind == BindingValueKind::object ||
+        kind == BindingValueKind::collection;
+}
+
+bool valid_property_value_tree_impl(const BindingValue& value,
+                                    std::size_t depth,
+                                    std::size_t& nodes) {
+    if (++nodes > maximum_property_value_nodes ||
+        depth > maximum_property_value_depth) {
+        return false;
+    }
+    if (const auto* object = std::get_if<PropertyObjectValue>(&value)) {
+        if (!*object || object->type_name().empty() ||
+            object->type_name().size() > 256U ||
+            trimmed(object->type_name()).size() != object->type_name().size() ||
+            !validate_utf8(object->type_name()).valid() ||
+            object->members().size() > maximum_property_object_members) {
+            return false;
+        }
+        std::set<std::string> identities;
+        for (const PropertyObjectMember& member : object->members()) {
+            if (trimmed(member.name).size() != member.name.size() ||
+                member.name.empty() || member.name.size() > 256U ||
+                !validate_utf8(member.name).valid() ||
+                !validate_utf8(member.description).valid() ||
+                !identities.insert(canonical_binding_name(member.name)).second ||
+                !valid_property_value_tree_impl(member.value, depth + 1U,
+                                                nodes)) {
+                return false;
+            }
+        }
+    } else if (const auto* collection =
+                   std::get_if<PropertyCollectionValue>(&value)) {
+        const auto items = property_collection_items(*collection);
+        if (!*collection || collection->item_type_name().empty() ||
+            collection->item_type_name().size() > 256U ||
+            trimmed(collection->item_type_name()).size() !=
+                collection->item_type_name().size() ||
+            !validate_utf8(collection->item_type_name()).valid() ||
+            !valid_nested_kind(collection->item_kind()) ||
+            items.size() > maximum_property_collection_items) {
+            return false;
+        }
+        for (const BindingValue& item : items) {
+            if (binding_value_kind(item) != collection->item_kind() ||
+                !valid_property_value_tree_impl(item, depth + 1U, nodes)) {
+                return false;
+            }
+        }
+    } else if (!convert_binding_value(value, binding_value_kind(value))) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 BindingValueKind binding_value_kind(const BindingValue& value) noexcept {
@@ -127,8 +397,28 @@ BindingValueKind binding_value_kind(const BindingValue& value) noexcept {
             return BindingValueKind::unsigned_integer;
         } else if constexpr (std::is_same_v<Type, double>) {
             return BindingValueKind::number;
-        } else {
+        } else if constexpr (std::is_same_v<Type, std::string>) {
             return BindingValueKind::text;
+        } else if constexpr (std::is_same_v<Type, Point>) {
+            return BindingValueKind::point;
+        } else if constexpr (std::is_same_v<Type, Size>) {
+            return BindingValueKind::size;
+        } else if constexpr (std::is_same_v<Type, Rect>) {
+            return BindingValueKind::rectangle;
+        } else if constexpr (std::is_same_v<Type, Insets>) {
+            return BindingValueKind::insets;
+        } else if constexpr (std::is_same_v<Type, Color>) {
+            return BindingValueKind::color;
+        } else if constexpr (std::is_same_v<Type, FontSpec>) {
+            return BindingValueKind::font;
+        } else if constexpr (std::is_same_v<Type, ImageId>) {
+            return BindingValueKind::image;
+        } else if constexpr (std::is_same_v<Type, PropertyEnumValue>) {
+            return BindingValueKind::enumeration;
+        } else if constexpr (std::is_same_v<Type, PropertyObjectValue>) {
+            return BindingValueKind::object;
+        } else {
+            return BindingValueKind::collection;
         }
     }, value);
 }
@@ -142,11 +432,51 @@ std::string binding_value_to_string(const BindingValue& value) {
             return item ? "true" : "false";
         } else if constexpr (std::is_same_v<Type, std::string>) {
             return item;
-        } else {
+        } else if constexpr (std::is_arithmetic_v<Type>) {
             std::ostringstream output;
+            output.imbue(std::locale::classic());
             output.precision(std::numeric_limits<double>::max_digits10);
             output << item;
             return output.str();
+        } else if constexpr (std::is_same_v<Type, Point>) {
+            return std::to_string(item.x) + "," + std::to_string(item.y);
+        } else if constexpr (std::is_same_v<Type, Size>) {
+            return std::to_string(item.width) + "," +
+                   std::to_string(item.height);
+        } else if constexpr (std::is_same_v<Type, Rect>) {
+            return std::to_string(item.x) + "," + std::to_string(item.y) +
+                   "," + std::to_string(item.width) + "," +
+                   std::to_string(item.height);
+        } else if constexpr (std::is_same_v<Type, Insets>) {
+            return std::to_string(item.left) + "," + std::to_string(item.top) +
+                   "," + std::to_string(item.right) + "," +
+                   std::to_string(item.bottom);
+        } else if constexpr (std::is_same_v<Type, Color>) {
+            std::ostringstream output;
+            output << '#' << std::hex << std::uppercase << std::setfill('0')
+                   << std::setw(2) << static_cast<unsigned>(item.red)
+                   << std::setw(2) << static_cast<unsigned>(item.green)
+                   << std::setw(2) << static_cast<unsigned>(item.blue)
+                   << std::setw(2) << static_cast<unsigned>(item.alpha);
+            return output.str();
+        } else if constexpr (std::is_same_v<Type, FontSpec>) {
+            return "font(" + std::to_string(static_cast<unsigned>(item.role)) +
+                "," + std::to_string(item.size) + "," +
+                std::to_string(item.weight) + "," +
+                (item.italic ? "italic" : "regular") + "," +
+                std::to_string(item.letter_spacing) + ")";
+        } else if constexpr (std::is_same_v<Type, ImageId>) {
+            return "image:" + std::to_string(item.value);
+        } else if constexpr (std::is_same_v<Type, PropertyEnumValue>) {
+            return item.name.empty() ? std::to_string(item.value) : item.name;
+        } else if constexpr (std::is_same_v<Type, PropertyObjectValue>) {
+            return item ? std::string(item.type_name()) + " {" +
+                    std::to_string(item.members().size()) + "}"
+                : std::string("<invalid object>");
+        } else {
+            return item ? std::string(item.item_type_name()) + " [" +
+                    std::to_string(property_collection_items(item).size()) + "]"
+                : std::string("<invalid collection>");
         }
     }, value);
 }
@@ -172,8 +502,10 @@ std::optional<bool> binding_value_to_bool(const BindingValue& value) noexcept {
         } else if constexpr (std::is_floating_point_v<Type>) {
             return std::isfinite(item) ? std::optional<bool>{item != 0.0}
                                        : std::nullopt;
-        } else {
+        } else if constexpr (std::is_integral_v<Type>) {
             return item != 0;
+        } else {
+            return std::nullopt;
         }
     }, value);
 }
@@ -197,8 +529,13 @@ std::optional<std::int64_t> binding_value_to_signed(
                 return std::nullopt;
             }
             return static_cast<std::int64_t>(item);
-        } else {
+        } else if constexpr (std::is_same_v<Type, std::int64_t> ||
+                             std::is_same_v<Type, bool>) {
             return static_cast<std::int64_t>(item);
+        } else if constexpr (std::is_same_v<Type, PropertyEnumValue>) {
+            return item.value;
+        } else {
+            return std::nullopt;
         }
     }, value);
 }
@@ -221,8 +558,17 @@ std::optional<std::uint64_t> binding_value_to_unsigned(
                 return std::nullopt;
             }
             return static_cast<std::uint64_t>(item);
-        } else {
+        } else if constexpr (std::is_same_v<Type, std::uint64_t> ||
+                             std::is_same_v<Type, bool>) {
             return static_cast<std::uint64_t>(item);
+        } else if constexpr (std::is_same_v<Type, ImageId>) {
+            return item.value;
+        } else if constexpr (std::is_same_v<Type, PropertyEnumValue>) {
+            return item.value < 0 ? std::nullopt
+                : std::optional<std::uint64_t>{
+                      static_cast<std::uint64_t>(item.value)};
+        } else {
+            return std::nullopt;
         }
     }, value);
 }
@@ -234,10 +580,15 @@ std::optional<double> binding_value_to_number(const BindingValue& value) noexcep
             return std::nullopt;
         } else if constexpr (std::is_same_v<Type, std::string>) {
             return parse_number<double>(item);
-        } else {
+        } else if constexpr (std::is_same_v<Type, bool> ||
+                             std::is_same_v<Type, std::int64_t> ||
+                             std::is_same_v<Type, std::uint64_t> ||
+                             std::is_same_v<Type, double>) {
             const double result = static_cast<double>(item);
             return std::isfinite(result) ? std::optional<double>{result}
                                          : std::nullopt;
+        } else {
+            return std::nullopt;
         }
     }, value);
 }
@@ -245,7 +596,59 @@ std::optional<double> binding_value_to_number(const BindingValue& value) noexcep
 std::optional<BindingValue> convert_binding_value(
     const BindingValue& value, BindingValueKind target_kind) {
     if (target_kind == BindingValueKind::null) return BindingValue{};
-    if (binding_value_kind(value) == target_kind) return value;
+    if (binding_value_kind(value) == target_kind) {
+        switch (target_kind) {
+        case BindingValueKind::null:
+        case BindingValueKind::boolean:
+        case BindingValueKind::signed_integer:
+        case BindingValueKind::unsigned_integer:
+        case BindingValueKind::text:
+        case BindingValueKind::color:
+        case BindingValueKind::image:
+            return value;
+        case BindingValueKind::number:
+            return std::isfinite(std::get<double>(value))
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        case BindingValueKind::point: {
+            const Point item = std::get<Point>(value);
+            return std::isfinite(item.x) && std::isfinite(item.y)
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        case BindingValueKind::size: {
+            const Size item = std::get<Size>(value);
+            return std::isfinite(item.width) && std::isfinite(item.height) &&
+                    item.width >= 0.0 && item.height >= 0.0
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        case BindingValueKind::rectangle: {
+            const Rect item = std::get<Rect>(value);
+            return item.finite() && item.width >= 0.0 && item.height >= 0.0
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        case BindingValueKind::insets: {
+            const Insets item = std::get<Insets>(value);
+            return std::isfinite(item.left) && std::isfinite(item.top) &&
+                    std::isfinite(item.right) && std::isfinite(item.bottom)
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        case BindingValueKind::font: {
+            const FontSpec item = std::get<FontSpec>(value);
+            const bool valid_role = item.role == FontRole::control ||
+                item.role == FontRole::content ||
+                item.role == FontRole::monospace;
+            return valid_role && valid_font_spec(item)
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        case BindingValueKind::enumeration:
+            return !std::get<PropertyEnumValue>(value).type_name.empty()
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        case BindingValueKind::object:
+        case BindingValueKind::collection:
+            return valid_property_value_tree(value)
+                ? std::optional<BindingValue>{value} : std::nullopt;
+        }
+        return std::nullopt;
+    }
     switch (target_kind) {
     case BindingValueKind::null: return BindingValue{};
     case BindingValueKind::boolean:
@@ -270,8 +673,114 @@ std::optional<BindingValue> convert_binding_value(
         break;
     case BindingValueKind::text:
         return BindingValue{binding_value_to_string(value)};
+    case BindingValueKind::image:
+        if (const auto converted = binding_value_to_unsigned(value)) {
+            return BindingValue{ImageId{*converted}};
+        }
+        break;
+    case BindingValueKind::point:
+    case BindingValueKind::size:
+    case BindingValueKind::rectangle:
+    case BindingValueKind::insets:
+    case BindingValueKind::color:
+    case BindingValueKind::font:
+    case BindingValueKind::enumeration:
+    case BindingValueKind::object:
+    case BindingValueKind::collection:
+        break;
     }
     return std::nullopt;
+}
+
+bool valid_property_value_tree(const BindingValue& value) noexcept {
+    try {
+        std::size_t nodes{};
+        return valid_property_value_tree_impl(value, 0U, nodes);
+    } catch (...) {
+        return false;
+    }
+}
+
+PropertyObjectValue make_property_object(
+    std::string type_name, std::vector<PropertyObjectMember> members) {
+    auto data = std::make_shared<PropertyObjectData>();
+    data->type_name = std::move(type_name);
+    data->members = std::move(members);
+    PropertyObjectValue result = PropertyValueFactoryAccess::object(
+        std::move(data));
+    if (!valid_property_value_tree(BindingValue{result})) {
+        throw std::invalid_argument(
+            "GUI.Forms property object schema/value tree is invalid or exceeds its bound");
+    }
+    return result;
+}
+
+PropertyCollectionValue make_property_collection(
+    std::string item_type_name, BindingValueKind item_kind,
+    std::vector<BindingValue> items) {
+    if (!valid_nested_kind(item_kind)) {
+        throw std::invalid_argument(
+            "GUI.Forms property collection requires one non-null item kind");
+    }
+    for (BindingValue& item : items) {
+        const auto converted = convert_binding_value(item, item_kind);
+        if (!converted) {
+            throw std::invalid_argument(
+                "GUI.Forms property collection item cannot convert to its declared kind");
+        }
+        item = *converted;
+    }
+    auto data = std::make_shared<PropertyCollectionData>();
+    data->item_type_name = std::move(item_type_name);
+    data->item_kind = item_kind;
+    data->items = std::move(items);
+    PropertyCollectionValue result = PropertyValueFactoryAccess::collection(
+        std::move(data));
+    if (!valid_property_value_tree(BindingValue{result})) {
+        throw std::invalid_argument(
+            "GUI.Forms property collection schema/value tree is invalid or exceeds its bound");
+    }
+    return result;
+}
+
+bool valid_property_enum_descriptor(
+    const PropertyEnumDescriptor& descriptor) noexcept {
+    if (trimmed(descriptor.type_name).size() != descriptor.type_name.size() ||
+        descriptor.type_name.empty() ||
+        descriptor.type_name.size() > maximum_property_enum_text_bytes ||
+        !validate_utf8(descriptor.type_name).valid() ||
+        descriptor.choices.empty() ||
+        descriptor.choices.size() > maximum_property_enum_choices) {
+        return false;
+    }
+    for (std::size_t index = 0; index < descriptor.choices.size(); ++index) {
+        const PropertyEnumChoice& choice = descriptor.choices[index];
+        if (trimmed(choice.name).size() != choice.name.size() ||
+            choice.name.empty() ||
+            choice.name.size() > maximum_property_enum_text_bytes ||
+            !validate_utf8(choice.name).valid()) return false;
+        for (std::size_t peer = index + 1U;
+             peer < descriptor.choices.size(); ++peer) {
+            if (ascii_name_equal(choice.name,
+                                 descriptor.choices[peer].name)) return false;
+        }
+    }
+    return true;
+}
+
+std::optional<BindingValue> convert_property_value(
+    const BindingValue& value, const PropertyDescriptor& descriptor) {
+    if (descriptor.kind != BindingValueKind::enumeration) {
+        if (descriptor.enumeration) return std::nullopt;
+        return convert_binding_value(value, descriptor.kind);
+    }
+    if (!descriptor.enumeration ||
+        !valid_property_enum_descriptor(*descriptor.enumeration)) {
+        return std::nullopt;
+    }
+    const auto normalized = normalize_enum_value(value, *descriptor.enumeration);
+    return normalized ? std::optional<BindingValue>{BindingValue{*normalized}}
+                      : std::nullopt;
 }
 
 std::string canonical_binding_name(std::string_view name) {
@@ -903,7 +1412,7 @@ void Binding::start() {
         throw std::logic_error("GUI.Forms cannot start a binding with a retired endpoint");
     }
     const BindableProperty* property = target_->find_bindable_property(property_name_);
-    if (!property || !property->readable || !property->get) {
+    if (!property || !property->descriptor.readable || !property->get) {
         throw std::invalid_argument("GUI.Forms Binding target property is not readable");
     }
     const std::weak_ptr<Binding> weak = weak_from_this();
@@ -991,7 +1500,7 @@ bool Binding::update_control(bool automatic) {
     const BindableProperty* property =
         target_ ? target_->find_bindable_property(property_name_) : nullptr;
     if (!source || !source->is_alive() || !target_ || !target_->is_alive() ||
-        !property || !property->writable || !property->set) {
+        !property || !property->descriptor.writable || !property->set) {
         ++failed_updates_;
         return complete(BindingCompleteContext::control_update,
                         BindingCompleteState::data_error,
@@ -1012,14 +1521,16 @@ bool Binding::update_control(bool automatic) {
             proposed = options_.null_value;
         }
         if (options_.formatting_enabled) {
-            BindingConvertEvent event{proposed, property->kind, false};
+            BindingConvertEvent event{
+                proposed, property->descriptor.kind, false};
             format_.emit(event);
             proposed = std::move(event.value);
             if (!event.handled && !options_.format_string.empty()) {
                 proposed = apply_format_string(proposed, options_.format_string);
             }
         }
-        const auto converted = convert_binding_value(proposed, property->kind);
+        const auto converted = convert_property_value(
+            proposed, property->descriptor);
         if (!converted) {
             throw std::invalid_argument("binding value cannot convert to target kind");
         }
@@ -1056,7 +1567,7 @@ bool Binding::update_source(bool automatic) {
     const BindableProperty* property =
         target_ ? target_->find_bindable_property(property_name_) : nullptr;
     if (!source || !source->is_alive() || !target_ || !target_->is_alive() ||
-        !property || !property->readable || !property->get) {
+        !property || !property->descriptor.readable || !property->get) {
         ++failed_updates_;
         return complete(BindingCompleteContext::data_source_update,
                         BindingCompleteState::data_error,

@@ -98,6 +98,87 @@ public:
     std::vector<EventPhase> phases;
 };
 
+class FaultingLayoutControl final : public Control {
+public:
+    explicit FaultingLayoutControl(StableId id) : Control(std::move(id)) {}
+
+    void arrange(Rect bounds) override {
+        ++arrange_attempts;
+        if (throw_next_arrange) {
+            throw_next_arrange = false;
+            throw std::runtime_error("intentional layout fault");
+        }
+        Control::arrange(bounds);
+    }
+
+    bool throw_next_arrange{};
+    std::uint64_t arrange_attempts{};
+};
+
+class MutatingLayoutControl final : public Control {
+public:
+    explicit MutatingLayoutControl(StableId id) : Control(std::move(id)) {}
+
+    Size measure(Size available) override {
+        ++measure_count;
+        if (measure_callback) measure_callback();
+        return is_alive() ? Control::measure(available) : Size{};
+    }
+
+    void arrange(Rect bounds) override {
+        ++arrange_count;
+        if (arrange_callback) arrange_callback();
+        if (is_alive()) Control::arrange(bounds);
+    }
+
+    std::function<void()> measure_callback;
+    std::function<void()> arrange_callback;
+    std::uint64_t measure_count{};
+    std::uint64_t arrange_count{};
+};
+
+class CallbackArbitrationControl final : public Control {
+public:
+    explicit CallbackArbitrationControl(StableId id)
+        : Control(std::move(id)) {}
+
+    void on_paint(Painter& painter, Rect damage) override {
+        ++paint_count;
+        if (paint_callback) paint_callback();
+        if (is_alive()) painter.fill_rect(damage, Color::rgba(30, 60, 90));
+    }
+
+    void on_paint_overlay(Painter&, Rect) override {
+        ++paint_overlay_count;
+        if (paint_overlay_callback) paint_overlay_callback();
+    }
+
+    bool hit_test_local(Point) const override {
+        ++hit_test_count;
+        if (hit_test_callback) hit_test_callback();
+        return true;
+    }
+
+    SemanticDescriptor semantic_descriptor() const override {
+        ++semantic_count;
+        if (semantic_callback) semantic_callback();
+        if (!is_alive()) return {};
+        SemanticDescriptor descriptor = Control::semantic_descriptor();
+        descriptor.exposed = !descriptor.name.empty() ||
+                             !descriptor.description.empty();
+        return descriptor;
+    }
+
+    std::function<void()> paint_callback;
+    std::function<void()> paint_overlay_callback;
+    mutable std::function<void()> hit_test_callback;
+    mutable std::function<void()> semantic_callback;
+    std::uint64_t paint_count{};
+    std::uint64_t paint_overlay_count{};
+    mutable std::uint64_t hit_test_count{};
+    mutable std::uint64_t semantic_count{};
+};
+
 class FontProbe final : public Control {
 public:
     explicit FontProbe(StableId id) : Control(std::move(id)) {}
@@ -171,6 +252,403 @@ void test_nested_scopes_and_read_barrier() {
     require(snapshot.maximum_update_scope_depth == 2, "maximum nesting depth must be structured");
     require(snapshot.arrange_passes == 1, "nested mutations must coalesce to one arrange pass");
     require(snapshot.flush_count == 1, "nested mutations must coalesce to one flush");
+}
+
+void test_per_control_layout_transactions() {
+    Fixture fixture;
+    const Rect child_committed = fixture.child->committed_arranged_bounds();
+    auto sibling = make_control<ProbeControl>(StableId("layout-sibling"));
+    sibling->set_requested_bounds({90.0, 10.0, 30.0, 20.0});
+    fixture.root->add_child(sibling);
+    fixture.window->perform_layout();
+    fixture.window->reset_activity_metrics();
+
+    fixture.child->suspend_layout();
+    fixture.child->suspend_layout();
+    fixture.child->set_requested_bounds({24.0, 18.0, 58.0, 36.0});
+    sibling->set_requested_bounds({104.0, 16.0, 34.0, 22.0});
+    fixture.window->perform_layout();
+
+    require(fixture.child->arranged_bounds() == child_committed,
+            "a suspended control must expose its last committed geometry");
+    require(sibling->arranged_bounds() == Rect{104.0, 16.0, 34.0, 22.0},
+            "a suspended subtree must not block runnable sibling layout");
+    auto state = fixture.child->layout_transaction_state();
+    require(state.suspend_depth == 2U && state.deferred &&
+                state.requested_revision > state.committed_revision,
+            "nested suspension must retain an observable deferred request");
+
+    fixture.child->resume_layout(true);
+    require(fixture.child->committed_arranged_bounds() == child_committed,
+            "an inner resume must not commit a nested transaction");
+    fixture.child->resume_layout(false);
+    require(fixture.child->committed_arranged_bounds() == child_committed,
+            "ResumeLayout(false) must preserve committed geometry");
+
+    require(fixture.child->arranged_bounds() == Rect{24.0, 18.0, 58.0, 36.0},
+            "the first read outside suspension must minimally flush geometry");
+    state = fixture.child->layout_transaction_state();
+    require(state.suspend_depth == 0U && !state.deferred &&
+                state.committed_revision == state.requested_revision,
+            "a completed deferred layout must publish its committed revision");
+
+    fixture.child->suspend_layout();
+    fixture.child->perform_layout();
+    fixture.child->resume_layout(true);
+    state = fixture.child->layout_transaction_state();
+    require(!state.deferred &&
+                state.committed_revision == state.requested_revision,
+            "final ResumeLayout(true) must flush an explicit pending layout once");
+    fixture.child->resume_layout(true);
+    require(fixture.child->layout_transaction_state().suspend_depth == 0U,
+            "an unmatched resume must remain a harmless no-op");
+}
+
+void test_layout_fault_releases_reentry_guard() {
+    auto root = make_control<ProbeControl>(StableId("fault-root"));
+    auto child = make_control<FaultingLayoutControl>(StableId("fault-child"));
+    root->set_requested_bounds({0.0, 0.0, 200.0, 120.0});
+    child->set_requested_bounds({12.0, 10.0, 40.0, 24.0});
+    root->add_child(child);
+    Window window(root, {200.0, 120.0});
+    window.perform_layout();
+
+    child->throw_next_arrange = true;
+    child->set_requested_bounds({20.0, 18.0, 52.0, 30.0});
+    bool fault_observed = false;
+    try {
+        window.perform_layout();
+    } catch (const std::runtime_error&) {
+        fault_observed = true;
+    }
+    require(fault_observed &&
+                child->committed_arranged_bounds() == Rect{12.0, 10.0, 40.0, 24.0},
+            "a failing layout pass must preserve the last committed geometry");
+    window.perform_layout();
+    require(child->arranged_bounds() == Rect{20.0, 18.0, 52.0, 30.0} &&
+                child->arrange_attempts >= 3U,
+            "a layout fault must preserve dirty state and release the re-entry guard");
+}
+
+void test_layout_callbacks_may_mutate_retained_tree() {
+    {
+        auto root = make_control<ProbeControl>(StableId("mutation.remove.root"));
+        auto mutator = make_control<MutatingLayoutControl>(
+            StableId("mutation.remove.mutator"));
+        auto removed = make_control<ProbeControl>(
+            StableId("mutation.remove.victim"));
+        root->set_requested_bounds({0.0, 0.0, 240.0, 120.0});
+        mutator->set_requested_bounds({0.0, 0.0, 80.0, 30.0});
+        removed->set_requested_bounds({90.0, 0.0, 80.0, 30.0});
+        root->add_child(mutator);
+        root->add_child(removed);
+        bool removed_once{};
+        mutator->measure_callback = [&] {
+            if (removed_once) return;
+            removed_once = true;
+            static_cast<void>(root->remove_child(removed->runtime_id()));
+        };
+        Window window(root, {240.0, 120.0});
+        window.perform_layout();
+        require(removed_once && !removed->attached() && !removed->parent() &&
+                    removed->measure_count == 0U,
+                "measure mutation must skip a removed identity from the retained snapshot");
+        require(window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "measure mutation must converge within the bounded scheduler");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("mutation.move.root"));
+        auto source = make_control<ProbeControl>(StableId("mutation.move.source"));
+        auto destination = make_control<ProbeControl>(
+            StableId("mutation.move.destination"));
+        auto mutator = make_control<MutatingLayoutControl>(
+            StableId("mutation.move.mutator"));
+        auto moved = make_control<ProbeControl>(StableId("mutation.move.victim"));
+        root->set_requested_bounds({0.0, 0.0, 320.0, 180.0});
+        source->set_requested_bounds({0.0, 0.0, 150.0, 180.0});
+        destination->set_requested_bounds({160.0, 0.0, 150.0, 180.0});
+        mutator->set_requested_bounds({0.0, 0.0, 60.0, 30.0});
+        moved->set_requested_bounds({70.0, 0.0, 60.0, 30.0});
+        source->add_child(mutator);
+        source->add_child(moved);
+        root->add_child(source);
+        root->add_child(destination);
+        bool moved_once{};
+        mutator->arrange_callback = [&] {
+            if (moved_once) return;
+            moved_once = true;
+            destination->add_child(moved);
+        };
+        Window window(root, {320.0, 180.0});
+        window.perform_layout();
+        require(moved_once && moved->parent() == destination && moved->attached() &&
+                    moved->arrange_count == 1U,
+                "arrange mutation must transfer ownership and arrange only under the new parent");
+        require(window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "reparenting during arrange must converge without stale work");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("mutation.dispose.root"));
+        auto disposing = make_control<MutatingLayoutControl>(
+            StableId("mutation.dispose.child"));
+        root->set_requested_bounds({0.0, 0.0, 160.0, 90.0});
+        disposing->set_requested_bounds({0.0, 0.0, 80.0, 30.0});
+        root->add_child(disposing);
+        disposing->arrange_callback = [disposing] {
+            if (disposing->is_alive()) disposing->dispose();
+        };
+        Window window(root, {160.0, 90.0});
+        window.perform_layout();
+        require(!disposing->is_alive() && !disposing->attached() &&
+                    root->children().empty(),
+                "self-disposal during arrange must detach before scheduler bookkeeping");
+        window.perform_layout();
+        require(window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "layout must remain usable after a callback disposes its target");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(
+            StableId("mutation.dispose-parent.root"));
+        auto parent = make_control<ProbeControl>(
+            StableId("mutation.dispose-parent.parent"));
+        auto child = make_control<MutatingLayoutControl>(
+            StableId("mutation.dispose-parent.child"));
+        root->set_requested_bounds({0.0, 0.0, 180.0, 100.0});
+        parent->set_requested_bounds({0.0, 0.0, 120.0, 70.0});
+        child->set_requested_bounds({0.0, 0.0, 60.0, 30.0});
+        parent->add_child(child);
+        root->add_child(parent);
+        child->measure_callback = [parent] {
+            if (parent->is_alive()) parent->dispose();
+        };
+        Window window(root, {180.0, 100.0});
+        window.perform_layout();
+        require(!parent->is_alive() && !child->is_alive() &&
+                    root->children().empty(),
+                "a child callback may dispose its layout owner without post-callback access");
+        window.perform_layout();
+        require(window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "ancestor disposal during measure must leave the scheduler converged");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("mutation.add.root"));
+        auto mutator = make_control<MutatingLayoutControl>(
+            StableId("mutation.add.mutator"));
+        auto added = make_control<ProbeControl>(StableId("mutation.add.child"));
+        root->set_requested_bounds({0.0, 0.0, 180.0, 100.0});
+        mutator->set_requested_bounds({0.0, 0.0, 70.0, 30.0});
+        added->set_requested_bounds({80.0, 0.0, 70.0, 30.0});
+        root->add_child(mutator);
+        bool added_once{};
+        mutator->arrange_callback = [&] {
+            if (added_once) return;
+            added_once = true;
+            root->add_child(added);
+        };
+        Window window(root, {180.0, 100.0});
+        window.perform_layout();
+        require(added_once && added->attached() && added->parent() == root &&
+                    added->arrange_count == 1U,
+                "a child added during arrange must enter a following bounded pass");
+        require(window.metrics_snapshot().arrange_passes >= 2U &&
+                    window.metrics_snapshot().bounded_pass_limit_hits == 0U,
+                "callback addition must schedule another pass rather than mutate live traversal");
+    }
+}
+
+void test_designer_scale_layout_transaction_converges() {
+    auto root = make_control<ProbeControl>(StableId("designer.root"));
+    root->set_requested_bounds({0.0, 0.0, 1280.0, 800.0});
+    std::vector<std::shared_ptr<ProbeControl>> leaves;
+    leaves.reserve(1024U);
+    for (std::size_t row = 0U; row < 32U; ++row) {
+        auto panel = make_control<ProbeControl>(
+            StableId("designer.panel." + std::to_string(row)));
+        panel->set_requested_bounds(
+            {0.0, static_cast<double>(row) * 25.0, 1280.0, 25.0});
+        for (std::size_t column = 0U; column < 32U; ++column) {
+            auto leaf = make_control<ProbeControl>(StableId(
+                "designer.leaf." + std::to_string(row) + "." +
+                std::to_string(column)));
+            leaf->set_requested_bounds(
+                {static_cast<double>(column) * 40.0, 0.0, 38.0, 22.0});
+            panel->add_child(leaf);
+            leaves.push_back(std::move(leaf));
+        }
+        root->add_child(panel);
+    }
+    Window window(root, {1280.0, 800.0});
+    window.perform_layout();
+    const Rect committed = leaves.back()->committed_arranged_bounds();
+    window.reset_activity_metrics();
+
+    root->suspend_layout();
+    for (std::size_t index = 0U; index < leaves.size(); ++index) {
+        Rect requested = leaves[index]->requested_bounds();
+        requested.width = 30.0 + static_cast<double>(index % 7U);
+        leaves[index]->set_requested_bounds(requested);
+    }
+    window.perform_layout();
+    require(leaves.back()->committed_arranged_bounds() == committed,
+            "designer-scale suspension must preserve committed descendant geometry");
+    root->resume_layout(true);
+    const MetricsSnapshot metrics = window.metrics_snapshot();
+    require(leaves.back()->committed_arranged_bounds().width ==
+                leaves.back()->requested_bounds().width &&
+                metrics.bounded_pass_limit_hits == 0U &&
+                metrics.arrange_passes <= 2U,
+            "a thousand deferred child mutations must coalesce into bounded layout passes");
+}
+
+void test_callback_arbitration_snapshots_paint_hit_semantics_and_validation() {
+    {
+        auto root = make_control<ProbeControl>(StableId("callback.paint.root"));
+        auto mutator = make_control<CallbackArbitrationControl>(
+            StableId("callback.paint.mutator"));
+        auto removed = make_control<ProbeControl>(
+            StableId("callback.paint.removed"));
+        root->set_requested_bounds({0.0, 0.0, 180.0, 100.0});
+        mutator->set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+        removed->set_requested_bounds({90.0, 0.0, 80.0, 40.0});
+        root->add_child(mutator);
+        root->add_child(removed);
+        bool removed_once{};
+        mutator->paint_callback = [&] {
+            if (removed_once) return;
+            removed_once = true;
+            static_cast<void>(root->remove_child(removed->runtime_id()));
+        };
+        Window window(root, {180.0, 100.0});
+        window.perform_layout();
+        RecordingPainter painter;
+        paint_pending(window, painter);
+        require(removed_once && removed->paint_count == 0U &&
+                    !removed->attached() && mutator->paint_overlay_count == 1U,
+                "paint must skip a later identity removed by an earlier callback");
+        paint_pending(window, painter);
+        require(window.paint_lease_snapshot().state !=
+                    PaintLeaseState::rendering,
+                "callback-time paint mutation must release a coherent lease");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("callback.paint-dispose.root"));
+        auto disposing = make_control<CallbackArbitrationControl>(
+            StableId("callback.paint-dispose.child"));
+        root->set_requested_bounds({0.0, 0.0, 120.0, 70.0});
+        disposing->set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+        root->add_child(disposing);
+        disposing->paint_callback = [disposing] {
+            if (disposing->is_alive()) disposing->dispose();
+        };
+        Window window(root, {120.0, 70.0});
+        window.perform_layout();
+        RecordingPainter painter;
+        paint_pending(window, painter);
+        require(!disposing->is_alive() &&
+                    disposing->paint_overlay_count == 0U &&
+                    root->children().empty(),
+                "self-disposal in OnPaint must suppress overlay and chunk publication");
+        paint_pending(window, painter);
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("callback.hit.root"));
+        auto bottom = make_control<ProbeControl>(StableId("callback.hit.bottom"));
+        auto top = make_control<CallbackArbitrationControl>(
+            StableId("callback.hit.top"));
+        root->set_requested_bounds({0.0, 0.0, 100.0, 60.0});
+        bottom->set_requested_bounds({0.0, 0.0, 100.0, 60.0});
+        top->set_requested_bounds({0.0, 0.0, 100.0, 60.0});
+        root->add_child(bottom);
+        root->add_child(top);
+        top->hit_test_callback = [top] {
+            if (top->is_alive()) top->dispose();
+        };
+        Window window(root, {100.0, 60.0});
+        window.perform_layout();
+        require(window.hit_test({20.0, 20.0}) == bottom &&
+                    !top->is_alive() && top->hit_test_count == 1U,
+                "hit testing must retry after callback disposal and return a live target");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("callback.semantic.root"));
+        auto mutator = make_control<CallbackArbitrationControl>(
+            StableId("callback.semantic.mutator"));
+        auto removed = make_control<CallbackArbitrationControl>(
+            StableId("callback.semantic.removed"));
+        auto added = make_control<CallbackArbitrationControl>(
+            StableId("callback.semantic.added"));
+        root->set_accessible_name("Semantic root");
+        mutator->set_accessible_name("Semantic mutator");
+        removed->set_accessible_name("Semantic removed");
+        added->set_accessible_name("Semantic added");
+        root->add_child(mutator);
+        root->add_child(removed);
+        bool changed_once{};
+        mutator->semantic_callback = [&] {
+            if (changed_once) return;
+            changed_once = true;
+            static_cast<void>(root->remove_child(removed->runtime_id()));
+            root->add_child(added);
+        };
+        Window window(root, {160.0, 90.0});
+        window.perform_layout();
+        const SemanticSnapshot snapshot = window.semantic_snapshot();
+        const std::string json = snapshot.to_json();
+        require(changed_once && snapshot.generation == window.semantic_generation() &&
+                    json.find("Semantic added") != std::string::npos &&
+                    json.find("Semantic removed") == std::string::npos,
+                "semantic snapshots must retry to one coherent retained generation");
+
+        bool alternate{};
+        mutator->semantic_callback = [&] {
+            alternate = !alternate;
+            mutator->set_accessible_name(
+                alternate ? "Semantic oscillation A" : "Semantic oscillation B");
+        };
+        bool bounded_fault{};
+        try {
+            static_cast<void>(window.semantic_snapshot());
+        } catch (const std::runtime_error&) {
+            bounded_fault = true;
+        }
+        mutator->semantic_callback = {};
+        const MetricsSnapshot arbitration = window.metrics_snapshot();
+        require(bounded_fault &&
+                    arbitration.callback_arbitration_retries >= 5U &&
+                    arbitration.callback_arbitration_limit_hits == 1U &&
+                    window.semantic_snapshot().generation ==
+                        window.semantic_generation(),
+                "nonconvergent semantic callbacks must stop at a bound and release the guard");
+    }
+
+    {
+        auto root = make_control<ProbeControl>(StableId("callback.validate.root"));
+        auto first = make_control<ProbeControl>(StableId("callback.validate.first"));
+        auto removed = make_control<ProbeControl>(
+            StableId("callback.validate.removed"));
+        root->add_child(first);
+        root->add_child(removed);
+        Window window(root, {120.0, 70.0});
+        std::size_t removed_validations{};
+        auto owner = std::make_shared<Component>();
+        auto first_token = first->validating().subscribe(
+            *owner, [&](ControlValidationEvent&) {
+                static_cast<void>(root->remove_child(removed->runtime_id()));
+            });
+        auto removed_token = removed->validating().subscribe(
+            *owner, [&](ControlValidationEvent&) { ++removed_validations; });
+        require(window.validate_children(root, ValidationConstraints::none) &&
+                    removed_validations == 0U && !removed->attached() &&
+                    first_token.connected() && removed_token.connected(),
+                "bulk validation must skip identities removed by an earlier callback");
+    }
 }
 
 void test_paint_only_does_not_measure() {
@@ -635,6 +1113,11 @@ void test_paint_wake_is_coalesced_and_rearmed_after_damage_consumption() {
 int main() {
     try {
         test_nested_scopes_and_read_barrier();
+        test_per_control_layout_transactions();
+        test_layout_fault_releases_reentry_guard();
+        test_layout_callbacks_may_mutate_retained_tree();
+        test_designer_scale_layout_transaction_converges();
+        test_callback_arbitration_snapshots_paint_hit_semantics_and_validation();
         test_paint_only_does_not_measure();
         test_layout_flushes_before_hit_test();
         test_topmost_hit_and_activation();

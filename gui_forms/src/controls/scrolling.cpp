@@ -291,12 +291,18 @@ Size ScrollableControl::content_extent() {
         std::max(0.0, auto_scroll_min_size_.width),
         std::max(0.0, auto_scroll_min_size_.height)};
     const Insets own_padding = padding();
-    for (const Control::Ptr& child : children()) {
-        if (!child || !child->is_alive() || !child->visible() ||
+    const std::vector<Control::Ptr> retained = snapshot_layout_children();
+    for (const Control::Ptr& child : retained) {
+        if (!is_current_layout_child(child) || !child->visible() ||
             child->dock() != DockStyle::none) continue;
         Rect bounds = child->requested_bounds();
         if (child->auto_size()) {
             const Size preferred = child->get_preferred_size({0.0, 0.0});
+            if (!is_alive()) return extent;
+            if (!is_current_layout_child(child) || !child->visible() ||
+                child->dock() != DockStyle::none) {
+                continue;
+            }
             bounds.width = child->auto_size_mode() == AutoSizeMode::grow_only
                 ? std::max(bounds.width, preferred.width) : preferred.width;
             bounds.height = child->auto_size_mode() == AutoSizeMode::grow_only
@@ -323,6 +329,7 @@ void ScrollableControl::recompute_scroll_layout(Size client_size) {
     const Point previous_position = scroll_position_;
 
     content_extent_ = content_extent();
+    if (!is_alive()) return;
     const double width = std::max(0.0, client_size.width);
     const double height = std::max(0.0, client_size.height);
     bool h = auto_scroll_ ? false : horizontal_scroll_.visible_;
@@ -407,6 +414,7 @@ void ScrollableControl::arrange(Rect final_bounds) {
     } reset{arranging_scroll_};
     arrange_self(final_bounds);
     recompute_scroll_layout({final_bounds.width, final_bounds.height});
+    if (!is_alive()) return;
     if (auto_scroll_) adjust_scrollbars(true);
     Control::arrange(final_bounds);
     if (scroll_position_ == Point{}) return;
@@ -486,11 +494,27 @@ void ScrollableControl::set_display_rect_location(Point location) {
 }
 
 Point ScrollableControl::scroll_to_control(const Control& control) const {
-    Rect bounds = rectangle_from_window(control.rectangle_to_window(
-        {0.0, 0.0, control.committed_arranged_bounds().width,
-         control.committed_arranged_bounds().height}));
-    bounds.x += scroll_position_.x;
-    bounds.y += scroll_position_.y;
+    Rect bounds;
+    if (attached() && control.attached()) {
+        bounds = rectangle_from_window(control.rectangle_to_window(
+            {0.0, 0.0, control.committed_arranged_bounds().width,
+             control.committed_arranged_bounds().height}));
+        bounds.x += scroll_position_.x;
+        bounds.y += scroll_position_.y;
+    } else {
+        // Detached controls still have a complete authored retained tree even
+        // though no Window has committed descendant layout slots. Walk that
+        // logical tree so designer/tests and pre-show initialization can reveal
+        // a control without inventing zero-sized arranged geometry.
+        bounds = control.requested_bounds();
+        for (Control::Ptr ancestor = control.parent(); ancestor;
+             ancestor = ancestor->parent()) {
+            if (ancestor.get() == this) break;
+            const Rect parent_bounds = ancestor->requested_bounds();
+            bounds.x += parent_bounds.x;
+            bounds.y += parent_bounds.y;
+        }
+    }
     Point next = scroll_position_;
     if (bounds.x - auto_scroll_margin_.width < next.x) {
         next.x = bounds.x - auto_scroll_margin_.width;
@@ -526,6 +550,8 @@ void ScrollableControl::notify_scroll(ScrollOrientation orientation,
                                       double old_value,
                                       double new_value) {
     ScrollEvent event{type, old_value, new_value, orientation};
+    last_scroll_event_ = event;
+    ++scroll_event_revision_;
     scroll_event_.emit(event);
 }
 
