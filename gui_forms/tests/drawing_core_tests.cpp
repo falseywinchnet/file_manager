@@ -256,6 +256,47 @@ void extended_vocabulary_snapshots_resources() {
                                 {0.1, 1.0}}));
 }
 
+void curve_polygon_and_pie_paths_are_retained_and_bounded() {
+    GraphicsPath path;
+    path.set_fill_mode(FillMode::winding);
+    path.start_figure();
+    path.add_quadratic({0, 10}, {5, 0}, {10, 10});
+    path.add_bezier({10, 10}, {12, 20}, {18, 20}, {20, 10});
+    const PointF continuation[] = {
+        {20, 10}, {22, 0}, {28, 0}, {30, 10},
+        {30, 10}, {32, 20}, {38, 20}, {40, 10},
+    };
+    // Two independent calls make the canonical 4 + 3n rule explicit.
+    path.add_beziers(std::span<const PointF>(continuation, 4U));
+    const PointF second_curve[] = {
+        {30, 10}, {32, 20}, {38, 20}, {40, 10},
+    };
+    path.add_beziers(second_curve);
+    path.close_figure();
+    const std::size_t before_invalid = path.snapshot().elements.size();
+    const PointF invalid[] = {{0, 0}, {1, 1}, {2, 2}};
+    CHECK_THROWS(std::invalid_argument, path.add_beziers(invalid));
+    CHECK(path.snapshot().elements.size() == before_invalid);
+    CHECK(path.fill_mode() == FillMode::winding);
+    CHECK(path.bounds() == (RectF{0, 0, 40, 20}));
+
+    GraphicsPath polygon;
+    const PointF triangle[] = {{2, 2}, {18, 2}, {10, 18}};
+    polygon.add_polygon(triangle);
+    CHECK(polygon.is_visible({10, 8}));
+    CHECK(!polygon.is_visible({1, 1}));
+    CHECK_THROWS(std::invalid_argument,
+                 polygon.add_polygon(std::span<const PointF>(triangle, 2U)));
+
+    GraphicsPath pie;
+    pie.add_pie({0, 0, 20, 20}, 0.0, 90.0);
+    CHECK(pie.is_visible({13, 13}));
+    CHECK(!pie.is_visible({3, 3}));
+    auto transformed = pie.clone();
+    transformed->transform(Matrix::translation(5, 7));
+    CHECK(transformed->bounds() == (RectF{5, 7, 20, 20}));
+}
+
 void bitmap_storage_and_leases_are_generation_safe() {
     Bitmap bitmap(2, 2);
     CHECK(bitmap.width() == 2U && bitmap.height() == 2U);
@@ -326,6 +367,26 @@ void bitmap_storage_and_leases_are_generation_safe() {
     CHECK(recorder.commands().front().image.pixels().data() !=
           bitmap.snapshot().pixels().data());
 
+    TextureBrush texture(bitmap, WrapMode::tile_flip_x);
+    texture.translate_transform(3.0, 4.0);
+    texture.scale_transform(2.0, 1.5);
+    const BrushSnapshot texture_snapshot = texture.snapshot();
+    CHECK(texture_snapshot.kind == BrushKind::texture);
+    CHECK(texture_snapshot.image.has_pixels());
+    CHECK(texture_snapshot.wrap_mode == WrapMode::tile_flip_x);
+    const PointF transformed_origin =
+        texture_snapshot.transform.transform({0.0, 0.0});
+    CHECK(transformed_origin.x == 6.0 && transformed_origin.y == 6.0);
+    auto copied_texture = texture.clone();
+    texture.reset_transform();
+    CHECK(copied_texture->snapshot().transform == texture_snapshot.transform);
+    GraphicsRecorder texture_recorder;
+    texture_recorder.fill_rectangle(*copied_texture, {0.0, 0.0, 12.0, 8.0});
+    CHECK(texture_recorder.commands().front().brush.kind == BrushKind::texture);
+    CHECK(texture_recorder.deterministic_trace().find("image=") !=
+          std::string::npos);
+    CHECK_THROWS(std::invalid_argument, texture.scale_transform(0.0, 1.0));
+
     CHECK_THROWS(std::invalid_argument, Bitmap(0, 1));
     CHECK_THROWS(std::length_error, Bitmap(32768, 32768));
 
@@ -347,6 +408,7 @@ int main() {
     geometry_and_color_are_deterministic();
     transforms_resources_and_metrics_obey_contracts();
     extended_vocabulary_snapshots_resources();
+    curve_polygon_and_pie_paths_are_retained_and_bounded();
     bitmap_storage_and_leases_are_generation_safe();
     const std::string trace = record_reference_trace();
     CHECK(trace == gui_drawing_expected_trace);

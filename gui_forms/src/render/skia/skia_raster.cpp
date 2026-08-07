@@ -7,6 +7,7 @@
 #include "include/codec/SkCodec.h"
 #include "include/codec/SkPngDecoder.h"
 #include "include/core/SkCanvas.h"
+#include "include/core/SkBlurTypes.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
 #include "include/core/SkFont.h"
@@ -15,12 +16,15 @@
 #include "include/core/SkFontStyle.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
+#include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkRegion.h"
+#include "include/core/SkRRect.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkTypeface.h"
+#include "include/effects/SkGradient.h"
 #if defined(__APPLE__)
 #include "include/ports/SkFontMgr_mac_ct.h"
 #else
@@ -47,6 +51,50 @@ SkRect to_sk_rect(Rect rect) noexcept {
                             static_cast<SkScalar>(rect.y),
                             static_cast<SkScalar>(rect.width),
                             static_cast<SkScalar>(rect.height));
+}
+
+SkRRect to_sk_rrect(Rect rect, double radius) noexcept {
+    const SkScalar bounded = static_cast<SkScalar>(std::clamp(
+        radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5)));
+    return SkRRect::MakeRectXY(to_sk_rect(rect), bounded, bounded);
+}
+
+struct SkGradientData final {
+    std::vector<SkColor4f> colors;
+    std::vector<float> positions;
+};
+
+SkGradientData to_sk_gradient(std::span<const GradientStop> stops) {
+    SkGradientData result;
+    result.colors.reserve(stops.size());
+    result.positions.reserve(stops.size());
+    for (const GradientStop& stop : stops) {
+        result.colors.push_back(SkColor4f::FromColor(to_sk_color(stop.color)));
+        result.positions.push_back(static_cast<float>(stop.offset));
+    }
+    return result;
+}
+
+SkTileMode to_sk_tile_mode(GradientSpreadMode spread) noexcept {
+    switch (spread) {
+    case GradientSpreadMode::pad: return SkTileMode::kClamp;
+    case GradientSpreadMode::repeat: return SkTileMode::kRepeat;
+    case GradientSpreadMode::reflect: return SkTileMode::kMirror;
+    }
+    return SkTileMode::kClamp;
+}
+
+SkGradient make_sk_gradient(
+    const SkGradientData& data,
+    GradientSpreadMode spread = GradientSpreadMode::pad) {
+    const SkGradient::Colors colors(
+        SkSpan<const SkColor4f>(data.colors.data(), data.colors.size()),
+        SkSpan<const float>(data.positions.data(), data.positions.size()),
+        to_sk_tile_mode(spread), SkColorSpace::MakeSRGB());
+    SkGradient::Interpolation interpolation;
+    interpolation.fInPremul = SkGradient::Interpolation::InPremul::kYes;
+    interpolation.fColorSpace = SkGradient::Interpolation::ColorSpace::kSRGB;
+    return SkGradient(colors, interpolation);
 }
 
 SkPaint make_paint(Color color) {
@@ -481,9 +529,21 @@ void SkiaRaster::clip_rect(Rect rect) {
     }
 }
 
+void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
+    if (SkCanvas* canvas = impl_->canvas()) {
+        canvas->clipRRect(to_sk_rrect(rect, radius), SkClipOp::kIntersect, true);
+    }
+}
+
 void SkiaRaster::fill_rect(Rect rect, Color color) {
     if (SkCanvas* canvas = impl_->canvas()) {
         canvas->drawRect(to_sk_rect(rect), make_paint(color));
+    }
+}
+
+void SkiaRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
+    if (SkCanvas* canvas = impl_->canvas()) {
+        canvas->drawRRect(to_sk_rrect(rect, radius), make_paint(color));
     }
 }
 
@@ -494,6 +554,98 @@ void SkiaRaster::stroke_rect(Rect rect, Color color, double width) {
         paint.setStrokeWidth(static_cast<SkScalar>(width));
         canvas->drawRect(to_sk_rect(rect), paint);
     }
+}
+
+void SkiaRaster::stroke_rounded_rect(Rect rect, double radius, Color color,
+                                    double width) {
+    if (SkCanvas* canvas = impl_->canvas()) {
+        SkPaint paint = make_paint(color);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(static_cast<SkScalar>(width));
+        canvas->drawRRect(to_sk_rrect(rect, radius), paint);
+    }
+}
+
+void SkiaRaster::fill_linear_gradient(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops) {
+    fill_linear_gradient_spread(rect, start, end, stops,
+                                GradientSpreadMode::pad);
+}
+
+void SkiaRaster::fill_linear_gradient_spread(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops, GradientSpreadMode spread) {
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || rect.empty() || !valid_gradient_stops(stops) ||
+        (spread != GradientSpreadMode::pad &&
+         spread != GradientSpreadMode::repeat &&
+         spread != GradientSpreadMode::reflect)) {
+        return;
+    }
+    const SkGradientData data = to_sk_gradient(stops);
+    const SkPoint points[2]{{static_cast<SkScalar>(start.x),
+                             static_cast<SkScalar>(start.y)},
+                            {static_cast<SkScalar>(end.x),
+                             static_cast<SkScalar>(end.y)}};
+    sk_sp<SkShader> shader = SkShaders::LinearGradient(
+        points, make_sk_gradient(data, spread));
+    if (!shader) return;
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setShader(std::move(shader));
+    canvas->drawRect(to_sk_rect(rect), paint);
+}
+
+void SkiaRaster::fill_radial_gradient(
+    Rect rect, Point center, Size radii,
+    std::span<const GradientStop> stops) {
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || rect.empty() || radii.width <= 0.0 ||
+        radii.height <= 0.0 || !valid_gradient_stops(stops)) {
+        return;
+    }
+    const SkGradientData data = to_sk_gradient(stops);
+    sk_sp<SkShader> shader = SkShaders::RadialGradient(
+        {0.0F, 0.0F}, 1.0F, make_sk_gradient(data));
+    if (!shader) return;
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setShader(std::move(shader));
+    canvas->save();
+    canvas->clipRect(to_sk_rect(rect), SkClipOp::kIntersect, true);
+    canvas->translate(static_cast<SkScalar>(center.x),
+                      static_cast<SkScalar>(center.y));
+    canvas->scale(static_cast<SkScalar>(radii.width),
+                  static_cast<SkScalar>(radii.height));
+    canvas->drawRect(SkRect::MakeLTRB(
+        static_cast<SkScalar>((rect.x - center.x) / radii.width),
+        static_cast<SkScalar>((rect.y - center.y) / radii.height),
+        static_cast<SkScalar>((rect.x + rect.width - center.x) / radii.width),
+        static_cast<SkScalar>((rect.y + rect.height - center.y) / radii.height)),
+        paint);
+    canvas->restore();
+}
+
+void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
+                                 double blur_radius, double spread,
+                                 Color color) {
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
+        blur_radius < 0.0) {
+        return;
+    }
+    Rect shadow{rect.x + offset.x - spread, rect.y + offset.y - spread,
+                rect.width + spread * 2.0, rect.height + spread * 2.0};
+    if (shadow.empty()) return;
+    SkPaint paint = make_paint(color);
+    if (blur_radius > 0.0) {
+        paint.setMaskFilter(SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
+            false));
+    }
+    canvas->drawRRect(to_sk_rrect(
+        shadow, std::max(0.0, corner_radius + spread)), paint);
 }
 
 void SkiaRaster::draw_line(Point from, Point to, Color color, double width) {
@@ -586,6 +738,63 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
         canvas->drawImageRect(found->second.image.get(), to_sk_rect(destination),
                               SkSamplingOptions(SkFilterMode::kLinear), &paint);
     }
+}
+
+void SkiaRaster::draw_image_region(ImageId image, Rect source,
+                                   Rect destination, double opacity) {
+    const auto found = impl_->images.find(image.value);
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || found == impl_->images.end() || source.empty() ||
+        destination.empty() || !source.finite() || !destination.finite() ||
+        !std::isfinite(opacity) || opacity <= 0.0) {
+        return;
+    }
+    const Rect image_bounds{
+        0.0, 0.0,
+        static_cast<double>(found->second.image->width()),
+        static_cast<double>(found->second.image->height())};
+    if (!image_bounds.contains(source)) return;
+    SkPaint paint;
+    paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
+    paint.setAntiAlias(true);
+    canvas->drawImageRect(found->second.image.get(), to_sk_rect(source),
+                          to_sk_rect(destination),
+                          SkSamplingOptions(SkFilterMode::kLinear), &paint,
+                          SkCanvas::kStrict_SrcRectConstraint);
+}
+
+void SkiaRaster::fill_image_pattern(
+    ImageId image, Size source_pixel_size, Rect destination,
+    Size logical_tile_size, ImagePatternWrap wrap, double opacity) {
+    const auto found = impl_->images.find(image.value);
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || found == impl_->images.end() ||
+        wrap != ImagePatternWrap::tile || destination.empty() ||
+        !destination.finite() || !std::isfinite(source_pixel_size.width) ||
+        !std::isfinite(source_pixel_size.height) ||
+        !std::isfinite(logical_tile_size.width) ||
+        !std::isfinite(logical_tile_size.height) ||
+        source_pixel_size.width != found->second.image->width() ||
+        source_pixel_size.height != found->second.image->height() ||
+        logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
+        !std::isfinite(opacity) || opacity <= 0.0) {
+        return;
+    }
+    SkMatrix local;
+    local.setScaleTranslate(
+        static_cast<SkScalar>(logical_tile_size.width /
+                              source_pixel_size.width),
+        static_cast<SkScalar>(logical_tile_size.height /
+                              source_pixel_size.height),
+        static_cast<SkScalar>(destination.x),
+        static_cast<SkScalar>(destination.y));
+    SkPaint paint;
+    paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
+    paint.setAntiAlias(false);
+    paint.setShader(found->second.image->makeShader(
+        SkTileMode::kRepeat, SkTileMode::kRepeat,
+        SkSamplingOptions(SkFilterMode::kLinear), local));
+    canvas->drawRect(to_sk_rect(destination), paint);
 }
 
 } // namespace gui_forms::render

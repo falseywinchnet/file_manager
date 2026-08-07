@@ -8,6 +8,17 @@
 #include <span>
 #include <vector>
 
+namespace {
+
+const std::uint8_t* pixel_at(const std::uint8_t* pixels,
+                             std::size_t row_bytes, int scale,
+                             int x, int y) {
+    return pixels + static_cast<std::size_t>(y * scale) * row_bytes +
+           static_cast<std::size_t>(x * scale) * 4U;
+}
+
+} // namespace
+
 int main() {
     constexpr std::array<std::uint8_t, 70> png{
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -25,7 +36,12 @@ int main() {
         std::byte{0}, std::byte{128}, std::byte{255}, std::byte{255}};
     const gui_forms::ImageLoadResult raw =
         images.load_bgra32_premultiplied(1, 1, 4, bgra);
-    if (!loaded || !raw || !raster.synchronize_images(images)) {
+    constexpr std::array<std::byte, 8> strip_bgra{
+        std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255},
+        std::byte{0}, std::byte{255}, std::byte{0}, std::byte{255}};
+    const gui_forms::ImageLoadResult strip =
+        images.load_bgra32_premultiplied(2, 1, 8, strip_bgra);
+    if (!loaded || !raw || !strip || !raster.synchronize_images(images)) {
         std::fputs("CoreGraphics rejected the validated PNG resource\n", stderr);
         return 1;
     }
@@ -65,6 +81,17 @@ int main() {
                           gui_forms::Color::rgba(255, 255, 255));
     raster.draw_image(loaded.image, {130.0, 8.0, 20.0, 20.0}, 1.0);
     raster.draw_image(raw.image, {130.0, 32.0, 20.0, 20.0}, 1.0);
+    raster.draw_image_region(strip.image, {1.0, 0.0, 1.0, 1.0},
+                             {92.0, 82.0, 8.0, 8.0}, 1.0);
+    raster.fill_image_pattern(strip.image, {2.0, 1.0},
+                              {102.0, 64.0, 48.0, 14.0}, {16.0, 8.0},
+                              gui_forms::ImagePatternWrap::tile, 1.0);
+    constexpr std::array<gui_forms::GradientStop, 2> repeating_gradient{{
+        {0.0, gui_forms::Color::rgba(12, 28, 44)},
+        {1.0, gui_forms::Color::rgba(225, 236, 246)}}};
+    raster.fill_linear_gradient_spread(
+        {8.0, 64.0, 80.0, 14.0}, {8.0, 64.0}, {16.0, 64.0},
+        repeating_gradient, gui_forms::GradientSpreadMode::repeat);
     raster.end_frame();
 
     const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());
@@ -73,6 +100,50 @@ int main() {
         pixels[3] != 255U) {
         std::fputs("CoreGraphics RGBA surface contract failed\n", stderr);
         return 6;
+    }
+    const std::uint8_t* repeat_first = pixel_at(
+        pixels, raster.row_bytes(), 2, 10, 70);
+    const std::uint8_t* repeat_second = pixel_at(
+        pixels, raster.row_bytes(), 2, 18, 70);
+    const std::uint8_t* repeat_contrast = pixel_at(
+        pixels, raster.row_bytes(), 2, 14, 70);
+    const std::uint8_t* cropped_green = pixel_at(
+        pixels, raster.row_bytes(), 2, 95, 85);
+    const std::uint8_t* pattern_red = pixel_at(
+        pixels, raster.row_bytes(), 2, 106, 70);
+    const std::uint8_t* pattern_green = pixel_at(
+        pixels, raster.row_bytes(), 2, 114, 70);
+    const std::uint8_t* pattern_repeat = pixel_at(
+        pixels, raster.row_bytes(), 2, 122, 70);
+    const auto channel_distance = [](std::uint8_t first, std::uint8_t second) {
+        return first > second ? first - second : second - first;
+    };
+    if (channel_distance(repeat_first[0], repeat_second[0]) > 2U ||
+        channel_distance(repeat_first[1], repeat_second[1]) > 2U ||
+        channel_distance(repeat_first[2], repeat_second[2]) > 2U ||
+        repeat_contrast[0] <= repeat_first[0] + 45U) {
+        std::fprintf(stderr,
+                     "CoreGraphics repeating-gradient period contract changed: "
+                     "first=%u,%u,%u second=%u,%u,%u contrast=%u,%u,%u\n",
+                     repeat_first[0], repeat_first[1], repeat_first[2],
+                     repeat_second[0], repeat_second[1], repeat_second[2],
+                     repeat_contrast[0], repeat_contrast[1], repeat_contrast[2]);
+        return 8;
+    }
+    if (cropped_green[0] > 8U || cropped_green[1] < 240U ||
+        cropped_green[2] > 8U || cropped_green[3] != 255U) {
+        std::fputs("CoreGraphics source-region image crop contract changed\n", stderr);
+        return 9;
+    }
+    if (pattern_red[0] < 220U || pattern_red[1] > 24U ||
+        pattern_green[0] > 24U || pattern_green[1] < 220U ||
+        pattern_repeat[0] < 220U || pattern_repeat[1] > 24U) {
+        std::fprintf(stderr,
+                     "CoreGraphics exact image-pattern period changed: "
+                     "red=%u,%u green=%u,%u repeat=%u,%u\n",
+                     pattern_red[0], pattern_red[1], pattern_green[0],
+                     pattern_green[1], pattern_repeat[0], pattern_repeat[1]);
+        return 10;
     }
     std::uint64_t checksum = 1469598103934665603ULL;
     for (std::size_t offset = 0; offset < raster.byte_size(); offset += 97U) {

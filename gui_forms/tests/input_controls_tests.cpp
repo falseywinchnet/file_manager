@@ -24,11 +24,21 @@ public:
     void translate(Point) override {}
     void clip_rect(Rect) override {}
     void fill_rect(Rect rect, Color color) override {
+        if (rect == Rect{0.0, 0.0, 300.0, 220.0}) {
+            saw_window_backplane = true;
+        }
         if (color == Color::rgba(38, 114, 185) && rect.width > 0.0) {
             saw_selection = true;
         }
     }
     void stroke_rect(Rect, Color, double) override {}
+    void fill_linear_gradient_spread(
+        Rect rect, Point, Point, std::span<const GradientStop>,
+        GradientSpreadMode) override {
+        if (rect.width > 0.0 && rect.width < 170.0 && rect.y >= 3.0) {
+            saw_selection = true;
+        }
+    }
     void draw_line(Point, Point, Color, double) override { ++lines; }
     void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override {
         painted_text += std::string(text);
@@ -36,6 +46,7 @@ public:
     void draw_image(ImageId, Rect, double) override {}
 
     bool saw_selection{};
+    bool saw_window_backplane{};
     std::uint64_t lines{};
     std::string painted_text;
 };
@@ -319,6 +330,10 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     combo->set_requested_bounds({20.0, 20.0, 220.0, 32.0});
     root->add_child(combo);
     Window window(root, {300.0, 220.0});
+    RecordingPainter initial_painter;
+    const DamageRegion initial_damage = window.take_damage();
+    window.paint(initial_painter, initial_damage.bounds());
+    window.notify_presented();
     require(window.request_focus(combo), "ComboBox must accept retained focus");
     std::string order;
     auto selection = combo->selected_index_changed().subscribe(
@@ -333,6 +348,10 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     const auto popup = window.find("combo.field.popup.list");
     window.perform_layout();
     const Rect bounds = popup->absolute_bounds();
+    const DamageRegion opening_damage = window.take_damage();
+    RecordingPainter opening_painter;
+    window.paint(opening_painter, opening_damage.bounds());
+    window.notify_presented();
     const Point third{bounds.x + 20.0, bounds.y + 2.0 + 2.0 * 26.0 + 13.0};
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, third}) &&
                 window.dispatch_pointer({PointerAction::up, PointerButton::primary, third}) &&
@@ -341,6 +360,31 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
                 !window.find("combo.field.popup.layer") &&
                 order == "open\nselection\nclose\n",
             "ComboBox popup activation must commit, close, restore focus, and detach overlay");
+    const Rect close_damage = window.take_damage().bounds();
+    require(Rect::intersection(close_damage, bounds) == bounds,
+            "detaching a ComboBox overlay must damage every formerly painted popup pixel");
+
+    combo->set_dropped_down(true);
+    window.perform_layout();
+    const Rect semantic_popup_bounds =
+        window.find("combo.field.popup.list")->absolute_bounds();
+    const DamageRegion semantic_open_damage = window.take_damage();
+    RecordingPainter semantic_open_painter;
+    window.paint(semantic_open_painter, semantic_open_damage.bounds());
+    window.notify_presented();
+    require(window.perform_semantic_action(
+                "combo.field.popup.list.item.1", SemanticAction::press) &&
+                !combo->dropped_down(),
+            "semantic ComboBox row press must commit and close its overlay");
+    const DamageRegion semantic_close_region = window.take_damage();
+    const Rect semantic_close_damage = semantic_close_region.bounds();
+    require(Rect::intersection(semantic_close_damage, semantic_popup_bounds) ==
+                semantic_popup_bounds,
+            "semantic popup close must damage every formerly painted popup pixel");
+    RecordingPainter semantic_close_painter;
+    window.paint(semantic_close_painter, semantic_close_damage);
+    require(semantic_close_painter.saw_window_backplane,
+            "popup removal repaint must restore an opaque themed Window backplane");
 
     combo->set_dropped_down(true);
     const Point outside{5.0, 5.0};

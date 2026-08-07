@@ -3,6 +3,7 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/range_controls.hpp"
+#include "gui_forms/scrolling.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 #include "headless_host.hpp"
@@ -1037,6 +1038,197 @@ public:
             ? static_cast<std::uint32_t>(*value) +
                   static_cast<std::uint32_t>(GF_CURSOR_ARROW)
             : static_cast<std::uint32_t>(GF_CURSOR_INHERIT);
+        return GF_OK;
+    }
+
+    gf_result set_auto_scroll_offset(gf_handle handle, gf_point offset) {
+        if (!std::isfinite(offset.x) || !std::isfinite(offset.y)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "auto-scroll offset must be finite");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        record->control->set_auto_scroll_offset({offset.x, offset.y});
+        return GF_OK;
+    }
+
+    gf_result set_auto_scroll(gf_handle handle, std::uint32_t enabled) {
+        if (enabled > 1U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "auto-scroll enabled must be zero or one");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "auto-scroll requires a scrollable control");
+        }
+        scrollable->set_auto_scroll(enabled != 0U);
+        return GF_OK;
+    }
+
+    gf_result set_auto_scroll_margin(gf_handle handle, gf_size margin) {
+        if (!std::isfinite(margin.width) || !std::isfinite(margin.height) ||
+            margin.width < 0.0 || margin.height < 0.0) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "auto-scroll margin must be finite and nonnegative");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "auto-scroll margin requires a scrollable control");
+        }
+        scrollable->set_auto_scroll_margin({margin.width, margin.height});
+        return GF_OK;
+    }
+
+    gf_result set_auto_scroll_min_size(gf_handle handle, gf_size size) {
+        if (!std::isfinite(size.width) || !std::isfinite(size.height) ||
+            size.width < 0.0 || size.height < 0.0) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "auto-scroll minimum size must be finite and nonnegative");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "auto-scroll minimum size requires a scrollable control");
+        }
+        scrollable->set_auto_scroll_min_size({size.width, size.height});
+        return GF_OK;
+    }
+
+    gf_result set_auto_scroll_position(gf_handle handle, gf_point position) {
+        if (!std::isfinite(position.x) || !std::isfinite(position.y)) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "auto-scroll position must be finite");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "auto-scroll position requires a scrollable control");
+        }
+        scrollable->set_auto_scroll_position({position.x, position.y});
+        return GF_OK;
+    }
+
+    gf_result get_scroll_state(gf_handle handle, gf_scroll_state* state) {
+        if (state == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "get_scroll_state requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "get_scroll_state requires a scrollable control");
+        }
+        if (scrollable->attached()) {
+            static_cast<void>(scrollable->arranged_bounds());
+        } else {
+            const Rect requested = scrollable->requested_bounds();
+            scrollable->arrange(
+                {0.0, 0.0, requested.width, requested.height});
+        }
+        const gui_forms::ScrollSnapshot snapshot = scrollable->scroll_snapshot();
+        const auto axis = [](const gui_forms::ScrollAxisSnapshot& source) {
+            return gf_scroll_axis_state{
+                source.enabled ? 1U : 0U, source.visible ? 1U : 0U,
+                source.minimum, source.maximum, source.large_change,
+                source.small_change, source.value};
+        };
+        *state = {
+            snapshot.auto_scroll ? 1U : 0U,
+            {snapshot.position.x, snapshot.position.y},
+            {snapshot.margin.width, snapshot.margin.height},
+            {snapshot.minimum_content_size.width,
+             snapshot.minimum_content_size.height},
+            {snapshot.display_rectangle.x, snapshot.display_rectangle.y,
+             snapshot.display_rectangle.width,
+             snapshot.display_rectangle.height},
+            {snapshot.viewport_rectangle.x, snapshot.viewport_rectangle.y,
+             snapshot.viewport_rectangle.width,
+             snapshot.viewport_rectangle.height},
+            axis(snapshot.horizontal), axis(snapshot.vertical)};
+        return GF_OK;
+    }
+
+    gf_result set_scroll_axis_state(gf_handle handle,
+                                    std::uint32_t orientation,
+                                    gf_scroll_axis_state state) {
+        if (orientation > 1U || state.enabled > 1U || state.visible > 1U ||
+            !std::isfinite(state.minimum) || !std::isfinite(state.maximum) ||
+            !std::isfinite(state.large_change) ||
+            !std::isfinite(state.small_change) || !std::isfinite(state.value) ||
+            state.minimum < 0.0 || state.large_change < 0.0 ||
+            state.small_change < 0.0 || state.value < state.minimum ||
+            state.value > state.maximum) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "scroll axis state is invalid");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "scroll axis state requires a scrollable control");
+        }
+        gui_forms::ScrollProperties& axis = orientation == 0U
+            ? scrollable->horizontal_scroll() : scrollable->vertical_scroll();
+        axis.set_minimum(state.minimum);
+        axis.set_maximum(state.maximum);
+        axis.set_large_change(state.large_change);
+        axis.set_small_change(state.small_change);
+        axis.set_enabled(state.enabled != 0U);
+        axis.set_visible(state.visible != 0U);
+        axis.set_value(state.value);
+        return GF_OK;
+    }
+
+    gf_result scroll_control_into_view(gf_handle handle, gf_handle child_handle) {
+        std::shared_ptr<ControlRecord> record;
+        std::shared_ptr<ControlRecord> child;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        if (const gf_result result = get_control(child_handle, child);
+            result != GF_OK) {
+            return result;
+        }
+        const auto scrollable = std::dynamic_pointer_cast<
+            gui_forms::ScrollableControl>(record->control);
+        if (!scrollable) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "ScrollControlIntoView requires a scrollable control");
+        }
+        scrollable->scroll_control_into_view(child->control);
         return GF_OK;
     }
 
@@ -3154,6 +3346,40 @@ gf_result api_set_cursor(gf_handle handle, std::uint32_t cursor_kind) noexcept {
 gf_result api_get_cursor(gf_handle handle, std::uint32_t* cursor_kind) noexcept {
     return translate([&] { return registry().get_cursor(handle, cursor_kind); });
 }
+gf_result api_set_auto_scroll_offset(gf_handle handle, gf_point offset) noexcept {
+    return translate([&] { return registry().set_auto_scroll_offset(handle, offset); });
+}
+gf_result api_set_auto_scroll(gf_handle handle, std::uint32_t enabled) noexcept {
+    return translate([&] { return registry().set_auto_scroll(handle, enabled); });
+}
+gf_result api_set_auto_scroll_margin(gf_handle handle, gf_size margin) noexcept {
+    return translate([&] { return registry().set_auto_scroll_margin(handle, margin); });
+}
+gf_result api_set_auto_scroll_min_size(gf_handle handle, gf_size size) noexcept {
+    return translate([&] { return registry().set_auto_scroll_min_size(handle, size); });
+}
+gf_result api_set_auto_scroll_position(gf_handle handle,
+                                       gf_point position) noexcept {
+    return translate([&] {
+        return registry().set_auto_scroll_position(handle, position);
+    });
+}
+gf_result api_get_scroll_state(gf_handle handle, gf_scroll_state* state) noexcept {
+    return translate([&] { return registry().get_scroll_state(handle, state); });
+}
+gf_result api_set_scroll_axis_state(gf_handle handle,
+                                    std::uint32_t orientation,
+                                    gf_scroll_axis_state state) noexcept {
+    return translate([&] {
+        return registry().set_scroll_axis_state(handle, orientation, state);
+    });
+}
+gf_result api_scroll_control_into_view(gf_handle handle,
+                                       gf_handle child) noexcept {
+    return translate([&] {
+        return registry().scroll_control_into_view(handle, child);
+    });
+}
 gf_result api_run_window(gf_handle handle, std::uint32_t flags) noexcept {
     return translate([&] { return registry().run_window(handle, flags); });
 }
@@ -3378,7 +3604,8 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_16 &&
         requested_version != GF_ABI_VERSION_0_17 &&
         requested_version != GF_ABI_VERSION_0_18 &&
-        requested_version != GF_ABI_VERSION_0_19) {
+        requested_version != GF_ABI_VERSION_0_19 &&
+        requested_version != GF_ABI_VERSION_0_20) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -3446,6 +3673,14 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_subscribe_key_preview,
         &api_set_cursor,
         &api_get_cursor,
+        &api_set_auto_scroll_offset,
+        &api_set_auto_scroll,
+        &api_set_auto_scroll_margin,
+        &api_set_auto_scroll_min_size,
+        &api_set_auto_scroll_position,
+        &api_get_scroll_state,
+        &api_set_scroll_axis_state,
+        &api_scroll_control_into_view,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

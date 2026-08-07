@@ -70,6 +70,9 @@ struct ShowcaseContext final {
     ComponentContainer components;
     std::shared_ptr<Timer> ui_timer;
     std::shared_ptr<ToolTip> tooltips;
+    std::shared_ptr<ErrorProvider> error_provider;
+    std::shared_ptr<HelpProvider> help_provider;
+    std::shared_ptr<BindingSource> binding_source;
     std::shared_ptr<Label> timer_status;
     std::shared_ptr<ProgressBar> timer_progress;
     std::shared_ptr<TrackBar> timer_interval;
@@ -79,6 +82,14 @@ struct ShowcaseContext final {
     std::shared_ptr<Button> timer_stop;
     std::shared_ptr<Button> tooltip_show_disabled;
     std::shared_ptr<Button> tooltip_disabled_target;
+    std::shared_ptr<TextBox> provider_error_target;
+    std::shared_ptr<Button> provider_error_toggle;
+    std::shared_ptr<TextBox> binding_editor;
+    std::shared_ptr<CheckBox> binding_enabled;
+    std::shared_ptr<TrackBar> binding_gain;
+    std::shared_ptr<Button> binding_previous;
+    std::shared_ptr<Button> binding_next;
+    std::shared_ptr<Label> binding_status;
     std::shared_ptr<Label> dispatcher_status;
     std::shared_ptr<Button> dispatcher_invoke;
     std::vector<DispatchOperation> dispatcher_operations;
@@ -220,10 +231,10 @@ void add_control_spectrum(const std::shared_ptr<Surface>& page,
                               {930.0, 142.0});
     page->add_at(button_group, {24.0, 92.0, 930.0, 142.0});
     const std::array<std::pair<ButtonVisualStyle, std::string_view>, 4> buttons{{
-        {ButtonVisualStyle::standard, "Standard"},
-        {ButtonVisualStyle::flat, "Flat"},
-        {ButtonVisualStyle::accent, "Accent"},
-        {ButtonVisualStyle::command, "Command"},
+        {ButtonVisualStyle::standard, "&Standard"},
+        {ButtonVisualStyle::flat, "&Flat"},
+        {ButtonVisualStyle::accent, "&Accent"},
+        {ButtonVisualStyle::command, "&Command"},
     }};
     for (std::size_t index = 0; index < buttons.size(); ++index) {
         auto button = make_control<Button>(
@@ -240,8 +251,7 @@ void add_control_spectrum(const std::shared_ptr<Surface>& page,
     disabled->set_enabled(false);
     button_group->add_at(disabled, {24.0, 92.0, 185.0, 30.0});
     auto default_button = make_control<Button>(
-        StableId("showcase.controls.button.default"), "Default cue");
-    default_button->set_default_button(true);
+        StableId("showcase.controls.button.default"), "&Default action");
     button_group->add_at(default_button, {239.0, 92.0, 185.0, 30.0});
     auto link = make_control<LinkLabel>(StableId("showcase.controls.link"),
                                         "LinkLabel · visited on activation");
@@ -253,8 +263,8 @@ void add_control_spectrum(const std::shared_ptr<Surface>& page,
     for (std::size_t index = 0; index < 3U; ++index) {
         auto check = make_control<CheckBox>(
             StableId("showcase.controls.check." + std::to_string(index)),
-            index == 0U ? "Classic checkbox" : index == 1U
-                ? "Modern checkbox" : "Toggle checkbox");
+            index == 0U ? "&Classic checkbox" : index == 1U
+                ? "&Modern checkbox" : "&Toggle checkbox");
         check->set_indicator_style(static_cast<ChoiceIndicatorStyle>(index));
         check->set_checked(index != 0U);
         check_group->add_at(check,
@@ -413,34 +423,39 @@ void add_ranges(const std::shared_ptr<Surface>& page,
         }));
 
     auto progress_group = group("showcase.ranges.progress",
-                                "ProgressBar · blocks, continuous, marquee, pulse, moving stripes",
-                                {930.0, 280.0});
-    page->add_at(progress_group, {24.0, 340.0, 930.0, 280.0});
-    for (std::size_t index = 0; index < 5U; ++index) {
+                                "ProgressBar · static, indeterminate, luminance, marching, laser",
+                                {930.0, 325.0});
+    page->add_at(progress_group, {24.0, 340.0, 930.0, 325.0});
+    for (std::size_t index = 0; index < 6U; ++index) {
         auto caption = label("showcase.ranges.progress.caption." + std::to_string(index),
                              index == 0U ? "Blocks" : index == 1U ? "Continuous"
-                                 : index == 2U ? "Marquee" : index == 3U ? "Pulse"
-                                 : "Moving stripes", 11.0, 600, muted);
+                                 : index == 2U ? "Marquee"
+                                 : index == 3U ? "Luminance pulse"
+                                 : index == 4U ? "Marching stripes"
+                                               : "Laser etch",
+                             11.0, 600, muted);
         progress_group->add_at(caption,
                                {24.0, 36.0 + static_cast<double>(index) * 45.0,
-                                110.0, 24.0});
+                                122.0, 24.0});
         auto progress = make_control<ProgressBar>(
             StableId("showcase.ranges.progress." + std::to_string(index)));
         progress->set_accessible_name(index == 0U ? "Blocks progress"
             : index == 1U ? "Continuous progress"
-            : index == 2U ? "Marquee progress" : index == 3U ? "Pulse progress"
-            : "Moving striped progress");
-        progress->set_visual_style(index < 4U
-            ? static_cast<ProgressBarVisualStyle>(index)
-            : ProgressBarVisualStyle::continuous);
-        if (index == 4U) {
-            progress->set_overlay_style(ProgressBarOverlayStyle::moving_stripes);
-            progress->set_animation_period(std::chrono::milliseconds(750));
-        }
+            : index == 2U ? "Marquee progress"
+            : index == 3U ? "Slow luminance pulse progress"
+            : index == 4U ? "Classic marching stripe progress"
+                          : "Laser etching progress");
+        progress->set_visual_style(static_cast<ProgressBarVisualStyle>(index));
+        if (index == 3U)
+            progress->set_animation_period(std::chrono::milliseconds(2400));
+        else if (index == 4U)
+            progress->set_animation_period(std::chrono::milliseconds(850));
+        else if (index == 5U)
+            progress->set_animation_period(std::chrono::milliseconds(1250));
         progress->set_value(64.0);
         progress_group->add_at(progress,
-                               {155.0, 38.0 + static_cast<double>(index) * 45.0,
-                                700.0, 24.0});
+                               {160.0, 38.0 + static_cast<double>(index) * 45.0,
+                                695.0, 24.0});
         if (index >= 2U) {
             context->animated_progress.push_back(progress);
         }
@@ -1438,6 +1453,35 @@ void add_values(const std::shared_ptr<Surface>& page,
     note->set_text_wrapping(TextWrapping::word);
     note->set_vertical_alignment(VerticalAlignment::near);
     group_box->add_at(note, {500.0, 154.0, 380.0, 80.0});
+
+    auto binding = group("showcase.values.binding",
+                         "BindingSource · currency, edit, conversion, two-way controls",
+                         {930.0, 164.0});
+    page->add_at(binding, {24.0, 474.0, 930.0, 164.0});
+    context->binding_editor = make_control<TextBox>(
+        StableId("showcase.values.binding.name"));
+    context->binding_editor->set_accessible_name("Bound profile name");
+    context->binding_enabled = make_control<CheckBox>(
+        StableId("showcase.values.binding.enabled"), "Enabled");
+    context->binding_gain = make_control<TrackBar>(
+        StableId("showcase.values.binding.gain"));
+    context->binding_gain->set_visual_style(TrackBarVisualStyle::filled);
+    context->binding_previous = make_control<Button>(
+        StableId("showcase.values.binding.previous"), "‹ Previous");
+    context->binding_next = make_control<Button>(
+        StableId("showcase.values.binding.next"), "Next ›");
+    context->binding_previous->set_visual_style(ButtonVisualStyle::command);
+    context->binding_next->set_visual_style(ButtonVisualStyle::command);
+    context->binding_status = label(
+        "showcase.values.binding.status",
+        "Runtime binding initializes after the retained Window attaches",
+        10.0, 600, green);
+    binding->add_at(context->binding_editor, {20.0, 42.0, 190.0, 32.0});
+    binding->add_at(context->binding_enabled, {228.0, 44.0, 120.0, 28.0});
+    binding->add_at(context->binding_gain, {360.0, 42.0, 250.0, 32.0});
+    binding->add_at(context->binding_previous, {630.0, 42.0, 128.0, 32.0});
+    binding->add_at(context->binding_next, {772.0, 42.0, 128.0, 32.0});
+    binding->add_at(context->binding_status, {20.0, 94.0, 880.0, 26.0});
 }
 
 void add_images_and_drawing(const std::shared_ptr<Surface>& page,
@@ -1513,7 +1557,7 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
     }
 
     auto primitives = group("showcase.images.primitives",
-                             "Painter · clipped composition", {460.0, 220.0});
+                             "Painter · image materials", {460.0, 220.0});
     page->add_at(primitives, {494.0, 404.0, 460.0, 220.0});
     auto board = make_control<DrawingEffectsBoard>(
         StableId("showcase.images.drawing.board"));
@@ -1544,16 +1588,36 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
                 : index % 3U == 1U ? green : orange;
             painter.draw_line({0.0, 66.0}, {x, 0.0}, color, 1.5);
         }
-        painter.fill_rect({20.0, 20.0, 92.0, 38.0}, Color::rgba(43, 82, 112));
-        painter.stroke_rect({20.5, 20.5, 91.0, 37.0},
+        painter.fill_rect({8.0, 20.0, width * 0.30, 38.0},
+                          Color::rgba(43, 82, 112));
+        painter.stroke_rect({8.5, 20.5, width * 0.30 - 1.0, 37.0},
                             Color::rgba(211, 228, 239), 1.0);
-        painter.fill_rect({126.0, 12.0, 72.0, 54.0}, violet);
-        painter.stroke_rect({126.5, 12.5, 71.0, 53.0},
+        painter.fill_rect({width * 0.37, 12.0, width * 0.25, 54.0}, violet);
+        painter.stroke_rect({width * 0.37 + 0.5, 12.5,
+                             width * 0.25 - 1.0, 53.0},
                             Color::rgba(234, 220, 244), 1.0);
-        painter.fill_rect({212.0, 28.0, 118.0, 22.0}, green);
+        painter.fill_rect({width * 0.68, 28.0, width * 0.29, 22.0}, green);
         painter.restore();
     });
-    primitives->add_at(board, {20.0, 38.0, 420.0, 158.0});
+    primitives->add_at(board, {20.0, 38.0, 252.0, 158.0});
+    auto nine_patch = make_control<MaterialPanel>(
+        StableId("showcase.images.material.nine-patch"));
+    nine_patch->set_accessible_name("Density-aware nine-patch material");
+    nine_patch->set_accessible_description(
+        "Corners remain fixed while edge and center source regions stretch");
+    primitives->add_at(nine_patch, {292.0, 52.0, 148.0, 54.0});
+    auto nine_caption = label("showcase.images.material.nine-patch.caption",
+                              "NINE-PATCH", 9.0, 700, shell_blue_dark);
+    primitives->add_at(nine_caption, {292.0, 34.0, 148.0, 16.0});
+    auto tiled = make_control<MaterialPanel>(
+        StableId("showcase.images.material.tile"));
+    tiled->set_accessible_name("Tiled source-image material");
+    tiled->set_accessible_description(
+        "Exact logical period with cropped partial edge tiles");
+    primitives->add_at(tiled, {292.0, 132.0, 148.0, 54.0});
+    auto tile_caption = label("showcase.images.material.tile.caption",
+                              "TEXTURE TILE", 9.0, 700, shell_blue_dark);
+    primitives->add_at(tile_caption, {292.0, 114.0, 148.0, 16.0});
     static_cast<void>(context);
 }
 
@@ -1900,6 +1964,21 @@ void add_timing_and_tooltips(const std::shared_ptr<Surface>& page,
     proof->set_text_wrapping(TextWrapping::word);
     proof->set_vertical_alignment(VerticalAlignment::near);
     tips_group->add_at(proof, {628.0, 44.0, 270.0, 126.0});
+    context->provider_error_target = make_control<TextBox>(
+        StableId("showcase.timing.provider.field"), "192.168.1.96:5555");
+    context->provider_error_target->set_accessible_name("Remote endpoint");
+    context->provider_error_toggle = make_control<Button>(
+        StableId("showcase.timing.provider.toggle"), "Clear");
+    context->provider_error_toggle->set_visual_style(ButtonVisualStyle::command);
+    tips_group->add_at(context->provider_error_target,
+                       {628.0, 174.0, 204.0, 32.0});
+    tips_group->add_at(context->provider_error_toggle,
+                       {840.0, 174.0, 66.0, 32.0});
+    auto provider_note = label(
+        "showcase.timing.provider.note",
+        "ErrorProvider adornment · focus the field and press F1",
+        9.0, 400, muted);
+    tips_group->add_at(provider_note, {628.0, 210.0, 278.0, 22.0});
 }
 
 void add_dates_and_calendar(const std::shared_ptr<Surface>& page,
@@ -2474,12 +2553,56 @@ void initialize_showcase_runtime(Window& window) {
 
     context->ui_timer = std::make_shared<Timer>(window, 250ms);
     context->tooltips = std::make_shared<ToolTip>(window);
+    context->error_provider = std::make_shared<ErrorProvider>(window);
+    context->help_provider = std::make_shared<HelpProvider>(window);
+    context->binding_source = std::make_shared<BindingSource>(window);
     context->components.add(context->ui_timer);
     context->components.add(context->tooltips);
+    context->components.add(context->error_provider);
+    context->components.add(context->help_provider);
+    context->components.add(context->binding_source);
+    context->binding_source->set_records({
+        {"profile.local", {{"name", std::string("Local index")},
+                            {"enabled", true}, {"gain", 28.0}}},
+        {"profile.archive", {{"name", std::string("Archive review")},
+                              {"enabled", false}, {"gain", 61.0}}},
+        {"profile.plugins", {{"name", std::string("Plugin surfaces")},
+                              {"enabled", true}, {"gain", 84.0}}},
+    });
+    BindingOptions validated_binding;
+    validated_binding.formatting_enabled = true;
+    validated_binding.data_source_update_mode =
+        DataSourceUpdateMode::on_validation;
+    const auto name_binding = context->binding_editor->data_bindings().add(
+        "Text", context->binding_source, "name", validated_binding);
+    context->subscriptions.push_back(name_binding->parse().subscribe(
+        *window.root(), [](BindingConvertEvent& event) {
+            const auto* text = std::get_if<std::string>(&event.value);
+            if (text == nullptr || text->empty()) {
+                throw std::invalid_argument("Profile name may not be empty");
+            }
+        }));
+    BindingOptions immediate_binding;
+    immediate_binding.data_source_update_mode =
+        DataSourceUpdateMode::on_property_changed;
+    static_cast<void>(context->binding_enabled->data_bindings().add(
+        "Checked", context->binding_source, "enabled", immediate_binding));
+    static_cast<void>(context->binding_gain->data_bindings().add(
+        "Value", context->binding_source, "gain", immediate_binding));
     context->tooltips->set_initial_delay(420ms);
     context->tooltips->set_reshow_delay(90ms);
     context->tooltips->set_auto_pop_delay(4s);
     context->tooltips->set_show_always(true);
+    context->error_provider->set_blink_style(ErrorBlinkStyle::never_blink);
+    context->error_provider->bind_to_data_and_errors(context->binding_source);
+    context->error_provider->set_error(
+        context->provider_error_target,
+        "Endpoint is intentionally marked invalid for provider dogfood.");
+    context->help_provider->set_help_string(
+        context->provider_error_target,
+        "Enter a host and port, then clear validation after the endpoint is accepted.");
+    context->help_provider->set_help_keyword(
+        context->provider_error_target, "network.endpoint");
 
     const auto hover = window.find("showcase.timing.tooltip.hover");
     const auto keyboard = window.find("showcase.timing.tooltip.focus");
@@ -2504,6 +2627,63 @@ void initialize_showcase_runtime(Window& window) {
     }
 
     const std::weak_ptr<ShowcaseContext> weak = context;
+    const auto update_binding_status = [weak] {
+        const auto context = weak.lock();
+        if (!context || !context->binding_source ||
+            !context->binding_status) return;
+        const BindingSourceSnapshot snapshot = context->binding_source->snapshot();
+        context->binding_status->set_text(
+            "Current " + std::to_string(snapshot.position + 1) + " / " +
+            std::to_string(snapshot.count) + " · " + snapshot.current_stable_id +
+            " · text commits on validation · revision " +
+            std::to_string(snapshot.revision));
+    };
+    context->subscriptions.push_back(
+        context->binding_source->current_changed().subscribe(
+            *window.root(), update_binding_status));
+    context->subscriptions.push_back(
+        context->binding_source->current_item_changed().subscribe(
+            *window.root(), update_binding_status));
+    context->subscriptions.push_back(
+        context->binding_previous->clicked().subscribe(
+            *window.root(), [weak](ButtonBase&) {
+                if (const auto context = weak.lock()) {
+                    static_cast<void>(context->binding_source->move_previous());
+                }
+            }));
+    context->subscriptions.push_back(
+        context->binding_next->clicked().subscribe(
+            *window.root(), [weak](ButtonBase&) {
+                if (const auto context = weak.lock()) {
+                    static_cast<void>(context->binding_source->move_next());
+                }
+            }));
+    update_binding_status();
+    context->subscriptions.push_back(
+        context->help_provider->help_requested().subscribe(
+            *window.root(), [weak](HelpRequestEvent& request) {
+                const auto context = weak.lock();
+                if (!context) return;
+                context->status->set_text("Help · " + request.help_string);
+                request.handled = true;
+            }));
+    context->subscriptions.push_back(
+        context->provider_error_toggle->clicked().subscribe(
+            *window.root(), [weak](ButtonBase&) {
+                const auto context = weak.lock();
+                if (!context) return;
+                if (context->error_provider->error(
+                        *context->provider_error_target).empty()) {
+                    context->error_provider->set_error(
+                        context->provider_error_target,
+                        "Endpoint is intentionally marked invalid for provider dogfood.");
+                    context->provider_error_toggle->set_text("Clear");
+                } else {
+                    context->error_provider->set_error(
+                        context->provider_error_target, {});
+                    context->provider_error_toggle->set_text("Restore");
+                }
+            }));
     context->subscriptions.push_back(context->ui_timer->tick().subscribe(
         *window.root(), [weak] {
             const auto context = weak.lock();

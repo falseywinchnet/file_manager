@@ -81,6 +81,8 @@ dismiss_native_dialog() {
 dismiss_native_dialog showcase.host.message.1
 dismiss_native_dialog showcase.host.dialog.4
 
+WINEDEBUG=-all "$wine_binary" "$probe" activate showcase.navigation.8 >/dev/null
+WINEDEBUG=-all "$wine_binary" "$probe" capture >/dev/null
 WINEDEBUG=-all "$wine_binary" "$probe" snapshot >/dev/null
 WINEDEBUG=-all "$wine_binary" "$probe" close >/dev/null
 wait "$showcase_pid"
@@ -88,6 +90,7 @@ trap - EXIT INT TERM
 
 rg -q '"automation":"activate","id":"showcase.navigation.13"' "$log"
 rg -q '"automation":"activate","id":"showcase.navigation.3"' "$log"
+rg -q '"automation":"activate","id":"showcase.navigation.8"' "$log"
 rg -q '"automation":"activate","id":"showcase.animation.reduced"' "$log"
 rg -q '"automation":"activate","id":"showcase.animation.pause"' "$log"
 zero_motion_snapshots=$(rg -c '"automation":"snapshot".*"active_surface_count":0' "$log")
@@ -116,6 +119,8 @@ rg -q '"dialog_cancellations":2' "$log"
 rg -q '"maximum_modal_depth":1' "$log"
 rg -q '"modal_depth":0' "$log"
 rg -q '"events_rejected":0' "$log"
+rg -q '"automation":"capture","saved":true' "$log"
+test -s "$build_directory/gallery-automation.bmp"
 rg -q '"close_requests":1' "$log"
 rg -q '"closed":true' "$log"
 rg -q '"shutdown":true' "$log"

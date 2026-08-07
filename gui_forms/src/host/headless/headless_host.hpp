@@ -58,7 +58,7 @@ private:
 class HeadlessHost final {
 public:
     explicit HeadlessHost(Window& window);
-    ~HeadlessHost() = default;
+    ~HeadlessHost();
     HeadlessHost(const HeadlessHost&) = delete;
     HeadlessHost& operator=(const HeadlessHost&) = delete;
 
@@ -69,6 +69,12 @@ public:
     [[nodiscard]] bool dispatcher_wake_pending() const noexcept {
         return dispatcher_wake_pending_.load(std::memory_order_acquire);
     }
+    [[nodiscard]] bool paint_wake_pending() const noexcept {
+        return paint_wake_pending_.load(std::memory_order_acquire);
+    }
+    [[nodiscard]] bool consume_paint_wake() noexcept {
+        return paint_wake_pending_.exchange(false, std::memory_order_acq_rel);
+    }
     [[nodiscard]] HostSession& session() noexcept { return session_; }
     [[nodiscard]] const HostSession& session() const noexcept { return session_; }
     [[nodiscard]] HostServices& services() noexcept { return services_; }
@@ -78,6 +84,7 @@ public:
 private:
     Window* window_{};
     std::atomic<bool> dispatcher_wake_pending_{};
+    std::atomic<bool> paint_wake_pending_{};
     HeadlessHostServices services_;
     HostSession session_;
     SubscriptionToken observation_;

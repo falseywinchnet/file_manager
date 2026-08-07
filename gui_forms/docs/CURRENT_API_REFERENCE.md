@@ -18,8 +18,12 @@ Language level: C++20. Public platform objects and renderer types are absent.
 provides integer/floating geometry, captured colors and a small system-role
 palette, affine matrices, thread-affine disposable brushes, pens, fonts,
 formats, paths, regions, image attributes, owned COW bitmaps, and graphics
-recorders. Brushes include solid, hatch, linear-gradient, and path-gradient
-resources.
+recorders. Brushes include solid, hatch, linear-gradient, path-gradient, and
+retained bitmap-backed `TextureBrush` resources. A texture brush snapshots its
+source pixels, supports tile/mirror/clamp wrapping, affine set/reset/translate/
+scale/rotate operations, cloning, deterministic traces, and CPU Skia execution.
+Identity-only `ImageReference` textures record honestly but cannot rasterize
+until pixels are supplied.
 
 The recorder owns a bounded state stack and typed snapshot commands for clear,
 rectangle, line, string, ellipse, polygon, path, and logical image operations.
@@ -148,6 +152,31 @@ Every control has a nonempty immutable `StableId` and a process-local
 
 ### State and geometry
 
+- mutable `name` is distinct from immutable `StableId` and has a synchronous
+  tokenized change event;
+- requested bounds reject nonfinite/negative extents and honor retained
+  minimum/maximum size; edge queries, client rectangle, containment,
+  window-coordinate conversion, and bring/send z-order operations are public;
+- exact `BoundsSpecified` masks support atomic partial bounds mutation;
+  point/rectangle transforms round-trip through retained ancestry;
+- `child_index` and `get_child_at_point` use index-zero-topmost direct-child
+  order. Lookup can independently skip invisible, disabled, and explicitly
+  hit-transparent children; ordinary pointer routing passes through the latter;
+- `get_next_control` returns the preceding/following live descendant in stable
+  nested TabIndex order without wrapping or conflating traversal with focus;
+- `get_preferred_size`, `AutoSize`, and `AutoSizeMode` provide retained
+  GrowOnly/GrowAndShrink sizing over visible child bounds, trailing margins,
+  padding, and min/max constraints. Flow/Table panels consume the same base
+  policy rather than owning unrelated boolean state;
+- `tab_index` defines stable sibling traversal order and `tab_stop` removes a
+  focusable control from Tab traversal without preventing explicit focus;
+- `ControlStyles` stores the admitted Forms-compatible style bits, including
+  resize redraw, user paint, transparency support, standard click/double-click,
+  and buffering requests;
+- `set_style`, `has_style`, `set_double_buffered`, and `double_buffered` retain
+  those facts across attachment. Clearing buffering never disables the
+  framework's baseline coherent-paint safety;
+
 - requested, arranged, committed-arranged, and absolute bounds;
 - retained `visible`, `enabled`, `focusable`, `allow_drop`, and inherited
   cursor state;
@@ -158,6 +187,12 @@ Every control has a nonempty immutable `StableId` and a process-local
 
 Reading arranged or absolute geometry may execute the declared layout read
 barrier. It is not a raw field read.
+
+Portable conversion currently terminates at Window client coordinates. The
+generated facade owns a top-level presentation offset for PointToScreen, but a
+native desktop-screen origin and multi-monitor transform remain host-contract
+work; the core does not encode one platform's coordinate system as portable
+truth.
 
 ### Invalidation
 
@@ -187,11 +222,30 @@ throwing attach hooks succeed.
 `pointer_observed`, `focus_observed`, and `arranged_bounds_changed` provide
 tokenized observation for nonvisual providers without subclassing a target.
 
+`causes_validation` defaults true and publishes a tokenized change event.
+`validating` receives a mutable `ControlValidationEvent` before focus loss;
+setting `cancel` rejects the focus move under prevent mode. `validated` follows
+only an accepted validation. The Window rejects nested focus mutation during a
+validation callback, rechecks both endpoints after callbacks, and exposes exact
+attempt/success/cancel/block/reentrancy/bulk counts in `ValidationSnapshot`.
+
+`parse_mnemonic_text` and `is_mnemonic` implement the portable ampersand
+contract: one marker names the next Unicode scalar, `&&` displays one literal
+ampersand, and matching preserves Unicode identity with ASCII case folding.
+`process_mnemonic` snapshots eligible effective controls in stable retained/tab
+order before any callback runs. Window confines the set to the active focus
+scope and cycles duplicate winners after the prior match. `DialogKeySnapshot`
+reports candidates, collision-bearing dispatches, and completed cycles in
+addition to attempts and handled commands.
+
 ### Custom-control overrides
 
-`measure`, `arrange`, `on_paint`, `hit_test_local`, pointer/key/text/drag route
-hooks, focus notification, and activation are available. Drawing uses the
-renderer-neutral `Painter` vocabulary.
+`measure`, `arrange`, `on_paint`, `visual_outsets`, `hit_test_local`,
+pointer/key/text/drag route hooks, focus notification, and activation are
+available. Drawing uses the renderer-neutral `Painter` vocabulary. Visual
+outsets let bounded decoration extend beyond arranged bounds without changing
+layout or hit testing; the compositor includes the current and last-presented
+outsets in damage while retaining parent-client clipping.
 
 ## Containers
 
@@ -200,9 +254,16 @@ renderer-neutral `Painter` vocabulary.
 - `contains_descendant` tests retained logical containment;
 - `active_control` returns the focused descendant when present;
 - `request_active_control` and `clear_active_control` use the owning window's
-  focus contract.
+  focus contract;
+- inherited `AutoValidate` supports disabled, prevent-focus-change, and
+  allow-focus-change policies; an unresolved root inheritance defaults to
+  prevent-focus-change; and
+- `validate` and constrained `validate_children` use the same retained
+  cancellable transaction and exact WinForms flag values.
 
-Validation, scaling, scrolling, and dialog-key routing are not implemented.
+Container mnemonic traversal is inherited from `Control`. Scaling, scrolling,
+protected managed override projection, and the rest of key preprocessing remain
+separate work.
 
 ### `UserControl`
 
@@ -262,15 +323,43 @@ DML/C ABI projection remain open.
 
 ### `Label`
 
-Text, font, foreground, horizontal alignment, synchronous `text_changed`,
-measurement, and nonintercepting hit testing. Ellipsis, multiple link spans,
-mnemonics, and the final text engine are incomplete.
+Text, horizontal/vertical alignment, wrapping, line spacing, synchronous
+`text_changed`, measurement, and nonintercepting hit testing. `TextStyleRole`
+selects inherited body, control, caption, heading, title, or monospace
+typography from the active structural theme. Font and foreground remain
+independently overridable; `clear_font()` and `clear_foreground()` restore
+theme authority. `use_mnemonic` controls marker-aware measure, paint, semantic
+text, and next-selectable-control focus. Ellipsis, multiple link spans,
+locale-sensitive case folding, underline cue policy, and the final text engine
+remain incomplete.
 
 ### `ButtonBase` and `Button`
 
 Text/font/style, press/focus visual state, synchronous `clicked` and
 `text_changed`, pointer activation, normalized keyboard activation, and default
-button cue. Complete form accept/cancel routing and mnemonics are open.
+button cue. A Button may use a direct Window `ImageId` or an `ImageList` plus
+mutually exclusive index/key selection. Nine-way image/text alignment,
+overlay/before/after/above/below relations, bounded gap, preferred-size
+measurement, pressed displacement, and state/density selection are retained and
+custom-rendered. `use_mnemonic` applies consistently to measure, paint,
+semantics, and activation. `perform_click()` uses the same availability and
+validation gate as mnemonic and dialog commands. `DialogResult` publishes the
+exact WinForms numeric values; Button and Window reject undefined gaps. A
+cancel Button defaults from `none` to `cancel`. `Window::set_accept_button`
+transfers the default cue; Enter/Escape route to live accept/cancel targets only
+after the focused route declines the key and never move focus. Button publishes
+Click before a non-None retained Window result. Independent native modal-loop
+closure and full managed protected-call projection remain open.
+
+### `MenuStrip` and `ContextMenu`
+
+MenuStrip is a retained focusable menu bar whose live popup rows share Command
+authority with pointer, keyboard, and semantic activation. `use_mnemonic`
+removes markers from top-level width, paint, and semantics. Duplicate
+top-level mnemonics cycle deterministically; active popup rows resolve Alt
+mnemonics inside their focus scope and retain submenu behavior. Overflow,
+hosted ToolStrip controls, and protected generated ToolStrip projection remain
+open.
 
 ### `CheckBox`
 
@@ -287,6 +376,29 @@ Boolean checked state, logical `group_name`, automatic same-container exclusion,
 
 Single retained link, visited state, link styling, and button-like activation.
 External navigation is application policy and is not performed by the control.
+
+### `ImageList`
+
+`ImageList` is a nonvisual Component bound to one Window resource registry. It
+owns an ordered, ASCII-case-insensitive keyed collection with stable indices, bounded
+UTF-8 keys, logical image size, a type-erased Tag, and tokenized revisioned
+change events. Each key may carry normal, hot, pressed, selected, and disabled
+variants at multiple density scales. Resolution prefers an exact scale, then
+the nearest larger source, then the nearest smaller source; state fallback is
+explicit and deterministic. Logical layout size remains unchanged when a 2x
+source is chosen.
+
+PNG additions validate and mutate atomically through generational Window image
+IDs. Entries may also reference an existing Window image without claiming its
+ownership. Explicit component disposal synchronously releases list-owned
+images; a failed import/replacement preserves the prior entry and revision.
+Button/CheckBox/RadioButton, TreeView, and ObjectView consume the same public
+list and invalidate from its tokenized changes. Disabled fallback uses reduced
+opacity only when no disabled raster exists.
+
+Native HIMAGELIST handles/streams, strip slicing, color-key transparency,
+palette quantization/`ColorDepth`, and designer converters are not implemented
+by this tranche. PNG remains the only encoded GUI.Forms import format.
 
 ## Motion and animation
 
@@ -320,6 +432,108 @@ other active surfaces.
 `Painter` vocabulary. The callback receives local bounds and damage, and can be
 made hit-test visible explicitly. It publishes image semantics when named. It
 does not expose a renderer or platform graphics context.
+
+### `MaterialPanel`
+
+`MaterialPanel` is a content-agnostic retained container for chrome bands,
+cards, wells, specimens, and composed surfaces. `SurfaceMaterial` owns up to
+eight ordered solid/linear/radial/image fill layers, four bounded box shadows,
+one rounded border, and a corner radius. Image layers provide whole-image
+stretch, density-aware exact-period tiling with cropped edge tiles, and
+nine-patch source slicing whose corners remain fixed and whose edge/center
+bands stretch. Image IDs are Window-scoped; attached panels reject resources
+missing from that Window or declared with stale pixel dimensions atomically.
+Gradient coordinates may be normalized to
+the arranged bounds or expressed in logical units. Linear layers select
+`GradientSpreadMode::pad`, `repeat`, or `reflect`; `repeating_linear` is the
+logical-period convenience for pinstripes, grooves, scanlines, and other
+scale-independent texture. Recipes validate atomically;
+identical assignment is silent and a change invalidates paint only.
+
+The public `Painter` vocabulary now records rounded clip/fill/stroke,
+multi-stop linear and elliptical radial gradients, repeating/mirrored linear
+gradients, bounded box shadows, and source-region image replay.
+Skia, CoreGraphics, and Win32 DIB painters realize those commands; minimal
+painters receive deterministic bounded primitive fallbacks. Gradient stops are
+limited to 32, begin at exactly zero, end at exactly one, and increase strictly.
+Compositing groups, opacity/luminance masks, blur/color effects, vector assets,
+native image-stream/strip imports, and C ABI projection of the new material and
+texture objects remain open.
+
+### `Theme`
+
+`Theme` is immutable after `Theme::create`. A complete `ThemeDefinition` owns
+renderer-neutral recipes for window, panel, card, button, accent-button,
+command-button, choice, editor, menu-item, selection, and progress roles. Every
+role has ordinary, selected, high-contrast, and high-contrast-selected recipes
+for normal, hot, pressed, pending, invalid, disabled, and deactivated states.
+Each recipe combines a `SurfaceMaterial` with text/glyph colors, focus/default
+cues, and pressed-content displacement.
+
+`Window::set_theme` replaces the application surface atomically and
+invalidates inherited style, paint, and semantic state once. A `Control` may
+install or clear a local immutable override; otherwise resolution walks the
+retained visual parent chain. State precedence is disabled, invalid, pending,
+pressed, hot, deactivated, normal. The built-in `windows-professional` theme is
+a Windows 7/10-inspired default, not a pixel-identical system-theme promise.
+Every paint transaction first records the full-coordinate `window` material,
+clipped to the current damage. This retained backplane restores gaps beneath
+detached overlays even when the application root is a transparent layout
+container, without changing child layout or z order.
+Panel, Button, command/accent Button, CheckBox, RadioButton, Card, TextBox,
+ListBox selection, ComboBox, MenuStrip, and ProgressBar consume these recipes.
+Explicit local Panel style/background overrides retain compatibility paint.
+`ThemeStructureTokens` adds validated logical spacing and geometry scales,
+Portsmouth-oriented control/title plus content-field typography roles, and
+bounded motion durations. Card and MasterDetailView follow these inherited
+tokens by default, preserve explicit component layouts, and provide explicit
+reset-to-theme operations. Theme replacement therefore invalidates inherited
+measure, arrangement, hit testing, style, paint, and semantics atomically.
+Remaining stock-control/type adoption, density variants, serialization, and ABI
+projection remain open.
+
+### `Card`
+
+`Card` is a content-agnostic retained header/body/footer composition. It owns
+ordinary child controls in each slot, returns the detached predecessor on
+replacement, validates a bounded `CardLayout`, and resolves the card theme
+role. Its default effective layout derives from structural theme tokens;
+explicit layouts remain authoritative until `reset_card_layout_to_theme()`.
+Optional interaction adds pointer/keyboard activation, independent
+selection, focus/hot/pressed state, tokenized events, visual-status projection,
+and selectable list-item semantics. The File Manager atmosphere laboratory
+uses only this public API and `MaterialPanel`; it contains no private card
+renderer.
+
+### `ReviewCard`
+
+`ReviewCard` is a typed Card specialization for evidence, decision, audit, and
+verdict projections. One atomic `ReviewRecord` carries a stable key, title,
+summary, verdict, and neutral/information/accepted/pending/warning/rejected
+disposition. It owns theme-aware heading, body, and caption Labels, retains
+ordinary Card layout and interaction, emits tokenized `record_changed`, and
+projects complete semantic name/description/value. Pending and rejected
+records also publish busy and invalid state respectively. Text bounds and UTF-8
+are validated before mutation, so an invalid replacement cannot partially
+change the visible or semantic record.
+
+### `MasterDetailView`
+
+`MasterDetailView` owns arbitrary master and detail subtrees around a genuine
+public `SplitContainer`. Its `MasterDetailLayout` controls orientation, master
+extent, visible and hit splitter widths, pane minima, compact threshold, and
+resize policy. Automatic presentation is side-by-side when both roles fit and
+otherwise exposes either master-only or detail-only compact navigation.
+Collapse removes the hidden role from visibility and focus order; growth
+restores both roles. Explicit side-by-side/master/detail modes, compact
+master/detail navigation, atomic role replacement, presentation-change events,
+and current-presentation semantics are public.
+Default splitter, navigation, minimum-pane, and compact-breakpoint geometry
+derives from structural theme tokens. Explicit layout remains authoritative
+until `reset_master_detail_layout_to_theme()`.
+The File Manager DNA laboratory dogfoods this API with four interactive
+decision Cards: wide layouts retain side-by-side evidence and compact layouts
+navigate focus-safely between the decision list and projected detail.
 
 ### `MetricsView`
 
@@ -355,12 +569,63 @@ This is a GUI.Forms range control, not yet the complete stock WinForms facade.
 ### `ProgressBar`
 
 Horizontal/vertical blocks and continuous determinate display plus bounded
-marquee and pulse animation through active-surface deadlines. It is
+marquee, slow travelling luminance pulse, classic marching stripes, and
+laser-etch animation through active-surface deadlines. Laser etch combines a
+vertically shifting repeated phase across the fill with a bright leading edge
+and deterministic sparks. `ProgressBarAnimationAppearance` atomically sets the
+luminance, stripe, phase, edge, and spark colors plus bounded pulse/edge/pitch
+geometry; invalid records leave the prior appearance intact. These are public
+library styles, not showcase painters. The control is
 nonfocusable, does not intercept hit testing, becomes scheduler-quiescent when
 paused, disabled by application policy, or effectively hidden, and publishes
 numeric or busy semantics. Reduced motion remains busy and visibly animated at
 the calmer public policy cadence/speed/excursion without resetting phase. The
 older pause and reduced setters delegate to the same atomic policy transaction.
+
+## Binding and currency
+
+### `BindingValue` and `BindableProperty`
+
+`BindingValue` is the renderer-neutral null/Boolean/signed/unsigned/number/text
+value union. Conversion is strict and locale-invariant. A control registers a
+`BindableProperty` once with a canonical name, value kind, explicit getter,
+setter, and tokenized change connector. Binding does not use RTTI, renderer
+objects, platform handles, or managed reflection.
+
+### `BindingSource` and `CurrencyManager`
+
+`BindingSource` owns validated stable-ID `BindingRecord` values and one
+`CurrencyManager`. It provides current/count/position, deterministic currency
+movement, field mutation, add/insert/remove/find, begin/cancel/end edit,
+list/current/position/data-source/data-member events, reset operations,
+`RaiseListChangedEvents`, and coalesced `SuspendBinding`/`ResumeBinding`.
+Currency movement updates bound controls before public `PositionChanged`,
+`CurrentChanged`, then `CurrentItemChanged`. The manager also exposes
+manager-wide `PullData` and `PushData`, current/list/error events, refresh, and
+edit/removal operations.
+
+### `Binding`, `ControlBindingsCollection`, and `BindingContext`
+
+`Binding` supports source-to-control reads, control-to-source writes,
+`OnPropertyChanged`, focus-driven and explicit `OnValidation`, and `Never` update modes,
+invariant `F0..F12` formatting, Format/Parse hooks, null substitutions,
+post-commit BindingComplete and DataError, and reentrancy/lifetime cleanup.
+Successful completion runs after the destination commit and propagates from the
+binding to its source/currency manager. `ControlBindingsCollection` owns each
+control's bindings, rejects duplicate canonical properties, and applies its
+default update mode only through the no-options Add overload.
+`BindingContext` preserves same-window manager identity and eagerly removes a
+disposed source.
+
+Stock descriptors currently cover base `Name`, `Visible`, and `Enabled`;
+TextBox/Label/ButtonBase `Text`; CheckBox/RadioButton `Checked`; range and
+NumericUpDown `Value`; and noneditable ComboBox `Text` and `SelectedIndex`.
+OnValidation subscribes to its target's cancellable validation event, commits
+before focus loss, and cancels prevent-mode focus when parse/transfer fails.
+Nested data members, sort/filter, arbitrary culture providers, managed-object
+reflection, BindingNavigator, and DataGridView remain open. Evidence:
+`experiments/M12P5_BINDING_CURRENCY_KERNEL.md` and
+`experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`.
 
 ## Nonvisual providers
 
@@ -376,8 +641,52 @@ older pause and reduced setters delegate to the same atomic policy transaction.
 - input-transparent overlay-plane presentation and a stable semantic
   `tool_tip` node; and
 - synchronous popup/timer cleanup when a mapping, target, provider, or Window
-  goes away. Accessible described-by relations, title/icon/balloon variants,
-  HelpProvider, and ErrorProvider remain open.
+  goes away. Accessible described-by relations and title/icon/balloon variants
+  remain open.
+
+### `ErrorProvider`
+
+- tokenized per-control error text, alignment, signed bounded padding, clear,
+  `HasErrors`, provider `Tag`, portable `ImageId` icon substitution, and
+  container-root lookup;
+- six target-relative icon alignments with provider-level right-to-left
+  mirroring and deterministic repositioning after retained layout changes;
+- one independently owned popup-root glyph per available target, passive
+  ownership for disabled controls, target/ancestor visibility cleanup, and
+  automatic restoration when availability returns;
+- `NeverBlink`, bounded six-transition `BlinkIfDifferentError`, and
+  `AlwaysBlink` using active-surface deadlines. Occlusion suppresses wakes and
+  reduced motion settles the icon visible without a provider timer loop;
+- error text appears through the ordinary public `ToolTip` provider, while the
+  final semantic projection marks the target `invalid` and appends a stable
+  error description even when a control subclass does not call its base
+  descriptor; and
+- `ErrorProviderSnapshot` reports each target, retained glyph geometry,
+  presentation, blink phase, and active work;
+- `DataSource`, `DataMember`, `BindToDataAndErrors`, and `UpdateBinding` attach
+  a same-Window `BindingSource`, project current record-wide/field errors by
+  real binding target, aggregate multiple errors, surface `BindingComplete`
+  failures, refresh on list/currency movement, and clear synchronously when
+  the source retires. Arbitrary managed `IDataErrorInfo` objects and true
+  nested object traversal remain open.
+
+### `HelpProvider`
+
+- per-control help string, keyword, navigator, explicit/automatic `ShowHelp`,
+  `ResetShowHelp`, provider namespace, clear, and `Tag`;
+- F1 resolves the focused control then its retained ancestors and dispatches
+  one mutable `HelpRequestEvent` to the mapped Control before provider policy;
+  a handled control event terminates the route;
+- requests retain the target ID, logical position, namespace, string, keyword,
+  navigator, keyboard origin, and handled result, with requested/handled
+  counters in `HelpProviderSnapshot`; and
+- authored help enriches the target semantic description without adding a
+  redundant label prefix. A mapped otherwise
+  unexposed container becomes an accessible group so guidance is not dropped.
+  The provider deliberately does not open a browser, network location, or help
+  file; that external action belongs to a consumer or capability-gated plugin.
+  TopicId/raw managed-enum projection and accessibility described-by relations
+  remain open.
 
 ## `Window`
 
@@ -387,12 +696,138 @@ older pause and reduced setters delegate to the same atomic policy transaction.
 - nested update scopes, explicit layout, flush, paint, and per-plane damage;
 - retained lookup by stable ID and recursive hit testing;
 - focus, pointer capture, pressed state, and routed input dispatch;
+- retained accept/cancel targets, exact retained `DialogResult`, stable
+  duplicate-mnemonic/dialog-key routing, validation-aware programmatic
+  commands, and queryable `DialogKeySnapshot`
+  attempt/activation/rejection/candidate/collision/cycle counters;
 - nested focus scopes and owner-tokenized retained popup attachment;
+- deterministic control-availability publication for retained extender
+  providers and overlays;
 - frame scheduling, active surfaces, occlusion, and wake deadlines;
 - UI timer callbacks plus `check_access`/`verify_access` thread guards;
 - validated PNG load/replace/remove through the resource registry;
 - renderer-free semantic snapshots and stable-ID action routing;
 - structured metrics and activity reset.
+
+### Paint leases and coherent release
+
+`PaintLeaseSnapshot` exposes `content_revision`, `rendered_revision`,
+`presented_revision`, `surface_epoch`, lease counters, deferred reentry, and the
+clean/dirty/rendering/ready/occluded-dirty state. A paint pass holds one
+exclusive UI-thread lease. Nested paint calls are coalesced into later damage;
+owner callbacks rebuild retained chunks into a transaction recorder, and no
+candidate command reaches the host painter until every callback succeeds.
+
+A callback failure restores the prior retained chunks, abandons the candidate,
+and republishes damage. Mutation during paint increments the content revision
+and survives as one later pass. `paint` returns an exact `PaintReceipt` only
+after complete backend replay and a second owner/surface-epoch validation.
+Native hosts present only a valid receipt, then
+`notify_presented(PaintReceipt, duration)` advances that exact revision after a
+successful platform copy. Duplicate, backward, forged-future, and
+replaced-epoch receipts are rejected and counted. The duration-only overload
+remains for synchronous inspection code; asynchronous/native hosts must use the
+exact receipt. Surface resize/scale increments the epoch so an obsolete
+candidate cannot release into a replacement surface.
+
+`set_paint_wake_handler` is the renderer-neutral host notification seam for
+model-originated damage. One wake is coalesced until the host consumes all
+damage, then rearmed for the next independent mutation. Occlusion suppresses
+the wake without discarding dirtiness; exposure requests one wake. This lets a
+controller Window mutate another Window and present the result immediately,
+without requiring input to be dispatched through the changed Window first.
+
+Generated managed compatibility input and portable retained pointer/key/text,
+drag, and semantic input now queue during active paint leases. Physical
+native-host reentry probes, raster double-surface swap after a backend replay
+fault, and complete multi-rectangle native presentation remain open.
+
+The paint diagnostics deliberately separate state, backing, and presentation
+commit through `content_revision`, `rendered_revision`, and
+`presented_revision`. `PaintLeaseState` exposes `dirty_queued`, `rendering`,
+`rendering_dirty`, and `ready`; `PaintLeaseSnapshot` also reports whether one
+render wake is queued and how many requests were queued or merged. Intermediate
+revisions are not stored as render jobs. The normative implementation/closure
+matrix is `planning/PAINT_PIPELINE_AVAILABILITY.md`.
+
+The generated Win32 compatibility bridge applies the same shape to admitted
+direct-HWND controls. `Graphics.FromHwnd` owns one private GUI.Drawing bitmap;
+Flush executes only new commands into it, updates the isolated offscreen HWND,
+and marks a revision rather than synchronously importing the surface. Flush,
+ReleaseHdc, EndPaint, relevant callback return, resize, visibility, and
+Invalidate merge behind one owner-thread import drain. `Update`/`Refresh` may
+drain their target synchronously, but a call from OnPaint becomes one deferred
+pass. Unknown raw GetDC writers use an adaptive 33–250 ms hash fallback that
+stops once explicit boundaries are observed. The private compatibility
+diagnostic reports content/captured revisions, epoch, queue/active/deferred
+bits, and drain counters.
+
+Generated managed owner paint has a parallel bounded surface contract.
+Protected `DoubleBuffered`, `GetStyle`, `SetStyle`, `OnPaintBackground`, and
+`InvokePaintBackground` are available to subclasses. Enabling buffering reuses
+one size-matched PArgb bitmap; background and foreground paint through the same
+`Graphics`. Resize/dispose/style retirement invalidates the surface epoch, so a
+stale callback cannot publish into its replacement. A touch during paint posts
+one follow-up; a callback exception abandons the candidate, preserves the last
+published raster, and waits for a later real mutation rather than self-retrying.
+Disabling buffering retires persistence but retains coherent ephemeral owner
+paint. The internal deterministic snapshot exists for conformance telemetry;
+native presentation remains authoritative for presented state.
+
+All nominal `Invalidate` overloads are present, including rectangle, Region,
+and recursive-child forms. Rectangle damage clips to the client and unions
+behind the single queued lease. `NotifyInvalidate` synchronously enters the
+protected `OnInvalidated` hook and public `Invalidated` event but does not itself
+schedule painting. Recursive invalidation intersects parent damage and converts
+it to child-local coordinates. Buffered owner paint exposes the captured union
+through both `PaintEventArgs.ClipRectangle` and the Graphics clip; a failed
+lease restores that union for a later real touch. Region input currently uses
+an outward conservative GUI.Drawing `Region.GetBounds` rectangle, and native
+raster upload/presentation is still full-surface. Unbuffered ephemeral paint
+uses a full clip because no prior private bitmap exists to preserve untouched
+pixels.
+
+Generated pointer, key, and text ingress is deferred whenever any managed paint
+lease is active on the UI thread. One thread-local queue is bounded at 1,024
+entries, preserves arrival order, and posts its drain only when the outermost
+lease has released. Disposed targets are removed without invoking application
+code. Input-caused invalidation then follows the ordinary callback-boundary
+paint path. The internal conformance injectors prove pointer-before-key delivery,
+no input callback inside `OnPaint`, one localized follow-up, and disposal from
+`OnPaint` without querying a retired native peer under physical Wine. Complete
+key-preview return-value parity and native pressure/stall breadth remain open.
+
+Portable `Window::dispatch_pointer`, `dispatch_key`, `dispatch_text`,
+`dispatch_drag`, and `perform_semantic_action` share a renderer-neutral
+lease-time queue. `maximum_deferred_inputs` is 1,024. Consecutive moves from
+the same pointer and consecutive overs from the same drag session compact to
+their latest event; down/up/wheel, drop/leave, key, text, and semantic actions
+retain causal order. Deferred drag returns only a previously negotiated effect
+from the same active session that remains allowed; new sessions return none.
+Semantic requests copy stable ID, action, and value, then resolve against the
+live tree after release. One posted dispatcher drain runs after the outermost
+lease; root retirement and dispatcher shutdown explicitly abandon pending
+input. `DeferredInputSnapshot` reports pending/capacity, deferred, delivered,
+move/drag compaction, capacity rejection, abandonment, faults, and drain state.
+A 100-move pressure probe, 32-over drag probe, and semantic Press probe return
+to zero work after ordinary later dispatch/paint in normal and renderer-free
+builds.
+
+`HostDispatchResult.input_deferred` distinguishes accepted lease-time
+retention from an immediately handled route.
+`input_capacity_rejected` distinguishes a fixed-bound rejection from an
+ordinary unhandled route. The headless deterministic trace publishes both
+fields. `DragDispatchResult` carries equivalent `deferred` and
+`capacity_rejected` facts alongside the prior valid effect. Normalized-host
+conformance forces pointer and drag events through the boundary from inside
+application paint.
+
+Frame and UI-timer callback faults are isolated per request. The failing lease
+disconnects, `FramePollResult::callback_faults` and
+`MetricsSnapshot::frame_callback_faults` count it, and healthy scheduled
+surfaces continue. Native scheduler callbacks contain any residual C++
+exception instead of allowing it to cross an AppKit block or Win32 timer
+callback.
 
 `Window` is not yet a reusable `Form` control or public top-level-window facade.
 Platform window creation lives in private host adapters.
@@ -504,7 +939,7 @@ than closure. See `../planning/GUI_DRAWING_REVISION_PLAN.md`.
   scrollbars, Dock/Anchor/table/flow layout;
 - grapheme-aware editing, shaping/fallback, IME, selection, clipboard commands,
   and undo;
-- date/grid/menu/toolstrip/help/error-provider/background-worker
+- grid/complete-toolstrip/background-worker
   control families;
 - property metadata/default/reset/serialization registry;
 - accessibility publisher and complete semantic tree;

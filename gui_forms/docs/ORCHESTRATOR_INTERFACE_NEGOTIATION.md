@@ -121,10 +121,14 @@ Orchestrator policy.
    drag-source initiation, typed file references, bounded media bytes,
    lazy/promised data, cancellation/expiry, clipboard formats, and
    cross-participating-window behavior.
-5. **Help mechanics:** complete Forms-shaped `HelpProvider` attachment,
-   help-key/F1 command routing, stable help-topic/context IDs, and reuse of the
-   semantic graph/greaseboard anchors without coupling help availability to
-   accessibility publication.
+5. **Help mechanics:** **MEASURED PARTIAL M12-P4:** Forms-shaped
+   `HelpProvider` attachment, help strings/keywords/navigators, automatic and
+   explicit ShowHelp, focus-ancestor F1 routing, control-first/provider-second
+   handled events, and semantic descriptions are public. The provider emits
+   intent and never opens an external resource. Stable TopicId/context-ID
+   registry, Orchestrator capability routing, greaseboard anchors, described-by
+   relations, and native publisher verification remain to negotiate without
+   coupling help availability to accessibility publication.
 6. **Inspection:** consumption manifests and headless traces name modal, native
    dialog, help, inbound/outbound transfer, lazy payload, and clipboard
    capability independently.
@@ -150,3 +154,59 @@ Status: **awaiting project reply**.
 Please identify which requirements are already covered by M11h evidence, which
 need additive public projection only, which require new implementation, and any
 request that would improperly place application policy in GUI.Forms.
+
+## GUI.Forms implementation fact M12-P5 — local binding projection
+
+Status: **MEASURED; not yet an ABI proposal**.
+
+GUI.Forms now has a renderer-neutral retained binding/currency kernel for local
+application models. It deliberately accepts explicit typed property
+descriptors and stable `BindingRecord` projections, not arbitrary managed
+objects or Orchestrator-owned records. Orchestrator remains the authority for
+cross-project contract meaning; a future frontend adapter may project a
+negotiated snapshot into this local model without giving GUI.Forms service,
+persistence, or capability-policy ownership.
+
+Before this becomes a consumption-manifest capability, GUI.Forms still owes a
+versioned C ABI table for value/record/binding handles, bounded string/value
+transport, callback cleanup, source replacement, and headless trace identity.
+Nested object reflection is explicitly not required of the native ABI. Current
+C++ evidence is recorded in
+`../experiments/M12P5_BINDING_CURRENCY_KERNEL.md`.
+
+## GUI.Forms implementation fact M12-P6 — validation and local errors
+
+Status: **MEASURED; not yet an ABI proposal**.
+
+GUI.Forms now owns deterministic retained focus validation and a local
+BindingSource/ErrorProvider error projection. This is presentation-local
+behavior: it does not make GUI.Forms authoritative for Orchestrator service
+validity, capability policy, or persisted diagnostic records. A future ABI may
+carry bounded error snapshots into `BindingRecord`, but the producer remains
+the authority and arbitrary managed-object reflection is not part of the
+native contract. Evidence:
+`../experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`.
+
+## GUI.Forms implementation fact M12-P7 — local dialog commands
+
+Status: **MEASURED; not yet an ABI proposal**.
+
+GUI.Forms now owns renderer-neutral mnemonic parsing/routing and retained
+accept/cancel command roles. These are local presentation commands, not
+Orchestrator capabilities: they do not authorize work, close a service session,
+or select a cross-project action by themselves. A future ABI projection may
+carry stable command identity and handled/result state, but Orchestrator remains
+the authority for the meaning and availability of the invoked operation.
+Evidence: `../experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md`.
+
+## GUI.Forms implementation fact M12-P8 — deterministic command arbitration
+
+Status: **MEASURED; not yet an ABI proposal**.
+
+GUI.Forms now precomputes mnemonic candidates before callbacks, cycles
+duplicate winners, retains exact DialogResult state, and routes MenuStrip and
+popup mnemonics through local shared Command authority. These remain
+presentation facts. A non-None local result does not authorize an Orchestrator
+operation, and native modal closure is still owned by the presenting host.
+Evidence:
+`../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md`.

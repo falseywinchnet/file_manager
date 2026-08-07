@@ -443,10 +443,15 @@ void ToolTip::close_overlay(bool emit_change) {
     const bool was_visible = visible();
     popup_subscription_.disconnect();
     auto popup = std::move(popup_);
+    // PopupAttachment deliberately keeps weak control references so the
+    // Window cannot create an ownership cycle. Keep our retained overlay tree
+    // alive until disconnect lets Window detach it and remove every stable ID.
+    // Releasing these first leaves an expired attachment and a poisoned ID
+    // registry that faults the next tooltip for the same target.
+    if (popup) popup->token.disconnect();
     overlay_layer_.reset();
     overlay_bubble_.reset();
     visible_target_.reset();
-    if (popup) popup->token.disconnect();
     if (was_visible) last_hidden_ = FrameClock::now();
     if (emit_change && was_visible && target) {
         ToolTipEvent change{std::string(target->stable_id().value()), std::move(text),

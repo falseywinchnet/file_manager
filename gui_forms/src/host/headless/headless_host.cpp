@@ -119,6 +119,9 @@ HeadlessHost::HeadlessHost(Window& window)
     window.set_dispatch_wake_handler([this] {
         dispatcher_wake_pending_.store(true, std::memory_order_release);
     });
+    window.set_paint_wake_handler([this] {
+        paint_wake_pending_.store(true, std::memory_order_release);
+    });
     observation_ = session_.observed().subscribe(
         [this](const HostEvent& event, const HostDispatchResult& result) {
             const HostSessionSnapshot snapshot = session_.snapshot();
@@ -129,6 +132,9 @@ HeadlessHost::HeadlessHost(Window& window)
                  << " event=" << host_event_name(event.payload)
                  << " accepted=" << (result.accepted() ? 1 : 0)
                  << " handled=" << (result.handled ? 1 : 0)
+                 << " input_deferred=" << (result.input_deferred ? 1 : 0)
+                 << " input_rejected="
+                 << (result.input_capacity_rejected ? 1 : 0)
                  << " drag_effect=" << drag_effect_name(result.drag_effect)
                  << " close_allowed=" << (result.close_allowed ? 1 : 0)
                  << " error=" << host_dispatch_error_name(result.error)
@@ -148,6 +154,13 @@ HeadlessHost::HeadlessHost(Window& window)
                  << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
             trace_ += line.str();
         });
+}
+
+HeadlessHost::~HeadlessHost() {
+    if (window_ != nullptr) {
+        window_->set_paint_wake_handler({});
+        window_->set_dispatch_wake_handler({});
+    }
 }
 
 DispatchDrainResult HeadlessHost::pump_dispatcher(

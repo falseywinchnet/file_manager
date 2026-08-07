@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gui_forms/control.hpp"
+#include "gui_forms/scrolling.hpp"
 #include "gui_forms/range_controls.hpp"
 
 #include <cstdint>
@@ -14,9 +14,10 @@
 
 namespace gui_forms {
 
-// The first reusable focus-container identity. Validation, scaling, scrolling,
-// and dialog-key routing remain separate contracts owned by later M5/M6 slices.
-class ContainerControl : public Control {
+// Retained focus and validation container. AutoValidate is inherited through
+// nested containers while the Window owns the single deterministic focus
+// transition and cancellation order.
+class ContainerControl : public ScrollableControl {
 public:
     explicit ContainerControl(StableId stable_id);
 
@@ -24,8 +25,25 @@ public:
     [[nodiscard]] Control::Ptr active_control() const noexcept;
     bool request_active_control(const Control::Ptr& control);
     bool clear_active_control();
+    [[nodiscard]] AutoValidate auto_validate() const noexcept {
+        return auto_validate_;
+    }
+    [[nodiscard]] AutoValidate effective_auto_validate() const noexcept;
+    void set_auto_validate(AutoValidate value);
+    [[nodiscard]] Event<AutoValidate>& auto_validate_changed() noexcept {
+        return auto_validate_changed_;
+    }
+    bool validate(bool check_auto_validate = false);
+    bool validate_children(
+        ValidationConstraints constraints = ValidationConstraints::selectable);
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
+private:
+    [[nodiscard]] AutoValidate authored_auto_validate() const noexcept override {
+        return auto_validate_;
+    }
+    AutoValidate auto_validate_{AutoValidate::inherit};
+    Event<AutoValidate> auto_validate_changed_;
 };
 
 // A retained composition root with a one-shot lifetime load notification and
@@ -111,8 +129,10 @@ public:
     void set_flow_direction(FlowDirection direction);
     [[nodiscard]] bool wrap_contents() const noexcept { return wrap_contents_; }
     void set_wrap_contents(bool wrap);
-    [[nodiscard]] bool auto_size() const noexcept { return auto_size_; }
-    void set_auto_size(bool auto_size);
+    [[nodiscard]] bool auto_size() const noexcept override {
+        return Control::auto_size();
+    }
+    void set_auto_size(bool auto_size) override;
     void set_flow_break(const Control& child, bool flow_break);
     [[nodiscard]] bool flow_break(const Control& child) const;
 
@@ -127,7 +147,6 @@ private:
     std::unordered_map<std::uint64_t, bool> flow_breaks_;
     FlowDirection flow_direction_{FlowDirection::left_to_right};
     bool wrap_contents_{true};
-    bool auto_size_{};
 };
 
 enum class TableSizeMode : std::uint8_t {
@@ -180,8 +199,10 @@ public:
         return grow_style_;
     }
     void set_grow_style(TableLayoutGrowStyle style);
-    [[nodiscard]] bool auto_size() const noexcept { return auto_size_; }
-    void set_auto_size(bool auto_size);
+    [[nodiscard]] bool auto_size() const noexcept override {
+        return Control::auto_size();
+    }
+    void set_auto_size(bool auto_size) override;
     [[nodiscard]] TableCellBorderStyle cell_border_style() const noexcept {
         return cell_border_style_;
     }
@@ -246,7 +267,6 @@ private:
     std::size_t row_count_{1U};
     TableLayoutGrowStyle grow_style_{TableLayoutGrowStyle::add_rows};
     TableCellBorderStyle cell_border_style_{TableCellBorderStyle::none};
-    bool auto_size_{};
     bool layout_overflowed_{};
 };
 

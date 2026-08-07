@@ -1,0 +1,322 @@
+#include "gui_forms/gui_forms.hpp"
+
+#include <array>
+#include <chrono>
+#include <exception>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+
+using namespace gui_forms;
+using namespace std::chrono_literals;
+
+void require(bool condition, const char* message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
+                              std::string_view stable_id) {
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id == stable_id) return &node;
+        if (const SemanticNode* found = find_node(node.children, stable_id)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+struct Fixture final {
+    Fixture() : window(root, {480.0, 260.0}) {
+        root->set_requested_bounds({0.0, 0.0, 480.0, 260.0});
+        panel->set_requested_bounds({30.0, 30.0, 360.0, 170.0});
+        target->set_requested_bounds({25.0, 35.0, 160.0, 32.0});
+        child->set_requested_bounds({25.0, 90.0, 160.0, 32.0});
+        panel->add_child(target);
+        panel->add_child(child);
+        root->add_child(panel);
+        window.perform_layout();
+        static_cast<void>(window.take_damage());
+    }
+
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("guidance.root"));
+    std::shared_ptr<Panel> panel = make_control<Panel>(StableId("guidance.panel"));
+    std::shared_ptr<TextBox> target =
+        make_control<TextBox>(StableId("guidance.target"), "192.168.1.96:5555");
+    std::shared_ptr<Button> child =
+        make_control<Button>(StableId("guidance.child"), "Connect");
+    Window window;
+};
+
+void poll_next(Window& window) {
+    const auto wake = window.next_wake();
+    require(wake.has_value(), "expected a scheduled provider frame");
+    static_cast<void>(window.poll_frame_schedule(*wake));
+}
+
+void test_error_semantics_geometry_rtl_and_lifetime() {
+    Fixture fixture;
+    ErrorProvider errors(fixture.window);
+    require(errors.can_extend(fixture.target) &&
+                errors.container_control() == fixture.root,
+            "provider extension and container lookup must stay bound to one Window");
+    errors.set_tag(std::string("validation-channel"));
+    require(std::any_cast<std::string>(errors.tag()) == "validation-channel",
+            "ErrorProvider Tag must retain application metadata inertly");
+    const std::array<std::byte, 4> pixel{
+        std::byte{0x20}, std::byte{0x30}, std::byte{0xd0}, std::byte{0xff}};
+    const ImageLoadResult image = fixture.window.load_bgra32_premultiplied(
+        1U, 1U, 4U, pixel);
+    require(static_cast<bool>(image), "fixture must register a provider icon image");
+    errors.set_icon(image.image);
+    require(errors.icon() == image.image,
+            "ErrorProvider must retain a validated portable ImageId override");
+    errors.set_blink_style(ErrorBlinkStyle::never_blink);
+    errors.set_error(fixture.target, "Server address is not reachable");
+    fixture.window.perform_layout();
+
+    ErrorProviderSnapshot first = errors.snapshot();
+    require(errors.has_errors() && first.live_errors == 1U &&
+                first.presented_icons == 1U && first.icons.size() == 1U,
+            "an error must retain one presented adornment");
+    const Rect target_bounds = fixture.target->absolute_bounds();
+    require(first.icons.front().bounds.x >= target_bounds.right(),
+            "the default middle-right error glyph must sit beyond the target edge");
+
+    const std::array<ErrorIconAlignment, 6> alignments{
+        ErrorIconAlignment::top_left, ErrorIconAlignment::top_right,
+        ErrorIconAlignment::middle_left, ErrorIconAlignment::middle_right,
+        ErrorIconAlignment::bottom_left, ErrorIconAlignment::bottom_right};
+    for (const ErrorIconAlignment alignment : alignments) {
+        errors.set_icon_alignment(fixture.target, alignment);
+        const Rect glyph = errors.snapshot().icons.front().bounds;
+        const bool expected_left = alignment == ErrorIconAlignment::top_left ||
+            alignment == ErrorIconAlignment::middle_left ||
+            alignment == ErrorIconAlignment::bottom_left;
+        require(expected_left ? glyph.right() <= target_bounds.x
+                              : glyph.x >= target_bounds.right(),
+                "all six ErrorIconAlignment values must choose the authored side");
+        if (alignment == ErrorIconAlignment::top_left ||
+            alignment == ErrorIconAlignment::top_right) {
+            require(glyph.y == target_bounds.y,
+                    "top error alignment must use the target top edge");
+        } else if (alignment == ErrorIconAlignment::bottom_left ||
+                   alignment == ErrorIconAlignment::bottom_right) {
+            require(glyph.bottom() == target_bounds.bottom(),
+                    "bottom error alignment must use the target bottom edge");
+        } else {
+            require(glyph.y > target_bounds.y && glyph.bottom() < target_bounds.bottom(),
+                    "middle error alignment must center within the target height");
+        }
+    }
+
+    const SemanticSnapshot semantic_snapshot = fixture.window.semantic_snapshot();
+    const SemanticNode* target = find_node(
+        semantic_snapshot.roots, "guidance.target");
+    require(target && has_semantic_state(target->states, SemanticState::invalid) &&
+                target->description.find("Error: Server address is not reachable") !=
+                    std::string::npos,
+            "provider errors must enrich every control subclass at final semantic projection");
+
+    errors.set_icon_alignment(fixture.target, ErrorIconAlignment::top_left);
+    errors.set_icon_padding(fixture.target, 4.0);
+    ErrorProviderSnapshot left = errors.snapshot();
+    require(left.icons.front().bounds.right() <= target_bounds.x - 4.0,
+            "left alignment and padding must be reflected in retained geometry");
+    int direction_changes = 0;
+    auto direction = errors.right_to_left_changed().subscribe(
+        [&](bool value) { if (value) ++direction_changes; });
+    errors.set_right_to_left(true);
+    ErrorProviderSnapshot mirrored = errors.snapshot();
+    require(mirrored.icons.front().bounds.x >= target_bounds.right() &&
+                direction_changes == 1,
+            "provider RTL must mirror horizontal icon alignment deterministically");
+
+    fixture.target->set_requested_bounds({190.0, 105.0, 130.0, 32.0});
+    fixture.window.perform_layout();
+    const ErrorProviderSnapshot moved = errors.snapshot();
+    require(moved.icons.front().bounds != mirrored.icons.front().bounds,
+            "error adornments must follow committed retained layout changes");
+
+    fixture.panel->set_visible(false);
+    require(errors.snapshot().presented_icons == 0U,
+            "hiding an ancestor must synchronously revoke descendant adornments");
+    fixture.panel->set_visible(true);
+    fixture.window.perform_layout();
+    require(errors.snapshot().presented_icons == 1U,
+            "restoring an ancestor must rebuild descendant adornments without reauthoring errors");
+
+    errors.clear();
+    const SemanticSnapshot cleared_snapshot = fixture.window.semantic_snapshot();
+    target = find_node(cleared_snapshot.roots, "guidance.target");
+    require(!errors.has_errors() && target &&
+                !has_semantic_state(target->states, SemanticState::invalid),
+            "clearing the provider must remove both visuals and invalid semantics");
+}
+
+void test_error_blink_is_bounded_occlusion_aware_and_reduced_motion_safe() {
+    Fixture fixture;
+    ErrorProvider errors(fixture.window);
+    errors.set_blink_rate(50ms);
+    errors.set_error(fixture.target, "Transient validation failure");
+    require(errors.snapshot().icons.front().blink_active && fixture.window.next_wake(),
+            "changed-error blinking must use a scheduled active surface");
+
+    fixture.window.set_occluded(true, FrameClock::now());
+    require(!fixture.window.next_wake(),
+            "occlusion must suppress provider animation wakeups");
+    fixture.window.set_occluded(false, FrameClock::now());
+    require(fixture.window.next_wake().has_value(),
+            "exposure must resume the retained blink deadline");
+
+    PresentationSettings settings = fixture.window.presentation_settings();
+    settings.reduced_motion = true;
+    fixture.window.set_presentation_settings(settings);
+    ErrorProviderSnapshot reduced = errors.snapshot();
+    require(!reduced.icons.front().blink_active &&
+                reduced.icons.front().blink_phase_visible &&
+                !fixture.window.next_wake(),
+            "reduced motion must settle the glyph visible and quiescent");
+
+    settings.reduced_motion = false;
+    fixture.window.set_presentation_settings(settings);
+    for (std::size_t index = 0; index < 6U; ++index) poll_next(fixture.window);
+    ErrorProviderSnapshot settled = errors.snapshot();
+    require(!settled.icons.front().blink_active &&
+                settled.icons.front().blink_phase_visible &&
+                !fixture.window.next_wake(),
+            "BlinkIfDifferentError must finish after a bounded deterministic sequence");
+
+    errors.set_blink_style(ErrorBlinkStyle::always_blink);
+    require(errors.snapshot().icons.front().blink_active,
+            "AlwaysBlink must retain an active surface while visible");
+    errors.set_blink_style(ErrorBlinkStyle::never_blink);
+    require(!errors.snapshot().icons.front().blink_active &&
+                !fixture.window.next_wake(),
+            "NeverBlink must synchronously revoke scheduled work");
+}
+
+void test_help_routes_f1_locally_then_to_provider_without_external_policy() {
+    Fixture fixture;
+    HelpProvider help(fixture.window);
+    require(help.can_extend(fixture.panel),
+            "HelpProvider must accept a live target in its Window");
+    help.set_tag(std::string("local-help"));
+    require(std::any_cast<std::string>(help.tag()) == "local-help",
+            "HelpProvider Tag must retain inert application metadata");
+    help.set_help_namespace("malkuth://local-help");
+    help.set_help_string(fixture.panel, "Choose a reachable local service endpoint.");
+    help.set_help_keyword(fixture.panel, "network.endpoint");
+    help.set_help_navigator(fixture.panel, HelpNavigator::keyword_index);
+    require(fixture.window.request_focus(fixture.child),
+            "fixture child must accept keyboard focus");
+
+    std::vector<std::string> order;
+    auto local = fixture.panel->help_requested().subscribe(
+        [&](HelpRequestEvent& request) {
+            order.push_back("control");
+            require(request.keyboard_initiated &&
+                        request.target_stable_id == "guidance.panel",
+                    "F1 must route to the nearest mapped focus ancestor");
+        });
+    auto provider = help.help_requested().subscribe(
+        [&](HelpRequestEvent& request) {
+            order.push_back("provider");
+            require(request.help_namespace == "malkuth://local-help" &&
+                        request.keyword == "network.endpoint" &&
+                        request.navigator == HelpNavigator::keyword_index,
+                    "provider requests must retain namespace, keyword, and navigation intent");
+            request.handled = true;
+        });
+
+    const bool handled = fixture.window.dispatch_key(
+        {KeyAction::down, PhysicalKey::f1, Modifier::none});
+    require(handled && order == std::vector<std::string>({"control", "provider"}),
+            "F1 must use deterministic local-then-provider event ordering");
+    const HelpProviderSnapshot first = help.snapshot();
+    require(first.requests == 1U && first.handled_requests == 1U,
+            "help instrumentation must distinguish requested and handled work");
+
+    const SemanticSnapshot help_semantics = fixture.window.semantic_snapshot();
+    const SemanticNode* panel = find_node(
+        help_semantics.roots, "guidance.panel");
+    require(panel && panel->description.find(
+                "Choose a reachable local service endpoint.") !=
+                std::string::npos,
+            "authored help must enrich native semantic output");
+
+    help.set_show_help(fixture.panel, false);
+    require(!help.show_help(*fixture.panel) &&
+                !fixture.window.dispatch_key(
+                    {KeyAction::down, PhysicalKey::f1, Modifier::none}),
+            "an explicit false ShowHelp value must disable automatic metadata routing");
+    help.reset_show_help(*fixture.panel);
+    require(help.show_help(*fixture.panel),
+            "ResetShowHelp must restore metadata-derived automatic behavior");
+
+    local.disconnect();
+    provider.disconnect();
+    int provider_calls = 0;
+    auto local_handler = fixture.panel->help_requested().subscribe(
+        [&](HelpRequestEvent& request) {
+            order.push_back("handled-control");
+            request.handled = true;
+        });
+    auto provider_handler = help.help_requested().subscribe(
+        [&](HelpRequestEvent&) { ++provider_calls; });
+    require(fixture.window.dispatch_key(
+                {KeyAction::down, PhysicalKey::f1, Modifier::none}) &&
+                provider_calls == 0,
+            "a handled control request must not fall through to provider policy");
+}
+
+void test_multiple_providers_and_disposal_cleanup() {
+    Fixture fixture;
+    auto first = std::make_unique<ErrorProvider>(fixture.window);
+    auto second = std::make_unique<ErrorProvider>(fixture.window);
+    first->set_blink_style(ErrorBlinkStyle::never_blink);
+    second->set_blink_style(ErrorBlinkStyle::never_blink);
+    first->set_error(fixture.target, "First validation channel");
+    second->set_error(fixture.target, "Second validation channel");
+    const SemanticSnapshot both_snapshot = fixture.window.semantic_snapshot();
+    const SemanticNode* both = find_node(
+        both_snapshot.roots, "guidance.target");
+    require(both && both->description.find("First validation channel") <
+                         both->description.find("Second validation channel"),
+            "multiple providers must project in stable provider-identity order");
+
+    first->dispose();
+    const SemanticSnapshot remaining_snapshot = fixture.window.semantic_snapshot();
+    const SemanticNode* remaining = find_node(
+        remaining_snapshot.roots, "guidance.target");
+    require(remaining &&
+                remaining->description.find("First validation channel") ==
+                    std::string::npos &&
+                remaining->description.find("Second validation channel") !=
+                    std::string::npos,
+            "disposing one provider must remove only its own extension state");
+
+    fixture.target->dispose();
+    require(second->snapshot().presented_icons == 0U &&
+                !fixture.window.next_wake(),
+            "target disposal must revoke provider popup and frame work synchronously");
+}
+
+} // namespace
+
+int main() {
+    try {
+        test_error_semantics_geometry_rtl_and_lifetime();
+        test_error_blink_is_bounded_occlusion_aware_and_reduced_motion_safe();
+        test_help_routes_f1_locally_then_to_provider_without_external_policy();
+        test_multiple_providers_and_disposal_cleanup();
+        std::cout << "guidance provider tests passed\n";
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "guidance provider tests failed: " << error.what() << '\n';
+        return 1;
+    }
+}

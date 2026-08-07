@@ -13,6 +13,7 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -20,6 +21,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace gui_forms {
@@ -27,8 +29,11 @@ namespace gui_forms {
 class UpdateScope;
 class Timer;
 class ToolTip;
+class ImageList;
 class HostServices;
 class HostSession;
+class BindingSource;
+class BindingContext;
 namespace detail {
 class PopupAttachment;
 class AcceleratorAttachment;
@@ -88,6 +93,75 @@ struct PresentationSettings final {
                                      const PresentationSettings&) = default;
 };
 
+enum class PaintLeaseState : std::uint8_t {
+    clean,
+    // New mutations collapse into one queued render opportunity. `dirty` is
+    // retained as a source-compatible spelling for the original public name.
+    dirty_queued,
+    dirty = dirty_queued,
+    rendering,
+    ready,
+    occluded_dirty,
+    retired,
+    // A mutation arrived while the exclusive lease was active. Completion of
+    // that lease may publish its coherent result, but exactly one later drain
+    // remains eligible; intermediate revisions are never queued individually.
+    rendering_dirty,
+};
+
+struct PaintLeaseSnapshot final {
+    PaintLeaseState state{PaintLeaseState::dirty_queued};
+    std::uint64_t content_revision{1U};
+    std::uint64_t rendered_revision{};
+    std::uint64_t presented_revision{};
+    std::uint64_t surface_epoch{1U};
+    std::uint64_t leases_started{};
+    std::uint64_t leases_completed{};
+    std::uint64_t leases_abandoned{};
+    std::uint64_t reentrant_requests_deferred{};
+    std::uint64_t render_wakes_queued{};
+    std::uint64_t render_wakes_coalesced{};
+    std::uint64_t presentation_receipts_accepted{};
+    std::uint64_t presentation_receipts_rejected{};
+    bool render_wake_queued{};
+    bool dirty_after_render{};
+};
+
+// Exact proof that one coherent retained transaction finished replaying into
+// the host's private backing surface. A receipt is bound to both the sampled
+// content revision and the surface epoch; native adapters must not publish a
+// missing receipt or one from a replaced surface.
+struct PaintReceipt final {
+    std::uint64_t rendered_revision{};
+    std::uint64_t surface_epoch{};
+
+    [[nodiscard]] explicit constexpr operator bool() const noexcept {
+        return rendered_revision != 0U && surface_epoch != 0U;
+    }
+    friend constexpr auto operator<=>(const PaintReceipt&,
+                                      const PaintReceipt&) = default;
+};
+
+inline constexpr std::size_t maximum_deferred_inputs = 1024U;
+
+// Renderer-neutral lease-time input diagnostics. Pointer moves may compact,
+// but critical input is either retained in order or counted as capacity
+// rejected; no event silently enters application code while paint is active.
+struct DeferredInputSnapshot final {
+    std::size_t pending{};
+    std::size_t capacity{maximum_deferred_inputs};
+    std::uint64_t deferred{};
+    std::uint64_t delivered{};
+    std::uint64_t coalesced_moves{};
+    std::uint64_t coalesced_drag_overs{};
+    std::uint64_t rejected_capacity{};
+    std::uint64_t abandoned{};
+    std::uint64_t faults{};
+    std::uint64_t drains{};
+    bool drain_queued{};
+    bool draining{};
+};
+
 class AcceleratorToken final {
 public:
     AcceleratorToken() = default;
@@ -120,6 +194,13 @@ struct PointerCaptureChange final {
     RuntimeId control_id{};
     std::string stable_id;
     std::uint64_t pointer_id{};
+};
+
+struct ControlAvailabilityChange final {
+    RuntimeId control_id{};
+    std::string stable_id;
+    bool effectively_visible{};
+    bool effectively_enabled{};
 };
 
 struct PopupOptions final {
@@ -166,6 +247,29 @@ struct FocusScopeChange final {
     bool restored_focus{};
 };
 
+struct ValidationSnapshot final {
+    std::uint64_t attempts{};
+    std::uint64_t succeeded{};
+    std::uint64_t cancelled{};
+    std::uint64_t focus_moves_blocked{};
+    std::uint64_t reentrant_requests_rejected{};
+    std::uint64_t bulk_controls_visited{};
+    bool validating{};
+};
+
+struct DialogKeySnapshot final {
+    std::uint64_t mnemonic_attempts{};
+    std::uint64_t mnemonics_handled{};
+    std::uint64_t accept_attempts{};
+    std::uint64_t accept_handled{};
+    std::uint64_t cancel_attempts{};
+    std::uint64_t cancel_handled{};
+    std::uint64_t command_rejections{};
+    std::uint64_t mnemonic_candidates{};
+    std::uint64_t mnemonic_collisions{};
+    std::uint64_t mnemonic_cycles{};
+};
+
 class Window {
 public:
     explicit Window(Control::Ptr root, Size client_size = {});
@@ -186,6 +290,19 @@ public:
     [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept {
         return presentation_changed_;
     }
+    [[nodiscard]] const Theme& theme() const noexcept { return *theme_; }
+    [[nodiscard]] std::shared_ptr<const Theme> theme_ptr() const noexcept {
+        return theme_;
+    }
+    void set_theme(std::shared_ptr<const Theme> theme);
+    [[nodiscard]] Event<const Theme&>& theme_changed() noexcept {
+        return theme_changed_;
+    }
+    [[nodiscard]] bool active() const noexcept { return active_; }
+    void set_active(bool active);
+    [[nodiscard]] Event<bool>& active_changed() noexcept {
+        return active_changed_;
+    }
     // Non-owning portable service seam, installed for the lifetime of a
     // HostSession. Renderer-free and headless windows may legitimately return
     // null when no host is attached.
@@ -196,7 +313,21 @@ public:
     [[nodiscard]] UpdateScope begin_update();
     void perform_layout();
     void flush();
-    void paint(Painter& painter, Rect requested_damage = {});
+    // Returns an exact presentation receipt only when a complete candidate
+    // replay remains current for its surface epoch. Ignoring the result is
+    // valid for renderer-neutral inspection; a native host must require it.
+    std::optional<PaintReceipt> paint(
+        Painter& painter, Rect requested_damage = {});
+    // Preferred host release. Returns false for a duplicate, out-of-order, or
+    // replaced-epoch receipt and never advances the presentation revision in
+    // that case.
+    [[nodiscard]] bool notify_presented(
+        PaintReceipt receipt, std::uint64_t duration_nanoseconds = 0U);
+    // Synchronous compatibility spelling. It acknowledges the latest complete
+    // receipt in the current epoch; asynchronous/native hosts must use the
+    // exact-receipt overload above.
+    void notify_presented(std::uint64_t duration_nanoseconds = 0U);
+    [[nodiscard]] PaintLeaseSnapshot paint_lease_snapshot() const noexcept;
 
     [[nodiscard]] DamageRegion take_damage();
     [[nodiscard]] DamageRegion take_damage(PaintPlane plane);
@@ -230,6 +361,12 @@ public:
     // Host adapters install a thread-safe wake primitive. Installing a handler
     // after work was queued immediately publishes one coalesced wake.
     void set_dispatch_wake_handler(std::function<void()> wake);
+    // Host adapters also install a paint wake seam. Retained invalidation may
+    // originate from another Window's callback, so relying only on the host
+    // currently dispatching input can strand valid dirty state indefinitely.
+    // Wakes coalesce until the host consumes damage and remain suppressed while
+    // the model is explicitly occluded.
+    void set_paint_wake_handler(std::function<void()> wake);
     void shutdown_dispatcher() noexcept;
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
@@ -257,6 +394,13 @@ public:
     [[nodiscard]] Control::Ptr hit_test(Point position);
     bool request_focus(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr focused_control() const noexcept { return focused_.lock(); }
+    bool validate_control(const Control::Ptr& control,
+                          Control* destination = nullptr,
+                          bool bulk = false);
+    bool validate_children(
+        const Control::Ptr& container,
+        ValidationConstraints constraints = ValidationConstraints::selectable);
+    [[nodiscard]] ValidationSnapshot validation_snapshot() const noexcept;
     [[nodiscard]] FocusScopeId begin_focus_scope(
         const Control::Ptr& root,
         const Control::Ptr& preferred_focus = {},
@@ -267,6 +411,22 @@ public:
     [[nodiscard]] std::size_t focus_scope_depth() const noexcept;
     [[nodiscard]] Control::Ptr active_focus_scope_root() const noexcept;
     bool move_focus(bool forward = true);
+    void set_accept_button(const Control::Ptr& control);
+    void set_cancel_button(const Control::Ptr& control);
+    [[nodiscard]] Control::Ptr accept_button() const noexcept {
+        return accept_button_.lock();
+    }
+    [[nodiscard]] Control::Ptr cancel_button() const noexcept {
+        return cancel_button_.lock();
+    }
+    [[nodiscard]] DialogKeySnapshot dialog_key_snapshot() const noexcept;
+    [[nodiscard]] DialogResult dialog_result() const noexcept {
+        return dialog_result_;
+    }
+    void set_dialog_result(DialogResult result);
+    [[nodiscard]] Event<DialogResult>& dialog_result_changed() noexcept {
+        return dialog_result_changed_;
+    }
     [[nodiscard]] Event<const FocusScopeChange&>& focus_scope_changed() noexcept {
         return focus_scope_changed_;
     }
@@ -279,6 +439,10 @@ public:
     [[nodiscard]] Event<const PointerCaptureChange&>& pointer_capture_changed() noexcept {
         return pointer_capture_changed_;
     }
+    [[nodiscard]] Event<const ControlAvailabilityChange&>&
+    control_availability_changed() noexcept {
+        return control_availability_changed_;
+    }
     [[nodiscard]] PopupToken open_popup(const Control::Ptr& owner,
                                         const Control::Ptr& popup,
                                         PopupOptions options = {});
@@ -290,9 +454,14 @@ public:
         AcceleratorOptions options = {});
     [[nodiscard]] Control::Ptr pressed_control() const noexcept { return pressed_.lock(); }
 
+    // During an active paint lease these return true when the input was
+    // retained for posted delivery and false only when the fixed queue bound
+    // rejected it. Outside paint the return value remains the routed handled
+    // result.
     bool dispatch_pointer(PointerEvent event);
     bool dispatch_key(KeyEvent event);
     bool dispatch_text(TextInputEvent event);
+    [[nodiscard]] DeferredInputSnapshot deferred_input_snapshot() const noexcept;
     [[nodiscard]] DragDispatchResult dispatch_drag(DragEvent event);
     void cancel_drag() noexcept;
 
@@ -313,6 +482,11 @@ private:
     friend class UpdateScope;
     friend class Timer;
     friend class ToolTip;
+    friend class ErrorProvider;
+    friend class HelpProvider;
+    friend class ImageList;
+    friend class BindingSource;
+    friend class BindingContext;
     friend class detail::PopupAttachment;
     friend class detail::AcceleratorAttachment;
 
@@ -332,10 +506,15 @@ private:
         const Control::Ptr& control) const noexcept;
     [[nodiscard]] std::vector<Control::Ptr> focus_candidates(
         const Control::Ptr& scope_root) const;
+    [[nodiscard]] bool validate_focus_transition(
+        const Control::Ptr& previous, const Control::Ptr& destination,
+        AutoValidate mode);
     void change_pointer_capture(const Control::Ptr& control,
                                 std::uint64_t pointer_id,
                                 bool revoked);
     void on_eligibility_changed(const Control::Ptr& control);
+    void on_hit_test_transparency_changed(const Control::Ptr& control);
+    void publish_control_availability(Control& control);
     void register_subtree(const Control::Ptr& control);
     void unregister_subtree(const Control::Ptr& control);
     void mark_dirty(Control& control, Dirty dirty);
@@ -344,6 +523,23 @@ private:
     void change_paint_plane(Control& control, PaintPlane plane);
     void add_damage(Rect damage, PaintPlane plane);
     void add_damage_all_planes(Rect damage);
+    void request_paint_wake() noexcept;
+    void acknowledge_paint_wake_if_damage_drained() noexcept;
+    void touch_paint() noexcept;
+    void update_paint_lease_state() noexcept;
+    struct DeferredSemanticInput final {
+        std::string stable_id;
+        SemanticAction action{SemanticAction::focus};
+        std::string value;
+    };
+    using DeferredInput = std::variant<
+        PointerEvent, KeyEvent, TextInputEvent, DragEvent,
+        DeferredSemanticInput>;
+    [[nodiscard]] bool defer_input(DeferredInput input);
+    void schedule_deferred_input_drain() noexcept;
+    void drain_deferred_input();
+    void abandon_deferred_input() noexcept;
+    void abandon_deferred_drag() noexcept;
     void add_subtree_damage(const Control::Ptr& control);
     void ensure_layout(bool read_barrier);
     void leave_update_scope();
@@ -382,7 +578,16 @@ private:
     [[nodiscard]] std::size_t active_surface_count() const noexcept;
     void update_frame_schedule_metrics() noexcept;
     [[nodiscard]] Rect absolute_bounds_of(const Control& control) const;
+    [[nodiscard]] Rect visual_bounds_of(const Control& control,
+                                        Insets outsets) const;
+    [[nodiscard]] Rect paint_damage_bounds_of(const Control& control) const;
     [[nodiscard]] bool eligible(const Control::Ptr& control) const noexcept;
+    [[nodiscard]] bool move_focus_after(const Control::Ptr& origin);
+    [[nodiscard]] bool validate_command_activation(
+        const Control::Ptr& destination);
+    [[nodiscard]] bool dispatch_mnemonic(char32_t character);
+    [[nodiscard]] bool dispatch_dialog_button(bool accept);
+    void clear_dialog_targets_for_subtree(const Control::Ptr& control) noexcept;
     void require_ui_thread(std::string_view operation);
 
     Control::Ptr root_;
@@ -390,8 +595,35 @@ private:
     double scale_{1.0};
     PresentationSettings presentation_settings_{};
     Event<const PresentationSettings&> presentation_changed_;
+    std::shared_ptr<const Theme> theme_;
+    Event<const Theme&> theme_changed_;
+    Event<bool> active_changed_;
+    bool active_{true};
     std::unordered_map<std::string, Control::WeakPtr> stable_ids_;
     Control::WeakPtr focused_;
+    Control::WeakPtr accept_button_;
+    Control::WeakPtr cancel_button_;
+    std::uint64_t mnemonic_attempts_{};
+    std::uint64_t mnemonics_handled_{};
+    std::uint64_t accept_attempts_{};
+    std::uint64_t accept_handled_{};
+    std::uint64_t cancel_attempts_{};
+    std::uint64_t cancel_handled_{};
+    std::uint64_t dialog_command_rejections_{};
+    std::uint64_t mnemonic_candidates_{};
+    std::uint64_t mnemonic_collisions_{};
+    std::uint64_t mnemonic_cycles_{};
+    Control::WeakPtr mnemonic_cursor_;
+    char32_t mnemonic_cursor_character_{};
+    DialogResult dialog_result_{DialogResult::none};
+    Event<DialogResult> dialog_result_changed_;
+    std::uint64_t validation_attempts_{};
+    std::uint64_t validation_succeeded_{};
+    std::uint64_t validation_cancelled_{};
+    std::uint64_t validation_focus_moves_blocked_{};
+    std::uint64_t validation_reentrant_requests_rejected_{};
+    std::uint64_t validation_bulk_controls_visited_{};
+    bool validating_{};
     struct FocusScopeState final {
         FocusScopeId id{};
         Control::WeakPtr root;
@@ -407,12 +639,14 @@ private:
     Control::WeakPtr captured_;
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
+    Event<const ControlAvailabilityChange&> control_availability_changed_;
     std::vector<std::shared_ptr<detail::PopupAttachment>> popups_;
     std::vector<std::shared_ptr<detail::AcceleratorAttachment>> accelerators_;
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;
     std::uint64_t drag_session_id_{};
+    DragEffect drag_last_accepted_effect_{DragEffect::none};
     std::array<DamageRegion, paint_plane_count> plane_damage_;
     Metrics metrics_;
     ImageRegistry image_resources_;
@@ -427,9 +661,37 @@ private:
     bool hit_test_dirty_{true};
     bool in_layout_{};
     bool in_paint_{};
+    PaintLeaseState paint_lease_state_{PaintLeaseState::dirty_queued};
+    std::uint64_t content_revision_{1U};
+    std::uint64_t rendered_revision_{};
+    std::uint64_t presented_revision_{};
+    std::uint64_t surface_epoch_{1U};
+    std::uint64_t paint_leases_started_{};
+    std::uint64_t paint_leases_completed_{};
+    std::uint64_t paint_leases_abandoned_{};
+    std::uint64_t reentrant_paint_requests_deferred_{};
+    std::uint64_t paint_wakes_queued_{};
+    std::uint64_t paint_wakes_coalesced_{};
+    std::uint64_t presentation_receipts_accepted_{};
+    std::uint64_t presentation_receipts_rejected_{};
+    bool dirty_after_render_{};
+    std::deque<DeferredInput> deferred_inputs_;
+    std::uint64_t deferred_inputs_received_{};
+    std::uint64_t deferred_inputs_delivered_{};
+    std::uint64_t deferred_input_moves_coalesced_{};
+    std::uint64_t deferred_drag_overs_coalesced_{};
+    std::uint64_t deferred_inputs_rejected_{};
+    std::uint64_t deferred_inputs_abandoned_{};
+    std::uint64_t deferred_input_faults_{};
+    std::uint64_t deferred_input_drains_{};
+    DispatchOperation deferred_input_drain_operation_;
+    bool deferred_input_drain_queued_{};
+    bool draining_deferred_input_{};
     bool in_lifecycle_notification_{};
     bool second_layout_pass_requested_{};
     bool occluded_{};
+    std::function<void()> paint_wake_handler_;
+    bool paint_wake_pending_{};
     std::uint64_t semantic_generation_{1U};
     HostServices* host_services_{};
 };

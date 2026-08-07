@@ -7,6 +7,7 @@
 #include <ImageIO/ImageIO.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
@@ -19,6 +20,32 @@ namespace {
 
 CGRect to_cg_rect(Rect rect) noexcept {
     return CGRectMake(rect.x, rect.y, rect.width, rect.height);
+}
+
+CGPathRef rounded_path(Rect rect, double radius) noexcept {
+    const CGFloat bounded = std::clamp(
+        radius, 0.0, std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+    return CGPathCreateWithRoundedRect(to_cg_rect(rect), bounded, bounded,
+                                       nullptr);
+}
+
+CGGradientRef create_gradient(CGColorSpaceRef color_space,
+                              std::span<const GradientStop> stops) {
+    if (color_space == nullptr || !valid_gradient_stops(stops)) return nullptr;
+    constexpr CGFloat divisor = 255.0;
+    std::vector<CGFloat> components;
+    std::vector<CGFloat> locations;
+    components.reserve(stops.size() * 4U);
+    locations.reserve(stops.size());
+    for (const GradientStop& stop : stops) {
+        components.push_back(stop.color.red / divisor);
+        components.push_back(stop.color.green / divisor);
+        components.push_back(stop.color.blue / divisor);
+        components.push_back(stop.color.alpha / divisor);
+        locations.push_back(stop.offset);
+    }
+    return CGGradientCreateWithColorComponents(
+        color_space, components.data(), locations.data(), stops.size());
 }
 
 void set_color(CGContextRef context, Color color) noexcept {
@@ -448,11 +475,30 @@ void CoreGraphicsRaster::clip_rect(Rect rect) {
     }
 }
 
+void CoreGraphicsRaster::clip_rounded_rect(Rect rect, double radius) {
+    if (impl_->context == nullptr) return;
+    CGPathRef path = rounded_path(rect, radius);
+    if (path == nullptr) return;
+    CGContextAddPath(impl_->context, path);
+    CGContextClip(impl_->context);
+    CGPathRelease(path);
+}
+
 void CoreGraphicsRaster::fill_rect(Rect rect, Color color) {
     if (impl_->context != nullptr) {
         set_color(impl_->context, color);
         CGContextFillRect(impl_->context, to_cg_rect(rect));
     }
+}
+
+void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
+    if (impl_->context == nullptr) return;
+    CGPathRef path = rounded_path(rect, radius);
+    if (path == nullptr) return;
+    set_color(impl_->context, color);
+    CGContextAddPath(impl_->context, path);
+    CGContextFillPath(impl_->context);
+    CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
@@ -461,6 +507,176 @@ void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
         CGContextSetLineWidth(impl_->context, width);
         CGContextStrokeRect(impl_->context, to_cg_rect(rect));
     }
+}
+
+void CoreGraphicsRaster::stroke_rounded_rect(Rect rect, double radius,
+                                             Color color, double width) {
+    if (impl_->context == nullptr) return;
+    CGPathRef path = rounded_path(rect, radius);
+    if (path == nullptr) return;
+    set_color(impl_->context, color);
+    CGContextSetLineWidth(impl_->context, width);
+    CGContextAddPath(impl_->context, path);
+    CGContextStrokePath(impl_->context);
+    CGPathRelease(path);
+}
+
+void CoreGraphicsRaster::fill_linear_gradient(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops) {
+    if (impl_->context == nullptr || rect.empty()) return;
+    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    if (gradient == nullptr) return;
+    CGContextSaveGState(impl_->context);
+    CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    CGContextDrawLinearGradient(
+        impl_->context, gradient, CGPointMake(start.x, start.y),
+        CGPointMake(end.x, end.y),
+        kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+    CGContextRestoreGState(impl_->context);
+    CGGradientRelease(gradient);
+}
+
+void CoreGraphicsRaster::fill_linear_gradient_spread(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops, GradientSpreadMode spread) {
+    if (spread == GradientSpreadMode::pad) {
+        fill_linear_gradient(rect, start, end, stops);
+        return;
+    }
+    if (impl_->context == nullptr || rect.empty() ||
+        !valid_gradient_stops(stops) ||
+        (spread != GradientSpreadMode::repeat &&
+         spread != GradientSpreadMode::reflect)) {
+        return;
+    }
+    const double dx = end.x - start.x;
+    const double dy = end.y - start.y;
+    const double length_squared = dx * dx + dy * dy;
+    if (length_squared <= 0.0 || !std::isfinite(length_squared)) return;
+    const std::array<Point, 4> corners{{
+        {rect.x, rect.y},
+        {rect.x + rect.width, rect.y},
+        {rect.x, rect.y + rect.height},
+        {rect.x + rect.width, rect.y + rect.height},
+    }};
+    double minimum = std::numeric_limits<double>::infinity();
+    double maximum = -std::numeric_limits<double>::infinity();
+    for (const Point corner : corners) {
+        const double projection = ((corner.x - start.x) * dx +
+                                   (corner.y - start.y) * dy) /
+                                  length_squared;
+        minimum = std::min(minimum, projection);
+        maximum = std::max(maximum, projection);
+    }
+    if (!(maximum > minimum)) return;
+
+    const double first_period = std::floor(minimum);
+    const double final_period = std::ceil(maximum);
+    constexpr double maximum_periods = 4096.0;
+    if (final_period - first_period > maximum_periods) {
+        // Keep an adversarially short period bounded and visible. Material
+        // authors should use a period large enough to survive device sampling.
+        Painter::fill_linear_gradient_spread(rect, start, end, stops, spread);
+        return;
+    }
+    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    if (gradient == nullptr) return;
+    const double length = std::sqrt(length_squared);
+    const Point perpendicular{-dy / length, dx / length};
+    double reach = 1.0;
+    for (const Point corner : corners) {
+        reach = std::max(reach, std::abs(
+            (corner.x - start.x) * perpendicular.x +
+            (corner.y - start.y) * perpendicular.y) + 1.0);
+    }
+
+    CGContextSaveGState(impl_->context);
+    CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    for (double period = first_period; period < final_period; period += 1.0) {
+        const Point band_start{start.x + dx * period,
+                               start.y + dy * period};
+        const Point band_end{band_start.x + dx, band_start.y + dy};
+        CGContextSaveGState(impl_->context);
+        CGContextBeginPath(impl_->context);
+        CGContextMoveToPoint(impl_->context,
+                             band_start.x - perpendicular.x * reach,
+                             band_start.y - perpendicular.y * reach);
+        CGContextAddLineToPoint(impl_->context,
+                                band_end.x - perpendicular.x * reach,
+                                band_end.y - perpendicular.y * reach);
+        CGContextAddLineToPoint(impl_->context,
+                                band_end.x + perpendicular.x * reach,
+                                band_end.y + perpendicular.y * reach);
+        CGContextAddLineToPoint(impl_->context,
+                                band_start.x + perpendicular.x * reach,
+                                band_start.y + perpendicular.y * reach);
+        CGContextClosePath(impl_->context);
+        CGContextClip(impl_->context);
+        const bool reversed = spread == GradientSpreadMode::reflect &&
+            std::fmod(std::abs(period), 2.0) >= 1.0;
+        CGContextDrawLinearGradient(
+            impl_->context, gradient,
+            CGPointMake(reversed ? band_end.x : band_start.x,
+                        reversed ? band_end.y : band_start.y),
+            CGPointMake(reversed ? band_start.x : band_end.x,
+                        reversed ? band_start.y : band_end.y),
+            static_cast<CGGradientDrawingOptions>(0));
+        CGContextRestoreGState(impl_->context);
+    }
+    CGContextRestoreGState(impl_->context);
+    CGGradientRelease(gradient);
+}
+
+void CoreGraphicsRaster::fill_radial_gradient(
+    Rect rect, Point center, Size radii,
+    std::span<const GradientStop> stops) {
+    if (impl_->context == nullptr || rect.empty() || radii.width <= 0.0 ||
+        radii.height <= 0.0) {
+        return;
+    }
+    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    if (gradient == nullptr) return;
+    CGContextSaveGState(impl_->context);
+    CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    CGContextTranslateCTM(impl_->context, center.x, center.y);
+    CGContextScaleCTM(impl_->context, radii.width, radii.height);
+    CGContextDrawRadialGradient(
+        impl_->context, gradient, CGPointZero, 0.0, CGPointZero, 1.0,
+        kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+    CGContextRestoreGState(impl_->context);
+    CGGradientRelease(gradient);
+}
+
+void CoreGraphicsRaster::draw_box_shadow(Rect rect, double corner_radius,
+                                         Point offset, double blur_radius,
+                                         double spread, Color color) {
+    if (impl_->context == nullptr || rect.empty() || color.alpha == 0U ||
+        blur_radius < 0.0) {
+        return;
+    }
+    const Rect expanded{rect.x - spread, rect.y - spread,
+                        rect.width + spread * 2.0,
+                        rect.height + spread * 2.0};
+    if (expanded.empty()) return;
+    CGPathRef path = rounded_path(
+        expanded, std::max(0.0, corner_radius + spread));
+    if (path == nullptr) return;
+    constexpr CGFloat divisor = 255.0;
+    CGColorRef shadow = CGColorCreateGenericRGB(
+        color.red / divisor, color.green / divisor, color.blue / divisor,
+        color.alpha / divisor);
+    if (shadow != nullptr) {
+        CGContextSaveGState(impl_->context);
+        CGContextSetShadowWithColor(
+            impl_->context, CGSizeMake(offset.x, offset.y), blur_radius, shadow);
+        set_color(impl_->context, Color::rgba(0, 0, 0, 255));
+        CGContextAddPath(impl_->context, path);
+        CGContextFillPath(impl_->context);
+        CGContextRestoreGState(impl_->context);
+        CGColorRelease(shadow);
+    }
+    CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::draw_line(Point from, Point to, Color color, double width) {
@@ -584,6 +800,69 @@ void CoreGraphicsRaster::draw_image(ImageId image, Rect destination, double opac
     CGContextDrawImage(impl_->context,
                        CGRectMake(0, 0, destination.width, destination.height),
                        found->second.image);
+    CGContextRestoreGState(impl_->context);
+}
+
+void CoreGraphicsRaster::draw_image_region(ImageId image, Rect source,
+                                           Rect destination, double opacity) {
+    const auto found = impl_->images.find(image.value);
+    if (impl_->context == nullptr || found == impl_->images.end() ||
+        source.empty() || destination.empty() || !source.finite() ||
+        !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
+        return;
+    }
+    const Rect image_bounds{
+        0.0, 0.0,
+        static_cast<double>(CGImageGetWidth(found->second.image)),
+        static_cast<double>(CGImageGetHeight(found->second.image))};
+    if (!image_bounds.contains(source)) return;
+    CGImageRef cropped = CGImageCreateWithImageInRect(
+        found->second.image,
+        CGRectMake(source.x, source.y, source.width, source.height));
+    if (cropped == nullptr) return;
+    CGContextSaveGState(impl_->context);
+    CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
+    CGContextTranslateCTM(impl_->context, destination.x,
+                          destination.y + destination.height);
+    CGContextScaleCTM(impl_->context, 1, -1);
+    CGContextSetInterpolationQuality(impl_->context, kCGInterpolationHigh);
+    CGContextDrawImage(impl_->context,
+                       CGRectMake(0, 0, destination.width, destination.height),
+                       cropped);
+    CGContextRestoreGState(impl_->context);
+    CGImageRelease(cropped);
+}
+
+void CoreGraphicsRaster::fill_image_pattern(
+    ImageId image, Size source_pixel_size, Rect destination,
+    Size logical_tile_size, ImagePatternWrap wrap, double opacity) {
+    const auto found = impl_->images.find(image.value);
+    if (impl_->context == nullptr || found == impl_->images.end() ||
+        wrap != ImagePatternWrap::tile || destination.empty() ||
+        !destination.finite() || !std::isfinite(source_pixel_size.width) ||
+        !std::isfinite(source_pixel_size.height) ||
+        !std::isfinite(logical_tile_size.width) ||
+        !std::isfinite(logical_tile_size.height) ||
+        source_pixel_size.width != CGImageGetWidth(found->second.image) ||
+        source_pixel_size.height != CGImageGetHeight(found->second.image) ||
+        logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
+        !std::isfinite(opacity) || opacity <= 0.0) {
+        return;
+    }
+    CGContextSaveGState(impl_->context);
+    CGContextClipToRect(impl_->context, to_cg_rect(destination));
+    CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
+    CGContextTranslateCTM(impl_->context, destination.x,
+                          destination.y + logical_tile_size.height);
+    CGContextScaleCTM(impl_->context,
+                      logical_tile_size.width / source_pixel_size.width,
+                      -logical_tile_size.height / source_pixel_size.height);
+    CGContextSetInterpolationQuality(impl_->context, kCGInterpolationHigh);
+    CGContextDrawTiledImage(
+        impl_->context,
+        CGRectMake(0.0, 0.0, source_pixel_size.width,
+                   source_pixel_size.height),
+        found->second.image);
     CGContextRestoreGState(impl_->context);
 }
 

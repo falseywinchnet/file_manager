@@ -219,6 +219,7 @@ namespace System.Drawing {
         public Region() { }
         public Region(global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); __handle = NativeDrawingBridge.RegionCreate(path.__handle); }
         public Region(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Rectangle)");  __handle = NativeDrawingBridge.RegionCreate(new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
+        public global::System.Drawing.RectangleF GetBounds(global::System.Drawing.Graphics g) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|GetBounds|System.Drawing.RectangleF (System.Drawing.Graphics)");  if (__regionDisposed) throw new global::System.ObjectDisposedException(nameof(Region)); return NativeDrawingBridge.RegionBounds(__handle); }
         public void Dispose() { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Dispose|System.Void ()");  if (__regionDisposed) return; __regionDisposed = true; NativeDrawingBridge.Release(ref __handle); global::System.GC.SuppressFinalize(this); }
         public void Union(global::System.Drawing.Drawing2D.GraphicsPath path) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Drawing2D.GraphicsPath)");  if (path is null) throw new global::System.ArgumentNullException(nameof(path)); NativeDrawingBridge.RegionUnion(__handle, path.__handle); }
         public void Exclude(global::System.Drawing.Rectangle rect) { global::System.Drawing.FacadeCallTelemetry.Hit("System.Drawing.Common|System.Drawing.Region|Exclude|System.Void (System.Drawing.Rectangle)");  NativeDrawingBridge.RegionExclude(__handle, new global::System.Drawing.RectangleF(rect.X, rect.Y, rect.Width, rect.Height)); }
@@ -730,6 +731,7 @@ namespace System.Drawing {
             "System.Drawing.Common|System.Drawing.Region|.ctor|System.Void (System.Drawing.Rectangle)",
             "System.Drawing.Common|System.Drawing.Region|Dispose|System.Void ()",
             "System.Drawing.Common|System.Drawing.Region|Exclude|System.Void (System.Drawing.Rectangle)",
+            "System.Drawing.Common|System.Drawing.Region|GetBounds|System.Drawing.RectangleF (System.Drawing.Graphics)",
             "System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Drawing2D.GraphicsPath)",
             "System.Drawing.Common|System.Drawing.Region|Union|System.Void (System.Drawing.Rectangle)",
             "System.Drawing.Common|System.Drawing.SolidBrush|.ctor|System.Void (System.Drawing.Color)",

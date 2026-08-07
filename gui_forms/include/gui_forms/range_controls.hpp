@@ -33,7 +33,11 @@ enum class ProgressBarVisualStyle : std::uint8_t {
     blocks,
     continuous,
     marquee,
+    // Source-compatible spelling retained for the original proving slice.
     pulse,
+    luminance_pulse = pulse,
+    marching_stripes,
+    laser_etch,
 };
 
 // Orthogonal to ProgressBarVisualStyle: stripes can decorate a determinate
@@ -41,6 +45,24 @@ enum class ProgressBarVisualStyle : std::uint8_t {
 enum class ProgressBarOverlayStyle : std::uint8_t {
     none,
     moving_stripes,
+    marching_stripes = moving_stripes,
+};
+
+// Renderer-neutral effect parameters shared by the animated determinate
+// styles. Applications may replace the complete record atomically; invalid
+// geometry is rejected without partially changing the active appearance.
+struct ProgressBarAnimationAppearance final {
+    Color luminance_color{Color::rgba(255, 255, 255, 92)};
+    Color stripe_color{Color::rgba(224, 241, 252, 116)};
+    Color laser_phase_color{Color::rgba(130, 222, 247, 108)};
+    Color laser_edge_color{Color::rgba(196, 246, 255, 226)};
+    Color laser_spark_color{Color::rgba(238, 253, 255, 236)};
+    double pulse_extent{0.32};
+    double laser_edge_extent{13.0};
+    double laser_phase_pitch{10.0};
+
+    friend constexpr bool operator==(const ProgressBarAnimationAppearance&,
+                                     const ProgressBarAnimationAppearance&) = default;
 };
 
 struct RangeScrollEvent final {
@@ -148,6 +170,11 @@ public:
     void set_overlay_style(ProgressBarOverlayStyle style);
     [[nodiscard]] double stripe_width() const noexcept { return stripe_width_; }
     void set_stripe_width(double width);
+    [[nodiscard]] const ProgressBarAnimationAppearance& animation_appearance()
+        const noexcept {
+        return animation_appearance_;
+    }
+    void set_animation_appearance(ProgressBarAnimationAppearance appearance);
     [[nodiscard]] bool animation_enabled() const noexcept {
         return animation_enabled_;
     }
@@ -200,6 +227,7 @@ private:
 
     ProgressBarVisualStyle visual_style_{ProgressBarVisualStyle::continuous};
     ProgressBarOverlayStyle overlay_style_{ProgressBarOverlayStyle::none};
+    ProgressBarAnimationAppearance animation_appearance_{};
     double stripe_width_{7.0};
     FrameRequestToken animation_frames_;
     SubscriptionToken presentation_subscription_;

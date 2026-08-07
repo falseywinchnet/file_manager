@@ -3,6 +3,8 @@
 /tools/**/obj/
 /generated/**/bin/
 /generated/**/obj/
+/tools/**/__pycache__/
+*.pyc
 
 # Keep private compatibility specimens and derived experiments local.
 /compatibility/[sS][dD][rR][sS][hH][aA][rR][pP]/

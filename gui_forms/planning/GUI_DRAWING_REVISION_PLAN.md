@@ -60,7 +60,7 @@ traces and differential fixtures remain required.
 | D5 | Gradient and hatch paints | 15 | `missing` | linear/path gradients, interpolation colors, blend/wrap behavior, hatch foreground/background |
 | D6 | Images, bitmap storage and codecs | 24 | PNG resource presentation is `native`; managed bitmap mutation is `passthrough` | dimensions/pixel format, clone, file/stream load, save, thumbnail, pixel read, transparency, pixel locking, native bitmap bridge |
 | D7 | Image adjustment | 11 | `missing` | color matrix alpha, color remap table, clone and bounded application during image draw |
-| D8 | Compatibility-native surface leases | 7 of D2/D6 | `passthrough` | `FromHdc`, `FromHdcInternal`, `FromHwnd`, `GetHdc`, `ReleaseHdc`, `GetHbitmap`, `FromHbitmap` behind an explicit platform capability |
+| D8 | Compatibility-native surface leases | 7 of D2/D6 | **measured partial native** | opaque `FromHdc`/`FromHdcInternal`/`FromHwnd`, `GetHdc`/`ReleaseHdc`, `GetHbitmap`/`FromHbitmap`; persistent private bitmap, revisioned/coalesced retained import, and bounded raw-GDI fallback pass Wine. Rectangle damage, complete ordering/exceptions, public availability projection, and non-Windows rejection corpus remain |
 
 The family counts partition the 307 required rows. D8 is a cross-cutting subset
 of D2/D6 and is not added again to the total.
@@ -340,6 +340,20 @@ out-of-order-safe restoration, owner-unavailable cleanup, typed changes, and
 structured metrics. Popup ownership/dismissal and the C ABI/generated binding
 projection remain open; this core slice does not justify calling item 1
 complete. Evidence: `experiments/M11H_RETAINED_FOCUS_SCOPES.md`.
+
+**MEASURED PARTIAL M11h / reusable material vocabulary:** GUI.Forms' smaller
+control-paint vocabulary now retains rounded geometry, multi-stop linear and
+elliptical radial gradients, and bounded shadows without exposing GUI.Drawing
+or renderer types. Public `MaterialPanel` composes validated resize-normalized
+layers and publishes bounded visual outsets into damage. Skia, CoreGraphics,
+and Win32 DIB realize the same display commands; minimal hosts have bounded
+fallbacks. A later M11h continuation adds source-region replay, retained image
+stretch/tile/nine-patch layers, and a GUI.Drawing bitmap-snapshot TextureBrush
+with five wrap modes, affine transforms, cloning, deterministic trace, and Skia
+execution. This advances GUI.Drawing D1/D5 and FMD2–FMD3; source-rectangle and
+image-attribute constructor parity, MatrixOrder overloads, masks/groups, full
+effects, and managed/C ABI projection remain open. Evidence:
+`experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md`.
 
 Multi-window work may proceed before the full D3–D7 breadth only if a narrow
 GUI.Drawing slice can populate the source dialog without falling back to the

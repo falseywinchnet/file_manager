@@ -153,6 +153,31 @@ void image_attributes_clip_and_snapshot_execution() {
     CHECK(foreign_error.load() == RasterError::wrong_thread);
 }
 
+void texture_brush_tiles_and_mirrors_retained_pixels() {
+    SkiaExecutor executor;
+    Bitmap source(2, 1);
+    source.set_pixel(0, 0, Color::from_name("blue"));
+    source.set_pixel(1, 0, Color::from_name("red"));
+    TextureBrush texture(source, WrapMode::tile_flip_x);
+
+    GraphicsRecorder recorder;
+    recorder.set_quality(SmoothingMode::none, InterpolationMode::nearest,
+                         PixelOffsetMode::none, CompositingMode::source_copy,
+                         CompositingQuality::high_speed);
+    recorder.fill_rectangle(texture, {0.0, 0.0, 6.0, 2.0});
+    source.set_pixel(0, 0, Color::from_name("lime"));
+
+    Bitmap target(6, 2);
+    CHECK(executor.execute(recorder, target));
+    const std::array<std::uint32_t, 6> expected{
+        Color::from_name("blue").argb(), Color::from_name("red").argb(),
+        Color::from_name("red").argb(), Color::from_name("blue").argb(),
+        Color::from_name("blue").argb(), Color::from_name("red").argb()};
+    for (std::uint32_t x = 0; x < expected.size(); ++x) {
+        CHECK(target.get_pixel(x, 0).argb() == expected[x]);
+    }
+}
+
 void transparent_png_channels_are_premultiplied() {
     constexpr std::array<std::uint8_t, 70> encoded{
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -228,13 +253,45 @@ void connected_line_figures_fill_as_one_contour() {
     CHECK(target.get_pixel(0, 0).alpha() == 0U);
 }
 
+void quadratic_bezier_polygon_and_pie_paths_rasterize() {
+    SkiaExecutor executor;
+    Bitmap target(64, 40);
+    SolidBrush green(Color::from_name("lime"));
+    SolidBrush blue(Color::from_name("blue"));
+
+    GraphicsPath curved(FillMode::winding);
+    curved.start_figure();
+    curved.add_line({2, 20}, {2, 12});
+    curved.add_quadratic({2, 12}, {10, 2}, {18, 12});
+    curved.add_bezier({18, 12}, {22, 2}, {30, 2}, {34, 12});
+    curved.add_line({34, 12}, {34, 28});
+    curved.add_line({34, 28}, {2, 28});
+    curved.close_figure();
+
+    GraphicsPath primitives;
+    const PointF triangle[] = {{40, 4}, {60, 4}, {50, 18}};
+    primitives.add_polygon(triangle);
+    primitives.add_pie({40, 18, 20, 20}, 180.0, 180.0);
+
+    GraphicsRecorder recorder;
+    recorder.fill_path(green, curved);
+    recorder.fill_path(blue, primitives);
+    CHECK(executor.execute(recorder, target));
+    CHECK(target.get_pixel(16, 20).green() > 240U);
+    CHECK(target.get_pixel(50, 10).blue() > 240U);
+    CHECK(target.get_pixel(50, 24).blue() > 240U);
+    CHECK(target.get_pixel(0, 0).alpha() == 0U);
+}
+
 } // namespace
 
 int main() {
     command_execution_and_png_round_trip();
     image_attributes_clip_and_snapshot_execution();
+    texture_brush_tiles_and_mirrors_retained_pixels();
     transparent_png_channels_are_premultiplied();
     gradients_and_hatches_are_native_raster_commands();
     connected_line_figures_fill_as_one_contour();
+    quadratic_bezier_polygon_and_pie_paths_rasterize();
     return 0;
 }

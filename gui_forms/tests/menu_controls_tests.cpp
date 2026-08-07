@@ -169,9 +169,9 @@ void test_context_menu_scroll_and_validation_bounds() {
                     "long.menu.popup.row.item.29",
             "End must scroll the last logical command into the visible menu viewport");
     const Rect focused_bounds = window.focused_control()->absolute_bounds();
-    require(panel->absolute_bounds().contains(
-                {focused_bounds.x + focused_bounds.width * .5,
-                 focused_bounds.y + focused_bounds.height * .5}),
+    require(panel->absolute_bounds().contains(Point{
+                focused_bounds.x + focused_bounds.width * .5,
+                focused_bounds.y + focused_bounds.height * .5}),
             "End must reveal the last logical command inside the menu viewport");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
                 !menu.is_open(),
@@ -261,6 +261,66 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
     strip->close();
 }
 
+void test_menu_mnemonics_strip_markers_and_popup_activation() {
+    auto root = make_control<Panel>(StableId("mnemonic.root"));
+    auto strip = make_control<MenuStrip>(StableId("mnemonic.strip"));
+    strip->set_requested_bounds({0.0, 0.0, 360.0, 24.0});
+    auto owner = make_control<Button>(StableId("mnemonic.owner"), "Owner");
+    owner->set_requested_bounds({20.0, 50.0, 90.0, 28.0});
+    root->add_child(strip);
+    root->add_child(owner);
+
+    auto first = std::make_shared<Command>("first", "First");
+    auto second = std::make_shared<Command>("second", "Second");
+    strip->set_items({
+        {"mnemonic.file", "&File", {
+            {"first", MenuItemKind::command, first},
+        }},
+        {"mnemonic.format", "&Format", {
+            {"second", MenuItemKind::command, second},
+        }},
+    });
+    Window window(root, {360.0, 220.0});
+    window.perform_layout();
+
+    const std::vector<SemanticNode> top_level = strip->semantic_virtual_children();
+    require(top_level.size() == 2U && top_level[0].name == "File" &&
+                top_level[1].name == "Format",
+            "MenuStrip mnemonic markers must stay out of retained semantics");
+
+    KeyEvent alt_f{KeyAction::down, PhysicalKey::f};
+    alt_f.modifiers = Modifier::alt;
+    require(window.dispatch_key(alt_f) && strip->is_open() &&
+                strip->active_index() == 0U,
+            "a top-level menu mnemonic must focus and open its retained popup");
+    strip->close();
+    require(window.dispatch_key(alt_f) && strip->is_open() &&
+                strip->active_index() == 1U,
+            "duplicate top-level menu mnemonics must cycle deterministically");
+    strip->close();
+
+    auto copy = std::make_shared<Command>("copy", "Copy");
+    std::uint64_t copy_count{};
+    auto copy_invoked = copy->invoked().subscribe(
+        [&copy_count](const CommandInvocation&) { ++copy_count; });
+    ContextMenu popup("mnemonic.popup");
+    popup.set_items({
+        {"copy", MenuItemKind::command, copy, "&Copy"},
+    });
+    popup.show(owner, {20.0, 84.0});
+    const Control::Ptr row = window.find("mnemonic.popup.popup.row.copy");
+    require(row && row->semantic_descriptor().name == "Copy",
+            "popup menu rows must expose marker-free authored text");
+    KeyEvent alt_c{KeyAction::down, PhysicalKey::c};
+    alt_c.modifiers = Modifier::alt;
+    require(window.dispatch_key(alt_c) && copy_count == 1U && !popup.is_open(),
+            "an active popup mnemonic must execute through shared command authority");
+
+    strip->set_use_mnemonic(false);
+    require(!window.dispatch_key(alt_f),
+            "UseMnemonic false must leave the ampersand literal and revoke activation");
+}
+
 } // namespace
 
 int main() {
@@ -268,6 +328,7 @@ int main() {
         test_context_menu_command_snapshot_keyboard_nesting_and_restore();
         test_context_menu_scroll_and_validation_bounds();
         test_menu_strip_retained_switching_commands_and_semantics();
+        test_menu_mnemonics_strip_markers_and_popup_activation();
         std::cout << "gui_forms_menu_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

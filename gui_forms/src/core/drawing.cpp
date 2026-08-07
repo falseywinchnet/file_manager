@@ -336,6 +336,13 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
         return result + ",hatch=" +
             std::to_string(static_cast<unsigned>(brush.hatch_style));
     }
+    if (brush.kind == BrushKind::texture) {
+        return result + ",image=" + std::to_string(brush.image.stable_id) +
+            "@" + std::to_string(brush.image.generation) + ",size=" +
+            std::to_string(brush.image.width) + "x" +
+            std::to_string(brush.image.height) + ",transform=" +
+            matrix_text(brush.transform);
+    }
     result += ",bounds=" + rect_text(brush.bounds) +
               ",center=" + point_text(brush.center) +
               ",angle=" + number(brush.angle) + ",stops=";
@@ -363,6 +370,15 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
         switch (element.verb) {
         case PathVerb::line:
             result += "," + point_text(element.first) + "," + point_text(element.second);
+            break;
+        case PathVerb::quadratic:
+            result += "," + point_text(element.first) + "," +
+                      point_text(element.second) + "," + point_text(element.third);
+            break;
+        case PathVerb::bezier:
+            result += "," + point_text(element.first) + "," +
+                      point_text(element.second) + "," + point_text(element.third) +
+                      "," + point_text(element.fourth);
             break;
         case PathVerb::rectangle:
         case PathVerb::ellipse:
@@ -434,6 +450,42 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
             if (figure.empty()) figure.push_back(element.first);
             figure.push_back(element.second);
             break;
+        case PathVerb::quadratic: {
+            if (figure.empty() || figure.back() != element.first) {
+                figure.push_back(element.first);
+            }
+            constexpr int segments = 24;
+            for (int index = 1; index <= segments; ++index) {
+                const double t = static_cast<double>(index) / segments;
+                const double u = 1.0 - t;
+                figure.push_back({u * u * element.first.x +
+                                      2.0 * u * t * element.second.x +
+                                      t * t * element.third.x,
+                                  u * u * element.first.y +
+                                      2.0 * u * t * element.second.y +
+                                      t * t * element.third.y});
+            }
+            break;
+        }
+        case PathVerb::bezier: {
+            if (figure.empty() || figure.back() != element.first) {
+                figure.push_back(element.first);
+            }
+            constexpr int segments = 32;
+            for (int index = 1; index <= segments; ++index) {
+                const double t = static_cast<double>(index) / segments;
+                const double u = 1.0 - t;
+                figure.push_back({u * u * u * element.first.x +
+                                      3.0 * u * u * t * element.second.x +
+                                      3.0 * u * t * t * element.third.x +
+                                      t * t * t * element.fourth.x,
+                                  u * u * u * element.first.y +
+                                      3.0 * u * u * t * element.second.y +
+                                      3.0 * u * t * t * element.third.y +
+                                      t * t * t * element.fourth.y});
+            }
+            break;
+        }
         case PathVerb::rectangle:
             include_polygon();
             primitive_hit = element.rect.contains(point);
@@ -1038,6 +1090,17 @@ GraphicsPath::GraphicsPath(FillMode fill_mode) : fill_mode_(fill_mode) {
     require_enum(fill_mode, 1U, "path fill mode");
 }
 
+FillMode GraphicsPath::fill_mode() const {
+    require_alive();
+    return fill_mode_;
+}
+
+void GraphicsPath::set_fill_mode(FillMode fill_mode) {
+    require_alive();
+    require_enum(fill_mode, 1U, "path fill mode");
+    fill_mode_ = fill_mode;
+}
+
 void GraphicsPath::reset() {
     require_alive();
     elements_.clear();
@@ -1062,6 +1125,89 @@ void GraphicsPath::add_line(PointF from, PointF to) {
     element.first = from;
     element.second = to;
     append(std::move(element));
+}
+
+void GraphicsPath::add_quadratic(PointF from, PointF control, PointF to) {
+    require_alive();
+    require_finite(from, "path quadratic start");
+    require_finite(control, "path quadratic control");
+    require_finite(to, "path quadratic end");
+    PathElement element;
+    element.verb = PathVerb::quadratic;
+    element.first = from;
+    element.second = control;
+    element.third = to;
+    append(std::move(element));
+}
+
+void GraphicsPath::add_bezier(PointF from, PointF control1,
+                              PointF control2, PointF to) {
+    require_alive();
+    require_finite(from, "path bezier start");
+    require_finite(control1, "path bezier first control");
+    require_finite(control2, "path bezier second control");
+    require_finite(to, "path bezier end");
+    PathElement element;
+    element.verb = PathVerb::bezier;
+    element.first = from;
+    element.second = control1;
+    element.third = control2;
+    element.fourth = to;
+    append(std::move(element));
+}
+
+void GraphicsPath::add_beziers(std::span<const PointF> points) {
+    require_alive();
+    if (points.size() < 4U || (points.size() - 1U) % 3U != 0U) {
+        throw std::invalid_argument(
+            "path bezier sequence requires 4 + 3n points");
+    }
+    const std::size_t count = (points.size() - 1U) / 3U;
+    if (count > maximum_elements - elements_.size()) {
+        throw std::length_error("GUI.Drawing path element limit exceeded");
+    }
+    for (const PointF point : points) require_finite(point, "path bezier point");
+    std::vector<PathElement> appended;
+    appended.reserve(count);
+    for (std::size_t index = 0U; index < count; ++index) {
+        PathElement element;
+        element.verb = PathVerb::bezier;
+        element.first = points[index * 3U];
+        element.second = points[index * 3U + 1U];
+        element.third = points[index * 3U + 2U];
+        element.fourth = points[index * 3U + 3U];
+        appended.push_back(element);
+    }
+    elements_.insert(elements_.end(), appended.begin(), appended.end());
+}
+
+void GraphicsPath::add_polygon(std::span<const PointF> points) {
+    require_alive();
+    if (points.size() < 3U) {
+        throw std::invalid_argument("path polygon requires at least three points");
+    }
+    // start + (n - 1) edges + closing edge + close verb = n + 2.
+    if (points.size() + 2U > maximum_elements - elements_.size()) {
+        throw std::length_error("GUI.Drawing path element limit exceeded");
+    }
+    for (const PointF point : points) require_finite(point, "path polygon point");
+    std::vector<PathElement> appended;
+    appended.reserve(points.size() + 2U);
+    appended.push_back({PathVerb::start_figure});
+    for (std::size_t index = 1U; index < points.size(); ++index) {
+        PathElement line;
+        line.verb = PathVerb::line;
+        line.first = points[index - 1U];
+        line.second = points[index];
+        appended.push_back(line);
+    }
+    PathElement closing;
+    closing.verb = PathVerb::line;
+    closing.first = points.back();
+    closing.second = points.front();
+    appended.push_back(closing);
+    appended.push_back({PathVerb::close_figure});
+    elements_.insert(elements_.end(), appended.begin(), appended.end());
 }
 
 void GraphicsPath::add_rectangle(RectF rectangle) {
@@ -1099,6 +1245,48 @@ void GraphicsPath::add_arc(RectF bounds, double start_angle,
     element.start_angle = start_angle;
     element.sweep_angle = sweep_angle;
     append(std::move(element));
+}
+
+void GraphicsPath::add_pie(RectF bounds, double start_angle,
+                           double sweep_angle) {
+    require_alive();
+    // Validate atomically before appending the five-element closed figure.
+    require_finite(bounds, "path pie bounds");
+    require_finite(start_angle, "path pie start angle");
+    require_finite(sweep_angle, "path pie sweep angle");
+    if (bounds.empty() || sweep_angle == 0.0 ||
+        std::abs(start_angle) > 1'000'000.0 ||
+        std::abs(sweep_angle) > 1'000'000.0) {
+        throw std::invalid_argument("path pie requires bounded nonempty geometry");
+    }
+    if (5U > maximum_elements - elements_.size()) {
+        throw std::length_error("GUI.Drawing path element limit exceeded");
+    }
+    constexpr double degrees_to_radians = 0.01745329251994329576923690768489;
+    const PointF center{bounds.x + bounds.width * 0.5,
+                        bounds.y + bounds.height * 0.5};
+    const auto at = [&](double angle) {
+        const double radians = angle * degrees_to_radians;
+        return PointF{center.x + bounds.width * 0.5 * std::cos(radians),
+                      center.y + bounds.height * 0.5 * std::sin(radians)};
+    };
+    const PointF start = at(start_angle);
+    const PointF end = at(start_angle + sweep_angle);
+    PathElement radial_start{PathVerb::line};
+    radial_start.first = center;
+    radial_start.second = start;
+    PathElement arc{PathVerb::arc};
+    arc.rect = bounds;
+    arc.start_angle = start_angle;
+    arc.sweep_angle = sweep_angle;
+    PathElement radial_end{PathVerb::line};
+    radial_end.first = end;
+    radial_end.second = center;
+    elements_.push_back({PathVerb::start_figure});
+    elements_.push_back(radial_start);
+    elements_.push_back(arc);
+    elements_.push_back(radial_end);
+    elements_.push_back({PathVerb::close_figure});
 }
 
 void GraphicsPath::add_path(const GraphicsPath& path, bool connect) {
@@ -1139,6 +1327,17 @@ void GraphicsPath::transform(const Matrix& matrix) {
             element.first = matrix.transform(element.first);
             element.second = matrix.transform(element.second);
             break;
+        case PathVerb::quadratic:
+            element.first = matrix.transform(element.first);
+            element.second = matrix.transform(element.second);
+            element.third = matrix.transform(element.third);
+            break;
+        case PathVerb::bezier:
+            element.first = matrix.transform(element.first);
+            element.second = matrix.transform(element.second);
+            element.third = matrix.transform(element.third);
+            element.fourth = matrix.transform(element.fourth);
+            break;
         case PathVerb::rectangle:
         case PathVerb::ellipse:
         case PathVerb::arc:
@@ -1170,6 +1369,21 @@ std::vector<PointF> GraphicsPath::path_points() const {
                 result.push_back(element.first);
             }
             result.push_back(element.second);
+            break;
+        case PathVerb::quadratic:
+            if (result.empty() || result.back() != element.first) {
+                result.push_back(element.first);
+            }
+            result.push_back(element.second);
+            result.push_back(element.third);
+            break;
+        case PathVerb::bezier:
+            if (result.empty() || result.back() != element.first) {
+                result.push_back(element.first);
+            }
+            result.push_back(element.second);
+            result.push_back(element.third);
+            result.push_back(element.fourth);
             break;
         case PathVerb::rectangle:
             result.insert(result.end(), {{element.rect.left(), element.rect.top()},
@@ -1296,6 +1510,17 @@ RectF GraphicsPath::bounds() const {
             include_point(element.first);
             include_point(element.second);
             break;
+        case PathVerb::quadratic:
+            include_point(element.first);
+            include_point(element.second);
+            include_point(element.third);
+            break;
+        case PathVerb::bezier:
+            include_point(element.first);
+            include_point(element.second);
+            include_point(element.third);
+            include_point(element.fourth);
+            break;
         case PathVerb::rectangle:
         case PathVerb::ellipse:
         case PathVerb::arc:
@@ -1392,6 +1617,17 @@ RectF Region::bounds() const {
             case PathVerb::line:
                 include_point(element.first);
                 include_point(element.second);
+                break;
+            case PathVerb::quadratic:
+                include_point(element.first);
+                include_point(element.second);
+                include_point(element.third);
+                break;
+            case PathVerb::bezier:
+                include_point(element.first);
+                include_point(element.second);
+                include_point(element.third);
+                include_point(element.fourth);
                 break;
             case PathVerb::rectangle:
             case PathVerb::ellipse:
@@ -1706,6 +1942,73 @@ ImageSnapshot Bitmap::snapshot() const {
     result.generation = generation_;
     result.storage_ = storage_;
     return result;
+}
+
+TextureBrush::TextureBrush(const Bitmap& image, WrapMode wrap_mode) {
+    require_enum(wrap_mode, 4U, "texture wrap mode");
+    value_.kind = BrushKind::texture;
+    value_.wrap_mode = wrap_mode;
+    value_.image = image.snapshot();
+}
+
+TextureBrush::TextureBrush(const ImageReference& image, WrapMode wrap_mode) {
+    require_enum(wrap_mode, 4U, "texture wrap mode");
+    value_.kind = BrushKind::texture;
+    value_.wrap_mode = wrap_mode;
+    value_.image = image.snapshot();
+}
+
+TextureBrush::TextureBrush(BrushSnapshot value) : value_(std::move(value)) {}
+
+void TextureBrush::set_wrap_mode(WrapMode mode) {
+    require_alive();
+    require_enum(mode, 4U, "texture wrap mode");
+    value_.wrap_mode = mode;
+}
+
+void TextureBrush::set_transform(Matrix transform) {
+    require_alive();
+    if (!transform.finite()) {
+        throw std::invalid_argument("texture transform must be finite");
+    }
+    value_.transform = transform;
+}
+
+void TextureBrush::reset_transform() {
+    require_alive();
+    value_.transform = Matrix{};
+}
+
+void TextureBrush::translate_transform(double x, double y) {
+    require_alive();
+    value_.transform = value_.transform.followed_by(Matrix::translation(x, y));
+}
+
+void TextureBrush::scale_transform(double x, double y) {
+    require_alive();
+    require_finite(x, "texture scale x");
+    require_finite(y, "texture scale y");
+    if (x == 0.0 || y == 0.0) {
+        throw std::invalid_argument("texture scale must be nonzero");
+    }
+    value_.transform = value_.transform.followed_by(
+        Matrix{x, 0.0, 0.0, y, 0.0, 0.0});
+}
+
+void TextureBrush::rotate_transform(double degrees) {
+    require_alive();
+    value_.transform = value_.transform.followed_by(
+        Matrix::rotation_at(degrees, {0.0, 0.0}));
+}
+
+std::unique_ptr<TextureBrush> TextureBrush::clone() const {
+    require_alive();
+    return std::unique_ptr<TextureBrush>(new TextureBrush(value_));
+}
+
+BrushSnapshot TextureBrush::snapshot() const {
+    require_alive();
+    return value_;
 }
 
 void Bitmap::on_dispose() noexcept {

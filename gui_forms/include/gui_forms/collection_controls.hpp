@@ -21,6 +21,7 @@ struct TreeViewItem final {
     bool expandable{};
     bool expanded{};
     bool enabled{true};
+    std::string image_key;
 };
 
 struct TreeSelectionChange final {
@@ -61,6 +62,10 @@ public:
     void set_top_row(std::size_t row);
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
+    [[nodiscard]] std::shared_ptr<ImageList> image_list() const noexcept {
+        return image_list_;
+    }
+    void set_image_list(std::shared_ptr<ImageList> image_list);
 
     [[nodiscard]] Event<const TreeSelectionChange&>& selection_changed() noexcept {
         return selection_changed_;
@@ -83,6 +88,9 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+
+protected:
+    void on_attached_to_window() override;
 
 private:
     void rebuild_visible();
@@ -110,6 +118,8 @@ private:
     std::string type_prefix_;
     std::chrono::steady_clock::time_point last_type_time_{};
     bool focused_{};
+    std::shared_ptr<ImageList> image_list_;
+    SubscriptionToken image_list_changed_;
     Event<const TreeSelectionChange&> selection_changed_;
     Event<const TreeExpansionChange&> expansion_changed_;
     Event<const std::string&> item_activated_;
@@ -136,6 +146,7 @@ struct ObjectViewItem final {
     std::string description;
     ObjectGlyph glyph{ObjectGlyph::document};
     bool enabled{true};
+    std::string image_key;
 };
 
 struct ObjectSelectionChange final {
@@ -199,6 +210,10 @@ public:
     void set_top_row(std::size_t row);
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
+    [[nodiscard]] std::shared_ptr<ImageList> image_list() const noexcept {
+        return image_list_;
+    }
+    void set_image_list(std::shared_ptr<ImageList> image_list);
 
     [[nodiscard]] Event<const ObjectSelectionChange&>& selection_changed() noexcept {
         return selection_changed_;
@@ -221,6 +236,9 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+
+protected:
+    void on_attached_to_window() override;
 
 private:
     [[nodiscard]] std::optional<std::size_t> item_index(
@@ -263,6 +281,8 @@ private:
     std::string type_prefix_;
     std::chrono::steady_clock::time_point last_type_time_{};
     bool focused_{};
+    std::shared_ptr<ImageList> image_list_;
+    SubscriptionToken image_list_changed_;
     Event<const ObjectSelectionChange&> selection_changed_;
     Event<const std::string&> item_activated_;
     Event<const ObjectContextRequest&> context_requested_;

@@ -46,6 +46,16 @@ Color with_alpha(Color color, std::uint8_t alpha) noexcept {
     return color;
 }
 
+Rect fit_image_rect(Rect bounds, Size source) noexcept {
+    if (bounds.empty() || source.width <= 0.0 || source.height <= 0.0) return {};
+    const double scale = std::min(bounds.width / source.width,
+                                  bounds.height / source.height);
+    const double width = source.width * scale;
+    const double height = source.height * scale;
+    return {bounds.x + (bounds.width - width) * 0.5,
+            bounds.y + (bounds.height - height) * 0.5, width, height};
+}
+
 void draw_emphasized_text(Painter& painter, Point origin,
                           std::string_view text,
                           std::span<const std::string> terms,
@@ -104,6 +114,11 @@ void TreeView::set_items(std::vector<TreeViewItem> items) {
     std::unordered_set<std::string> identities;
     for (std::size_t index = 0; index < items.size(); ++index) {
         validate_identity_text(items[index].stable_id, items[index].text);
+        if (items[index].image_key.size() > 256U ||
+            (!items[index].image_key.empty() &&
+             !validate_utf8(items[index].image_key).valid())) {
+            throw std::invalid_argument("TreeView image keys must be bounded valid UTF-8");
+        }
         if (!identities.insert(items[index].stable_id).second ||
             (index == 0U && items[index].depth != 0U) ||
             (index != 0U && items[index].depth > items[index - 1U].depth + 1U)) {
@@ -207,6 +222,33 @@ void TreeView::set_font(FontSpec font) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
+void TreeView::set_image_list(std::shared_ptr<ImageList> image_list) {
+    require_mutable();
+    if (image_list && !image_list->is_alive()) {
+        throw std::invalid_argument("TreeView requires a live ImageList");
+    }
+    if (image_list && window() && !image_list->belongs_to(*window())) {
+        throw std::invalid_argument("TreeView and ImageList must belong to one Window");
+    }
+    if (image_list_ == image_list) return;
+    image_list_changed_.disconnect();
+    image_list_ = std::move(image_list);
+    if (image_list_) {
+        image_list_changed_ = image_list_->changed().subscribe(
+            *this, [this](const ImageListChange&) {
+                if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
+            });
+    }
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void TreeView::on_attached_to_window() {
+    Panel::on_attached_to_window();
+    if (image_list_ && !image_list_->belongs_to(*window())) {
+        throw std::logic_error("TreeView cannot attach to a different ImageList Window");
+    }
+}
+
 void TreeView::rebuild_visible() {
     visible_.clear();
     std::optional<std::size_t> collapsed_depth;
@@ -302,7 +344,35 @@ void TreeView::on_paint(Painter& painter, Rect damage) {
         }
         const Color text = !item.enabled ? style().disabled_text
             : selected && focused_ ? style().highlight : style().text;
-        painter.draw_text_utf8({indent + 14.0,
+        double content_x = indent + 14.0;
+        if (image_list_ && image_list_->is_alive() && !item.image_key.empty()) {
+            const ImageVisualState state = !item.enabled
+                ? ImageVisualState::disabled
+                : selected ? ImageVisualState::selected
+                : hovered_row_ == row ? ImageVisualState::hot
+                                      : ImageVisualState::normal;
+            const double scale = window() ? window()->scale() : 1.0;
+            const ImageListResolution resolved =
+                image_list_->resolve(item.image_key, state, scale);
+            const Size logical = image_list_->image_size();
+            const double slot_height = std::min(logical.height,
+                                                std::max(0.0, row_height - 4.0));
+            const double slot_width = logical.height > 0.0
+                ? logical.width * slot_height / logical.height : 0.0;
+            if (resolved && slot_width > 0.0 && slot_height > 0.0) {
+                const Rect destination = fit_image_rect(
+                    {content_x, y + (row_height - slot_height) * 0.5,
+                     slot_width, slot_height},
+                    resolved.source_size);
+                painter.draw_image(
+                    resolved.image, destination,
+                    !item.enabled &&
+                            resolved.resolved_state != ImageVisualState::disabled
+                        ? 0.45 : 1.0);
+            }
+            content_x += slot_width + 5.0;
+        }
+        painter.draw_text_utf8({content_x,
                                 y + std::max(font.size, row_height * 0.5 + 4.0)},
                                item.text, font, text);
         if (active) {
@@ -510,6 +580,8 @@ void ObjectView::set_items(std::vector<ObjectViewItem> items) {
         validate_identity_text(item.stable_id, item.name);
         if (!validate_utf8(item.secondary_text).valid() ||
             !validate_utf8(item.description).valid() ||
+            item.image_key.size() > 256U ||
+            (!item.image_key.empty() && !validate_utf8(item.image_key).valid()) ||
             !identities.insert(item.stable_id).second) {
             throw std::invalid_argument("ObjectView requires unique IDs and valid UTF-8");
         }
@@ -741,6 +813,33 @@ void ObjectView::set_font(FontSpec font) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
+void ObjectView::set_image_list(std::shared_ptr<ImageList> image_list) {
+    require_mutable();
+    if (image_list && !image_list->is_alive()) {
+        throw std::invalid_argument("ObjectView requires a live ImageList");
+    }
+    if (image_list && window() && !image_list->belongs_to(*window())) {
+        throw std::invalid_argument("ObjectView and ImageList must belong to one Window");
+    }
+    if (image_list_ == image_list) return;
+    image_list_changed_.disconnect();
+    image_list_ = std::move(image_list);
+    if (image_list_) {
+        image_list_changed_ = image_list_->changed().subscribe(
+            *this, [this](const ImageListChange&) {
+                if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
+            });
+    }
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ObjectView::on_attached_to_window() {
+    Panel::on_attached_to_window();
+    if (image_list_ && !image_list_->belongs_to(*window())) {
+        throw std::logic_error("ObjectView cannot attach to a different ImageList Window");
+    }
+}
+
 std::size_t ObjectView::columns() const noexcept {
     if (view_mode_ == ObjectViewMode::details) return 1U;
     double width = local_bounds().width;
@@ -908,11 +1007,34 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
             painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
                                cell.width - 2.0, cell.height - 2.0}, style().face_light);
         }
+        const auto paint_item_image = [&](Rect destination_bounds) {
+            if (!image_list_ || !image_list_->is_alive() || item.image_key.empty()) {
+                return false;
+            }
+            const ImageVisualState state = !item.enabled
+                ? ImageVisualState::disabled
+                : selected ? ImageVisualState::selected
+                : hovered_index_ == index ? ImageVisualState::hot
+                                          : ImageVisualState::normal;
+            const ImageListResolution resolved = image_list_->resolve(
+                item.image_key, state, window() ? window()->scale() : 1.0);
+            if (!resolved) return false;
+            const Rect destination = fit_image_rect(destination_bounds,
+                                                    resolved.source_size);
+            painter.draw_image(
+                resolved.image, destination,
+                !item.enabled &&
+                        resolved.resolved_state != ImageVisualState::disabled
+                    ? 0.45 : 1.0);
+            return true;
+        };
         if (view_mode_ == ObjectViewMode::icons) {
             const double glyph_width = std::min(46.0, cell.width - 18.0);
-            paint_glyph(painter,
-                        {cell.x + (cell.width - glyph_width) * .5, cell.y + 4.0,
-                         glyph_width, 43.0}, item.glyph, item.enabled);
+            const Rect glyph_bounds{cell.x + (cell.width - glyph_width) * .5,
+                                    cell.y + 4.0, glyph_width, 43.0};
+            if (!paint_item_image(glyph_bounds)) {
+                paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
+            }
             const Size measured = painter.measure_text_utf8(item.name, font);
             const double text_x = cell.x + std::max(4.0, (cell.width - measured.width) * .5);
             painter.draw_text_utf8({text_x, cell.y +
@@ -929,9 +1051,11 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                                        style().disabled_text);
             }
         } else {
-            paint_glyph(painter, {cell.x + 6.0, cell.y + 3.0, 24.0,
-                                   std::max(18.0, cell.height - 6.0)},
-                        item.glyph, item.enabled);
+            const Rect glyph_bounds{cell.x + 6.0, cell.y + 3.0, 24.0,
+                                    std::max(18.0, cell.height - 6.0)};
+            if (!paint_item_image(glyph_bounds)) {
+                paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
+            }
             painter.draw_text_utf8({cell.x + 38.0, cell.y + cell.height * .5 + 4.0},
                                    item.name, font, item.enabled ? style().text
                                                                  : style().disabled_text);

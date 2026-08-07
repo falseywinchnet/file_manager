@@ -4,11 +4,13 @@
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 
@@ -318,7 +320,7 @@ void test_progress_stripes_are_clipped_and_configurable() {
     window.perform_layout();
     StripePainter painter;
     progress->on_paint(painter, {0.0, 0.0, 200.0, 24.0});
-    require(painter.saves == 1 && painter.restores == 1 &&
+    require(painter.saves >= 1 && painter.restores == painter.saves &&
                 painter.stripe_lines > 1 &&
                 painter.clip == Rect{2.0, 2.0, 98.0, 20.0} &&
                 close_to(painter.line_width, 6.0) && painter.slopes_down,
@@ -332,6 +334,151 @@ void test_progress_stripes_are_clipped_and_configurable() {
     }
     require(narrow_rejected && close_to(progress->stripe_width(), 6.0),
             "stripe geometry must reject unusable widths without mutation");
+}
+
+class ProgressEffectsPainter final : public Painter {
+public:
+    void save() override { ++saves; }
+    void restore() override { ++restores; }
+    void translate(Point) override {}
+    void clip_rect(Rect bounds) override { clips.push_back(bounds); }
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void fill_linear_gradient(Rect rect, Point, Point,
+                              std::span<const GradientStop> stops) override {
+        ++linear_gradients;
+        if (stops.size() == 5U) ++five_stop_linear_gradients;
+        if (stops.size() == 4U) ++four_stop_linear_gradients;
+        last_linear = rect;
+        largest_stop_count = std::max(largest_stop_count, stops.size());
+    }
+    void fill_linear_gradient_spread(
+        Rect, Point start, Point end, std::span<const GradientStop> stops,
+        GradientSpreadMode spread) override {
+        ++spread_gradients;
+        if (stops.size() == 5U) ++five_stop_spread_gradients;
+        spread_mode = spread;
+        spread_axis = {end.x - start.x, end.y - start.y};
+        largest_stop_count = std::max(largest_stop_count, stops.size());
+    }
+    void fill_radial_gradient(Rect, Point, Size,
+                              std::span<const GradientStop> stops) override {
+        ++radial_gradients;
+        largest_stop_count = std::max(largest_stop_count, stops.size());
+    }
+    void draw_line(Point from, Point to, Color, double width) override {
+        if (width <= 1.5) {
+            ++sparks;
+            maximum_spark_length = std::max(
+                maximum_spark_length,
+                std::hypot(to.x - from.x, to.y - from.y));
+        }
+        else ++bands;
+    }
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+
+    int saves{};
+    int restores{};
+    int linear_gradients{};
+    int spread_gradients{};
+    int radial_gradients{};
+    int five_stop_linear_gradients{};
+    int four_stop_linear_gradients{};
+    int five_stop_spread_gradients{};
+    int sparks{};
+    int bands{};
+    double maximum_spark_length{};
+    std::size_t largest_stop_count{};
+    GradientSpreadMode spread_mode{GradientSpreadMode::pad};
+    Point spread_axis{};
+    Rect last_linear{};
+    std::vector<Rect> clips;
+};
+
+void test_progress_animation_style_family() {
+    auto progress = make_control<ProgressBar>(
+        StableId("animation.progress-style-family"));
+    progress->set_requested_bounds({0.0, 0.0, 240.0, 24.0});
+    progress->set_value(64.0);
+    progress->set_animation_period(1000ms);
+    Window window(progress, {240.0, 24.0});
+    window.perform_layout();
+
+    ProgressBarAnimationAppearance appearance =
+        progress->animation_appearance();
+    appearance.pulse_extent = 0.4;
+    appearance.laser_edge_extent = 13.0;
+    appearance.laser_phase_pitch = 12.0;
+    progress->set_animation_appearance(appearance);
+    require(progress->animation_appearance() == appearance,
+            "progress animation appearance must replace atomically");
+
+    progress->set_visual_style(ProgressBarVisualStyle::luminance_pulse);
+    const FrameTime origin = FrameClock::now();
+    progress->on_frame(origin);
+    progress->on_frame(origin + 250ms);
+    ProgressEffectsPainter pulse;
+    progress->on_paint(pulse, {0.0, 0.0, 240.0, 24.0});
+    require(window.next_wake().has_value() &&
+                pulse.five_stop_linear_gradients == 1 &&
+                pulse.five_stop_spread_gradients == 0 &&
+                std::find(pulse.clips.begin(), pulse.clips.end(),
+                          Rect{2.0, 2.0, 151.04, 20.0}) != pulse.clips.end() &&
+                pulse.largest_stop_count == 5U &&
+                pulse.last_linear.width >= 8.0,
+            "luminance progress must own one clipped, forward-moving soft pulse");
+
+    progress->set_visual_style(ProgressBarVisualStyle::marching_stripes);
+    progress->on_frame(origin + 500ms);
+    ProgressEffectsPainter stripes;
+    progress->on_paint(stripes, {0.0, 0.0, 240.0, 24.0});
+    require(stripes.bands > 2 && stripes.saves >= 1 &&
+                stripes.restores == stripes.saves &&
+                std::find(stripes.clips.begin(), stripes.clips.end(),
+                          Rect{2.0, 2.0, 151.04, 20.0}) != stripes.clips.end(),
+            "marching-stripe progress must remain clipped to determinate fill");
+
+    progress->set_visual_style(ProgressBarVisualStyle::laser_etch);
+    progress->on_frame(origin + 750ms);
+    ProgressEffectsPainter laser;
+    progress->on_paint(laser, {0.0, 0.0, 240.0, 24.0});
+    require(laser.five_stop_spread_gradients == 1 &&
+                laser.four_stop_linear_gradients >= 1 &&
+                laser.spread_mode == GradientSpreadMode::repeat &&
+                close_to(laser.spread_axis.x, 0.0) &&
+                close_to(laser.spread_axis.y, appearance.laser_phase_pitch) &&
+                laser.radial_gradients == 5 && laser.sparks >= 7 &&
+                laser.maximum_spark_length < 5.0 &&
+                std::find(laser.clips.begin(), laser.clips.end(),
+                          Rect{2.0, 2.0, 151.04, 20.0}) != laser.clips.end(),
+            "laser progress must combine a repeating phase with a compact white-hot corona and short sparks");
+
+    progress->set_reduced_motion(true);
+    ProgressEffectsPainter reduced_laser;
+    progress->on_paint(reduced_laser, {0.0, 0.0, 240.0, 24.0});
+    require(reduced_laser.five_stop_spread_gradients == 1 &&
+                reduced_laser.radial_gradients == 3 &&
+                reduced_laser.sparks + 4 == laser.sparks &&
+                reduced_laser.maximum_spark_length < 3.0,
+            "reduced laser motion must preserve meaning with a calmer spark field");
+
+    const ProgressBarAnimationAppearance retained =
+        progress->animation_appearance();
+    bool invalid_rejected = false;
+    try {
+        auto invalid = retained;
+        invalid.laser_phase_pitch = 0.0;
+        progress->set_animation_appearance(invalid);
+    } catch (const std::invalid_argument&) {
+        invalid_rejected = true;
+    }
+    require(invalid_rejected && progress->animation_appearance() == retained,
+            "invalid progress effect geometry must not partially mutate appearance");
+
+    progress->set_visual_style(ProgressBarVisualStyle::continuous);
+    require(!window.next_wake().has_value(),
+            "returning to a static progress style must revoke the frame lease");
 }
 
 void test_visual_style_round_trips() {
@@ -411,6 +558,7 @@ int main() {
         test_reduced_motion_remains_active_and_calm();
         test_progress_animation_and_hidden_suspension();
         test_progress_stripes_are_clipped_and_configurable();
+        test_progress_animation_style_family();
         test_visual_style_round_trips();
         test_public_easing_preview_owns_scheduler_policy_and_semantics();
         std::cout << "gui_forms_animation_tests: all tests passed\n";

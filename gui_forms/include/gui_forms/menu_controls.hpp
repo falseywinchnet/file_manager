@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace gui_forms {
@@ -28,6 +29,15 @@ enum class MenuItemKind : std::uint8_t {
 // snapshotted immediately before the menu opens; one invocation still flows
 // through Command::execute regardless of pointer, keyboard, or semantic input.
 struct MenuItemSpec final {
+    MenuItemSpec() = default;
+    MenuItemSpec(std::string stable_identity, MenuItemKind item_kind,
+                 std::shared_ptr<Command> item_command = {},
+                 std::string item_text = {},
+                 std::vector<MenuItemSpec> item_children = {})
+        : stable_id(std::move(stable_identity)), kind(item_kind),
+          command(std::move(item_command)), text(std::move(item_text)),
+          children(std::move(item_children)) {}
+
     std::string stable_id;
     MenuItemKind kind{MenuItemKind::command};
     std::shared_ptr<Command> command;
@@ -116,6 +126,8 @@ public:
         return items_;
     }
     void set_items(std::vector<MenuStripItemSpec> items);
+    [[nodiscard]] bool use_mnemonic() const noexcept { return use_mnemonic_; }
+    void set_use_mnemonic(bool value);
     [[nodiscard]] std::optional<std::size_t> active_index() const noexcept {
         return active_index_;
     }
@@ -143,6 +155,9 @@ public:
 
 protected:
     void on_dispose() noexcept override;
+    [[nodiscard]] bool mnemonic_matches(
+        char32_t character) const noexcept override;
+    bool process_mnemonic_self(char32_t character) override;
 
 private:
     [[nodiscard]] std::vector<Rect> item_bounds() const;
@@ -159,6 +174,7 @@ private:
     std::optional<std::size_t> hot_index_;
     bool focused_{};
     bool switching_{};
+    bool use_mnemonic_{true};
     SubscriptionToken popup_invoked_;
     SubscriptionToken popup_changed_;
     Event<const MenuStripInvocation&> item_invoked_;

@@ -127,4 +127,19 @@ rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferr
 rg -q 'lifecycle-order=load>input>closing>closed\|handle-created:1\|handle-destroyed:1\|early-close:suppressed' "$behavior_wine_log"
 unlink "$behavior_wine_log"
 
+paint_lease_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-paint-lease-wine.XXXXXX")
+for behavior_mode in native-surface native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage; do
+  (cd "$behavior_output" && MVK_CONFIG_LOG_LEVEL=0 WINEDEBUG=-all \
+    "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
+    GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$paint_lease_wine_log" 2>&1
+done
+cat "$paint_lease_wine_log"
+rg -q 'native-surface=hwnd:true\|input:retained-host\|size:96x48\|gdi:true\|present-boundary:true\|coalesced:true\|single-drain:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'native-surface-fallback=raw-gdi:true\|bounded-probe:true\|single-commit:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'paint-reentry=recursive:false\|follow-up:one\|callback-boundary:true' "$paint_lease_wine_log"
+rg -q 'paint-input-deferral=order:pointer>key\|during-paint:false\|follow-up:one\|disposed:abandoned\|queue:zero' "$paint_lease_wine_log"
+rg -q 'managed-double-buffer=reflected:true\|phases:shared\|surface:reused\|burst:coalesced\|resize:stale-abandoned\|follow-up:one\|disabled:ephemeral\|fault:no-self-retry' "$paint_lease_wine_log"
+rg -q 'managed-damage=rect:merged\|notify:signal-only\|event:clipped\|region:bounded\|children:translated\|fault:restored\|unbuffered:full' "$paint_lease_wine_log"
+unlink "$paint_lease_wine_log"
+
 echo "Generated facade surface and current experimental-ABI managed-loop smoke passed on host .NET and Wine."

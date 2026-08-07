@@ -46,8 +46,19 @@ public:
         ++commands;
         ++images;
     }
+    void draw_image_region(ImageId, Rect, Rect, double) override {
+        ++commands;
+        ++image_regions;
+    }
+    void fill_image_pattern(ImageId, Size, Rect, Size,
+                            ImagePatternWrap, double) override {
+        ++commands;
+        ++image_patterns;
+    }
     std::uint64_t commands{};
     std::uint64_t images{};
+    std::uint64_t image_regions{};
+    std::uint64_t image_patterns{};
 };
 
 class FillTracePainter final : public Painter {
@@ -273,6 +284,49 @@ void test_timing_and_tooltip_runtime() {
             "showcase must explain a disabled target through passive popup ownership");
 }
 
+void test_binding_source_showcase_runtime() {
+    std::unique_ptr<Window> owned = showcase::make_showcase();
+    Window& window = *owned;
+    select_page(window, 7U);
+    const auto editor = std::dynamic_pointer_cast<TextBox>(
+        window.find("showcase.values.binding.name"));
+    const auto enabled = std::dynamic_pointer_cast<CheckBox>(
+        window.find("showcase.values.binding.enabled"));
+    const auto gain = std::dynamic_pointer_cast<TrackBar>(
+        window.find("showcase.values.binding.gain"));
+    const auto status = std::dynamic_pointer_cast<Label>(
+        window.find("showcase.values.binding.status"));
+    require(editor && enabled && gain && status &&
+                editor->text() == "Local index" && enabled->checked() &&
+                gain->value() == 28.0 &&
+                status->text().find("profile.local") != std::string::npos,
+            "showcase binding specimen must project the initial retained record");
+    require(window.request_focus(editor),
+            "showcase bound editor must focus before its retained edit");
+    editor->set_text("Local index edited");
+    click(window, window.find("showcase.values.binding.next"));
+    require(editor->text() == "Archive review" && !enabled->checked() &&
+                gain->value() == 61.0 &&
+                status->text().find("profile.archive") != std::string::npos,
+            "showcase binding currency command must update all three stock control families");
+    click(window, window.find("showcase.values.binding.previous"));
+    require(editor->text() == "Local index edited",
+            "showcase OnValidation binding must preserve the committed edit across currency movement");
+    require(window.request_focus(editor),
+            "showcase bound editor must accept focus for invalid-input dogfood");
+    editor->set_text({});
+    require(!window.request_focus(window.find("showcase.values.binding.next")) &&
+                window.focused_control() == editor &&
+                window.semantic_snapshot().to_json().find(
+                    "Profile name may not be empty") != std::string::npos,
+            "showcase validation must retain focus and project a binding-aware ErrorProvider error");
+    editor->set_text("Local index repaired");
+    require(window.request_focus(window.find("showcase.values.binding.next")) &&
+                window.semantic_snapshot().to_json().find(
+                    "Profile name may not be empty") == std::string::npos,
+            "corrected showcase input must commit and revoke its retained error adornment");
+}
+
 void test_showcase_semantic_surface() {
     std::unique_ptr<Window> owned = showcase::make_showcase();
     Window& window = *owned;
@@ -326,6 +380,59 @@ void test_ranges_containers_and_animation() {
                 horizontal_scroll->value() > 95.0 &&
                 vertical_scroll->value() == horizontal_scroll->value(),
             "showcase ScrollBar drag must track continuously and synchronize orientations");
+
+    // Reproduce the reported interaction family without depending on wall
+    // clock luck: mutate a captured slider continuously, release it, replace
+    // the visible retained page immediately, service the new animation lease,
+    // and paint. Repeating both directions exercises stale deadlines and page
+    // visibility invalidation rather than merely proving that Animation opens.
+    const std::uint64_t frame_faults_before =
+        window.metrics_snapshot().frame_callback_faults;
+    for (std::size_t cycle = 0U; cycle < 48U; ++cycle) {
+        select_page(window, 1U);
+        const Rect live_track = slider->absolute_bounds();
+        const double start_ratio = cycle % 2U == 0U ? 0.18 : 0.82;
+        const double finish_ratio = cycle % 2U == 0U ? 0.82 : 0.18;
+        const Point drag_start{
+            live_track.x + live_track.width * start_ratio,
+            live_track.y + live_track.height * 0.5};
+        require(window.dispatch_pointer(
+                    {PointerAction::down, PointerButton::primary, drag_start}),
+                "slider-to-animation stress must acquire the TrackBar");
+        for (std::size_t step = 1U; step <= 9U; ++step) {
+            const double ratio = start_ratio +
+                (finish_ratio - start_ratio) *
+                    static_cast<double>(step) / 9.0;
+            require(window.dispatch_pointer(
+                        {PointerAction::move, PointerButton::none,
+                         {live_track.x + live_track.width * ratio,
+                          drag_start.y}}),
+                    "slider-to-animation stress must deliver every captured move");
+        }
+        const Point drag_finish{
+            live_track.x + live_track.width * finish_ratio, drag_start.y};
+        require(window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::primary, drag_finish}) &&
+                    !window.captured_control(),
+                "slider-to-animation stress must release capture before navigation");
+
+        select_page(window, 3U);
+        require(window.next_wake().has_value(),
+                "opening Animation after a slider drag must retain a live deadline");
+        static_cast<void>(window.poll_frame_schedule(*window.next_wake()));
+        CountingPainter transition_painter;
+        const DamageRegion transition_damage = window.take_damage();
+        static_cast<void>(window.paint(
+            transition_painter,
+            transition_damage.empty()
+                ? Rect{0.0, 0.0, 1280.0, 820.0}
+                : transition_damage.bounds()));
+        require(transition_painter.commands > 0U,
+                "slider-to-animation transition must complete a retained paint");
+    }
+    require(window.metrics_snapshot().frame_callback_faults ==
+                frame_faults_before,
+            "slider-to-animation stress must not fault an active surface callback");
 
     select_page(window, 2U);
     auto split = std::dynamic_pointer_cast<SplitContainer>(
@@ -565,6 +672,10 @@ void test_text_collections_and_popup_lifecycle() {
     window.paint(image_painter, {0.0, 0.0, 1280.0, 820.0});
     require(image_painter.images == 8U,
             "showcase image page must render all eight public PictureBox consumers");
+    require(image_painter.image_regions >= 9U,
+            "showcase image page must retain source-cropped nine-patch material");
+    require(image_painter.image_patterns == 1U,
+            "showcase image page must retain one bounded exact-period tile command");
 
     select_page(window, 9U);
     auto tabs = std::dynamic_pointer_cast<TabControl>(
@@ -839,6 +950,7 @@ int main() {
         test_ranges_containers_and_animation();
         test_text_collections_and_popup_lifecycle();
         test_timing_and_tooltip_runtime();
+        test_binding_source_showcase_runtime();
         test_date_time_picker_showcase();
         test_dialogs_and_host_services_showcase();
         test_dispatcher_showcase();

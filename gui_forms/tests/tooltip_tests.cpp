@@ -128,6 +128,37 @@ void test_focus_policy_autopop_and_moving_target() {
     require(!tips.visible(), "auto-pop deadline must close a focused tooltip");
 }
 
+void test_repeated_focus_show_hide_reuses_no_stale_overlay_identity() {
+    Fixture fixture;
+    ToolTip tips(fixture.window);
+    tips.set_initial_delay(1ms);
+    tips.set_reshow_delay(1ms);
+    tips.set_auto_pop_delay(5s);
+    tips.set_tool_tip(fixture.button, "Repeated keyboard help");
+    for (std::size_t cycle = 0U; cycle < 32U; ++cycle) {
+        require(fixture.window.request_focus(fixture.button),
+                "repeated tooltip target must accept focus");
+        fire_next(fixture.window);
+        fixture.window.perform_layout();
+        const std::size_t shown = count_role(
+            fixture.window.semantic_snapshot().roots, SemanticRole::tool_tip);
+        if (!tips.visible() || shown != 1U) {
+            throw std::runtime_error(
+                "tooltip focus cycle " + std::to_string(cycle) +
+                " opened visible=" + (tips.visible() ? "true" : "false") +
+                " count=" + std::to_string(shown) + " frame_faults=" +
+                std::to_string(
+                    fixture.window.metrics_snapshot().frame_callback_faults));
+        }
+        require(fixture.window.request_focus(fixture.other),
+                "focus must leave the repeated tooltip target");
+        require(!tips.visible() &&
+                    count_role(fixture.window.semantic_snapshot().roots,
+                               SemanticRole::tool_tip) == 0U,
+                "focus departure must detach the tooltip subtree and identity");
+    }
+}
+
 void test_explicit_show_multiple_providers_and_owner_disposal() {
     Fixture fixture;
     ToolTip first(fixture.window);
@@ -196,6 +227,7 @@ int main() {
     try {
         test_hover_delay_cancel_and_accessible_overlay();
         test_focus_policy_autopop_and_moving_target();
+        test_repeated_focus_show_hide_reuses_no_stale_overlay_identity();
         test_explicit_show_multiple_providers_and_owner_disposal();
         test_mapping_removal_and_provider_disposal_are_quiescent();
         test_show_always_supports_a_disabled_visible_owner();

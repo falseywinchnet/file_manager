@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -80,6 +82,10 @@ if (args.Length == 1 && args[0] == "dock-padding")
 {
     return RunDockPaddingSemantics();
 }
+if (args.Length == 1 && args[0] == "control-geometry")
+{
+    return RunControlGeometrySemantics();
+}
 if (args.Length == 1 && args[0] == "split-container")
 {
     return RunSplitContainerSemantics();
@@ -124,6 +130,27 @@ if (args.Length == 1 && args[0] == "native-surface")
 {
     Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
     return RunNativeWindowSurfaceHost();
+}
+if (args.Length == 1 && args[0] == "native-surface-fallback")
+{
+    Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
+    return RunNativeWindowSurfaceFallbackHost();
+}
+if (args.Length == 1 && args[0] == "paint-reentry")
+{
+    return RunPaintReentryHost();
+}
+if (args.Length == 1 && args[0] == "paint-input-deferral")
+{
+    return RunPaintInputDeferralHost();
+}
+if (args.Length == 1 && args[0] == "managed-double-buffer")
+{
+    return RunManagedDoubleBufferHost();
+}
+if (args.Length == 1 && args[0] == "managed-damage")
+{
+    return RunManagedDamageHost();
 }
 if (args.Length == 1 && args[0] == "visibility-paint")
 {
@@ -941,6 +968,80 @@ static int RunDockPaddingSemantics()
     return 0;
 }
 
+static int RunControlGeometrySemantics()
+{
+    using var root = new GeometryPanel { Name = "geometryRoot", Size = new Size(200, 140) };
+    using var back = new GeometryPanel {
+        Name = "geometryBack", Bounds = new Rectangle(10, 12, 80, 60), TabIndex = 20 };
+    using var front = new GeometryPanel {
+        Name = "geometryFront", Bounds = new Rectangle(10, 12, 80, 60), TabIndex = 10 };
+    using var nested = new Panel {
+        Name = "geometryNested", Bounds = new Rectangle(2, 3, 12, 9), TabIndex = 5 };
+    front.Controls.Add(nested);
+    root.Controls.Add(back);
+    root.Controls.Add(front);
+
+    Require(root.Controls.GetChildIndex(front) == 0 &&
+        root.Controls.GetChildIndex(back) == 1 &&
+        ReferenceEquals(root.GetChildAtPoint(new Point(20, 20)), front),
+        "ControlCollection and point lookup expose topmost-first z order");
+    front.Visible = false;
+    Require(ReferenceEquals(root.GetChildAtPoint(
+        new Point(20, 20), GetChildAtPointSkip.Invisible), back),
+        "invisible point lookup reveals the next retained child");
+    front.Visible = true;
+    front.Enabled = false;
+    Require(ReferenceEquals(root.GetChildAtPoint(
+        new Point(20, 20), GetChildAtPointSkip.Disabled), back),
+        "disabled point lookup reveals the next retained child");
+    front.Enabled = true;
+    front.MakeTransparent();
+    Require(ReferenceEquals(root.GetChildAtPoint(
+        new Point(20, 20), GetChildAtPointSkip.Transparent), back),
+        "transparent point lookup uses the retained transparency contract");
+    front.MakeOpaque();
+
+    front.SendToBack();
+    Require(root.Controls.GetChildIndex(front) == 1 &&
+        ReferenceEquals(root.GetChildAtPoint(new Point(20, 20)), back),
+        "SendToBack updates both collection and hit-test order");
+    front.BringToFront();
+    Require(root.Controls.GetChildIndex(front) == 0,
+        "BringToFront restores topmost collection order");
+
+    front.SetBounds(25, 30, 70, 40,
+        BoundsSpecified.Location | BoundsSpecified.Width);
+    Require(front.Bounds == new Rectangle(25, 30, 70, 60),
+        "masked bounds mutation preserves unspecified height");
+    Require(front.RectangleToScreen(new Rectangle(2, 3, 4, 5)) ==
+            new Rectangle(27, 33, 4, 5) &&
+        front.RectangleToClient(new Rectangle(27, 33, 4, 5)) ==
+            new Rectangle(2, 3, 4, 5),
+        "point and rectangle transforms round trip retained ancestry");
+    Require(ReferenceEquals(root.GetNextControl(null!, true), front) &&
+        ReferenceEquals(root.GetNextControl(front, true), nested) &&
+        ReferenceEquals(root.GetNextControl(nested, true), back) &&
+        root.GetNextControl(back, true) is null,
+        "GetNextControl traverses stable nested TabIndex order without wrapping");
+
+    using var sizing = new GeometryPanel {
+        Name = "geometryAutoSize", Size = new Size(100, 80),
+        Padding = new Padding(2) };
+    using var content = new Panel {
+        Name = "geometryContent", Bounds = new Rectangle(10, 8, 40, 20) };
+    sizing.Controls.Add(content);
+    var autoSizeEvents = 0;
+    sizing.AutoSizeChanged += (_, _) => ++autoSizeEvents;
+    sizing.SetMode(AutoSizeMode.GrowAndShrink);
+    sizing.AutoSize = true;
+    Require(sizing.PreferredSize == new Size(55, 33) &&
+        sizing.Size == new Size(55, 33) && autoSizeEvents == 1,
+        "GrowAndShrink AutoSize derives child, margin, and padding extent once");
+
+    Console.WriteLine("control-geometry=zorder:coherent|lookup:filtered|bounds:masked|coordinates:roundtrip|tab-order:nested|autosize:shrink");
+    return 0;
+}
+
 static int RunDialogKeyLiveHost()
 {
     var form = new Form { Name = "dialogKeyLive", Text = "Dialog key routing", Size = new Size(360, 180) };
@@ -1633,6 +1734,7 @@ static int RunLoadLifecycle()
 
 static int RunInitializationOrder()
 {
+    Environment.SetEnvironmentVariable("GUI_FORMS_AUTOMATION_ACTIVATE", "1");
     var form = new Form { Name = "initializationOrder", Size = new Size(360, 180) };
     var button = new Button { Name = "initializationAction", Dock = DockStyle.Fill };
     form.Controls.Add(button);
@@ -1660,8 +1762,9 @@ static int RunInitializationOrder()
     }
 
     Application.Run(form);
-    Require(string.Join(",", order) == "load,input,closing,closed",
-        "portable initialization completes before input and terminal callbacks");
+    var observedOrder = string.Join(",", order);
+    Require(observedOrder == "load,input,closing,closed",
+        $"portable initialization completes before input and terminal callbacks (observed {observedOrder})");
     form.Dispose();
     if (OperatingSystem.IsWindows())
         Require(handleDestroyed == 1, "disposing a leased handle raises HandleDestroyed once");
@@ -1775,39 +1878,523 @@ static int RunNativeWindowSurfaceHost()
         resized.Right - resized.Left == 96 && resized.Bottom - resized.Top == 48,
         "control HWND tracks retained client size");
 
-    using var timer = new System.Windows.Forms.Timer { Interval = 30 };
+    var snapshotMethod = typeof(Control).GetMethod("__WindowSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("window-surface diagnostics are unavailable");
+    string Snapshot() => (string)(snapshotMethod.Invoke(surface, null) ?? string.Empty);
+
+    using var timer = new System.Windows.Forms.Timer { Interval = 40 };
     var ticks = 0;
-    var paintedAttachedChild = false;
+    var paintedCompatibilitySurface = false;
+    Dictionary<string, string>? before = null;
+    Dictionary<string, string>? during = null;
+    Dictionary<string, string>? after = null;
     timer.Tick += (_, _) =>
     {
         ++ticks;
         if (ticks == 1)
         {
+            // Drain creation/resize work first so the deltas below measure only
+            // this callback's high-rate backing-surface commits.
+            surface.Update();
+            before = ParseSurfaceSnapshot(Snapshot());
+            using var graphics = Graphics.FromHwnd(window);
+            for (var frame = 0; frame < 16; ++frame)
+            {
+                using var brush = new SolidBrush(Color.FromArgb(
+                    255, 32 + frame * 8, 48 + frame * 3, 96 + frame * 4));
+                graphics.FillRectangle(brush, 0, 0, 96, 48);
+                graphics.Flush();
+            }
+            var leased = graphics.GetHdc();
+            var leasedBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
+            var leasedArea = new NativeSurfaceProbe.NativeRect { Right = 24, Bottom = 16 };
+            Require(leased != 0 && leasedBrush != 0 &&
+                NativeSurfaceProbe.FillRect(leased, ref leasedArea, leasedBrush) != 0,
+                "bitmap-backed HDC lease accepts direct GDI mutation");
+            _ = NativeSurfaceProbe.DeleteObject(leasedBrush);
+            graphics.ReleaseHdc(leased);
             var device = NativeSurfaceProbe.GetDC(window);
             Require(device != 0, "control HWND exposes a device context");
-            var brush = NativeSurfaceProbe.CreateSolidBrush(0x003322ccu);
-            var area = new NativeSurfaceProbe.NativeRect { Right = 96, Bottom = 48 };
-            Require(brush != 0 && NativeSurfaceProbe.FillRect(device, ref area, brush) != 0,
-                "direct GDI fill succeeds");
-            paintedAttachedChild = NativeSurfaceProbe.GetPixel(device, 20, 20) ==
-                0x003322ccu && NativeSurfaceProbe.GetParent(window) != 0;
-            _ = NativeSurfaceProbe.DeleteObject(brush);
+            paintedCompatibilitySurface =
+                NativeSurfaceProbe.GetPixel(device, 20, 20) != 0xffffffffu;
             _ = NativeSurfaceProbe.ReleaseDC(window, device);
+            during = ParseSurfaceSnapshot(Snapshot());
+            Require(during["state"] == "dirty_queued" && SurfaceMetric(during, "queued") == 1,
+                "many flushes retain one queued compatibility drain before callback return");
             return;
         }
+        after = ParseSurfaceSnapshot(Snapshot());
+        Require(before is not null && during is not null &&
+            after["state"] == "clean" &&
+            SurfaceMetric(after, "content") == SurfaceMetric(after, "captured") &&
+            SurfaceMetric(after, "drains-queued") - SurfaceMetric(before, "drains-queued") == 1 &&
+            SurfaceMetric(after, "drains-started") - SurfaceMetric(before, "drains-started") == 1 &&
+            SurfaceMetric(after, "drains-committed") - SurfaceMetric(before, "drains-committed") == 1 &&
+            SurfaceMetric(after, "drains-coalesced") - SurfaceMetric(before, "drains-coalesced") >= 16 &&
+            SurfaceMetric(after, "explicit") == 1,
+            "sixteen backing flushes plus HDC release must collapse into one retained capture/import drain");
         timer.Stop();
         form.Close();
     };
     timer.Start();
     Application.Run(form);
     Require(ticks == 2, "native surface crosses an event-loop presentation boundary");
-    Require(paintedAttachedChild, "direct GDI targets the attached child HWND");
+    Require(paintedCompatibilitySurface,
+        "direct GDI targets the isolated compatibility HWND");
     surface.Dispose();
     Require(!NativeSurfaceProbe.IsWindow(window), "control HWND is destroyed with its owner");
-    Console.WriteLine("native-surface=hwnd:true|input:retained-host|size:96x48|gdi:true|present-boundary:true|disposed:true");
+    Console.WriteLine("native-surface=hwnd:true|input:retained-host|size:96x48|gdi:true|present-boundary:true|coalesced:true|single-drain:true|disposed:true");
     form.Dispose();
     return 0;
 }
+
+static int RunNativeWindowSurfaceFallbackHost()
+{
+    var form = new Form { Name = "nativeSurfaceFallbackForm", Text = "Native surface fallback", Size = new Size(240, 140) };
+    var surface = new PaintInputProbe
+    {
+        Name = "nativeSurfaceFallback",
+        Bounds = new Rectangle(12, 12, 96, 48),
+        BackColor = Color.Black,
+    };
+    form.Controls.Add(surface);
+    var window = surface.Handle;
+    var snapshotMethod = typeof(Control).GetMethod("__WindowSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("window-surface diagnostics are unavailable");
+    Dictionary<string, string> Snapshot() => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(surface, null) ?? string.Empty));
+
+    using var timer = new System.Windows.Forms.Timer { Interval = 300 };
+    Dictionary<string, string>? before = null;
+    var ticks = 0;
+    timer.Tick += (_, _) =>
+    {
+        ++ticks;
+        if (ticks == 1)
+        {
+            surface.Update();
+            before = Snapshot();
+            var device = NativeSurfaceProbe.GetDC(window);
+            Require(device != 0, "fallback surface exposes a device context");
+            var brush = NativeSurfaceProbe.CreateSolidBrush(0x003322ccu);
+            var area = new NativeSurfaceProbe.NativeRect { Right = 96, Bottom = 48 };
+            Require(brush != 0 && NativeSurfaceProbe.FillRect(device, ref area, brush) != 0,
+                "unobservable raw GDI fill succeeds");
+            _ = NativeSurfaceProbe.DeleteObject(brush);
+            _ = NativeSurfaceProbe.ReleaseDC(window, device);
+            return;
+        }
+        var after = Snapshot();
+        Require(before is not null && after["state"] == "clean" &&
+            SurfaceMetric(after, "content") == SurfaceMetric(after, "captured") &&
+            SurfaceMetric(after, "drains-committed") -
+                SurfaceMetric(before, "drains-committed") == 1 &&
+            SurfaceMetric(after, "explicit") == 0,
+            "bounded hash fallback imports one otherwise unobservable raw GDI mutation");
+        timer.Stop();
+        form.Close();
+    };
+    timer.Start();
+    Application.Run(form);
+    Require(ticks == 2, "fallback probe crosses a bounded event-loop boundary");
+    surface.Dispose();
+    form.Dispose();
+    Console.WriteLine("native-surface-fallback=raw-gdi:true|bounded-probe:true|single-commit:true|disposed:true");
+    return 0;
+}
+
+static int RunPaintReentryHost()
+{
+    var form = new Form { Name = "paintReentryForm", Text = "Paint reentry", Size = new Size(240, 140) };
+    var probe = new ReentrantPaintProbe { Name = "paintReentryProbe", Bounds = new Rectangle(12, 12, 96, 48) };
+    form.Controls.Add(probe);
+    var before = 0;
+    form.Load += (_, _) =>
+    {
+        form.BeginInvoke((Action)(() =>
+        {
+            before = probe.Paints;
+            probe.RequestUpdateDuringNextPaint = true;
+            probe.Refresh();
+            Require(probe.Paints == before + 1 && probe.MaximumDepth == 1,
+                "Update during OnPaint defers without recursive application paint");
+            form.BeginInvoke((Action)(() =>
+            {
+                Require(probe.Paints == before + 2 && probe.MaximumDepth == 1,
+                    "one deferred managed-paint follow-up drains after callback return");
+                form.Close();
+            }));
+        }));
+    };
+    Application.Run(form);
+    Console.WriteLine("paint-reentry=recursive:false|follow-up:one|callback-boundary:true");
+    form.Dispose();
+    return 0;
+}
+
+static int RunManagedDoubleBufferHost()
+{
+    var form = new Form
+    {
+        Name = "managedDoubleBufferForm",
+        Text = "Managed double buffer",
+        Size = new Size(280, 170),
+    };
+    var probe = new ManagedDoubleBufferProbe
+    {
+        Name = "managedDoubleBufferProbe",
+        Bounds = new Rectangle(12, 12, 96, 48),
+        BackColor = Color.FromArgb(31, 48, 66),
+    };
+    probe.Buffered = true;
+    form.Controls.Add(probe);
+
+    var snapshotMethod = typeof(Control).GetMethod("__ManagedPaintSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed paint diagnostics are unavailable");
+    Dictionary<string, string> Snapshot() => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(probe, null) ?? string.Empty));
+
+    form.Load += (_, _) =>
+    {
+        form.BeginInvoke((Action)(() =>
+        {
+            var before = Snapshot();
+            Require(probe.Buffered && probe.OptimizedBuffering && probe.AllPainting,
+                "DoubleBuffered is readable and reflected in compatible style state");
+            Require(before["double-buffered"] == "1" && before["surface"] == "1" &&
+                before["size"] == "96x48",
+                "double-buffered owner paint owns one size-matched private surface");
+            var paints = probe.Paints;
+            for (var revision = 0; revision < 16; ++revision) probe.Invalidate();
+            Require(probe.Paints == paints,
+                "a mutation burst does not paint before its callback boundary");
+            form.BeginInvoke((Action)(() =>
+            {
+                var coalesced = Snapshot();
+                Require(probe.Paints == paints + 1 &&
+                    SurfaceMetric(coalesced, "allocations") == SurfaceMetric(before, "allocations") &&
+                    SurfaceMetric(coalesced, "reuses") > SurfaceMetric(before, "reuses") &&
+                    SurfaceMetric(coalesced, "queue-coalesced") -
+                        SurfaceMetric(before, "queue-coalesced") >= 15,
+                    "sixteen invalidations reuse one surface and drain as one paint");
+
+                var beforeResizePaints = probe.Paints;
+                var beforeResize = coalesced;
+                probe.ResizeDuringNextPaint = true;
+                probe.Refresh();
+                var stale = Snapshot();
+                Require(probe.Paints == beforeResizePaints + 1 &&
+                    probe.MaximumDepth == 1 && stale["state"] == "dirty_queued" &&
+                    SurfaceMetric(stale, "leases-abandoned") ==
+                        SurfaceMetric(beforeResize, "leases-abandoned") + 1 &&
+                    SurfaceMetric(stale, "epoch") > SurfaceMetric(beforeResize, "epoch"),
+                    "resize during owner paint abandons the stale epoch without recursion");
+
+                form.BeginInvoke((Action)(() =>
+                {
+                    var resized = Snapshot();
+                    Require(probe.Paints == beforeResizePaints + 2 &&
+                        resized["state"] == "clean" && resized["size"] == "128x64" &&
+                        SurfaceMetric(resized, "content") == SurfaceMetric(resized, "rendered") &&
+                        probe.Backgrounds == probe.Paints && probe.SharedGraphics,
+                        "one deferred pass paints background and foreground into the replacement surface");
+
+                    var allocations = SurfaceMetric(resized, "allocations");
+                    probe.Buffered = false;
+                    probe.Refresh();
+                    var unbuffered = Snapshot();
+                    Require(!probe.Buffered && !probe.OptimizedBuffering &&
+                        unbuffered["double-buffered"] == "0" &&
+                        unbuffered["surface"] == "0" &&
+                        SurfaceMetric(unbuffered, "allocations") == allocations + 1,
+                        "disabling the compatibility request retires persistence but keeps coherent ephemeral paint");
+                    var beforeFaultPaints = probe.Paints;
+                    var beforeFault = unbuffered;
+                    probe.ThrowDuringNextPaint = true;
+                    probe.Refresh();
+                    var faulted = Snapshot();
+                    Require(probe.Paints == beforeFaultPaints + 1 &&
+                        faulted["queued"] == "0" &&
+                        SurfaceMetric(faulted, "leases-abandoned") ==
+                            SurfaceMetric(beforeFault, "leases-abandoned") + 1,
+                        "a callback fault abandons its candidate without queuing a self-retry");
+                    form.BeginInvoke((Action)(() =>
+                    {
+                        var settledFault = Snapshot();
+                        Require(probe.Paints == beforeFaultPaints + 1 &&
+                            settledFault["queued"] == "0",
+                            "a callback fault remains quiescent until a real later touch");
+                        form.Close();
+                    }));
+                }));
+            }));
+        }));
+    };
+    Application.Run(form);
+    Require(Application.LastCallbackException is InvalidOperationException,
+        "the deliberate managed owner-paint failure is reported exactly once");
+    probe.Dispose();
+    form.Dispose();
+    Console.WriteLine("managed-double-buffer=reflected:true|phases:shared|surface:reused|burst:coalesced|resize:stale-abandoned|follow-up:one|disabled:ephemeral|fault:no-self-retry");
+    return 0;
+}
+
+static int RunManagedDamageHost()
+{
+    var form = new Form
+    {
+        Name = "managedDamageForm",
+        Text = "Managed damage",
+        Size = new Size(320, 190),
+    };
+    var parent = new ManagedDoubleBufferProbe
+    {
+        Name = "managedDamageParent",
+        Bounds = new Rectangle(12, 12, 96, 48),
+        BackColor = Color.FromArgb(31, 48, 66),
+    };
+    var child = new ManagedDoubleBufferProbe
+    {
+        Name = "managedDamageChild",
+        Bounds = new Rectangle(20, 10, 30, 20),
+        BackColor = Color.FromArgb(42, 62, 81),
+    };
+    parent.Buffered = true;
+    child.Buffered = true;
+    parent.Controls.Add(child);
+    form.Controls.Add(parent);
+
+    var parentEvents = new List<Rectangle>();
+    var childEvents = new List<Rectangle>();
+    parent.Invalidated += (_, e) => parentEvents.Add(e.InvalidRect);
+    child.Invalidated += (_, e) => childEvents.Add(e.InvalidRect);
+    var snapshotMethod = typeof(Control).GetMethod("__ManagedPaintSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed paint diagnostics are unavailable");
+    Dictionary<string, string> Snapshot(Control control) => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(control, null) ?? string.Empty));
+
+    form.Load += (_, _) =>
+    {
+        form.BeginInvoke((Action)(() =>
+        {
+            parent.Clips.Clear();
+            child.Clips.Clear();
+            parentEvents.Clear();
+            childEvents.Clear();
+            parent.InvalidatedHooks.Clear();
+            child.InvalidatedHooks.Clear();
+            var notifyPaints = parent.Paints;
+            var notifyRevision = SurfaceMetric(Snapshot(parent), "content");
+            parent.NotifyOnly(new Rectangle(1, 2, 3, 4));
+            Require(parentEvents.SequenceEqual(new[] { new Rectangle(1, 2, 3, 4) }) &&
+                parent.InvalidatedHooks.SequenceEqual(parentEvents) &&
+                parent.Paints == notifyPaints &&
+                SurfaceMetric(Snapshot(parent), "content") == notifyRevision,
+                "NotifyInvalidate raises the protected hook and public event without scheduling paint");
+            parentEvents.Clear();
+            parent.InvalidatedHooks.Clear();
+            var parentPaints = parent.Paints;
+            var before = Snapshot(parent);
+            parent.Invalidate(new Rectangle(5, 6, 10, 8));
+            parent.Invalidate(new Rectangle(12, 10, 10, 12));
+            var pending = Snapshot(parent);
+            Require(parent.Paints == parentPaints &&
+                parentEvents.SequenceEqual(new[]
+                {
+                    new Rectangle(5, 6, 10, 8),
+                    new Rectangle(12, 10, 10, 12),
+                }) &&
+                parent.InvalidatedHooks.SequenceEqual(parentEvents) &&
+                pending["damage"] == "5,6,17,16" &&
+                SurfaceMetric(pending, "partial-touches") ==
+                    SurfaceMetric(before, "partial-touches") + 2 &&
+                SurfaceMetric(pending, "damage-merges") ==
+                    SurfaceMetric(before, "damage-merges") + 1,
+                "rectangle invalidations publish synchronously and merge before paint");
+
+            form.BeginInvoke((Action)(() =>
+            {
+                var rendered = Snapshot(parent);
+                Require(parent.Paints == parentPaints + 1 &&
+                    parent.Clips.Last() == new Rectangle(5, 6, 17, 16) &&
+                    rendered["last-damage"] == "5,6,17,16" &&
+                    rendered["damage"] == "0,0,0,0",
+                    "one persistent owner-paint lease consumes the merged damage clip");
+
+                parentEvents.Clear();
+                parent.Clips.Clear();
+                using (var region = new Region(new Rectangle(30, 4, 12, 9)))
+                {
+                    Require(region.GetBounds(null!) == new RectangleF(30, 4, 12, 9),
+                        "GUI.Drawing Region bounds project through the native retained region");
+                    parent.Invalidate(region);
+                    parent.Update();
+                }
+                Require(parentEvents.SequenceEqual(new[] { new Rectangle(30, 4, 12, 9) }) &&
+                    parent.Clips.Last() == new Rectangle(30, 4, 12, 9),
+                    "region invalidation uses an outward bounded rectangle");
+
+                parentEvents.Clear();
+                childEvents.Clear();
+                parent.Clips.Clear();
+                child.Clips.Clear();
+                parent.Invalidate(new Rectangle(10, 5, 30, 20), true);
+                parent.Update();
+                child.Update();
+                Require(parentEvents.SequenceEqual(new[] { new Rectangle(10, 5, 30, 20) }) &&
+                    childEvents.SequenceEqual(new[] { new Rectangle(0, 0, 20, 15) }) &&
+                    parent.Clips.Last() == new Rectangle(10, 5, 30, 20) &&
+                    child.Clips.Last() == new Rectangle(0, 0, 20, 15),
+                    "child propagation intersects parent damage and translates to child coordinates");
+
+                parentEvents.Clear();
+                parent.Clips.Clear();
+                var beforeFault = Snapshot(parent);
+                parent.ThrowDuringNextPaint = true;
+                parent.Invalidate(new Rectangle(7, 8, 9, 10));
+                parent.Update();
+                var faulted = Snapshot(parent);
+                Require(faulted["damage"] == "7,8,9,10" && faulted["queued"] == "0" &&
+                    SurfaceMetric(faulted, "leases-abandoned") ==
+                        SurfaceMetric(beforeFault, "leases-abandoned") + 1,
+                    "a failed partial lease restores its consumed damage without self-retry");
+                parent.Invalidate(new Rectangle(20, 20, 2, 2));
+                parent.Update();
+                Require(parent.Clips.Last() == new Rectangle(7, 8, 15, 14),
+                    "the next real touch merges with damage restored from a failed lease");
+
+                parent.Buffered = false;
+                parent.Update();
+                parent.Clips.Clear();
+                parent.Invalidate(new Rectangle(4, 5, 6, 7));
+                parent.Update();
+                Require(parent.Clips.Last() == new Rectangle(0, 0, 96, 48),
+                    "ephemeral owner paint promotes partial damage to a coherent full surface");
+                form.Close();
+            }));
+        }));
+    };
+    Application.Run(form);
+    Require(Application.LastCallbackException is InvalidOperationException,
+        "the deliberate partial-paint fault is reported once");
+    child.Dispose();
+    parent.Dispose();
+    form.Dispose();
+    Console.WriteLine("managed-damage=rect:merged|notify:signal-only|event:clipped|region:bounded|children:translated|fault:restored|unbuffered:full");
+    return 0;
+}
+
+static int RunPaintInputDeferralHost()
+{
+    var form = new Form
+    {
+        Name = "paintInputDeferralForm",
+        Text = "Paint input deferral",
+        Size = new Size(300, 180),
+    };
+    var probe = new DeferredInputPaintProbe
+    {
+        Name = "paintInputDeferralProbe",
+        Bounds = new Rectangle(12, 12, 96, 48),
+    };
+    var disposedProbe = new DeferredInputPaintProbe
+    {
+        Name = "paintInputDisposedProbe",
+        Bounds = new Rectangle(12, 72, 96, 48),
+    };
+    probe.Buffered = true;
+    disposedProbe.Buffered = true;
+    form.Controls.Add(probe);
+    form.Controls.Add(disposedProbe);
+    var snapshotMethod = typeof(Control).GetMethod("__ManagedPaintSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed paint diagnostics are unavailable");
+    Dictionary<string, string> Snapshot(Control control) => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(control, null) ?? string.Empty));
+
+    form.Load += (_, _) =>
+    {
+        form.BeginInvoke((Action)(() =>
+        {
+            probe.InputEvents.Clear();
+            probe.Clips.Clear();
+            var paints = probe.Paints;
+            var before = Snapshot(probe);
+            probe.InjectInputDuringNextPaint = true;
+            probe.Refresh();
+            var deferred = Snapshot(probe);
+            Require(probe.Paints == paints + 1 && probe.MaximumDepth == 1 &&
+                probe.InputEvents.Count == 0 && deferred["input-pending"] == "2" &&
+                SurfaceMetric(deferred, "inputs-deferred") ==
+                    SurfaceMetric(before, "inputs-deferred") + 2 &&
+                SurfaceMetric(deferred, "inputs-drained") ==
+                    SurfaceMetric(before, "inputs-drained"),
+                "pointer and key ingress remain queued until the paint lease returns");
+
+            form.BeginInvoke((Action)(() =>
+            {
+                var drained = Snapshot(probe);
+                Require(probe.InputEvents.SequenceEqual(new[] { "pointer", "key" }) &&
+                    !probe.EventObservedDuringPaint && drained["input-pending"] == "0" &&
+                    SurfaceMetric(drained, "inputs-drained") ==
+                        SurfaceMetric(before, "inputs-drained") + 2 &&
+                    probe.Paints == paints + 2,
+                    "deferred input preserves order, runs outside application paint, and " +
+                    "flushes one ordinary invalidation after its callback boundary");
+
+                var disposedBefore = Snapshot(disposedProbe);
+                disposedProbe.InjectInputDuringNextPaint = true;
+                disposedProbe.DisposeDuringNextPaint = true;
+                disposedProbe.Refresh();
+                var disposed = Snapshot(disposedProbe);
+                Require(disposedProbe.InputEvents.Count == 0 && disposed["input-pending"] == "0" &&
+                    SurfaceMetric(disposed, "inputs-abandoned") ==
+                        SurfaceMetric(disposedBefore, "inputs-abandoned") + 2,
+                    "disposing a paint owner abandons queued input without callbacks");
+
+                form.BeginInvoke((Action)(() =>
+                {
+                    var followed = Snapshot(probe);
+                    Require(probe.Paints == paints + 2 && probe.MaximumDepth == 1 &&
+                        probe.Clips.Last() == new Rectangle(2, 2, 4, 4) &&
+                        followed["input-pending"] == "0",
+                        "input mutation schedules one ordinary post-input paint without reentry");
+                    form.Close();
+                }));
+            }));
+        }));
+    };
+    Application.Run(form);
+    Require(Application.LastCallbackException is null,
+        "paint input deferral completes without callback failure");
+    probe.Dispose();
+    form.Dispose();
+    Console.WriteLine("paint-input-deferral=order:pointer>key|during-paint:false|follow-up:one|disposed:abandoned|queue:zero");
+    return 0;
+}
+
+static Dictionary<string, string> ParseSurfaceSnapshot(string snapshot)
+{
+    var result = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var field in snapshot.Split('|', StringSplitOptions.RemoveEmptyEntries))
+    {
+        var separator = field.IndexOf(':');
+        if (separator > 0) result[field[..separator]] = field[(separator + 1)..];
+    }
+    return result;
+}
+
+static long SurfaceMetric(Dictionary<string, string> snapshot, string key) =>
+    long.Parse(snapshot[key], global::System.Globalization.CultureInfo.InvariantCulture);
 
 static void Require(bool condition, string name)
 {
@@ -1928,6 +2515,167 @@ sealed class PaintInputProbe : Control
         ++MouseUps;
         LastPoint = new Point(e.X, e.Y);
         base.OnMouseUp(e);
+    }
+}
+
+sealed class ReentrantPaintProbe : Control
+{
+    internal int Paints { get; private set; }
+    internal int MaximumDepth { get; private set; }
+    internal bool RequestUpdateDuringNextPaint { get; set; }
+    private int depth;
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        ++depth;
+        MaximumDepth = Math.Max(MaximumDepth, depth);
+        ++Paints;
+        try
+        {
+            if (RequestUpdateDuringNextPaint)
+            {
+                RequestUpdateDuringNextPaint = false;
+                Update();
+            }
+            base.OnPaint(e);
+        }
+        finally { --depth; }
+    }
+}
+
+sealed class ManagedDoubleBufferProbe : Control
+{
+    internal bool Buffered { get => DoubleBuffered; set => DoubleBuffered = value; }
+    internal bool OptimizedBuffering => GetStyle(ControlStyles.OptimizedDoubleBuffer);
+    internal bool AllPainting => GetStyle(ControlStyles.AllPaintingInWmPaint);
+    internal int Paints { get; private set; }
+    internal int Backgrounds { get; private set; }
+    internal int MaximumDepth { get; private set; }
+    internal bool SharedGraphics { get; private set; } = true;
+    internal bool ResizeDuringNextPaint { get; set; }
+    internal bool ThrowDuringNextPaint { get; set; }
+    internal List<Rectangle> Clips { get; } = new();
+    internal List<Rectangle> InvalidatedHooks { get; } = new();
+    internal void NotifyOnly(Rectangle damage) => NotifyInvalidate(damage);
+    private Graphics? backgroundGraphics;
+    private int depth;
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        ++Backgrounds;
+        backgroundGraphics = e.Graphics;
+        base.OnPaintBackground(e);
+    }
+
+    protected override void OnInvalidated(InvalidateEventArgs e)
+    {
+        InvalidatedHooks.Add(e.InvalidRect);
+        base.OnInvalidated(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        ++depth;
+        MaximumDepth = Math.Max(MaximumDepth, depth);
+        ++Paints;
+        Clips.Add(e.ClipRectangle);
+        SharedGraphics &= ReferenceEquals(backgroundGraphics, e.Graphics);
+        try
+        {
+            using var brush = new SolidBrush(Color.FromArgb(80, 162, 220));
+            e.Graphics.FillRectangle(brush, 4, 4,
+                Math.Max(1, Width - 8), Math.Max(1, Height - 8));
+            if (ResizeDuringNextPaint)
+            {
+                ResizeDuringNextPaint = false;
+                Size = new Size(128, 64);
+            }
+            if (ThrowDuringNextPaint)
+            {
+                ThrowDuringNextPaint = false;
+                throw new InvalidOperationException("managed owner-paint fault probe");
+            }
+            base.OnPaint(e);
+        }
+        finally { --depth; }
+    }
+}
+
+sealed class DeferredInputPaintProbe : Control
+{
+    private static readonly global::System.Reflection.MethodInfo InjectPointer =
+        typeof(Control).GetMethod("__InjectManagedPointer",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed pointer injection is unavailable");
+    private static readonly global::System.Reflection.MethodInfo InjectKey =
+        typeof(Control).GetMethod("__InjectManagedKey",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed key injection is unavailable");
+    private int depth;
+
+    internal bool Buffered { get => DoubleBuffered; set => DoubleBuffered = value; }
+    internal bool InjectInputDuringNextPaint { get; set; }
+    internal bool DisposeDuringNextPaint { get; set; }
+    internal bool EventObservedDuringPaint { get; private set; }
+    internal int Paints { get; private set; }
+    internal int MaximumDepth { get; private set; }
+    internal List<string> InputEvents { get; } = new();
+    internal List<Rectangle> Clips { get; } = new();
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        ++depth;
+        MaximumDepth = Math.Max(MaximumDepth, depth);
+        ++Paints;
+        Clips.Add(e.ClipRectangle);
+        try
+        {
+            if (InjectInputDuringNextPaint)
+            {
+                InjectInputDuringNextPaint = false;
+                _ = InjectPointer.Invoke(this, new object[] { 6u, 8d, 9d, 0d, 1u });
+                _ = InjectKey.Invoke(this, new object[] { 0x04u, true, 0u, false });
+                if (DisposeDuringNextPaint)
+                {
+                    DisposeDuringNextPaint = false;
+                    Dispose();
+                }
+            }
+            base.OnPaint(e);
+        }
+        finally { --depth; }
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        EventObservedDuringPaint |= depth != 0;
+        InputEvents.Add("pointer");
+        Invalidate(new Rectangle(2, 2, 4, 4));
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        EventObservedDuringPaint |= depth != 0;
+        InputEvents.Add("key");
+        base.OnKeyDown(e);
+    }
+}
+
+sealed class GeometryPanel : Panel
+{
+    internal void SetMode(AutoSizeMode mode) => SetAutoSizeMode(mode);
+    internal void MakeTransparent()
+    {
+        SetStyle(ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+    internal void MakeOpaque()
+    {
+        BackColor = Color.White;
+        SetStyle(ControlStyles.SupportsTransparentBackColor, false);
     }
 }
 

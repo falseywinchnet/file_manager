@@ -179,11 +179,22 @@ private:
 TextBox::TextBox(StableId stable_id, std::string text)
     : Panel(std::move(stable_id)), store_(text) {
     set_paint_plane(PaintPlane::control);
-    set_background(style().paper);
     set_border_style(BorderStyle::sunken);
     set_focusable(true);
     set_cursor(CursorKind::text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
+    define_bindable_property({
+        "Text", BindingValueKind::text,
+        [this] { return BindingValue{std::string(store_.utf8())}; },
+        [this](const BindingValue& value) {
+            const auto converted = convert_binding_value(value, BindingValueKind::text);
+            if (!converted) throw std::invalid_argument("TextBox.Text binding requires text");
+            set_text(std::get<std::string>(*converted));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return text_changed_.subscribe(owner,
+                [changed = std::move(changed)](const std::string&) { changed(); });
+        }});
 }
 
 void TextBox::set_text(std::string text) {
@@ -523,8 +534,16 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
 }
 
 void TextBox::on_paint(Painter& painter, Rect damage) {
-    Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const ControlVisualRecipe& editor_recipe = effective_theme().resolve(
+        ControlVisualRole::editor,
+        visual_context(false, false, false, focused_));
+    if (themed) {
+        paint_surface_material(painter, bounds, editor_recipe.material);
+    } else {
+        Panel::on_paint(painter, damage);
+    }
     const FontSpec font = effective_font(font_);
     const double right = std::max(text_left_, bounds.width - 4.0);
     const double viewport = std::max(0.0, right - text_left_);
@@ -565,37 +584,61 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     painter.clip_rect({text_left_, 2.0, viewport,
                        std::max(0.0, bounds.height - 4.0)});
     if (focused_ && !selection_.empty()) {
-        painter.fill_rect({selection_x, 3.0,
-                           std::max(0.0, selection_end_x - selection_x),
-                           std::max(0.0, bounds.height - 6.0)}, style().accent);
+        const Rect selection_bounds{
+            selection_x, 3.0,
+            std::max(0.0, selection_end_x - selection_x),
+            std::max(0.0, bounds.height - 6.0)};
+        if (themed) {
+            paint_surface_material(
+                painter, selection_bounds,
+                effective_theme().resolve(
+                    ControlVisualRole::selection,
+                    visual_context(false, false, true, true)).material);
+        } else {
+            painter.fill_rect(selection_bounds, style().accent);
+        }
     }
     if (!store_.utf8().empty()) {
-        painter.draw_text_utf8({origin_x, baseline}, presented, font,
-                               enabled() ? style().text : style().disabled_text);
+        painter.draw_text_utf8(
+            {origin_x, baseline}, presented, font,
+            themed ? editor_recipe.text
+                   : enabled() ? style().text : style().disabled_text);
         if (focused_ && !selection_.empty()) {
             painter.save();
             painter.clip_rect({selection_x, 3.0,
                                std::max(0.0, selection_end_x - selection_x),
                                std::max(0.0, bounds.height - 6.0)});
+            const Color selected_text = themed
+                ? effective_theme().resolve(
+                      ControlVisualRole::selection,
+                      visual_context(false, false, true, true)).text
+                : style().highlight;
             painter.draw_text_utf8({origin_x, baseline}, presented, font,
-                                   style().highlight);
+                                   selected_text);
             painter.restore();
         }
     } else if (!placeholder_.empty()) {
-        painter.draw_text_utf8({text_left_, baseline}, placeholder_, font,
-                               style().disabled_text);
+        painter.draw_text_utf8(
+            {text_left_, baseline}, placeholder_, font,
+            themed ? editor_recipe.muted_text : style().disabled_text);
     }
     if (focused_ && caret_visible_ && selection_.empty()) {
         const double caret_x = origin_x + caret_content_x;
         painter.draw_line({caret_x, 4.0},
                           {caret_x, std::max(4.0, bounds.height - 4.0)},
-                          style().text, 1.0);
+                          themed ? editor_recipe.text : style().text, 1.0);
     }
     painter.restore();
     if (focused_) {
-        painter.stroke_rect({1.5, 1.5, std::max(0.0, bounds.width - 3.0),
-                             std::max(0.0, bounds.height - 3.0)},
-                            style().accent, 1.0);
+        const Rect ring{1.5, 1.5, std::max(0.0, bounds.width - 3.0),
+                        std::max(0.0, bounds.height - 3.0)};
+        if (themed) {
+            painter.stroke_rounded_rect(
+                ring, std::max(0.0, editor_recipe.material.corner_radius - 1.0),
+                editor_recipe.focus_ring, editor_recipe.focus_width);
+        } else {
+            painter.stroke_rect(ring, style().accent, 1.0);
+        }
     }
 }
 
@@ -826,7 +869,6 @@ void TextBox::on_detached_from_window() noexcept {
 
 ListBox::ListBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_paint_plane(PaintPlane::control);
-    set_background(style().paper);
     set_border_style(BorderStyle::sunken);
     set_focusable(true);
 }
@@ -1067,8 +1109,16 @@ std::optional<std::size_t> ListBox::index_at(Point absolute) const noexcept {
 }
 
 void ListBox::on_paint(Painter& painter, Rect damage) {
-    Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const ControlVisualRecipe& editor_recipe = effective_theme().resolve(
+        ControlVisualRole::editor,
+        visual_context(false, false, false, focused_));
+    if (themed) {
+        paint_surface_material(painter, bounds, editor_recipe.material);
+    } else {
+        Panel::on_paint(painter, damage);
+    }
     const FontSpec font = effective_font(font_);
     const double row_height = item_height_ * effective_text_scale();
     painter.save();
@@ -1080,25 +1130,37 @@ void ListBox::on_paint(Painter& painter, Rect damage) {
         const double y = 2.0 + static_cast<double>(index - top_index_) * row_height;
         const bool selected = std::binary_search(selected_.begin(), selected_.end(), index);
         const bool hovered = hovered_index_ == index;
-        if (selected) {
-            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
-                              focused_ ? style().accent : style().accent_light);
-        } else if (hovered) {
-            painter.fill_rect({2.0, y, std::max(0.0, bounds.width - 4.0), row_height},
-                              style().face_light);
-        }
         const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
+        const ControlVisualRecipe& row_recipe = effective_theme().resolve(
+            ControlVisualRole::selection,
+            visual_context(hovered, false, selected, focused_));
+        if (themed && (selected || hovered)) {
+            paint_surface_material(painter, row, row_recipe.material);
+        } else if (selected) {
+            painter.fill_rect(row, focused_ ? style().accent
+                                            : style().accent_light);
+        } else if (hovered) {
+            painter.fill_rect(row, style().face_light);
+        }
         paint_row_adornment(painter, index, row, selected, focused_);
         painter.draw_text_utf8({row_text_left(),
                                 y + std::max(font.size,
                                              row_height * 0.5 + 4.0)},
-                               items_[index], font, selected && focused_
-                                   ? style().highlight
-                                   : enabled() ? style().text : style().disabled_text);
+                               items_[index], font,
+                               themed ? (selected || hovered
+                                             ? row_recipe.text
+                                             : editor_recipe.text)
+                                      : selected && focused_
+                                            ? style().highlight
+                                            : enabled() ? style().text
+                                                        : style().disabled_text);
         if (focused_ && active_index_ == index) {
             painter.stroke_rect({3.5, y + 1.5, std::max(0.0, bounds.width - 7.0),
                                  std::max(0.0, row_height - 3.0)},
-                                selected ? style().highlight : style().accent, 1.0);
+                                themed ? row_recipe.focus_ring
+                                       : selected ? style().highlight
+                                                  : style().accent,
+                                themed ? row_recipe.focus_width : 1.0);
         }
     }
     painter.restore();
@@ -1481,10 +1543,60 @@ bool CheckedListBox::on_semantic_child_action(std::string_view stable_id,
 
 ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_paint_plane(PaintPlane::control);
-    set_background(style().paper);
     set_border_style(BorderStyle::sunken);
     set_focusable(true);
     set_cursor(CursorKind::hand);
+    define_bindable_property({
+        "SelectedIndex", BindingValueKind::signed_integer,
+        [this] {
+            return BindingValue{selected_index_
+                ? static_cast<std::int64_t>(*selected_index_)
+                : std::int64_t{-1}};
+        },
+        [this](const BindingValue& value) {
+            const auto converted = convert_binding_value(
+                value, BindingValueKind::signed_integer);
+            if (!converted) {
+                throw std::invalid_argument(
+                    "ComboBox.SelectedIndex binding requires an integer");
+            }
+            const std::int64_t index = std::get<std::int64_t>(*converted);
+            if (index == -1) {
+                set_selected_index(std::nullopt);
+                return;
+            }
+            if (index < 0) {
+                throw std::out_of_range(
+                    "ComboBox.SelectedIndex binding must be -1 or non-negative");
+            }
+            set_selected_index(static_cast<std::size_t>(index));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return selected_index_changed_.subscribe(owner,
+                [changed = std::move(changed)](
+                    std::optional<std::size_t>) { changed(); });
+        }});
+    define_bindable_property({
+        "Text", BindingValueKind::text,
+        [this] { return BindingValue{std::string(selected_text())}; },
+        [this](const BindingValue& value) {
+            const auto converted = convert_binding_value(
+                value, BindingValueKind::text);
+            if (!converted) {
+                throw std::invalid_argument("ComboBox.Text binding requires text");
+            }
+            const std::string& text = std::get<std::string>(*converted);
+            const auto found = std::find(items_.begin(), items_.end(), text);
+            set_selected_index(found == items_.end()
+                ? std::optional<std::size_t>{}
+                : std::optional<std::size_t>{static_cast<std::size_t>(
+                      std::distance(items_.begin(), found))});
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return selected_index_changed_.subscribe(owner,
+                [changed = std::move(changed)](
+                    std::optional<std::size_t>) { changed(); });
+        }});
 }
 
 void ComboBox::set_items(std::vector<std::string> items) {
@@ -1676,23 +1788,45 @@ void ComboBox::commit_popup_selection(std::size_t index) {
 }
 
 void ComboBox::on_paint(Painter& painter, Rect damage) {
-    Panel::on_paint(painter, damage);
     const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const ControlVisualRecipe& editor_recipe = effective_theme().resolve(
+        ControlVisualRole::editor,
+        visual_context(false, dropped_down_, false, focused_));
+    if (themed) {
+        paint_surface_material(painter, bounds, editor_recipe.material);
+    } else {
+        Panel::on_paint(painter, damage);
+    }
     const FontSpec font = effective_font(font_);
     const double button_width = std::min(24.0, bounds.width);
-    painter.fill_rect({std::max(0.0, bounds.width - button_width), 1.0,
-                       std::max(0.0, button_width - 1.0),
-                       std::max(0.0, bounds.height - 2.0)}, style().face);
+    const Rect button_bounds{std::max(0.0, bounds.width - button_width), 1.0,
+                             std::max(0.0, button_width - 1.0),
+                             std::max(0.0, bounds.height - 2.0)};
+    const ControlVisualRecipe& button_recipe = effective_theme().resolve(
+        ControlVisualRole::choice,
+        visual_context(false, dropped_down_, dropped_down_, focused_));
+    if (themed) {
+        paint_surface_material(painter, button_bounds, button_recipe.material);
+    } else {
+        painter.fill_rect(button_bounds, style().face);
+    }
     painter.draw_line({bounds.width - button_width, 1.0},
                       {bounds.width - button_width, bounds.height - 1.0},
-                      style().border, 1.0);
+                      themed ? (button_recipe.material.border
+                                    ? button_recipe.material.border->color
+                                    : button_recipe.glyph)
+                             : style().border,
+                      1.0);
     const double center_x = bounds.width - button_width * 0.5;
     const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
     const double direction = dropped_down_ ? -1.0 : 1.0;
     painter.draw_line({center_x - 4.0, center_y - direction * 2.0},
-                      {center_x, center_y + direction * 2.0}, style().dark_border, 1.0);
+                      {center_x, center_y + direction * 2.0},
+                      themed ? button_recipe.glyph : style().dark_border, 1.0);
     painter.draw_line({center_x, center_y + direction * 2.0},
-                      {center_x + 4.0, center_y - direction * 2.0}, style().dark_border, 1.0);
+                      {center_x + 4.0, center_y - direction * 2.0},
+                      themed ? button_recipe.glyph : style().dark_border, 1.0);
     const std::string_view text = selected_index_ ? selected_text()
                                                   : std::string_view(placeholder_);
     painter.save();
@@ -1701,13 +1835,22 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
                        std::max(0.0, bounds.height - 4.0)});
     painter.draw_text_utf8({7.0, std::max(font.size,
                             (bounds.height + font.size) * 0.5 - 1.0)},
-                           text, font, selected_index_ ? style().text
-                                                       : style().disabled_text);
+                           text, font,
+                           themed ? (selected_index_ ? editor_recipe.text
+                                                     : editor_recipe.muted_text)
+                                  : selected_index_ ? style().text
+                                                    : style().disabled_text);
     painter.restore();
     if (focused_ || dropped_down_) {
-        painter.stroke_rect({1.5, 1.5, std::max(0.0, bounds.width - 3.0),
-                             std::max(0.0, bounds.height - 3.0)},
-                            style().accent, 1.0);
+        const Rect ring{1.5, 1.5, std::max(0.0, bounds.width - 3.0),
+                        std::max(0.0, bounds.height - 3.0)};
+        if (themed) {
+            painter.stroke_rounded_rect(
+                ring, std::max(0.0, editor_recipe.material.corner_radius - 1.0),
+                editor_recipe.focus_ring, editor_recipe.focus_width);
+        } else {
+            painter.stroke_rect(ring, style().accent, 1.0);
+        }
     }
 }
 
@@ -1798,6 +1941,22 @@ void ComboBox::on_detached_from_window() noexcept {
 NumericUpDown::NumericUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
     set_border_style(BorderStyle::line);
     set_background(style().paper);
+    define_bindable_property({
+        "Value", BindingValueKind::number,
+        [this] { return BindingValue{value_}; },
+        [this](const BindingValue& value) {
+            const auto converted = convert_binding_value(
+                value, BindingValueKind::number);
+            if (!converted) {
+                throw std::invalid_argument(
+                    "NumericUpDown.Value binding requires a number");
+            }
+            set_value(std::get<double>(*converted));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return value_changed_.subscribe(owner,
+                [changed = std::move(changed)](double) { changed(); });
+        }});
 }
 
 void NumericUpDown::initialize_control_tree() {

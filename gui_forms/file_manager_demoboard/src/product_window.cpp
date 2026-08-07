@@ -54,6 +54,12 @@ struct ProductRefs final {
     Control::Ptr search_surface;
     std::shared_ptr<CorrespondenceView> search_results;
     Control::Ptr criteria_surface;
+    Control::Ptr palette_surface;
+    std::vector<std::shared_ptr<Card>> palette_cards;
+    std::shared_ptr<MasterDetailView> dna_surface;
+    std::vector<std::shared_ptr<Card>> dna_decisions;
+    std::shared_ptr<Label> dna_heading;
+    std::shared_ptr<ReviewCard> dna_verdict_card;
     std::shared_ptr<Label> criteria_title;
     std::shared_ptr<InstrumentRack> criteria_rack;
     std::shared_ptr<ObjectView> criteria_objects;
@@ -91,6 +97,7 @@ struct ProductLifetime final {
     std::shared_ptr<PathMatrixController> path_matrix;
     std::shared_ptr<SearchController> search_controller;
     std::shared_ptr<CriteriaController> criteria_controller;
+    std::function<bool(std::string)> review_surface_selector;
 };
 
 BasicControlStyle house_style() {
@@ -127,15 +134,6 @@ std::shared_ptr<Button> button(std::string id, std::string text, Rect bounds,
     return result;
 }
 
-Color mix(Color a, Color b, double t) {
-    const auto channel = [t](std::uint8_t x, std::uint8_t y) {
-        return static_cast<std::uint8_t>(std::lround(
-            static_cast<double>(x) + (static_cast<double>(y) - x) * t));
-    };
-    return Color::rgba(channel(a.red, b.red), channel(a.green, b.green),
-                       channel(a.blue, b.blue), channel(a.alpha, b.alpha));
-}
-
 std::shared_ptr<DrawingSurface> material(std::string id,
                                          DrawingSurface::PaintCallback paint) {
     auto result = std::make_shared<DrawingSurface>(StableId(std::move(id)));
@@ -149,19 +147,37 @@ std::shared_ptr<ScaledPanel> make_title(ProductRefs& refs) {
     auto panel = std::make_shared<ScaledPanel>(StableId("fm.title.identity"),
                                                Size{1450.0, 40.0});
     panel->set_background(Color::rgba(23, 52, 127));
-    auto fresco = material("fm.title.material", [](Painter& painter, Rect bounds, Rect) {
-        constexpr Color start = Color::rgba(23, 52, 127);
-        constexpr Color middle = Color::rgba(58, 104, 203);
-        constexpr Color end = Color::rgba(217, 104, 114);
-        const int strips = std::max(1, static_cast<int>(std::ceil(bounds.width / 8.0)));
-        for (int index = 0; index < strips; ++index) {
-            const double x = bounds.width * index / strips;
-            const double next = bounds.width * (index + 1) / strips;
-            const double t = (index + 0.5) / strips;
-            const Color color = t < 0.62 ? mix(start, middle, t / 0.62)
-                                         : mix(middle, end, (t - 0.62) / 0.38);
-            painter.fill_rect({x, 0.0, next - x + 0.5, bounds.height}, color);
-        }
+    auto fresco = std::make_shared<MaterialPanel>(StableId("fm.title.material"));
+    SurfaceMaterial title_material;
+    title_material.fills = {
+        MaterialFillLayer::linear(
+            {0.0, 0.0}, {1.0, 0.0},
+            {{0.0, Color::rgba(23, 52, 127)},
+             {0.62, Color::rgba(58, 104, 203)},
+             {1.0, Color::rgba(217, 104, 114)}}),
+        MaterialFillLayer::repeating_linear(
+            {0.0, 0.0}, {9.0, 9.0},
+            {{0.0, Color::rgba(255, 255, 255, 0)},
+             {0.43, Color::rgba(255, 255, 255, 0)},
+             {0.44, Color::rgba(255, 255, 255, 22)},
+             {0.56, Color::rgba(255, 255, 255, 22)},
+             {0.57, Color::rgba(255, 255, 255, 0)},
+             {1.0, Color::rgba(255, 255, 255, 0)}}),
+        MaterialFillLayer::radial(
+            {0.08, 0.0}, {0.28, 1.1},
+            {{0.0, Color::rgba(146, 217, 255, 145)},
+             {1.0, Color::rgba(146, 217, 255, 0)}}),
+        MaterialFillLayer::radial(
+            {0.58, 1.15}, {0.34, 0.9},
+            {{0.0, Color::rgba(186, 139, 255, 96)},
+             {1.0, Color::rgba(186, 139, 255, 0)}}),
+        MaterialFillLayer::radial(
+            {0.94, 1.05}, {0.22, 0.82},
+            {{0.0, Color::rgba(255, 185, 144, 110)},
+             {1.0, Color::rgba(255, 185, 144, 0)}})};
+    fresco->set_material(std::move(title_material));
+    panel->add_at(fresco, {0.0, 0.0, 1450.0, 40.0});
+    auto keylines = material("fm.title.keylines", [](Painter& painter, Rect bounds, Rect) {
         painter.fill_rect({0.0, 0.0, bounds.width * 0.24, 2.0},
                           Color::rgba(146, 217, 255, 150));
         painter.fill_rect({0.0, bounds.height - 2.0, bounds.width, 1.0},
@@ -169,7 +185,7 @@ std::shared_ptr<ScaledPanel> make_title(ProductRefs& refs) {
         painter.fill_rect({0.0, bounds.height - 1.0, bounds.width, 1.0},
                           Color::rgba(23, 45, 105));
     });
-    panel->add_at(fresco, {0.0, 0.0, 1450.0, 40.0});
+    panel->add_at(keylines, {0.0, 0.0, 1450.0, 40.0});
     auto mark = material("fm.title.icon", [](Painter& painter, Rect bounds, Rect) {
         painter.fill_rect({2.0, 2.0, bounds.width - 4.0, bounds.height - 4.0},
                           Color::rgba(239, 248, 255, 220));
@@ -203,14 +219,22 @@ std::shared_ptr<ScaledPanel> make_ribbon(ProductRefs& refs) {
     auto panel = std::make_shared<ScaledPanel>(StableId("fm.ribbon.shelf"),
                                                Size{1450.0, 66.0});
     panel->set_background(Color::rgba(231, 237, 246));
-    auto pearl = material("fm.ribbon.material", [](Painter& painter, Rect b, Rect) {
-        painter.fill_rect(b, Color::rgba(231, 237, 246));
-        painter.fill_rect({0.0, 0.0, b.width, 19.0}, Color::rgba(250, 253, 255));
+    auto pearl = std::make_shared<MaterialPanel>(StableId("fm.ribbon.material"));
+    SurfaceMaterial ribbon_material;
+    ribbon_material.fills = {MaterialFillLayer::linear(
+        {0.0, 0.0}, {0.0, 1.0},
+        {{0.0, Color::rgba(250, 253, 255)},
+         {0.29, Color::rgba(250, 253, 255)},
+         {0.64, Color::rgba(237, 243, 249)},
+         {1.0, Color::rgba(213, 225, 235)}})};
+    pearl->set_material(std::move(ribbon_material));
+    panel->add_at(pearl, {0.0, 0.0, 1450.0, 66.0});
+    auto ribbon_lines = material("fm.ribbon.keylines", [](Painter& painter, Rect b, Rect) {
         painter.fill_rect({0.0, 0.0, b.width, 2.0}, Color::rgba(146, 217, 255));
         painter.draw_line({0.0, b.height - 1.0}, {b.width, b.height - 1.0},
                           Color::rgba(119, 140, 171), 1.0);
     });
-    panel->add_at(pearl, {0.0, 0.0, 1450.0, 66.0});
+    panel->add_at(ribbon_lines, {0.0, 0.0, 1450.0, 66.0});
     refs.ribbon_move_copy = button("fm.ribbon.move_copy", "Move / copy", {10, 6, 96, 42}, ButtonVisualStyle::command);
     panel->add_at(refs.ribbon_move_copy, {10, 6, 96, 42});
     refs.ribbon_delete = button("fm.ribbon.delete", "Delete", {110, 6, 72, 42}, ButtonVisualStyle::command);
@@ -572,6 +596,205 @@ std::shared_ptr<CriteriaSurfacePanel> make_criteria_surface(ProductRefs& refs) {
     return surface;
 }
 
+std::shared_ptr<FlowLayoutPanel> make_palette_surface(ProductRefs& refs) {
+    struct PaletteSpec final {
+        const char* id;
+        const char* name;
+        Color first;
+        Color second;
+        Color accent;
+    };
+    static constexpr PaletteSpec palettes[] = {
+        {"cobalt", "Cobalt", Color::rgba(26, 61, 139), Color::rgba(75, 126, 220), Color::rgba(148, 214, 255)},
+        {"amethyst", "Amethyst", Color::rgba(77, 48, 132), Color::rgba(154, 99, 204), Color::rgba(231, 181, 255)},
+        {"miami", "Miami", Color::rgba(23, 127, 168), Color::rgba(227, 92, 142), Color::rgba(255, 196, 113)},
+        {"orchid", "Orchid", Color::rgba(94, 51, 128), Color::rgba(207, 109, 172), Color::rgba(255, 202, 229)},
+        {"aqua", "Aqua", Color::rgba(19, 104, 126), Color::rgba(70, 188, 203), Color::rgba(189, 246, 244)},
+        {"apricot", "Apricot", Color::rgba(145, 75, 50), Color::rgba(238, 143, 94), Color::rgba(255, 219, 166)},
+        {"mulberry", "Mulberry", Color::rgba(89, 31, 70), Color::rgba(169, 71, 124), Color::rgba(238, 165, 206)},
+        {"viridian", "Viridian", Color::rgba(21, 93, 82), Color::rgba(61, 160, 128), Color::rgba(169, 229, 194)},
+        {"sapphire", "Sapphire", Color::rgba(23, 52, 127), Color::rgba(58, 104, 203), Color::rgba(217, 104, 114)},
+        {"rose", "Rose", Color::rgba(132, 50, 75), Color::rgba(220, 104, 133), Color::rgba(255, 196, 199)},
+        {"iris", "Iris", Color::rgba(55, 55, 135), Color::rgba(121, 102, 215), Color::rgba(201, 188, 255)},
+        {"phosphor", "Phosphor", Color::rgba(25, 64, 48), Color::rgba(64, 166, 102), Color::rgba(191, 244, 115)},
+    };
+    auto surface = std::make_shared<FlowLayoutPanel>(
+        StableId("fm.review.palettes"));
+    surface->set_padding({14.0, 14.0, 14.0, 14.0});
+    surface->set_wrap_contents(true);
+    surface->set_visible(false);
+    surface->set_accessible_name("Atmosphere palette review");
+    for (std::size_t index = 0; index < std::size(palettes); ++index) {
+        const PaletteSpec& spec = palettes[index];
+        auto card = std::make_shared<Card>(
+            StableId(std::string("fm.palette.") + spec.id));
+        card->set_requested_bounds({0.0, 0.0, 220.0, 142.0});
+        card->set_margin({7.0, 7.0, 7.0, 7.0});
+        card->set_interactive(true);
+        card->set_selected(index == 8U);
+        card->set_accessible_name(std::string(spec.name) + " atmosphere");
+        CardLayout card_layout;
+        card_layout.padding = {10.0, 8.0, 10.0, 8.0};
+        card_layout.section_gap = 6.0;
+        card_layout.header_extent = 24.0;
+        card_layout.footer_extent = 18.0;
+        card->set_card_layout(card_layout);
+        auto heading = label(std::string("fm.palette.") + spec.id + ".title",
+                             spec.name, {},
+                             {FontRole::control, 11.0, 700, false, 0.22});
+        static_cast<void>(card->set_header(heading));
+        auto swatch = std::make_shared<MaterialPanel>(
+            StableId(std::string("fm.palette.") + spec.id + ".swatch"));
+        SurfaceMaterial material_recipe;
+        material_recipe.fills = {
+            MaterialFillLayer::linear(
+                {0.0, 0.0}, {1.0, 1.0},
+                {{0.0, spec.first}, {0.68, spec.second}, {1.0, spec.accent}}),
+            MaterialFillLayer::radial(
+                {0.18, 0.0}, {0.42, 0.95},
+                {{0.0, Color::rgba(255, 255, 255, 115)},
+                 {1.0, Color::rgba(255, 255, 255, 0)}})};
+        material_recipe.corner_radius = 4.0;
+        material_recipe.border = MaterialBorder{Color::rgba(56, 72, 92), 1.0};
+        swatch->set_material(std::move(material_recipe));
+        static_cast<void>(card->set_body(swatch));
+        auto footer = label(std::string("fm.palette.") + spec.id + ".state",
+                            index == 8U ? "CURRENT · HOUSE" : "AVAILABLE",
+                            {}, {FontRole::content, 8.5, 600, false, 0.28});
+        footer->set_foreground(muted);
+        static_cast<void>(card->set_footer(footer));
+        surface->add_child(card);
+        refs.palette_cards.push_back(card);
+    }
+    refs.palette_surface = surface;
+    return surface;
+}
+
+std::shared_ptr<ReviewCard> review_card(
+    std::string id, std::string title, std::string body, std::string footer,
+    double height,
+    ReviewDisposition disposition = ReviewDisposition::neutral) {
+    auto card = std::make_shared<ReviewCard>(StableId(std::move(id)));
+    card->set_requested_bounds({0.0, 0.0, 720.0, height});
+    CardLayout layout;
+    layout.padding = {14.0, 10.0, 14.0, 10.0};
+    layout.section_gap = 7.0;
+    layout.header_extent = 28.0;
+    layout.footer_extent = 22.0;
+    card->set_card_layout(layout);
+    card->set_record({std::string(card->stable_id().value()), std::move(title),
+                      std::move(body), std::move(footer), disposition});
+    return card;
+}
+
+std::shared_ptr<MasterDetailView> make_dna_surface(ProductRefs& refs) {
+    struct DecisionSpec final {
+        const char* id;
+        const char* title;
+        const char* summary;
+        const char* state;
+    };
+    static constexpr DecisionSpec decisions[]{
+        {"surface", "Retained surface pipeline",
+         "Imperative authoring compiles into retained layout, paint, input, and semantic state.",
+         "DECIDED · PROGRAM SPINE"},
+        {"material", "House material authority",
+         "Relational theme recipes and public drawing primitives own ordinary interface chrome.",
+         "MEASURED PARTIAL · M9"},
+        {"provider", "Local provider boundary",
+         "Exact local identity remains authoritative; plugins enter through explicit policy.",
+         "GIVEN · LOCAL MACHINE"},
+        {"similarity", "Similarity candidate channel",
+         "Approximate candidates may propose; exact filesystem identity and records still decide.",
+         "CANDIDATE · GATED"},
+    };
+
+    auto view = std::make_shared<MasterDetailView>(StableId("fm.review.dna"));
+    view->initialize_control_tree();
+    view->set_visible(false);
+    view->set_accessible_name("Program DNA decision browser");
+    MasterDetailLayout view_layout;
+    view_layout.master_extent = 334.0;
+    view_layout.master_minimum = 270.0;
+    view_layout.detail_minimum = 390.0;
+    view_layout.compact_threshold = 780.0;
+    view_layout.splitter_width = 3.0;
+    view_layout.splitter_hit_width = 9.0;
+    view->set_master_detail_layout(view_layout);
+
+    auto master = std::make_shared<FlowLayoutPanel>(
+        StableId("fm.review.dna.master"));
+    master->set_flow_direction(FlowDirection::top_down);
+    master->set_wrap_contents(false);
+    master->set_padding({12.0, 12.0, 12.0, 12.0});
+    auto master_title = label("fm.review.dna.master.title",
+                              "PROGRAM DNA · DECISIONS", {0.0, 0.0, 296.0, 28.0},
+                              {FontRole::control, 10.0, 700, false, 0.32});
+    master->add_child(master_title);
+    for (std::size_t index = 0; index < std::size(decisions); ++index) {
+        const DecisionSpec& spec = decisions[index];
+        auto card = review_card(std::string("fm.dna.") + spec.id,
+                                spec.title, spec.summary, spec.state, 130.0);
+        card->set_requested_bounds({0.0, 0.0, 296.0, 130.0});
+        card->set_margin({0.0, 4.0, 0.0, 4.0});
+        card->set_interactive(true);
+        card->set_selected(index == 0U);
+        master->add_child(card);
+        refs.dna_decisions.push_back(card);
+    }
+
+    auto detail = std::make_shared<TableLayoutPanel>(
+        StableId("fm.review.dna.detail"));
+    detail->set_column_count(1U);
+    detail->set_row_count(4U);
+    detail->set_column_style(0U, {TableSizeMode::percent, 1.0});
+    detail->set_row_style(0U, {TableSizeMode::absolute, 62.0});
+    detail->set_row_style(1U, {TableSizeMode::absolute, 142.0});
+    detail->set_row_style(2U, {TableSizeMode::absolute, 176.0});
+    detail->set_row_style(3U, {TableSizeMode::percent, 1.0});
+    detail->set_padding({18.0, 16.0, 18.0, 16.0});
+
+    refs.dna_heading = label(
+        "fm.review.dna.heading", "Retained surface pipeline",
+        {}, {FontRole::control, 18.0, 700, false, 0.32});
+    refs.dna_heading->set_dock(DockStyle::fill);
+    detail->add_child(refs.dna_heading);
+    detail->set_cell_position(*refs.dna_heading, {0U, 0U});
+
+    auto evidence = review_card(
+        "fm.review.dna.evidence", "Evidence and constraints",
+        "The live surface is retained, renderer-neutral at its public boundary, deterministic under headless replay, and independently buildable without Skia or platform types. Authoring, serialization, runtime state, layout, hosting, and raster choice remain separate axes.",
+        "OBSERVED + MEASURED · CORE / DISPLAY / HOST GATES", 130.0);
+    evidence->set_dock(DockStyle::fill);
+    evidence->set_margin({0.0, 5.0, 0.0, 5.0});
+    detail->add_child(evidence);
+    detail->set_cell_position(*evidence, {0U, 1U});
+
+    auto consequences = review_card(
+        "fm.review.dna.consequences", "Consequences",
+        "Controls own durable state and semantics. Paint records commands rather than borrowing a live backend object. Themes replace relational recipes atomically. Native controls may be wrapped where policy admits them, but they do not dictate the core architecture.",
+        "REVERSAL COST · MEDIUM / EXPLICIT ADAPTER SEAMS", 164.0);
+    consequences->set_dock(DockStyle::fill);
+    consequences->set_margin({0.0, 5.0, 0.0, 5.0});
+    detail->add_child(consequences);
+    detail->set_cell_position(*consequences, {0U, 2U});
+
+    auto verdict = review_card(
+        "fm.review.dna.verdict", "Current verdict",
+        "Keep the retained native core. Continue widening behavior and visual vocabulary through public reusable controls; do not promote a prototype shortcut into the program spine.",
+        "DECIDED · REVISIT ONLY THROUGH NUMBERED ADR", 148.0);
+    verdict->set_dock(DockStyle::fill);
+    verdict->set_margin({0.0, 5.0, 0.0, 5.0});
+    refs.dna_verdict_card = verdict;
+    detail->add_child(verdict);
+    detail->set_cell_position(*verdict, {0U, 3U});
+
+    static_cast<void>(view->set_master(master));
+    static_cast<void>(view->set_detail(detail));
+    refs.dna_surface = view;
+    return view;
+}
+
 std::shared_ptr<Panel> make_tree_pane(ProductRefs& refs) {
     auto pane = std::make_shared<Panel>(StableId("fm.tree.pane"));
     pane->set_background(Color::rgba(235, 240, 246));
@@ -736,6 +959,12 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     auto search = make_search_surface(refs);
     search->set_dock(DockStyle::fill);
     surface_host->add_child(search);
+    auto palettes = make_palette_surface(refs);
+    palettes->set_dock(DockStyle::fill);
+    surface_host->add_child(palettes);
+    auto dna = make_dna_surface(refs);
+    dna->set_dock(DockStyle::fill);
+    surface_host->add_child(dna);
     refs.surface_host = surface_host;
     outer->second_panel()->add_child(surface_host);
     return outer;
@@ -1527,6 +1756,8 @@ public:
             refs_.search_surface->set_visible(false);
             refs_.folder_surface->set_visible(true);
             refs_.criteria_surface->set_visible(false);
+            refs_.palette_surface->set_visible(false);
+            refs_.dna_surface->set_visible(false);
             refs_.objects->set_visible(true);
             navigation_->restore_projection();
             if (Window* window = refs_.shell->attached_window()) {
@@ -1546,7 +1777,8 @@ public:
 
     [[nodiscard]] bool search_visible() const noexcept { return search_visible_; }
     [[nodiscard]] bool non_folder_surface_visible() const noexcept {
-        return search_visible_ || refs_.criteria_surface->visible();
+        return search_visible_ || refs_.criteria_surface->visible() ||
+               refs_.palette_surface->visible() || refs_.dna_surface->visible();
     }
     void deactivate_for_other_surface() {
         pending_query_.disconnect();
@@ -1614,6 +1846,8 @@ private:
         search_visible_ = true;
         refs_.folder_surface->set_visible(false);
         refs_.search_surface->set_visible(true);
+        refs_.palette_surface->set_visible(false);
+        refs_.dna_surface->set_visible(false);
         refs_.title->set_text("File Manager  ·  Search");
         refs_.status_summary->set_text(search_status());
         refs_.status_authority->set_text(
@@ -1826,6 +2060,8 @@ public:
         refs_.folder_surface->set_visible(true);
         refs_.objects->set_visible(false);
         refs_.criteria_surface->set_visible(true);
+        refs_.palette_surface->set_visible(false);
+        refs_.dna_surface->set_visible(false);
         refs_.title->set_text("File Manager  ·  Criteria");
         refs_.search->set_placeholder_text("Search this virtual folder");
         update_actions();
@@ -2897,6 +3133,123 @@ std::shared_ptr<ProductLifetime> wire_product(const ProductRefs& refs) {
     lifetime->criteria_controller = std::make_shared<CriteriaController>(
         refs, navigation, lifetime->path_matrix, lifetime->search_controller,
         status_message, emit_feedback);
+    lifetime->review_surface_selector =
+        [palette = std::weak_ptr<Control>(refs.palette_surface),
+         dna = std::weak_ptr<MasterDetailView>(refs.dna_surface),
+         folder = std::weak_ptr<Control>(refs.folder_surface),
+         search = std::weak_ptr<Control>(refs.search_surface),
+         criteria = std::weak_ptr<Control>(refs.criteria_surface),
+         objects = std::weak_ptr<ObjectView>(refs.objects),
+         title = std::weak_ptr<Label>(refs.title),
+         summary = std::weak_ptr<Label>(refs.status_summary),
+         authority = std::weak_ptr<Label>(refs.status_authority),
+         first_card = refs.palette_cards.empty()
+             ? std::weak_ptr<Card>{}
+             : std::weak_ptr<Card>(refs.palette_cards.front()),
+         first_decision = refs.dna_decisions.empty()
+             ? std::weak_ptr<Card>{}
+             : std::weak_ptr<Card>(refs.dna_decisions.front())](
+            std::string surface) {
+            if (surface != "palettes" && surface != "dna") return false;
+            const auto palette_surface = palette.lock();
+            const auto dna_surface = dna.lock();
+            const auto folder_surface = folder.lock();
+            const auto search_surface = search.lock();
+            const auto criteria_surface = criteria.lock();
+            if (!palette_surface || !dna_surface || !folder_surface || !search_surface ||
+                !criteria_surface) return false;
+            folder_surface->set_visible(false);
+            search_surface->set_visible(false);
+            criteria_surface->set_visible(false);
+            const bool palettes_selected = surface == "palettes";
+            palette_surface->set_visible(palettes_selected);
+            dna_surface->set_visible(!palettes_selected);
+            if (!palettes_selected) dna_surface->show_master();
+            if (const auto field = objects.lock()) field->set_visible(false);
+            if (const auto label = title.lock()) {
+                label->set_text(palettes_selected
+                    ? "File Manager  ·  Atmosphere palettes"
+                    : "File Manager  ·  Program DNA");
+            }
+            if (const auto label = summary.lock()) {
+                label->set_text(palettes_selected
+                    ? "12 atmosphere recipes · Sapphire current"
+                    : "4 decision records · retained surface selected");
+            }
+            if (const auto label = authority.lock()) {
+                label->set_text(palettes_selected
+                    ? "Review laboratory · public Card / MaterialPanel"
+                    : "Decision browser · public MasterDetailView / Card");
+            }
+            if (Window* owner = palette_surface->attached_window()) {
+                owner->perform_layout();
+                const auto focus = palettes_selected ? first_card.lock()
+                                                     : first_decision.lock();
+                if (focus) {
+                    static_cast<void>(owner->request_focus(focus));
+                }
+            }
+            return true;
+        };
+    std::vector<std::weak_ptr<Card>> palette_cards;
+    palette_cards.reserve(refs.palette_cards.size());
+    for (const auto& card : refs.palette_cards) palette_cards.push_back(card);
+    for (const auto& card : refs.palette_cards) {
+        lifetime->subscriptions.push_back(card->activated().subscribe(
+            [cards = palette_cards,
+             activated = std::weak_ptr<Card>(card),
+             summary = std::weak_ptr<Label>(refs.status_summary)](Card&) {
+                const auto selected = activated.lock();
+                if (!selected) return;
+                for (const auto& weak_candidate : cards) {
+                    if (const auto candidate = weak_candidate.lock()) {
+                        candidate->set_selected(candidate == selected);
+                    }
+                }
+                if (const auto label = summary.lock()) {
+                    label->set_text(std::string(selected->accessible_name()) +
+                                    " · selected for review");
+                }
+            }));
+    }
+    std::vector<std::weak_ptr<Card>> dna_decisions;
+    dna_decisions.reserve(refs.dna_decisions.size());
+    for (const auto& card : refs.dna_decisions) dna_decisions.push_back(card);
+    for (const auto& card : refs.dna_decisions) {
+        lifetime->subscriptions.push_back(card->activated().subscribe(
+            [cards = dna_decisions,
+             activated = std::weak_ptr<Card>(card),
+             heading = std::weak_ptr<Label>(refs.dna_heading),
+             verdict = std::weak_ptr<ReviewCard>(refs.dna_verdict_card),
+             browser = std::weak_ptr<MasterDetailView>(refs.dna_surface),
+             summary = std::weak_ptr<Label>(refs.status_summary)](Card&) {
+                const auto selected = activated.lock();
+                if (!selected) return;
+                for (const auto& weak_candidate : cards) {
+                    if (const auto candidate = weak_candidate.lock()) {
+                        candidate->set_selected(candidate == selected);
+                    }
+                }
+                if (const auto label = heading.lock()) {
+                    label->set_text(std::string(selected->accessible_name()));
+                }
+                if (const auto card = verdict.lock()) {
+                    ReviewRecord record = card->record();
+                    record.verdict = "ACTIVE REVIEW · " +
+                        std::string(selected->accessible_name());
+                    card->set_record(std::move(record));
+                }
+                if (const auto label = summary.lock()) {
+                    label->set_text(std::string(selected->accessible_name()) +
+                                    " · decision record selected");
+                }
+                if (const auto view = browser.lock(); view &&
+                    view->effective_display_mode() !=
+                        MasterDetailDisplayMode::side_by_side) {
+                    view->show_detail();
+                }
+            }));
+    }
     const std::weak_ptr<NavigationSession> weak_navigation = navigation;
     const std::weak_ptr<SearchController> weak_search =
         lifetime->search_controller;
@@ -3046,6 +3399,12 @@ bool apply_capture_state(gui_forms::Window& product, std::string_view state) {
                product.perform_semantic_action(
                    "fm.criteria.apply", gui_forms::SemanticAction::press);
     }
+    if (state == "palettes") {
+        return set_product_surface(product, "palettes");
+    }
+    if (state == "dna") {
+        return set_product_surface(product, "dna");
+    }
     return false;
 }
 
@@ -3060,6 +3419,13 @@ bool set_product_surface(gui_forms::Window& product,
     if (normalized == "criteria") {
         return (*lifetime)->criteria_controller != nullptr &&
                (*lifetime)->criteria_controller->show();
+    }
+    if (normalized == "palettes" || normalized == "dna") {
+        if ((*lifetime)->search_controller != nullptr) {
+            (*lifetime)->search_controller->deactivate_for_other_surface();
+        }
+        return static_cast<bool>((*lifetime)->review_surface_selector) &&
+               (*lifetime)->review_surface_selector(normalized);
     }
     return (*lifetime)->search_controller != nullptr &&
            (*lifetime)->search_controller->select_surface(normalized);

@@ -20,6 +20,10 @@ constexpr double command_row_height = 28.0;
 constexpr double separator_row_height = 9.0;
 constexpr double menu_border = 2.0;
 
+[[nodiscard]] std::string menu_display_text(std::string_view text) {
+    return parse_mnemonic_text(text).display_text;
+}
+
 struct MenuSnapshot final {
     std::string stable_id;
     MenuItemKind kind{MenuItemKind::command};
@@ -272,7 +276,8 @@ struct ContextMenu::Impl final {
                                 false, 0.12});
             const double baseline = std::max(font.size,
                                               bounds.height * 0.5 + font.size * 0.35);
-            painter.draw_text_utf8({30.0, baseline}, item_.text, font, ink);
+            painter.draw_text_utf8({30.0, baseline},
+                                   menu_display_text(item_.text), font, ink);
             if (!item_.command_state.shortcut.empty()) {
                 const FontSpec shortcut_font = effective_font(
                     {FontRole::content, 10.0, 400, false});
@@ -351,7 +356,7 @@ struct ContextMenu::Impl final {
             SemanticDescriptor descriptor;
             descriptor.role = item_.kind == MenuItemKind::separator
                 ? SemanticRole::separator : SemanticRole::menu_item;
-            descriptor.name = item_.text;
+            descriptor.name = menu_display_text(item_.text);
             descriptor.description = item_.command_state.description;
             if (!item_.command_state.shortcut.empty()) {
                 if (!descriptor.description.empty()) descriptor.description += " · ";
@@ -400,6 +405,19 @@ struct ContextMenu::Impl final {
                 return true;
             }
             return false;
+        }
+
+    protected:
+        [[nodiscard]] bool mnemonic_matches(
+            char32_t character) const noexcept override {
+            return item_.kind != MenuItemKind::separator && enabled_item() &&
+                   is_mnemonic(character, item_.text);
+        }
+
+        bool process_mnemonic_self(char32_t character) override {
+            if (!mnemonic_matches(character)) return false;
+            impl_.activate(depth_, index_);
+            return true;
         }
 
     private:
@@ -868,6 +886,13 @@ void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+void MenuStrip::set_use_mnemonic(bool value) {
+    require_mutable();
+    if (use_mnemonic_ == value) return;
+    use_mnemonic_ = value;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
 bool MenuStrip::open(std::size_t index) {
     require_mutable();
     if (index >= items_.size() || !items_[index].visible ||
@@ -908,7 +933,9 @@ std::vector<Rect> MenuStrip::item_bounds() const {
     double x{};
     for (std::size_t index = 0; index < items_.size(); ++index) {
         if (!items_[index].visible) continue;
-        const double width = menu_strip_item_width(items_[index].text) *
+        const std::string display = use_mnemonic_
+            ? menu_display_text(items_[index].text) : items_[index].text;
+        const double width = menu_strip_item_width(display) *
             effective_text_scale();
         result[index] = {x, 0.0, width,
                          std::max(menu_strip_height * effective_text_scale(),
@@ -975,8 +1002,10 @@ void MenuStrip::set_hot(std::optional<std::size_t> index) {
 void MenuStrip::on_paint(Painter& painter, Rect) {
     const Rect surface{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
-    const BasicControlStyle style;
-    painter.fill_rect(surface, Color::rgba(246, 249, 252));
+    const BasicControlStyle& style = effective_theme().basic_style();
+    const ControlVisualRecipe& strip_recipe = effective_theme().resolve(
+        ControlVisualRole::panel, visual_context());
+    paint_surface_material(painter, surface, strip_recipe.material);
     painter.draw_line({0.0, std::max(0.0, surface.height - 1.0)},
                       {surface.width, std::max(0.0, surface.height - 1.0)},
                       style.border, 1.0);
@@ -986,15 +1015,21 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
         const Rect item = bounds[index];
         const bool active = active_index_ == index;
         const bool hot = hot_index_ == index;
-        if (active || hot) {
-            painter.fill_rect({item.x + 1.0, 1.0, item.width - 2.0,
-                               std::max(0.0, item.height - 2.0)},
-                              active ? style.accent_light : style.face_light);
-            painter.stroke_rect({item.x + 1.5, 1.5, item.width - 3.0,
-                                 std::max(0.0, item.height - 3.0)},
-                                active ? style.border : style.face, 1.0);
+        ControlVisualContext item_context =
+            visual_context(hot, active, active, focused_);
+        if (!items_[index].enabled) {
+            item_context.surface = ControlSurfaceState::disabled;
         }
-        const Color ink = items_[index].enabled ? style.text : style.disabled_text;
+        const ControlVisualRecipe& item_recipe = effective_theme().resolve(
+            ControlVisualRole::menu_item, item_context);
+        if (active || hot) {
+            paint_surface_material(
+                painter,
+                {item.x + 1.0, 1.0, item.width - 2.0,
+                 std::max(0.0, item.height - 2.0)},
+                item_recipe.material);
+        }
+        const Color ink = item_recipe.text;
         const FontSpec font = effective_font({FontRole::control, 10.5,
                             static_cast<std::uint16_t>(active ? 700U : 400U),
                             false, 0.12});
@@ -1002,13 +1037,20 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
                                              effective_text_scale(),
                                 item.y + std::max(font.size,
                                     item.height * 0.5 + font.size * 0.35)},
-                               items_[index].text, font, ink);
+                               use_mnemonic_
+                                   ? menu_display_text(items_[index].text)
+                                   : items_[index].text,
+                               font, ink);
     }
     if (focused_ && !active_index_ && hot_index_) {
         const Rect item = bounds[*hot_index_];
         painter.stroke_rect({item.x + 2.5, 2.5, item.width - 5.0,
                              std::max(0.0, item.height - 5.0)},
-                            style.accent, 1.0);
+                            effective_theme().resolve(
+                                ControlVisualRole::menu_item,
+                                visual_context(true, false, false, true))
+                                .focus_ring,
+                            1.0);
     }
 }
 
@@ -1099,7 +1141,8 @@ std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
         node.stable_id = items_[index].stable_id;
         node.runtime_id = menu_virtual_runtime_id(node.stable_id);
         node.role = SemanticRole::menu_bar_item;
-        node.name = items_[index].text;
+        node.name = use_mnemonic_
+            ? menu_display_text(items_[index].text) : items_[index].text;
         node.bounds = {absolute.x + bounds[index].x, absolute.y + bounds[index].y,
                        bounds[index].width, bounds[index].height};
         node.states = SemanticState::visible | SemanticState::focusable;
@@ -1137,6 +1180,44 @@ bool MenuStrip::on_semantic_child_action(std::string_view id,
     set_hot(index);
     if (action != SemanticAction::focus) return open(index);
     return true;
+}
+
+bool MenuStrip::mnemonic_matches(char32_t character) const noexcept {
+    if (!use_mnemonic_) return false;
+    return std::any_of(items_.begin(), items_.end(),
+        [character](const MenuStripItemSpec& item) {
+            return item.visible && item.enabled &&
+                   is_mnemonic(character, item.text);
+        });
+}
+
+bool MenuStrip::process_mnemonic_self(char32_t character) {
+    if (!mnemonic_matches(character)) return false;
+    std::vector<std::size_t> matches;
+    for (std::size_t index = 0U; index < items_.size(); ++index) {
+        if (items_[index].visible && items_[index].enabled &&
+            is_mnemonic(character, items_[index].text)) {
+            matches.push_back(index);
+        }
+    }
+    if (matches.empty()) return false;
+    std::size_t selected = matches.front();
+    const std::optional<std::size_t> current = active_index_
+        ? active_index_ : hot_index_;
+    if (current) {
+        const auto found = std::find(matches.begin(), matches.end(), *current);
+        if (found != matches.end()) {
+            const auto next = std::next(found);
+            selected = next == matches.end() ? matches.front() : *next;
+        }
+    }
+    if (window() && !window()->request_focus(shared_from_this())) {
+        // The mnemonic is still owned, but prevent-mode validation may reject
+        // the focus transaction that would authorize opening the popup.
+        return true;
+    }
+    set_hot(selected);
+    return open(selected);
 }
 
 void MenuStrip::on_dispose() noexcept {

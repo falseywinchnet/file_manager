@@ -230,6 +230,32 @@ void test_open_callback_may_close_without_late_focus() {
             "a synchronous open handler may close the scope without a late focus leak");
 }
 
+void test_tab_index_and_tab_stop_define_deterministic_traversal() {
+    auto root = make_control<Panel>(StableId("tab.root"));
+    auto late = make_control<Button>(StableId("tab.late"), "Late");
+    auto skipped = make_control<Button>(StableId("tab.skipped"), "Skipped");
+    auto first = make_control<Button>(StableId("tab.first"), "First");
+    late->set_tab_index(20U);
+    skipped->set_tab_index(10U);
+    skipped->set_tab_stop(false);
+    first->set_tab_index(0U);
+    root->add_child(late);
+    root->add_child(skipped);
+    root->add_child(first);
+    Window window(root, {200.0, 100.0});
+
+    require(window.move_focus(true) && window.focused_control() == first,
+            "Tab traversal must begin at the smallest retained TabIndex");
+    require(window.move_focus(true) && window.focused_control() == late,
+            "TabStop false must remove a focusable control from traversal");
+    require(window.request_focus(skipped) && window.focused_control() == skipped,
+            "TabStop false must not prevent explicit programmatic focus");
+    require(window.request_focus(late),
+            "reverse traversal fixture must restore a traversable starting point");
+    require(window.move_focus(false) && window.focused_control() == first,
+            "reverse traversal must use the same deterministic TabIndex order");
+}
+
 } // namespace
 
 int main() {
@@ -240,6 +266,7 @@ int main() {
         test_ui_thread_enforcement_and_empty_focus_traversal();
         test_bounded_nesting();
         test_open_callback_may_close_without_late_focus();
+        test_tab_index_and_tab_stop_define_deterministic_traversal();
         std::cout << "gui_forms_focus_scope_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

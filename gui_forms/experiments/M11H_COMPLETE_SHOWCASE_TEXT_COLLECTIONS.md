@@ -319,6 +319,13 @@ memory and undefined-behavior checks completed without findings.
   from a public UI Timer. Live AppKit automation changed its interval from 250
   to 500 ms, observed the next published tick at 500 ms, stopped it to zero
   wakeups, and resumed it by page re-entry.
+- The ranges page now dogfoods six public `ProgressBar` styles: blocks,
+  continuous, marquee, slow luminance pulse, marching stripes, and laser etch.
+  The latter three are reusable control behavior with the same retained motion
+  policy and semantic node, not page-local painting. Fresh native inspection
+  observed active marquee movement, clipped stripe marching, and the laser's
+  repeated phase field and leading edge while the accessibility tree remained
+  stable.
 - Persistent ToolTip dogfood initially placed the popup at the client origin
   because programmatic show had no pointer coordinate. The provider now tracks
   target anchoring separately from pointer placement; live inspection shows

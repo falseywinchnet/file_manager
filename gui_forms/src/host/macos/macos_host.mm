@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <exception>
 #include <unordered_set>
 #include <utility>
 
@@ -63,6 +64,7 @@ using gui_forms::HostTooltipRequest;
 using gui_forms::KeyAction;
 using gui_forms::KeyEvent;
 using gui_forms::Modifier;
+using gui_forms::PaintReceipt;
 using GFPoint = gui_forms::Point;
 using gui_forms::PointerAction;
 using gui_forms::PointerButton;
@@ -814,6 +816,7 @@ private:
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
     std::uint64_t _accessibilityCacheGeneration;
+    std::uint64_t _nativeCallbackFaults;
     NSArray* _semanticAccessibilityChildren;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
@@ -834,6 +837,9 @@ private:
 - (void)drainPostedWork;
 - (void)armWakeTimer;
 - (void)scheduledWake;
+- (void)recordNativeCallbackFault:(const char*)operation
+                          message:(const char*)message;
+- (void)drawRetainedRect:(NSRect)dirtyRect;
 - (void)prepareForShutdown;
 - (HostDialogResult)showHostDialog:(const HostDialogRequest&)request;
 - (HostClipboardTextResult)readHostClipboard;
@@ -1091,6 +1097,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         _hostAttached = NO;
         _lastSemanticGeneration = 0;
         _accessibilityCacheGeneration = 0;
+        _nativeCallbackFaults = 0;
         _semanticAccessibilityChildren = nil;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
@@ -1111,6 +1118,12 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
             dispatch_async(dispatch_get_main_queue(), ^{
                 GUIFormsView* strongSelf = weakSelf;
                 if (strongSelf != nil) [strongSelf drainPostedWork];
+            });
+        });
+        _model->set_paint_wake_handler([weakSelf] {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                GUIFormsView* strongSelf = weakSelf;
+                if (strongSelf != nil) [strongSelf collectDamage];
             });
         });
         [self setWantsLayer:NO];
@@ -1475,32 +1488,47 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)collectDamage {
-    if (!_model) {
-        return;
+    try {
+        if (!_model) {
+            return;
+        }
+        static_cast<void>(
+            _model->poll_frame_schedule(std::chrono::steady_clock::now()));
+        const std::uint64_t semanticGeneration = _model->semantic_generation();
+        if (semanticGeneration != _lastSemanticGeneration) {
+            _lastSemanticGeneration = semanticGeneration;
+            _semanticAccessibilityChildren = nil;
+            _accessibilityCacheGeneration = 0;
+            NSAccessibilityPostNotification(
+                self, NSAccessibilityLayoutChangedNotification);
+        }
+        DamageRegion damage = _model->take_damage();
+        const double scale =
+            self.window == nil ? 1.0 : self.window.backingScaleFactor;
+        for (GFRect rect : damage.rectangles()) {
+            rect = gui_forms::detail::align_damage_outward(rect, scale);
+            _pendingDamage.add(rect);
+            [self setNeedsDisplayInRect:
+                NSMakeRect(rect.x, rect.y, rect.width, rect.height)];
+        }
+        [self armWakeTimer];
+    } catch (const std::exception& error) {
+        [self recordNativeCallbackFault:"collect-damage" message:error.what()];
+    } catch (...) {
+        [self recordNativeCallbackFault:"collect-damage" message:"unknown"];
     }
-    static_cast<void>(_model->poll_frame_schedule(std::chrono::steady_clock::now()));
-    const std::uint64_t semanticGeneration = _model->semantic_generation();
-    if (semanticGeneration != _lastSemanticGeneration) {
-        _lastSemanticGeneration = semanticGeneration;
-        _semanticAccessibilityChildren = nil;
-        _accessibilityCacheGeneration = 0;
-        NSAccessibilityPostNotification(self,
-                                        NSAccessibilityLayoutChangedNotification);
-    }
-    DamageRegion damage = _model->take_damage();
-    const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
-    for (GFRect rect : damage.rectangles()) {
-        rect = gui_forms::detail::align_damage_outward(rect, scale);
-        _pendingDamage.add(rect);
-        [self setNeedsDisplayInRect:NSMakeRect(rect.x, rect.y, rect.width, rect.height)];
-    }
-    [self armWakeTimer];
 }
 
 - (void)drainPostedWork {
-    if (!_model) return;
-    static_cast<void>(_model->drain_posted_work());
-    [self collectDamage];
+    try {
+        if (!_model) return;
+        static_cast<void>(_model->drain_posted_work());
+        [self collectDamage];
+    } catch (const std::exception& error) {
+        [self recordNativeCallbackFault:"posted-work" message:error.what()];
+    } catch (...) {
+        [self recordNativeCallbackFault:"posted-work" message:"unknown"];
+    }
 }
 
 - (void)armWakeTimer {
@@ -1527,7 +1555,32 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)scheduledWake {
-    [self collectDamage];
+    // Objective-C exceptions do not participate in C++ exception handling.
+    // A raised AppKit exception escaping a libdispatch source terminates the
+    // process, so contain it at the native callback boundary and preserve its
+    // exact name/reason in the same structured fault channel as C++ failures.
+    @try {
+        [self collectDamage];
+    } @catch (NSException* exception) {
+        NSString* name = exception.name == nil ? @"NSException" : exception.name;
+        NSString* reason = exception.reason == nil ? @"no reason" : exception.reason;
+        NSString* diagnostic = [NSString stringWithFormat:@"%@: %@", name, reason];
+        [self recordNativeCallbackFault:"scheduled-wake"
+                                 message:diagnostic.UTF8String];
+    }
+}
+
+- (void)recordNativeCallbackFault:(const char*)operation
+                          message:(const char*)message {
+    ++_nativeCallbackFaults;
+    if (_wakeSource != nil) {
+        dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
+                                  DISPATCH_TIME_FOREVER, 0);
+    }
+    std::fprintf(stderr, "gui-forms-host=%s-fault|what:%s\n",
+                 operation == nullptr ? "native-callback" : operation,
+                 message == nullptr ? "unknown" : message);
+    std::fflush(stderr);
 }
 
 - (void)prepareForShutdown {
@@ -1535,7 +1588,10 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
     }
-    if (_model) _model->shutdown_dispatcher();
+    if (_model) {
+        _model->set_paint_wake_handler({});
+        _model->shutdown_dispatcher();
+    }
     if (_hostSession) {
         static_cast<void>([self dispatchHostPayload:HostShutdownEvent{}
                                    timestampNanoseconds:host_now_nanoseconds()]);
@@ -1592,6 +1648,18 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+    try {
+        [self drawRetainedRect:dirtyRect];
+    } catch (const std::exception& error) {
+        _raster.end_frame();
+        [self recordNativeCallbackFault:"draw" message:error.what()];
+    } catch (...) {
+        _raster.end_frame();
+        [self recordNativeCallbackFault:"draw" message:"unknown"];
+    }
+}
+
+- (void)drawRetainedRect:(NSRect)dirtyRect {
     if (!_model) {
         return;
     }
@@ -1608,11 +1676,13 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 
     static_cast<void>(_raster.synchronize_images(_model->image_resources()));
     _raster.begin_frame(_pendingDamage);
-    _model->paint(_raster, _pendingDamage.bounds());
+    const std::optional<PaintReceipt> receipt =
+        _model->paint(_raster, _pendingDamage.bounds());
     _raster.end_frame();
 
+    bool presented = false;
     const void* pixels = _raster.pixels();
-    if (pixels != nullptr) {
+    if (receipt && pixels != nullptr) {
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, pixels, _raster.byte_size(), nullptr);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
@@ -1633,15 +1703,19 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                                CGRectMake(0.0, 0.0, logicalSize.width, logicalSize.height),
                                image);
             CGContextRestoreGState(context);
+            presented = true;
             CGImageRelease(image);
         }
         CGColorSpaceRelease(colorSpace);
         CGDataProviderRelease(provider);
     }
-    _pendingDamage.clear();
     const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
-    _model->metrics().record_present(static_cast<std::uint64_t>(elapsed.count()));
+    if (presented &&
+        _model->notify_presented(*receipt,
+                                 static_cast<std::uint64_t>(elapsed.count()))) {
+        _pendingDamage.clear();
+    }
     // Do not collect the next model invalidation from inside AppKit's paint
     // transaction. setNeedsDisplayInRect: may leave the view dirty without
     // enqueueing a second draw when invoked synchronously by drawRect:, which
@@ -1856,7 +1930,9 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         ? _hostSession->snapshot().to_json() : std::string("{}");
     const std::string services = _hostServices
         ? _hostServices->snapshot().to_json() : std::string("{}");
-    return "{\"session\":" + session + ",\"services\":" + services + "}";
+    return "{\"session\":" + session + ",\"services\":" + services +
+        ",\"native_callback_faults\":" +
+        std::to_string(_nativeCallbackFaults) + "}";
 }
 
 @end

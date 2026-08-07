@@ -220,7 +220,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_19, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_20, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -252,13 +252,21 @@ static void test_version_negotiation(void) {
                 api.get_control_absolute_bounds != NULL &&
                 api.subscribe_key_preview != NULL &&
                 api.set_cursor != NULL && api.get_cursor != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_19,
+                api.set_auto_scroll_offset != NULL &&
+                api.set_auto_scroll != NULL &&
+                api.set_auto_scroll_margin != NULL &&
+                api.set_auto_scroll_min_size != NULL &&
+                api.set_auto_scroll_position != NULL &&
+                api.get_scroll_state != NULL &&
+                api.set_scroll_axis_state != NULL &&
+                api.scroll_control_into_view != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_20,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000014), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000015), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
 }
@@ -285,6 +293,71 @@ static void test_abi_0_19_cursor_contract(void) {
             "0.19 cursor accepted an invalid request");
     require(api.dispose(control) == GF_OK,
             "0.19 cursor fixture disposal failed");
+}
+
+static void test_abi_0_20_scrollable_control_contract(void) {
+    gf_handle form = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    gf_handle content = {0U, 0U};
+    gf_scroll_state state;
+    memset(&state, 0, sizeof(state));
+    require(api.control_create_kind(GF_CONTROL_FORM, text("abi.scroll.form"),
+                                    &form) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.scroll.panel"),
+                                        &panel) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_BUTTON,
+                                        text("abi.scroll.content"),
+                                        &content) == GF_OK,
+            "0.20 scrolling fixtures failed");
+    require(api.set_bounds(form, (gf_rect){0.0, 0.0, 100.0, 80.0}) == GF_OK &&
+                api.set_bounds(panel, (gf_rect){0.0, 0.0, 100.0, 80.0}) == GF_OK &&
+                api.set_bounds(content,
+                               (gf_rect){20.0, 10.0, 220.0, 160.0}) == GF_OK &&
+                api.set_auto_scroll_offset(content,
+                                           (gf_point){3.0, 5.0}) == GF_OK &&
+                api.add_child(panel, content) == GF_OK &&
+                api.add_child(form, panel) == GF_OK &&
+                api.set_auto_scroll_margin(panel,
+                                           (gf_size){5.0, 7.0}) == GF_OK &&
+                api.set_auto_scroll(panel, 1U) == GF_OK &&
+                api.run_window(form, GF_WINDOW_RUN_FORCE_HEADLESS) == GF_OK,
+            "0.20 retained scrolling setup failed");
+    require(api.get_scroll_state(panel, &state) == GF_OK &&
+                state.auto_scroll == 1U && state.horizontal.visible == 1U &&
+                state.vertical.visible == 1U &&
+                state.viewport_rectangle.width == 84.0 &&
+                state.viewport_rectangle.height == 64.0,
+            "0.20 automatic viewport state did not cross the ABI");
+    require(api.set_auto_scroll_position(panel,
+                                         (gf_point){50.0, 40.0}) == GF_OK &&
+                api.get_scroll_state(panel, &state) == GF_OK &&
+                state.position.x == 50.0 && state.position.y == 40.0 &&
+                state.display_rectangle.x == -50.0 &&
+                state.display_rectangle.y == -40.0,
+            "0.20 automatic position did not round-trip");
+    require(api.scroll_control_into_view(panel, content) == GF_OK &&
+                api.get_scroll_state(panel, &state) == GF_OK &&
+                state.position.x >= 0.0 && state.position.y >= 0.0,
+            "0.20 ScrollControlIntoView did not preserve a valid viewport");
+    require(api.set_auto_scroll(panel, 0U) == GF_OK &&
+                api.set_scroll_axis_state(
+                    panel, 0U,
+                    (gf_scroll_axis_state){1U, 1U, 0.0, 250.0,
+                                           50.0, 1.0, 80.0}) == GF_OK &&
+                api.get_scroll_state(panel, &state) == GF_OK &&
+                state.auto_scroll == 0U && state.horizontal.visible == 1U &&
+                state.horizontal.value == 80.0,
+            "0.20 manual ScrollProperties state did not round-trip");
+    require(api.get_scroll_state(content, &state) ==
+                GF_ERROR_WRONG_HANDLE_KIND &&
+                api.set_auto_scroll(panel, 2U) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_auto_scroll_margin(panel,
+                                           (gf_size){-1.0, 0.0}) ==
+                    GF_ERROR_INVALID_ARGUMENT,
+            "0.20 scrolling ABI accepted invalid kinds or values");
+    require(api.dispose(form) == GF_OK,
+            "0.20 scrolling fixture disposal failed");
 }
 
 static uint32_t preview_key_callback(gf_handle sender, uint32_t event_kind,
@@ -1102,6 +1175,7 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_20_scrollable_control_contract();
     test_abi_0_19_cursor_contract();
     test_abi_0_18_form_key_preview_contract();
     test_abi_0_16_owned_pixel_surface();

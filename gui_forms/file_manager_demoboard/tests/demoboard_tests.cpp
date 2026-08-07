@@ -164,7 +164,7 @@ int main() {
             "path matrix must retain one full current drive stack and exactly five recents");
 
     std::dynamic_pointer_cast<gui_forms::Button>(
-        product->find("fm.path.matrix.current.tail"))->on_activate();
+        product->find("fm.path.matrix.current.tail"))->perform_click();
     static_cast<void>(product->drain_posted_work());
     product->perform_layout();
     auto path_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
@@ -209,13 +209,13 @@ int main() {
                     std::string::npos,
             "Enter on a valid completion must close once and navigate atomically");
     std::dynamic_pointer_cast<gui_forms::Button>(
-        product->find("fm.nav.back"))->on_activate();
+        product->find("fm.nav.back"))->perform_click();
 
     require(product->request_focus(terminal),
             "terminal must accept focus after valid path navigation");
-    terminal->on_activate();
+    terminal->perform_click();
     std::dynamic_pointer_cast<gui_forms::Button>(
-        product->find("fm.path.matrix.current.tail"))->on_activate();
+        product->find("fm.path.matrix.current.tail"))->perform_click();
     static_cast<void>(product->drain_posted_work());
     path_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
         product->find("fm.path.matrix.editor"));
@@ -242,7 +242,7 @@ int main() {
                 product->focused_control() == terminal,
             "Escape must first return to browse, then close and restore terminal focus");
 
-    terminal->on_activate();
+    terminal->perform_click();
     product->perform_layout();
     require(product->dispatch_pointer({gui_forms::PointerAction::down,
                                        gui_forms::PointerButton::primary,
@@ -563,6 +563,115 @@ int main() {
                     compact_rack->committed_arranged_bounds().height,
             "Criteria must wrap and remain scroll-reachable under narrow large text");
 
+    auto palette_product = file_manager_demoboard::make_product_window();
+    require(file_manager_demoboard::apply_capture_state(
+                *palette_product, "palettes"),
+            "palette capture state must enter through the public surface selector");
+    palette_product->perform_layout();
+    const auto palette_surface = palette_product->find("fm.review.palettes");
+    require(palette_surface && palette_surface->visible() &&
+                !palette_product->find("fm.workspace.content_selection")->visible() &&
+                !palette_product->find("fm.search.surface")->visible() &&
+                !palette_product->find("fm.criteria.surface")->visible(),
+            "palette review must replace the daily content surface without hidden overlap");
+    constexpr const char* palette_ids[] = {
+        "cobalt", "amethyst", "miami", "orchid", "aqua", "apricot",
+        "mulberry", "viridian", "sapphire", "rose", "iris", "phosphor"};
+    for (const char* palette_id : palette_ids) {
+        const std::string card_id = std::string("fm.palette.") + palette_id;
+        const auto card = std::dynamic_pointer_cast<gui_forms::Card>(
+            palette_product->find(card_id));
+        require(card && card->interactive() &&
+                    palette_product->find(card_id + ".title") &&
+                    palette_product->find(card_id + ".swatch") &&
+                    palette_product->find(card_id + ".state"),
+                "every atmosphere must be a public interactive Card with retained sections");
+    }
+    const auto sapphire_card = std::dynamic_pointer_cast<gui_forms::Card>(
+        palette_product->find("fm.palette.sapphire"));
+    const auto cobalt_card = std::dynamic_pointer_cast<gui_forms::Card>(
+        palette_product->find("fm.palette.cobalt"));
+    const auto palette_semantics = palette_product->semantic_snapshot();
+    const auto* sapphire_semantic = find_semantic(
+        palette_semantics.roots, "fm.palette.sapphire");
+    require(sapphire_card && cobalt_card && sapphire_card->selected() &&
+                !cobalt_card->selected() && sapphire_semantic &&
+                gui_forms::has_semantic_state(
+                    sapphire_semantic->states, gui_forms::SemanticState::selected),
+            "Sapphire must begin as the visibly and semantically selected recipe");
+    require(palette_product->perform_semantic_action(
+                "fm.palette.cobalt", gui_forms::SemanticAction::press) &&
+                cobalt_card->selected() && !sapphire_card->selected() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    palette_product->find("fm.status.summary"))->text().find(
+                        "Cobalt atmosphere") != std::string::npos,
+            "palette activation must atomically move one selection and publish its status");
+    palette_product->resize({1800.0, 1050.0});
+    palette_product->perform_layout();
+    palette_product->perform_layout();
+    require(palette_surface->absolute_bounds().width > 1500.0 &&
+                palette_product->find("fm.palette.phosphor")
+                        ->absolute_bounds().x +
+                        palette_product->find("fm.palette.phosphor")
+                            ->absolute_bounds().width <=
+                    palette_surface->absolute_bounds().x +
+                        palette_surface->absolute_bounds().width,
+            "palette cards must reflow inside the grown product surface");
+    require(file_manager_demoboard::set_product_surface(
+                *palette_product, "folder") &&
+                !palette_surface->visible() &&
+                palette_product->find("fm.workspace.content_selection")->visible(),
+            "leaving a review laboratory must restore the ordinary Folder projection");
+
+    auto dna_product = file_manager_demoboard::make_product_window();
+    require(file_manager_demoboard::apply_capture_state(*dna_product, "dna"),
+            "DNA capture state must enter through the public surface selector");
+    dna_product->perform_layout();
+    const auto dna_view = std::dynamic_pointer_cast<gui_forms::MasterDetailView>(
+        dna_product->find("fm.review.dna"));
+    require(dna_view && dna_view->visible() && dna_view->master() &&
+                dna_view->detail() &&
+                dna_view->effective_display_mode() ==
+                    gui_forms::MasterDetailDisplayMode::side_by_side,
+            "DNA must dogfood the public wide MasterDetailView composition");
+    constexpr const char* decision_ids[]{
+        "surface", "material", "provider", "similarity"};
+    for (const char* decision_id : decision_ids) {
+        const auto card = std::dynamic_pointer_cast<gui_forms::Card>(
+            dna_product->find(std::string("fm.dna.") + decision_id));
+        require(card && card->interactive() && card->header() && card->body() &&
+                    card->footer(),
+                "every DNA decision must be a retained interactive public Card");
+    }
+    require(dna_product->perform_semantic_action(
+                "fm.dna.material", gui_forms::SemanticAction::press) &&
+                std::dynamic_pointer_cast<gui_forms::Card>(
+                    dna_product->find("fm.dna.material"))->selected() &&
+                !std::dynamic_pointer_cast<gui_forms::Card>(
+                    dna_product->find("fm.dna.surface"))->selected() &&
+                std::dynamic_pointer_cast<gui_forms::Label>(
+                    dna_product->find("fm.review.dna.heading"))->text() ==
+                    "House material authority",
+            "DNA activation must move selection and project the chosen record");
+    dna_product->resize({680.0, 650.0});
+    dna_product->perform_layout();
+    dna_product->perform_layout();
+    require(dna_view->effective_display_mode() ==
+                gui_forms::MasterDetailDisplayMode::master_only,
+            "DNA must collapse to its master navigation under compact width");
+    require(dna_product->perform_semantic_action(
+                "fm.dna.provider", gui_forms::SemanticAction::press),
+            "compact DNA decision must accept semantic activation");
+    dna_product->perform_layout();
+    require(dna_view->effective_display_mode() ==
+                gui_forms::MasterDetailDisplayMode::detail_only,
+            "compact DNA activation must navigate to the detail presentation");
+    dna_view->show_master();
+    dna_product->perform_layout();
+    require(dna_view->effective_display_mode() ==
+                gui_forms::MasterDetailDisplayMode::master_only,
+            "compact DNA detail must retain an explicit route back to master");
+
     NullPainter painter;
     const gui_forms::DamageRegion startup_damage = product->take_damage();
     require(!startup_damage.empty(), "startup did not publish retained damage");
@@ -656,11 +765,11 @@ int main() {
                     product->find("fm.status.authority"))->text().find(
                     "handler committed") != std::string::npos,
             "choice property must commit through the shared PropertyList model");
-    preview_disclosure->on_activate();
+    preview_disclosure->perform_click();
     require(!preview->visible() && property_list->header_height() == 34.0 &&
                 preview_disclosure->text() == "▶",
             "preview disclosure must collapse retained header content without replacing it");
-    preview_disclosure->on_activate();
+    preview_disclosure->perform_click();
     require(preview->visible() && property_list->header_height() == 212.0 &&
                 preview_disclosure->text() == "▼" &&
                 property_list->header_content() ==
@@ -677,13 +786,13 @@ int main() {
     product->perform_layout();
     const double inspector_extent =
         selection_split->second_panel()->arranged_bounds().width;
-    selection_collapse->on_activate();
+    selection_collapse->perform_click();
     product->perform_layout();
     require(selection_split->second_collapsed() &&
                 !selection_split->second_panel()->visible(),
             "Selection caption affordance must collapse the reusable split pane");
     std::dynamic_pointer_cast<gui_forms::Button>(
-        product->find("fm.ribbon.properties"))->on_activate();
+        product->find("fm.ribbon.properties"))->perform_click();
     product->perform_layout();
     require(!selection_split->second_collapsed() &&
                 selection_split->second_panel()->visible() &&
@@ -712,7 +821,7 @@ int main() {
                 inspection_group->role == gui_forms::SemanticRole::property_group,
             "Selection properties must expose reusable property grid/group semantics");
 
-    view_command->on_activate();
+    view_command->perform_click();
     require(objects->view_mode() == gui_forms::ObjectViewMode::details &&
                 std::dynamic_pointer_cast<gui_forms::Button>(
                     product->find("fm.status.view"))->text() == "Details  ▼" &&
@@ -737,7 +846,7 @@ int main() {
                     product->find("fm.status.summary"))->text().starts_with(
                     "2 selected"),
             "multi-selection did not project one coherent Selection/status state");
-    sort_command->on_activate();
+    sort_command->perform_click();
     require(objects->items().front().stable_id ==
                 "fm.object.obj-delivery-archive" &&
                 objects->selected_id() == "fm.object.obj-file-manager" &&
@@ -1002,8 +1111,21 @@ int main() {
                 responsive->find("fm.workspace.content_selection")->visible() &&
                 !responsive->find("fm.folder.objects")->visible(),
             "controller Criteria choice must reach the public retained surface transition");
+    surface_choice->set_selected_index(3U);
+    require(responsive->find("fm.review.palettes")->visible() &&
+                !responsive->find("fm.workspace.content_selection")->visible() &&
+                !responsive->find("fm.search.surface")->visible() &&
+                !responsive->find("fm.criteria.surface")->visible(),
+            "controller Palettes choice must reach the public Card laboratory");
+    surface_choice->set_selected_index(6U);
+    require(responsive->find("fm.review.dna")->visible() &&
+                !responsive->find("fm.review.palettes")->visible() &&
+                !responsive->find("fm.workspace.content_selection")->visible(),
+            "controller DNA choice must reach the public MasterDetail laboratory");
     surface_choice->set_selected_index(0U);
     require(!responsive->find("fm.search.surface")->visible() &&
+                !responsive->find("fm.review.palettes")->visible() &&
+                !responsive->find("fm.review.dna")->visible() &&
                 responsive->find("fm.workspace.content_selection")->visible(),
             "controller Folder choice must restore the retained Folder projection");
     text_scale->set_selected_index(4U);

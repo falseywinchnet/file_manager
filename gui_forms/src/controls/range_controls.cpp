@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
@@ -59,10 +60,206 @@ void paint_thumb(Painter& painter, Rect bounds,
     }
 }
 
+void paint_progress_stripes(Painter& painter, Rect fill, Color color,
+                            double stripe_width, double phase) {
+    if (fill.empty()) return;
+    const double pitch = stripe_width * 2.0;
+    const double travel = phase * pitch;
+    painter.save();
+    painter.clip_rect(fill);
+    const double begin = fill.x - fill.height - pitch + travel;
+    const double end = fill.x + fill.width + fill.height + pitch;
+    for (double x = begin; x <= end; x += pitch) {
+        painter.draw_line({x, fill.y + fill.height},
+                          {x + fill.height, fill.y}, color, stripe_width);
+    }
+    painter.restore();
+}
+
+void paint_progress_luminance(Painter& painter, Rect fill, Color color,
+                              double extent, double phase) {
+    if (fill.empty()) return;
+    const double band = std::max(8.0, fill.width * extent);
+    const double x = fill.x - band + (fill.width + band) * phase;
+    const Rect pulse{x, fill.y, band, fill.height};
+    const std::array<GradientStop, 5> stops{{
+        {0.0, Color::rgba(color.red, color.green, color.blue, 0)},
+        {0.22, Color::rgba(color.red, color.green, color.blue,
+                           static_cast<std::uint8_t>(color.alpha / 3U))},
+        {0.5, color},
+        {0.78, Color::rgba(color.red, color.green, color.blue,
+                           static_cast<std::uint8_t>(color.alpha / 3U))},
+        {1.0, Color::rgba(color.red, color.green, color.blue, 0)},
+    }};
+    painter.save();
+    painter.clip_rect(fill);
+    painter.fill_linear_gradient(pulse, {pulse.x, pulse.y},
+                                 {pulse.x + pulse.width, pulse.y}, stops);
+    painter.restore();
+}
+
+void paint_progress_laser(Painter& painter, Rect fill, Rect interior,
+                          Orientation orientation,
+                          const ProgressBarAnimationAppearance& appearance,
+                          double phase, bool reduced) {
+    if (fill.empty()) return;
+    const double pitch = appearance.laser_phase_pitch;
+    const double offset = phase * pitch;
+    const Color phase_color = appearance.laser_phase_color;
+    const std::array<GradientStop, 5> phase_stops{{
+        {0.0, Color::rgba(phase_color.red, phase_color.green,
+                          phase_color.blue, 0)},
+        {0.24, phase_color},
+        {0.5, Color::rgba(255, 255, 255,
+                          static_cast<std::uint8_t>(phase_color.alpha / 2U))},
+        {0.76, phase_color},
+        {1.0, Color::rgba(phase_color.red, phase_color.green,
+                          phase_color.blue, 0)},
+    }};
+    painter.save();
+    painter.clip_rect(fill);
+    painter.fill_linear_gradient_spread(
+        fill, {fill.x, fill.y - offset},
+        {fill.x, fill.y - offset + pitch}, phase_stops,
+        GradientSpreadMode::repeat);
+    painter.restore();
+
+    const double edge_extent = std::min(
+        appearance.laser_edge_extent,
+        orientation == Orientation::horizontal ? fill.width : fill.height);
+    if (edge_extent <= 0.0) return;
+    const Color edge = appearance.laser_edge_color;
+    const std::array<GradientStop, 4> edge_stops{{
+        {0.0, Color::rgba(edge.red, edge.green, edge.blue, 0)},
+        {0.58, Color::rgba(edge.red, edge.green, edge.blue,
+                           static_cast<std::uint8_t>(edge.alpha / 2U))},
+        {0.86, edge},
+        {1.0, appearance.laser_spark_color},
+    }};
+    if (orientation == Orientation::horizontal) {
+        const Rect edge_rect{fill.x + fill.width - edge_extent, fill.y,
+                             edge_extent, fill.height};
+        painter.fill_linear_gradient(
+            edge_rect, {edge_rect.x, edge_rect.y},
+            {edge_rect.x + edge_rect.width, edge_rect.y}, edge_stops);
+    } else {
+        const Rect edge_rect{fill.x, fill.y, fill.width, edge_extent};
+        painter.fill_linear_gradient(
+            edge_rect, {edge_rect.x, edge_rect.y + edge_rect.height},
+            {edge_rect.x, edge_rect.y}, edge_stops);
+    }
+
+    // The front is a compact white-hot burn, not a set of long particle
+    // tendrils. A soft corona and a razor-bright core carry most of the energy;
+    // the deterministic sparks are deliberately short ember flecks.
+    constexpr double tau = 6.28318530717958647692;
+    const Color spark = appearance.laser_spark_color;
+    const std::array<GradientStop, 4> corona_stops{{
+        {0.0, Color::rgba(255, 255, 255, 255)},
+        {0.2, spark},
+        {0.56, Color::rgba(edge.red, edge.green, edge.blue,
+                           static_cast<std::uint8_t>(edge.alpha * 2U / 3U))},
+        {1.0, Color::rgba(edge.red, edge.green, edge.blue, 0)},
+    }};
+    painter.save();
+    painter.clip_rect(interior);
+    if (orientation == Orientation::horizontal) {
+        const Point center{fill.x + fill.width,
+                           fill.y + fill.height * 0.5};
+        const Size radii{std::clamp(edge_extent * 0.72, 4.0, 10.0),
+                         std::max(3.0, fill.height * 0.68)};
+        painter.fill_radial_gradient(
+            {center.x - radii.width, center.y - radii.height,
+             radii.width * 2.0, radii.height * 2.0},
+            center, radii, corona_stops);
+        painter.draw_line({center.x, fill.y + 1.0},
+                          {center.x, fill.y + fill.height - 1.0},
+                          Color::rgba(255, 255, 255, 252), 1.8);
+    } else {
+        const Point center{fill.x + fill.width * 0.5, fill.y};
+        const Size radii{std::max(3.0, fill.width * 0.68),
+                         std::clamp(edge_extent * 0.72, 4.0, 10.0)};
+        painter.fill_radial_gradient(
+            {center.x - radii.width, center.y - radii.height,
+             radii.width * 2.0, radii.height * 2.0},
+            center, radii, corona_stops);
+        painter.draw_line({fill.x + 1.0, center.y},
+                          {fill.x + fill.width - 1.0, center.y},
+                          Color::rgba(255, 255, 255, 252), 1.8);
+    }
+
+    // Small overlapping hot lobes make the corona flicker like combustion at
+    // the cut, while remaining compact enough not to resemble long filaments.
+    const int flame_count = reduced ? 2 : 4;
+    for (int index = 0; index < flame_count; ++index) {
+        const double lane = (static_cast<double>(index) + 0.5) /
+                            static_cast<double>(flame_count);
+        const double wave = std::sin(tau * phase * 1.7 +
+                                     static_cast<double>(index) * 2.11);
+        const double heat = 0.5 + 0.5 * wave;
+        if (orientation == Orientation::horizontal) {
+            const Point center{fill.x + fill.width + 0.6 + heat * 1.4,
+                               fill.y + fill.height * lane + wave * 1.1};
+            const Size radii{2.4 + heat * 2.2, 1.8 + (1.0 - heat) * 2.0};
+            painter.fill_radial_gradient(
+                {center.x - radii.width, center.y - radii.height,
+                 radii.width * 2.0, radii.height * 2.0},
+                center, radii, corona_stops);
+        } else {
+            const Point center{fill.x + fill.width * lane + wave * 1.1,
+                               fill.y - 0.6 - heat * 1.4};
+            const Size radii{1.8 + (1.0 - heat) * 2.0, 2.4 + heat * 2.2};
+            painter.fill_radial_gradient(
+                {center.x - radii.width, center.y - radii.height,
+                 radii.width * 2.0, radii.height * 2.0},
+                center, radii, corona_stops);
+        }
+    }
+
+    const int spark_count = reduced ? 3 : 7;
+    for (int index = 0; index < spark_count; ++index) {
+        const double lane = (static_cast<double>(index) + 0.5) /
+                            static_cast<double>(spark_count);
+        const double wave = std::sin(tau * phase +
+                                     static_cast<double>(index) * 1.73);
+        const double length = (reduced ? 0.9 : 1.2) +
+                              (wave + 1.0) * (reduced ? 0.65 : 1.35);
+        const double spark_width = reduced ? 0.75 :
+            0.8 + 0.28 * static_cast<double>(index % 3);
+        if (orientation == Orientation::horizontal) {
+            const double y = fill.y + fill.height * lane;
+            const double edge_x = fill.x + fill.width;
+            painter.draw_line({edge_x - 0.35, y},
+                              {edge_x + length, y + wave * 0.8},
+                              spark, spark_width);
+        } else {
+            const double x = fill.x + fill.width * lane;
+            const double edge_y = fill.y;
+            painter.draw_line({x, edge_y + 0.35},
+                              {x + wave * 0.8, edge_y - length},
+                              spark, spark_width);
+        }
+    }
+    painter.restore();
+}
+
 } // namespace
 
 RangeControl::RangeControl(StableId stable_id)
-    : Control(std::move(stable_id)) {}
+    : Control(std::move(stable_id)) {
+    define_bindable_property({
+        "Value", BindingValueKind::number,
+        [this] { return BindingValue{value_}; },
+        [this](const BindingValue& value) {
+            const auto converted = convert_binding_value(value, BindingValueKind::number);
+            if (!converted) throw std::invalid_argument("RangeControl.Value binding requires a number");
+            set_value(std::get<double>(*converted));
+        },
+        [this](Component& owner, std::function<void()> changed) {
+            return value_changed_.subscribe(owner,
+                [changed = std::move(changed)](double) { changed(); });
+        }});
+}
 
 double RangeControl::normalized_value() const noexcept {
     return (value_ - minimum_) / (maximum_ - minimum_);
@@ -473,6 +670,34 @@ void ProgressBar::set_stripe_width(double width) {
     invalidate(Dirty::paint);
 }
 
+void ProgressBar::set_animation_appearance(
+    ProgressBarAnimationAppearance appearance) {
+    require_mutable();
+    require_finite(appearance.pulse_extent,
+                   "progress pulse extent must be finite");
+    require_finite(appearance.laser_edge_extent,
+                   "progress laser edge extent must be finite");
+    require_finite(appearance.laser_phase_pitch,
+                   "progress laser phase pitch must be finite");
+    if (appearance.pulse_extent < 0.1 || appearance.pulse_extent > 0.8) {
+        throw std::invalid_argument(
+            "progress pulse extent must be between 0.1 and 0.8");
+    }
+    if (appearance.laser_edge_extent < 2.0 ||
+        appearance.laser_edge_extent > 48.0) {
+        throw std::invalid_argument(
+            "progress laser edge extent must be between 2 and 48 pixels");
+    }
+    if (appearance.laser_phase_pitch < 3.0 ||
+        appearance.laser_phase_pitch > 64.0) {
+        throw std::invalid_argument(
+            "progress laser phase pitch must be between 3 and 64 pixels");
+    }
+    if (animation_appearance_ == appearance) return;
+    animation_appearance_ = appearance;
+    invalidate(Dirty::paint);
+}
+
 void ProgressBar::set_animation_enabled(bool enabled_value) {
     require_mutable();
     if (animation_enabled_ == enabled_value) {
@@ -539,6 +764,8 @@ void ProgressBar::set_animation_period(FrameInterval period) {
 bool ProgressBar::animated_style() const noexcept {
     return visual_style_ == ProgressBarVisualStyle::marquee ||
            visual_style_ == ProgressBarVisualStyle::pulse ||
+           visual_style_ == ProgressBarVisualStyle::marching_stripes ||
+           visual_style_ == ProgressBarVisualStyle::laser_etch ||
            overlay_style_ == ProgressBarOverlayStyle::moving_stripes;
 }
 
@@ -608,10 +835,13 @@ Size ProgressBar::measure(Size available) {
 
 void ProgressBar::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
-    paint_sunken(painter, bounds, style(), style().paper);
+    const ControlVisualRecipe& track_recipe = effective_theme().resolve(
+        ControlVisualRole::progress, visual_context());
+    paint_surface_material(painter, bounds, track_recipe.material);
     const double ratio = normalized_value();
     Rect fill{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
               std::max(0.0, bounds.height - 4.0)};
+    const Rect interior = fill;
     const MotionPolicy policy = effective_motion_policy();
     const double presented_phase = policy.presentation_phase(animation_phase_);
     if (visual_style_ == ProgressBarVisualStyle::marquee) {
@@ -640,51 +870,52 @@ void ProgressBar::on_paint(Painter& painter, Rect) {
         }
     }
 
-    const Color progress_color = enabled() ? style().accent : style().border;
+    const ControlVisualRecipe& fill_recipe = effective_theme().resolve(
+        ControlVisualRole::progress,
+        visual_context(false, false, true, false));
     if (visual_style_ == ProgressBarVisualStyle::blocks) {
         constexpr double gap = 2.0;
         constexpr double block = 9.0;
         if (orientation() == Orientation::horizontal) {
             for (double x = fill.x; x + block <= fill.x + fill.width; x += block + gap) {
-                painter.fill_rect({x, fill.y, block, fill.height}, progress_color);
+                paint_surface_material(
+                    painter, {x, fill.y, block, fill.height},
+                    fill_recipe.material);
             }
         } else {
             for (double y = fill.y + fill.height - block; y >= fill.y; y -= block + gap) {
-                painter.fill_rect({fill.x, y, fill.width, block}, progress_color);
+                paint_surface_material(
+                    painter, {fill.x, y, fill.width, block},
+                    fill_recipe.material);
             }
         }
     } else {
-        painter.fill_rect(fill, progress_color);
+        paint_surface_material(painter, fill, fill_recipe.material);
     }
-    if (fill.width > 0.0 && fill.height > 3.0) {
+    if (fill.width > 0.0 && fill.height > 0.0) {
         if (visual_style_ == ProgressBarVisualStyle::pulse) {
-            const double highlight_width = std::max(8.0, fill.width * 0.18);
-            const double x = fill.x +
-                std::max(0.0, fill.width - highlight_width) * presented_phase;
-            painter.fill_rect({x, fill.y, std::min(highlight_width, fill.width),
-                               fill.height}, style().accent_light);
-        } else {
+            paint_progress_luminance(
+                painter, fill, animation_appearance_.luminance_color,
+                animation_appearance_.pulse_extent, presented_phase);
+        } else if (visual_style_ == ProgressBarVisualStyle::marching_stripes) {
+            paint_progress_stripes(
+                painter, fill, animation_appearance_.stripe_color,
+                stripe_width_, animation_enabled_ ? presented_phase : 0.0);
+        } else if (visual_style_ == ProgressBarVisualStyle::laser_etch) {
+            paint_progress_laser(
+                painter, fill, interior, orientation(), animation_appearance_,
+                presented_phase, policy.reduced);
+        } else if (fill.height > 3.0) {
             painter.fill_rect({fill.x, fill.y, fill.width, 3.0},
-                              style().accent_light);
+                              fill_recipe.muted_text);
         }
     }
     if (overlay_style_ == ProgressBarOverlayStyle::moving_stripes &&
+        visual_style_ != ProgressBarVisualStyle::marching_stripes &&
         fill.width > 0.0 && fill.height > 0.0) {
-        // A retained clip makes the overlay reusable for both orientations and
-        // for a marquee band without allowing a diagonal to escape the fill.
-        const double pitch = stripe_width_ * 2.0;
-        const double travel = animation_enabled_
-            ? presented_phase * pitch : 0.0;
-        painter.save();
-        painter.clip_rect(fill);
-        const double begin = fill.x - fill.height - pitch + travel;
-        const double end = fill.x + fill.width + fill.height + pitch;
-        for (double x = begin; x <= end; x += pitch) {
-            painter.draw_line({x, fill.y + fill.height},
-                              {x + fill.height, fill.y},
-                              style().accent_light, stripe_width_);
-        }
-        painter.restore();
+        paint_progress_stripes(
+            painter, fill, animation_appearance_.stripe_color, stripe_width_,
+            animation_enabled_ ? presented_phase : 0.0);
     }
 }
 

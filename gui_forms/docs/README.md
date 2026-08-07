@@ -19,6 +19,12 @@ spike APIs to a frozen compatibility promise.
   stable-ID instrumentation, measured smoke result, and accessibility boundary.
 - [`../planning/CONTROL_COMPLETENESS_MATRIX.md`](../planning/CONTROL_COMPLETENESS_MATRIX.md)
   — the authoritative support/defer/exclude ledger for control families.
+- [`../planning/WINFORMS_API_CATALOGUE.md`](../planning/WINFORMS_API_CATALOGUE.md)
+  — pinned LibreWinForms/.NET 10 member-level oversight totals and honest
+  native/partial/missing/excluded states; the generated TSV contains every row.
+- [`../planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md`](../planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md)
+  — cross-cutting behavior and visual-superset gaps that API identities alone
+  cannot prove.
 - [`../planning/MASTER_IMPLEMENTATION_PLAN.md`](../planning/MASTER_IMPLEMENTATION_PLAN.md)
   — dependency order and release gates.
 - [`../planning/GUI_DRAWING_REVISION_PLAN.md`](../planning/GUI_DRAWING_REVISION_PLAN.md)
@@ -44,6 +50,28 @@ spike APIs to a frozen compatibility promise.
 - [`../experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md`](../experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md)
   — renderer-free GUI.Drawing value/resource/state semantics, independent C
   ABI, deterministic cross-language traces, and the precise M11f boundary.
+- [`../experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md`](../experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md)
+  — the 18,097-row nominal-base catalogue and the first revisioned,
+  non-reentrant coherent paint-lease implementation.
+- [`../experiments/M12P5_POPUP_CALLBACK_CONTAINMENT.md`](../experiments/M12P5_POPUP_CALLBACK_CONTAINMENT.md)
+  — deterministic reproduction and correction of stale popup stable IDs plus
+  portable/native foreign-callback exception containment.
+- [`../experiments/M12P5_BINDING_CURRENCY_KERNEL.md`](../experiments/M12P5_BINDING_CURRENCY_KERNEL.md)
+  — retained record currency, explicit control-property descriptors, two-way
+  update modes, format/parse/completion, manager transfer, and lifetime gates.
+- [`../experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`](../experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md)
+  — focus-driven cancellable validation, AutoValidate policy, automatic
+  OnValidation binding, and binding-aware ErrorProvider projection.
+- [`../experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md`](../experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md)
+  — renderer-free mnemonic text/routing, validated programmatic clicks, and
+  retained accept/cancel dialog commands.
+- [`../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md`](../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md)
+  — stable duplicate mnemonic arbitration, retained DialogResult/menu behavior,
+  and the AppKit dispatch-source exception boundary.
+- [`../experiments/M12P9_CONTROL_GEOMETRY_AND_ORDER.md`](../experiments/M12P9_CONTROL_GEOMETRY_AND_ORDER.md)
+  — exact geometry flags, masked bounds, preferred/AutoSize sizing,
+  direct-child filtering, nested traversal, and coherent topmost-first ordering
+  across the retained core and generated facade.
 - [`../experiments/M4A_UNICODE_TEXT_STORE.md`](../experiments/M4A_UNICODE_TEXT_STORE.md)
   — strict UTF-8, typed positions, atomic edits, Unicode line indexing, style
   spans, and deterministic corpus evidence.

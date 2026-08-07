@@ -187,6 +187,32 @@ namespace {
             current_point = element.second;
             has_current_point = true;
             break;
+        case PathVerb::quadratic:
+            if (!has_current_point || current_point != element.first) {
+                builder.moveTo(static_cast<SkScalar>(element.first.x),
+                               static_cast<SkScalar>(element.first.y));
+            }
+            builder.quadTo(static_cast<SkScalar>(element.second.x),
+                           static_cast<SkScalar>(element.second.y),
+                           static_cast<SkScalar>(element.third.x),
+                           static_cast<SkScalar>(element.third.y));
+            current_point = element.third;
+            has_current_point = true;
+            break;
+        case PathVerb::bezier:
+            if (!has_current_point || current_point != element.first) {
+                builder.moveTo(static_cast<SkScalar>(element.first.x),
+                               static_cast<SkScalar>(element.first.y));
+            }
+            builder.cubicTo(static_cast<SkScalar>(element.second.x),
+                            static_cast<SkScalar>(element.second.y),
+                            static_cast<SkScalar>(element.third.x),
+                            static_cast<SkScalar>(element.third.y),
+                            static_cast<SkScalar>(element.fourth.x),
+                            static_cast<SkScalar>(element.fourth.y));
+            current_point = element.fourth;
+            has_current_point = true;
+            break;
         case PathVerb::rectangle:
             builder.addRect(to_sk_rect(element.rect));
             has_current_point = false;
@@ -300,6 +326,18 @@ void configure_pen(SkPaint& paint, const PenSnapshot& pen,
     return SkTileMode::kClamp;
 }
 
+[[nodiscard]] SkTileMode texture_tile_mode_x(WrapMode mode) noexcept {
+    return mode == WrapMode::tile_flip_x || mode == WrapMode::tile_flip_xy
+        ? SkTileMode::kMirror
+        : mode == WrapMode::clamp ? SkTileMode::kClamp : SkTileMode::kRepeat;
+}
+
+[[nodiscard]] SkTileMode texture_tile_mode_y(WrapMode mode) noexcept {
+    return mode == WrapMode::tile_flip_y || mode == WrapMode::tile_flip_xy
+        ? SkTileMode::kMirror
+        : mode == WrapMode::clamp ? SkTileMode::kClamp : SkTileMode::kRepeat;
+}
+
 void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
                      const GraphicsState& state) {
     configure_paint(paint, state);
@@ -340,6 +378,28 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
                 SkTileMode::kRepeat, SkTileMode::kRepeat,
                 SkSamplingOptions(SkFilterMode::kNearest)));
         }
+        return;
+    }
+    if (brush.kind == BrushKind::texture) {
+        if (!brush.image.has_pixels()) {
+            paint.setColor(SK_ColorTRANSPARENT);
+            return;
+        }
+        const SkImageInfo info = image_info(
+            brush.image.width, brush.image.height, brush.image.pixel_format);
+        sk_sp<SkData> data = SkData::MakeWithCopy(
+            brush.image.pixels().data(), brush.image.pixels().size());
+        sk_sp<SkImage> image = SkImages::RasterFromData(
+            info, std::move(data), brush.image.row_bytes());
+        if (!image) {
+            paint.setColor(SK_ColorTRANSPARENT);
+            return;
+        }
+        const SkMatrix local = to_sk_matrix(brush.transform);
+        paint.setShader(image->makeShader(
+            texture_tile_mode_x(brush.wrap_mode),
+            texture_tile_mode_y(brush.wrap_mode),
+            sampling_for(state), local));
         return;
     }
 

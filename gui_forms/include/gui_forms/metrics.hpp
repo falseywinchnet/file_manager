@@ -64,6 +64,7 @@ struct MetricsSnapshot {
     std::uint64_t frame_deadlines_fired{};
     std::uint64_t active_surface_ticks{};
     std::uint64_t frame_requests_coalesced{};
+    std::uint64_t frame_callback_faults{};
     std::uint64_t active_surface_count{};
     std::uint64_t maximum_active_surface_count{};
     std::uint64_t occlusion_suspensions{};
@@ -124,6 +125,7 @@ public:
     void record_frame_poll(std::uint64_t deadlines_fired,
                            std::uint64_t active_surface_ticks,
                            std::uint64_t coalesced_requests) noexcept;
+    void record_frame_callback_fault() noexcept;
     void set_active_surface_count(std::size_t count) noexcept;
     void record_occlusion_transition(bool occluded) noexcept;
     void record_occluded_frame_poll() noexcept;

@@ -34,6 +34,18 @@ public:
     void draw_image(ImageId, Rect, double) override {}
 };
 
+class ThrowingFrameControl final : public Control {
+public:
+    explicit ThrowingFrameControl(StableId id) : Control(std::move(id)) {}
+
+    void on_frame(FrameTime) override {
+        ++frame_calls;
+        throw std::runtime_error("intentional frame callback fault");
+    }
+
+    std::uint64_t frame_calls{};
+};
+
 struct Fixture {
     Fixture() {
         root->set_requested_bounds({0.0, 0.0, 160.0, 90.0});
@@ -122,6 +134,39 @@ void test_active_surface_skips_catch_up_bursts() {
                 fixture.window->metrics_snapshot().active_surface_count == 0 &&
                 !fixture.window->needs_frame(),
             "disconnecting the active lease must restore quiescence");
+}
+
+void test_throwing_frame_callback_isolated_and_disconnected() {
+    auto root = make_control<Control>(StableId("scheduler.fault.root"));
+    auto throwing =
+        make_control<ThrowingFrameControl>(StableId("scheduler.fault.throwing"));
+    auto healthy = make_control<Control>(StableId("scheduler.fault.healthy"));
+    root->set_requested_bounds({0.0, 0.0, 160.0, 90.0});
+    throwing->set_requested_bounds({0.0, 0.0, 70.0, 40.0});
+    healthy->set_requested_bounds({80.0, 0.0, 70.0, 40.0});
+    root->add_child(throwing);
+    root->add_child(healthy);
+    Window window(root, {160.0, 90.0});
+    NullPainter painter;
+    window.paint(painter, window.take_damage().bounds());
+    window.reset_activity_metrics();
+    const FrameTime due = FrameTime{} + 33ms;
+    auto bad = window.activate_surface(throwing, 33ms, due);
+    auto good = window.activate_surface(healthy, 33ms, due);
+
+    const FramePollResult result = window.poll_frame_schedule(due);
+    const MetricsSnapshot metrics = window.metrics_snapshot();
+    require(result.active_surface_ticks == 2U &&
+                result.callback_faults == 1U &&
+                throwing->frame_calls == 1U && !bad.connected() &&
+                good.connected() && metrics.frame_callback_faults == 1U &&
+                metrics.active_surface_count == 1U && result.damage_pending,
+            "one throwing animation callback must disconnect itself, report the fault, and preserve a healthy peer");
+    window.paint(painter, window.take_damage().bounds());
+    const FramePollResult later = window.poll_frame_schedule(due + 33ms);
+    require(later.callback_faults == 0U && later.active_surface_ticks == 1U &&
+                throwing->frame_calls == 1U && good.connected(),
+            "a faulted frame request must not crash or retry on later native timer turns");
 }
 
 void test_owner_disposal_revokes_active_surface() {
@@ -269,6 +314,7 @@ int main() {
         test_deadline_is_exact_and_one_shot();
         test_same_target_deadlines_coalesce();
         test_active_surface_skips_catch_up_bursts();
+        test_throwing_frame_callback_isolated_and_disconnected();
         test_owner_disposal_revokes_active_surface();
         test_occlusion_pauses_and_rebases_active_surface();
         test_thirty_tick_band_stays_localized();

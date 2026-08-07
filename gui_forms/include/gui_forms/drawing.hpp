@@ -245,7 +245,31 @@ enum class HatchStyle : std::uint8_t {
     horizontal, vertical, forward_diagonal, backward_diagonal,
     cross, diagonal_cross,
 };
-enum class BrushKind : std::uint8_t { solid, hatch, linear_gradient, path_gradient };
+struct PixelStorage;
+
+struct ImageSnapshot final {
+    std::uint64_t stable_id{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
+    std::uint64_t generation{};
+
+    [[nodiscard]] bool has_pixels() const noexcept;
+    [[nodiscard]] std::size_t row_bytes() const noexcept;
+    [[nodiscard]] std::span<const std::byte> pixels() const noexcept;
+
+private:
+    std::shared_ptr<const PixelStorage> storage_;
+    friend class Bitmap;
+};
+
+enum class BrushKind : std::uint8_t {
+    solid,
+    hatch,
+    linear_gradient,
+    path_gradient,
+    texture,
+};
 
 struct ColorBlend final {
     std::vector<Color> colors;
@@ -264,6 +288,8 @@ struct BrushSnapshot final {
     std::vector<PointF> points;
     std::vector<Color> colors;
     std::vector<double> positions;
+    ImageSnapshot image;
+    Matrix transform;
 };
 
 class Brush : public DrawingObject {
@@ -405,18 +431,22 @@ private:
 };
 
 enum class PathVerb : std::uint8_t {
-    start_figure,
-    line,
-    rectangle,
-    ellipse,
-    arc,
-    close_figure,
+    start_figure = 0,
+    line = 1,
+    rectangle = 2,
+    ellipse = 3,
+    arc = 4,
+    close_figure = 5,
+    quadratic = 6,
+    bezier = 7,
 };
 
 struct PathElement final {
     PathVerb verb{};
     PointF first{};
     PointF second{};
+    PointF third{};
+    PointF fourth{};
     RectF rect{};
     double start_angle{};
     double sweep_angle{};
@@ -427,20 +457,25 @@ struct PathSnapshot final {
     std::vector<PathElement> elements;
 };
 
-struct PixelStorage;
-
 class GraphicsPath final : public DrawingObject {
 public:
     static constexpr std::size_t maximum_elements = 1'000'000;
 
     explicit GraphicsPath(FillMode fill_mode = FillMode::alternate);
+    [[nodiscard]] FillMode fill_mode() const;
+    void set_fill_mode(FillMode fill_mode);
     void reset();
     void start_figure();
     void close_figure();
     void add_line(PointF from, PointF to);
+    void add_quadratic(PointF from, PointF control, PointF to);
+    void add_bezier(PointF from, PointF control1, PointF control2, PointF to);
+    void add_beziers(std::span<const PointF> points);
+    void add_polygon(std::span<const PointF> points);
     void add_rectangle(RectF rectangle);
     void add_ellipse(RectF bounds);
     void add_arc(RectF bounds, double start_angle, double sweep_angle);
+    void add_pie(RectF bounds, double start_angle, double sweep_angle);
     void add_path(const GraphicsPath& path, bool connect);
     void transform(const Matrix& matrix);
     [[nodiscard]] bool is_visible(PointF point) const;
@@ -475,22 +510,6 @@ public:
 
 private:
     RegionSnapshot value_;
-};
-
-struct ImageSnapshot final {
-    std::uint64_t stable_id{};
-    std::uint32_t width{};
-    std::uint32_t height{};
-    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
-    std::uint64_t generation{};
-
-    [[nodiscard]] bool has_pixels() const noexcept;
-    [[nodiscard]] std::size_t row_bytes() const noexcept;
-    [[nodiscard]] std::span<const std::byte> pixels() const noexcept;
-
-private:
-    std::shared_ptr<const PixelStorage> storage_;
-    friend class Bitmap;
 };
 
 /*
@@ -587,6 +606,27 @@ private:
     std::uint64_t next_lock_token_{1};
     std::uint64_t active_lock_token_{};
     BitmapLockMode lock_mode_{BitmapLockMode::read};
+};
+
+class TextureBrush final : public Brush {
+public:
+    explicit TextureBrush(const Bitmap& image,
+                          WrapMode wrap_mode = WrapMode::tile);
+    explicit TextureBrush(const ImageReference& image,
+                          WrapMode wrap_mode = WrapMode::tile);
+
+    void set_wrap_mode(WrapMode mode);
+    void set_transform(Matrix transform);
+    void reset_transform();
+    void translate_transform(double x, double y);
+    void scale_transform(double x, double y);
+    void rotate_transform(double degrees);
+    [[nodiscard]] std::unique_ptr<TextureBrush> clone() const;
+    [[nodiscard]] BrushSnapshot snapshot() const override;
+
+private:
+    explicit TextureBrush(BrushSnapshot value);
+    BrushSnapshot value_;
 };
 
 struct GraphicsState final {

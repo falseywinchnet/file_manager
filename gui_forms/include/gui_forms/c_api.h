@@ -40,6 +40,7 @@ extern "C" {
 #define GF_ABI_VERSION_0_17 UINT32_C(0x00000011)
 #define GF_ABI_VERSION_0_18 UINT32_C(0x00000012)
 #define GF_ABI_VERSION_0_19 UINT32_C(0x00000013)
+#define GF_ABI_VERSION_0_20 UINT32_C(0x00000014)
 
 #define GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED UINT32_C(1)
 
@@ -61,6 +62,37 @@ typedef struct gf_rect {
     double width;
     double height;
 } gf_rect;
+
+typedef struct gf_point {
+    double x;
+    double y;
+} gf_point;
+
+typedef struct gf_size {
+    double width;
+    double height;
+} gf_size;
+
+typedef struct gf_scroll_axis_state {
+    uint32_t enabled;
+    uint32_t visible;
+    double minimum;
+    double maximum;
+    double large_change;
+    double small_change;
+    double value;
+} gf_scroll_axis_state;
+
+typedef struct gf_scroll_state {
+    uint32_t auto_scroll;
+    gf_point position;
+    gf_size margin;
+    gf_size minimum_content_size;
+    gf_rect display_rectangle;
+    gf_rect viewport_rectangle;
+    gf_scroll_axis_state horizontal;
+    gf_scroll_axis_state vertical;
+} gf_scroll_state;
 
 typedef struct gf_field_edit_result {
     uint64_t anchor_utf8;
@@ -392,6 +424,18 @@ typedef struct gf_api_v0 {
     /* ABI 0.19 additions: inherited retained cursor projection. */
     gf_result (*set_cursor)(gf_handle control, uint32_t cursor_kind);
     gf_result (*get_cursor)(gf_handle control, uint32_t* cursor_kind);
+
+    /* ABI 0.20 additions: retained two-axis ScrollableControl projection. */
+    gf_result (*set_auto_scroll_offset)(gf_handle control, gf_point offset);
+    gf_result (*set_auto_scroll)(gf_handle control, uint32_t enabled);
+    gf_result (*set_auto_scroll_margin)(gf_handle control, gf_size margin);
+    gf_result (*set_auto_scroll_min_size)(gf_handle control, gf_size size);
+    gf_result (*set_auto_scroll_position)(gf_handle control, gf_point position);
+    gf_result (*get_scroll_state)(gf_handle control, gf_scroll_state* state);
+    gf_result (*set_scroll_axis_state)(gf_handle control,
+                                       uint32_t orientation,
+                                       gf_scroll_axis_state state);
+    gf_result (*scroll_control_into_view)(gf_handle control, gf_handle child);
 } gf_api_v0;
 
 /*

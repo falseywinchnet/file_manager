@@ -35,6 +35,10 @@ struct FramePollResult final {
     std::uint64_t active_surface_ticks{};
     std::uint64_t ui_timer_ticks{};
     std::uint64_t coalesced_requests{};
+    // Application/toolkit frame callbacks are isolated individually. A
+    // throwing request is disconnected so one bad animated surface cannot
+    // repeatedly escape through a native timer callback or starve its peers.
+    std::uint64_t callback_faults{};
     bool damage_pending{};
     bool suppressed_by_occlusion{};
     std::optional<FrameTime> next_wake;

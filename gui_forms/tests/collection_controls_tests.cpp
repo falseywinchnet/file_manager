@@ -3,6 +3,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -17,6 +18,32 @@ namespace {
 
 using namespace gui_forms;
 using namespace std::chrono_literals;
+
+class ImageRecordingPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void clip_rounded_rect(Rect, double) override {}
+    void fill_rect(Rect, Color) override {}
+    void fill_rounded_rect(Rect, double, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void stroke_rounded_rect(Rect, double, Color, double) override {}
+    void fill_linear_gradient(Rect, Point, Point,
+                              std::span<const GradientStop>) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId image, Rect destination, double opacity) override {
+        images.push_back(image);
+        destinations.push_back(destination);
+        opacities.push_back(opacity);
+    }
+
+    std::vector<ImageId> images;
+    std::vector<Rect> destinations;
+    std::vector<double> opacities;
+};
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -75,6 +102,39 @@ void test_tree_model_validation() {
         rejected = true;
     }
     require(rejected, "TreeView must reject duplicate IDs and invalid depth jumps");
+}
+
+void test_tree_and_object_view_consume_keyed_image_list() {
+    auto root = make_control<Panel>(StableId("collections.images.root"));
+    auto tree = make_control<TreeView>(StableId("collections.images.tree"));
+    auto objects = make_control<ObjectView>(StableId("collections.images.objects"));
+    tree->set_requested_bounds({0.0, 0.0, 180.0, 80.0});
+    objects->set_requested_bounds({180.0, 0.0, 180.0, 100.0});
+    root->add_child(tree);
+    root->add_child(objects);
+    Window window(root, {360.0, 100.0});
+    const std::array<std::byte, 4> pixel{
+        std::byte{0x33}, std::byte{0x77}, std::byte{0xcc}, std::byte{0xff}};
+    const ImageLoadResult loaded = window.load_bgra32_premultiplied(
+        1U, 1U, 4U, pixel);
+    require(static_cast<bool>(loaded), "collection image fixture must load");
+    auto images = std::make_shared<ImageList>(window, Size{18.0, 18.0});
+    images->add_image("folder", loaded.image);
+    tree->set_image_list(images);
+    objects->set_image_list(images);
+    tree->set_items({{"tree.image", "Folder", 0U, false, false, true,
+                      "FOLDER"}});
+    objects->set_items({{"object.image", "Folder", "1 item", "Fixture",
+                         ObjectGlyph::folder, true, "folder"}});
+    window.perform_layout();
+    ImageRecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 360.0, 100.0});
+    require(painter.images.size() == 2U &&
+                painter.images[0] == loaded.image &&
+                painter.images[1] == loaded.image &&
+                !painter.destinations[0].empty() &&
+                !painter.destinations[1].empty(),
+            "TreeView and ObjectView must paint shared keyed ImageList resources instead of private glyph paths");
 }
 
 void test_object_virtualization_view_preservation_and_input() {
@@ -300,12 +360,13 @@ void test_shared_command_binding() {
         [&trace](const CommandInvocation& invocation) {
             trace += invocation.command_id + "@" + invocation.source_id + "\n";
         });
-    ribbon->on_activate();
-    status->on_activate();
+    require(ribbon->perform_click() && status->perform_click(),
+            "enabled command presentations must accept public click execution");
     require(trace == "view.mode@ribbon.view\nview.mode@status.view\n",
             "bound presentations must converge on one ordered command path");
     command->set_enabled(false);
-    ribbon->on_activate();
+    require(!ribbon->perform_click(),
+            "disabled command presentation must reject public click execution");
     require(!ribbon->enabled() && !status->enabled() &&
                 trace == "view.mode@ribbon.view\nview.mode@status.view\n",
             "disabled command state must synchronize and reject execution");
@@ -444,6 +505,7 @@ int main() {
     try {
         test_tree_visibility_identity_and_navigation();
         test_tree_model_validation();
+        test_tree_and_object_view_consume_keyed_image_list();
         test_object_virtualization_view_preservation_and_input();
         test_object_multiselection_pointer_keyboard_and_semantics();
         test_shared_command_binding();

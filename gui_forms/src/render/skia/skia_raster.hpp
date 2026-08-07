@@ -38,8 +38,25 @@ public:
     void restore() override;
     void translate(Point offset) override;
     void clip_rect(Rect rect) override;
+    void clip_rounded_rect(Rect rect, double radius) override;
     void fill_rect(Rect rect, Color color) override;
+    void fill_rounded_rect(Rect rect, double radius, Color color) override;
     void stroke_rect(Rect rect, Color color, double width) override;
+    void stroke_rounded_rect(Rect rect, double radius, Color color,
+                             double width) override;
+    void fill_linear_gradient(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops) override;
+    void fill_linear_gradient_spread(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops,
+        GradientSpreadMode spread) override;
+    void fill_radial_gradient(
+        Rect rect, Point center, Size radii,
+        std::span<const GradientStop> stops) override;
+    void draw_box_shadow(Rect rect, double corner_radius, Point offset,
+                         double blur_radius, double spread,
+                         Color color) override;
     void draw_line(Point from, Point to, Color color, double width) override;
     void draw_text_utf8(Point origin,
                         std::string_view text,
@@ -48,6 +65,11 @@ public:
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
+    void draw_image_region(ImageId image, Rect source, Rect destination,
+                           double opacity) override;
+    void fill_image_pattern(ImageId image, Size source_pixel_size,
+                            Rect destination, Size logical_tile_size,
+                            ImagePatternWrap wrap, double opacity) override;
 
 private:
     class Impl;

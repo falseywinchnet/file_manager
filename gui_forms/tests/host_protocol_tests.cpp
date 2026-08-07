@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -29,6 +30,9 @@ public:
 
     void on_pointer(PointerEvent& event) override {
         ++pointer_events;
+        if (throw_on_pointer) {
+            throw std::runtime_error("intentional host callback fault");
+        }
         event.handled = true;
     }
 
@@ -59,6 +63,58 @@ public:
     std::vector<DragAction> drag_actions;
     std::vector<DragDataItem> last_drag_items;
     DragEffect drag_effect{DragEffect::copy};
+    bool throw_on_pointer{};
+};
+
+class HostLeasePainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+};
+
+class HostLeaseInputProbe final : public Control {
+public:
+    explicit HostLeaseInputProbe(StableId id) : Control(std::move(id)) {
+        set_focusable(true);
+        set_allow_drop(true);
+    }
+
+    void on_paint(Painter& painter, Rect damage) override {
+        in_application_paint = true;
+        if (inject) {
+            result = inject();
+            inject = {};
+        }
+        in_application_paint = false;
+        painter.fill_rect(damage, Color::rgba(12, 24, 36));
+    }
+
+    void on_pointer(PointerEvent& event) override {
+        callback_during_paint |= in_application_paint;
+        ++pointer_events;
+        event.handled = true;
+    }
+
+    void on_drag(DragEvent& event) override {
+        callback_during_paint |= in_application_paint;
+        drag_actions.push_back(event.action);
+        event.accepted_effect = DragEffect::copy;
+        event.handled = true;
+    }
+
+    std::function<HostDispatchResult()> inject;
+    HostDispatchResult result;
+    bool in_application_paint{};
+    bool callback_during_paint{};
+    std::uint64_t pointer_events{};
+    std::vector<DragAction> drag_actions;
 };
 
 struct Fixture final {
@@ -248,6 +304,38 @@ void test_capabilities_and_normalized_dispatch() {
     require(fixture.host.dispatch(std::move(text), 4).handled &&
                 fixture.probe->last_text == "é",
             "committed UTF-8 host text must retain bytes and handling result");
+}
+
+void test_application_callback_fault_is_contained_at_host_boundary() {
+    Fixture fixture;
+    require(fixture.host.dispatch(
+                HostAttachEvent{{320.0, 180.0}, 1.0}, 1).accepted(),
+            "callback-fault fixture must attach before input");
+    fixture.probe->throw_on_pointer = true;
+    PointerEvent pointer;
+    pointer.action = PointerAction::down;
+    pointer.button = PointerButton::primary;
+    pointer.position = {10.0, 10.0};
+    pointer.pointer_id = 7U;
+    const HostDispatchResult fault = fixture.host.dispatch(pointer, 2);
+    const HostSessionSnapshot after_fault = fixture.host.session().snapshot();
+    require(fault.error == HostDispatchError::callback_fault &&
+                after_fault.callback_faults == 1U &&
+                after_fault.last_sequence == 2U &&
+                !fixture.window.captured_control(),
+            "throwing input callbacks must become an observable host fault and release capture");
+
+    fixture.probe->throw_on_pointer = false;
+    pointer.action = PointerAction::move;
+    const HostDispatchResult recovered = fixture.host.dispatch(pointer, 3);
+    require(recovered.accepted() && recovered.handled &&
+                fixture.host.session().snapshot().callback_faults == 1U,
+            "a contained callback fault must not poison later host dispatch");
+    require(std::string(host_dispatch_error_name(
+                HostDispatchError::callback_fault)) == "callback_fault" &&
+                after_fault.to_json().find("\"callback_faults\":1") !=
+                    std::string::npos,
+            "callback fault telemetry must be stable and machine readable");
 }
 
 void test_semantic_sound_cues_are_bounded_and_deterministic() {
@@ -845,11 +933,122 @@ void test_headless_trace_is_byte_deterministic() {
             "nested modal trace must be byte-identical across fresh adapters");
 }
 
+void test_headless_host_observes_model_originated_paint_wakes() {
+    Fixture fixture;
+    require(fixture.host.consume_paint_wake(),
+            "headless host must observe initial retained Window dirtiness");
+    static_cast<void>(fixture.window.take_damage());
+    fixture.probe->invalidate(Dirty::paint);
+    require(fixture.host.paint_wake_pending() &&
+                fixture.host.consume_paint_wake(),
+            "host paint wake must not depend on dispatching input through that Window");
+}
+
+void test_normalized_host_input_reports_paint_lease_deferral() {
+    auto probe =
+        make_control<HostLeaseInputProbe>(StableId("host.paint.input"));
+    probe->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    Window window(probe, {100.0, 80.0});
+    host::HeadlessHost host(window);
+    require(host.dispatch(
+                HostAttachEvent{{100.0, 80.0}, 1.0}, 1U).accepted(),
+            "lease-input fixture must attach before normalized input");
+
+    probe->inject = [&host] {
+        PointerEvent down;
+        down.action = PointerAction::down;
+        down.button = PointerButton::primary;
+        down.position = {20.0, 20.0};
+        down.pointer_id = 9U;
+        return host.dispatch(std::move(down), 2U);
+    };
+    HostLeasePainter painter;
+    const DamageRegion damage = window.take_damage();
+    window.paint(painter, damage.bounds());
+
+    require(probe->result.accepted() && probe->result.handled &&
+                probe->result.input_deferred &&
+                !probe->result.input_capacity_rejected &&
+                probe->pointer_events == 0U && !probe->callback_during_paint &&
+                host.dispatcher_wake_pending(),
+            "normalized host input must report accepted deferral without entering paint");
+    const DispatchDrainResult drain = host.pump_dispatcher();
+    require(drain.invoked == 1U && drain.remaining == 0U &&
+                probe->pointer_events == 1U && !probe->callback_during_paint &&
+                host.trace().find("event=pointer accepted=1 handled=1 "
+                                  "input_deferred=1 input_rejected=0") !=
+                    std::string::npos,
+            "headless host must deliver deferred input on one later dispatcher turn");
+}
+
+void test_drag_over_reuses_effect_and_compacts_while_painting() {
+    auto probe =
+        make_control<HostLeaseInputProbe>(StableId("host.paint.drag"));
+    probe->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    Window window(probe, {100.0, 80.0});
+    host::HeadlessHost host(window);
+    require(host.dispatch(
+                HostAttachEvent{{100.0, 80.0}, 1.0}, 1U).accepted(),
+            "lease-drag fixture must attach before normalized input");
+
+    DragEvent initial;
+    initial.action = DragAction::over;
+    initial.session_id = 77U;
+    initial.position = {20.0, 20.0};
+    initial.allowed_effects = DragEffect::copy | DragEffect::move;
+    initial.items.emplace_back(DragTextData{"lease-drag"});
+    const HostDispatchResult negotiated =
+        host.dispatch(std::move(initial), 2U);
+    require(negotiated.handled &&
+                negotiated.drag_effect == DragEffect::copy &&
+                !negotiated.input_deferred,
+            "an ordinary drag-over must establish the session's last valid effect");
+    probe->drag_actions.clear();
+    probe->invalidate(invalidation::paint_only);
+    std::uint64_t sequence = 3U;
+    bool every_deferred = true;
+    probe->inject = [&] {
+        HostDispatchResult last;
+        for (std::uint32_t index = 0U; index < 32U; ++index) {
+            DragEvent over;
+            over.action = DragAction::over;
+            over.session_id = 77U;
+            over.position = {20.0 + static_cast<double>(index), 20.0};
+            over.allowed_effects = DragEffect::copy | DragEffect::move;
+            over.items.emplace_back(DragTextData{"lease-drag"});
+            last = host.dispatch(std::move(over), sequence++);
+            every_deferred =
+                every_deferred && last.handled && last.input_deferred &&
+                !last.input_capacity_rejected &&
+                last.drag_effect == DragEffect::copy;
+        }
+        return last;
+    };
+
+    HostLeasePainter painter;
+    const DamageRegion damage = window.take_damage();
+    window.paint(painter, damage.bounds());
+    const DeferredInputSnapshot pending = window.deferred_input_snapshot();
+    require(every_deferred && probe->drag_actions.empty() &&
+                !probe->callback_during_paint && pending.pending == 1U &&
+                pending.coalesced_drag_overs == 31U &&
+                pending.drain_queued,
+            "paint-time drag-over must reuse the last effect and compact obsolete positions");
+    const DispatchDrainResult drain = host.pump_dispatcher();
+    require(drain.invoked == 1U && drain.remaining == 0U &&
+                probe->drag_actions == std::vector<DragAction>{DragAction::over} &&
+                !probe->callback_during_paint &&
+                window.deferred_input_snapshot().pending == 0U,
+            "one latest drag-over must deliver outside paint on the posted host turn");
+    window.cancel_drag();
+}
+
 } // namespace
 
 int main() {
     try {
         test_capabilities_and_normalized_dispatch();
+        test_application_callback_fault_is_contained_at_host_boundary();
         test_semantic_sound_cues_are_bounded_and_deterministic();
         test_typed_dialog_requests_and_results();
         test_typed_drag_destination_routing_and_bounds();
@@ -860,6 +1059,9 @@ int main() {
         test_lifecycle_transition_guards();
         test_close_cancellation_and_closed_cleanup();
         test_headless_trace_is_byte_deterministic();
+        test_headless_host_observes_model_originated_paint_wakes();
+        test_normalized_host_input_reports_paint_lease_deferral();
+        test_drag_over_reuses_effect_and_compacts_while_painting();
         std::cout << "headless_capabilities="
                   << host::headless_capabilities().to_json() << '\n';
         std::cout << canonical_host_trace();

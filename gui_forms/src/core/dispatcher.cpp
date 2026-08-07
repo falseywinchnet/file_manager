@@ -348,6 +348,9 @@ void Window::set_dispatch_wake_handler(std::function<void()> wake_handler) {
 
 void Window::shutdown_dispatcher() noexcept {
     if (!dispatcher_state_) return;
+    if (std::this_thread::get_id() == ui_thread_) {
+        abandon_deferred_input();
+    }
     std::deque<std::shared_ptr<detail::DispatchWork>> pending;
     {
         std::scoped_lock lock(dispatcher_state_->mutex);

@@ -1096,6 +1096,305 @@ Current bounded M11 rounds:
    editing, binding/source selection, responsive collapse/pane
    persistence, then damage isolation, sustained paint measurement, and soak.
 
+**MEASURED PARTIAL M11h / nominal-base correction:** the pinned LibreWinForms
+and .NET 10 reference surfaces now generate an 18,097-row member ledger. It
+reports missing/partial/excluded status conservatively and makes the 1,104-row
+specimen facade an explicit floor rather than a completion score. The first
+corrective tranche stores buffering/control styles and adds revisioned,
+exclusive, non-reentrant transaction paint leases with coherent callback-fault
+abandon and host presentation release. It also closes a first base-Control
+tranche: mutable Name, constrained finite geometry, coordinate conversion,
+containment, z-order operations, and deterministic TabIndex/TabStop traversal.
+Physical native-host reentry coverage, drag/semantic deferral, raster swap on
+backend fault, multi-rectangle host release, ABI projection, and the majority of the
+nominal API ledger remain open. Evidence:
+`experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md`.
+
+**GIVEN / REQUIRED paint-pipeline closure:**
+`planning/PAINT_PIPELINE_AVAILABILITY.md` makes the high-rate buffering premise
+a baseline contract rather than an optional host feature: mutation may outrun
+rendering and rendering may outrun presentation without backlog or incomplete
+pixels. The existing content/rendered/presented revisions, coalesced wake,
+exclusive lease, rendering-dirty follow-up, ready state, and host release are
+measured. M11h-P1 replaces compatibility-surface capture-on-flush with dirty
+signals and one target-scoped drain; M12-P2 requires atomic candidate-raster
+swap; M12-P3 adds input/stall/producer-pressure conformance; M11h/M12-P4
+projects the mandatory contract version plus only genuinely optional host
+accelerations through availability reporting.
+
+**MEASURED PARTIAL M11h-P1 / compatibility-surface drains:** generated
+`Graphics.FromHwnd` now retains its private GUI.Drawing bitmap instead of
+recapturing the HWND before every Flush. Flush, ReleaseHdc, EndPaint, callback
+return, resize, visibility, and Invalidate mark a revisioned direct-surface
+queue; one owner-thread drain imports the newest pixels, one active lease rejects
+reentry, and one dirty-after bit preserves a later pass. Physical Wine proves
+sixteen Flush updates plus ReleaseHdc collapse into one changed import, a raw
+unobservable GDI write is found once by the adaptive 33–250 ms fallback, and
+Update from OnPaint reaches depth one with one follow-up. The same generated
+Control surface now reflects protected `DoubleBuffered`/style state and reuses
+one size-matched managed owner-paint bitmap; background and foreground share a
+transaction, resize abandons the stale epoch and posts one replacement, disable
+retires persistence, and callback failure preserves the last raster without a
+self-retry loop. Rectangle-aware GDI damage, presentation acknowledgement, and
+the full ordering/failure corpus remain. Evidence:
+`experiments/M11H_COMPATIBILITY_SURFACE_DRAINS.md`.
+
+**MEASURED PARTIAL M11h-P1 / managed damage continuation:** all six nominal
+`Control.Invalidate` overloads, `InvalidateEventArgs`, `Invalidated`,
+`NotifyInvalidate`, `OnInvalidated`, and GUI.Drawing `Region.GetBounds` are now
+generated behavior rather than owner-level placeholders. Persistent buffered
+surfaces clip, union, and consume rectangle damage once; child invalidation is
+intersected and coordinate-translated; failed paint restores its lease damage;
+ephemeral paint promotes to a coherent full surface. Physical Wine proves each
+center. Nonrectangular region fidelity, direct-GDI rectangle damage, and partial
+native upload/presentation remain open.
+
+**MEASURED PARTIAL M11h-P1 / managed paint-input continuation:** generated
+pointer, key, and text ingress now defers behind one bounded UI-thread queue
+while any managed paint lease is active and posts one ordered drain after the
+outermost lease. Physical Wine proves pointer-before-key delivery outside
+application paint, one ordinary localized invalidation flush, and deterministic
+abandonment when a control disposes from `OnPaint`. That disposal also retires
+the paint candidate without querying its dead native peer. Managed key-preview
+return-value parity and physical native-host coverage remain M12-P3 work.
+
+**MEASURED PARTIAL M12-P3 / retained input-pressure continuation:** portable
+`Window` now owns a renderer-neutral deferred-input queue with a fixed 1,024
+event capacity, adjacent pointer-move and same-session drag-over compaction, one
+posted outermost-lease drain, per-event fault isolation, and explicit retirement
+counters.
+Normal and renderer-free gates inject 100 moves plus down/key/text during paint:
+the moves become one latest position, critical input remains ordered, no
+application callback enters paint, and one input mutation produces one ordinary
+later paint with zero residual work. A 1,025-key root-retirement gate proves the
+capacity, one explicit rejection, and deterministic abandonment. Thirty-two
+drag overs reuse only the same session's prior valid effect and compact to one
+delivery; stable-identity semantic Press invokes once after release and uses the
+ordinary invalidation path. `HostDispatchResult` and `DragDispatchResult`
+distinguish deferred retention from capacity rejection. Physical native-host
+reentry and slow renderer/presenter/occlusion storms remain. Evidence:
+`experiments/M12P3_RETAINED_INPUT_PRESSURE.md`.
+
+**MEASURED PARTIAL M12-P3 / presentation-pressure and frame-fault
+continuation:** `Window::paint` now returns an exact revision/epoch receipt
+only after backend replay and a second owner/epoch check. macOS and Win32
+publish and acknowledge only that receipt; duplicate, backward, and
+replaced-epoch releases are rejected and counted. Deterministic gates inject
+100 replay-boundary mutations, one deferred pointer, eight nested paint
+attempts, replay-time resize, backend fault, retirement, and 100 occluded
+mutations. Each path retains one wake/drain/follow-up and returns to zero work.
+Frame/UI-timer callback faults now disconnect and count only the failing lease
+while healthy peers continue; native timer callbacks contain any residual C++
+exception. A supplied AppKit wake-source `std::terminate` report established
+the escaped-exception class. M12-P5 then reproduced the concrete fault through
+deterministic slider/navigation/tooltip churn and corrected popup unregister
+ownership; host callback containment remains a last boundary, not a substitute
+for fixing the model fault. Candidate-raster swap, physical native paint
+reentry, and wall-clock native soak remain. Evidence:
+`experiments/M12P3_PRESENTATION_PRESSURE_AND_FRAME_FAULTS.md`.
+
+**MEASURED PARTIAL M12-P4 / guidance-provider continuation:** the generated
+LibreWinForms ledger selected the previously missing ErrorProvider/HelpProvider
+family rather than a showcase-local need. Public `ErrorProvider` now owns
+per-control error strings, six alignments, padding, portable icon substitution,
+RTL, Tag, semantic invalid/error projection, and independently retained popup
+glyphs. Changed-error blink is a bounded six-transition active surface;
+AlwaysBlink remains active only while schedulable, NeverBlink is idle,
+occlusion suppresses deadlines, and reduced motion settles visible. Target,
+ancestor, provider, and Window lifetime paths revoke or restore adornments
+deterministically. Public `HelpProvider` retains string, keyword, navigator,
+namespace, automatic/explicit ShowHelp, reset, and Tag; F1 walks focus ancestry
+and emits a mutable Control event before provider policy. It never launches an
+external help resource. The Complete Showcase dogfoods both providers. Binding
+and currency integration, TopicId/raw managed enum projection, described-by
+relations, DML/C ABI, localization refresh, and native accessibility publisher
+verification remain open. Evidence:
+`experiments/M12P4_GUIDANCE_PROVIDERS.md`.
+
+**MEASURED PARTIAL M12-P5 / popup and callback containment:** a 48-cycle
+range-to-Animation sequence deterministically reproduced the reported
+intermittent abort as a duplicate tooltip popup stable ID. `ToolTip` had
+released its strong overlay references before disconnecting the weak popup
+attachment, so Window could no longer detach and unregister the subtree. It
+now closes the token first; a separate 32-cycle keyboard tooltip test proves
+stable-ID reuse. Portable host dispatch and AppKit damage/posted-work/draw
+callbacks contain and count residual application exceptions so none crosses a
+foreign callback boundary. Focused normal and sanitizer gates pass; another
+manual trace is not required for this defect. Evidence:
+`experiments/M12P5_POPUP_CALLBACK_CONTAINMENT.md`.
+
+**MEASURED PARTIAL M12-P5 / binding and currency:** public renderer-neutral
+`BindingValue`, explicit `BindableProperty`, `BindingSource`, `Binding`,
+`CurrencyManager`/`BindingManagerBase`, `ControlBindingsCollection`, and
+`BindingContext` now provide stable retained records, edit/list/currency
+mutation, deterministic notification, suspension coalescing, immediate /
+explicit-validation / never update modes, strict invariant conversion,
+Format/Parse plus F0..F12, null substitution, post-commit completion and error
+propagation, manager-wide push/pull, and synchronous endpoint/context cleanup.
+Base state, stock text/check/range, NumericUpDown Value, and ComboBox Text /
+SelectedIndex are registered properties. The Complete Showcase Values page
+dogfoods three two-way fields and record currency. Normal, sanitizer, strict
+renderer-free, MinGW x64, and Wine gates pass. At this stage managed-object
+projection, nested DataMember, culture providers, sort/filter, focus
+validation, ErrorProvider integration, BindingNavigator, DataGridView, DML,
+and C ABI were the next tranche; focus validation and ErrorProvider binding are
+closed immediately below by M12-P6. Evidence:
+`experiments/M12P5_BINDING_CURRENCY_KERNEL.md`.
+
+**MEASURED PARTIAL M12-P6 / validation and bound errors:** `Control` now
+retains `CausesValidation`, cancellable `Validating`, and successful
+`Validated`; `ContainerControl` retains exact-value inherited `AutoValidate`,
+explicit validation, and constrained child validation. Window executes the
+transaction before focus loss, supports prevent/allow/disable policy, walks
+the previous branch only to the common ancestor, rejects nested focus
+mutation, rechecks callback-mutated endpoints, and exposes deterministic
+counters. `Binding` subscribes OnValidation to that transaction. BindingSource
+records carry portable record-wide/field errors, and ErrorProvider now binds
+to real targets, aggregates record and BindingComplete failures, follows
+currency, and revokes on source retirement. The Complete Showcase dogfoods the
+path, while its existing 48-cycle slider-to-Animation scenario keeps the
+previous intermittent crash deterministic. Arbitrary managed IDataErrorInfo,
+true nested object traversal, ABI projection, and deeper native oracle parity
+remain open. Evidence:
+`experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`.
+
+**MEASURED PARTIAL M12-P7 / dialog keys and mnemonics:** the renderer-free
+control kernel now parses single-marker/escaped-ampersand mnemonic text,
+projects marker-free measure/paint/semantics, and routes Alt+letter/digit in
+stable effective retained order after the focused route and accelerators.
+Label/GroupBox focus the next selectable control. ButtonBase owns a validated
+programmatic command path shared by mnemonics and semantic press. Window/Form
+retains accept/cancel targets, transfers the Button default cue, routes
+Enter/Escape without focus theft, contains commands to the active focus scope,
+clears disposed targets, and exposes attempt/handled counters. The Complete
+Showcase dogfoods those contracts. Duplicate-mnemonic cycling, locale-sensitive
+case folding/underline cues, native DialogResult/modal closure, managed
+protected-call/C ABI projection, and an independent Windows oracle remain.
+Evidence: `experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md`.
+
+**MEASURED PARTIAL M12-P8 / command arbitration and native callback
+boundaries:** mnemonic dispatch now snapshots one stable eligible candidate
+set before application callbacks, confines it to the active focus scope,
+cycles duplicate winners, and exposes candidate/collision/cycle counters.
+MenuStrip and popup rows share marker-free measure/paint/semantics and retained
+Command activation. The native core publishes every exact DialogResult value,
+rejects numeric gaps, defaults a previously unset cancel Button, and propagates
+Button Click before Window result. Independent native modal-loop closure and
+protected managed ToolStrip projection remain open. The historical
+Ranges-to-Animation crash is isolated to an Objective-C exception escaping the
+AppKit dispatch-source wake; that boundary now records name/reason instead of
+terminating. The exact user path passes 48 deterministic retained cycles and
+10 real AppKit cycles after repair. Evidence:
+`experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md`.
+
+**MEASURED PARTIAL M12-P9 / Control geometry and order:** the retained core and
+generated facade now publish exact AutoSizeMode, BoundsSpecified, and
+GetChildAtPointSkip values; masked bounds, proposed preferred size,
+GrowOnly/GrowAndShrink AutoSize, point/rectangle ancestry transforms,
+direct-child filtered lookup, non-wrapping nested TabIndex traversal, and
+index-zero-topmost collection mutation. The audit corrected a generated-facade
+ordering split where Add/BringToFront disagreed with SetChildIndex, docking,
+and native paint order. Portable desktop-screen origin, multi-monitor/DPI
+rounding, protected event-order parity, and hard AutoSize convergence remain
+open. Evidence: `experiments/M12P9_CONTROL_GEOMETRY_AND_ORDER.md`.
+
+**MEASURED PARTIAL M11h / progress-effects continuation:** public
+`ProgressBar` now owns three additional reusable visual styles: a slow
+forward-travelling luminance pulse, clipped marching stripes, and a laser-etch
+style with a vertically shifting repeated phase field, leading-edge energy,
+compact white-hot corona/core, short phase-shifted flame lobes, and sparse ember
+flecks. Long tendril-like particles were rejected during native dogfood.
+`ProgressBarAnimationAppearance` validates and
+commits all effect colors and geometry atomically. Every style uses the common
+retained frame lease, pause/disable/visibility quiescence, and reduced-motion
+policy; none is a showcase-private painter. Deterministic painter probes and
+the native Complete Showcase ranges board are recorded in
+`experiments/M11H_PROGRESS_ANIMATION_STYLES.md`.
+
+**MEASURED PARTIAL M11h / visual-material correction:** the public retained
+paint vocabulary and display chunks now carry rounded clip/fill/stroke,
+multi-stop linear gradients with pad/repeat/reflect spread, elliptical radial
+gradients, and bounded box shadows.
+Public `SurfaceMaterial`/`MaterialPanel` provides content-agnostic ordered
+layers, border, shadow, normalized resizing, atomic validation, and bounded
+visual outsets whose former extents participate in damage. Private Skia,
+CoreGraphics, and Win32 DIB painters implement the vocabulary; the File Manager
+title/ribbon consumes it through public API, including a logical-period title
+texture. Exact repeated-period probes pass in Skia and CoreGraphics; Win32 DIB
+uses the same renderer-neutral spread contract.
+
+**MEASURED PARTIAL M11h / visual-composition continuation:** an immutable
+complete theme matrix now covers eleven relational roles, seven surface states,
+selected/unselected, and ordinary/high-contrast axes. Window replacement is
+atomic; retained controls inherit or locally override a theme. Panel,
+Button/command/accent Button, CheckBox, RadioButton, Card, TextBox, ListBox
+selection, ComboBox, MenuStrip, and ProgressBar consume relational recipes,
+while explicit local style overrides preserve compatibility paint. A stock-role
+routing fixture proves application replacement reaches each family. Public Card provides atomic header/body/footer composition and full
+interactive state. Public MasterDetailView provides arbitrary retained roles,
+genuine splitter input, focus-safe compact navigation, and automatic wide
+restoration. The File Manager dogfoods twelve public palette Cards. Immutable,
+validated spacing/geometry/typography/motion tokens now drive Card and
+MasterDetailView defaults while preserving explicit overrides and reset. This
+still does not close M9: complete control/type adoption, density variants,
+remaining typed specimen/disclosure/step patterns, rich icons,
+masks/groups/effects, vector role assets, and broader image import remain open.
+
+**MEASURED PARTIAL M11h / typed review and paint-wake continuation:** Label now
+inherits explicit body/control/caption/heading/title/monospace typography roles
+and state-aware foreground from the immutable structural theme, while local
+font/color overrides remain authoritative and resettable. Public `ReviewCard`
+atomically projects validated decision/evidence/verdict records through ordinary
+Card ownership, layout, interaction, tokenized events, and complete semantics;
+the File Manager DNA surface now dogfoods it. Native individual-window
+inspection also reproduced a cross-window stale-frame defect: controller
+mutation changed the product semantics but pixels waited for product input. A
+renderer-neutral coalesced paint wake now rearms after damage consumption,
+suppresses while occluded, and wakes on exposure. AppKit, Win32, and headless
+hosts implement it; the repeated controller action immediately presents Program
+DNA without a target-window click.
+
+**MEASURED PARTIAL M11h / rich-image continuation:** the generated nominal
+ledger's 46 ImageList/ImageCollection rows are promoted from `missing` to
+conservative `partial_native` because a real renderer-neutral type now exists.
+It owns ordered ASCII-case-insensitive keys, stable indices, bounded logical size,
+Tag, revision/events, atomic PNG or existing-image variants, deterministic
+normal/hot/pressed/selected/disabled and density fallback, and synchronous
+owned-resource disposal. ButtonBase implements direct Image plus ImageList
+key/index selection, alignment, five text/image relations, gap, measurement,
+pressed displacement, and state painting; TreeView/ObjectView virtual rows use
+the same list. The Complete Showcase visibly dogfoods an authored normal/hot/
+disabled folder icon. Native handles/streams, strip slicing, color-key,
+quantized import, and vector/provenance role packs remain open; reusable
+nine-patch is processed by the following image-material continuation.
+
+**MEASURED PARTIAL M11h / image-material continuation:** the retained Painter
+and display-chunk vocabulary now carries source-pixel image regions. Skia,
+CoreGraphics, and Win32 DIB painters realize the same crop contract. Public
+SurfaceMaterial adds atomically validated stretch, exact-period tile with
+cropped partial edges, and density-aware nine-patch layers; attached
+MaterialPanel rejects missing or stale-size Window resources. GUI.Drawing adds
+bitmap-snapshot `TextureBrush` with tile/mirror/clamp wrapping, affine
+transforms, cloning, deterministic trace, and Skia shader execution. The
+Complete Showcase visibly dogfoods a crisp nine-patch and diagonal texture
+tile. Physical Wine automation navigates to the page, captures the 1280×820
+Win32 DIB surface with both materials intact, and closes normally. All 22
+TextureBrush owner rows are conservatively `partial_native`;
+source-rectangle/image-attribute constructors, MatrixOrder overload parity,
+managed/C ABI projection, masks/groups/effects, and vector assets remain open.
+
+**MEASURED PARTIAL M11h / DNA and backplane correction:** the File Manager now
+dogfoods `MasterDetailView` and interactive public `Card` in a four-record DNA
+decision browser. Tests cover wide side-by-side projection, compact
+master/detail navigation, selection transfer, controller routing, and Folder
+restoration. Native AppKit inspection also exposed a stale-pixel defect after
+popup detachment: damage already covered the former bounds, but a transparent
+layout root did not repaint empty gaps. `Window::paint` now records the themed
+window backplane in full window coordinates, clipped to damage, before
+application planes. Model tests prove pointer and semantic popup-closure damage
+and retained backplane replay; live Computer Use confirms the native popup
+pixels clear.
+
 M11g remains active, and the first bounded M11h Forms-semantics slice is
 measured: instrumentation distinguishes missing Forms behavior from owned
 drawing behavior without the temporary Microsoft drawing implementation.

@@ -11,15 +11,24 @@
 namespace gui_forms::detail {
 
 enum class DisplayOperation : std::uint8_t {
-    save,
-    restore,
-    translate,
-    clip_rect,
-    fill_rect,
-    stroke_rect,
-    draw_line,
-    draw_text_utf8,
-    draw_image,
+    save = 0,
+    restore = 1,
+    translate = 2,
+    clip_rect = 3,
+    fill_rect = 4,
+    stroke_rect = 5,
+    draw_line = 6,
+    draw_text_utf8 = 7,
+    draw_image = 8,
+    clip_rounded_rect = 9,
+    fill_rounded_rect = 10,
+    stroke_rounded_rect = 11,
+    fill_linear_gradient = 12,
+    fill_radial_gradient = 13,
+    draw_box_shadow = 14,
+    fill_linear_gradient_spread = 15,
+    draw_image_region = 16,
+    fill_image_pattern = 17,
 };
 
 struct DisplayCommand final {
@@ -31,6 +40,11 @@ struct DisplayCommand final {
     FontSpec font{};
     ImageId image{};
     double scalar{};
+    double secondary_scalar{};
+    double tertiary_scalar{};
+    std::vector<GradientStop> gradient_stops;
+    GradientSpreadMode gradient_spread{GradientSpreadMode::pad};
+    ImagePatternWrap image_pattern_wrap{ImagePatternWrap::tile};
     std::string text;
 };
 
@@ -62,8 +76,25 @@ public:
     void restore() override;
     void translate(Point offset) override;
     void clip_rect(Rect rect) override;
+    void clip_rounded_rect(Rect rect, double radius) override;
     void fill_rect(Rect rect, Color color) override;
+    void fill_rounded_rect(Rect rect, double radius, Color color) override;
     void stroke_rect(Rect rect, Color color, double width) override;
+    void stroke_rounded_rect(Rect rect, double radius, Color color,
+                             double width) override;
+    void fill_linear_gradient(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops) override;
+    void fill_linear_gradient_spread(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops,
+        GradientSpreadMode spread) override;
+    void fill_radial_gradient(
+        Rect rect, Point center, Size radii,
+        std::span<const GradientStop> stops) override;
+    void draw_box_shadow(Rect rect, double corner_radius, Point offset,
+                         double blur_radius, double spread,
+                         Color color) override;
     void draw_line(Point from, Point to, Color color, double width) override;
     void draw_text_utf8(Point origin,
                         std::string_view text,
@@ -72,6 +103,11 @@ public:
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
+    void draw_image_region(ImageId image, Rect source, Rect destination,
+                           double opacity) override;
+    void fill_image_pattern(ImageId image, Size source_pixel_size,
+                            Rect destination, Size logical_tile_size,
+                            ImagePatternWrap wrap, double opacity) override;
 
     [[nodiscard]] std::shared_ptr<const DisplayChunk> finish(
         std::uint64_t generation, PaintPlane plane, Rect logical_bounds);

@@ -333,6 +333,126 @@ void test_cursor_inheritance_and_override() {
             "clearing a cursor override must restore inheritance");
 }
 
+void test_control_identity_geometry_constraints_and_z_order() {
+    auto root = make_control<Control>(StableId("control.root"));
+    auto first = make_control<Control>(StableId("control.first"));
+    auto second = make_control<Control>(StableId("control.second"));
+    auto nested = make_control<Control>(StableId("control.second.nested"));
+    std::string observed_name;
+    auto changed = first->name_changed().subscribe(
+        [&observed_name](const std::string& name) { observed_name = name; });
+    first->set_name("primary-field");
+    require(first->name() == "primary-field" &&
+                observed_name == "primary-field" &&
+                first->stable_id().value() == "control.first",
+            "mutable Forms Name must remain distinct from immutable retained identity");
+
+    first->set_minimum_size({40.0, 20.0});
+    first->set_maximum_size({80.0, 60.0});
+    first->set_requested_bounds({10.0, 12.0, 5.0, 100.0});
+    require(first->requested_bounds() == Rect{10.0, 12.0, 40.0, 60.0} &&
+                first->left() == 10.0 && first->top() == 12.0 &&
+                first->right() == 50.0 && first->bottom() == 72.0,
+            "requested bounds must apply finite minimum/maximum constraints");
+    bool invalid_rejected = false;
+    try {
+        first->set_requested_bounds({0.0, 0.0, -1.0, 1.0});
+    } catch (const std::invalid_argument&) {
+        invalid_rejected = true;
+    }
+    require(invalid_rejected,
+            "negative control extents must be rejected before retained layout mutation");
+
+    second->set_requested_bounds({10.0, 12.0, 40.0, 60.0});
+    nested->set_requested_bounds({2.0, 2.0, 8.0, 8.0});
+    nested->set_tab_index(5U);
+    second->set_tab_index(10U);
+    first->set_tab_index(20U);
+    second->add_child(nested);
+    root->add_child(first);
+    root->add_child(second);
+    root->set_requested_bounds({0.0, 0.0, 120.0, 90.0});
+    Window window(root, {120.0, 90.0});
+    window.perform_layout();
+    require(root->contains(*first) && !first->contains(*root) &&
+                first->point_to_window({2.0, 3.0}) == Point{12.0, 15.0} &&
+                first->point_from_window({12.0, 15.0}) == Point{2.0, 3.0} &&
+                first->rectangle_to_window({2.0, 3.0, 5.0, 7.0}) ==
+                    Rect{12.0, 15.0, 5.0, 7.0} &&
+                first->rectangle_from_window({12.0, 15.0, 5.0, 7.0}) ==
+                    Rect{2.0, 3.0, 5.0, 7.0},
+            "containment and window-coordinate conversion must use committed retained geometry");
+    require(root->child_index(second->runtime_id()) == 0U &&
+                root->child_index(first->runtime_id()) == 1U &&
+                !root->child_index(nested->runtime_id()),
+            "child indices must expose topmost-first direct-child z order");
+    require(root->get_child_at_point({20.0, 20.0}) == second,
+            "direct child lookup must return the topmost overlapping child");
+    window.capture_pointer(second, 1U);
+    second->set_hit_test_transparent(true);
+    require(root->get_child_at_point(
+                {20.0, 20.0}, GetChildAtPointSkip::transparent) == first &&
+                window.hit_test({20.0, 20.0}) == first &&
+                window.captured_control() == nullptr,
+            "transparent child lookup and ordinary pointer routing must pass through and revoke capture coherently");
+    second->set_hit_test_transparent(false);
+    second->set_enabled(false);
+    require(root->get_child_at_point(
+                {20.0, 20.0}, GetChildAtPointSkip::disabled) == first,
+            "disabled child lookup exclusion must reveal the next z-order candidate");
+    second->set_enabled(true);
+    second->set_visible(false);
+    require(root->get_child_at_point(
+                {20.0, 20.0}, GetChildAtPointSkip::invisible) == first,
+            "invisible child lookup exclusion must reveal the next z-order candidate");
+    second->set_visible(true);
+    require(root->get_next_control({}, true) == second &&
+                root->get_next_control(second, true) == nested &&
+                root->get_next_control(nested, true) == first &&
+                root->get_next_control(first, true) == nullptr &&
+                root->get_next_control(first, false) == nested,
+            "GetNextControl must traverse stable nested tab order without wrapping");
+
+    first->set_bounds({25.0, 30.0, 70.0, 50.0},
+                      BoundsSpecified::location | BoundsSpecified::width);
+    require(first->requested_bounds() == Rect{25.0, 30.0, 70.0, 60.0},
+            "masked bounds mutation must preserve unspecified constrained fields");
+    bool invalid_bounds_mask_rejected = false;
+    try {
+        first->set_bounds({}, static_cast<BoundsSpecified>(0x80U));
+    } catch (const std::invalid_argument&) {
+        invalid_bounds_mask_rejected = true;
+    }
+    require(invalid_bounds_mask_rejected,
+            "unknown BoundsSpecified bits must be rejected before mutation");
+
+    first->bring_to_front();
+    require(root->children().back() == first &&
+                root->child_index(first->runtime_id()) == 0U,
+            "BringToFront must move the child to retained topmost z order");
+    first->send_to_back();
+    require(root->children().front() == first &&
+                root->child_index(first->runtime_id()) == 1U,
+            "SendToBack must move the child to retained backmost z order");
+
+    auto sizing = make_control<Control>(StableId("control.autosize"));
+    auto content = make_control<Control>(StableId("control.autosize.content"));
+    sizing->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    sizing->set_padding({2.0, 2.0, 2.0, 2.0});
+    content->set_requested_bounds({10.0, 8.0, 40.0, 20.0});
+    sizing->add_child(content);
+    std::size_t auto_size_events{};
+    auto auto_size_token = sizing->auto_size_changed().subscribe(
+        [&auto_size_events](bool value) { if (value) ++auto_size_events; });
+    sizing->set_auto_size(true);
+    require(sizing->get_preferred_size({200.0, 200.0}) == Size{100.0, 80.0} &&
+                auto_size_events == 1U,
+            "GrowOnly AutoSize must retain authored minimum extent and publish one change");
+    sizing->set_auto_size_mode(AutoSizeMode::grow_and_shrink);
+    require(sizing->get_preferred_size({200.0, 200.0}) == Size{55.0, 33.0},
+            "GrowAndShrink AutoSize must derive deterministic child, margin, and padding extent");
+}
+
 void test_damage_and_idle_metrics() {
     DamageRegion region;
     region.add({0.0, 0.0, 10.0, 10.0});
@@ -476,6 +596,40 @@ void test_semantic_feedback_is_clocked_bounded_and_sound_optional() {
             "feedback history and trace must be deterministic and bounded");
 }
 
+void test_paint_wake_is_coalesced_and_rearmed_after_damage_consumption() {
+    auto root = make_control<ProbeControl>(StableId("paint-wake.root"));
+    Window window(root, {120.0, 80.0});
+    unsigned wakes{};
+    window.set_paint_wake_handler([&] { ++wakes; });
+    require(wakes == 1U,
+            "installing a host paint seam on a dirty Window must request one wake");
+    static_cast<void>(window.take_damage());
+
+    root->invalidate(Dirty::paint);
+    root->invalidate(Dirty::paint);
+    require(wakes == 2U,
+            "repeated retained invalidation must coalesce before host damage consumption");
+    const PaintLeaseSnapshot coalesced = window.paint_lease_snapshot();
+    require(coalesced.state == PaintLeaseState::dirty_queued &&
+                coalesced.render_wake_queued &&
+                coalesced.render_wakes_coalesced >= 1U,
+            "the availability snapshot must expose one queued render and merged touches");
+    static_cast<void>(window.take_damage());
+    root->invalidate(Dirty::paint);
+    require(wakes == 3U,
+            "consuming damage must rearm the next independent paint wake");
+    static_cast<void>(window.take_damage());
+
+    window.set_occluded(true, FrameClock::now());
+    root->invalidate(Dirty::paint);
+    require(wakes == 3U,
+            "explicitly occluded Window must retain dirtiness without waking raster work");
+    window.set_occluded(false, FrameClock::now());
+    require(wakes == 4U,
+            "exposure must wake exactly once for retained occluded dirtiness");
+    window.set_paint_wake_handler({});
+}
+
 } // namespace
 
 int main() {
@@ -490,10 +644,12 @@ int main() {
         test_stable_ids_and_detached_lifetime();
         test_static_tree_factory();
         test_cursor_inheritance_and_override();
+        test_control_identity_geometry_constraints_and_z_order();
         test_damage_and_idle_metrics();
         test_tokenized_accelerator_runs_after_focused_route();
         test_presentation_settings_separate_text_and_device_scale();
         test_semantic_feedback_is_clocked_bounded_and_sound_optional();
+        test_paint_wake_is_coalesced_and_rearmed_after_damage_consumption();
         std::cout << "gui_forms_core_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

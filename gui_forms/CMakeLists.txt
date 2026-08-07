@@ -38,7 +38,9 @@ endif()
 
 add_library(gui_forms_core STATIC
     src/core/animation.cpp
+    src/core/binding.cpp
     src/core/types.cpp
+    src/core/theme.cpp
     src/core/text.cpp
     src/core/text_shaping.cpp
     src/core/unicode_grapheme.cpp
@@ -169,6 +171,7 @@ target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 add_library(gui_forms_controls STATIC
     src/controls/basic_controls.cpp
     src/controls/collection_controls.cpp
+    src/controls/composition_controls.cpp
     src/controls/commands.cpp
     src/controls/menu_controls.cpp
     src/controls/popup_controls.cpp
@@ -178,7 +181,11 @@ add_library(gui_forms_controls STATIC
     src/controls/input_controls.cpp
     src/controls/inspection_controls.cpp
     src/controls/instrument_controls.cpp
+    src/controls/image_list.cpp
+    src/controls/guidance.cpp
+    src/controls/material.cpp
     src/controls/range_controls.cpp
+    src/controls/scrolling.cpp
     src/controls/tooltip.cpp
 )
 target_include_directories(gui_forms_controls PUBLIC
@@ -870,6 +877,13 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_basic_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_basic_controls_tests COMMAND gui_forms_basic_controls_tests)
 
+    add_executable(gui_forms_scrollable_control_tests
+        tests/scrollable_control_tests.cpp)
+    target_link_libraries(gui_forms_scrollable_control_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_scrollable_control_tests
+             COMMAND gui_forms_scrollable_control_tests)
+
     add_executable(gui_forms_input_controls_tests tests/input_controls_tests.cpp)
     target_link_libraries(gui_forms_input_controls_tests PRIVATE
         gui_forms_controls
@@ -922,6 +936,23 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
+
+    add_executable(gui_forms_material_tests tests/material_tests.cpp)
+    target_link_libraries(gui_forms_material_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_material_tests COMMAND gui_forms_material_tests)
+
+    add_executable(gui_forms_theme_tests tests/theme_tests.cpp)
+    target_link_libraries(gui_forms_theme_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_theme_tests COMMAND gui_forms_theme_tests)
+
+    add_executable(gui_forms_composition_controls_tests
+        tests/composition_controls_tests.cpp
+    )
+    target_link_libraries(gui_forms_composition_controls_tests
+        PRIVATE gui_forms_controls
+    )
+    add_test(NAME gui_forms_composition_controls_tests
+        COMMAND gui_forms_composition_controls_tests)
 
     add_executable(gui_forms_split_container_tests
         tests/split_container_tests.cpp
@@ -1011,6 +1042,21 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tooltip_tests tests/tooltip_tests.cpp)
     target_link_libraries(gui_forms_tooltip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tooltip_tests COMMAND gui_forms_tooltip_tests)
+
+    add_executable(gui_forms_binding_tests tests/binding_tests.cpp)
+    target_link_libraries(gui_forms_binding_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_binding_tests COMMAND gui_forms_binding_tests)
+
+    add_executable(gui_forms_validation_tests tests/validation_tests.cpp)
+    target_link_libraries(gui_forms_validation_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_validation_tests COMMAND gui_forms_validation_tests)
+
+    add_executable(gui_forms_guidance_provider_tests
+        tests/guidance_provider_tests.cpp)
+    target_link_libraries(gui_forms_guidance_provider_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_guidance_provider_tests
+             COMMAND gui_forms_guidance_provider_tests)
 
     add_executable(gui_forms_date_time_picker_tests
         tests/date_time_picker_tests.cpp

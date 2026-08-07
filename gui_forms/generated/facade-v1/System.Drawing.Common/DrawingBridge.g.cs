@@ -677,6 +677,13 @@ internal static unsafe class NativeDrawingBridge
         Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)Entry(81))(region, path));
     internal static void RegionExclude(Handle region, global::System.Drawing.RectangleF rectangle) =>
         Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)Entry(82))(region, Native(rectangle)));
+    internal static global::System.Drawing.RectangleF RegionBounds(Handle region)
+    {
+        Rect bounds;
+        Check(((delegate* unmanaged[Cdecl]<Handle, Rect*, int>)Entry(84))(region, &bounds));
+        return new global::System.Drawing.RectangleF((float)bounds.X, (float)bounds.Y,
+            (float)bounds.Width, (float)bounds.Height);
+    }
 
     internal static Handle ImageAttributesCreate()
     {
@@ -781,7 +788,6 @@ internal static unsafe class NativeDrawingBridge
         var recorder = graphics.__recorder;
         if (target is null || recorder.IsNull) return;
         if (graphics.__executedCommands == RecorderCommandCount(recorder)) return;
-        if (graphics.__nativeSurface != 0) RefreshNativeSurfaceTarget(graphics, target);
         graphics.__executedCommands += ExecuteFrom(
             recorder, target.__BitmapHandle,
             graphics.__executedCommands);
@@ -820,24 +826,6 @@ internal static unsafe class NativeDrawingBridge
             graphics.__recorder = previous;
             throw;
         }
-        Release(ref previous);
-    }
-
-    private static void RefreshNativeSurfaceTarget(global::System.Drawing.Graphics graphics,
-                                                    global::System.Drawing.Image target)
-    {
-        Handle refreshed;
-        Rect bounds;
-        var result = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle*, Rect*, int>)Entry(92))(
-            (nuint)graphics.__nativeSurface, graphics.__nativeSurfaceKind, &refreshed, &bounds);
-        if (result == 7) throw new PlatformNotSupportedException(
-            "Native HDC/HWND drawing is available only through the Windows adapter.");
-        Check(result);
-        Dimensions(refreshed, out var width, out var height);
-        var previous = target.__bitmap;
-        target.__bitmap = refreshed;
-        target.__width = width;
-        target.__height = height;
         Release(ref previous);
     }
 
@@ -1019,6 +1007,7 @@ internal static unsafe class NativeDrawingBridge
         var priorRecorder = graphics.__recorder;
         Release(ref priorRecorder);
         graphics.__recorder = RecorderCreate();
+        graphics.__executedCommands = 0;
         nuint device;
         ulong token;
         var result = ((delegate* unmanaged[Cdecl]<Handle, nuint*, ulong*, int>)Entry(94))(
@@ -1042,6 +1031,7 @@ internal static unsafe class NativeDrawingBridge
         Check(result);
         graphics.__leasedHdc = 0;
         graphics.__hdcLeaseToken = 0;
+        if (graphics.__nativeSurface != 0) PresentNativeSurface(graphics);
     }
     internal static nint GetHbitmap(global::System.Drawing.Bitmap bitmap,
                                     global::System.Drawing.Color background)

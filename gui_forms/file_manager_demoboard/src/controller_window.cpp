@@ -116,6 +116,10 @@ std::unique_ptr<gui_forms::Window> make_controller_window(
                         static_cast<void>(set_product_surface(*product, "search"));
                     } else if (*index == 2U) {
                         static_cast<void>(set_product_surface(*product, "criteria"));
+                    } else if (*index == 3U) {
+                        static_cast<void>(set_product_surface(*product, "palettes"));
+                    } else if (*index == 6U) {
+                        static_cast<void>(set_product_surface(*product, "dna"));
                     }
                 }));
         lifetime->subscriptions.push_back(

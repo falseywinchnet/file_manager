@@ -47,11 +47,28 @@ void RecordingPainter::clip_rect(Rect rect) {
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::clip_rounded_rect(Rect rect, double radius) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::clip_rounded_rect;
+    command.rect = rect;
+    command.scalar = radius;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::fill_rect(Rect rect, Color color) {
     DisplayCommand command;
     command.operation = DisplayOperation::fill_rect;
     command.rect = rect;
     command.color = color;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::fill_rounded_rect(Rect rect, double radius, Color color) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_rounded_rect;
+    command.rect = rect;
+    command.color = color;
+    command.scalar = radius;
     commands_.push_back(std::move(command));
 }
 
@@ -61,6 +78,80 @@ void RecordingPainter::stroke_rect(Rect rect, Color color, double width) {
     command.rect = rect;
     command.color = color;
     command.scalar = width;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::stroke_rounded_rect(Rect rect, double radius, Color color,
+                                           double width) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::stroke_rounded_rect;
+    command.rect = rect;
+    command.color = color;
+    command.scalar = radius;
+    command.secondary_scalar = width;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::fill_linear_gradient(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops) {
+    if (!valid_gradient_stops(stops)) {
+        throw std::invalid_argument("display gradient stops are invalid");
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_linear_gradient;
+    command.rect = rect;
+    command.first = start;
+    command.second = end;
+    command.gradient_stops.assign(stops.begin(), stops.end());
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::fill_linear_gradient_spread(
+    Rect rect, Point start, Point end,
+    std::span<const GradientStop> stops, GradientSpreadMode spread) {
+    if (!valid_gradient_stops(stops) ||
+        (spread != GradientSpreadMode::pad &&
+         spread != GradientSpreadMode::repeat &&
+         spread != GradientSpreadMode::reflect)) {
+        throw std::invalid_argument("display gradient spread is invalid");
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_linear_gradient_spread;
+    command.rect = rect;
+    command.first = start;
+    command.second = end;
+    command.gradient_stops.assign(stops.begin(), stops.end());
+    command.gradient_spread = spread;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::fill_radial_gradient(
+    Rect rect, Point center, Size radii,
+    std::span<const GradientStop> stops) {
+    if (!valid_gradient_stops(stops)) {
+        throw std::invalid_argument("display gradient stops are invalid");
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_radial_gradient;
+    command.rect = rect;
+    command.first = center;
+    command.second = {radii.width, radii.height};
+    command.gradient_stops.assign(stops.begin(), stops.end());
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::draw_box_shadow(Rect rect, double corner_radius,
+                                       Point offset, double blur_radius,
+                                       double spread, Color color) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_box_shadow;
+    command.rect = rect;
+    command.first = offset;
+    command.color = color;
+    command.scalar = corner_radius;
+    command.secondary_scalar = blur_radius;
+    command.tertiary_scalar = spread;
     commands_.push_back(std::move(command));
 }
 
@@ -110,6 +201,32 @@ void RecordingPainter::draw_image(ImageId image, Rect destination, double opacit
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_image_region(ImageId image, Rect source,
+                                          Rect destination, double opacity) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_image_region;
+    command.first = {source.x, source.y};
+    command.second = {source.width, source.height};
+    command.rect = destination;
+    command.image = image;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::fill_image_pattern(
+    ImageId image, Size source_pixel_size, Rect destination,
+    Size logical_tile_size, ImagePatternWrap wrap, double opacity) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::fill_image_pattern;
+    command.first = {source_pixel_size.width, source_pixel_size.height};
+    command.second = {logical_tile_size.width, logical_tile_size.height};
+    command.rect = destination;
+    command.image = image;
+    command.scalar = opacity;
+    command.image_pattern_wrap = wrap;
+    commands_.push_back(std::move(command));
+}
+
 std::shared_ptr<const DisplayChunk> RecordingPainter::finish(
     std::uint64_t generation, PaintPlane plane, Rect logical_bounds) {
     if (save_depth_ != 0U) {
@@ -126,11 +243,44 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
         case DisplayOperation::restore: painter.restore(); break;
         case DisplayOperation::translate: painter.translate(command.first); break;
         case DisplayOperation::clip_rect: painter.clip_rect(command.rect); break;
+        case DisplayOperation::clip_rounded_rect:
+            painter.clip_rounded_rect(command.rect, command.scalar);
+            break;
         case DisplayOperation::fill_rect:
             painter.fill_rect(command.rect, command.color);
             break;
+        case DisplayOperation::fill_rounded_rect:
+            painter.fill_rounded_rect(command.rect, command.scalar,
+                                      command.color);
+            break;
         case DisplayOperation::stroke_rect:
             painter.stroke_rect(command.rect, command.color, command.scalar);
+            break;
+        case DisplayOperation::stroke_rounded_rect:
+            painter.stroke_rounded_rect(command.rect, command.scalar,
+                                        command.color,
+                                        command.secondary_scalar);
+            break;
+        case DisplayOperation::fill_linear_gradient:
+            painter.fill_linear_gradient(command.rect, command.first,
+                                         command.second,
+                                         command.gradient_stops);
+            break;
+        case DisplayOperation::fill_linear_gradient_spread:
+            painter.fill_linear_gradient_spread(
+                command.rect, command.first, command.second,
+                command.gradient_stops, command.gradient_spread);
+            break;
+        case DisplayOperation::fill_radial_gradient:
+            painter.fill_radial_gradient(
+                command.rect, command.first,
+                {command.second.x, command.second.y}, command.gradient_stops);
+            break;
+        case DisplayOperation::draw_box_shadow:
+            painter.draw_box_shadow(
+                command.rect, command.scalar, command.first,
+                command.secondary_scalar, command.tertiary_scalar,
+                command.color);
             break;
         case DisplayOperation::draw_line:
             painter.draw_line(command.first, command.second, command.color,
@@ -142,6 +292,19 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
             break;
         case DisplayOperation::draw_image:
             painter.draw_image(command.image, command.rect, command.scalar);
+            break;
+        case DisplayOperation::draw_image_region:
+            painter.draw_image_region(
+                command.image,
+                {command.first.x, command.first.y,
+                 command.second.x, command.second.y},
+                command.rect, command.scalar);
+            break;
+        case DisplayOperation::fill_image_pattern:
+            painter.fill_image_pattern(
+                command.image, {command.first.x, command.first.y},
+                command.rect, {command.second.x, command.second.y},
+                command.image_pattern_wrap, command.scalar);
             break;
         }
     }

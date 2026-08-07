@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -690,7 +691,11 @@ public:
 
     void begin_frame() {
         states_.clear();
-        states_.push_back({0.0, 0.0, {0.0, 0.0, logical_size_.width, logical_size_.height}});
+        states_.push_back(State{
+            0.0,
+            0.0,
+            {0.0, 0.0, logical_size_.width, logical_size_.height},
+            std::nullopt});
         SetBkMode(memory_dc_, TRANSPARENT);
     }
 
@@ -750,9 +755,9 @@ public:
         return synchronized;
     }
 
-    void present(HDC target) const {
-        if (target == nullptr || memory_dc_ == nullptr) return;
-        BitBlt(target, 0, 0, width_, height_, memory_dc_, 0, 0, SRCCOPY);
+    [[nodiscard]] bool present(HDC target) const {
+        if (target == nullptr || memory_dc_ == nullptr) return false;
+        return BitBlt(target, 0, 0, width_, height_, memory_dc_, 0, 0, SRCCOPY) != FALSE;
     }
 
     bool save_bmp(std::wstring_view path) const {
@@ -797,6 +802,14 @@ public:
         rect.y += state().ty;
         states_.back().clip = Rect::intersection(state().clip, rect);
     }
+    void clip_rounded_rect(Rect rect, double radius) override {
+        rect.x += state().tx;
+        rect.y += state().ty;
+        states_.back().clip = Rect::intersection(state().clip, rect);
+        states_.back().rounded_clip = RoundedClip{
+            rect, std::clamp(radius, 0.0,
+                             std::max(0.0, std::min(rect.width, rect.height) * 0.5))};
+    }
 
     void fill_rect(Rect rect, Color color) override {
         const PixelRect area = pixel_rect(rect);
@@ -805,15 +818,25 @@ public:
         for (int y = area.top; y < area.bottom; ++y) {
             auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
-                const std::uint32_t destination = row[x];
-                const unsigned db = destination & 0xffU;
-                const unsigned dg = (destination >> 8U) & 0xffU;
-                const unsigned dr = (destination >> 16U) & 0xffU;
-                const unsigned inverse = 255U - alpha;
-                const unsigned b = (color.blue * alpha + db * inverse + 127U) / 255U;
-                const unsigned g = (color.green * alpha + dg * inverse + 127U) / 255U;
-                const unsigned r = (color.red * alpha + dr * inverse + 127U) / 255U;
-                row[x] = b | (g << 8U) | (r << 16U) | 0xff000000U;
+                if (pixel_allowed(x, y)) blend_pixel(row[x], color, alpha);
+            }
+        }
+    }
+
+    void fill_rounded_rect(Rect rect, double radius, Color color) override {
+        const PixelRect area = pixel_rect(rect);
+        if (area.empty()) return;
+        rect.x += state().tx;
+        rect.y += state().ty;
+        radius = std::clamp(radius, 0.0,
+                            std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        for (int y = area.top; y < area.bottom; ++y) {
+            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                if (pixel_allowed(x, y) && inside_rounded(sample, rect, radius)) {
+                    blend_pixel(row[x], color, color.alpha);
+                }
             }
         }
     }
@@ -824,6 +847,132 @@ public:
         fill_rect({rect.x, rect.y + rect.height - line, rect.width, line}, color);
         fill_rect({rect.x, rect.y, line, rect.height}, color);
         fill_rect({rect.x + rect.width - line, rect.y, line, rect.height}, color);
+    }
+
+    void stroke_rounded_rect(Rect rect, double radius, Color color,
+                             double width) override {
+        const PixelRect area = pixel_rect(rect);
+        if (area.empty()) return;
+        const double line = std::max(width, 1.0 / scale_);
+        rect.x += state().tx;
+        rect.y += state().ty;
+        radius = std::clamp(radius, 0.0,
+                            std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        const Rect inner{rect.x + line, rect.y + line,
+                         rect.width - line * 2.0, rect.height - line * 2.0};
+        const double inner_radius = std::max(0.0, radius - line);
+        for (int y = area.top; y < area.bottom; ++y) {
+            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                const bool in_outer = inside_rounded(sample, rect, radius);
+                const bool in_inner = !inner.empty() &&
+                    inside_rounded(sample, inner, inner_radius);
+                if (pixel_allowed(x, y) && in_outer && !in_inner) {
+                    blend_pixel(row[x], color, color.alpha);
+                }
+            }
+        }
+    }
+
+    void fill_linear_gradient(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops) override {
+        fill_linear_gradient_spread(rect, start, end, stops,
+                                    GradientSpreadMode::pad);
+    }
+
+    void fill_linear_gradient_spread(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops,
+        GradientSpreadMode spread) override {
+        const PixelRect area = pixel_rect(rect);
+        if (area.empty() || !valid_gradient_stops(stops) ||
+            (spread != GradientSpreadMode::pad &&
+             spread != GradientSpreadMode::repeat &&
+             spread != GradientSpreadMode::reflect)) {
+            return;
+        }
+        start.x += state().tx;
+        start.y += state().ty;
+        end.x += state().tx;
+        end.y += state().ty;
+        const double dx = end.x - start.x;
+        const double dy = end.y - start.y;
+        const double length_squared = dx * dx + dy * dy;
+        if (length_squared <= 0.0) return;
+        for (int y = area.top; y < area.bottom; ++y) {
+            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
+                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                const double amount = spread_gradient_coordinate(
+                    ((sample.x - start.x) * dx +
+                     (sample.y - start.y) * dy) /
+                    length_squared,
+                    spread);
+                const Color color = gradient_color(stops, amount);
+                blend_pixel(row[x], color, color.alpha);
+            }
+        }
+    }
+
+    void fill_radial_gradient(
+        Rect rect, Point center, Size radii,
+        std::span<const GradientStop> stops) override {
+        const PixelRect area = pixel_rect(rect);
+        if (area.empty() || radii.width <= 0.0 || radii.height <= 0.0 ||
+            !valid_gradient_stops(stops)) {
+            return;
+        }
+        center.x += state().tx;
+        center.y += state().ty;
+        for (int y = area.top; y < area.bottom; ++y) {
+            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
+                const double sample_x = ((x + 0.5) / scale_ - center.x) /
+                                        radii.width;
+                const double sample_y = ((y + 0.5) / scale_ - center.y) /
+                                        radii.height;
+                const Color color = gradient_color(
+                    stops, std::sqrt(sample_x * sample_x + sample_y * sample_y));
+                blend_pixel(row[x], color, color.alpha);
+            }
+        }
+    }
+
+    void draw_box_shadow(Rect rect, double corner_radius, Point offset,
+                         double blur_radius, double spread,
+                         Color color) override {
+        if (rect.empty() || color.alpha == 0U || blur_radius < 0.0) return;
+        const double reach = blur_radius * 3.0;
+        const Rect paint_bounds{rect.x + offset.x - spread - reach,
+                                rect.y + offset.y - spread - reach,
+                                rect.width + (spread + reach) * 2.0,
+                                rect.height + (spread + reach) * 2.0};
+        const PixelRect area = pixel_rect(paint_bounds);
+        if (area.empty()) return;
+        Rect shadow{rect.x + state().tx + offset.x - spread,
+                    rect.y + state().ty + offset.y - spread,
+                    rect.width + spread * 2.0,
+                    rect.height + spread * 2.0};
+        const double radius = std::max(0.0, corner_radius + spread);
+        const double sigma = std::max(blur_radius * 0.5, 0.25 / scale_);
+        for (int y = area.top; y < area.bottom; ++y) {
+            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
+                const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
+                const double distance = rounded_distance(sample, shadow, radius);
+                const double coverage = distance <= 0.0 ? 1.0
+                    : std::exp(-0.5 * (distance / sigma) * (distance / sigma));
+                if (coverage <= 0.001) continue;
+                const unsigned alpha = static_cast<unsigned>(std::lround(
+                    static_cast<double>(color.alpha) * coverage));
+                blend_pixel(row[x], color, alpha);
+            }
+        }
     }
 
     void draw_line(Point from, Point to, Color color, double width) override {
@@ -906,9 +1055,27 @@ public:
 
     void draw_image(ImageId image, Rect destination, double opacity) override {
         const auto found = images_.find(image.value);
+        if (found == images_.end()) return;
+        draw_image_region(
+            image,
+            {0.0, 0.0, static_cast<double>(found->second.width),
+             static_cast<double>(found->second.height)},
+            destination, opacity);
+    }
+
+    void draw_image_region(ImageId image, Rect source_rect, Rect destination,
+                           double opacity) override {
+        const auto found = images_.find(image.value);
         const PixelRect area = pixel_rect(destination);
-        if (found == images_.end() || area.empty() || opacity <= 0.0) return;
+        if (found == images_.end() || area.empty() || source_rect.empty() ||
+            !source_rect.finite() || !destination.finite() ||
+            !std::isfinite(opacity) || opacity <= 0.0) {
+            return;
+        }
         const DecodedImage& source = found->second;
+        const Rect source_bounds{0.0, 0.0, static_cast<double>(source.width),
+                                 static_cast<double>(source.height)};
+        if (!source_bounds.contains(source_rect)) return;
         const double left = (destination.x + state().tx) * scale_;
         const double top = (destination.y + state().ty) * scale_;
         const double width = std::max(1.0, destination.width * scale_);
@@ -918,12 +1085,15 @@ public:
         for (int y = area.top; y < area.bottom; ++y) {
             const auto source_y = std::min<std::uint32_t>(
                 source.height - 1U,
-                static_cast<std::uint32_t>(std::max(0.0, (y - top) * source.height / height)));
+                static_cast<std::uint32_t>(source_rect.y + std::max(
+                    0.0, (y - top) * source_rect.height / height)));
             auto* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
                 const auto source_x = std::min<std::uint32_t>(
                     source.width - 1U,
-                    static_cast<std::uint32_t>(std::max(0.0, (x - left) * source.width / width)));
+                    static_cast<std::uint32_t>(source_rect.x + std::max(
+                        0.0, (x - left) * source_rect.width / width)));
                 const std::uint32_t source_pixel =
                     source.pixels[static_cast<std::size_t>(source_y) * source.width + source_x];
                 const unsigned source_alpha = ((source_pixel >> 24U) & 0xffU) * global_alpha / 255U;
@@ -941,8 +1111,75 @@ public:
         }
     }
 
+    void fill_image_pattern(
+        ImageId image, Size source_pixel_size, Rect destination,
+        Size logical_tile_size, ImagePatternWrap wrap,
+        double opacity) override {
+        const auto found = images_.find(image.value);
+        const PixelRect area = pixel_rect(destination);
+        if (found == images_.end() || area.empty() ||
+            wrap != ImagePatternWrap::tile || !destination.finite() ||
+            !std::isfinite(source_pixel_size.width) ||
+            !std::isfinite(source_pixel_size.height) ||
+            !std::isfinite(logical_tile_size.width) ||
+            !std::isfinite(logical_tile_size.height) ||
+            source_pixel_size.width != found->second.width ||
+            source_pixel_size.height != found->second.height ||
+            logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
+            !std::isfinite(opacity) || opacity <= 0.0) {
+            return;
+        }
+        const DecodedImage& source = found->second;
+        const double left = (destination.x + state().tx) * scale_;
+        const double top = (destination.y + state().ty) * scale_;
+        const double tile_width = logical_tile_size.width * scale_;
+        const double tile_height = logical_tile_size.height * scale_;
+        const unsigned global_alpha = static_cast<unsigned>(
+            std::lround(std::clamp(opacity, 0.0, 1.0) * 255.0));
+        for (int y = area.top; y < area.bottom; ++y) {
+            const double tile_y = std::fmod(std::max(0.0, y - top), tile_height);
+            const auto source_y = std::min<std::uint32_t>(
+                source.height - 1U,
+                static_cast<std::uint32_t>(tile_y * source.height / tile_height));
+            auto* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
+            for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
+                const double tile_x = std::fmod(std::max(0.0, x - left), tile_width);
+                const auto source_x = std::min<std::uint32_t>(
+                    source.width - 1U,
+                    static_cast<std::uint32_t>(tile_x * source.width / tile_width));
+                const std::uint32_t source_pixel =
+                    source.pixels[static_cast<std::size_t>(source_y) *
+                                      source.width + source_x];
+                const unsigned source_alpha =
+                    ((source_pixel >> 24U) & 0xffU) * global_alpha / 255U;
+                const unsigned inverse = 255U - source_alpha;
+                const std::uint32_t destination_pixel = destination_row[x];
+                const auto channel = [&](unsigned shift) {
+                    const unsigned premultiplied =
+                        ((source_pixel >> shift) & 0xffU) * global_alpha / 255U;
+                    const unsigned destination_channel =
+                        (destination_pixel >> shift) & 0xffU;
+                    return std::min(255U, premultiplied +
+                        (destination_channel * inverse + 127U) / 255U);
+                };
+                destination_row[x] = channel(0) | (channel(8) << 8U) |
+                                     (channel(16) << 16U) | 0xff000000U;
+            }
+        }
+    }
+
 private:
-    struct State { double tx{}; double ty{}; Rect clip{}; };
+    struct RoundedClip final {
+        Rect rect{};
+        double radius{};
+    };
+    struct State {
+        double tx{};
+        double ty{};
+        Rect clip{};
+        std::optional<RoundedClip> rounded_clip;
+    };
     struct GdiTextRun {
         std::wstring family;
         std::wstring text;
@@ -959,6 +1196,91 @@ private:
     };
 
     const State& state() const noexcept { return states_.back(); }
+    [[nodiscard]] static bool inside_rounded(Point point, Rect rect,
+                                             double radius) noexcept {
+        if (!rect.contains(point)) return false;
+        radius = std::clamp(radius, 0.0,
+                            std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        if (radius <= 0.0) return true;
+        const double nearest_x = std::clamp(
+            point.x, rect.x + radius, rect.x + rect.width - radius);
+        const double nearest_y = std::clamp(
+            point.y, rect.y + radius, rect.y + rect.height - radius);
+        const double dx = point.x - nearest_x;
+        const double dy = point.y - nearest_y;
+        return dx * dx + dy * dy <= radius * radius;
+    }
+    [[nodiscard]] static double rounded_distance(Point point, Rect rect,
+                                                 double radius) noexcept {
+        radius = std::clamp(radius, 0.0,
+                            std::max(0.0, std::min(rect.width, rect.height) * 0.5));
+        const double center_x = rect.x + rect.width * 0.5;
+        const double center_y = rect.y + rect.height * 0.5;
+        const double qx = std::abs(point.x - center_x) -
+                          std::max(0.0, rect.width * 0.5 - radius);
+        const double qy = std::abs(point.y - center_y) -
+                          std::max(0.0, rect.height * 0.5 - radius);
+        const double outside = std::hypot(std::max(qx, 0.0), std::max(qy, 0.0));
+        const double inside = std::min(std::max(qx, qy), 0.0);
+        return outside + inside - radius;
+    }
+    [[nodiscard]] bool pixel_allowed(int x, int y) const noexcept {
+        if (!state().rounded_clip) return true;
+        const Point point{(x + 0.5) / scale_, (y + 0.5) / scale_};
+        return inside_rounded(point, state().rounded_clip->rect,
+                              state().rounded_clip->radius);
+    }
+    static void blend_pixel(std::uint32_t& destination, Color color,
+                            unsigned alpha) noexcept {
+        alpha = std::min(alpha, 255U);
+        const unsigned db = destination & 0xffU;
+        const unsigned dg = (destination >> 8U) & 0xffU;
+        const unsigned dr = (destination >> 16U) & 0xffU;
+        const unsigned inverse = 255U - alpha;
+        const unsigned b = (color.blue * alpha + db * inverse + 127U) / 255U;
+        const unsigned g = (color.green * alpha + dg * inverse + 127U) / 255U;
+        const unsigned r = (color.red * alpha + dr * inverse + 127U) / 255U;
+        destination = b | (g << 8U) | (r << 16U) | 0xff000000U;
+    }
+    [[nodiscard]] static Color gradient_color(
+        std::span<const GradientStop> stops, double amount) noexcept {
+        amount = std::clamp(amount, 0.0, 1.0);
+        for (std::size_t index = 1U; index < stops.size(); ++index) {
+            if (amount <= stops[index].offset) {
+                const GradientStop& first = stops[index - 1U];
+                const GradientStop& second = stops[index];
+                const double width = second.offset - first.offset;
+                const double local = width <= 0.0 ? 1.0
+                    : (amount - first.offset) / width;
+                const auto channel = [local](std::uint8_t left,
+                                             std::uint8_t right) {
+                    return static_cast<std::uint8_t>(std::lround(
+                        static_cast<double>(left) +
+                        (static_cast<double>(right) - left) * local));
+                };
+                return Color::rgba(channel(first.color.red, second.color.red),
+                                   channel(first.color.green, second.color.green),
+                                   channel(first.color.blue, second.color.blue),
+                                   channel(first.color.alpha, second.color.alpha));
+            }
+        }
+        return stops.back().color;
+    }
+    [[nodiscard]] static double spread_gradient_coordinate(
+        double amount, GradientSpreadMode spread) noexcept {
+        switch (spread) {
+        case GradientSpreadMode::pad:
+            return std::clamp(amount, 0.0, 1.0);
+        case GradientSpreadMode::repeat:
+            return amount - std::floor(amount);
+        case GradientSpreadMode::reflect: {
+            double folded = std::fmod(amount, 2.0);
+            if (folded < 0.0) folded += 2.0;
+            return folded <= 1.0 ? folded : 2.0 - folded;
+        }
+        }
+        return std::clamp(amount, 0.0, 1.0);
+    }
     int logical_x(double value) const noexcept {
         return static_cast<int>(std::lround((value + state().tx) * scale_));
     }
@@ -1373,6 +1695,11 @@ public:
                 PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
             }
         });
+        model_->set_paint_wake_handler([this] {
+            if (hwnd_ != nullptr) {
+                PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
+            }
+        });
         if (options_.host_ready) {
             options_.host_ready(
                 [this] { PostMessageW(hwnd_, managed_dispatch_message, 0, 0); },
@@ -1452,7 +1779,26 @@ public:
             if (options_.dispatch_pending) options_.dispatch_pending();
             collect_damage(); return 0;
         case WM_TIMER:
-            if (wparam == scheduler_timer) { KillTimer(hwnd_, scheduler_timer); collect_damage(); return 0; }
+            if (wparam == scheduler_timer) {
+                KillTimer(hwnd_, scheduler_timer);
+                try {
+                    collect_damage();
+                } catch (const std::exception& error) {
+                    ++native_callback_faults_;
+                    std::fprintf(
+                        stderr,
+                        "gui-forms-host=scheduled-wake-fault|what:%s\n",
+                        error.what());
+                    std::fflush(stderr);
+                } catch (...) {
+                    ++native_callback_faults_;
+                    std::fprintf(
+                        stderr,
+                        "gui-forms-host=scheduled-wake-fault|what:unknown\n");
+                    std::fflush(stderr);
+                }
+                return 0;
+            }
             break;
         case WM_MOUSEMOVE: pointer(message, PointerAction::move, wparam, lparam); return 0;
         case WM_LBUTTONDOWN: case WM_RBUTTONDOWN: case WM_MBUTTONDOWN:
@@ -1479,6 +1825,7 @@ public:
                 native_phase_ = NativePhase::closed;
                 if (options_.closed) options_.closed();
             }
+            model_->set_paint_wake_handler({});
             session_.shutdown();
             native_phase_ = NativePhase::shutdown;
             services_.shutdown();
@@ -1706,13 +2053,17 @@ private:
         }
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images(model_->image_resources()));
-        model_->paint(raster_, pending_damage_.bounds());
-        raster_.present(dc);
-        pending_damage_.clear();
+        const std::optional<PaintReceipt> receipt =
+            model_->paint(raster_, pending_damage_.bounds());
+        const bool presented = receipt && raster_.present(dc);
         EndPaint(hwnd_, &paint_state);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - started);
-        model_->metrics().record_present(static_cast<std::uint64_t>(elapsed.count()));
+        if (presented &&
+            model_->notify_presented(*receipt,
+                                     static_cast<std::uint64_t>(elapsed.count()))) {
+            pending_damage_.clear();
+        }
         collect_damage();
     }
 
@@ -2159,6 +2510,7 @@ private:
     DamageRegion pending_damage_;
     double scale_{1.0};
     std::uint64_t next_sequence_{1};
+    std::uint64_t native_callback_faults_{};
     wchar_t pending_high_surrogate_{};
     bool closed_{};
     NativePhase native_phase_{NativePhase::creating};

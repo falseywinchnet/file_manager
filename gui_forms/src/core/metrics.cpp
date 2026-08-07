@@ -83,6 +83,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"frame_deadlines_fired\":" << frame_deadlines_fired << ','
            << "\"active_surface_ticks\":" << active_surface_ticks << ','
            << "\"frame_requests_coalesced\":" << frame_requests_coalesced << ','
+           << "\"frame_callback_faults\":" << frame_callback_faults << ','
            << "\"active_surface_count\":" << active_surface_count << ','
            << "\"maximum_active_surface_count\":" << maximum_active_surface_count << ','
            << "\"occlusion_suspensions\":" << occlusion_suspensions << ','
@@ -250,6 +251,9 @@ void Metrics::record_frame_poll(std::uint64_t deadlines_fired,
     values_.frame_deadlines_fired += deadlines_fired;
     values_.active_surface_ticks += active_surface_ticks;
     values_.frame_requests_coalesced += coalesced_requests;
+}
+void Metrics::record_frame_callback_fault() noexcept {
+    ++values_.frame_callback_faults;
 }
 void Metrics::set_active_surface_count(std::size_t count) noexcept {
     values_.active_surface_count = static_cast<std::uint64_t>(count);

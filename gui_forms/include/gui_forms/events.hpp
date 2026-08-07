@@ -86,8 +86,28 @@ struct KeyEvent {
 // boundary. Text remains a separate TextInputEvent.
 struct PhysicalKey final {
     static constexpr std::uint32_t a = 0x04U;
+    static constexpr std::uint32_t b = 0x05U;
     static constexpr std::uint32_t c = 0x06U;
+    static constexpr std::uint32_t d = 0x07U;
+    static constexpr std::uint32_t e = 0x08U;
+    static constexpr std::uint32_t f = 0x09U;
+    static constexpr std::uint32_t g = 0x0AU;
+    static constexpr std::uint32_t h = 0x0BU;
+    static constexpr std::uint32_t i = 0x0CU;
+    static constexpr std::uint32_t j = 0x0DU;
+    static constexpr std::uint32_t k = 0x0EU;
+    static constexpr std::uint32_t l = 0x0FU;
+    static constexpr std::uint32_t m = 0x10U;
+    static constexpr std::uint32_t n = 0x11U;
+    static constexpr std::uint32_t o = 0x12U;
+    static constexpr std::uint32_t p = 0x13U;
+    static constexpr std::uint32_t q = 0x14U;
+    static constexpr std::uint32_t r = 0x15U;
+    static constexpr std::uint32_t s = 0x16U;
+    static constexpr std::uint32_t t = 0x17U;
+    static constexpr std::uint32_t u = 0x18U;
     static constexpr std::uint32_t v = 0x19U;
+    static constexpr std::uint32_t w = 0x1AU;
     static constexpr std::uint32_t x = 0x1bU;
     static constexpr std::uint32_t y = 0x1cU;
     static constexpr std::uint32_t z = 0x1dU;
@@ -96,6 +116,7 @@ struct PhysicalKey final {
     static constexpr std::uint32_t backspace = 0x2AU;
     static constexpr std::uint32_t tab = 0x2BU;
     static constexpr std::uint32_t space = 0x2CU;
+    static constexpr std::uint32_t f1 = 0x3AU;
     static constexpr std::uint32_t f2 = 0x3BU;
     static constexpr std::uint32_t f4 = 0x3DU;
     static constexpr std::uint32_t home = 0x4AU;
@@ -183,6 +204,11 @@ struct DragEvent final {
 struct DragDispatchResult final {
     bool handled{};
     DragEffect accepted_effect{DragEffect::none};
+    // Lease-time drag dispatch cannot synchronously enter application code.
+    // A deferred result reuses only the last valid effect for the same session;
+    // capacity rejection is explicit and never pretends acceptance.
+    bool deferred{};
+    bool capacity_rejected{};
 };
 
 } // namespace gui_forms

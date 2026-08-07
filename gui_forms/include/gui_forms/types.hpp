@@ -33,12 +33,25 @@ struct Rect {
     [[nodiscard]] constexpr bool empty() const noexcept {
         return width <= 0.0 || height <= 0.0;
     }
+    [[nodiscard]] bool finite() const noexcept {
+        return std::isfinite(x) && std::isfinite(y) &&
+               std::isfinite(width) && std::isfinite(height);
+    }
+    [[nodiscard]] constexpr double left() const noexcept { return x; }
+    [[nodiscard]] constexpr double top() const noexcept { return y; }
+    [[nodiscard]] constexpr double right() const noexcept { return x + width; }
+    [[nodiscard]] constexpr double bottom() const noexcept { return y + height; }
     [[nodiscard]] constexpr double area() const noexcept {
         return empty() ? 0.0 : width * height;
     }
     [[nodiscard]] constexpr bool contains(Point point) const noexcept {
         return !empty() && point.x >= x && point.y >= y &&
                point.x < x + width && point.y < y + height;
+    }
+    [[nodiscard]] constexpr bool contains(Rect rect) const noexcept {
+        return !empty() && !rect.empty() && rect.x >= x && rect.y >= y &&
+               rect.x + rect.width <= x + width &&
+               rect.y + rect.height <= y + height;
     }
     [[nodiscard]] static Rect intersection(Rect left, Rect right) noexcept;
     [[nodiscard]] static Rect united(Rect left, Rect right) noexcept;
@@ -66,6 +79,31 @@ struct Color {
         return {red_value, green_value, blue_value, alpha_value};
     }
 };
+
+// Renderer-neutral retained paint vocabulary.  Stops are deliberately copied
+// into display chunks; callers may therefore supply stack-backed spans without
+// extending their lifetime through presentation.
+struct GradientStop final {
+    double offset{};
+    Color color{};
+    friend constexpr bool operator==(const GradientStop&,
+                                     const GradientStop&) = default;
+};
+
+// Controls how a linear gradient behaves outside its authored start/end
+// interval. `repeat` is the retained material primitive behind pinstripes,
+// grooves, scanlines, and other scale-independent surface texture; `reflect`
+// mirrors alternate intervals so the seam remains continuous.
+enum class GradientSpreadMode : std::uint8_t {
+    pad,
+    repeat,
+    reflect,
+};
+
+inline constexpr std::size_t maximum_gradient_stops = 32U;
+
+[[nodiscard]] bool valid_gradient_stops(
+    std::span<const GradientStop> stops) noexcept;
 
 enum class FontRole : std::uint8_t {
     control,
@@ -108,6 +146,10 @@ struct ImageId {
     friend constexpr auto operator<=>(const ImageId&, const ImageId&) = default;
 };
 
+enum class ImagePatternWrap : std::uint8_t {
+    tile,
+};
+
 class Painter {
 public:
     virtual ~Painter() = default;
@@ -116,8 +158,29 @@ public:
     virtual void restore() = 0;
     virtual void translate(Point offset) = 0;
     virtual void clip_rect(Rect rect) = 0;
+    // Rich geometry has deterministic renderer-neutral fallbacks so a minimal
+    // host stays coherent.  Recording and production raster painters override
+    // these operations to preserve the authored material exactly.
+    virtual void clip_rounded_rect(Rect rect, double radius);
     virtual void fill_rect(Rect rect, Color color) = 0;
+    virtual void fill_rounded_rect(Rect rect, double radius, Color color);
     virtual void stroke_rect(Rect rect, Color color, double width) = 0;
+    virtual void stroke_rounded_rect(Rect rect, double radius, Color color,
+                                     double width);
+    virtual void fill_linear_gradient(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops);
+    virtual void fill_linear_gradient_spread(
+        Rect rect, Point start, Point end,
+        std::span<const GradientStop> stops, GradientSpreadMode spread);
+    virtual void fill_radial_gradient(
+        Rect rect, Point center, Size radii,
+        std::span<const GradientStop> stops);
+    // Drawn before the owning surface fill.  The shape body may therefore be
+    // included by a fallback without changing the final composited result.
+    virtual void draw_box_shadow(Rect rect, double corner_radius, Point offset,
+                                 double blur_radius, double spread,
+                                 Color color);
     virtual void draw_line(Point from, Point to, Color color, double width) = 0;
     virtual void draw_text_utf8(Point origin,
                                 std::string_view text,
@@ -140,6 +203,20 @@ public:
     virtual void draw_image(ImageId image,
                             Rect destination,
                             double opacity = 1.0) = 0;
+    // Source-region replay is the renderer-neutral primitive behind image
+    // strips, texture fills, and nine-patch materials. `source` is expressed
+    // in source-image pixels. Minimal painters may preserve coherence by
+    // falling back to whole-image scaling; production painters override it.
+    virtual void draw_image_region(ImageId image, Rect source,
+                                   Rect destination,
+                                   double opacity = 1.0);
+    // One retained command regardless of repetition count. Production
+    // painters realize the pattern exactly; the base implementation is a
+    // bounded compatibility fallback for deliberately minimal hosts.
+    virtual void fill_image_pattern(ImageId image, Size source_pixel_size,
+                                    Rect destination, Size logical_tile_size,
+                                    ImagePatternWrap wrap = ImagePatternWrap::tile,
+                                    double opacity = 1.0);
 };
 
 class DamageRegion {

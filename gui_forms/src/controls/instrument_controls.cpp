@@ -614,8 +614,6 @@ struct InstrumentRack::Impl final {
             0.0, available_width - inset.left - inset.right);
         const double gap = rack_gap * s;
         const double preferred_module = module_width * s;
-        const double min_module = std::min(preferred_module,
-                                           std::max(1.0, width));
         const double action_min = std::min(action_minimum_width * s,
                                            std::max(1.0, width));
         std::vector<Slot> slots;

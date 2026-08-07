@@ -411,6 +411,7 @@ enum class HostDispatchError : std::uint8_t {
     invalid_lifecycle,
     invalid_geometry,
     invalid_payload,
+    callback_fault,
 };
 
 // Portable presentation lifecycle. Native adapters may have private allocation
@@ -427,6 +428,8 @@ enum class HostLifecyclePhase : std::uint8_t {
 
 struct HostDispatchResult final {
     bool handled{};
+    bool input_deferred{};
+    bool input_capacity_rejected{};
     bool close_allowed{true};
     DragEffect drag_effect{DragEffect::none};
     HostDispatchError error{HostDispatchError::none};
@@ -442,6 +445,7 @@ struct HostSessionSnapshot final {
     std::uint64_t last_sequence{};
     std::uint64_t events_accepted{};
     std::uint64_t events_rejected{};
+    std::uint64_t callback_faults{};
     std::uint64_t close_requests{};
     std::uint64_t close_cancellations{};
     std::uint64_t display_changes{};

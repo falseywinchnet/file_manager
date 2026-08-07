@@ -13,6 +13,8 @@ internal enum NativeEvent : uint { Clicked = 2, FormClosing = 3, FormClosed = 4,
 internal readonly record struct NativePointer(uint Kind, double X, double Y, double WheelDelta, uint Button);
 internal readonly record struct NativeKey(uint Kind, uint PhysicalKey, uint Modifiers, bool Repeat);
 internal readonly record struct NativeFieldEdit(string Text, int Anchor, int Caret, bool Changed, bool CanUndo, bool CanRedo);
+internal readonly record struct NativeScrollAxis(bool Enabled, bool Visible, int Minimum, int Maximum, int LargeChange, int SmallChange, int Value);
+internal readonly record struct NativeScrollState(bool AutoScroll, global::System.Drawing.Point Position, global::System.Drawing.Size Margin, global::System.Drawing.Size MinimumContentSize, global::System.Drawing.Rectangle DisplayRectangle, global::System.Drawing.Rectangle ViewportRectangle, NativeScrollAxis Horizontal, NativeScrollAxis Vertical);
 
 internal sealed unsafe class NativeControlBridge : IDisposable
 {
@@ -28,6 +30,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct StringView { internal byte* Data; internal ulong Size; }
     [StructLayout(LayoutKind.Sequential)] private struct ErrorView { internal uint Code; internal StringView Message; }
     [StructLayout(LayoutKind.Sequential)] private struct Rect { internal double X, Y, Width, Height; }
+    [StructLayout(LayoutKind.Sequential)] private struct Point { internal double X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct Size { internal double Width, Height; }
+    [StructLayout(LayoutKind.Sequential)] private struct ScrollAxisState { internal uint Enabled, Visible; internal double Minimum, Maximum, LargeChange, SmallChange, Value; }
+    [StructLayout(LayoutKind.Sequential)] private struct ScrollState { internal uint AutoScroll; internal Point Position; internal Size Margin, MinimumContentSize; internal Rect DisplayRectangle, ViewportRectangle; internal ScrollAxisState Horizontal, Vertical; }
     [StructLayout(LayoutKind.Sequential)] private struct FieldEditResult { internal ulong Anchor, Caret, Revision; internal uint Changed, CanUndo, CanRedo; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfoHeader { internal uint Size; internal int Width, Height; internal ushort Planes, BitCount; internal uint Compression, SizeImage; internal int XPelsPerMeter, YPelsPerMeter; internal uint ClrUsed, ClrImportant; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfo { internal BitmapInfoHeader Header; internal uint Color; }
@@ -55,6 +61,9 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint GetControlAbsoluteBounds;
         internal nint SubscribeKeyPreview;
         internal nint SetCursor, GetCursor;
+        internal nint SetAutoScrollOffset, SetAutoScroll, SetAutoScrollMargin;
+        internal nint SetAutoScrollMinSize, SetAutoScrollPosition, GetScrollState;
+        internal nint SetScrollAxisState, ScrollControlIntoView;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -112,8 +121,22 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private bool haveAppliedWindowState;
     private bool windowSurfaceConfigured;
     private global::System.Threading.Timer? windowSurfaceTimer;
+    private const int WindowSurfaceMinimumProbeMilliseconds = 33;
+    private const int WindowSurfaceMaximumProbeMilliseconds = 250;
+    private int windowSurfaceProbeIntervalMilliseconds = WindowSurfaceMinimumProbeMilliseconds;
     private volatile bool hasExplicitPresentBoundary;
-    private int windowSurfaceCapturePending;
+    private int windowSurfaceDrainQueued;
+    private int windowSurfaceDrainActive;
+    private int windowSurfaceDirtyAfterDrain;
+    private int windowSurfaceProbePending;
+    private long windowSurfaceContentRevision;
+    private long windowSurfaceCapturedRevision;
+    private long windowSurfaceEpoch = 1;
+    private long windowSurfaceDrainsQueued;
+    private long windowSurfaceDrainsCoalesced;
+    private long windowSurfaceDrainsStarted;
+    private long windowSurfaceDrainsCommitted;
+    private long windowSurfaceDrainsUnchanged;
     private nint captureDevice;
     private nint captureBitmap;
     private nint capturePreviousBitmap;
@@ -162,8 +185,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                         windowSurfaces[surfaceId] = new(this);
                         windowSurfacesByHandle[windowHandle] = new(this);
                         if (exposesWindowSurface)
-                            windowSurfaceTimer = new global::System.Threading.Timer(_ => QueueWindowSurfaceCapture(),
-                                null, 0, 33);
+                            windowSurfaceTimer = new global::System.Threading.Timer(_ => QueueWindowSurfaceProbe(),
+                                null, 0, global::System.Threading.Timeout.Infinite);
                     }
                 }
                 return windowHandle;
@@ -228,7 +251,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         {
             kind = current.Name switch
             {
-                "Form" => 1u, "UserControl" => 2u, "Panel" => 3u, "Button" => 4u,
+                "Form" => 1u, "UserControl" => 2u,
+                "ScrollableControl" or "ContainerControl" or "Panel" => 3u, "Button" => 4u,
                 "CheckBox" => 5u, "ComboBox" => 6u, "Label" => 7u, "ListBox" => 8u,
                 "TextBox" or "TextBoxBase" => 9u, "TrackBar" => 10u,
                 "RadioButton" => 11u, "GroupBox" => 12u, "ProgressBar" => 13u,
@@ -259,6 +283,14 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         get { EnsureAlive(); lock (stateGate) return cachedBounds; }
         set { pendingChange = NativeChange.Bounds; lock (stateGate) cachedBounds = value; ResizeWindowSurface(value.Width, value.Height); Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)api.SetBounds)(handle.Value, new Rect { X = value.X, Y = value.Y, Width = value.Width, Height = value.Height })); }
     }
+    internal void SetAutoScrollOffset(global::System.Drawing.Point value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Point, int>)api.SetAutoScrollOffset)(handle.Value, new Point { X = value.X, Y = value.Y })); }
+    internal void SetAutoScroll(bool value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetAutoScroll)(handle.Value, value ? 1u : 0u)); }
+    internal void SetAutoScrollMargin(global::System.Drawing.Size value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Size, int>)api.SetAutoScrollMargin)(handle.Value, new Size { Width = value.Width, Height = value.Height })); }
+    internal void SetAutoScrollMinSize(global::System.Drawing.Size value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Size, int>)api.SetAutoScrollMinSize)(handle.Value, new Size { Width = value.Width, Height = value.Height })); }
+    internal void SetAutoScrollPosition(global::System.Drawing.Point value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Point, int>)api.SetAutoScrollPosition)(handle.Value, new Point { X = value.X, Y = value.Y })); }
+    internal NativeScrollState GetScrollState() { EnsureAlive(); ScrollState value; Check(((delegate* unmanaged[Cdecl]<Handle, ScrollState*, int>)api.GetScrollState)(handle.Value, &value)); static NativeScrollAxis Axis(ScrollAxisState axis) => new(axis.Enabled != 0, axis.Visible != 0, (int)global::System.Math.Round(axis.Minimum), (int)global::System.Math.Round(axis.Maximum), (int)global::System.Math.Round(axis.LargeChange), (int)global::System.Math.Round(axis.SmallChange), (int)global::System.Math.Round(axis.Value)); return new(value.AutoScroll != 0, new global::System.Drawing.Point((int)global::System.Math.Round(value.Position.X), (int)global::System.Math.Round(value.Position.Y)), new global::System.Drawing.Size((int)global::System.Math.Round(value.Margin.Width), (int)global::System.Math.Round(value.Margin.Height)), new global::System.Drawing.Size((int)global::System.Math.Round(value.MinimumContentSize.Width), (int)global::System.Math.Round(value.MinimumContentSize.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.DisplayRectangle.X), (int)global::System.Math.Round(value.DisplayRectangle.Y), (int)global::System.Math.Round(value.DisplayRectangle.Width), (int)global::System.Math.Round(value.DisplayRectangle.Height)), new global::System.Drawing.Rectangle((int)global::System.Math.Round(value.ViewportRectangle.X), (int)global::System.Math.Round(value.ViewportRectangle.Y), (int)global::System.Math.Round(value.ViewportRectangle.Width), (int)global::System.Math.Round(value.ViewportRectangle.Height)), Axis(value.Horizontal), Axis(value.Vertical)); }
+    internal void SetScrollAxisState(bool vertical, NativeScrollAxis value) { EnsureAlive(); var state = new ScrollAxisState { Enabled = value.Enabled ? 1u : 0u, Visible = value.Visible ? 1u : 0u, Minimum = value.Minimum, Maximum = value.Maximum, LargeChange = value.LargeChange, SmallChange = value.SmallChange, Value = value.Value }; Check(((delegate* unmanaged[Cdecl]<Handle, uint, ScrollAxisState, int>)api.SetScrollAxisState)(handle.Value, vertical ? 1u : 0u, state)); }
+    internal void ScrollControlIntoView(NativeControlBridge child) { EnsureAlive(); if (child is null) throw new global::System.ArgumentNullException(nameof(child)); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.ScrollControlIntoView)(handle.Value, child.handle.Value)); }
 
     internal void AddChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=add|parent={stableId}|parent-type={managedTypeName}|child={child.stableId}|child-type={child.managedTypeName}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.AddChild)(handle.Value, child.handle.Value)); }
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
@@ -401,6 +433,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         nint value;
         windowSurfaceTimer?.Dispose();
         windowSurfaceTimer = null;
+        global::System.Threading.Interlocked.Increment(ref windowSurfaceEpoch);
+        global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 0);
+        global::System.Threading.Interlocked.Exchange(ref windowSurfaceDirtyAfterDrain, 0);
+        global::System.Threading.Interlocked.Exchange(ref windowSurfaceProbePending, 0);
         windowSurfaces.TryRemove(surfaceId, out _);
         lock (windowHandleGate)
         {
@@ -418,27 +454,46 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private void ResizeWindowSurface(int width, int height)
     {
         if (!global::System.OperatingSystem.IsWindows()) return;
+        var changed = false;
         lock (windowHandleGate)
         {
             if (windowHandle == 0) return;
             width = global::System.Math.Max(1, width);
             height = global::System.Math.Max(1, height);
+            changed = windowSize.Width != width || windowSize.Height != height;
             windowSize = new(width, height);
-            if (windowParent == 0) _ = SetWindowPos(windowHandle, 0, 0, 0, width, height, 0x0016u);
+            if (changed)
+            {
+                global::System.Threading.Interlocked.Increment(ref windowSurfaceEpoch);
+                windowSurfaceContentHash = 0;
+                if (windowParent == 0) _ = SetWindowPos(windowHandle, 0, 0, 0, width, height, 0x0016u);
+            }
         }
+        if (changed) MarkWindowSurfaceDirty();
     }
 
     internal void ConfigureWindowSurface(global::System.Drawing.Point position,
                                          global::System.Drawing.Size size)
     {
         if (!global::System.OperatingSystem.IsWindows()) return;
+        var changed = false;
         lock (windowHandleGate)
         {
+            var normalized = new global::System.Drawing.Size(
+                global::System.Math.Max(1, size.Width),
+                global::System.Math.Max(1, size.Height));
+            changed = !windowSurfaceConfigured || windowPosition != position ||
+                windowSize != normalized;
             windowPosition = position;
-            windowSize = new(global::System.Math.Max(1, size.Width),
-                             global::System.Math.Max(1, size.Height));
+            if (windowSize != normalized)
+            {
+                windowSize = normalized;
+                global::System.Threading.Interlocked.Increment(ref windowSurfaceEpoch);
+                windowSurfaceContentHash = 0;
+            }
             windowSurfaceConfigured = true;
         }
+        if (changed) MarkWindowSurfaceDirty();
     }
 
     private static bool RegisterWindowSurfaceClass()
@@ -471,19 +526,143 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                     continue;
                 }
                 if (bridge.ownerThreadId != ownerThread || !bridge.supportsRaster ||
-                    !bridge.exposesWindowSurface || bridge.hasExplicitPresentBoundary) continue;
-                try { bridge.SynchronizeWindowSurface(); }
+                    !bridge.exposesWindowSurface) continue;
+                try { bridge.DrainWindowSurfaceIfQueued(); }
                 catch (global::System.Exception error) { Application.__ReportCallbackException(error); }
             }
         }
         finally { flushingWindowSurfaces = false; }
     }
 
-    private void SynchronizeWindowSurface()
+    internal void TouchWindowSurface()
     {
+        if (IsDisposed || !exposesWindowSurface || windowHandle == 0) return;
+        MarkWindowSurfaceDirty();
+    }
+
+    private void MarkWindowSurfaceDirty()
+    {
+        global::System.Threading.Interlocked.Increment(ref windowSurfaceContentRevision);
+        if (global::System.Threading.Volatile.Read(ref windowSurfaceDrainActive) != 0)
+            global::System.Threading.Interlocked.Exchange(ref windowSurfaceDirtyAfterDrain, 1);
+        if (!hasExplicitPresentBoundary)
+            windowSurfaceTimer?.Change(WindowSurfaceMinimumProbeMilliseconds,
+                global::System.Threading.Timeout.Infinite);
+        QueueWindowSurfaceDrain();
+    }
+
+    private void QueueWindowSurfaceProbe()
+    {
+        if (IsDisposed || hasExplicitPresentBoundary || !exposesWindowSurface || windowHandle == 0) return;
+        global::System.Threading.Interlocked.Exchange(ref windowSurfaceProbePending, 1);
+        QueueWindowSurfaceDrain();
+    }
+
+    private void QueueWindowSurfaceDrain()
+    {
+        if (IsDisposed || !exposesWindowSurface || windowHandle == 0) return;
+        if (global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 1) != 0)
+        {
+            global::System.Threading.Interlocked.Increment(ref windowSurfaceDrainsCoalesced);
+            return;
+        }
+        global::System.Threading.Interlocked.Increment(ref windowSurfaceDrainsQueued);
+        if (!Application.__Post(ownerThreadId, DrainWindowSurfaceIfQueued))
+            global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 0);
+    }
+
+    private void DrainWindowSurfaceIfQueued()
+    {
+        if (global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 0) == 0) return;
+        DrainWindowSurfaceCore();
+    }
+
+    internal void DrainWindowSurfaceNow()
+    {
+        if (IsDisposed || !exposesWindowSurface || windowHandle == 0) return;
+        global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 0);
+        DrainWindowSurfaceCore();
+    }
+
+    private void DrainWindowSurfaceCore()
+    {
+        if (global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainActive, 1) != 0)
+        {
+            global::System.Threading.Interlocked.Exchange(ref windowSurfaceDirtyAfterDrain, 1);
+            return;
+        }
+        var leaseRevision = global::System.Threading.Interlocked.Read(ref windowSurfaceContentRevision);
+        var leaseEpoch = global::System.Threading.Interlocked.Read(ref windowSurfaceEpoch);
+        var probe = global::System.Threading.Interlocked.Exchange(ref windowSurfaceProbePending, 0) != 0;
+        var completed = false;
+        var probeChanged = false;
+        try
+        {
+            if (leaseRevision <= global::System.Threading.Interlocked.Read(ref windowSurfaceCapturedRevision) && !probe)
+                return;
+            global::System.Threading.Interlocked.Increment(ref windowSurfaceDrainsStarted);
+            var processedRevision = SynchronizeWindowSurface(leaseRevision, leaseEpoch, out probeChanged);
+            if (processedRevision < 0) return;
+            completed = true;
+            global::System.Threading.Interlocked.Exchange(ref windowSurfaceCapturedRevision, processedRevision);
+            if (probeChanged) global::System.Threading.Interlocked.Increment(ref windowSurfaceDrainsCommitted);
+            else global::System.Threading.Interlocked.Increment(ref windowSurfaceDrainsUnchanged);
+            if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACES") == "1")
+                global::System.Console.Error.WriteLine("gui-forms-native-surface-drain=id:" + stableId + "|" + WindowSurfaceSnapshot());
+        }
+        finally
+        {
+            global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainActive, 0);
+            if (probe && !hasExplicitPresentBoundary) RearmWindowSurfaceProbe(completed && probeChanged);
+            var deferred = global::System.Threading.Interlocked.Exchange(ref windowSurfaceDirtyAfterDrain, 0) != 0;
+            if (completed && (deferred ||
+                global::System.Threading.Interlocked.Read(ref windowSurfaceContentRevision) >
+                global::System.Threading.Interlocked.Read(ref windowSurfaceCapturedRevision)))
+                QueueWindowSurfaceDrain();
+        }
+    }
+
+    private void RearmWindowSurfaceProbe(bool changed)
+    {
+        windowSurfaceProbeIntervalMilliseconds = changed
+            ? WindowSurfaceMinimumProbeMilliseconds
+            : global::System.Math.Min(WindowSurfaceMaximumProbeMilliseconds,
+                windowSurfaceProbeIntervalMilliseconds * 2);
+        windowSurfaceTimer?.Change(windowSurfaceProbeIntervalMilliseconds,
+            global::System.Threading.Timeout.Infinite);
+    }
+
+    internal string WindowSurfaceSnapshot()
+    {
+        var content = global::System.Threading.Interlocked.Read(ref windowSurfaceContentRevision);
+        var captured = global::System.Threading.Interlocked.Read(ref windowSurfaceCapturedRevision);
+        var active = global::System.Threading.Volatile.Read(ref windowSurfaceDrainActive) != 0;
+        var deferred = global::System.Threading.Volatile.Read(ref windowSurfaceDirtyAfterDrain) != 0;
+        var queued = global::System.Threading.Volatile.Read(ref windowSurfaceDrainQueued) != 0;
+        var state = IsDisposed || windowHandle == 0 ? "retired" :
+            active && deferred ? "rendering_dirty" : active ? "rendering" :
+            queued || content > captured ? "dirty_queued" : "clean";
+        return "state:" + state + "|content:" + content + "|captured:" + captured +
+            "|epoch:" + global::System.Threading.Interlocked.Read(ref windowSurfaceEpoch) +
+            "|queued:" + (queued ? 1 : 0) +
+            "|active:" + (active ? 1 : 0) +
+            "|deferred:" + (deferred ? 1 : 0) +
+            "|drains-queued:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsQueued) +
+            "|drains-coalesced:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsCoalesced) +
+            "|drains-started:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsStarted) +
+            "|drains-committed:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsCommitted) +
+            "|drains-unchanged:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsUnchanged) +
+            "|explicit:" + (hasExplicitPresentBoundary ? 1 : 0);
+    }
+
+    private long SynchronizeWindowSurface(long leaseRevision, long leaseEpoch,
+                                          out bool changed)
+    {
+        changed = false;
         lock (windowHandleGate)
         {
-            if (windowHandle == 0 || IsDisposed || !SupportsRaster || !exposesWindowSurface || !windowSurfaceConfigured) return;
+            if (windowHandle == 0 || IsDisposed || !SupportsRaster || !exposesWindowSurface ||
+                !windowSurfaceConfigured || leaseEpoch != windowSurfaceEpoch) return -1;
             Rect absolute;
             Check(((delegate* unmanaged[Cdecl]<Handle, Rect*, int>)api.GetControlAbsoluteBounds)(handle.Value, &absolute));
             windowPosition = new(global::System.Convert.ToInt32(global::System.Math.Round(absolute.X)),
@@ -506,33 +685,23 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACES") == "1" && windowSurfaceTraceCount++ < 4)
                     global::System.Console.Error.WriteLine("gui-forms-native-surface=id:" + stableId + "|type:" + managedTypeName + "|mode:offscreen-gdi-capture|size:" + windowSize.Width + "x" + windowSize.Height);
             }
-            CaptureWindowSurfacePixels();
+            return CaptureWindowSurfacePixels(leaseRevision, leaseEpoch, out changed);
         }
     }
 
-    private void QueueWindowSurfaceCapture()
+    private long CaptureWindowSurfacePixels(long leaseRevision, long leaseEpoch,
+                                            out bool changed)
     {
-        if (IsDisposed || hasExplicitPresentBoundary ||
-            global::System.Threading.Interlocked.Exchange(ref windowSurfaceCapturePending, 1) != 0) return;
-        if (!Application.__Post(ownerThreadId, () =>
-        {
-            global::System.Threading.Interlocked.Exchange(ref windowSurfaceCapturePending, 0);
-            if (IsDisposed) return;
-            try { SynchronizeWindowSurface(); }
-            catch (global::System.Exception error) { Application.__ReportCallbackException(error); }
-        })) global::System.Threading.Interlocked.Exchange(ref windowSurfaceCapturePending, 0);
-    }
-
-    private void CaptureWindowSurfacePixels()
-    {
-        if (!cachedVisible || windowSize.Width < 1 || windowSize.Height < 1 || api.SetControlPixels == 0) return;
+        changed = false;
+        if (!cachedVisible || windowSize.Width < 1 || windowSize.Height < 1 ||
+            api.SetControlPixels == 0 || leaseEpoch != windowSurfaceEpoch) return -1;
         var source = GetDC(windowHandle);
-        if (source == 0) return;
+        if (source == 0) return -1;
         try
         {
             EnsureCaptureSurface(source, windowSize.Width, windowSize.Height);
             if (captureDevice == 0 || capturePixels == null ||
-                !BitBlt(captureDevice, 0, 0, captureWidth, captureHeight, source, 0, 0, 0x00cc0020u)) return;
+                !BitBlt(captureDevice, 0, 0, captureWidth, captureHeight, source, 0, 0, 0x00cc0020u)) return -1;
 
             // GDI color copies commonly leave the alpha byte at zero. The retained
             // compositor consumes premultiplied BGRA, so an unset alpha would turn
@@ -546,16 +715,21 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 pixel[index] = opaque;
                 hash = (hash ^ opaque) * 1099511628211UL;
             }
-            if (hash == windowSurfaceContentHash) return;
-            windowSurfaceContentHash = hash;
+            if (hash == windowSurfaceContentHash) return leaseRevision;
+            if (leaseEpoch != windowSurfaceEpoch) return -1;
+            if (leaseRevision <= global::System.Threading.Interlocked.Read(ref windowSurfaceCapturedRevision))
+                leaseRevision = global::System.Threading.Interlocked.Increment(ref windowSurfaceContentRevision);
             Check(((delegate* unmanaged[Cdecl]<Handle, byte*, uint, uint, ulong, uint, int>)api.SetControlPixels)(
                 handle.Value, capturePixels, checked((uint)captureWidth), checked((uint)captureHeight),
                 checked((ulong)captureWidth * 4UL), 1u));
+            windowSurfaceContentHash = hash;
+            changed = true;
             if (global::System.Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACE_CONTENT") == "1" &&
                 windowSurfaceContentTraceCount++ < 16)
                 global::System.Console.Error.WriteLine("gui-forms-native-surface-content=id:" + stableId +
                     "|type:" + managedTypeName + "|hash:" + hash.ToString("x16") +
                     "|size:" + captureWidth + "x" + captureHeight);
+            return leaseRevision;
         }
         finally { _ = ReleaseDC(windowHandle, source); }
     }
@@ -599,6 +773,9 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             PaintStruct paint;
             _ = BeginPaint(window, &paint);
             _ = EndPaint(window, &paint);
+            if (windowSurfacesByHandle.TryGetValue(window, out var weak) &&
+                weak.TryGetTarget(out var bridge) && !bridge.IsDisposed)
+                bridge.MarkWindowSurfaceDirty();
             return 0;
         }
         if (message == 0x83f1u)
@@ -609,8 +786,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 bridge.hasExplicitPresentBoundary = true;
                 bridge.windowSurfaceTimer?.Change(global::System.Threading.Timeout.Infinite,
                     global::System.Threading.Timeout.Infinite);
-                try { bridge.SynchronizeWindowSurface(); }
-                catch (global::System.Exception error) { Application.__ReportCallbackException(error); }
+                bridge.MarkWindowSurfaceDirty();
             }
             return 0;
         }
@@ -796,7 +972,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { if ((NativeEvent)kind == NativeEvent.BoundsChanged) { bridge.QueueManagedBoundsSynchronization(); return 0; } return bridge.NativeEventRaised?.Invoke((NativeEvent)kind) == true ? 1u : 0u; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { ExitNativeCallback(); }
+        finally { bridge.TouchWindowSurface(); ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -807,7 +983,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { bridge.PointerRaised?.Invoke(new NativePointer(kind, x, y, wheelDelta, button)); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { ExitNativeCallback(); }
+        finally { bridge.TouchWindowSurface(); ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -818,7 +994,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { bridge.KeyRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { ExitNativeCallback(); }
+        finally { bridge.TouchWindowSurface(); ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -829,7 +1005,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { return bridge.KeyPreviewRaised?.Invoke(new NativeKey(kind, physicalKey, modifiers, repeat != 0)) == true ? 1u : 0u; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { ExitNativeCallback(); }
+        finally { bridge.TouchWindowSurface(); ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -841,7 +1017,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         ++nativeCallbackDepth;
         try { var value = text.Data == null || text.Size == 0 ? string.Empty : Encoding.UTF8.GetString(text.Data, checked((int)text.Size)); bridge.TextRaised?.Invoke(value, composing != 0, replacementStart, replacementLength); return 0; }
         catch (Exception error) { Application.__ReportCallbackException(error); return 2u; }
-        finally { ExitNativeCallback(); }
+        finally { bridge.TouchWindowSurface(); ExitNativeCallback(); }
     }
 
     private static uint DispatchCallback(void* context, uint cancelled)
@@ -885,8 +1061,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(19, ref value));
-        if (value.AbiVersion != 19 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0) throw new InvalidOperationException("GUI.Forms ABI 0.19 table is incomplete.");
+        Check(GetApi(20, ref value));
+        if (value.AbiVersion != 20 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0) throw new InvalidOperationException("GUI.Forms ABI 0.20 table is incomplete.");
         return value;
     }
     private static void Check(int result)

@@ -327,6 +327,7 @@ std::string HostSessionSnapshot::to_json() const {
            << ",\"last_sequence\":" << last_sequence
            << ",\"events_accepted\":" << events_accepted
            << ",\"events_rejected\":" << events_rejected
+           << ",\"callback_faults\":" << callback_faults
            << ",\"close_requests\":" << close_requests
            << ",\"close_cancellations\":" << close_cancellations
            << ",\"display_changes\":" << display_changes
@@ -731,8 +732,9 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
         observed_.emit(event, result);
         return result;
     }
-    std::visit(
-        [this, &result, &event](auto& payload) {
+    try {
+        std::visit(
+            [this, &result, &event](auto& payload) {
             using Payload = std::decay_t<decltype(payload)>;
             if constexpr (std::is_same_v<Payload, HostAttachEvent>) {
                 UpdateScope update = window_->begin_update();
@@ -761,12 +763,35 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
                 const DragDispatchResult drag = window_->dispatch_drag(std::move(payload));
                 result.handled = drag.handled;
                 result.drag_effect = drag.accepted_effect;
+                result.input_deferred = drag.deferred;
+                result.input_capacity_rejected = drag.capacity_rejected;
             } else if constexpr (std::is_same_v<Payload, PointerEvent>) {
+                const DeferredInputSnapshot before =
+                    window_->deferred_input_snapshot();
                 result.handled = window_->dispatch_pointer(std::move(payload));
+                const DeferredInputSnapshot after =
+                    window_->deferred_input_snapshot();
+                result.input_deferred = after.deferred > before.deferred;
+                result.input_capacity_rejected =
+                    after.rejected_capacity > before.rejected_capacity;
             } else if constexpr (std::is_same_v<Payload, KeyEvent>) {
+                const DeferredInputSnapshot before =
+                    window_->deferred_input_snapshot();
                 result.handled = window_->dispatch_key(std::move(payload));
+                const DeferredInputSnapshot after =
+                    window_->deferred_input_snapshot();
+                result.input_deferred = after.deferred > before.deferred;
+                result.input_capacity_rejected =
+                    after.rejected_capacity > before.rejected_capacity;
             } else if constexpr (std::is_same_v<Payload, TextInputEvent>) {
+                const DeferredInputSnapshot before =
+                    window_->deferred_input_snapshot();
                 result.handled = window_->dispatch_text(std::move(payload));
+                const DeferredInputSnapshot after =
+                    window_->deferred_input_snapshot();
+                result.input_deferred = after.deferred > before.deferred;
+                result.input_capacity_rejected =
+                    after.rejected_capacity > before.rejected_capacity;
             } else if constexpr (std::is_same_v<Payload, HostCloseRequest>) {
                 ++snapshot_.close_requests;
                 closing_.emit(payload);
@@ -788,8 +813,32 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
             } else if constexpr (std::is_same_v<Payload, HostShutdownEvent>) {
                 shutdown();
             }
-        }, event.payload);
-    observed_.emit(event, result);
+            }, event.payload);
+        observed_.emit(event, result);
+    } catch (...) {
+        // Event callbacks are ordinary C++ and deliberately propagate through
+        // Event::emit. The portable host seam is the foreign-ABI boundary: no
+        // application exception may unwind into AppKit, Win32, X11, or
+        // Wayland. Retain the consumed sequence, report the fault, and revoke
+        // transient input ownership that a partially delivered event may have
+        // acquired.
+        result.handled = false;
+        result.input_deferred = false;
+        result.input_capacity_rejected = false;
+        result.close_allowed = false;
+        result.drag_effect = DragEffect::none;
+        result.error = HostDispatchError::callback_fault;
+        ++snapshot_.callback_faults;
+        if (window_ != nullptr) {
+            try {
+                window_->release_pointer();
+                window_->cancel_drag();
+            } catch (...) {
+                // Cleanup is best effort at an exception boundary. The
+                // original callback fault remains the observable result.
+            }
+        }
+    }
     return result;
 }
 
@@ -825,6 +874,7 @@ const char* host_dispatch_error_name(HostDispatchError error) noexcept {
     case HostDispatchError::invalid_lifecycle: return "invalid_lifecycle";
     case HostDispatchError::invalid_geometry: return "invalid_geometry";
     case HostDispatchError::invalid_payload: return "invalid_payload";
+    case HostDispatchError::callback_fault: return "callback_fault";
     }
     return "unknown";
 }
