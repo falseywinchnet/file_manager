@@ -34,6 +34,7 @@ struct LiveSurfaceState final {
     std::uint64_t publishes{};
     std::uint64_t dropped_acquires{};
     std::uint64_t read_acquires{};
+    std::uint64_t last_read_generation{};
     std::uint64_t next_wake_sequence{1};
     Rect damage{};
     std::vector<std::shared_ptr<LiveSurfaceWake>> wakes;
@@ -328,6 +329,7 @@ LiveSurfaceFrame LiveSurface::acquire_latest() const noexcept {
     std::scoped_lock lock(state_->mutex);
     if (state_->published_slot >= state_->buffers.size()) return {};
     ++state_->read_acquires;
+    state_->last_read_generation = state_->generation;
     return {state_->buffers[state_->published_slot], state_->epoch,
             state_->generation, state_->damage};
 }
@@ -337,7 +339,7 @@ LiveSurfaceSnapshot LiveSurface::snapshot() const noexcept {
     std::scoped_lock lock(state_->mutex);
     return {state_->description, state_->epoch, state_->generation,
             state_->publishes, state_->dropped_acquires,
-            state_->read_acquires,
+            state_->read_acquires, state_->last_read_generation,
             state_->writing_slot < state_->buffers.size(),
             state_->published_slot < state_->buffers.size()};
 }

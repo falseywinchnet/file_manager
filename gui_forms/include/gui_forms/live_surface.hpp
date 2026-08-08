@@ -28,6 +28,9 @@ struct LiveSurfaceSnapshot final {
     std::uint64_t publishes{};
     std::uint64_t dropped_acquires{};
     std::uint64_t read_acquires{};
+    // Newest generation ever sampled by a terminal renderer. This is a
+    // sampling diagnostic, not a compositor-present acknowledgement.
+    std::uint64_t last_read_generation{};
     bool write_active{};
     bool has_frame{};
 };

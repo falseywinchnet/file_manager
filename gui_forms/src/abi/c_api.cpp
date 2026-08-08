@@ -833,10 +833,19 @@ private:
     void connect_live_surface_wake() {
         disconnect_live_surface_wake();
         if (!live_surface_ || window() == nullptr) return;
+        const auto self = std::static_pointer_cast<RasterControl>(
+            shared_from_this());
+        if (window()->queue_live_surface_presentation(self, live_surface_)) {
+            // Registration is persistent. The terminal host display clock now
+            // samples newest generations; producer publication must not post
+            // one dispatcher callback per frame.
+            live_surface_direct_ = true;
+            return;
+        }
         auto wake_state = std::make_shared<LiveWakeState>();
         live_wake_state_ = wake_state;
         const std::weak_ptr<RasterControl> weak_target =
-            std::static_pointer_cast<RasterControl>(shared_from_this());
+            self;
         live_wake_ = live_surface_->connect_presentation_wake(
             [weak_target, weak_state = std::weak_ptr<LiveWakeState>(wake_state)] {
                 queue_live_surface_paint(weak_target, weak_state);
@@ -844,6 +853,7 @@ private:
     }
 
     void disconnect_live_surface_wake() noexcept {
+        live_surface_direct_ = false;
         if (live_wake_state_) {
             live_wake_state_->connected.store(false, std::memory_order_release);
         }
@@ -859,6 +869,7 @@ private:
     std::uint64_t pixel_row_bytes_{};
     gui_forms::ImageId image_{};
     std::shared_ptr<gui_forms::LiveSurface> live_surface_;
+    bool live_surface_direct_{};
     gui_forms::LiveSurfaceWakeConnection live_wake_;
     std::shared_ptr<LiveWakeState> live_wake_state_;
     gui_forms::Event<const RasterPointerSample&> pointer_input_;

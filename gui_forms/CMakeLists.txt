@@ -522,6 +522,7 @@ endif()
 if(GUI_FORMS_ENABLE_MACOS_HOST)
     enable_language(OBJCXX)
     find_library(GUI_FORMS_APPKIT AppKit REQUIRED)
+    find_library(GUI_FORMS_COREVIDEO CoreVideo REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
@@ -533,7 +534,8 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     target_compile_options(gui_forms_host_macos PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_host_macos
         PUBLIC gui_forms_core gui_forms_skia
-        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREGRAPHICS}
+        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_COREVIDEO}
+                ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_macos)
@@ -669,6 +671,14 @@ if(GUI_FORMS_BUILD_GALLERY)
     )
     target_link_libraries(gui_forms_showcase_model PUBLIC gui_forms_controls)
 
+    add_library(gui_forms_vsync_lab_model STATIC
+        demo/vsync_lab.cpp
+    )
+    target_include_directories(gui_forms_vsync_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_vsync_lab_model PUBLIC gui_forms_controls)
+
     if(GUI_FORMS_ENABLE_MACOS_HOST)
         set_source_files_properties(
             ${GUI_FORMS_GALLERY_FONTS}
@@ -711,6 +721,24 @@ if(GUI_FORMS_BUILD_GALLERY)
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
             OUTPUT_NAME "GUI.Forms Complete Showcase"
         )
+
+        add_executable(gui_forms_vsync_lab MACOSX_BUNDLE
+            src/host/macos/vsync_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_vsync_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_vsync_lab PRIVATE
+            gui_forms_vsync_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_vsync_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms VSync + Waterfall Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.vsync-waterfall-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
+        )
     endif()
 
     if(GUI_FORMS_ENABLE_WINDOWS_HOST)
@@ -740,6 +768,20 @@ if(GUI_FORMS_BUILD_GALLERY)
         )
         set_target_properties(gui_forms_showcase_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Complete Showcase"
+        )
+
+        add_executable(gui_forms_vsync_lab_windows
+            src/host/windows/vsync_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_vsync_lab_windows PRIVATE
+            gui_forms_vsync_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_vsync_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_vsync_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
         )
         foreach(font_target IN ITEMS
                 gui_forms_showcase_windows gui_forms_gallery_windows)

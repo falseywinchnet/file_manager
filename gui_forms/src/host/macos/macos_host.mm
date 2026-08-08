@@ -1,5 +1,6 @@
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <CoreVideo/CoreVideo.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
@@ -7,12 +8,14 @@
 #include "../../render/skia/skia_raster.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <exception>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 using gui_forms::DamageRegion;
 using gui_forms::DragAction;
@@ -63,6 +66,7 @@ using gui_forms::HostShutdownEvent;
 using gui_forms::HostTooltipRequest;
 using gui_forms::KeyAction;
 using gui_forms::KeyEvent;
+using gui_forms::LiveSurfacePresentation;
 using gui_forms::Modifier;
 using gui_forms::PaintReceipt;
 using GFPoint = gui_forms::Point;
@@ -812,6 +816,10 @@ private:
     NSRange _selectedRange;
     NSTrackingArea* _trackingArea;
     dispatch_source_t _wakeSource;
+    CVDisplayLinkRef _displayLink;
+    std::atomic<bool> _displayTickQueued;
+    BOOL _hostOccluded;
+    std::vector<LiveSurfacePresentation> _pendingLivePresentations;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -837,6 +845,10 @@ private:
 - (void)drainPostedWork;
 - (void)armWakeTimer;
 - (void)scheduledWake;
+- (void)startDisplayLinkIfNeeded;
+- (void)stopDisplayLink;
+- (void)queueDisplayLinkTick;
+- (void)displayLinkTick;
 - (void)recordNativeCallbackFault:(const char*)operation
                           message:(const char*)message;
 - (void)drawRetainedRect:(NSRect)dirtyRect;
@@ -854,6 +866,16 @@ private:
                      stableId:(NSString*)stableId
                         value:(NSString*)value;
 @end
+
+static CVReturn gui_forms_display_link_callback(
+    CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
+    CVOptionFlags, CVOptionFlags*, void* context) {
+    @autoreleasepool {
+        GUIFormsView* view = (__bridge GUIFormsView*)context;
+        if (view != nil) [view queueDisplayLinkTick];
+    }
+    return kCVReturnSuccess;
+}
 
 @interface GUIFormsAccessibilityElement : NSAccessibilityElement {
     __weak GUIFormsView* _owner;
@@ -1102,6 +1124,17 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
         _selectedRange = NSMakeRange(NSNotFound, 0);
+        _displayLink = nullptr;
+        _displayTickQueued.store(false, std::memory_order_relaxed);
+        _hostOccluded = NO;
+        if (CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink) ==
+            kCVReturnSuccess) {
+            CVDisplayLinkSetOutputCallback(
+                _displayLink, gui_forms_display_link_callback,
+                (__bridge void*)self);
+        } else {
+            _displayLink = nullptr;
+        }
         _wakeSource = dispatch_source_create(
             DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
         __weak GUIFormsView* weakSelf = self;
@@ -1180,6 +1213,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     _hostAttached = YES;
     [self notifyDisplaysChanged];
     [self collectDamage];
+    [self startDisplayLinkIfNeeded];
     return YES;
 }
 
@@ -1229,10 +1263,13 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (_hostAttached == NO) return;
     static_cast<void>([self dispatchHostPayload:HostOcclusionEvent{occluded == YES}
                                timestampNanoseconds:host_now_nanoseconds()]);
+    _hostOccluded = occluded;
     if (occluded == YES) {
+        [self stopDisplayLink];
         [self armWakeTimer];
     } else {
         [self collectDamage];
+        [self startDisplayLinkIfNeeded];
     }
 }
 
@@ -1342,6 +1379,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     [self notifyScaleChanged];
     [self notifyDisplaysChanged];
     [self collectDamage];
+    [self startDisplayLinkIfNeeded];
 }
 
 - (void)viewWillMoveToWindow:(NSWindow*)newWindow {
@@ -1349,11 +1387,17 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
     }
+    if (newWindow == nil) [self stopDisplayLink];
     [super viewWillMoveToWindow:newWindow];
 }
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self stopDisplayLink];
+    if (_displayLink != nullptr) {
+        CVDisplayLinkRelease(_displayLink);
+        _displayLink = nullptr;
+    }
     if (_wakeSource != nil) {
         dispatch_source_cancel(_wakeSource);
         _wakeSource = nil;
@@ -1511,12 +1555,63 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
             [self setNeedsDisplayInRect:
                 NSMakeRect(rect.x, rect.y, rect.width, rect.height)];
         }
+        [self startDisplayLinkIfNeeded];
         [self armWakeTimer];
     } catch (const std::exception& error) {
         [self recordNativeCallbackFault:"collect-damage" message:error.what()];
     } catch (...) {
         [self recordNativeCallbackFault:"collect-damage" message:"unknown"];
     }
+}
+
+- (void)startDisplayLinkIfNeeded {
+    if (_displayLink == nullptr || !_model || self.window == nil ||
+        _hostOccluded == YES || !_model->has_live_surface_presentations() ||
+        CVDisplayLinkIsRunning(_displayLink)) {
+        return;
+    }
+    CVDisplayLinkStart(_displayLink);
+}
+
+- (void)stopDisplayLink {
+    if (_displayLink != nullptr && CVDisplayLinkIsRunning(_displayLink)) {
+        CVDisplayLinkStop(_displayLink);
+    }
+    _displayTickQueued.store(false, std::memory_order_release);
+}
+
+- (void)queueDisplayLinkTick {
+    if (_displayTickQueued.exchange(true, std::memory_order_acq_rel)) return;
+    __weak GUIFormsView* weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        GUIFormsView* strongSelf = weakSelf;
+        if (strongSelf == nil) return;
+        strongSelf->_displayTickQueued.store(false, std::memory_order_release);
+        [strongSelf displayLinkTick];
+    });
+}
+
+- (void)displayLinkTick {
+    if (!_model || self.window == nil || _hostOccluded == YES) return;
+    std::vector<LiveSurfacePresentation> updates =
+        _model->take_live_surface_presentations();
+    if (!_model->has_live_surface_presentations()) {
+        [self stopDisplayLink];
+        return;
+    }
+    if (updates.empty()) return;
+
+    _pendingLivePresentations = std::move(updates);
+    const double scale = self.window.backingScaleFactor;
+    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+        const GFRect clip = gui_forms::detail::align_damage_outward(
+            update.clip, scale);
+        [self setNeedsDisplayInRect:
+            NSMakeRect(clip.x, clip.y, clip.width, clip.height)];
+    }
+    // This is the terminal display-clock release. Ticks coalesce before the
+    // main queue, and each release samples only the newest published frame.
+    [self displayIfNeeded];
 }
 
 - (void)drainPostedWork {
@@ -1584,6 +1679,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (void)prepareForShutdown {
+    [self stopDisplayLink];
     if (_wakeSource != nil) {
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
@@ -1669,20 +1765,32 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (_raster.resize(logicalSize, scale)) {
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
     }
-    if (_pendingDamage.empty()) {
+    if (_pendingDamage.empty() && _pendingLivePresentations.empty()) {
         _pendingDamage.add(GFRect{dirtyRect.origin.x, dirtyRect.origin.y,
                                 dirtyRect.size.width, dirtyRect.size.height});
     }
 
     static_cast<void>(_raster.synchronize_images(_model->image_resources()));
-    _raster.begin_frame(_pendingDamage);
-    const std::optional<PaintReceipt> receipt =
-        _model->paint(_raster, _pendingDamage.bounds());
+    DamageRegion frameDamage = _pendingDamage;
+    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+        frameDamage.add(update.clip);
+    }
+    _raster.begin_frame(frameDamage);
+    std::optional<PaintReceipt> receipt;
+    if (!_pendingDamage.empty()) {
+        receipt = _model->paint(_raster, _pendingDamage.bounds());
+    }
+    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+        _raster.save();
+        _raster.clip_rect(update.clip);
+        _raster.draw_live_surface(update.surface, update.destination, 1.0);
+        _raster.restore();
+    }
     _raster.end_frame();
 
     bool presented = false;
     const void* pixels = _raster.pixels();
-    if (receipt && pixels != nullptr) {
+    if ((receipt || !_pendingLivePresentations.empty()) && pixels != nullptr) {
         CGDataProviderRef provider = CGDataProviderCreateWithData(
             nullptr, pixels, _raster.byte_size(), nullptr);
         CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
@@ -1711,10 +1819,13 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     }
     const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
-    if (presented &&
-        _model->notify_presented(*receipt,
-                                 static_cast<std::uint64_t>(elapsed.count()))) {
-        _pendingDamage.clear();
+    if (presented) {
+        _pendingLivePresentations.clear();
+        if (receipt &&
+            _model->notify_presented(*receipt,
+                static_cast<std::uint64_t>(elapsed.count()))) {
+            _pendingDamage.clear();
+        }
     }
     // Do not collect the next model invalidation from inside AppKit's paint
     // transaction. setNeedsDisplayInRect: may leave the view dirty without

@@ -871,33 +871,18 @@ bool Window::queue_live_surface_presentation(
     const Control::Ptr& control, std::shared_ptr<LiveSurface> surface) {
     require_ui_thread("live-surface presentation");
     if (!control || !surface || !control->is_alive() ||
-        control->window_ != this || !control->visible_ || occluded_ ||
-        !popups_.empty()) {
+        control->window_ != this) {
         return false;
     }
-
-    const Rect destination = absolute_bounds_of(*control);
-    Rect clip = Rect::intersection(
-        destination, {0.0, 0.0, client_size_.width, client_size_.height});
-    for (auto ancestor = control->parent(); ancestor && !clip.empty();
-         ancestor = ancestor->parent()) {
-        if (!ancestor->is_alive() || ancestor->window_ != this ||
-            !ancestor->visible_) {
-            return false;
-        }
-        const Rect ancestor_bounds = absolute_bounds_of(*ancestor);
-        const Rect viewport = ancestor->child_viewport_rectangle();
-        clip = Rect::intersection(
-            clip, {ancestor_bounds.x + viewport.x,
-                   ancestor_bounds.y + viewport.y,
-                   viewport.width, viewport.height});
-    }
-    if (destination.empty() || clip.empty()) return true;
-
-    live_surface_presentations_.insert_or_assign(
+    auto [entry, inserted] = live_surface_registrations_.try_emplace(
         control->runtime_id().value,
-        LiveSurfacePresentation{
-            control->runtime_id(), std::move(surface), destination, clip});
+        LiveSurfaceRegistration{control, surface, 0U, 0U});
+    if (!inserted && entry->second.surface != surface) {
+        entry->second = LiveSurfaceRegistration{control, std::move(surface), 0U, 0U};
+    } else {
+        entry->second.control = control;
+        entry->second.surface = std::move(surface);
+    }
     return true;
 }
 
@@ -905,12 +890,57 @@ std::vector<LiveSurfacePresentation>
 Window::take_live_surface_presentations() {
     require_ui_thread("live-surface presentation drain");
     std::vector<LiveSurfacePresentation> result;
-    result.reserve(live_surface_presentations_.size());
-    for (auto& [id, presentation] : live_surface_presentations_) {
-        static_cast<void>(id);
-        result.push_back(std::move(presentation));
+    result.reserve(live_surface_registrations_.size());
+    for (auto iterator = live_surface_registrations_.begin();
+         iterator != live_surface_registrations_.end();) {
+        const Control::Ptr control = iterator->second.control.lock();
+        if (!control || !control->is_alive() || control->window_ != this ||
+            !iterator->second.surface) {
+            iterator = live_surface_registrations_.erase(iterator);
+            continue;
+        }
+        if (occluded_ || !popups_.empty() || !control->visible_ ||
+            !control->effectively_visible()) {
+            ++iterator;
+            continue;
+        }
+
+        const LiveSurfaceSnapshot snapshot = iterator->second.surface->snapshot();
+        if (!snapshot.has_frame ||
+            (iterator->second.sampled_epoch == snapshot.epoch &&
+             iterator->second.sampled_generation ==
+                 snapshot.published_generation)) {
+            ++iterator;
+            continue;
+        }
+
+        const Rect destination = absolute_bounds_of(*control);
+        Rect clip = Rect::intersection(
+            destination, {0.0, 0.0, client_size_.width, client_size_.height});
+        bool valid = !destination.empty() && !clip.empty();
+        for (auto ancestor = control->parent(); ancestor && valid && !clip.empty();
+             ancestor = ancestor->parent()) {
+            if (!ancestor->is_alive() || ancestor->window_ != this ||
+                !ancestor->visible_) {
+                valid = false;
+                break;
+            }
+            const Rect ancestor_bounds = absolute_bounds_of(*ancestor);
+            const Rect viewport = ancestor->child_viewport_rectangle();
+            clip = Rect::intersection(
+                clip, {ancestor_bounds.x + viewport.x,
+                       ancestor_bounds.y + viewport.y,
+                       viewport.width, viewport.height});
+        }
+        if (valid && !clip.empty()) {
+            result.push_back(LiveSurfacePresentation{
+                control->runtime_id(), iterator->second.surface,
+                destination, clip});
+            iterator->second.sampled_epoch = snapshot.epoch;
+            iterator->second.sampled_generation = snapshot.published_generation;
+        }
+        ++iterator;
     }
-    live_surface_presentations_.clear();
     return result;
 }
 

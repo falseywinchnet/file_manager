@@ -345,6 +345,12 @@ public:
         const Control::Ptr& control, std::shared_ptr<LiveSurface> surface);
     [[nodiscard]] std::vector<LiveSurfacePresentation>
         take_live_surface_presentations();
+    // A registration is retained while its control remains attached. Native
+    // display clocks use this to stay armed without polling the control tree or
+    // requiring one UI callback per producer publication.
+    [[nodiscard]] bool has_live_surface_presentations() const noexcept {
+        return !live_surface_registrations_.empty();
+    }
 
     [[nodiscard]] DamageRegion take_damage();
     [[nodiscard]] DamageRegion take_damage(PaintPlane plane);
@@ -682,8 +688,14 @@ private:
     std::uint64_t drag_session_id_{};
     DragEffect drag_last_accepted_effect_{DragEffect::none};
     std::array<DamageRegion, paint_plane_count> plane_damage_;
-    std::unordered_map<std::uint64_t, LiveSurfacePresentation>
-        live_surface_presentations_;
+    struct LiveSurfaceRegistration final {
+        Control::WeakPtr control;
+        std::shared_ptr<LiveSurface> surface;
+        std::uint64_t sampled_epoch{};
+        std::uint64_t sampled_generation{};
+    };
+    std::unordered_map<std::uint64_t, LiveSurfaceRegistration>
+        live_surface_registrations_;
     Metrics metrics_;
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};

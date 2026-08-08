@@ -18,6 +18,39 @@ using EndEndpointWrite = int(__cdecl*)(std::uint64_t, std::uint32_t);
 
 std::mutex bitmap_orientation_mutex;
 std::unordered_set<HBITMAP> top_down_bitmaps;
+std::mutex endpoint_dc_mutex;
+std::unordered_set<HDC> endpoint_dcs;
+std::unordered_set<HDC> ordinary_dcs;
+
+enum class DcKind : std::uint8_t { unknown, endpoint, ordinary };
+
+DcKind cached_dc_kind(HDC dc) noexcept {
+    if (dc == nullptr) return DcKind::ordinary;
+    std::scoped_lock lock(endpoint_dc_mutex);
+    if (endpoint_dcs.contains(dc)) return DcKind::endpoint;
+    if (ordinary_dcs.contains(dc)) return DcKind::ordinary;
+    return DcKind::unknown;
+}
+
+void remember_dc(HDC dc, DcKind kind) noexcept {
+    if (dc == nullptr) return;
+    try {
+        std::scoped_lock lock(endpoint_dc_mutex);
+        endpoint_dcs.erase(dc);
+        ordinary_dcs.erase(dc);
+        (kind == DcKind::endpoint ? endpoint_dcs : ordinary_dcs).insert(dc);
+    } catch (...) {
+        // Classification is a fast-path cache. The ABI lookup remains the
+        // correctness fallback for an unclassified DC.
+    }
+}
+
+void forget_dc(HDC dc) noexcept {
+    if (dc == nullptr) return;
+    std::scoped_lock lock(endpoint_dc_mutex);
+    endpoint_dcs.erase(dc);
+    ordinary_dcs.erase(dc);
+}
 
 bool tracked_top_down(HBITMAP bitmap) noexcept {
     if (bitmap == nullptr) return false;
@@ -54,18 +87,19 @@ Function forms_entry(const char* name) noexcept {
 }
 
 bool endpoint_dc(HWND window, HDC* output) noexcept {
-    const auto entry = forms_entry<GetEndpointDc>(
+    static const auto entry = forms_entry<GetEndpointDc>(
         "gf_windows_paint_endpoint_get_dc_v1");
     if (entry == nullptr || output == nullptr) return false;
     std::uintptr_t value{};
     if (entry(reinterpret_cast<std::uintptr_t>(window), &value) != 0 ||
         value == 0U) return false;
     *output = reinterpret_cast<HDC>(value);
+    remember_dc(*output, DcKind::endpoint);
     return true;
 }
 
 bool release_endpoint_dc(HWND window, HDC dc) noexcept {
-    const auto entry = forms_entry<ReleaseEndpointDc>(
+    static const auto entry = forms_entry<ReleaseEndpointDc>(
         "gf_windows_paint_endpoint_release_dc_v1");
     return entry != nullptr &&
         entry(reinterpret_cast<std::uintptr_t>(window),
@@ -73,7 +107,8 @@ bool release_endpoint_dc(HWND window, HDC dc) noexcept {
 }
 
 void publish_endpoint_dc(HDC dc) noexcept {
-    const auto entry = forms_entry<PublishEndpointDc>(
+    if (cached_dc_kind(dc) == DcKind::ordinary) return;
+    static const auto entry = forms_entry<PublishEndpointDc>(
         "gf_windows_paint_endpoint_publish_dc_v1");
     if (entry != nullptr) {
         static_cast<void>(entry(reinterpret_cast<std::uintptr_t>(dc)));
@@ -81,15 +116,21 @@ void publish_endpoint_dc(HDC dc) noexcept {
 }
 
 bool begin_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
-    const auto entry = forms_entry<BeginEndpointWrite>(
+    const DcKind kind = cached_dc_kind(dc);
+    if (kind == DcKind::ordinary) return false;
+    static const auto entry = forms_entry<BeginEndpointWrite>(
         "gf_windows_paint_endpoint_begin_write_v1");
-    return entry != nullptr && lease != nullptr &&
+    const bool acquired = entry != nullptr && lease != nullptr &&
         entry(reinterpret_cast<std::uintptr_t>(dc), lease) == 0 &&
         *lease != 0U;
+    if (kind == DcKind::unknown) {
+        remember_dc(dc, acquired ? DcKind::endpoint : DcKind::ordinary);
+    }
+    return acquired;
 }
 
 void end_endpoint_write(std::uint64_t lease, bool publish) noexcept {
-    const auto entry = forms_entry<EndEndpointWrite>(
+    static const auto entry = forms_entry<EndEndpointWrite>(
         "gf_windows_paint_endpoint_end_write_v1");
     if (entry != nullptr && lease != 0U) {
         static_cast<void>(entry(lease, publish ? 1U : 0U));
@@ -166,9 +207,17 @@ bool try_dib32_srccopy(HDC destination, int destination_x, int destination_y,
     }
     if (destination_bitmap != source_bitmap) return false;
 
-    // DIB-section storage may still have queued GDI writes. BitBlt is itself a
-    // synchronization point; preserve that contract before touching bmBits.
-    if (GdiFlush() == FALSE) return false;
+    // Compatibility bitmaps derived from the GUI.Forms endpoint are explicit
+    // top-down DIB sections. Wine's overlapping self-BitBlt path does not
+    // reliably handle that object, while forcing GdiFlush before every direct
+    // scroll makes a high-rate compatibility consumer flush and copy its
+    // entire completed history for every scanline. The producer already owns
+    // the DIB memory synchronously; keep
+    // the overlap-safe memory move. Unknown/native DIBs retain GDI's flush
+    // boundary before direct access.
+    if (!tracked_top_down(destination_bitmap) && GdiFlush() == FALSE) {
+        return false;
+    }
 
     int copy_width = width;
     int copy_height = height;
@@ -225,6 +274,25 @@ bool try_dib32_srccopy(HDC destination, int destination_x, int destination_y,
 
     const std::size_t copy_bytes =
         static_cast<std::size_t>(copy_width) * 4U;
+    const bool complete_rows = destination_x == 0 && source_x == 0 &&
+        copy_bytes == static_cast<std::size_t>(destination_section.dsBm.bmWidthBytes) &&
+        copy_bytes == static_cast<std::size_t>(source_section.dsBm.bmWidthBytes) &&
+        (destination_section.dsBmih.biHeight < 0) ==
+            (source_section.dsBmih.biHeight < 0);
+    if (complete_rows) {
+        std::byte* destination_first =
+            logical_dib_row(destination_section, destination_y);
+        std::byte* destination_last =
+            logical_dib_row(destination_section, destination_y + copy_height - 1);
+        std::byte* source_first = logical_dib_row(source_section, source_y);
+        std::byte* source_last =
+            logical_dib_row(source_section, source_y + copy_height - 1);
+        std::memmove((std::min)(destination_first, destination_last),
+                     (std::min)(source_first, source_last),
+                     copy_bytes * static_cast<std::size_t>(copy_height));
+        *result = TRUE;
+        return true;
+    }
     const bool reverse = destination_y > source_y &&
         destination_y < source_y + copy_height;
     for (int index = 0; index < copy_height; ++index) {
@@ -344,7 +412,6 @@ extern "C" BOOL WINAPI gf_compat_BitBlt(
     trace(direct_dib ? "bitblt-dib32" : "bitblt", destination, source,
           result, width, height);
     if (leased) end_endpoint_write(lease, result != FALSE);
-    else if (result != FALSE) publish_endpoint_dc(destination);
     return result;
 }
 
@@ -380,6 +447,7 @@ extern "C" HBITMAP WINAPI gf_compat_CreateCompatibleBitmap(
 
 extern "C" HDC WINAPI gf_compat_CreateCompatibleDC(HDC dc) {
     HDC result = ::CreateCompatibleDC(dc);
+    remember_dc(result, DcKind::ordinary);
     trace("create-compatible-dc", dc, result, result != nullptr ? 1 : 0);
     return result;
 }
@@ -422,6 +490,7 @@ extern "C" HGDIOBJ WINAPI gf_compat_SelectObject(HDC dc, HGDIOBJ object) {
 
 extern "C" BOOL WINAPI gf_compat_DeleteDC(HDC dc) {
     const BOOL result = ::DeleteDC(dc);
+    if (result != FALSE) forget_dc(dc);
     trace("delete-dc", dc, nullptr, result);
     return result;
 }
@@ -440,7 +509,6 @@ extern "C" COLORREF WINAPI gf_compat_SetPixel(
     const bool leased = begin_endpoint_write(dc, &lease);
     const COLORREF result = ::SetPixel(dc, x, y, color);
     if (leased) end_endpoint_write(lease, result != CLR_INVALID);
-    else if (result != CLR_INVALID) publish_endpoint_dc(dc);
     return result;
 }
 
@@ -458,7 +526,6 @@ extern "C" BOOL WINAPI gf_compat_StretchBlt(
         destination, x, y, width, height, source, source_x, source_y,
         source_width, source_height, operation);
     if (leased) end_endpoint_write(lease, result != FALSE);
-    else if (result != FALSE) publish_endpoint_dc(destination);
     return result;
 }
 
@@ -473,8 +540,6 @@ extern "C" int WINAPI gf_compat_StretchDIBits(
         source_width, source_height, pixels, info, usage, operation);
     if (leased) {
         end_endpoint_write(lease, result != static_cast<int>(GDI_ERROR));
-    } else if (result != static_cast<int>(GDI_ERROR)) {
-        publish_endpoint_dc(destination);
     }
     return result;
 }
@@ -485,7 +550,6 @@ extern "C" int WINAPI gf_compat_FillRect(
     const bool leased = begin_endpoint_write(dc, &lease);
     const int result = ::FillRect(dc, rectangle, brush);
     if (leased) end_endpoint_write(lease, result != 0);
-    else if (result != 0) publish_endpoint_dc(dc);
     return result;
 }
 
@@ -495,7 +559,6 @@ extern "C" int WINAPI gf_compat_FrameRect(
     const bool leased = begin_endpoint_write(dc, &lease);
     const int result = ::FrameRect(dc, rectangle, brush);
     if (leased) end_endpoint_write(lease, result != 0);
-    else if (result != 0) publish_endpoint_dc(dc);
     return result;
 }
 
@@ -525,7 +588,6 @@ extern "C" int WINAPI gf_compat_ScrollWindowEx(
                                    update_region, update_rectangle);
     trace("scroll", window, dc, result, dx, dy);
     if (leased) end_endpoint_write(lease, result != FALSE);
-    else if (result != FALSE) publish_endpoint_dc(dc);
     if (result == FALSE) return ERROR;
     if (update_region != nullptr) {
         RECT update_bounds{};
@@ -588,6 +650,5 @@ extern "C" BOOL WINAPI gf_compat_GdiAlphaBlend(
         destination, x, y, width, height, source, source_x, source_y,
         source_width, source_height, blend);
     if (leased) end_endpoint_write(lease, result != FALSE);
-    else if (result != FALSE) publish_endpoint_dc(destination);
     return result;
 }

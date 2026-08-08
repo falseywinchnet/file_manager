@@ -40,6 +40,8 @@ namespace {
 constexpr wchar_t window_class_name[] = L"GUIForms.Window.v1";
 constexpr wchar_t tooltip_class_name[] = L"GUIForms.ToolTip.v1";
 constexpr UINT_PTR scheduler_timer = 1;
+constexpr UINT_PTR modal_live_surface_timer = 2;
+constexpr UINT live_surface_period_milliseconds = 16;
 constexpr UINT managed_dispatch_message = WM_APP + 0x41U;
 constexpr UINT render_dispatch_message = WM_APP + 0x42U;
 constexpr std::size_t maximum_automation_command = 4096;
@@ -1846,9 +1848,20 @@ class WindowsHostState final {
 public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
-          services_(), session_(*model_, windows_capabilities(), &services_) {}
+          services_(), session_(*model_, windows_capabilities(), &services_) {
+        live_frame_clock_ = CreateWaitableTimerExW(
+            nullptr, nullptr, 0, TIMER_ALL_ACCESS);
+        if (live_frame_clock_ == nullptr) {
+            live_frame_clock_ = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+        }
+    }
 
     ~WindowsHostState() {
+        if (live_frame_clock_ != nullptr) {
+            CancelWaitableTimer(live_frame_clock_);
+            CloseHandle(live_frame_clock_);
+            live_frame_clock_ = nullptr;
+        }
         hide_tooltip();
         if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
         session_.shutdown();
@@ -1921,6 +1934,15 @@ public:
         return true;
     }
 
+    [[nodiscard]] HANDLE live_frame_clock() const noexcept {
+        return live_frame_clock_;
+    }
+
+    void mark_live_frame_due() noexcept {
+        ++live_clock_signals_;
+        live_frame_due_ = true;
+    }
+
     LRESULT message(UINT message, WPARAM wparam, LPARAM lparam) {
         const bool ready = native_phase_ == NativePhase::ready ||
             native_phase_ == NativePhase::visible ||
@@ -1987,6 +2009,23 @@ public:
             presentation_pending_ = false;
             paint();
             return 0;
+        case WM_ENTERSIZEMOVE:
+            // DefWindowProc enters a nested modal loop while a top-level
+            // window is moved or sized. The outer waitable-timer loop cannot
+            // run there, but the live plane must keep presenting independently
+            // of retained layout and input. A modal-loop timer is the native
+            // Win32 clock bridge for exactly that interval.
+            in_size_move_ = true;
+            if (model_->has_live_surface_presentations()) {
+                SetTimer(hwnd_, modal_live_surface_timer,
+                         live_surface_period_milliseconds, nullptr);
+            }
+            return 0;
+        case WM_EXITSIZEMOVE:
+            KillTimer(hwnd_, modal_live_surface_timer);
+            in_size_move_ = false;
+            mark_live_frame_due();
+            return 0;
         case managed_dispatch_message:
             static_cast<void>(model_->drain_posted_work());
             if (options_.dispatch_pending) options_.dispatch_pending();
@@ -2003,6 +2042,12 @@ public:
                 GetUpdateRect(hwnd_, nullptr, FALSE) != FALSE;
             return 0;
         case WM_TIMER:
+            if (wparam == modal_live_surface_timer) {
+                // Do not enter retained polling/layout from the native modal
+                // loop. Sample and present only the newest live generation.
+                present_live_surface_updates();
+                return 0;
+            }
             if (wparam == scheduler_timer) {
                 KillTimer(hwnd_, scheduler_timer);
                 try {
@@ -2065,7 +2110,21 @@ public:
         return "{\"session\":" + session_.snapshot().to_json() +
                ",\"services\":" + services_.snapshot().to_json() +
                ",\"compatibility_surfaces\":" +
-               compatibility_paint_metrics_json() + "}";
+               compatibility_paint_metrics_json() +
+               ",\"live_presentations\":{" +
+               "\"clock_signals\":" + std::to_string(live_clock_signals_) +
+               ",\"drains\":" + std::to_string(live_presentation_drains_) +
+               ",\"updates_sampled\":" +
+                   std::to_string(live_updates_sampled_) +
+               ",\"updates_presented\":" +
+                   std::to_string(live_updates_presented_) +
+               ",\"updates_failed\":" +
+                   std::to_string(live_updates_failed_) +
+               ",\"duration_nanoseconds\":" +
+                   std::to_string(live_present_duration_nanoseconds_) +
+               ",\"worst_duration_nanoseconds\":" +
+                   std::to_string(live_worst_present_duration_nanoseconds_) +
+               "}}";
     }
 
     void present_pending_frame() {
@@ -2074,7 +2133,10 @@ public:
             presentation_pending_ = false;
             if (GetUpdateRect(hwnd_, nullptr, FALSE) != FALSE) paint();
         }
-        present_live_surface_updates();
+        if (live_frame_due_) {
+            live_frame_due_ = false;
+            present_live_surface_updates();
+        }
     }
 
 private:
@@ -2292,6 +2354,20 @@ private:
             SetTimer(hwnd_, scheduler_timer,
                      static_cast<UINT>(std::clamp<std::int64_t>(milliseconds, 1, 60'000)), nullptr);
         }
+        const bool needs_live_clock = model_->has_live_surface_presentations();
+        if (needs_live_clock && !live_clock_armed_) {
+            LARGE_INTEGER first_due{};
+            first_due.QuadPart = -static_cast<LONGLONG>(
+                live_surface_period_milliseconds) * 10'000LL;
+            live_clock_armed_ = live_frame_clock_ != nullptr &&
+                SetWaitableTimer(live_frame_clock_, &first_due,
+                    live_surface_period_milliseconds, nullptr, nullptr,
+                    FALSE) != FALSE;
+        } else if (!needs_live_clock && live_clock_armed_) {
+            CancelWaitableTimer(live_frame_clock_);
+            live_clock_armed_ = false;
+            live_frame_due_ = false;
+        }
     }
 
     void request_render_wake() noexcept {
@@ -2304,15 +2380,35 @@ private:
     }
 
     void present_live_surface_updates() {
+        ++live_presentation_drains_;
+        const auto started = std::chrono::steady_clock::now();
         std::vector<LiveSurfacePresentation> updates =
             model_->take_live_surface_presentations();
+        live_updates_sampled_ += updates.size();
+        if (!model_->has_live_surface_presentations() && live_clock_armed_) {
+            CancelWaitableTimer(live_frame_clock_);
+            live_clock_armed_ = false;
+        }
         if (updates.empty() || hwnd_ == nullptr) return;
         HDC target = GetDC(hwnd_);
-        if (target == nullptr) return;
+        if (target == nullptr) {
+            live_updates_failed_ += updates.size();
+            return;
+        }
         for (const auto& update : updates) {
-            static_cast<void>(raster_.present_live_surface(target, update));
+            if (raster_.present_live_surface(target, update)) {
+                ++live_updates_presented_;
+            } else {
+                ++live_updates_failed_;
+            }
         }
         ReleaseDC(hwnd_, target);
+        const auto duration = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started).count());
+        live_present_duration_nanoseconds_ += duration;
+        live_worst_present_duration_nanoseconds_ =
+            (std::max)(live_worst_present_duration_nanoseconds_, duration);
     }
 
     void paint() {
@@ -2779,6 +2875,17 @@ private:
     wchar_t pending_high_surrogate_{};
     bool render_dispatch_pending_{};
     bool presentation_pending_{};
+    HANDLE live_frame_clock_{};
+    bool live_clock_armed_{};
+    bool live_frame_due_{};
+    std::uint64_t live_clock_signals_{};
+    std::uint64_t live_presentation_drains_{};
+    std::uint64_t live_updates_sampled_{};
+    std::uint64_t live_updates_presented_{};
+    std::uint64_t live_updates_failed_{};
+    std::uint64_t live_present_duration_nanoseconds_{};
+    std::uint64_t live_worst_present_duration_nanoseconds_{};
+    bool in_size_move_{};
     bool closed_{};
     NativePhase native_phase_{NativePhase::creating};
     std::vector<std::wstring> private_font_paths_;
@@ -2886,6 +2993,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         std::scoped_lock lock(state_mutex);
         if (released || compatibility_handle == 0U) return false;
         if (width == next_width && height == next_height) return true;
+        std::scoped_lock publish_lock(surface_publish_mutex);
         if (!surface->reconfigure({next_width, next_height}) ||
             !create_backing(next_width, next_height)) {
             return false;
@@ -2899,6 +3007,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
     bool publish_locked() noexcept {
         if (released || pixels == nullptr || !surface) return false;
         const auto started = std::chrono::steady_clock::now();
+        std::scoped_lock publish_lock(surface_publish_mutex);
         auto lease = surface->try_acquire_write(false);
         if (!lease) return false;
         std::span<std::byte> destination = lease.pixels();
@@ -2920,6 +3029,53 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         return result;
     }
 
+    struct PendingFrame final {
+        std::shared_ptr<LiveSurface> target;
+        std::vector<std::byte> pixels;
+        std::uint32_t width{};
+        std::uint32_t height{};
+        std::uint64_t epoch{};
+        std::uint64_t revision{};
+    };
+
+    bool capture_pending_locked(PendingFrame& pending) noexcept {
+        if (released || pixels == nullptr || !surface) return false;
+        const std::size_t byte_count =
+            static_cast<std::size_t>(width) * height * 4U;
+        pending.target = surface;
+        try {
+            pending.pixels.resize(byte_count);
+        } catch (...) {
+            return false;
+        }
+        std::memcpy(pending.pixels.data(), pixels, byte_count);
+        pending.width = width;
+        pending.height = height;
+        pending.epoch = epoch;
+        pending.revision = content_revision;
+        return true;
+    }
+
+    bool publish_pending(PendingFrame& pending) noexcept {
+        if (!pending.target || pending.pixels.empty()) return false;
+        // GDI owns an opaque RGB surface and is permitted to leave alpha
+        // undefined. Normalize the private snapshot, not the GDI backing and
+        // not while holding the producer's state mutex.
+        for (std::size_t index = 3; index < pending.pixels.size(); index += 4U) {
+            pending.pixels[index] = std::byte{0xff};
+        }
+        std::scoped_lock publish_lock(surface_publish_mutex);
+        auto lease = pending.target->try_acquire_write(false);
+        if (!lease || lease.width() != pending.width ||
+            lease.height() != pending.height ||
+            lease.pixels().size() != pending.pixels.size()) {
+            return false;
+        }
+        std::memcpy(lease.pixels().data(), pending.pixels.data(),
+                    pending.pixels.size());
+        return lease.publish() != 0U;
+    }
+
     bool request_publish_locked(bool explicit_boundary = false) noexcept {
         if (released || pixels == nullptr || !surface) return false;
         ++content_revision;
@@ -2939,16 +3095,32 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
 
     void publisher_loop() noexcept {
         std::unique_lock lock(state_mutex);
+        PendingFrame pending;
         for (;;) {
             publish_wake.wait(lock, [this] {
                 return publisher_stop || publish_requested;
             });
             if (publisher_stop) return;
 
-            const std::uint64_t requested_revision = content_revision;
             publish_requested = false;
-            if (publish_locked()) {
-                published_revision = requested_revision;
+            const auto started = std::chrono::steady_clock::now();
+            const bool captured = capture_pending_locked(pending);
+
+            // The endpoint DIB is the producer-owned mutable object. Only its
+            // coherent snapshot needs state_mutex. Alpha conversion, copying
+            // into the triple-buffered live surface, and publication are
+            // consumer work and must not serialize subsequent GDI calls.
+            lock.unlock();
+            const bool published = captured && publish_pending(pending);
+            const auto duration = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - started).count());
+            record_compatibility_copy_duration(duration);
+            lock.lock();
+
+            if (published && !released && pending.epoch == epoch) {
+                published_revision = (std::max)(
+                    published_revision, pending.revision);
                 ++publish_commits;
                 compatibility_paint_metrics.commits.fetch_add(
                     1U, std::memory_order_relaxed);
@@ -3018,6 +3190,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         std::scoped_lock lock(state_mutex);
         if (released || pixels == nullptr || submitted_width != width ||
             submitted_height != height) return false;
+        std::scoped_lock publish_lock(surface_publish_mutex);
         auto lease = surface->try_acquire_write(false);
         if (!lease) return false;
         const std::size_t packed_row = static_cast<std::size_t>(width) * 4U;
@@ -3097,6 +3270,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
     }
 
     mutable std::mutex state_mutex;
+    std::mutex surface_publish_mutex;
     std::condition_variable publish_wake;
     std::thread publisher_thread;
     std::uintptr_t compatibility_handle{};
@@ -3307,15 +3481,21 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     MSG message{};
     bool quit{};
     while (!quit) {
-        const BOOL received = GetMessageW(&message, nullptr, 0, 0);
-        if (received <= 0) break;
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
+        HANDLE clock = state.live_frame_clock();
+        const DWORD handle_count = clock == nullptr ? 0U : 1U;
+        const DWORD wait = MsgWaitForMultipleObjectsEx(
+            handle_count, handle_count == 0U ? nullptr : &clock, INFINITE,
+            QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        if (wait == WAIT_FAILED) break;
+        if (handle_count != 0U && wait == WAIT_OBJECT_0) {
+            state.mark_live_frame_due();
+        }
 
-        // Drain a bounded batch before presentation. This gives already queued
-        // input and control work priority while still guaranteeing one newest-
-        // frame presentation under a continuous message stream.
-        for (std::size_t drained = 1U; drained < 256U; ++drained) {
+        // Input and managed callbacks receive a bounded turn, not an
+        // unbounded queue drain. Presentation therefore has a maximum queue
+        // latency even while pointer or plugin traffic remains continuous.
+        const auto batch_started = std::chrono::steady_clock::now();
+        for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
             if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
             if (pending.message == WM_QUIT) {
@@ -3329,6 +3509,14 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
                 quit = true;
                 break;
             }
+            if (std::chrono::steady_clock::now() - batch_started >=
+                std::chrono::milliseconds(4)) {
+                break;
+            }
+        }
+        if (clock != nullptr &&
+            WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
+            state.mark_live_frame_due();
         }
         if (!quit && IsWindow(window)) state.present_pending_frame();
         if (!options.quit_thread_on_close && !IsWindow(window)) break;
@@ -3461,11 +3649,34 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     MSG message{};
     bool quit{};
     while (!quit) {
-        const BOOL received = GetMessageW(&message, nullptr, 0, 0);
-        if (received <= 0) break;
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
-        for (std::size_t drained = 1U; drained < 256U; ++drained) {
+        std::vector<HANDLE> clocks;
+        clocks.reserve(states.size());
+        for (const auto& state : states) {
+            if (state->live_frame_clock() != nullptr) {
+                clocks.push_back(state->live_frame_clock());
+            }
+        }
+        if (clocks.size() >= MAXIMUM_WAIT_OBJECTS) {
+            clocks.resize(MAXIMUM_WAIT_OBJECTS - 1U);
+        }
+        const DWORD wait = MsgWaitForMultipleObjectsEx(
+            static_cast<DWORD>(clocks.size()),
+            clocks.empty() ? nullptr : clocks.data(), INFINITE,
+            QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        if (wait == WAIT_FAILED) break;
+        if (wait >= WAIT_OBJECT_0 &&
+            wait < WAIT_OBJECT_0 + clocks.size()) {
+            const HANDLE ready = clocks[wait - WAIT_OBJECT_0];
+            for (const auto& state : states) {
+                if (state->live_frame_clock() == ready) {
+                    state->mark_live_frame_due();
+                    break;
+                }
+            }
+        }
+
+        const auto batch_started = std::chrono::steady_clock::now();
+        for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
             if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
             if (pending.message == WM_QUIT) {
@@ -3475,6 +3686,17 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             }
             TranslateMessage(&pending);
             DispatchMessageW(&pending);
+            if (std::chrono::steady_clock::now() - batch_started >=
+                std::chrono::milliseconds(4)) {
+                break;
+            }
+        }
+        for (const auto& state : states) {
+            const HANDLE clock = state->live_frame_clock();
+            if (clock != nullptr &&
+                WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
+                state->mark_live_frame_due();
+            }
         }
         if (!quit) {
             for (const auto& state : states) state->present_pending_frame();
