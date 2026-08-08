@@ -386,6 +386,10 @@ public:
         return visual_style_;
     }
     void set_visual_style(ButtonVisualStyle style);
+    [[nodiscard]] double flat_border_width() const noexcept {
+        return flat_border_width_;
+    }
+    void set_flat_border_width(double width);
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
 
@@ -400,6 +404,7 @@ private:
     DialogResult dialog_result_{DialogResult::none};
     Event<DialogResult> dialog_result_changed_;
     ButtonVisualStyle visual_style_{ButtonVisualStyle::standard};
+    double flat_border_width_{1.0};
 };
 
 enum class CheckState : std::uint8_t {

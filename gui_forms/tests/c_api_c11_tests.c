@@ -229,7 +229,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_24, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_25, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -281,15 +281,44 @@ static void test_version_negotiation(void) {
                 api.property_grid_try_set_text != NULL &&
                 api.property_grid_reset_property != NULL &&
                 api.property_grid_activate_editor != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_24,
+                api.set_control_text_alignment != NULL &&
+                api.set_button_appearance != NULL &&
+                api.set_panel_border_style != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_25,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000019), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x0000001a), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+static void test_abi_0_25_presentation_properties(void) {
+    gf_handle label = {0U, 0U};
+    gf_handle button = {0U, 0U};
+    gf_handle panel = {0U, 0U};
+    require(api.control_create_kind(GF_CONTROL_LABEL,
+                                    text("abi.presentation.label"), &label) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_BUTTON,
+                                        text("abi.presentation.button"), &button) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PANEL,
+                                        text("abi.presentation.panel"), &panel) == GF_OK,
+            "0.25 presentation fixtures failed");
+    require(api.set_control_text_alignment(label, 4U) == GF_OK &&
+                api.set_control_text_alignment(button, 8U) == GF_OK &&
+                api.set_button_appearance(button, 1U, 0.0) == GF_OK &&
+                api.set_panel_border_style(panel, 0U) == GF_OK,
+            "0.25 retained presentation projection failed");
+    require(api.set_control_text_alignment(label, 9U) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_button_appearance(button, 99U, 0.0) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_button_appearance(button, 1U, -1.0) == GF_ERROR_INVALID_ARGUMENT &&
+                api.set_panel_border_style(panel, 3U) == GF_ERROR_INVALID_ARGUMENT,
+            "0.25 presentation validation failed");
+    require(api.dispose(label) == GF_OK && api.dispose(button) == GF_OK &&
+                api.dispose(panel) == GF_OK,
+            "0.25 presentation fixture disposal failed");
 }
 
 struct property_proxy_context {
@@ -1565,6 +1594,7 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_25_presentation_properties();
     test_abi_0_23_property_object_proxy();
     test_abi_0_22_property_grid_projection();
     test_abi_0_21_layout_transactions();

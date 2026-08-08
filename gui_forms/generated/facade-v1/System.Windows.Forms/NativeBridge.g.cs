@@ -76,6 +76,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint PropertyObjectDefine, PropertyObjectNotifyChanged;
         internal nint PropertyGridTrySetText, PropertyGridResetProperty;
         internal nint PropertyGridActivateEditor;
+        internal nint SetControlTextAlignment, SetButtonAppearance;
+        internal nint SetPanelBorderStyle;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -243,7 +245,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         this.handle = handle;
         this.stableId = stableId;
         this.managedTypeName = managedTypeName;
-        supportsRaster = kind is 20u or 0x7fffffffu;
+        supportsRaster = kind is 20u or 23u or 0x7fffffffu;
         exposesWindowSurface = global::System.Array.Exists(directWindowSurfaceTypes,
             candidate => global::System.String.Equals(candidate, managedTypeName, global::System.StringComparison.Ordinal));
         promotesPointerClick = kind is 4u or 5u or 11u or 14u;
@@ -303,9 +305,6 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 managedType.FullName ?? managedType.Name,
                 global::System.StringComparison.Ordinal));
         var paintMethod = managedType.GetMethod("OnPaint", global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic);
-        // DockPanelSuite's empty auto-hide strip reports the entire dock client
-        // even when it owns no tabs. Painting that compatibility overlay would
-        // obscure every retained pane beneath it.
         var retainedField = typeof(ComboBox).IsAssignableFrom(managedType) ||
             typeof(NumericUpDown).IsAssignableFrom(managedType) ||
             typeof(TextBoxBase).IsAssignableFrom(managedType);
@@ -316,15 +315,14 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         var pictureBoxSurface = typeof(PictureBox).IsAssignableFrom(managedType);
         var customPaint = global::System.OperatingSystem.IsWindows() &&
             (toolStripSurface || buttonSurface || pictureBoxSurface || (!retainedField && !typeof(Form).IsAssignableFrom(managedType) &&
-            !managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal) &&
             paintMethod?.DeclaringType?.Assembly != typeof(Control).Assembly));
         // A direct-GDI endpoint is sampled by the retained compositor as a
         // RasterControl regardless of whether reflection can see an OnPaint
         // override. Handle creation happens in the bridge constructor, so this
         // backing choice must be complete before the bridge exists.
-        var kind = directWindowSurface ? 0x7fffffffu :
-            managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal)
-            ? 19u : customPaint && transparentPaintSurface ? 20u : customPaint ? 0x7fffffffu : 0u;
+        var overlaySurface = typeof(ToolStripDropDown).IsAssignableFrom(managedType);
+        var kind = directWindowSurface ? 0x7fffffffu : overlaySurface ? 23u :
+            customPaint && transparentPaintSurface ? 20u : customPaint ? 0x7fffffffu : 0u;
         for (var current = managedType; current is not null && kind == 0u; current = current.BaseType)
         {
             kind = current.Name switch
@@ -398,6 +396,9 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
     internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
     internal void SetColors(global::System.Drawing.Color foreground, global::System.Drawing.Color background) { Check(((delegate* unmanaged[Cdecl]<Handle, uint, uint, int>)api.SetControlColors)(handle.Value, unchecked((uint)foreground.ToArgb()), unchecked((uint)background.ToArgb()))); }
+    internal void SetTextAlignment(uint contentAlignment) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetControlTextAlignment)(handle.Value, contentAlignment)); }
+    internal void SetButtonAppearance(uint visualStyle, double flatBorderWidth) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, double, int>)api.SetButtonAppearance)(handle.Value, visualStyle, flatBorderWidth)); }
+    internal void SetPanelBorderStyle(uint borderStyle) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetPanelBorderStyle)(handle.Value, borderStyle)); }
     internal void SetFieldSelection(int start, int length, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; start = global::System.Math.Clamp(start, 0, text.Length); length = global::System.Math.Clamp(length, 0, text.Length - start); var startBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, start)); var lengthBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(start, length)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldSelection)(handle.Value, (ulong)startBytes, (ulong)lengthBytes, caretVisible ? 1u : 0u)); }
     internal void SetFieldEditState(int anchor, int caret, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; anchor = global::System.Math.Clamp(anchor, 0, text.Length); caret = global::System.Math.Clamp(caret, 0, text.Length); var anchorBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, anchor)); var caretBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, caret)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldEditState)(handle.Value, (ulong)anchorBytes, (ulong)caretBytes, caretVisible ? 1u : 0u)); }
     internal int FieldPositionFromPoint(double x) { EnsureAlive(); ulong bytePosition; Check(((delegate* unmanaged[Cdecl]<Handle, double, ulong*, int>)api.FieldPositionFromPoint)(handle.Value, x, &bytePosition)); string text; lock (stateGate) text = cachedText; var bytes = global::System.Text.Encoding.UTF8.GetBytes(text); var bounded = global::System.Math.Min(bytePosition, (ulong)bytes.Length); return global::System.Text.Encoding.UTF8.GetCharCount(bytes.AsSpan(0, checked((int)bounded))); }
@@ -1656,8 +1657,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(24, ref value));
-        if (value.AbiVersion != 24 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0 || value.SuspendLayout == 0 || value.ResumeLayout == 0 || value.PerformControlLayout == 0 || value.GetLayoutState == 0 || value.PropertyGridSetSelectedControls == 0 || value.PropertyGridSetSort == 0 || value.PropertyGridGetSort == 0 || value.PropertyGridRefresh == 0 || value.PropertyObjectDefine == 0 || value.PropertyObjectNotifyChanged == 0 || value.PropertyGridTrySetText == 0 || value.PropertyGridResetProperty == 0 || value.PropertyGridActivateEditor == 0) throw new InvalidOperationException("GUI.Forms ABI 0.24 table is incomplete.");
+        Check(GetApi(25, ref value));
+        if (value.AbiVersion != 25 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0 || value.SuspendLayout == 0 || value.ResumeLayout == 0 || value.PerformControlLayout == 0 || value.GetLayoutState == 0 || value.PropertyGridSetSelectedControls == 0 || value.PropertyGridSetSort == 0 || value.PropertyGridGetSort == 0 || value.PropertyGridRefresh == 0 || value.PropertyObjectDefine == 0 || value.PropertyObjectNotifyChanged == 0 || value.PropertyGridTrySetText == 0 || value.PropertyGridResetProperty == 0 || value.PropertyGridActivateEditor == 0 || value.SetControlTextAlignment == 0 || value.SetButtonAppearance == 0 || value.SetPanelBorderStyle == 0) throw new InvalidOperationException("GUI.Forms ABI 0.25 table is incomplete.");
         return value;
     }
     private static void Check(int result)

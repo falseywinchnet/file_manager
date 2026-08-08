@@ -154,8 +154,18 @@ public:
 
     void set_colors(gui_forms::Color foreground, gui_forms::Color background) {
         require_mutable();
+        const auto disabled_channel = [](std::uint8_t foreground_channel,
+                                         std::uint8_t background_channel) {
+            return static_cast<std::uint8_t>(
+                (static_cast<unsigned>(foreground_channel) * 45U +
+                 static_cast<unsigned>(background_channel) * 55U) / 100U);
+        };
         style_.text = foreground;
-        style_.disabled_text = foreground;
+        style_.disabled_text = gui_forms::Color::rgba(
+            disabled_channel(foreground.red, background.red),
+            disabled_channel(foreground.green, background.green),
+            disabled_channel(foreground.blue, background.blue),
+            foreground.alpha);
         set_background(background);
         invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
     }
@@ -1599,8 +1609,10 @@ public:
             break;
         case GF_CONTROL_PANEL: {
             auto panel = std::make_shared<gui_forms::Panel>(std::move(native_id));
-            panel->set_background(gui_forms::BasicControlStyle{}.paper);
-            panel->set_border_style(gui_forms::BorderStyle::line);
+            // WinForms Panel starts borderless and inherits its effective
+            // background. Explicit BorderStyle and BackColor projection below
+            // own the two visual decisions independently.
+            panel->set_border_style(gui_forms::BorderStyle::none);
             record->control = std::move(panel);
             break;
         }
@@ -1674,6 +1686,10 @@ public:
         case GF_CONTROL_PROPERTY_OBJECT_PROXY:
             record->control =
                 std::make_shared<AbiPropertyObjectControl>(std::move(native_id));
+            break;
+        case GF_CONTROL_OVERLAY_CUSTOM:
+            record->control = std::make_shared<RasterControl>(std::move(native_id));
+            record->control->set_paint_plane(gui_forms::PaintPlane::overlay);
             break;
         case GF_CONTROL_CUSTOM:
             record->control = std::make_shared<RasterControl>(std::move(native_id));
@@ -2478,6 +2494,17 @@ public:
         }
         const auto foreground = color_from_argb(foreground_argb);
         const auto background = color_from_argb(background_argb);
+        const auto disabled_channel = [](std::uint8_t foreground_channel,
+                                         std::uint8_t background_channel) {
+            return static_cast<std::uint8_t>(
+                (static_cast<unsigned>(foreground_channel) * 45U +
+                 static_cast<unsigned>(background_channel) * 55U) / 100U);
+        };
+        const auto disabled = gui_forms::Color::rgba(
+            disabled_channel(foreground.red, background.red),
+            disabled_channel(foreground.green, background.green),
+            disabled_channel(foreground.blue, background.blue),
+            foreground.alpha);
         if (const auto field = std::dynamic_pointer_cast<FieldControl>(record->control)) {
             field->set_colors(foreground, background);
         } else if (const auto label =
@@ -2487,7 +2514,7 @@ public:
                        std::dynamic_pointer_cast<gui_forms::ButtonBase>(record->control)) {
             auto style = button->style();
             style.text = foreground;
-            style.disabled_text = foreground;
+            style.disabled_text = disabled;
             style.face = background;
             style.face_light = background;
             button->set_style(style);
@@ -2495,12 +2522,90 @@ public:
                        std::dynamic_pointer_cast<gui_forms::Panel>(record->control)) {
             auto style = panel->style();
             style.text = foreground;
-            style.disabled_text = foreground;
+            style.disabled_text = disabled;
             panel->set_style(style);
             panel->set_background(background);
         }
         // Style projection does not mutate a WinForms-observable property. The
         // managed side already owns and has raised the corresponding change.
+        return GF_OK;
+    }
+
+    gf_result set_control_text_alignment(gf_handle handle,
+                                         std::uint32_t content_alignment) {
+        if (content_alignment > 8U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "content alignment must be in the compact 0..8 range");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto horizontal = static_cast<gui_forms::HorizontalAlignment>(
+            content_alignment % 3U);
+        const auto vertical = static_cast<gui_forms::VerticalAlignment>(
+            content_alignment / 3U);
+        if (const auto label =
+                std::dynamic_pointer_cast<gui_forms::Label>(record->control)) {
+            label->set_alignment(horizontal);
+            label->set_vertical_alignment(vertical);
+            return GF_OK;
+        }
+        if (const auto button =
+                std::dynamic_pointer_cast<gui_forms::ButtonBase>(record->control)) {
+            button->set_text_alignment(
+                static_cast<gui_forms::ContentAlignment>(content_alignment));
+            return GF_OK;
+        }
+        return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                    "text alignment requires a retained label or button");
+    }
+
+    gf_result set_button_appearance(gf_handle handle, std::uint32_t visual_style,
+                                    double flat_border_width) {
+        if (visual_style >
+                static_cast<std::uint32_t>(gui_forms::ButtonVisualStyle::command) ||
+            !std::isfinite(flat_border_width) || flat_border_width < 0.0) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "button appearance is outside its retained range");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto button =
+            std::dynamic_pointer_cast<gui_forms::Button>(record->control);
+        if (!button) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "button appearance requires a retained push button");
+        }
+        button->set_visual_style(
+            static_cast<gui_forms::ButtonVisualStyle>(visual_style));
+        button->set_flat_border_width(flat_border_width);
+        return GF_OK;
+    }
+
+    gf_result set_panel_border_style(gf_handle handle,
+                                     std::uint32_t border_style) {
+        if (border_style > 2U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "panel border style must be None, FixedSingle, or Fixed3D");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto panel =
+            std::dynamic_pointer_cast<gui_forms::Panel>(record->control);
+        if (!panel) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "panel border style requires a retained panel");
+        }
+        const auto native_style = border_style == 0U
+            ? gui_forms::BorderStyle::none
+            : border_style == 1U ? gui_forms::BorderStyle::line
+                                 : gui_forms::BorderStyle::sunken;
+        panel->set_border_style(native_style);
         return GF_OK;
     }
 
@@ -4999,6 +5104,25 @@ gf_result api_set_control_colors(gf_handle control, std::uint32_t foreground_arg
                                              background_argb);
     });
 }
+gf_result api_set_control_text_alignment(gf_handle control,
+                                         std::uint32_t content_alignment) noexcept {
+    return translate([&] {
+        return registry().set_control_text_alignment(control, content_alignment);
+    });
+}
+gf_result api_set_button_appearance(gf_handle button, std::uint32_t visual_style,
+                                    double flat_border_width) noexcept {
+    return translate([&] {
+        return registry().set_button_appearance(button, visual_style,
+                                                flat_border_width);
+    });
+}
+gf_result api_set_panel_border_style(gf_handle panel,
+                                     std::uint32_t border_style) noexcept {
+    return translate([&] {
+        return registry().set_panel_border_style(panel, border_style);
+    });
+}
 gf_result api_subscribe_pointer(gf_handle sender, gf_pointer_callback callback,
                                 void* context, gf_event_token* token) noexcept {
     return translate([&] {
@@ -5355,7 +5479,8 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_21 &&
         requested_version != GF_ABI_VERSION_0_22 &&
         requested_version != GF_ABI_VERSION_0_23 &&
-        requested_version != GF_ABI_VERSION_0_24) {
+        requested_version != GF_ABI_VERSION_0_24 &&
+        requested_version != GF_ABI_VERSION_0_25) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -5444,6 +5569,9 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_property_grid_try_set_text,
         &api_property_grid_reset_property,
         &api_property_grid_activate_editor,
+        &api_set_control_text_alignment,
+        &api_set_button_appearance,
+        &api_set_panel_border_style,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

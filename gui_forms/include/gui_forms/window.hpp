@@ -693,6 +693,7 @@ private:
         std::shared_ptr<LiveSurface> surface;
         std::uint64_t sampled_epoch{};
         std::uint64_t sampled_generation{};
+        bool sampled_with_overlay_clip{};
     };
     std::unordered_map<std::uint64_t, LiveSurfaceRegistration>
         live_surface_registrations_;
