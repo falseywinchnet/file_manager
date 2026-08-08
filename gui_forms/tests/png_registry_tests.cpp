@@ -267,6 +267,26 @@ void owned_pixel_surface_contract() {
     require(replaced && replaced.image != loaded.image &&
                 !registry.find(loaded.image).has_value(),
             "owned BGRA replacement did not stale its prior generation");
+
+    const std::array<std::byte, 4> green{
+        std::byte{0}, std::byte{255}, std::byte{0}, std::byte{255}};
+    const ImageRegistrySnapshot before_patch = registry.snapshot();
+    const ImageLoadResult patched = registry.patch_bgra32_premultiplied(
+        replaced.image, 1, 0, 1, 1, 4, green);
+    require(patched && patched.image != replaced.image &&
+                !registry.find(replaced.image).has_value(),
+            "bounded BGRA patch did not advance the resource generation");
+    const auto patched_view = registry.find(patched.image);
+    require(patched_view && patched_view->encoded[4] == std::byte{0} &&
+                patched_view->encoded[5] == std::byte{255} &&
+                patched_view->encoded[7] == std::byte{255},
+            "bounded BGRA patch did not update the selected pixel");
+    require(registry.patch_bgra32_premultiplied(
+                patched.image, 2, 0, 1, 1, 4, green).error ==
+                ImageResourceError::dimension_limit_exceeded &&
+                registry.snapshot().revision == before_patch.revision + 1U &&
+                registry.find(patched.image).has_value(),
+            "failed bounded BGRA patch was not atomic");
 }
 
 void window_thread_boundary() {
@@ -311,6 +331,23 @@ void scoped_window_replacement_damage() {
             "scoped PNG replacement damaged more than its consumer bounds");
     require(damage.area() == 80.0,
             "scoped PNG replacement reported the wrong damaged area");
+
+    const std::array<std::byte, 16> raw{};
+    const ImageLoadResult raw_image = window.load_bgra32_premultiplied(
+        2, 2, 8, raw);
+    require(raw_image && window.take_damage().empty(),
+            "loading an unreferenced raw surface unexpectedly caused damage");
+    const std::array<std::byte, 4> pixel{
+        std::byte{255}, std::byte{0}, std::byte{0}, std::byte{255}};
+    const ImageLoadResult raw_patch = window.patch_bgra32_premultiplied(
+        raw_image.image, 1, 1, 1, 1, 4, pixel, *consumer,
+        {2.0, 1.0, 3.0, 2.0});
+    require(static_cast<bool>(raw_patch),
+            "scoped raw-surface patch was rejected");
+    const DamageRegion patch_damage = window.take_damage();
+    require(patch_damage.rectangle_count() == 1 &&
+                patch_damage.bounds() == Rect{7.0, 7.0, 3.0, 2.0},
+            "scoped raw-surface patch did not retain exact local damage");
 }
 
 } // namespace

@@ -143,6 +143,22 @@ public:
         std::uint32_t height,
         std::uint64_t row_bytes,
         std::span<const std::byte> pixels);
+    // Updates a same-sized live BGRA resource without changing its retained
+    // identity. This is the steady-state path for animated raster controls.
+    [[nodiscard]] ImageLoadResult update_bgra32_premultiplied(
+        ImageId image,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::uint64_t row_bytes,
+        std::span<const std::byte> pixels);
+    // Replaces one rectangle of an existing raw BGRA resource. `pixels`
+    // starts at the patch origin; its final row may be tightly terminated even
+    // when source_row_bytes describes a larger source bitmap stride.
+    [[nodiscard]] ImageLoadResult patch_bgra32_premultiplied(
+        ImageId image, std::uint32_t x, std::uint32_t y,
+        std::uint32_t width, std::uint32_t height,
+        std::uint64_t source_row_bytes,
+        std::span<const std::byte> pixels);
     [[nodiscard]] bool remove(ImageId image) noexcept;
     void clear() noexcept;
 

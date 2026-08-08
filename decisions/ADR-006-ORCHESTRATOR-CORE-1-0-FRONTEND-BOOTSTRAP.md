@@ -144,5 +144,20 @@ frontend bootstrap path that does not depend on frontend-owned core semantics.
 - **DECIDED by this ADR's existing criterion:** this satisfies the permitted
   digest-addressed-manifest branch. `signed: false` remains explicit; platform
   package signing is not claimed.
-- Core 1.0 remains `development` because the other independently reported
-  requirements remain pending.
+- Core 1.0 remained `development` at that increment because the other
+  independently reported requirements were still pending.
+
+## Core 1.0 promotion evidence — 2026-08-07
+
+- **MEASURED:** ADR-011's installed macOS 14.8.7 arm64 LaunchAgent trial passed
+  first-use activation, authenticated status, shutdown, supervisor reactivation
+  within the five-second client bound with a new instance, second shutdown,
+  bootout, and exact test artifact removal.
+- **OBSERVED:** the release manifest now has no pending requirement and reports
+  `state: ready`, `ready: true`; `frontend.bootstrap` and macOS launchd
+  discovery are `available`.
+- **OBSERVED:** the independent C++ source client validates the same ready
+  snapshot, restart strategy, availability catalogue, and digest without
+  linking Rust.
+- GUI.Forms FM0 remains negotiating. Engine live search and later services keep
+  their independent reduced states and were not promoted by this evidence.

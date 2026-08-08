@@ -215,8 +215,8 @@ void TextBox::set_text(std::string text) {
     reset_caret_blink();
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     const std::string value(store_.utf8());
-    text_changed_.emit(value);
-    selection_changed_.emit(selection_);
+    publish_change(text_changed_, value);
+    publish_change(selection_changed_, selection_);
 }
 
 void TextBox::set_placeholder_text(std::string text) {
@@ -308,8 +308,8 @@ void TextBox::apply_snapshot(Snapshot snapshot) {
     reset_caret_blink();
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     const std::string value(store_.utf8());
-    text_changed_.emit(value);
-    selection_changed_.emit(selection_);
+    publish_change(text_changed_, value);
+    publish_change(selection_changed_, selection_);
 }
 
 void TextBox::push_history(std::deque<Snapshot>& history, Snapshot snapshot) {
@@ -384,8 +384,8 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
     reset_caret_blink();
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     const std::string value(store_.utf8());
-    text_changed_.emit(value);
-    selection_changed_.emit(selection_);
+    publish_change(text_changed_, value);
+    publish_change(selection_changed_, selection_);
     return true;
 }
 
@@ -437,7 +437,7 @@ void TextBox::set_selection(TextSelection selection, bool reveal_caret) {
         reset_caret_blink();
     }
     invalidate(Dirty::paint | Dirty::semantics);
-    selection_changed_.emit(selection_);
+    publish_change(selection_changed_, selection_);
 }
 
 double TextBox::boundary_x(Utf8Offset offset) const noexcept {
@@ -892,7 +892,8 @@ void ListBox::set_items(std::vector<std::string> items) {
     top_index_ = items_.empty() ? 0U : std::min(top_index_, items_.size() - 1U);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     if (previous != selected_) {
-        selection_changed_.emit({previous, selected_, active_index_});
+        publish_change(selection_changed_,
+                       ListSelectionChange{previous, selected_, active_index_});
     }
 }
 
@@ -935,7 +936,8 @@ void ListBox::remove_item(std::size_t index) {
     top_index_ = items_.empty() ? 0U : std::min(top_index_, items_.size() - 1U);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     if (previous != selected_) {
-        selection_changed_.emit({previous, selected_, active_index_});
+        publish_change(selection_changed_,
+                       ListSelectionChange{previous, selected_, active_index_});
     }
 }
 
@@ -1000,7 +1002,8 @@ void ListBox::apply_selection(std::vector<std::size_t> selection,
     active_index_ = active;
     if (previous == selected_ && previous_active == active_index_) return;
     invalidate(Dirty::paint | Dirty::semantics);
-    selection_changed_.emit({previous, selected_, active_index_});
+    publish_change(selection_changed_,
+                   ListSelectionChange{previous, selected_, active_index_});
 }
 
 void ListBox::select_index(std::size_t index, bool extend, bool toggle) {
@@ -1414,7 +1417,7 @@ void CheckedListBox::set_item_check_state(std::size_t index,
     if (check_states_[index] == change.new_state) return;
     check_states_[index] = change.new_state;
     invalidate(Dirty::paint | Dirty::semantics);
-    item_check_state_changed_.emit(index, check_states_[index]);
+    publish_change(item_check_state_changed_, index, check_states_[index]);
 }
 
 void CheckedListBox::set_item_checked(std::size_t index, bool checked) {
@@ -1661,12 +1664,12 @@ void ComboBox::set_items(std::vector<std::string> items) {
     items_ = std::move(items);
     if (selected_index_ && *selected_index_ >= items_.size()) {
         selected_index_.reset();
-        selected_index_changed_.emit(selected_index_);
+        publish_change(selected_index_changed_, selected_index_);
         if (!is_alive()) return;
     }
     if (popup_list_) popup_list_->set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    items_changed_.emit();
+    publish_change(items_changed_);
 }
 
 void ComboBox::add_item(std::string item) {
@@ -1677,7 +1680,7 @@ void ComboBox::add_item(std::string item) {
     items_.push_back(std::move(item));
     if (popup_list_) popup_list_->set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    items_changed_.emit();
+    publish_change(items_changed_);
 }
 
 void ComboBox::set_selected_index(std::optional<std::size_t> index) {
@@ -1692,7 +1695,7 @@ void ComboBox::set_selected_index(std::optional<std::size_t> index) {
         else popup_list_->clear_selection();
     }
     invalidate(Dirty::paint | Dirty::semantics);
-    selected_index_changed_.emit(selected_index_);
+    publish_change(selected_index_changed_, selected_index_);
 }
 
 std::string_view ComboBox::selected_text() const noexcept {
@@ -1794,7 +1797,7 @@ void ComboBox::open_drop_down() {
     popup_scope_ = window()->begin_focus_scope(layer, list).value;
     dropped_down_ = true;
     invalidate(Dirty::paint | Dirty::semantics);
-    drop_down_changed_.emit(true);
+    publish_change(drop_down_changed_, true);
 }
 
 void ComboBox::close_drop_down() {
@@ -1815,7 +1818,7 @@ void ComboBox::close_drop_down() {
     dropped_down_ = false;
     closing_popup_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void ComboBox::on_popup_revoked() {
@@ -1834,7 +1837,7 @@ void ComboBox::on_popup_revoked() {
     const bool changed = dropped_down_;
     dropped_down_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void ComboBox::commit_popup_selection(std::size_t index) {
@@ -2050,7 +2053,7 @@ void NumericUpDown::set_range(double minimum, double maximum) {
     if (clamped != value_) {
         value_ = clamped;
         synchronize_editor();
-        value_changed_.emit(value_);
+        publish_change(value_changed_, value_);
     }
     invalidate(Dirty::paint | Dirty::semantics);
 }
@@ -2064,7 +2067,7 @@ void NumericUpDown::set_value(double value) {
     value_ = value;
     synchronize_editor();
     invalidate(Dirty::paint | Dirty::semantics);
-    value_changed_.emit(value_);
+    publish_change(value_changed_, value_);
 }
 
 void NumericUpDown::set_increment(double increment) {
@@ -2128,7 +2131,7 @@ void NumericUpDown::commit_editor_text() {
             parsed >= minimum_ && parsed <= maximum_ && parsed != value_) {
             value_ = parsed;
             invalidate(Dirty::paint | Dirty::semantics);
-            value_changed_.emit(value_);
+            publish_change(value_changed_, value_);
         }
     } catch (const std::exception&) {
     }

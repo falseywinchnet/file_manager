@@ -174,6 +174,17 @@ void Painter::draw_image_region(ImageId image, Rect source, Rect destination,
     draw_image(image, destination, std::clamp(opacity, 0.0, 1.0));
 }
 
+void Painter::draw_live_surface(std::shared_ptr<LiveSurface>, Rect, double) {
+    // Platform-neutral and deliberately inert. Terminal CPU renderers consume
+    // the retained surface resource directly.
+}
+
+void Painter::draw_image_region_sampled(
+    ImageId image, Rect source, Rect destination, ImageSampling,
+    double opacity) {
+    draw_image_region(image, source, destination, opacity);
+}
+
 void Painter::fill_image_pattern(ImageId image, Size source_pixel_size,
                                  Rect destination, Size logical_tile_size,
                                  ImagePatternWrap wrap, double opacity) {

@@ -1,10 +1,12 @@
-use crate::availability::{AvailabilityState, CAPABILITIES, state_count};
+use crate::availability::{AvailabilityState, CAPABILITIES};
 use crate::common::{
     ApiError, ApiErrorCode, MAX_CANCELLATION_ID_BYTES, MAX_CONTRACT_ID_BYTES,
     MAX_CRITICAL_EXTENSION_BYTES, MAX_CRITICAL_EXTENSIONS, MAX_METHOD_BYTES, MAX_REQUEST_ID_BYTES,
     PROTOCOL_FAMILY, PROTOCOL_MAJOR, PROTOCOL_MINOR, Request, Response, TerminalStatus,
 };
 use crate::contract::{CONTRACTS, supported_contract_for_method};
+use crate::engine_contract::{EngineSearchCursorSource, EngineSearchRequest};
+use crate::engine_port::{EngineSearchOutcome, UnifiedEngineSearch};
 use crate::lifecycle::{Lifecycle, LifecycleState};
 use crate::local_session::{LOCAL_WIRE_FAMILY, LOCAL_WIRE_MAJOR, LOCAL_WIRE_MINOR};
 use crate::release::core_release_manifest;
@@ -13,10 +15,11 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug)]
 pub struct Kernel {
     lifecycle: Lifecycle,
     runtime_health: Arc<RuntimeHealth>,
+    supervisor_restart: bool,
+    engine_search: Option<Box<dyn UnifiedEngineSearch>>,
 }
 
 impl Default for Kernel {
@@ -26,11 +29,19 @@ impl Default for Kernel {
 }
 
 impl Kernel {
+    fn live_search_available(&self) -> bool {
+        self.engine_search
+            .as_ref()
+            .is_some_and(|search| search.live_available())
+    }
+
     #[must_use]
     pub fn new() -> Self {
         Self {
             lifecycle: Lifecycle::started(),
             runtime_health: Arc::new(RuntimeHealth::in_process()),
+            supervisor_restart: false,
+            engine_search: None,
         }
     }
 
@@ -39,7 +50,25 @@ impl Kernel {
         Self {
             lifecycle: Lifecycle::started(),
             runtime_health: Arc::new(RuntimeHealth::local_daemon()),
+            supervisor_restart: false,
+            engine_search: None,
         }
+    }
+
+    #[must_use]
+    pub fn for_supervised_daemon() -> Self {
+        Self {
+            lifecycle: Lifecycle::started(),
+            runtime_health: Arc::new(RuntimeHealth::local_daemon()),
+            supervisor_restart: true,
+            engine_search: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_engine_search(mut self, search: impl UnifiedEngineSearch + 'static) -> Self {
+        self.engine_search = Some(Box::new(search));
+        self
     }
 
     #[must_use]
@@ -90,6 +119,11 @@ impl Kernel {
             );
         }
 
+        if request.method == "orchestrator.search" {
+            let response = self.search_response(request.id, request.params);
+            return enforce_response_budget(response_id, max_response_bytes, response);
+        }
+
         let result = match request.method.as_str() {
             "orchestrator.version" => Ok(version_result()),
             "orchestrator.release" => serde_json::to_value(core_release_manifest())
@@ -98,8 +132,7 @@ impl Kernel {
             "orchestrator.frontend.bootstrap" => Ok(self.frontend_bootstrap_result()),
             "orchestrator.contracts.list" => serde_json::to_value(CONTRACTS)
                 .map_err(|error| internal_serialization_error(&error)),
-            "orchestrator.availability.list" => serde_json::to_value(CAPABILITIES)
-                .map_err(|error| internal_serialization_error(&error)),
+            "orchestrator.availability.list" => Ok(self.availability_result()),
             "orchestrator.plugins.status" => Ok(stub_result(
                 "plugins.runtime",
                 "plugin and plugin-AI APIs are deliberately absent",
@@ -160,14 +193,20 @@ impl Kernel {
             "engine_scope": "systemwide",
             "normal_integration_route": "orchestrator",
             "degraded_engine_fallback": true,
+            "search": {
+                "unified_operation": "orchestrator.search",
+                "available": self.engine_search.is_some(),
+                "live_search_available": self.live_search_available(),
+                "provider_transport": if self.engine_search.is_some() { "development_jsonl" } else { "unavailable" }
+            },
             "runtime_health": self.runtime_health.snapshot(),
             "availability_summary": {
-                "available": state_count(AvailabilityState::Available),
-                "degraded": state_count(AvailabilityState::Degraded),
-                "negotiating": state_count(AvailabilityState::Negotiating),
-                "unavailable": state_count(AvailabilityState::Unavailable),
-                "deferred": state_count(AvailabilityState::Deferred),
-                "stubbed": state_count(AvailabilityState::Stubbed)
+                "available": self.availability_count(AvailabilityState::Available),
+                "degraded": self.availability_count(AvailabilityState::Degraded),
+                "negotiating": self.availability_count(AvailabilityState::Negotiating),
+                "unavailable": self.availability_count(AvailabilityState::Unavailable),
+                "deferred": self.availability_count(AvailabilityState::Deferred),
+                "stubbed": self.availability_count(AvailabilityState::Stubbed)
             }
         })
     }
@@ -175,13 +214,10 @@ impl Kernel {
     fn frontend_bootstrap_result(&self) -> Value {
         let lifecycle = self.lifecycle.snapshot();
         let release = core_release_manifest();
-        let opening = frontend_opening_result(release, CAPABILITIES);
+        let restart_eligible = release.ready && self.supervisor_restart;
+        let opening = frontend_opening_result(release, CAPABILITIES, restart_eligible);
         json!({
-            "schema": {
-                "family": "ORC-FE-001",
-                "major": 1,
-                "minor": 0
-            },
+            "schema": {"family": "ORC-FE-001", "major": 1, "minor": 0},
             "snapshot": {
                 "kind": "immutable",
                 "lifecycle_generation": lifecycle.generation,
@@ -191,10 +227,16 @@ impl Kernel {
             "release": release,
             "status": self.status_result_with(release),
             "contracts": CONTRACTS,
-            "availability": CAPABILITIES,
+            "availability": self.availability_result(),
             "routing": {
                 "normal_integration_route": "orchestrator",
                 "engine_scope": "systemwide",
+                "search": {
+                    "operation": "orchestrator.search",
+                    "frontend_selects_source_lane": false,
+                    "available": self.engine_search.is_some(),
+                    "live_search_available": self.live_search_available()
+                },
                 "direct_engine_fallback": {
                     "registered": true,
                     "eligible": false,
@@ -204,12 +246,128 @@ impl Kernel {
             },
             "service_controls": {
                 "shutdown_eligible": true,
-                "restart_eligible": false,
+                "restart_eligible": restart_eligible,
+                "restart_strategy": if restart_eligible { "shutdown_then_supervisor_reactivate" } else { "unavailable" },
+                "restart_effect": if restart_eligible { "new_instance_and_lifecycle_generation" } else { "none" },
                 "diagnostics_state": "unavailable",
                 "diagnostics_locator": Value::Null
             },
             "frontend_opening": opening
         })
+    }
+
+    fn availability_result(&self) -> Value {
+        let mut value = serde_json::to_value(CAPABILITIES).expect("static availability serializes");
+        if let Some(entries) = value.as_array_mut()
+            && let Some(live) = entries
+                .iter_mut()
+                .find(|entry| entry["id"] == "engine.query.catalogue_free_fallback")
+        {
+            live["state"] = Value::String(
+                if self.live_search_available() {
+                    "available"
+                } else {
+                    "unavailable"
+                }
+                .to_owned(),
+            );
+            live["reason"] = Value::String(if self.live_search_available() {
+                "connected Engine provider advertises ORC-ENG-004 through the bounded development adapter"
+            } else {
+                "ORC-ENG-004 is implemented, but no Engine provider transport is connected to this process"
+            }.to_owned());
+        }
+        value
+    }
+
+    fn availability_count(&self, state: AvailabilityState) -> usize {
+        CAPABILITIES
+            .iter()
+            .filter(|capability| {
+                let current = if capability.id == "engine.query.catalogue_free_fallback" {
+                    if self.live_search_available() {
+                        AvailabilityState::Available
+                    } else {
+                        AvailabilityState::Unavailable
+                    }
+                } else {
+                    capability.state
+                };
+                current == state
+            })
+            .count()
+    }
+
+    fn search_response(&mut self, id: String, params: Value) -> Response {
+        let request: EngineSearchRequest =
+            match serde_json::from_value::<EngineSearchRequest>(params) {
+                Ok(request) if request.is_well_formed() => request,
+                Ok(_) => {
+                    return Response::failure(
+                        id,
+                        ApiError::new(
+                            ApiErrorCode::InvalidRequest,
+                            TerminalStatus::Invalid,
+                            "search request is not well formed",
+                        ),
+                    );
+                }
+                Err(error) => {
+                    return Response::failure(
+                        id,
+                        ApiError::new(
+                            ApiErrorCode::InvalidRequest,
+                            TerminalStatus::Invalid,
+                            format!("invalid search request: {error}"),
+                        ),
+                    );
+                }
+            };
+        let Some(search) = self.engine_search.as_mut() else {
+            return Response::failure(
+                id,
+                ApiError::new(
+                    ApiErrorCode::Unavailable,
+                    TerminalStatus::Unavailable,
+                    "no Engine search provider is connected",
+                ),
+            );
+        };
+        let outcome = search.search(&request);
+        let terminal = outcome.terminal();
+        if !matches!(terminal, TerminalStatus::Success | TerminalStatus::Partial) {
+            return Response::failure(
+                id,
+                ApiError::new(
+                    search_error_code(terminal),
+                    terminal,
+                    "Engine search did not produce a usable page",
+                ),
+            );
+        }
+        let result = match outcome {
+            EngineSearchOutcome::Catalogue(page) => json!({
+                "source": "catalogue",
+                "complete": page.next_cursor.is_none(),
+                "cursor": page.next_cursor.map(|value| json!({"source": EngineSearchCursorSource::Catalogue, "value": value})),
+                "generation": page.generation,
+                "results": page.results,
+                "stale_roots": page.stale_roots,
+                "unavailable_roots": page.unavailable_roots,
+                "warnings": page.warnings
+            }),
+            EngineSearchOutcome::Live(page) => json!({
+                "source": page.source,
+                "complete": page.complete,
+                "cursor": page.next_cursor.map(|value| json!({"source": EngineSearchCursorSource::LiveFilesystem, "value": value})),
+                "scan_id": page.scan_id,
+                "results": page.results,
+                "unavailable_paths": page.unavailable_paths,
+                "work": page.work,
+                "warnings": page.warnings
+            }),
+        };
+        Response::result(id, terminal, result)
     }
 
     fn shutdown_result(&mut self) -> Result<Value, ApiError> {
@@ -230,6 +388,7 @@ impl Kernel {
 fn frontend_opening_result(
     release: &crate::release::CoreReleaseManifest,
     capabilities: &[crate::availability::CapabilityAvailability],
+    restart_eligible: bool,
 ) -> Value {
     let bootstrap = capabilities
         .iter()
@@ -261,6 +420,14 @@ fn frontend_opening_result(
             "reason": bootstrap.reason
         }));
     }
+    if !restart_eligible {
+        blockers.push(json!({
+            "kind": "runtime_requirement",
+            "id": "orchestrator.supervisor_restart",
+            "state": "unavailable",
+            "reason": "the live daemon is not running under the admitted launchd supervisor"
+        }));
+    }
     let orchestrator_gate_satisfied =
         release.ready && bootstrap.state == AvailabilityState::Available && blockers.is_empty();
 
@@ -280,8 +447,8 @@ fn frontend_opening_result(
             },
             "architect_direction": {
                 "authority": "grand_architect",
-                "state": "not_reported",
-                "satisfied": Value::Null
+                "state": "recorded",
+                "satisfied": true
             }
         },
         "policy": {
@@ -402,6 +569,23 @@ fn version_result() -> Value {
         "semantic_facts": "stubbed",
         "plugins": "stubbed"
     })
+}
+
+const fn search_error_code(status: TerminalStatus) -> ApiErrorCode {
+    match status {
+        TerminalStatus::Invalid | TerminalStatus::Denied => ApiErrorCode::InvalidRequest,
+        TerminalStatus::Unsupported => ApiErrorCode::MethodUnavailable,
+        TerminalStatus::Unavailable | TerminalStatus::Stale | TerminalStatus::Quarantined => {
+            ApiErrorCode::Unavailable
+        }
+        TerminalStatus::VersionMismatch => ApiErrorCode::VersionMismatch,
+        TerminalStatus::BudgetExceeded => ApiErrorCode::ResourceBudgetExceeded,
+        TerminalStatus::Timeout => ApiErrorCode::DeadlineExceeded,
+        TerminalStatus::Cancelled => ApiErrorCode::CancellationUnsupported,
+        TerminalStatus::InternalFault | TerminalStatus::Success | TerminalStatus::Partial => {
+            ApiErrorCode::Internal
+        }
+    }
 }
 
 fn stub_result(capability: &str, reason: &str) -> Value {
@@ -559,6 +743,7 @@ mod tests {
         );
         assert_eq!(result["contracts"].as_array().map(Vec::len), Some(24));
         assert_eq!(result["availability"].as_array().map(Vec::len), Some(27));
+        assert_eq!(result["release"]["ready"], true);
         assert_eq!(
             result["frontend_opening"]["orchestrator_gate"]["satisfied"],
             false
@@ -567,15 +752,24 @@ mod tests {
             result["frontend_opening"]["orchestrator_gate"]["blockers"]
                 .as_array()
                 .map(Vec::len),
-            Some(2)
+            Some(1)
         );
         assert_eq!(
             result["frontend_opening"]["external_gates"]["gui_forms"]["state"],
             "negotiating"
         );
-        assert!(
-            result["frontend_opening"]["external_gates"]["architect_direction"]["satisfied"]
-                .is_null()
+        assert_eq!(
+            result["frontend_opening"]["external_gates"]["architect_direction"]["state"],
+            "recorded"
+        );
+        assert_eq!(
+            result["frontend_opening"]["external_gates"]["architect_direction"]["satisfied"],
+            true
+        );
+        assert_eq!(result["service_controls"]["restart_eligible"], false);
+        assert_eq!(
+            result["service_controls"]["restart_strategy"],
+            "unavailable"
         );
         assert_eq!(
             result["frontend_opening"]["policy"]["separately_gated_provider_absence_blocks_opening"],
@@ -595,6 +789,28 @@ mod tests {
         assert_eq!(
             rejected.error.expect("bounded error").code,
             ApiErrorCode::ResourceBudgetExceeded
+        );
+
+        let mut supervised = Kernel::for_supervised_daemon();
+        let response = supervised.handle(Request::local(
+            "supervised",
+            "orchestrator.frontend.bootstrap",
+        ));
+        let result = response.result.expect("supervised frontend bootstrap");
+        assert_eq!(result["service_controls"]["restart_eligible"], true);
+        assert_eq!(
+            result["service_controls"]["restart_strategy"],
+            "shutdown_then_supervisor_reactivate"
+        );
+        assert_eq!(
+            result["frontend_opening"]["orchestrator_gate"]["satisfied"],
+            true
+        );
+        assert_eq!(
+            result["frontend_opening"]["orchestrator_gate"]["blockers"]
+                .as_array()
+                .map(Vec::len),
+            Some(0)
         );
     }
 
@@ -616,7 +832,7 @@ mod tests {
             }
         }
 
-        let opening = frontend_opening_result(&release, &capabilities);
+        let opening = frontend_opening_result(&release, &capabilities, true);
         assert_eq!(opening["orchestrator_gate"]["satisfied"], true);
         assert_eq!(opening["orchestrator_gate"]["state"], "available");
         assert_eq!(
@@ -626,7 +842,10 @@ mod tests {
             Some(0)
         );
         assert_eq!(opening["external_gates"]["gui_forms"]["satisfied"], true);
-        assert!(opening["external_gates"]["architect_direction"]["satisfied"].is_null());
+        assert_eq!(
+            opening["external_gates"]["architect_direction"]["satisfied"],
+            true
+        );
         assert_eq!(
             opening["policy"]["separately_gated_provider_absence_blocks_opening"],
             false

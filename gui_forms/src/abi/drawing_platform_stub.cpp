@@ -14,6 +14,14 @@ gd_result capture_surface(std::uintptr_t, std::uint32_t, CapturedSurface&) {
     return GD_ERROR_UNSUPPORTED_VERSION;
 }
 
+gd_result refresh_surface(std::uintptr_t, std::uint32_t, Bitmap&, RectF&) {
+    return GD_ERROR_UNSUPPORTED_VERSION;
+}
+
+gd_result publish_retained_surface(std::uintptr_t, std::uint32_t, Bitmap&) {
+    return GD_ERROR_UNSUPPORTED_VERSION;
+}
+
 gd_result present_surface(std::uintptr_t, std::uint32_t, Bitmap&) {
     return GD_ERROR_UNSUPPORTED_VERSION;
 }

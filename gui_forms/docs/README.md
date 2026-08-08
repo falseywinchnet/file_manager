@@ -57,6 +57,15 @@ spike APIs to a frozen compatibility promise.
 - [`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`](../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md)
   — retained multi-select flags popup, alpha-aware color field/swatch,
   bounded failure routing, and native-neutral portability gates.
+- [`../experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md`](../experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md)
+  — nullable payload schemas, finite standard values, per-registry numeric
+  culture, nested service identities, and atomic multiple-owner commit.
+- [`../experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md`](../experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md)
+  — additive native PropertyGrid ABI, generated managed control projection,
+  multi-selection/sort/refresh semantics, and exact remaining callback edge.
+- [`../experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md`](../experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md)
+  — bounded managed TypeDescriptor proxies, converter/reset/change callbacks,
+  nullable edits, rollback-safe multi-owner commits, and host/Wine evidence.
 - [`../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md`](../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md)
   — managed `Application.Run(Form)`, additive ABI 0.3 host projection,
   deterministic headless evidence, and a captured Win32/Wine surface.

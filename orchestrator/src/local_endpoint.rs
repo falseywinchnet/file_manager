@@ -50,6 +50,10 @@ pub enum LocalEndpointError {
     InsecurePermissions,
     UnexpectedEndpointFile,
     AlreadyRunning,
+    SupervisorEndpointMismatch {
+        expected: PathBuf,
+        observed: Option<PathBuf>,
+    },
     DiscoveryTooLarge,
     CredentialTooLarge,
     DiscoveryMismatch,
@@ -81,6 +85,15 @@ impl Display for LocalEndpointError {
             Self::AlreadyRunning => {
                 formatter.write_str("an Orchestrator endpoint is already accepting connections")
             }
+            Self::SupervisorEndpointMismatch { expected, observed } => write!(
+                formatter,
+                "launchd listener endpoint mismatch: expected {}, observed {}",
+                expected.display(),
+                observed.as_ref().map_or_else(
+                    || "<unnamed>".to_owned(),
+                    |path| path.as_os_str().as_bytes().escape_ascii().to_string()
+                )
+            ),
             Self::DiscoveryTooLarge => {
                 formatter.write_str("local discovery record exceeds its byte ceiling")
             }
@@ -271,12 +284,15 @@ impl UnixEndpoint {
             return Err(LocalEndpointError::EndpointPathTooLong);
         }
         let directory = prepare_runtime_directory(&layout.runtime_directory)?;
-        let listener_address = listener.local_addr()?;
-        let listener_path = listener_address
-            .as_pathname()
-            .ok_or(LocalEndpointError::DiscoveryMismatch)?;
-        if listener_path != layout.socket {
-            return Err(LocalEndpointError::DiscoveryMismatch);
+        let observed_path = listener.local_addr()?.as_pathname().map(Path::to_path_buf);
+        if !observed_path
+            .as_deref()
+            .is_some_and(|observed| supervisor_socket_path_matches(&layout.socket, observed))
+        {
+            return Err(LocalEndpointError::SupervisorEndpointMismatch {
+                expected: layout.socket.clone(),
+                observed: observed_path,
+            });
         }
         validate_socket(&layout.socket, directory.uid())?;
 
@@ -400,6 +416,20 @@ impl UnixEndpoint {
         fs::remove_dir(&layout.runtime_directory)?;
         Ok(())
     }
+}
+
+#[cfg(target_os = "macos")]
+fn supervisor_socket_path_matches(expected: &Path, observed: &Path) -> bool {
+    let expected = expected.as_os_str().as_bytes();
+    let observed = observed.as_os_str().as_bytes();
+    observed.len() >= expected.len()
+        && observed[..expected.len()] == *expected
+        && observed[expected.len()..].iter().all(|byte| *byte == 0)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn supervisor_socket_path_matches(expected: &Path, observed: &Path) -> bool {
+    expected == observed
 }
 
 /// Discovers, activates when necessary, and authenticates one local session.
@@ -843,14 +873,18 @@ fn remove_if_present(path: &Path) -> Result<(), LocalEndpointError> {
 mod tests {
     use super::{
         LocalEndpointError, UnixEndpoint, connect_authenticated, default_runtime_directory,
-        discover, remove_if_present,
+        discover, remove_if_present, supervisor_socket_path_matches,
     };
     use crate::local_session::ClientHello;
     use crate::local_wire::write_json_frame;
+    #[cfg(target_os = "macos")]
+    use std::ffi::OsStr;
     use std::fs;
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::{PermissionsExt, symlink};
     use std::os::unix::net::UnixListener;
+    #[cfg(target_os = "macos")]
+    use std::path::Path;
     use std::path::PathBuf;
     use std::thread;
 
@@ -948,6 +982,20 @@ mod tests {
         let layout = super::EndpointLayout::new(&runtime).expect("default layout");
         assert!(runtime.is_absolute());
         assert!(layout.socket.as_os_str().as_bytes().len() <= super::MAX_UNIX_SOCKET_PATH_BYTES);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn supervisor_path_accepts_only_trailing_nul_padding() {
+        let expected = Path::new("/tmp/orchestrator.sock");
+        let padded = Path::new(OsStr::from_bytes(b"/tmp/orchestrator.sock\0\0"));
+        let changed = Path::new(OsStr::from_bytes(b"/tmp/orchestrator.sockx\0"));
+        let truncated = Path::new("/tmp/orchestrator.soc");
+
+        assert!(supervisor_socket_path_matches(expected, expected));
+        assert!(supervisor_socket_path_matches(expected, padded));
+        assert!(!supervisor_socket_path_matches(expected, changed));
+        assert!(!supervisor_socket_path_matches(expected, truncated));
     }
 
     #[test]

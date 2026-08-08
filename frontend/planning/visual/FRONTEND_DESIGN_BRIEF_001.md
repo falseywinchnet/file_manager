@@ -13,6 +13,12 @@ inspectable Design DNA laboratory.
 Companion artifact:
 [`frontend-concept-atlas.html`](frontend-concept-atlas.html).
 
+**Superseding owner correction (2026-08-07):** the ordinary path trail is now a
+vertically dense continuous chevron cascade with a first-order inline editor.
+The pulled-down path matrix described in revision 007 is no longer the primary
+editing model. See
+[`../OWNER_DIRECTION_2026-08-07.md`](../OWNER_DIRECTION_2026-08-07.md).
+
 ## Purpose
 
 Turn the accepted product shape and recorded visual verdicts into a coherent
@@ -30,17 +36,16 @@ it does not dogfood GUI.Forms and contains no image-generated material.
   concepts but fully collapsible.
 - **GIVEN:** the center is the only file-content surface. Its default view is
   small icons; list/details and criteria views remain deliberate modes.
-- **GIVEN:** the compact breadcrumb precedes a separate current-subtree search
-  field. Its explicit terminal `./` action sits at the **end** of the path well.
-- **GIVEN:** activating `./` opens an over-window path matrix: the first row is
-  the current path as a full drive-rooted breadcrumb stack, followed by the last
-  N accessed directories, each retaining its own full stack. N is a user
-  preference defaulting to 5. Repeated common roots are intentional redundancy
-  because they preserve direct spatial proof.
-- **GIVEN:** clicking the open area after the last node in the current/full stack
-  converts that stack into a command-line-like text editor with path
-  autocomplete. Canonical paths and safe shell conveniences are accepted; the
-  resolved canonical destination is shown before navigation.
+- **GIVEN:** one vertically dense continuous chevron breadcrumb precedes a
+  separate current-subtree search field. Its first-order editing operator lives
+  inline in the trail rather than opening a path matrix.
+- **GIVEN:** activating path editing preserves the trail's retained identity and
+  row geometry while exposing command-line-like text entry and autocomplete.
+  Canonical paths and safe shell conveniences are accepted; the resolved
+  canonical destination is shown before explicit navigation.
+- **CANDIDATE:** recent full breadcrumb trails may survive behind a separate
+  history affordance. Their count, placement, and repeated-root treatment are
+  no longer frozen and may not displace the inline editor.
 - **GIVEN:** the shelf is compact, labelled, and task-specific. It is not a
   modern oversized ribbon or an icon-only strip. Move/Copy, Delete, View, Sort,
   and Properties remain permanent; New Folder is background-context only and
@@ -228,9 +233,10 @@ unbuilt state specimens open.
 ### 01 — Folder / small icons
 
 The baseline daily view. It tests the fixed single-window topology, physical
-command shelf, terminal `./` at the end of the path well, drive-rooted recent
-path matrix, editable/autocompleting full stack, honest tree roots, high-color
-objects, indexed folder-size badges, embedded preview, and collapsible panes.
+command shelf, dense chevron path cascade with inline editing and autocomplete,
+honest tree roots, high-color objects, indexed folder-size badges, embedded
+preview, and collapsible panes. The historical screenshot's pulled-down path
+matrix is no longer authoritative.
 Folder-size marks now show allocated size only after indexing: no mark at or
 below `1M`, then compact embossed values rounded by `5M` below 100 MB, `25M`
 through 1000 MB, `100M` from 1 GB to 1 TB, and `100G` above 1 TB. Exact size

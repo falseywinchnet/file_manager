@@ -85,6 +85,59 @@ func TestExactVerticalSliceOverJSONL(t *testing.T) {
 	}
 }
 
+func TestLiveVerticalSliceOverJSONLWithoutReconcile(t *testing.T) {
+	sandboxPath := t.TempDir()
+	source := filepath.Join(sandboxPath, "source")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "needle.txt"), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := sandbox.New(sandboxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := service.New(guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := []Request{
+		{ID: "apply", Method: "root.apply", Params: mustJSON(t, rootParams{Roots: []api.RootSpec{{ID: "docs", Path: source}}})},
+		{ID: "live", Method: "engine.query_live", Params: mustJSON(t, api.LiveQuery{QueryID: "wire-live", Scope: api.LiveQueryScope{RootID: "docs", Descendants: true}, Text: "needle"})},
+		{ID: "shutdown", Method: "shutdown"},
+	}
+	var input bytes.Buffer
+	for _, request := range requests {
+		if err := json.NewEncoder(&input).Encode(request); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var output bytes.Buffer
+	if err := Serve(context.Background(), &input, &output, engine); err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(&output)
+	for _, request := range requests {
+		var response decodedResponse
+		if err := decoder.Decode(&response); err != nil {
+			t.Fatal(err)
+		}
+		if response.Error != nil {
+			t.Fatalf("%s response error = %+v", request.ID, response.Error)
+		}
+		if request.ID == "live" {
+			var page api.LiveQueryResponse
+			if err := json.Unmarshal(response.Result, &page); err != nil {
+				t.Fatal(err)
+			}
+			if page.Source != api.LiveFilesystemSource || !page.Complete || len(page.Results) != 1 || page.Results[0].Metadata.Name != "needle.txt" {
+				t.Fatalf("live response = %+v", page)
+			}
+		}
+	}
+}
+
 func TestInvalidParamsAreNamedProtocolErrors(t *testing.T) {
 	guard, err := sandbox.New(t.TempDir())
 	if err != nil {
@@ -105,6 +158,26 @@ func TestInvalidParamsAreNamedProtocolErrors(t *testing.T) {
 	}
 	if response.Error == nil || response.Error.Code != api.ErrorInvalidRequest {
 		t.Fatalf("invalid params response = %#v", response)
+	}
+}
+
+func TestOversizedJSONLRequestIsRejectedAtFrameCeiling(t *testing.T) {
+	guard, err := sandbox.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := service.New(guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer engine.Close()
+	input := bytes.NewBuffer(bytes.Repeat([]byte{'x'}, MaxJSONLFrameBytes+1))
+	var output bytes.Buffer
+	if err := Serve(context.Background(), input, &output, engine); err == nil {
+		t.Fatal("oversized JSONL request unexpectedly succeeded")
+	}
+	if output.Len() != 0 {
+		t.Fatalf("oversized frame produced output bytes: %d", output.Len())
 	}
 }
 

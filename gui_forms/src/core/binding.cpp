@@ -348,14 +348,53 @@ bool valid_property_value_tree_impl(const BindingValue& value,
         }
         std::set<std::string> identities;
         for (const PropertyObjectMember& member : object->members()) {
+            const BindingValueKind runtime_kind = binding_value_kind(member.value);
+            const BindingValueKind declared_kind =
+                member.declared_kind.value_or(runtime_kind);
+            const bool schema_valid = valid_nested_kind(declared_kind) &&
+                (runtime_kind != BindingValueKind::null
+                     ? runtime_kind == declared_kind
+                     : member.nullable && member.declared_kind.has_value()) &&
+                ((declared_kind == BindingValueKind::enumeration) ==
+                 static_cast<bool>(member.enumeration)) &&
+                (!member.enumeration ||
+                 valid_property_enum_descriptor(*member.enumeration)) &&
+                member.standard_values.size() <=
+                    maximum_property_standard_values &&
+                (!member.standard_values_exclusive ||
+                 !member.standard_values.empty()) &&
+                member.converter_name.size() <= 256U &&
+                member.editor_name.size() <= 256U &&
+                validate_utf8(member.converter_name).valid() &&
+                validate_utf8(member.editor_name).valid();
             if (trimmed(member.name).size() != member.name.size() ||
                 member.name.empty() || member.name.size() > 256U ||
                 !validate_utf8(member.name).valid() ||
                 !validate_utf8(member.description).valid() ||
                 !identities.insert(canonical_binding_name(member.name)).second ||
+                !schema_valid ||
                 !valid_property_value_tree_impl(member.value, depth + 1U,
                                                 nodes)) {
                 return false;
+            }
+            PropertyDescriptor member_descriptor;
+            member_descriptor.kind = declared_kind;
+            member_descriptor.nullable = member.nullable;
+            member_descriptor.enumeration = member.enumeration;
+            member_descriptor.standard_values = member.standard_values;
+            member_descriptor.standard_values_exclusive =
+                member.standard_values_exclusive;
+            std::vector<BindingValue> normalized;
+            normalized.reserve(member.standard_values.size());
+            for (const BindingValue& standard : member.standard_values) {
+                const auto converted = convert_property_value(
+                    standard, member_descriptor);
+                if (!converted ||
+                    std::find(normalized.begin(), normalized.end(),
+                              *converted) != normalized.end()) {
+                    return false;
+                }
+                normalized.push_back(*converted);
             }
         }
     } else if (const auto* collection =
@@ -770,17 +809,38 @@ bool valid_property_enum_descriptor(
 
 std::optional<BindingValue> convert_property_value(
     const BindingValue& value, const PropertyDescriptor& descriptor) {
-    if (descriptor.kind != BindingValueKind::enumeration) {
-        if (descriptor.enumeration) return std::nullopt;
-        return convert_binding_value(value, descriptor.kind);
+    const auto normalize = [&descriptor](const BindingValue& candidate)
+            -> std::optional<BindingValue> {
+        if (binding_value_kind(candidate) == BindingValueKind::null) {
+            return descriptor.nullable
+                ? std::optional<BindingValue>{BindingValue{std::monostate{}}}
+                : std::optional<BindingValue>{};
+        }
+        if (descriptor.kind != BindingValueKind::enumeration) {
+            if (descriptor.enumeration) return {};
+            return convert_binding_value(candidate, descriptor.kind);
+        }
+        if (!descriptor.enumeration ||
+            !valid_property_enum_descriptor(*descriptor.enumeration)) {
+            return {};
+        }
+        const auto enumeration = normalize_enum_value(
+            candidate, *descriptor.enumeration);
+        return enumeration
+            ? std::optional<BindingValue>{BindingValue{*enumeration}}
+            : std::optional<BindingValue>{};
+    };
+    const auto normalized = normalize(value);
+    if (!normalized || !descriptor.standard_values_exclusive) {
+        return normalized;
     }
-    if (!descriptor.enumeration ||
-        !valid_property_enum_descriptor(*descriptor.enumeration)) {
-        return std::nullopt;
+    for (const BindingValue& standard : descriptor.standard_values) {
+        const auto normalized_standard = normalize(standard);
+        if (normalized_standard && *normalized_standard == *normalized) {
+            return normalized;
+        }
     }
-    const auto normalized = normalize_enum_value(value, *descriptor.enumeration);
-    return normalized ? std::optional<BindingValue>{BindingValue{*normalized}}
-                      : std::nullopt;
+    return {};
 }
 
 std::string canonical_binding_name(std::string_view name) {

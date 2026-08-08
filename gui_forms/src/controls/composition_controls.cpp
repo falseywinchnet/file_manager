@@ -160,7 +160,7 @@ void Card::set_selected(bool selected) {
     if (selected_ == selected) return;
     selected_ = selected;
     invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
-    selected_changed_.emit(selected_);
+    publish_change(selected_changed_, selected_);
 }
 
 Size Card::measure(Size available) {
@@ -419,7 +419,7 @@ void ReviewCard::set_record(ReviewRecord record) {
             : ControlVisualStatus::normal);
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::semantics);
-    record_changed_.emit(record_);
+    publish_change(record_changed_, record_);
 }
 
 Size ReviewCard::measure(Size available) {
@@ -635,8 +635,8 @@ void MasterDetailView::apply_display_mode(MasterDetailDisplayMode mode,
         return;
     }
     effective_display_mode_ = mode;
-    presentation_changed_.emit(
-        MasterDetailPresentationChange{previous, mode, automatic});
+    publish_change(presentation_changed_,
+                   MasterDetailPresentationChange{previous, mode, automatic});
 }
 
 Size MasterDetailView::measure(Size available) {

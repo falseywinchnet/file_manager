@@ -39,7 +39,7 @@ internal static unsafe class NativeDrawingBridge
     [StructLayout(LayoutKind.Sequential)] private struct Api
     {
         internal uint StructSize, AbiVersion;
-        internal fixed ulong Entries[98];
+        internal fixed ulong Entries[104];
     }
 
     [DllImport("gui_drawing_abi0", EntryPoint = "gd_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
@@ -57,9 +57,9 @@ internal static unsafe class NativeDrawingBridge
     private static Api Load()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(1, ref value));
-        if (value.AbiVersion != 1 || value.StructSize < sizeof(Api))
-            throw new InvalidOperationException("GUI.Drawing ABI 0.1 table is incomplete.");
+        Check(GetApi(2, ref value));
+        if (value.AbiVersion != 2 || value.StructSize < sizeof(Api))
+            throw new InvalidOperationException("GUI.Drawing ABI 0.2 table is incomplete.");
         return value;
     }
 
@@ -788,11 +788,45 @@ internal static unsafe class NativeDrawingBridge
         var recorder = graphics.__recorder;
         if (target is null || recorder.IsNull) return;
         if (graphics.__executedCommands == RecorderCommandCount(recorder)) return;
+        var telemetry = FacadeCallTelemetry.IsEnabled;
+        var flushStarted = telemetry ?
+            global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+        // A long-lived Graphics.FromHdc/FromHwnd may be interleaved with raw
+        // GDI writes to the same borrowed surface.  Its private raster is only
+        // a command candidate, not an authoritative copy of that surface.
+        // Refresh it immediately before applying the newly recorded commands
+        // so an external BitBlt/Clear completed since the previous Flush is
+        // observed exactly once instead of being overwritten by stale pixels.
+        if (graphics.__nativeSurface != 0)
+        {
+            var refreshStarted = telemetry ?
+                global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+            RefreshNativeSurfaceTarget(graphics);
+            if (telemetry)
+                FacadeCallTelemetry.ObserveValue("native-surface.refresh-nanoseconds",
+                    checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(refreshStarted).Ticks * 100L));
+        }
+        var executeStarted = telemetry ?
+            global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
         graphics.__executedCommands += ExecuteFrom(
             recorder, target.__BitmapHandle,
             graphics.__executedCommands);
-        if (graphics.__nativeSurface != 0) PresentNativeSurface(graphics);
+        if (telemetry)
+            FacadeCallTelemetry.ObserveValue("native-surface.flush-execute-nanoseconds",
+                checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(executeStarted).Ticks * 100L));
+        if (graphics.__nativeSurface != 0)
+        {
+            var presentStarted = telemetry ?
+                global::System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+            PresentNativeSurface(graphics);
+            if (telemetry)
+                FacadeCallTelemetry.ObserveValue("native-surface.present-nanoseconds",
+                    checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(presentStarted).Ticks * 100L));
+        }
         CompactExecutedRecorder(graphics);
+        if (telemetry)
+            FacadeCallTelemetry.ObserveValue("native-surface.flush-total-nanoseconds",
+                checked(global::System.Diagnostics.Stopwatch.GetElapsedTime(flushStarted).Ticks * 100L));
     }
 
     // Graphics.FromHwnd is commonly retained for the lifetime of a custom
@@ -907,10 +941,6 @@ internal static unsafe class NativeDrawingBridge
             var size = checked((int)U32(bytes, entry + 8));
             var offset = checked((int)U32(bytes, entry + 12));
             if (size < 8 || offset < 0 || offset > bytes.Length - size) continue;
-            if (bytes[offset] != 0x89 || bytes[offset + 1] != 0x50 ||
-                bytes[offset + 2] != 0x4e || bytes[offset + 3] != 0x47 ||
-                bytes[offset + 4] != 0x0d || bytes[offset + 5] != 0x0a ||
-                bytes[offset + 6] != 0x1a || bytes[offset + 7] != 0x0a) continue;
             var width = bytes[entry] == 0 ? 256 : bytes[entry];
             var height = bytes[entry + 1] == 0 ? 256 : bytes[entry + 1];
             var score = (long)width * height * 65536 + U16(bytes, entry + 6);
@@ -920,8 +950,72 @@ internal static unsafe class NativeDrawingBridge
             selectedSize = size;
         }
         if (selectedOffset < 0)
-            throw new NotSupportedException("GUI.Drawing currently admits PNG-backed ICO frames; this ICO is DIB-only.");
-        return DecodePng(bytes.AsSpan(selectedOffset, selectedSize).ToArray());
+            throw new ArgumentException("ICO contains no bounded image frame.", nameof(bytes));
+        if (selectedSize >= 8 && bytes[selectedOffset] == 0x89 && bytes[selectedOffset + 1] == 0x50 &&
+            bytes[selectedOffset + 2] == 0x4e && bytes[selectedOffset + 3] == 0x47 &&
+            bytes[selectedOffset + 4] == 0x0d && bytes[selectedOffset + 5] == 0x0a &&
+            bytes[selectedOffset + 6] == 0x1a && bytes[selectedOffset + 7] == 0x0a)
+            return DecodePng(bytes.AsSpan(selectedOffset, selectedSize).ToArray());
+        return DecodeIconDib(bytes, selectedOffset, selectedSize);
+    }
+    private static global::System.Drawing.Bitmap DecodeIconDib(byte[] bytes, int frameOffset, int frameSize)
+    {
+        static ushort U16(byte[] data, int offset) =>
+            (ushort)(data[offset] | data[offset + 1] << 8);
+        static uint U32(byte[] data, int offset) =>
+            (uint)(data[offset] | data[offset + 1] << 8 | data[offset + 2] << 16 |
+                   data[offset + 3] << 24);
+        if (frameSize < 40 || U32(bytes, frameOffset) < 40)
+            throw new NotSupportedException("ICO DIB header is unsupported.");
+        var width = checked((int)U32(bytes, frameOffset + 4));
+        var storedHeight = checked((int)U32(bytes, frameOffset + 8));
+        var planes = U16(bytes, frameOffset + 12);
+        var bitsPerPixel = U16(bytes, frameOffset + 14);
+        var compression = U32(bytes, frameOffset + 16);
+        if (width <= 0 || width > 4096 || storedHeight <= 0 || storedHeight > 8192 ||
+            (storedHeight & 1) != 0 || planes != 1 ||
+            bitsPerPixel != 32 || compression != 0)
+            throw new NotSupportedException("GUI.Drawing admits uncompressed 32-bit ICO DIB frames.");
+        var height = storedHeight / 2;
+        var headerSize = checked((int)U32(bytes, frameOffset));
+        var sourceStride = checked(width * 4);
+        var xorBytes = checked(sourceStride * height);
+        if (headerSize > frameSize || xorBytes > frameSize - headerSize)
+            throw new ArgumentException("ICO DIB pixels are truncated.", nameof(bytes));
+        var sourceOffset = frameOffset + headerSize;
+        var anyAlpha = false;
+        for (var index = 3; index < xorBytes; index += 4)
+            anyAlpha |= bytes[sourceOffset + index] != 0;
+        var maskStride = checked(((width + 31) / 32) * 4);
+        var maskOffset = sourceOffset + xorBytes;
+        var hasMask = maskStride <= frameSize - headerSize - xorBytes &&
+                      checked(maskStride * height) <= frameSize - headerSize - xorBytes;
+        var bitmap = new global::System.Drawing.Bitmap(width, height,
+            global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        var locked = bitmap.LockBits(new global::System.Drawing.Rectangle(0, 0, width, height),
+            global::System.Drawing.Imaging.ImageLockMode.WriteOnly,
+            global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        try
+        {
+            for (var y = 0; y < height; ++y)
+            {
+                var sourceRow = sourceOffset + (height - 1 - y) * sourceStride;
+                var maskRow = maskOffset + (height - 1 - y) * maskStride;
+                var destination = (byte*)locked.Scan0 + y * locked.Stride;
+                for (var x = 0; x < width; ++x)
+                {
+                    var source = sourceRow + x * 4;
+                    var alpha = anyAlpha ? bytes[source + 3] :
+                        hasMask && (bytes[maskRow + x / 8] & (0x80 >> (x & 7))) != 0 ? (byte)0 : (byte)255;
+                    destination[x * 4] = (byte)((bytes[source] * alpha + 127) / 255);
+                    destination[x * 4 + 1] = (byte)((bytes[source + 1] * alpha + 127) / 255);
+                    destination[x * 4 + 2] = (byte)((bytes[source + 2] * alpha + 127) / 255);
+                    destination[x * 4 + 3] = alpha;
+                }
+            }
+        }
+        finally { bitmap.UnlockBits(locked); }
+        return bitmap;
     }
     private static global::System.Drawing.Bitmap WrapBitmap(Handle handle, int width, int height)
     {
@@ -937,14 +1031,31 @@ internal static unsafe class NativeDrawingBridge
                                                                                uint kind)
     {
         if (surface == 0) throw new ArgumentException("Native surface must be nonzero.", nameof(surface));
+        var traceOwnership = global::System.Environment.GetEnvironmentVariable(
+            "GUI_FORMS_TRACE_DIRECT_GDI_OWNERSHIP") == "1";
+        if (traceOwnership)
+            global::System.Console.Error.WriteLine("gui-drawing-direct-gdi=from-native-begin|surface:0x" +
+                ((nuint)surface).ToString("x") + "|kind:" + kind + "|thread:" +
+                global::System.Environment.CurrentManagedThreadId);
         Handle bitmapHandle;
         Rect bounds;
         var result = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle*, Rect*, int>)Entry(92))(
             (nuint)surface, kind, &bitmapHandle, &bounds);
+        if (traceOwnership)
+            global::System.Console.Error.WriteLine("gui-drawing-direct-gdi=from-native-import|surface:0x" +
+                ((nuint)surface).ToString("x") + "|kind:" + kind + "|result:" + result +
+                "|bitmap:" + bitmapHandle.Slot + ":" + bitmapHandle.Generation + "|bounds:" +
+                bounds.X + "," + bounds.Y + "," + bounds.Width + "x" + bounds.Height +
+                "|thread:" + global::System.Environment.CurrentManagedThreadId);
         if (result == 7) throw new PlatformNotSupportedException(
             "Native HDC/HWND drawing is available only through the Windows adapter.");
         Check(result);
         Dimensions(bitmapHandle, out var width, out var height);
+        if (traceOwnership)
+            global::System.Console.Error.WriteLine("gui-drawing-direct-gdi=from-native-ready|surface:0x" +
+                ((nuint)surface).ToString("x") + "|kind:" + kind + "|bitmap:" + bitmapHandle.Slot +
+                ":" + bitmapHandle.Generation + "|size:" + width + "x" + height + "|thread:" +
+                global::System.Environment.CurrentManagedThreadId);
         if (global::System.Environment.GetEnvironmentVariable("GUI_DRAWING_TRACE_NATIVE_SURFACES") == "1" &&
             global::System.Threading.Interlocked.Increment(ref nativeSurfaceCaptureTraceCount) <= 32)
             global::System.Console.Error.WriteLine("gui-drawing-native-surface=capture|kind:" + kind +
@@ -968,6 +1079,33 @@ internal static unsafe class NativeDrawingBridge
         }
         return graphics;
     }
+    private static void RefreshNativeSurfaceTarget(global::System.Drawing.Graphics graphics)
+    {
+        var target = graphics.__target;
+        if (target is null || graphics.__nativeSurface == 0) return;
+        Rect bounds;
+        var inPlace = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle, Rect*, int>)Entry(102))(
+            (nuint)graphics.__nativeSurface, graphics.__nativeSurfaceKind,
+            target.__BitmapHandle, &bounds);
+        if (inPlace == 0) return;
+        // A native surface may be resized independently of its long-lived
+        // Graphics. Reallocate only for that uncommon topology transition.
+        if (inPlace != 1) Check(inPlace);
+        Handle refreshed;
+        var result = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle*, Rect*, int>)Entry(92))(
+            (nuint)graphics.__nativeSurface, graphics.__nativeSurfaceKind,
+            &refreshed, &bounds);
+        if (result == 7) throw new PlatformNotSupportedException(
+            "Native surface refresh is available only through the Windows adapter.");
+        Check(result);
+        Dimensions(refreshed, out var width, out var height);
+        var prior = target.__BitmapHandle;
+        target.__bitmap = refreshed;
+        target.__width = width;
+        target.__height = height;
+        target.__pixelFormat = global::System.Drawing.Imaging.PixelFormat.Format32bppPArgb;
+        Release(ref prior);
+    }
     internal static void PresentNativeSurface(global::System.Drawing.Graphics graphics)
     {
         if (graphics.__target is null || graphics.__nativeSurface == 0) return;
@@ -977,6 +1115,10 @@ internal static unsafe class NativeDrawingBridge
         if (result == 7) throw new PlatformNotSupportedException(
             "Native surface presentation is available only through the Windows adapter.");
         Check(result);
+        var retained = ((delegate* unmanaged[Cdecl]<nuint, uint, Handle, int>)Entry(103))(
+            (nuint)graphics.__nativeSurface, graphics.__nativeSurfaceKind,
+            graphics.__target.__BitmapHandle);
+        if (retained == 0) return;
         // A direct-GDI control is sampled into the retained tree only after its
         // managed Graphics flush has completed. This explicit boundary prevents
         // the polling fallback from publishing the intermediate Clear/BitBlt

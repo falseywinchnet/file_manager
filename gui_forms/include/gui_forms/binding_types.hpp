@@ -190,6 +190,7 @@ struct PropertyEnumDescriptor final {
 
 inline constexpr std::size_t maximum_property_enum_choices = 256U;
 inline constexpr std::size_t maximum_property_enum_text_bytes = 256U;
+inline constexpr std::size_t maximum_property_standard_values = 256U;
 
 [[nodiscard]] bool valid_property_enum_descriptor(
     const PropertyEnumDescriptor& descriptor) noexcept;

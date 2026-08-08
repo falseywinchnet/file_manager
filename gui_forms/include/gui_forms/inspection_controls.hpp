@@ -23,6 +23,18 @@ enum class PropertyEditorKind : std::uint8_t {
     custom,
 };
 
+// Instance-owned formatting context. It deliberately does not mutate the C or
+// process locale: two inspectors may display/edit different cultures in the
+// same deterministic headless run.
+struct PropertyConversionContext final {
+    std::string culture_name{"invariant"};
+    std::string decimal_separator{"."};
+    std::string group_separator{","};
+    bool use_grouping{};
+    friend bool operator==(const PropertyConversionContext&,
+                           const PropertyConversionContext&) = default;
+};
+
 // Renderer-neutral TypeConverter analogue. Formatting and parsing remain
 // separate so an inspector can show a useful representation without implying
 // that the value is editable. Registries are instance-owned and deterministic;
@@ -32,9 +44,17 @@ struct PropertyValueConverter final {
         const BindingValue&, const PropertyDescriptor&)>;
     using Parser = std::function<std::optional<BindingValue>(
         std::string_view, const BindingValue&, const PropertyDescriptor&)>;
+    using ContextFormatter = std::function<std::string(
+        const BindingValue&, const PropertyDescriptor&,
+        const PropertyConversionContext&)>;
+    using ContextParser = std::function<std::optional<BindingValue>(
+        std::string_view, const BindingValue&, const PropertyDescriptor&,
+        const PropertyConversionContext&)>;
 
     Formatter format;
     Parser parse;
+    ContextFormatter format_with_context;
+    ContextParser parse_with_context;
 };
 
 class PropertyValueConverterRegistry final {
@@ -52,12 +72,17 @@ public:
     [[nodiscard]] std::optional<BindingValue> parse(
         std::string_view text, const BindingValue& current,
         const PropertyDescriptor& descriptor) const;
+    [[nodiscard]] const PropertyConversionContext& context() const noexcept {
+        return context_;
+    }
+    void set_context(PropertyConversionContext context);
     [[nodiscard]] static std::shared_ptr<PropertyValueConverterRegistry>
     create_default();
 
 private:
     std::map<std::string, PropertyValueConverter> converters_;
     std::map<BindingValueKind, std::string> kind_mappings_;
+    PropertyConversionContext context_;
 };
 
 struct PropertyEditorRequest final {
@@ -401,6 +426,11 @@ public:
 
     [[nodiscard]] Control::Ptr selected_object() const noexcept;
     void set_selected_object(Control::Ptr object);
+    [[nodiscard]] std::vector<Control::Ptr> selected_objects() const;
+    // Projects the common schema and applies edits as one transaction. If any
+    // owner rejects the value, every previously changed owner is restored
+    // before failure is published.
+    void set_selected_objects(std::vector<Control::Ptr> objects);
     [[nodiscard]] PropertySort property_sort() const noexcept;
     void set_property_sort(PropertySort sort);
     void refresh_properties();
@@ -426,6 +456,14 @@ public:
 
     bool try_set_property_value(std::string_view property_name,
                                 BindingValue value);
+    // Automation/binding façades may submit culture-formatted text through the
+    // same instance-owned converter used by the retained editor.
+    bool try_set_property_text(std::string_view property_name,
+                               std::string_view text);
+    // Invokes the installed retained editor through its semantic Press action.
+    // This is shared by accessibility, ABI automation, and physical pointer
+    // activation; it never bypasses the editor's normal commit transaction.
+    bool activate_property_editor(std::string_view property_name);
     bool reset_property(std::string_view property_name);
     // Collection mutations rebuild the immutable value tree and commit it
     // through the owning property's registered setter. Index paths use the

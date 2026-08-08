@@ -124,6 +124,20 @@ impl Response {
     }
 
     #[must_use]
+    pub fn result(id: impl Into<String>, status: TerminalStatus, result: Value) -> Self {
+        debug_assert!(matches!(
+            status,
+            TerminalStatus::Success | TerminalStatus::Partial
+        ));
+        Self {
+            id: id.into(),
+            status,
+            result: Some(result),
+            error: None,
+        }
+    }
+
+    #[must_use]
     pub fn failure(id: impl Into<String>, error: ApiError) -> Self {
         Self {
             id: id.into(),

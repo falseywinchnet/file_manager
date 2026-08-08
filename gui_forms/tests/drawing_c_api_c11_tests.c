@@ -57,6 +57,10 @@ int main(void) {
     uint64_t path_point_count = 0;
     gd_rect path_bounds = {0};
     gd_bitmap_lock_view bitmap_lock = {0};
+    gd_bitmap_edit_view bitmap_edit = {0};
+    gd_bitmap_damage_summary damage_summary = {0};
+    gd_rect_i bitmap_damage[2] = {{0}};
+    uint64_t bitmap_damage_count = 0;
     gd_color pixel = {0};
     uint32_t bitmap_width = 0;
     uint32_t bitmap_height = 0;
@@ -66,7 +70,7 @@ int main(void) {
     memset(&prefix, 0, sizeof(prefix));
     prefix.struct_size = (uint32_t)(sizeof(uint32_t) * 2U);
     CHECK(gd_get_api_v0(GD_ABI_VERSION_0_1, &prefix) == GD_OK);
-    CHECK(prefix.struct_size == sizeof(gd_api_v0));
+    CHECK(prefix.struct_size == offsetof(gd_api_v0, bitmap_edit_begin));
     CHECK(prefix.abi_version == GD_ABI_VERSION_0_1);
 
     memset(&api, 0, sizeof(api));
@@ -74,8 +78,9 @@ int main(void) {
     CHECK(gd_get_api_v0(UINT32_C(0xffffffff), &api) ==
           GD_ERROR_UNSUPPORTED_VERSION);
     api.struct_size = sizeof(api);
-    CHECK(gd_get_api_v0(GD_ABI_VERSION_0_1, &api) == GD_OK);
+    CHECK(gd_get_api_v0(GD_ABI_VERSION_0_2, &api) == GD_OK);
     CHECK(api.struct_size == sizeof(api));
+    CHECK(api.abi_version == GD_ABI_VERSION_0_2);
     CHECK(api.recorder_trace != NULL);
     CHECK(api.graphics_path_create != NULL);
     CHECK(api.recorder_draw_image != NULL);
@@ -87,6 +92,10 @@ int main(void) {
     CHECK(api.native_surface_present != NULL);
     CHECK(api.bitmap_acquire_hdc != NULL);
     CHECK(api.bitmap_release_hdc != NULL);
+    CHECK(api.bitmap_edit_begin != NULL);
+    CHECK(api.bitmap_edit_commit != NULL);
+    CHECK(api.bitmap_edit_cancel != NULL);
+    CHECK(api.bitmap_changes_since != NULL);
 
     CHECK(api.solid_brush_create((gd_color){UINT32_C(0xffff0000), 0},
                                  &brush) == GD_OK);
@@ -244,6 +253,39 @@ int main(void) {
     CHECK(api.bitmap_unlock(bitmap, bitmap_lock.token) == GD_OK);
     CHECK(api.bitmap_get_pixel(bitmap, 0, 0, &pixel) == GD_OK &&
           pixel.argb == UINT32_C(0xff0000ff));
+    CHECK(api.bitmap_dimensions(bitmap, &bitmap_width, &bitmap_height,
+                                &bitmap_format, &bitmap_generation) == GD_OK &&
+          bitmap_generation == 3);
+    CHECK(api.bitmap_edit_begin(bitmap, (gd_rect_i){1, 1, 1, 1},
+                                &bitmap_edit) == GD_OK);
+    CHECK(bitmap_edit.writable_data != NULL && bitmap_edit.row_bytes == 8 &&
+          bitmap_edit.bounds.x == 1 && bitmap_edit.bounds.y == 1);
+    ((uint8_t*)bitmap_edit.writable_data)[0] = 0;
+    ((uint8_t*)bitmap_edit.writable_data)[1] = 255;
+    ((uint8_t*)bitmap_edit.writable_data)[2] = 0;
+    ((uint8_t*)bitmap_edit.writable_data)[3] = 255;
+    CHECK(api.bitmap_edit_commit(bitmap, bitmap_edit.token,
+                                 &bitmap_generation) == GD_OK &&
+          bitmap_generation == 4);
+    CHECK(api.bitmap_changes_since(bitmap, 3, NULL, 0, &bitmap_damage_count,
+                                   &damage_summary) == GD_ERROR_BUFFER_TOO_SMALL);
+    CHECK(bitmap_damage_count == 1 && damage_summary.from_generation == 3 &&
+          damage_summary.to_generation == 4 &&
+          damage_summary.history_complete == 1);
+    CHECK(api.bitmap_changes_since(bitmap, 3, bitmap_damage, 2,
+                                   &bitmap_damage_count,
+                                   &damage_summary) == GD_OK);
+    CHECK(bitmap_damage[0].x == 1 && bitmap_damage[0].y == 1 &&
+          bitmap_damage[0].width == 1 && bitmap_damage[0].height == 1);
+    CHECK(api.bitmap_edit_begin(bitmap, (gd_rect_i){1, 1, 1, 1},
+                                &bitmap_edit) == GD_OK);
+    ((uint8_t*)bitmap_edit.writable_data)[1] = 0;
+    CHECK(api.bitmap_edit_cancel(bitmap, bitmap_edit.token) == GD_OK);
+    CHECK(api.bitmap_get_pixel(bitmap, 1, 1, &pixel) == GD_OK &&
+          pixel.argb == UINT32_C(0xff00ff00));
+    CHECK(api.bitmap_changes_since(bitmap, 4, NULL, 0, &bitmap_damage_count,
+                                   &damage_summary) == GD_OK &&
+          bitmap_damage_count == 0 && damage_summary.to_generation == 4);
     CHECK(api.bitmap_clone(bitmap, (gd_rect_i){0, 0, 1, 1},
                            &bitmap_clone) == GD_OK);
     CHECK(api.bitmap_thumbnail(bitmap, 1, 1, &bitmap_thumbnail) == GD_OK);

@@ -161,6 +161,7 @@ func (s *Service) Shutdown(ctx context.Context) (api.LifecycleStatus, error) {
 	if err := s.StopBackgroundObservation(ctx); err != nil {
 		return api.LifecycleStatus{}, err
 	}
+	s.live.Close()
 
 	s.admin.Lock()
 	s.readerMu.Lock()
@@ -198,7 +199,7 @@ func (s *Service) lifecycleStatusLocked() (api.LifecycleStatus, api.WorkStatus) 
 
 func (s *Service) Version() api.VersionInfo {
 	lifecycle, _ := s.lifecycleStatus()
-	features := []string{"exact-reference", "integrity", "root-policy", "scan-reconcile", "service-lifecycle", "effective-configuration"}
+	features := []string{"exact-reference", "integrity", "root-policy", "scan-reconcile", "live-query", "service-lifecycle", "effective-configuration"}
 	if s.Persistent() {
 		features = append(features, "immutable-generation-v1")
 	}
@@ -208,7 +209,8 @@ func (s *Service) Version() api.VersionInfo {
 	return api.VersionInfo{
 		Component: api.EngineComponentName, BuildVersion: api.EngineBuildVersion,
 		Protocol: api.ProtocolVersion, InstanceID: lifecycle.InstanceID,
-		Features: features, Capabilities: s.capabilities(),
+		ContractFamilies: []string{"ORC-LIF-001", "ORC-ENG-001", "ORC-ENG-002", "ORC-ENG-003", "ORC-ENG-004"},
+		Features:         features, Capabilities: s.capabilities(),
 	}
 }
 
@@ -264,7 +266,7 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "engine.configuration.inspect", State: api.CapabilityAvailable, Revision: "0.1"},
 		{ID: "engine.exact.catalogue", State: api.CapabilityAvailable, Revision: "reference-v1"},
 		{ID: "engine.exact.query", State: api.CapabilityAvailable, Revision: "engine.v0"},
-		{ID: "engine.live.query", State: api.CapabilityUnavailable, Reason: "required by ADR-008 and ORC-ENG-004 but not implemented; manual reconcile plus exact query does not satisfy catalogue-independent search"},
+		{ID: "engine.live.query", State: api.CapabilityAvailable, Revision: "name-path-v0.1"},
 		{ID: "engine.ordered_metadata", State: api.CapabilityAvailable, Revision: "reference-v1"},
 		{ID: "engine.root_policy", State: api.CapabilityAvailable, Revision: "development-sandbox-v0"},
 		{ID: "engine.scan.reconcile", State: api.CapabilityAvailable, Revision: "metadata-full-scan-v0"},
@@ -281,7 +283,7 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "contract.ORC-ENG-001", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
 		{ID: "contract.ORC-ENG-002", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
 		{ID: "contract.ORC-ENG-003", State: api.CapabilityAvailable, Revision: "snapshot-v0.1"},
-		{ID: "contract.ORC-ENG-004", State: api.CapabilityNegotiating, Reason: "required catalogue-independent live-query proposal awaits Engine reply and implementation"},
+		{ID: "contract.ORC-ENG-004", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
 	}
 }
 

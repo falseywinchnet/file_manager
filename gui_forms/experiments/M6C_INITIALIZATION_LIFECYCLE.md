@@ -63,8 +63,8 @@ created behind the schema.
 - `gui_forms_lifecycle_controls_tests` covers attach/detach order and observable
   binding state, load-once reparenting, two-phase attachment counts, attach
   rollback and ID reuse, structural mutation rejection in lifecycle callbacks,
-  synchronous property events, underflow, disposal during initialization, and
-  wrong-thread initialization rejection.
+  (superseded by M12-P27) synchronous property events, underflow, disposal
+  during initialization, and wrong-thread initialization rejection.
 - Gallery integration verifies type identity, load/attachment count, lifecycle
   status text, complete visible-child containment, and the control/content font
   role split.

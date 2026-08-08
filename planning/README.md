@@ -44,7 +44,7 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `../engine/` | Standalone Go search/index engine workstream; implementation may proceed behind its API and evidence gates without selecting parent integration architecture |
 | `../kolmogrov/` | Independent ConeDAG, complexity, exhaustive-breakdown, and fixed-width perceptual-hashing research program |
 | `../orchestrator/` | Active Orchestrator integration authority, Rust bootstrap kernel, contract registry, and negotiation program |
-| `../frontend/` | Visual end-user frontend; Frontend 001 waits for Core 1.0, GUI.Forms go-ahead, and architect start direction |
+| `../frontend/` | Visual end-user frontend; architect direction recorded 2026-08-07; Frontend 001 waits for Core 1.0 and GUI.Forms go-ahead |
 | `../paint/` | Interview-first Paint planning subproject; implementation waits on its GUI.Forms/Orchestrator/picker/transfer gates and owner direction |
 | `../text_editor/` | Interview-first Text Editor planning subproject; implementation waits on its text/Orchestrator/picker gates and owner direction |
 | `../games/` | Planning-only nine-game GUI.Forms dogfood collection; implementation waits on interview/framework/owner gates |

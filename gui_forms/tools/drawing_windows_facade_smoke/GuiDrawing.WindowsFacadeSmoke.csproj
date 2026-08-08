@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../generated/facade-v1/System.Drawing.Common/System.Drawing.Common.csproj" />
+    <ProjectReference Include="../../generated/facade-v1/System.Windows.Forms/System.Windows.Forms.csproj" />
   </ItemGroup>
 </Project>

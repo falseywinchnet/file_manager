@@ -2,6 +2,8 @@
 
 | File | Purpose |
 |---|---|
+| `OWNER_DIRECTION_2026-08-07.md` | Superseding owner direction for frontend start, inline chevron breadcrumbs, backend settings, native suite menus, and contained integrated dogfood |
+| `TOTAL_IMPLEMENTATION_PLAN.md` | Complete staged frontend/component-integration implementation, verification, containment, dogfood, and platform-promotion program |
 | `FRONTEND_CHARTER.md` | What the frontend owns and refuses to absorb |
 | `FRONTEND_001.md` | Exact first executable slice, fixture boundary, and exit gate |
 | `DOCUMENT_PICKER_SURFACE.md` | Reusable File Manager browser/selection surface for File Manager, Paint, and Text Editor; planning-only until the frontend gate opens |

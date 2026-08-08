@@ -1,7 +1,7 @@
 # Orchestrator
 
-Status: **headless Core 1.0 implementation active; provider contracts negotiated
-incrementally**.
+Status: **headless Core 1.0 ready on macOS; provider contracts continue behind
+independent capability gates**.
 
 Orchestrator is File Manager's user-scoped Rust integration authority. It owns
 the required/available capability map and the canonical interoperability
@@ -47,16 +47,24 @@ The Rust bootstrap contains only provider-independent competence:
 
 Engine semantic v0 and its capability gates are now frozen for experimental
 implementation under ADR-007. ADR-008 separately requires catalogue-independent
-Engine search; Orchestrator now has a provider-neutral draft port and tested
-fallback law, while the real live-search provider contract and implementation
-remain negotiating. A bounded Rust development client now passes version,
-status, exact query, and shutdown against a separately built Go Engine process.
+Engine search. The Go provider now implements `engine.query_live`; the
+provider-neutral broker, narrow fallback law, development child adapter, and
+single frontend-facing `orchestrator.search` operation pass a real
+zero-catalogue route. Availability is derived from the connected Engine's
+advertised `engine.live.query` and `contract.ORC-ENG-004` capabilities. The
+authenticated Rust integration test and independently compiled C++17 client
+both pass without exposing catalogue/live selection to the frontend. Installed
+Engine discovery/authentication and native NTFS/ext4 promotion evidence remain
+open. The bounded Rust development client also passes version, status, exact
+query, and shutdown against a separately built Go Engine process.
 The first ADR-009 local-daemon slice now provides bounded `ORC1` framing,
 private Unix discovery, an OS-random credential hello, instance verification,
 and CLI status/shutdown across separate processes. ADR-011 adds a stable macOS
 Application Support endpoint, launchd listener adoption, and bounded
-activation/credential rediscovery. An actual installed LaunchAgent lifecycle
-and the Windows named-pipe gate remain open. Its fixed worker pool and bounded
+activation/credential rediscovery. The installed LaunchAgent lifecycle now
+passes first activation, shutdown, bounded supervisor reactivation, instance
+rotation, bootout, and exact removal; the Windows named-pipe gate remains open.
+Its fixed worker pool and bounded
 pending-session queue prevent slow peers from creating unbounded threads or
 blocking the control plane beyond the bounded handshake interval. Native peer
 UID verification, no-follow durable endpoint publication, secure Rust secret
@@ -73,10 +81,10 @@ The release projection now carries a deterministic SHA-256 digest over the
 manifest fields and embedded Core contract inputs. It is explicitly unsigned;
 packaged-artifact signing remains outside this development build's claim.
 
-The executable reports progress toward the Core 1.0 bootstrap profile. A target
-declaration is not a readiness claim: discovery/authentication, production
-local transport, independent client conformance, and stable contract horizons
-remain required before the release can report ready.
+The executable now reports the Core 1.0 bootstrap profile ready on macOS because
+discovery/authentication, production local transport, installed launchd
+lifecycle, independent client conformance, and stable contract horizons pass.
+Separately gated providers remain truthfully reduced.
 
 ## Negotiated integration
 
@@ -141,10 +149,10 @@ cargo run --manifest-path orchestrator/Cargo.toml -- \
   call-local shutdown
 ```
 
-`launchd-plist` prints (but does not install or load) a LaunchAgent definition
-for the current binary. Packaging must first create the printed socket's parent
-leaf as the user with mode `0700`, install the binary and plist, and then perform
-the remaining real activation/removal gate:
+`launchd-plist` prints (but does not install or load) the conformant LaunchAgent
+definition for the current binary. Packaging creates the printed socket's
+parent leaf as the user with mode `0700`, installs the binary and plist, and may
+then use the same lifecycle exercised by the Core 1.0 installed trial:
 
 ```sh
 cargo run --manifest-path orchestrator/Cargo.toml -- launchd-plist
@@ -166,3 +174,22 @@ cargo run --manifest-path orchestrator/Cargo.toml \
   --example engine_jsonl_probe -- /path/to/fileman-engine \
   /path/to/disposable-sandbox /path/to/disposable-sandbox/source ledger.txt
 ```
+
+For the end-to-end development route, `serve-local` may supervise that
+separately built Engine over bounded JSONL and expose only the unified
+`orchestrator.search` operation to authenticated local clients:
+
+```sh
+cargo run --manifest-path orchestrator/Cargo.toml -- serve-local \
+  --runtime-dir /absolute/private/runtime \
+  --engine-binary /absolute/path/fileman-engine \
+  --engine-sandbox-root /absolute/disposable/sandbox \
+  --engine-root-id docs \
+  --engine-root-path /absolute/disposable/sandbox/source
+```
+
+All four Engine options are atomic. Their absence makes runtime live-search
+availability `unavailable`; a connected child must advertise both
+`engine.live.query` and `contract.ORC-ENG-004` as `available`. This development
+route does not claim installed Engine discovery, query/admin authentication, or
+platform service supervision.

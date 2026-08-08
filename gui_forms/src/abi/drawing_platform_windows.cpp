@@ -6,6 +6,8 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
@@ -29,6 +31,92 @@ struct HdcLease final {
 std::mutex lease_mutex;
 std::unordered_map<std::uint64_t, HdcLease> leases;
 std::uint64_t next_lease{1U};
+
+BITMAPINFO bitmap_info(std::uint32_t width, std::uint32_t height);
+
+struct CompatibilityUser32 final {
+    using GetDc = HDC (WINAPI*)(HWND);
+    using ReleaseDc = int (WINAPI*)(HWND, HDC);
+    using GetClientBounds = BOOL (WINAPI*)(HWND, RECT*);
+
+    HMODULE module{};
+    GetDc get_dc{::GetDC};
+    ReleaseDc release_dc{::ReleaseDC};
+    GetClientBounds get_client_rect{::GetClientRect};
+
+    CompatibilityUser32() {
+        module = GetModuleHandleW(L"gui_forms_win32_compat.dll");
+        if (module == nullptr) module = LoadLibraryW(L"gui_forms_win32_compat.dll");
+        if (module == nullptr) return;
+        if (const auto value = GetProcAddress(module, "GetDC")) {
+            get_dc = reinterpret_cast<GetDc>(value);
+        }
+        if (const auto value = GetProcAddress(module, "ReleaseDC")) {
+            release_dc = reinterpret_cast<ReleaseDc>(value);
+        }
+        if (const auto value = GetProcAddress(module, "GetClientRect")) {
+            get_client_rect = reinterpret_cast<GetClientBounds>(value);
+        }
+    }
+};
+
+CompatibilityUser32& compatibility_user32() {
+    static CompatibilityUser32 api;
+    return api;
+}
+
+struct CaptureStaging final {
+    HDC device{};
+    HBITMAP dib{};
+    HGDIOBJ previous{};
+    void* pixels{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+
+    ~CaptureStaging() {
+        if (device != nullptr && previous != nullptr && previous != HGDI_ERROR) {
+            SelectObject(device, previous);
+        }
+        if (device != nullptr) DeleteDC(device);
+        if (dib != nullptr) DeleteObject(dib);
+    }
+
+    void ensure(std::uint32_t requested_width, std::uint32_t requested_height) {
+        if (device != nullptr && width == requested_width && height == requested_height) {
+            return;
+        }
+        if (device != nullptr && previous != nullptr && previous != HGDI_ERROR) {
+            SelectObject(device, previous);
+        }
+        if (device != nullptr) DeleteDC(device);
+        if (dib != nullptr) DeleteObject(dib);
+        device = nullptr;
+        dib = nullptr;
+        previous = nullptr;
+        pixels = nullptr;
+        width = 0U;
+        height = 0U;
+
+        BITMAPINFO info = bitmap_info(requested_width, requested_height);
+        dib = CreateDIBSection(nullptr, &info, DIB_RGB_COLORS,
+                               &pixels, nullptr, 0U);
+        device = dib == nullptr ? nullptr : CreateCompatibleDC(nullptr);
+        previous = device == nullptr ? nullptr : SelectObject(device, dib);
+        if (pixels == nullptr || previous == nullptr || previous == HGDI_ERROR) {
+            if (device != nullptr) DeleteDC(device);
+            if (dib != nullptr) DeleteObject(dib);
+            device = nullptr;
+            dib = nullptr;
+            previous = nullptr;
+            pixels = nullptr;
+            throw std::runtime_error("native surface staging allocation failed");
+        }
+        width = requested_width;
+        height = requested_height;
+    }
+};
+
+thread_local CaptureStaging capture_staging;
 
 BITMAPINFO bitmap_info(std::uint32_t width, std::uint32_t height) {
     BITMAPINFO info{};
@@ -130,10 +218,13 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
                           CapturedSurface& output) {
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(source) : nullptr;
-    HDC device = window_surface ? GetDC(window) : reinterpret_cast<HDC>(source);
+    auto& compatibility = compatibility_user32();
+    HDC device = window_surface ? compatibility.get_dc(window) :
+                                  reinterpret_cast<HDC>(source);
     if (device == nullptr) throw std::invalid_argument("surface has no device context");
     RECT bounds{};
-    bool have_bounds = window_surface ? GetClientRect(window, &bounds) != 0 :
+    bool have_bounds = window_surface ?
+        compatibility.get_client_rect(window, &bounds) != 0 :
                                         GetClipBox(device, &bounds) != ERROR;
     if (!have_bounds || bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
         bounds = {0, 0, GetDeviceCaps(device, HORZRES), GetDeviceCaps(device, VERTRES)};
@@ -141,11 +232,11 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
     const std::int64_t width64 = static_cast<std::int64_t>(bounds.right) - bounds.left;
     const std::int64_t height64 = static_cast<std::int64_t>(bounds.bottom) - bounds.top;
     if (width64 <= 0 || height64 <= 0) {
-        if (window_surface) ReleaseDC(window, device);
+        if (window_surface) compatibility.release_dc(window, device);
         throw std::invalid_argument("native surface has empty bounds");
     }
     if (width64 > Bitmap::maximum_dimension || height64 > Bitmap::maximum_dimension) {
-        if (window_surface) ReleaseDC(window, device);
+        if (window_surface) compatibility.release_dc(window, device);
         throw std::length_error("native surface exceeds bitmap limits");
     }
     const auto width = static_cast<std::uint32_t>(width64);
@@ -160,7 +251,14 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
     const bool ok = previous != nullptr && previous != HGDI_ERROR &&
         BitBlt(memory, 0, 0, static_cast<int>(width), static_cast<int>(height),
                device, bounds.left, bounds.top, SRCCOPY | CAPTUREBLT) != 0;
-    if (window_surface) ReleaseDC(window, device);
+    if (std::getenv("GUI_DRAWING_TRACE_NATIVE_SURFACES") != nullptr && !ok) {
+        std::fprintf(stderr,
+                     "gui-drawing-native-surface=capture-failed|kind:%u|size:%ux%u|dc:%p|dib:%p|memory:%p|previous:%p|error:%lu\n",
+                     kind, width, height, static_cast<void*>(device),
+                     static_cast<void*>(dib), static_cast<void*>(memory),
+                     previous, static_cast<unsigned long>(GetLastError()));
+    }
+    if (window_surface) compatibility.release_dc(window, device);
     if (!ok) {
         if (memory != nullptr && previous != nullptr && previous != HGDI_ERROR) {
             SelectObject(memory, previous);
@@ -189,17 +287,113 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
     return GD_OK;
 }
 
+gd_result refresh_surface(std::uintptr_t source, std::uint32_t kind,
+                          Bitmap& bitmap, RectF& output_bounds) {
+    const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
+    const HWND window = window_surface ? reinterpret_cast<HWND>(source) : nullptr;
+    auto& compatibility = compatibility_user32();
+    HDC source_device = window_surface ? compatibility.get_dc(window) :
+                                         reinterpret_cast<HDC>(source);
+    if (source_device == nullptr) {
+        throw std::invalid_argument("surface has no device context");
+    }
+    RECT bounds{};
+    bool have_bounds = window_surface ?
+        compatibility.get_client_rect(window, &bounds) != 0 :
+                                        GetClipBox(source_device, &bounds) != ERROR;
+    if (!have_bounds || bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
+        bounds = {0, 0, GetDeviceCaps(source_device, HORZRES),
+                        GetDeviceCaps(source_device, VERTRES)};
+    }
+    const auto width = static_cast<std::uint32_t>(bounds.right - bounds.left);
+    const auto height = static_cast<std::uint32_t>(bounds.bottom - bounds.top);
+    if (width == 0U || height == 0U ||
+        width != bitmap.width() || height != bitmap.height()) {
+        if (window_surface) compatibility.release_dc(window, source_device);
+        throw std::invalid_argument("native surface dimensions changed");
+    }
+
+    try {
+        capture_staging.ensure(width, height);
+        if (BitBlt(capture_staging.device, 0, 0,
+                   static_cast<int>(width), static_cast<int>(height),
+                   source_device, bounds.left, bounds.top,
+                   SRCCOPY | CAPTUREBLT) == 0) {
+            throw std::runtime_error("BitBlt failed");
+        }
+        BitmapLockView lock = bitmap.lock(BitmapLockMode::write);
+        try {
+            const auto packed_row_bytes = static_cast<std::size_t>(width) * 4U;
+            const auto* source_bytes = static_cast<const std::byte*>(capture_staging.pixels);
+            for (std::uint32_t y = 0; y < height; ++y) {
+                auto* destination = lock.writable_data +
+                    static_cast<std::size_t>(y) * lock.row_bytes;
+                std::memcpy(destination,
+                            source_bytes + static_cast<std::size_t>(y) * packed_row_bytes,
+                            packed_row_bytes);
+                auto* row = reinterpret_cast<std::uint8_t*>(destination);
+                for (std::uint32_t x = 0; x < width; ++x) {
+                    row[x * 4U + 3U] = 255U;
+                }
+            }
+        } catch (...) {
+            bitmap.unlock(lock.token);
+            throw;
+        }
+        bitmap.unlock(lock.token);
+    } catch (...) {
+        if (window_surface) compatibility.release_dc(window, source_device);
+        throw;
+    }
+    if (window_surface) compatibility.release_dc(window, source_device);
+    output_bounds = {static_cast<double>(bounds.left),
+                     static_cast<double>(bounds.top),
+                     static_cast<double>(width),
+                     static_cast<double>(height)};
+    return GD_OK;
+}
+
+gd_result publish_retained_surface(std::uintptr_t destination,
+                                   std::uint32_t kind, Bitmap& bitmap) {
+    const HWND window = kind == GD_NATIVE_SURFACE_HWND
+        ? reinterpret_cast<HWND>(destination)
+        : WindowFromDC(reinterpret_cast<HDC>(destination));
+    if (window == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
+    const HMODULE forms = GetModuleHandleW(L"gui_forms_abi0.dll");
+    if (forms == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
+    using Submit = int (__cdecl*)(std::uintptr_t, std::uint32_t, std::uint32_t,
+                                  std::uint64_t, const void*);
+    const auto submit = reinterpret_cast<Submit>(GetProcAddress(
+        forms, "gf_windows_paint_endpoint_submit_bgra_v1"));
+    if (submit == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
+    const ImageSnapshot snapshot = bitmap.snapshot();
+    if (snapshot.pixel_format != PixelFormat::bgra32_premultiplied) {
+        return GD_ERROR_UNSUPPORTED_VERSION;
+    }
+    return submit(reinterpret_cast<std::uintptr_t>(window),
+                  snapshot.width, snapshot.height, snapshot.row_bytes(),
+                  snapshot.pixels().data()) == 0
+        ? GD_OK : GD_ERROR_UNSUPPORTED_VERSION;
+}
+
 gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
                           Bitmap& bitmap) {
     const ImageSnapshot snapshot = bitmap.snapshot();
-    std::vector<std::byte> converted(snapshot.pixels().size());
-    copy_as_bgra(snapshot, converted.data());
+    std::vector<std::byte> converted;
+    const void* pixels = snapshot.pixels().data();
+    if (snapshot.pixel_format == PixelFormat::rgba32_premultiplied) {
+        converted.resize(snapshot.pixels().size());
+        copy_as_bgra(snapshot, converted.data());
+        pixels = converted.data();
+    }
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(destination) : nullptr;
-    HDC device = window_surface ? GetDC(window) : reinterpret_cast<HDC>(destination);
+    auto& compatibility = compatibility_user32();
+    HDC device = window_surface ? compatibility.get_dc(window) :
+                                  reinterpret_cast<HDC>(destination);
     if (device == nullptr) throw std::invalid_argument("surface has no device context");
     RECT bounds{};
-    if (window_surface) GetClientRect(window, &bounds);
+    if (window_surface) compatibility.get_client_rect(window, &bounds);
     else if (GetClipBox(device, &bounds) == ERROR) bounds = {};
     const int width = bounds.right > bounds.left ? bounds.right - bounds.left :
                                                       static_cast<int>(snapshot.width);
@@ -208,8 +402,8 @@ gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
     BITMAPINFO info = bitmap_info(snapshot.width, snapshot.height);
     const int copied = StretchDIBits(device, bounds.left, bounds.top, width, height,
                                      0, 0, snapshot.width, snapshot.height,
-                                     converted.data(), &info, DIB_RGB_COLORS, SRCCOPY);
-    if (window_surface) ReleaseDC(window, device);
+                                     pixels, &info, DIB_RGB_COLORS, SRCCOPY);
+    if (window_surface) compatibility.release_dc(window, device);
     if (copied == static_cast<int>(GDI_ERROR)) {
         throw std::runtime_error("StretchDIBits failed");
     }

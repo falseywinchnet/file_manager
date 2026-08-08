@@ -29,6 +29,8 @@ enum class DisplayOperation : std::uint8_t {
     fill_linear_gradient_spread = 15,
     draw_image_region = 16,
     fill_image_pattern = 17,
+    draw_image_region_sampled = 18,
+    draw_live_surface = 19,
 };
 
 struct DisplayCommand final {
@@ -39,12 +41,14 @@ struct DisplayCommand final {
     Color color{};
     FontSpec font{};
     ImageId image{};
+    std::shared_ptr<LiveSurface> live_surface;
     double scalar{};
     double secondary_scalar{};
     double tertiary_scalar{};
     std::vector<GradientStop> gradient_stops;
     GradientSpreadMode gradient_spread{GradientSpreadMode::pad};
     ImagePatternWrap image_pattern_wrap{ImagePatternWrap::tile};
+    ImageSampling image_sampling{ImageSampling::linear};
     std::string text;
 };
 
@@ -103,8 +107,13 @@ public:
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
+    void draw_live_surface(std::shared_ptr<LiveSurface> surface,
+                           Rect destination, double opacity) override;
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
+    void draw_image_region_sampled(ImageId image, Rect source,
+                                   Rect destination, ImageSampling sampling,
+                                   double opacity) override;
     void fill_image_pattern(ImageId image, Size source_pixel_size,
                             Rect destination, Size logical_tile_size,
                             ImagePatternWrap wrap, double opacity) override;

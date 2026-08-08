@@ -83,12 +83,15 @@ internal static class Program
         PreloadDefaultRuntimeSupport(Path.GetFullPath(args[6]));
 
         var probe = Environment.GetEnvironmentVariable("GUI_FORMS_LOAD_PROBE_METHOD");
+        var referenceProbe = Environment.GetEnvironmentVariable(
+            "GUI_FORMS_LOAD_PROBE_REFERENCES");
         var context = new FacadeLoadContext(
             extractDirectory, Path.GetFullPath(args[2]), Path.GetFullPath(args[3]),
             Path.GetFullPath(args[4]), Path.GetFullPath(args[5]),
             Path.GetFullPath(args[6]), Path.GetFullPath(args[7]),
             Path.GetFullPath(args[8]),
-            isCollectible: !string.IsNullOrWhiteSpace(probe));
+            isCollectible: !string.IsNullOrWhiteSpace(probe) ||
+                !string.IsNullOrWhiteSpace(referenceProbe));
         var entryPath = Path.Combine(extractDirectory,
             Path.GetFileNameWithoutExtension(bundlePath) + ".dll");
         if (!File.Exists(entryPath))
@@ -98,6 +101,12 @@ internal static class Program
         if (!string.IsNullOrWhiteSpace(probe))
         {
             IlSiteProbe.Write(context, extractDirectory, probe);
+            context.Unload();
+            return 0;
+        }
+        if (!string.IsNullOrWhiteSpace(referenceProbe))
+        {
+            IlSiteProbe.WriteReferences(context, extractDirectory, referenceProbe);
             context.Unload();
             return 0;
         }

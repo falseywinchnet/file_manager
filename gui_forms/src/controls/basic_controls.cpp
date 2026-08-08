@@ -536,7 +536,7 @@ void PictureBox::set_image(ImageId image) {
     }
     image_ = image;
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    image_changed_.emit(image_);
+    publish_change(image_changed_, image_);
 }
 
 void PictureBox::clear_image() {
@@ -729,8 +729,16 @@ void Label::set_text(std::string text) {
         return;
     }
     text_ = std::move(text);
-    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    text_changed_.emit(text_);
+    // Text only changes retained geometry when this label is content-sized.
+    // Fixed labels are a common high-rate telemetry surface; making every text
+    // update a measure request needlessly invalidates every layout ancestor.
+    const Rect requested = requested_bounds();
+    Dirty effects = Dirty::paint | Dirty::semantics | Dirty::accessibility;
+    if (auto_size() || requested.width <= 0.0 || requested.height <= 0.0) {
+        effects |= Dirty::measure | Dirty::arrange;
+    }
+    invalidate(effects);
+    publish_change(text_changed_, text_);
 }
 
 FontSpec Label::font() const noexcept {
@@ -999,7 +1007,7 @@ void ButtonBase::set_text(std::string text) {
     }
     text_ = std::move(text);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-    text_changed_.emit(text_);
+    publish_change(text_changed_, text_);
 }
 
 void ButtonBase::set_font(FontSpec font) {
@@ -1566,7 +1574,7 @@ void Button::set_dialog_result(DialogResult result) {
     if (dialog_result_ == result) return;
     dialog_result_ = result;
     invalidate(Dirty::semantics);
-    dialog_result_changed_.emit(dialog_result_);
+    publish_change(dialog_result_changed_, dialog_result_);
 }
 
 void Button::assign_cancel_dialog_result() {
@@ -1700,12 +1708,12 @@ void CheckBox::set_check_state(CheckState state) {
     const bool previous_checked = checked();
     check_state_ = state;
     invalidate(Dirty::paint | Dirty::semantics);
-    check_state_changed_.emit(check_state_);
+    publish_change(check_state_changed_, check_state_);
     if (!is_alive()) {
         return;
     }
     if (previous_checked != checked()) {
-        checked_changed_.emit(checked());
+        publish_change(checked_changed_, checked());
     }
 }
 
@@ -1888,7 +1896,7 @@ void RadioButton::set_checked_without_exclusion(bool checked_value) {
     }
     checked_ = checked_value;
     invalidate(Dirty::paint | Dirty::semantics);
-    checked_changed_.emit(checked_);
+    publish_change(checked_changed_, checked_);
 }
 
 void RadioButton::set_checked(bool checked_value) {

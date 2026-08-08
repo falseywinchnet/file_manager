@@ -22,6 +22,7 @@ extern "C" {
 
 /* Experimental GUI.Drawing ABI. Nothing in this header is a 1.0 promise. */
 #define GD_ABI_VERSION_0_1 UINT32_C(0x00000001)
+#define GD_ABI_VERSION_0_2 UINT32_C(0x00000002)
 
 typedef struct gd_handle {
     uint32_t slot;
@@ -182,6 +183,21 @@ typedef struct gd_bitmap_lock_view {
     uint32_t pixel_format;
     uint64_t token;
 } gd_bitmap_lock_view;
+
+typedef struct gd_bitmap_edit_view {
+    const void* data;
+    void* writable_data;
+    uint64_t row_bytes;
+    gd_rect_i bounds;
+    uint32_t pixel_format;
+    uint64_t token;
+} gd_bitmap_edit_view;
+
+typedef struct gd_bitmap_damage_summary {
+    uint64_t from_generation;
+    uint64_t to_generation;
+    uint32_t history_complete;
+} gd_bitmap_damage_summary;
 
 typedef struct gd_error_view {
     uint32_t code;
@@ -413,6 +429,22 @@ typedef struct gd_api_v0 {
     gd_result (*recorder_execute_from)(gd_handle recorder, gd_handle bitmap,
                                        uint64_t first_command,
                                        uint64_t* commands_executed);
+    /* M12-P26 transactional rectangular edit and multi-consumer damage query. */
+    gd_result (*bitmap_edit_begin)(gd_handle bitmap, gd_rect_i bounds,
+                                   gd_bitmap_edit_view* view);
+    gd_result (*bitmap_edit_commit)(gd_handle bitmap, uint64_t token,
+                                    uint64_t* generation);
+    gd_result (*bitmap_edit_cancel)(gd_handle bitmap, uint64_t token);
+    gd_result (*bitmap_changes_since)(gd_handle bitmap, uint64_t generation,
+                                      gd_rect_i* rectangles, uint64_t capacity,
+                                      uint64_t* required_count,
+                                      gd_bitmap_damage_summary* summary);
+    /* M12-P27 refreshes an existing bitmap from a borrowed native surface. */
+    gd_result (*native_surface_refresh)(uintptr_t surface, uint32_t kind,
+                                        gd_handle bitmap, gd_rect* bounds);
+    /* M12-P27 submits a coherent frame directly to a retained host endpoint. */
+    gd_result (*native_surface_publish_retained)(uintptr_t surface, uint32_t kind,
+                                                 gd_handle bitmap);
 } gd_api_v0;
 
 /*

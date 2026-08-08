@@ -765,9 +765,10 @@ Progress through M6b:
 
 Progress through M6c:
 
-- **OBSERVED:** `Control` now provides nested initialization scopes that retain
-  synchronous property events while coalescing declared control/subtree
-  invalidation into one outer completion.
+- **OBSERVED:** `Control` provides nested initialization scopes. M12-P27 closes
+  construction-time native re-entry: stock state events coalesce by event
+  identity and publish final payloads only after the outer dirty commit;
+  focus/capture/input are revoked or blocked until that commit.
 - **OBSERVED:** retained tree attachment binds the complete subtree before
   parent-first hooks; detachment unbinds the complete subtree before child-first
   hooks. Throwing attachment rolls back bindings and stable IDs, and lifecycle
@@ -1169,6 +1170,87 @@ Capture-0 measurement pulled forward after the bounded Windows host round:
   nested-member services, multiple selection, DML, and managed projection
   remain. Evidence:
   `experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
+- **MEASURED PARTIAL M12-P22 / nullable, culture, nested services, and atomic
+  owners:** property payload kind is retained independently from null; bounded
+  unique standard values can be exclusive; and each converter registry owns a
+  validated culture/separator context without process-global locale. Nested
+  object members carry their own payload/enum/standard/converter/editor schema
+  through every projected edit path. PropertyGrid multiple selection projects
+  compatible common properties, preflights every owner, restores prior owners
+  on rejection, and publishes once after success. Getter output is
+  schema-checked. Focused binding/inspection gates pass. Dynamic standard-value
+  providers, mixed-value editor visuals, DML, managed projection, modal/path/
+  date/duration editors, and full portability closure remain. Evidence:
+  `experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md`.
+- **MEASURED PARTIAL M12-P23 / managed PropertyGrid ABI 0.22:** the additive
+  C table creates native PropertyGrid and projects bounded same-thread control
+  selection, sort, and refresh. The generator explicitly emits PropertyGrid,
+  PropertySort, SelectedObject(s), and selection/sort events; generated build,
+  1,104-row verifier, managed behavior smoke, C/C++ ABI tests, and the 63-test
+  native suite pass. Arbitrary TypeDescriptor objects are rejected without
+  replacing selection until typed converter/reset/editor callbacks can be
+  carried honestly. Win64 builds and the managed PropertyGrid smoke passes
+  under Wine; the callback channel remains.
+  Evidence: `experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md`.
+- **MEASURED PARTIAL M12-P24 / managed TypeDescriptor ABI 0.23:** a nonvisual
+  foreign-object proxy deep-copies bounded descriptor/enum/standard metadata
+  and projects nullable scalar/text/Color/enum values through synchronous
+  getter/setter/reset/serialization/change and TypeConverter format/parse
+  callbacks. The generated PropertyGrid now accepts ordinary TypeDescriptor and
+  ICustomTypeDescriptor objects, preserves prior selection on adapter failure,
+  and delegates converted and reset commits to the native rollback-safe
+  multiple-owner transaction. C11 callback tests, the 1,104-row generated
+  verifier, host .NET behavior, the 63-test native suite, renderer-free ABI
+  tests, Win64, and Wine pass. UITypeEditor drop-down/modal services, dynamic
+  standards, mixed-value visuals, nested arbitrary managed objects, specialized
+  date/path/resource editors, DML, and public GridItem/value-change projection
+  remain. Evidence:
+  `experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md`.
+- **MEASURED PARTIAL M12-P25 / managed UITypeEditor ABI 0.24:** foreign
+  property definitions append an optional editor callback without breaking the
+  ABI 0.23 record prefix. The native PropertyEditorRegistry installs a real
+  retained value/editor Button, and activation calls the managed UITypeEditor
+  with a bounded ITypeDescriptorContext and IWindowsFormsEditorService.
+  DropDownControl owns an anchored blocking Control host with CloseDropDown;
+  ShowDialog owns a modal Form. Both return a typed value through the existing
+  rollback-safe multiple-owner setter transaction. Nested-loop lifetime is
+  revalidated before projection callbacks resume. Native C11, the 1,104-row
+  verifier, 0-warning managed build, host .NET behavior, the 63-test suite,
+  renderer-free ABI tests, Win64, and Wine pass. Dynamic standards, mixed-value
+  visuals, component editors, nested arbitrary managed objects, specialized
+  date/path/resource editors, DML, and public GridItem/value-change projection
+  remain. Evidence:
+  `experiments/M12P25_MANAGED_UI_TYPE_EDITOR_ABI_0_24.md`.
+- **MEASURED PARTIAL M12-P26 / editable raster canvas and color truth:**
+  GUI.Drawing `Bitmap` now supports one exclusive bounded edit lease with
+  explicit commit/cancel, byte-derived damage, no-op generation stability,
+  immutable prior snapshots, and a bounded multi-consumer `changes_since`
+  history. Experimental Drawing ABI 0.2 appends those operations while
+  preserving negotiable ABI 0.1 prefixes. `ImageRegistry` can patch one raw
+  BGRA rectangle atomically, `Control::invalidate(Rect)` retains exact local
+  host damage, and public `RasterCanvas` maps bitmap generations into retained
+  zoom/pan, nearest/linear sampling, transparency presentation, RGBA/BGRA
+  normalization, and deterministic resource retirement. GUI.Drawing also
+  owns checked IEC sRGB transfer, linear sRGB↔XYZ D65, OKLab/OKLCH, unclamped
+  gamut status, and deterministic chroma-only sRGB mapping. The 64-test full
+  native suite, five focused renderer-free gates, C11 ABI tests, Skia and
+  CoreGraphics builds, renderer audits, and strict Win64 cross-build pass.
+  Renderer-side partial cache upload, pressure samples, the detailed owned
+  Color dialog, ICC policy, and profile-explicit CMYK remain open. Evidence:
+  `experiments/M12P26_EDITABLE_RASTER_CANVAS_AND_COLOR_TRUTH.md`.
+- **MEASURED PARTIAL M12-P27 / initialization mutation ownership and Dock
+  order:** native `Control` now defers and coalesces stock state publications
+  during nested initialization, drains them after invalidation in stable order,
+  abandons them on disposal, and suppresses routed interaction while partial.
+  Focus cleanup no longer synchronously invokes application virtual/event
+  callbacks from `BeginInit`. Default Dock consumes reverse public z-order in
+  the native core while public index zero, paint, hit test, and bring/send retain
+  one coherent topmost model. Focused lifecycle/layout gates and the full
+  native and renderer-free suites, focused ASan/UBSan gates, and strict Win64
+  cross-build pass. An earlier parallel AppKit wake timing miss passed on
+  immediate isolated rerun and the rebuilt full follow-up. Aggregate old/new
+  payload semantics and independent .NET 10 geometry traces remain open. Evidence:
+  `experiments/M12P27_INITIALIZATION_OWNERSHIP_AND_DOCK_ORDER.md`.
 - **MEASURED PARTIAL M11h / FM-LY05:** the public retained control library now
   owns split-pane geometry and input rather than leaving it to a consumer:
   stable panel/seam identities, distinct thin paint and enlarged hit target,

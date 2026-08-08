@@ -34,6 +34,7 @@ class HostServices;
 class HostSession;
 class BindingSource;
 class BindingContext;
+class LiveSurface;
 namespace detail {
 class PopupAttachment;
 class AcceleratorAttachment;
@@ -91,6 +92,17 @@ struct PresentationSettings final {
     bool sound_enabled{true};
     friend constexpr bool operator==(const PresentationSettings&,
                                      const PresentationSettings&) = default;
+};
+
+// A newest-generation live layer is compositor work, not a retained-control
+// repaint. The producer owns pixel publication; Window owns stable geometry;
+// the host consumes these immutable placement snapshots without replaying the
+// control tree.
+struct LiveSurfacePresentation final {
+    RuntimeId control{};
+    std::shared_ptr<LiveSurface> surface;
+    Rect destination{};
+    Rect clip{};
 };
 
 enum class PaintLeaseState : std::uint8_t {
@@ -329,6 +341,11 @@ public:
     void notify_presented(std::uint64_t duration_nanoseconds = 0U);
     [[nodiscard]] PaintLeaseSnapshot paint_lease_snapshot() const noexcept;
 
+    [[nodiscard]] bool queue_live_surface_presentation(
+        const Control::Ptr& control, std::shared_ptr<LiveSurface> surface);
+    [[nodiscard]] std::vector<LiveSurfacePresentation>
+        take_live_surface_presentations();
+
     [[nodiscard]] DamageRegion take_damage();
     [[nodiscard]] DamageRegion take_damage(PaintPlane plane);
     [[nodiscard]] bool needs_frame() const noexcept;
@@ -382,6 +399,15 @@ public:
         ImageId image, std::uint32_t width, std::uint32_t height,
         std::uint64_t row_bytes, std::span<const std::byte> pixels,
         Control& consumer);
+    [[nodiscard]] ImageLoadResult update_bgra32_premultiplied(
+        ImageId image, std::uint32_t width, std::uint32_t height,
+        std::uint64_t row_bytes, std::span<const std::byte> pixels,
+        Control& consumer);
+    [[nodiscard]] ImageLoadResult patch_bgra32_premultiplied(
+        ImageId image, std::uint32_t x, std::uint32_t y,
+        std::uint32_t width, std::uint32_t height,
+        std::uint64_t source_row_bytes, std::span<const std::byte> pixels,
+        Control& consumer, Rect local_damage);
     [[nodiscard]] bool remove_image(ImageId image);
     [[nodiscard]] const ImageRegistry& image_resources() const noexcept {
         return image_resources_;
@@ -496,6 +522,9 @@ private:
     void revoke_interaction_for_subtree(const Control::Ptr& control,
                                         bool notify_focus);
     void close_focus_scopes_for_subtree(const Control::Ptr& control);
+    bool end_focus_scope(
+        FocusScopeId scope, FocusScopeCloseReason reason,
+        const Control::Ptr& notification_owner);
     void revoke_focus_scopes_for_subtree(const Control::Ptr& control) noexcept;
     void close_popups_for_subtree(const Control::Ptr& control) noexcept;
     void close_popup(detail::PopupAttachment& popup) noexcept;
@@ -518,6 +547,7 @@ private:
     void register_subtree(const Control::Ptr& control);
     void unregister_subtree(const Control::Ptr& control);
     void mark_dirty(Control& control, Dirty dirty);
+    void mark_paint_dirty(Control& control, Rect local_damage);
     void mark_subtree_dirty(Control& control, Dirty dirty);
     void mark_child_layout_slot(Control& control);
     void change_paint_plane(Control& control, PaintPlane plane);
@@ -652,6 +682,8 @@ private:
     std::uint64_t drag_session_id_{};
     DragEffect drag_last_accepted_effect_{DragEffect::none};
     std::array<DamageRegion, paint_plane_count> plane_damage_;
+    std::unordered_map<std::uint64_t, LiveSurfacePresentation>
+        live_surface_presentations_;
     Metrics metrics_;
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};

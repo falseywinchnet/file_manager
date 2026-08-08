@@ -156,6 +156,71 @@ private:
     bool known_{};
 };
 
+// Explicit color-space values used by editors and image applications. sRGB
+// means IEC 61966-2-1 transfer/primaries with D65; XYZ values are normalized
+// so reference white Y is 1. Alpha is always straight and normalized.
+struct LinearSrgb final {
+    double red{};
+    double green{};
+    double blue{};
+    double alpha{1.0};
+    friend constexpr bool operator==(const LinearSrgb&,
+                                     const LinearSrgb&) = default;
+};
+
+struct XyzD65 final {
+    double x{};
+    double y{};
+    double z{};
+    double alpha{1.0};
+    friend constexpr bool operator==(const XyzD65&, const XyzD65&) = default;
+};
+
+struct Oklab final {
+    double lightness{};
+    double a{};
+    double b{};
+    double alpha{1.0};
+    friend constexpr bool operator==(const Oklab&, const Oklab&) = default;
+};
+
+struct Oklch final {
+    double lightness{};
+    double chroma{};
+    double hue_degrees{};
+    double alpha{1.0};
+    friend constexpr bool operator==(const Oklch&, const Oklch&) = default;
+};
+
+struct SrgbConversion final {
+    Color color;
+    LinearSrgb unclamped;
+    bool in_gamut{};
+    bool clipped{};
+};
+
+struct OklchGamutMapping final {
+    Oklch requested;
+    Oklch mapped;
+    SrgbConversion srgb;
+};
+
+[[nodiscard]] LinearSrgb srgb_to_linear(Color color);
+[[nodiscard]] SrgbConversion linear_to_srgb(LinearSrgb color);
+[[nodiscard]] XyzD65 linear_srgb_to_xyz_d65(LinearSrgb color);
+[[nodiscard]] LinearSrgb xyz_d65_to_linear_srgb(XyzD65 color);
+[[nodiscard]] Oklab linear_srgb_to_oklab(LinearSrgb color);
+[[nodiscard]] LinearSrgb oklab_to_linear_srgb(Oklab color);
+[[nodiscard]] Oklab xyz_d65_to_oklab(XyzD65 color);
+[[nodiscard]] XyzD65 oklab_to_xyz_d65(Oklab color);
+[[nodiscard]] Oklch oklab_to_oklch(Oklab color);
+[[nodiscard]] Oklab oklch_to_oklab(Oklch color);
+[[nodiscard]] SrgbConversion oklch_to_srgb(Oklch color);
+// Reduces OKLCH chroma only, preserving lightness, hue, and alpha. The mapped
+// value is deterministic to 24 binary-search iterations and reports both the
+// requested and committed colors so a dialog can disclose gamut mapping.
+[[nodiscard]] OklchGamutMapping map_oklch_to_srgb_gamut(Oklch color);
+
 struct SystemPalette final {
     Color control{Color::from_rgb(240, 240, 240)};
     Color control_light{Color::from_rgb(255, 255, 255)};
@@ -565,10 +630,37 @@ struct BitmapLockView final {
     std::uint64_t token{};
 };
 
+/*
+ * A bounded writable lease over one bitmap rectangle.  The pointer addresses
+ * the rectangle's top-left pixel while row_bytes remains the bitmap stride.
+ * Callers must commit or cancel exactly once.  Cancel restores the leased
+ * rectangle byte-for-byte; commit derives conservative bounded damage from
+ * the pixels whose bytes actually changed.
+ */
+struct BitmapEditView final {
+    const std::byte* data{};
+    std::byte* writable_data{};
+    std::size_t row_bytes{};
+    RectI bounds{};
+    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
+    std::uint64_t token{};
+};
+
+struct BitmapDamageSnapshot final {
+    std::uint64_t from_generation{};
+    std::uint64_t to_generation{};
+    bool history_complete{true};
+    std::vector<RectI> rectangles;
+
+    [[nodiscard]] bool empty() const noexcept { return rectangles.empty(); }
+};
+
 class Bitmap final : public DrawingObject {
 public:
     static constexpr std::uint32_t maximum_dimension = 32768;
     static constexpr std::uint64_t maximum_bytes = 256ULL * 1024ULL * 1024ULL;
+    static constexpr std::size_t maximum_damage_rectangles = 256;
+    static constexpr std::size_t maximum_damage_history = 256;
 
     Bitmap(std::uint32_t width, std::uint32_t height,
            PixelFormat pixel_format = PixelFormat::bgra32_premultiplied);
@@ -589,6 +681,11 @@ public:
     [[nodiscard]] BitmapLockView lock(BitmapLockMode mode);
     void unlock(std::uint64_t token);
     [[nodiscard]] bool locked() const;
+    [[nodiscard]] BitmapEditView begin_edit(RectI bounds);
+    [[nodiscard]] std::uint64_t commit_edit(std::uint64_t token);
+    void cancel_edit(std::uint64_t token);
+    [[nodiscard]] BitmapDamageSnapshot changes_since(
+        std::uint64_t generation) const;
     [[nodiscard]] ImageSnapshot snapshot() const;
 
 protected:
@@ -597,8 +694,15 @@ protected:
 private:
     void require_unlocked() const;
     void require_coordinate(std::uint32_t x, std::uint32_t y) const;
+    void require_edit_token(std::uint64_t token) const;
     void prepare_write();
-    void publish_mutation();
+    void publish_mutation(std::vector<RectI> damage);
+    void finish_edit() noexcept;
+
+    struct DamageRecord final {
+        std::uint64_t generation{};
+        std::vector<RectI> rectangles;
+    };
 
     std::shared_ptr<PixelStorage> storage_;
     std::uint64_t stable_id_{};
@@ -606,6 +710,10 @@ private:
     std::uint64_t next_lock_token_{1};
     std::uint64_t active_lock_token_{};
     BitmapLockMode lock_mode_{BitmapLockMode::read};
+    bool active_edit_{};
+    RectI active_edit_bounds_{};
+    std::vector<std::byte> active_edit_backup_;
+    std::vector<DamageRecord> damage_history_;
 };
 
 class TextureBrush final : public Brush {

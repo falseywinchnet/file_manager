@@ -40,7 +40,7 @@ pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract> 
             major: 1,
             minor: 0,
         }),
-        "orchestrator.frontend.bootstrap" => Some(SupportedContract {
+        "orchestrator.frontend.bootstrap" | "orchestrator.search" => Some(SupportedContract {
             id: "ORC-FE-001",
             major: 1,
             minor: 0,
@@ -103,8 +103,8 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-ENG-004",
         name: "Catalogue-independent bounded live filesystem search",
         provider: "engine",
-        stage: ContractStage::Negotiating,
-        executable: false,
+        stage: ContractStage::FixtureDraft,
+        executable: true,
     },
     ContractDescriptor {
         id: "ORC-KOL-001",

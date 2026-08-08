@@ -1,7 +1,7 @@
 # Orchestrator conformance and versioning constitution
 
-Status: **macOS Core 1.0 bootstrap and independent C++ source-client conformance
-active; other platform projections and later-family codec/IDL work remain open**.
+Status: **macOS Core 1.0 bootstrap and independent C++ source-client conformant;
+other platform projections and later-family codec/IDL work remain open**.
 
 ## Independent version namespaces
 
@@ -26,8 +26,8 @@ selects semantics unknown to the peer.
 
 Orchestrator Core 1.0 is a release/readiness profile over named compatible
 contract versions, not an exception to this rule. Its executable release
-manifest remains `development` until every requirement in
-[`CORE_1_0_RELEASE.md`](CORE_1_0_RELEASE.md) passes.
+manifest reports `ready` only because every requirement in
+[`CORE_1_0_RELEASE.md`](CORE_1_0_RELEASE.md) now passes.
 
 ADR-010 starts the stable Core bootstrap, structured CLI, and installed local
 wire namespaces at 1.0 on the first macOS artifact. Pre-release 0.1 peers are

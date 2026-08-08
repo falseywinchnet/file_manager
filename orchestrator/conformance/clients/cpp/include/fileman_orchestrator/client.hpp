@@ -133,6 +133,8 @@ struct RoutingInfo {
 struct ServiceControlsInfo {
     bool shutdown_eligible{};
     bool restart_eligible{};
+    std::string restart_strategy;
+    std::string restart_effect;
     std::string diagnostics_state;
     std::optional<std::string> diagnostics_locator;
 };
@@ -189,6 +191,13 @@ struct BootstrapSnapshot {
     [[nodiscard]] bool orchestrator_gate_ready() const noexcept;
 };
 
+struct SearchPageInfo {
+    std::string terminal;
+    std::string source;
+    bool complete{};
+    std::vector<std::string> names;
+};
+
 class Client final {
 public:
     static Client connect(const std::filesystem::path& runtime_directory,
@@ -208,6 +217,7 @@ public:
     [[nodiscard]] std::vector<ContractInfo> contracts();
     [[nodiscard]] std::vector<AvailabilityInfo> availability();
     [[nodiscard]] BootstrapSnapshot bootstrap();
+    [[nodiscard]] SearchPageInfo search(std::string root_id, std::string text);
     void shutdown();
 
 private:
@@ -217,7 +227,9 @@ private:
     [[nodiscard]] std::string call(std::string_view method,
                                    std::string_view contract_id,
                                    std::uint16_t contract_major,
-                                   std::uint16_t contract_minor);
+                                   std::uint16_t contract_minor,
+                                   std::string_view params_json = "{}",
+                                   bool allow_partial = false);
 
     int socket_{-1};
     std::uint64_t next_request_id_{1};

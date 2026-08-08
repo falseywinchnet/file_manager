@@ -153,7 +153,7 @@ void TreeView::set_selected_id(std::string_view id) {
     selected_id_ = next;
     if (!next.empty()) active_id_ = next;
     invalidate(Dirty::paint | Dirty::semantics);
-    selection_changed_.emit(change);
+    publish_change(selection_changed_, change);
 }
 
 bool TreeView::expanded(std::string_view id) const {
@@ -178,7 +178,8 @@ void TreeView::set_expanded(std::string_view id, bool value) {
     item.expanded = value;
     rebuild_visible();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
-    expansion_changed_.emit({item.stable_id, value});
+    publish_change(expansion_changed_,
+                   TreeExpansionChange{item.stable_id, value});
     if (selected_descendant && is_alive()) set_selected_id(item.stable_id);
 }
 
@@ -616,7 +617,7 @@ void ObjectView::set_items(std::vector<ObjectViewItem> items) {
         change.current_id = selected_id_;
         change.previous_ids = retained_selection;
         change.current_ids = selected_ids_;
-        selection_changed_.emit(change);
+        publish_change(selection_changed_, change);
     }
 }
 
@@ -750,7 +751,7 @@ void ObjectView::apply_selection(std::vector<std::string> ids,
     change.previous_ids = previous_ids;
     change.current_ids = selected_ids_;
     invalidate(Dirty::paint | Dirty::semantics);
-    selection_changed_.emit(change);
+    publish_change(selection_changed_, change);
 }
 
 std::vector<std::string> ObjectView::range_selection(
@@ -1360,10 +1361,12 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     if (selection_change.previous_id != selected_id_) {
-        selection_changed_.emit({selection_change.previous_id, selected_id_});
+        publish_change(selection_changed_, CorrespondenceSelectionChange{
+            selection_change.previous_id, selected_id_});
     }
     if (pin_change.previous_id != pinned_id_) {
-        pin_changed_.emit({pin_change.previous_id, pinned_id_});
+        publish_change(pin_changed_, CorrespondencePinChange{
+            pin_change.previous_id, pinned_id_});
     }
 }
 
@@ -1378,7 +1381,7 @@ void CorrespondenceView::set_selected_id(std::string_view stable_id) {
     CorrespondenceSelectionChange change{selected_id_, next};
     selected_id_ = next;
     invalidate(Dirty::paint | Dirty::semantics);
-    selection_changed_.emit(change);
+    publish_change(selection_changed_, change);
 }
 
 bool CorrespondenceView::expanded(std::string_view stable_id) const {
@@ -1394,8 +1397,8 @@ void CorrespondenceView::emit_expansion_delta(
     std::string_view stable_id, bool before, bool after,
     CorrespondenceExpansionReason reason) {
     if (stable_id.empty() || before == after || !is_alive()) return;
-    expansion_changed_.emit({std::string(stable_id), after,
-                             stable_id == pinned_id_, reason});
+    publish_change(expansion_changed_, CorrespondenceExpansionChange{
+        std::string(stable_id), after, stable_id == pinned_id_, reason});
 }
 
 void CorrespondenceView::set_pinned_id(std::string_view stable_id) {
@@ -1425,7 +1428,8 @@ void CorrespondenceView::set_pinned_id(std::string_view stable_id) {
     restore_anchor(anchor);
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
-    pin_changed_.emit({previous, pinned_id_});
+    publish_change(pin_changed_,
+                   CorrespondencePinChange{previous, pinned_id_});
     if (!previous.empty()) {
         emit_expansion_delta(previous, previous_before, expanded(previous),
                              CorrespondenceExpansionReason::pin);

@@ -10,6 +10,11 @@ Date: 2026-08-05.
 Companion surface:
 [`frontend-concept-atlas.html`](frontend-concept-atlas.html), state `07 DNA`.
 
+**Superseding owner correction (2026-08-07):** path editing now lives inline in
+one vertically dense continuous chevron breadcrumb cascade. The terminal
+pull-down/full-path matrix is no longer authoritative as the edit surface. See
+[`../OWNER_DIRECTION_2026-08-07.md`](../OWNER_DIRECTION_2026-08-07.md).
+
 Latest owner verdicts:
 [`DESIGN_DNA_VERDICTS_007.md`](DESIGN_DNA_VERDICTS_007.md).
 
@@ -228,7 +233,7 @@ default. “Gate/debt” names what still prevents closure.
 | DNA-F04 | outer keyline | CANDIDATE | one dark keyline states the window boundary | test high contrast and dark host desktops |
 | DNA-F05 | window corner | CANDIDATE | small 3–4 px optical softening; internal role edges remain crisp | current values not scale-derived |
 | DNA-F06 | frame shadow | CANDIDATE | shadow only proves window overlap; no ambient glow | measure legibility on varied wallpapers |
-| DNA-F07 | popup shadow | CANDIDATE | deeper than window internals, proportional to actual overlap | path matrix is current specimen |
+| DNA-F07 | popup shadow | CANDIDATE | deeper than window internals, proportional to actual overlap | menus and suggestions are current specimens |
 | DNA-F08 | z-order vocabulary | HYPOTHESIS | keyline → local occlusion → cast shadow maps increasing layer | incomplete dialog/menu specimens |
 
 ### Ribbon and commands
@@ -254,11 +259,11 @@ default. “Gate/debt” names what still prevents closure.
 |---|---|---|---|---|
 | DNA-N01 | back/forward/up | GIVEN | stable leading navigation cluster | forward disabled state missing |
 | DNA-N02 | path/search separation | GIVEN | address and query are adjacent but independently bounded | narrow-window behavior unresolved |
-| DNA-N03 | terminal `./` position | GIVEN | terminal action at end of path well | icon/text accessible name required |
-| DNA-N04 | full-root matrix | GIVEN | overlay exposes current full root and a user-configurable recent count defaulting to 5 full stacks | preference bounds and overflow behavior unresolved |
-| DNA-N05 | path editing | GIVEN | terminal-like editor accepts canonical paths and safe conveniences, previews the resolved canonical destination, then navigates explicitly | platform expansion syntax and invalid-resolution treatment need specimens |
-| DNA-N06 | breadcrumb segments | CANDIDATE | tangible text segments navigate immediately | truncation and network roots unresolved |
-| DNA-N07 | repeated roots | GIVEN | accepted exception because each recent row is independently parseable | rows must stay skimmable at depth |
+| DNA-N03 | inline edit operator | GIVEN | first-order action lives inside the ordinary path trail and preserves its retained identity | icon/text accessible name required |
+| DNA-N04 | recent full trails | CANDIDATE | may survive behind a separate history affordance; never owns path editing | necessity, count, placement and overflow unresolved |
+| DNA-N05 | path editing | GIVEN | inline terminal-like editor accepts canonical paths and safe conveniences, previews the resolved canonical destination, then navigates explicitly | platform expansion syntax and invalid-resolution treatment need specimens |
+| DNA-N06 | breadcrumb segments | GIVEN | vertically dense continuous chevron cascade navigates immediately; not unrelated rectangular buttons | truncation, network roots and chevron hit geometry unresolved |
+| DNA-N07 | repeated roots | CANDIDATE | permitted only if a separate recent-trail history surface survives | must prove independent value without visual repetition |
 | DNA-N08 | tree root mode | GIVEN | Home-rooted default with honest immediate Volumes mode | retained-state behavior after first launch unresolved |
 | DNA-N09 | search scope suffix | GIVEN | scope is always stated in the query well | scope-change interaction unresolved |
 | DNA-N10 | navigation chassis | GIVEN | subtle graphite identifies wayfinding machinery below ribbon | current texture is a visual candidate |

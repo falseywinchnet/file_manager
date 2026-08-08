@@ -1,7 +1,7 @@
 # Orchestrator conformance corpus
 
-Status: **macOS Core 1.0 bootstrap/wire corpus executable; other platforms and
-installed launchd lifecycle pending**.
+Status: **macOS Core 1.0 bootstrap/wire/installed-launchd corpus conformant;
+other platforms remain open**.
 
 `fixtures/bootstrap/` contains canonical JSON request/response examples for
 version, Core 1.0 release readiness, status, incompatible contract versions,
@@ -57,7 +57,11 @@ other-platform cases remain open rather than being implied by these results.
 The adopted-listener and activation fixtures exercise ADR-011's persistent
 supervisor socket, stale discovery, credential rotation, and bounded
 rediscovery without mutating launchd state. `launchd-plist` output passes
-`plutil`; a real installed LaunchAgent lifecycle remains the macOS release gate.
+`plutil`; the separately recorded installed trial covers activation, shutdown,
+bounded reactivation, fresh identity, bootout, and removal.
+The measured environment, artifact hashes, negative results, and lifecycle
+observations are retained in
+[`evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md`](evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md).
 
 Endpoint fixtures additionally reject symlink publication files and
 noncanonical modes. Stdio fixtures send a record larger than one MiB and invalid

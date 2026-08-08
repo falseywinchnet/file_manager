@@ -515,6 +515,19 @@ ParsedResponse parse_successful_response(const std::string_view response,
     return parsed;
 }
 
+ParsedResponse parse_search_response(const std::string_view response,
+                                     const std::string_view expected_id) {
+    ParsedResponse parsed{JsonParser(response).parse()};
+    const auto& root = object(parsed.root, "response");
+    if (string(field(root, "id"), "response.id") != expected_id) fail("response id does not match request");
+    const auto& status = string(field(root, "status"), "response.status");
+    if (status != "success" && status != "partial") {
+        const auto& error = object(field(root, "error"), "response.error");
+        fail("Orchestrator returned " + status + ": " + string(field(error, "message"), "error.message"));
+    }
+    return parsed;
+}
+
 std::uint16_t narrow_u16(const std::uint64_t value, const std::string_view context) {
     if (value > std::numeric_limits<std::uint16_t>::max()) fail(std::string(context) + " exceeds uint16");
     return static_cast<std::uint16_t>(value);
@@ -820,7 +833,9 @@ const SessionInfo& Client::session() const noexcept { return session_; }
 std::string Client::call(const std::string_view method,
                          const std::string_view contract_id,
                          const std::uint16_t contract_major,
-                         const std::uint16_t contract_minor) {
+                         const std::uint16_t contract_minor,
+                         const std::string_view params_json,
+                         const bool allow_partial) {
     if (socket_ < 0) fail("local session is closed");
     const auto request_id = "cpp-" + std::to_string(next_request_id_++);
     const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -832,12 +847,37 @@ std::string Client::call(const std::string_view method,
                          json_escape(contract_id) + ",\"major\":" +
                          std::to_string(contract_major) + ",\"minor\":" +
                          std::to_string(contract_minor) + "},\"deadline_unix_ms\":" +
-                         std::to_string(deadline) + ",\"params\":{}}";
+                         std::to_string(deadline) + ",\"params\":" + std::string(params_json) + "}";
     write_frame(socket_, request);
     auto response = read_frame(socket_);
-    auto parsed = parse_successful_response(response, request_id);
+    auto parsed = allow_partial ? parse_search_response(response, request_id)
+                                : parse_successful_response(response, request_id);
     (void)parsed;
     return response;
+}
+
+SearchPageInfo Client::search(std::string root_id, std::string text) {
+    const auto params = "{\"query_id\":\"cpp-live\",\"root_id\":" + json_escape(root_id) +
+                        ",\"descendants\":true,\"text\":" + json_escape(text) +
+                        ",\"budget\":{\"max_results\":128,\"max_visited_entries\":10000,"
+                        "\"max_stat_calls\":4096,\"max_wall_time_ms\":1000,"
+                        "\"max_open_directories\":8,\"max_response_bytes\":131072}}";
+    const auto response = call("orchestrator.search", "ORC-FE-001", 1, 0, params, true);
+    auto parsed = parse_search_response(response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "search result");
+    const auto& response_root = object(parsed.root, "search response");
+    SearchPageInfo page{
+        string(field(response_root, "status"), "search.status"),
+        string(field(result, "source"), "search.source"),
+        boolean(field(result, "complete"), "search.complete"),
+        {},
+    };
+    for (const auto& item : array(field(result, "results"), "search.results")) {
+        const auto& record = object(item, "search result record");
+        const auto& metadata = object(field(record, "metadata"), "search result metadata");
+        page.names.push_back(string(field(metadata, "name"), "search result name"));
+    }
+    return page;
 }
 
 VersionInfo Client::version() {
@@ -939,6 +979,9 @@ BootstrapSnapshot Client::bootstrap() {
         {
             boolean(field(controls, "shutdown_eligible"), "bootstrap.controls.shutdown"),
             boolean(field(controls, "restart_eligible"), "bootstrap.controls.restart"),
+            string(field(controls, "restart_strategy"),
+                   "bootstrap.controls.restart_strategy"),
+            string(field(controls, "restart_effect"), "bootstrap.controls.restart_effect"),
             string(field(controls, "diagnostics_state"), "bootstrap.controls.diagnostics_state"),
             optional_string(field(controls, "diagnostics_locator"),
                             "bootstrap.controls.diagnostics_locator"),
@@ -1006,6 +1049,14 @@ BootstrapSnapshot Client::bootstrap() {
                                         snapshot.availability.end(), [](const auto& item) {
         return item.id == "gui_forms.consumption_manifest";
     });
+    const bool supervisor_restart_available =
+        snapshot.service_controls.restart_eligible &&
+        snapshot.service_controls.restart_strategy == "shutdown_then_supervisor_reactivate" &&
+        snapshot.service_controls.restart_effect == "new_instance_and_lifecycle_generation";
+    const bool supervisor_restart_unavailable =
+        !snapshot.service_controls.restart_eligible &&
+        snapshot.service_controls.restart_strategy == "unavailable" &&
+        snapshot.service_controls.restart_effect == "none";
     if (snapshot.frontend_opening.orchestrator_gate.authority != "orchestrator" ||
         (snapshot.frontend_opening.orchestrator_gate.satisfied &&
          (!snapshot.frontend_opening.orchestrator_gate.blockers.empty() ||
@@ -1020,8 +1071,12 @@ BootstrapSnapshot Client::bootstrap() {
         snapshot.frontend_opening.gui_forms_gate.satisfied !=
             std::optional<bool>{gui_forms->state == "available"} ||
         snapshot.frontend_opening.architect_direction_gate.authority != "grand_architect" ||
-        snapshot.frontend_opening.architect_direction_gate.state != "not_reported" ||
-        snapshot.frontend_opening.architect_direction_gate.satisfied.has_value() ||
+        snapshot.frontend_opening.architect_direction_gate.state != "recorded" ||
+        snapshot.frontend_opening.architect_direction_gate.satisfied !=
+            std::optional<bool>{true} ||
+        (!supervisor_restart_available && !supervisor_restart_unavailable) ||
+        snapshot.frontend_opening.orchestrator_gate.satisfied !=
+            supervisor_restart_available ||
         !snapshot.frontend_opening.policy.live_snapshot_required ||
         snapshot.frontend_opening.policy.separately_gated_provider_absence_blocks_opening ||
         snapshot.frontend_opening.policy.stale_snapshot_authority != "display_only") {
@@ -1043,7 +1098,10 @@ bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept {
         snapshot.kind != "immutable" ||
         snapshot.lifecycle_generation != session.lifecycle_generation ||
         routing.normal_integration_route != "orchestrator" ||
-        !routing.direct_engine_fallback.registered_route) {
+        !routing.direct_engine_fallback.registered_route ||
+        !service_controls.restart_eligible ||
+        service_controls.restart_strategy != "shutdown_then_supervisor_reactivate" ||
+        service_controls.restart_effect != "new_instance_and_lifecycle_generation") {
         return false;
     }
     for (const auto& required : release.required_contracts) {
@@ -1090,9 +1148,10 @@ StatusInfo Client::status() { throw ClientError("unsupported platform"); }
 std::vector<ContractInfo> Client::contracts() { throw ClientError("unsupported platform"); }
 std::vector<AvailabilityInfo> Client::availability() { throw ClientError("unsupported platform"); }
 BootstrapSnapshot Client::bootstrap() { throw ClientError("unsupported platform"); }
+SearchPageInfo Client::search(std::string, std::string) { throw ClientError("unsupported platform"); }
 bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept { return false; }
 void Client::shutdown() { throw ClientError("unsupported platform"); }
-std::string Client::call(std::string_view, std::string_view, std::uint16_t, std::uint16_t) {
+std::string Client::call(std::string_view, std::string_view, std::uint16_t, std::uint16_t, std::string_view, bool) {
     throw ClientError("unsupported platform");
 }
 

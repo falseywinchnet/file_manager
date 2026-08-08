@@ -1,6 +1,6 @@
 # ADR-011: Orchestrator macOS launchd activation
 
-Status: **accepted for implementation; installed-artifact evidence pending**.
+Status: **accepted and implemented; installed-artifact evidence passed**.
 
 Date: 2026-08-05.
 
@@ -114,9 +114,25 @@ installed major because existing 1.x clients embed the default. The launchd
 adapter can be replaced behind `UnixEndpoint::adopt` without changing framing or
 semantic contracts.
 
-## Remaining release gate
+## Installed release evidence — 2026-08-07
 
-Build an installed-path artifact, create the private leaf, bootstrap the
-generated LaunchAgent, verify first-use activation/status/shutdown/reactivation,
-then boot it out and remove only the test artifact. Core must remain
-`development` until that real launchd lifecycle passes.
+- **MEASURED:** on macOS 14.8.7 arm64, a release-built artifact installed at a
+  disposable user-private path bootstrapped the generated per-user LaunchAgent,
+  activated from the stable socket, authenticated status, shut down cleanly,
+  reactivated within the five-second client bound, published a distinct
+  instance identity, shut
+  down again, booted out, and removed only its test artifacts.
+- **OBSERVED negative result retained:** the first real trial exposed trailing
+  NUL padding in launchd's inherited `sockaddr_un` pathname. The adapter now
+  accepts only the exact expected bytes followed solely by NUL padding, then
+  still validates filesystem socket type, owner, and `0600` mode.
+- **OBSERVED negative result retained:** launchd's default ten-second throttle
+  violated the accepted five-second reconnect bound after shutdown. The
+  generated plist now declares a one-second `ThrottleInterval`; measured
+  reactivation is within the bound.
+- **OBSERVED:** bootout removed the supervisor job/socket and exact cleanup
+  removed the disposable plist, binary, credentials, discovery record, and
+  empty private directories. No persistent service was left installed.
+
+This closes ADR-011's Core 1.0 release gate. Windows and Linux retain their own
+supervisor decisions and evidence.

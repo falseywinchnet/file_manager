@@ -586,8 +586,8 @@ std::shared_ptr<CriteriaSurfacePanel> make_criteria_surface(ProductRefs& refs) {
     objects->set_accessible_name("Criteria virtual folder objects");
     objects->set_margin({});
     objects->set_dock(DockStyle::fill);
-    results->add_child(objects);
     results->add_child(virtual_label);
+    results->add_child(objects);
     surface->results = results;
     surface->add_child(results);
     refs.criteria_objects = objects;
@@ -821,14 +821,14 @@ std::shared_ptr<Panel> make_tree_pane(ProductRefs& refs) {
     tree->set_selected_id("fm.tree.node.projects");
     refs.tree = tree;
     tree->set_dock(DockStyle::fill);
-    pane->add_child(tree);
-    // Dock layout follows WinForms z-order: the trailing/topmost child claims
-    // its edge before the earlier fill child receives the remainder.
+    // Dock consumes reverse public z-order: add edge reservations behind the
+    // Fill child so they claim their space before Fill receives the remainder.
     auto caption = label("fm.tree.caption", "FOLDERS   ·   HOME-ROOTED", {7, 4, 204, 27},
                          {FontRole::control, 8.5, 700, false, .28});
     caption->set_margin({});
     caption->set_dock(DockStyle::top);
     pane->add_child(caption);
+    pane->add_child(tree);
     return pane;
 }
 
@@ -902,8 +902,8 @@ std::shared_ptr<Panel> make_selection_pane(ProductRefs& refs) {
         }},
     });
     refs.properties = properties;
-    pane->add_child(properties);
     pane->add_child(caption);
+    pane->add_child(properties);
     return pane;
 }
 

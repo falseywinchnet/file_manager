@@ -291,7 +291,7 @@ void ContainerControl::set_auto_validate(AutoValidate value) {
     }
     if (auto_validate_ == value) return;
     auto_validate_ = value;
-    auto_validate_changed_.emit(value);
+    publish_change(auto_validate_changed_, value);
 }
 
 bool ContainerControl::validate(bool check_auto_validate) {
@@ -331,7 +331,7 @@ void UserControl::on_attached_to_window() {
     attached_ = true;
     if (!loaded_) {
         loaded_ = true;
-        loaded_event_.emit();
+        publish_change(loaded_event_);
     }
 }
 
@@ -1274,7 +1274,7 @@ void TabControl::add_page(std::shared_ptr<TabPage> page) {
         selected_page_ = page;
         page->set_visible(true);
         const TabSelectionChange change{std::nullopt, 0U};
-        selected_index_changed_.emit(change);
+        publish_change(selected_index_changed_, change);
     }
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
@@ -1313,7 +1313,7 @@ std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
                Dirty::hit_test | Dirty::semantics);
     if (old_selected != new_selected || removing_selected) {
         const TabSelectionChange change{old_selected, new_selected};
-        selected_index_changed_.emit(change);
+        publish_change(selected_index_changed_, change);
     }
     return std::dynamic_pointer_cast<TabPage>(removed);
 }
@@ -1373,7 +1373,7 @@ void TabControl::set_selected_index(std::size_t index) {
                Dirty::semantics);
     restore_page_focus(live[index], selection_owned_focus);
     const TabSelectionChange change{old_index, index};
-    selected_index_changed_.emit(change);
+    publish_change(selected_index_changed_, change);
 }
 
 void TabControl::set_selected_tab(const std::shared_ptr<TabPage>& page) {
@@ -1855,7 +1855,7 @@ void SplitContainer::set_first_collapsed(bool collapsed,
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_,
                                   SplitChangeReason::collapse, origin};
-    splitter_changed_.emit(change);
+    publish_change(splitter_changed_, change);
 }
 
 void SplitContainer::set_second_collapsed(bool collapsed,
@@ -1891,7 +1891,7 @@ void SplitContainer::set_second_collapsed(bool collapsed,
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_,
                                   SplitChangeReason::collapse, origin};
-    splitter_changed_.emit(change);
+    publish_change(splitter_changed_, change);
 }
 
 void SplitContainer::set_splitter_fixed(bool fixed) {
@@ -2000,7 +2000,7 @@ void SplitContainer::arrange(Rect final_bounds) {
     if (old != effective_distance_) {
         const SplitChangeEvent change{old, effective_distance_,
                                       SplitChangeReason::container_resize};
-        splitter_changed_.emit(change);
+        publish_change(splitter_changed_, change);
     }
 }
 
@@ -2227,7 +2227,7 @@ void SplitContainer::set_distance(double distance, SplitChangeReason reason) {
     if (old == effective_distance_) return;
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_, reason};
-    splitter_changed_.emit(change);
+    publish_change(splitter_changed_, change);
 }
 
 void SplitContainer::transfer_focus_from(

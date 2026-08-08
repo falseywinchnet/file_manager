@@ -638,11 +638,34 @@ void Control::define_bindable_property(BindableProperty property) {
     }
     if (!validate_utf8(descriptor.converter_name).valid() ||
         !validate_utf8(descriptor.editor_name).valid() ||
+        !validate_utf8(descriptor.standard_values_provider_name).valid() ||
         descriptor.converter_name.size() > 256U ||
-        descriptor.editor_name.size() > 256U) {
+        descriptor.editor_name.size() > 256U ||
+        descriptor.standard_values_provider_name.size() > 256U) {
         throw std::invalid_argument(
             "GUI.Forms property service names must be bounded valid UTF-8");
     }
+    if (descriptor.standard_values.size() > maximum_property_standard_values ||
+        (descriptor.standard_values_exclusive &&
+         descriptor.standard_values.empty() &&
+         descriptor.standard_values_provider_name.empty())) {
+        throw std::invalid_argument(
+            "GUI.Forms property standard-value contract is invalid or unbounded");
+    }
+    std::vector<BindingValue> normalized_standard_values;
+    normalized_standard_values.reserve(descriptor.standard_values.size());
+    for (const BindingValue& standard : descriptor.standard_values) {
+        const auto converted = convert_property_value(standard, descriptor);
+        if (!converted ||
+            std::find(normalized_standard_values.begin(),
+                      normalized_standard_values.end(), *converted) !=
+                normalized_standard_values.end()) {
+            throw std::invalid_argument(
+                "GUI.Forms property standard values must be unique and convertible");
+        }
+        normalized_standard_values.push_back(*converted);
+    }
+    descriptor.standard_values = std::move(normalized_standard_values);
     if (descriptor.readable && !property.get) {
         throw std::invalid_argument(
             "GUI.Forms readable property requires a getter");
@@ -681,6 +704,11 @@ void Control::define_bindable_property(BindableProperty property) {
     // Derived stock controls may replace a base descriptor when they own a
     // more specific implementation of the same canonical property.
     bindable_properties_.insert_or_assign(canonical, std::move(property));
+}
+
+void Control::clear_bindable_properties() {
+    require_mutable();
+    bindable_properties_.clear();
 }
 
 const BindableProperty* Control::find_bindable_property(
@@ -735,7 +763,15 @@ std::optional<BindingValue> Control::property_value(std::string_view name) const
         return std::nullopt;
     }
     const auto getter = found->second.get;
-    return getter();
+    const BindingValue value = getter();
+    const auto normalized = convert_property_value(
+        value, found->second.descriptor);
+    if (!normalized || !valid_property_value_tree(*normalized)) {
+        throw std::logic_error(
+            "GUI.Forms property getter violated its declared schema: " +
+            found->second.descriptor.name);
+    }
+    return normalized;
 }
 
 void Control::set_property_value(std::string_view name, BindingValue value) {
@@ -865,7 +901,7 @@ void Control::set_name(std::string name) {
     if (name_ == name) return;
     name_ = std::move(name);
     invalidate(Dirty::semantics | Dirty::accessibility);
-    name_changed_.emit(name_);
+    publish_change(name_changed_, name_);
 }
 
 void Control::set_style(ControlStyles style, bool enabled) {
@@ -1311,7 +1347,7 @@ void Control::set_auto_size(bool auto_size) {
     anchor_reference_.reset();
     invalidate(Dirty::measure | Dirty::arrange | Dirty::hit_test |
                Dirty::semantics | Dirty::accessibility);
-    auto_size_changed_.emit(auto_size_);
+    publish_change(auto_size_changed_, auto_size_);
 }
 
 void Control::set_auto_size_mode(AutoSizeMode mode) {
@@ -1522,7 +1558,7 @@ void Control::set_visible(bool visible) {
     invalidate_subtree(invalidation::visibility);
     if (window_) window_->publish_control_availability(*this);
     if (!is_alive()) return;
-    visible_changed_.emit(visible_);
+    publish_change(visible_changed_, visible_);
 }
 
 void Control::set_enabled(bool enabled) {
@@ -1540,7 +1576,7 @@ void Control::set_enabled(bool enabled) {
     invalidate_declared(invalidation::enabled);
     if (window_) window_->publish_control_availability(*this);
     if (!is_alive()) return;
-    enabled_changed_.emit(enabled_);
+    publish_change(enabled_changed_, enabled_);
 }
 
 void Control::set_focusable(bool focusable) {
@@ -1562,7 +1598,7 @@ void Control::set_causes_validation(bool causes_validation) {
     require_mutable();
     if (causes_validation_ == causes_validation) return;
     causes_validation_ = causes_validation;
-    causes_validation_changed_.emit(causes_validation_);
+    publish_change(causes_validation_changed_, causes_validation_);
 }
 
 bool Control::perform_validation(Control* destination, bool bulk) {
@@ -1676,7 +1712,8 @@ bool Control::effectively_enabled() const noexcept {
 }
 
 bool Control::eligible_for_input() const noexcept {
-    return window_ != nullptr && effectively_visible() && effectively_enabled();
+    return window_ != nullptr && !initialization_blocked() &&
+           effectively_visible() && effectively_enabled();
 }
 
 void Control::set_pointer_capture(bool captured) {
@@ -1750,6 +1787,29 @@ void Control::invalidate(Dirty requested_dirty) {
     }
 }
 
+void Control::invalidate(Rect local_damage) {
+    require_mutable();
+    if (!local_damage.finite()) {
+        throw std::invalid_argument("local paint damage must be finite");
+    }
+    local_damage = Rect::intersection(local_damage, client_rectangle());
+    if (local_damage.empty()) return;
+    if (initialization_depth_ != 0) {
+        pending_initialization_dirty_ |= Dirty::paint;
+        return;
+    }
+    if (window_) {
+        window_->mark_paint_dirty(*this, local_damage);
+        return;
+    }
+    dirty_ |= Dirty::paint;
+    for (Control* current = this; current != nullptr;) {
+        current->subtree_dirty_ |= Dirty::paint;
+        const auto visual_parent = current->parent_.lock();
+        current = visual_parent.get();
+    }
+}
+
 void Control::invalidate_subtree(Dirty requested_dirty) {
     require_mutable();
     if (requested_dirty == Dirty::none) {
@@ -1816,6 +1876,30 @@ void Control::invalidate_declared(Dirty declared_effects) {
 void Control::begin_init() {
     require_mutable();
     ++initialization_depth_;
+    if (initialization_depth_ == 1U && window_ != nullptr) {
+        window_->on_eligibility_changed(shared_from_this());
+    }
+}
+
+void Control::publish_change(const void* event_key,
+                             std::function<void()> publication) {
+    if (!publication) return;
+    if (initialization_depth_ == 0) {
+        publication();
+        return;
+    }
+    const auto pending = std::find_if(
+        pending_initialization_changes_.begin(),
+        pending_initialization_changes_.end(),
+        [event_key](const DeferredInitializationChange& candidate) {
+            return candidate.event_key == event_key;
+        });
+    if (pending != pending_initialization_changes_.end()) {
+        pending->publication = std::move(publication);
+        return;
+    }
+    pending_initialization_changes_.push_back(
+        DeferredInitializationChange{event_key, std::move(publication)});
 }
 
 void Control::end_init() {
@@ -1837,6 +1921,22 @@ void Control::end_init() {
             invalidate(pending);
         }
     }
+    auto changes = std::exchange(pending_initialization_changes_, {});
+    for (std::size_t index = 0; index < changes.size(); ++index) {
+        if (!is_alive()) return;
+        changes[index].publication();
+        // A callback may deliberately begin a new initialization transaction.
+        // Do not deliver the previous transaction's remaining observers into
+        // that newly partial state; retain them in original order instead.
+        if (initialization_depth_ != 0) {
+            for (++index; index < changes.size(); ++index) {
+                publish_change(changes[index].event_key,
+                               std::move(changes[index].publication));
+            }
+            return;
+        }
+    }
+    if (!is_alive()) return;
     initialization_completed_.emit(pending, subtree);
 }
 
@@ -1892,11 +1992,11 @@ void Control::arrange(Rect final_bounds) {
         std::max(0.0, viewport.width - padding_.left - padding_.right),
         std::max(0.0, viewport.height - padding_.top - padding_.bottom)};
     Rect remaining = client;
-    // Child index zero is topmost. The vector stores that control last, so
-    // reverse traversal gives WinForms-style z-order-sensitive docking.
-    for (auto iterator = retained.rbegin(); iterator != retained.rend();
-         ++iterator) {
-        const Ptr& child = *iterator;
+    // The retained vector is painter order: backmost first, topmost last.
+    // Dock consumes that reverse public z-order (backmost to topmost), matching
+    // Forms semantics while leaving index zero consistently topmost for public
+    // child indexing, hit testing, BringToFront, and SendToBack.
+    for (const Ptr& child : retained) {
         if (!is_current_layout_child(child) || !child->visible_ ||
             child->dock_ == DockStyle::none) {
             continue;
@@ -2022,7 +2122,8 @@ void Control::on_key(KeyEvent&) {}
 void Control::on_key_bubble(KeyEvent&) {}
 void Control::on_text_input(TextInputEvent&) {}
 bool Control::process_mnemonic(char32_t character) {
-    if (!is_alive() || !effectively_visible() || !effectively_enabled()) {
+    if (!is_alive() || initialization_blocked() || !effectively_visible() ||
+        !effectively_enabled()) {
         return false;
     }
 
@@ -2067,7 +2168,8 @@ bool Control::process_mnemonic(char32_t character) {
 void Control::on_frame(FrameTime) {}
 
 bool Control::prepare_command_activation() {
-    if (!is_alive() || !effectively_visible() || !effectively_enabled()) {
+    if (!is_alive() || initialization_blocked() || !effectively_visible() ||
+        !effectively_enabled()) {
         return false;
     }
     return window_ == nullptr ||
@@ -2143,6 +2245,7 @@ void Control::on_focus_changed(bool) {}
 void Control::on_activate() {}
 void Control::on_attached_to_window() {}
 void Control::on_attachment_committed() noexcept {}
+void Control::on_detaching_from_window(Window&) noexcept {}
 void Control::on_detached_from_window() noexcept {}
 
 void Control::clear_dirty(Dirty cleared) noexcept {
@@ -2199,6 +2302,17 @@ std::uint64_t Control::subtree_size() const noexcept {
     return result;
 }
 
+bool Control::initialization_blocked() const noexcept {
+    const Control* current = this;
+    Ptr retained;
+    while (current != nullptr) {
+        if (current->initialization_depth_ != 0U) return true;
+        retained = current->parent_.lock();
+        current = retained.get();
+    }
+    return false;
+}
+
 void Control::require_mutable() const {
     if (!is_alive()) {
         throw std::logic_error("GUI.Forms cannot mutate a disposed control");
@@ -2226,6 +2340,7 @@ void Control::on_dispose() noexcept {
     initialization_depth_ = 0;
     pending_initialization_dirty_ = Dirty::none;
     pending_initialization_subtree_ = false;
+    pending_initialization_changes_.clear();
     tag_.reset();
     theme_override_.reset();
     provider_errors_.clear();

@@ -653,7 +653,7 @@ void DateTimePicker::set_value(DateTimeValue value) {
     if (value_ == value) return;
     value_ = value;
     invalidate(Dirty::paint | Dirty::semantics);
-    value_changed_.emit(value_);
+    publish_change(value_changed_, value_);
 }
 
 void DateTimePicker::set_range(DateTimeValue minimum, DateTimeValue maximum) {
@@ -671,7 +671,7 @@ void DateTimePicker::set_range(DateTimeValue minimum, DateTimeValue maximum) {
         close_drop_down();
     }
     invalidate(Dirty::paint | Dirty::semantics);
-    if (value_changes) value_changed_.emit(value_);
+    if (value_changes) publish_change(value_changed_, value_);
 }
 
 void DateTimePicker::set_format(DateTimePickerFormat format) {
@@ -724,7 +724,7 @@ void DateTimePicker::set_checked(bool checked) {
     if (checked_ == checked) return;
     checked_ = checked;
     invalidate(Dirty::paint | Dirty::semantics);
-    checked_changed_.emit(checked_);
+    publish_change(checked_changed_, checked_);
 }
 
 void DateTimePicker::set_show_up_down(bool show) {
@@ -943,7 +943,7 @@ void DateTimePicker::open_drop_down() {
     popup_scope_ = window()->begin_focus_scope(layer, calendar).value;
     dropped_down_ = true;
     invalidate(Dirty::paint | Dirty::semantics);
-    drop_down_changed_.emit(true);
+    publish_change(drop_down_changed_, true);
 }
 
 void DateTimePicker::close_drop_down() {
@@ -964,7 +964,7 @@ void DateTimePicker::close_drop_down() {
     dropped_down_ = false;
     closing_popup_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void DateTimePicker::on_popup_revoked() {
@@ -983,7 +983,7 @@ void DateTimePicker::on_popup_revoked() {
     const bool changed = dropped_down_;
     dropped_down_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void DateTimePicker::commit_popup_value(DateTimeValue value) {

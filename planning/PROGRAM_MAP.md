@@ -21,7 +21,7 @@ subproject's records and evidence gates.
 | Engine | `../engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
 | Kolmogrov | `../kolmogrov/` | Formal and empirical fixed-width perceptual-similarity program | Active independent research and conformance work |
 | Orchestrator | `../orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |
-| File Manager frontend | `../frontend/` | Visual C++ end-user program built on GUI.Forms and bootstrapped by Orchestrator | Frontend 001 waits for Orchestrator Core 1.0, GUI.Forms FM0 go-ahead, and explicit architect start direction |
+| File Manager frontend | `../frontend/` | Visual C++ end-user program built on GUI.Forms and bootstrapped by Orchestrator | Architect direction recorded 2026-08-07; Frontend 001 waits for Orchestrator Core 1.0 and GUI.Forms FM0 go-ahead |
 | Plugin Runtime research | `../plugin_runtime/` | Earlier containment and capability study | Frozen source material; implementation moves into Orchestrator's plugin-supervisor work |
 | Malkuth release program | `../malkuth/` | Suite manifest, public mission, documentation, installers, website and release acceptance | Planning open; implementation waits on dogfood/release-artifact gates |
 | Paint | `../paint/` | Future direct bitmap/clipart application | Architect interview and paper design open; implementation gated |

@@ -25,8 +25,9 @@ require experiments or further definition.
 - Single-click selects; double-click opens.
 - Filename extensions are optional as in classic Explorer. Inline rename always
   reveals the extension and selects only the basename by default.
-- Navigation uses breadcrumbs plus a terminal `./` control that turns the path
-  into editable text.
+- Navigation uses one vertically dense continuous chevron breadcrumb cascade.
+  Its first-order inline path-editing operator turns that same retained trail
+  into editable text without opening a separate path matrix.
 - Search has its own field to the right. The combined command/path/search field
   idea is deferred in favor of an unmistakable classic split.
 - A compact dynamic ribbon/control shelf is allowed when its structure is
@@ -37,12 +38,11 @@ require experiments or further definition.
 ## Navigation and organization
 
 - Home is the actual user home directory. Desktop is ordinarily navigable.
-- Clicking in the breadcrumb path opens a dropdown of recently used folder
-  trails. Each trail is itself rendered as breadcrumbs; any ancestor can be
-  clicked and drilled down, giving developer work several parallel recent
-  locality trees without tabs.
-- An editable path appears only through the terminal breadcrumb button or by
-  clicking the margin after the last breadcrumb.
+- The earlier pulled-down recent full-trail matrix is no longer authoritative
+  as the path editor. Whether full recent trails survive behind a separate
+  history affordance remains open; it may not displace the inline editor.
+- The inline editor preserves the breadcrumb row's identity and geometry and
+  supports canonical resolution, autocomplete, explicit commit, and cancel.
 - Search is scoped to the current folder subtree. It does not silently widen to
   the whole machine; this is intentionally classic Explorer behavior.
 - Instead of grouping, support explicit virtual criteria views. The proposed

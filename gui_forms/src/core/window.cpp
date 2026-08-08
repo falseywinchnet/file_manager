@@ -1,10 +1,14 @@
 #include "gui_forms/window.hpp"
+#include "gui_forms/live_surface.hpp"
 #include "dispatcher_state.hpp"
 #include "display_chunk.hpp"
 #include "frame_scheduler.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <functional>
 #include <stdexcept>
@@ -30,13 +34,14 @@ public:
     [[nodiscard]] Control::Ptr owner() const noexcept { return owner_.lock(); }
     [[nodiscard]] Control::Ptr popup() const noexcept { return popup_.lock(); }
     [[nodiscard]] Event<>& closed() noexcept { return closed_; }
-    void revoke() noexcept {
+    void revoke(bool publish_closed = true) noexcept {
         connected_ = false;
         window_ = nullptr;
-        closed_.emit();
+        if (publish_closed) closed_.emit();
         owner_.reset();
         popup_.reset();
     }
+    void publish_closed() { closed_.emit(); }
 
 private:
     Window* window_{};
@@ -299,6 +304,41 @@ ImageLoadResult Window::replace_bgra32_premultiplied(
     return result;
 }
 
+ImageLoadResult Window::update_bgra32_premultiplied(
+    ImageId image, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, std::span<const std::byte> pixels,
+    Control& consumer) {
+    require_ui_thread("scoped live BGRA resource update");
+    if (consumer.window_ != this) {
+        throw std::invalid_argument(
+            "scoped live BGRA update requires an attached consumer");
+    }
+    ImageLoadResult result = image_resources_.update_bgra32_premultiplied(
+        image, width, height, row_bytes, pixels);
+    if (result) {
+        mark_dirty(consumer, Dirty::paint | Dirty::semantics);
+    }
+    return result;
+}
+
+ImageLoadResult Window::patch_bgra32_premultiplied(
+    ImageId image, std::uint32_t x, std::uint32_t y,
+    std::uint32_t width, std::uint32_t height,
+    std::uint64_t source_row_bytes, std::span<const std::byte> pixels,
+    Control& consumer, Rect local_damage) {
+    require_ui_thread("scoped BGRA resource patch");
+    if (consumer.window_ != this) {
+        throw std::invalid_argument(
+            "scoped BGRA patch requires an attached consumer");
+    }
+    ImageLoadResult result = image_resources_.patch_bgra32_premultiplied(
+        image, x, y, width, height, source_row_bytes, pixels);
+    if (result) {
+        mark_paint_dirty(consumer, local_damage);
+    }
+    return result;
+}
+
 ImageLoadResult Window::replace_png(ImageId image,
                                     std::span<const std::byte> encoded,
                                     Control& consumer) {
@@ -427,8 +467,10 @@ void Window::close_popup(detail::PopupAttachment& popup) noexcept {
         popup.revoke();
         return;
     }
-    const Control::Ptr overlay = (*found)->popup();
-    (*found)->revoke();
+    const auto attachment = *found;
+    const Control::Ptr owner = attachment->owner();
+    const Control::Ptr overlay = attachment->popup();
+    attachment->revoke(false);
     popups_.erase(found);
     if (overlay && !overlay->parent() && overlay->window_ == this &&
         overlay != root_ && !in_lifecycle_notification_) {
@@ -436,6 +478,15 @@ void Window::close_popup(detail::PopupAttachment& popup) noexcept {
             detach_subtree(overlay);
         } catch (...) {
         }
+    }
+    const auto publish_closed = [attachment] {
+        attachment->publish_closed();
+    };
+    if (owner && owner->is_alive() && owner->window_ == this) {
+        owner->publish_change(
+            static_cast<const void*>(&attachment->closed()), publish_closed);
+    } else {
+        publish_closed();
     }
 }
 
@@ -814,6 +865,53 @@ PaintLeaseSnapshot Window::paint_lease_snapshot() const noexcept {
             paint_wakes_coalesced_, presentation_receipts_accepted_,
             presentation_receipts_rejected_, paint_wake_pending_,
             dirty_after_render_};
+}
+
+bool Window::queue_live_surface_presentation(
+    const Control::Ptr& control, std::shared_ptr<LiveSurface> surface) {
+    require_ui_thread("live-surface presentation");
+    if (!control || !surface || !control->is_alive() ||
+        control->window_ != this || !control->visible_ || occluded_ ||
+        !popups_.empty()) {
+        return false;
+    }
+
+    const Rect destination = absolute_bounds_of(*control);
+    Rect clip = Rect::intersection(
+        destination, {0.0, 0.0, client_size_.width, client_size_.height});
+    for (auto ancestor = control->parent(); ancestor && !clip.empty();
+         ancestor = ancestor->parent()) {
+        if (!ancestor->is_alive() || ancestor->window_ != this ||
+            !ancestor->visible_) {
+            return false;
+        }
+        const Rect ancestor_bounds = absolute_bounds_of(*ancestor);
+        const Rect viewport = ancestor->child_viewport_rectangle();
+        clip = Rect::intersection(
+            clip, {ancestor_bounds.x + viewport.x,
+                   ancestor_bounds.y + viewport.y,
+                   viewport.width, viewport.height});
+    }
+    if (destination.empty() || clip.empty()) return true;
+
+    live_surface_presentations_.insert_or_assign(
+        control->runtime_id().value,
+        LiveSurfacePresentation{
+            control->runtime_id(), std::move(surface), destination, clip});
+    return true;
+}
+
+std::vector<LiveSurfacePresentation>
+Window::take_live_surface_presentations() {
+    require_ui_thread("live-surface presentation drain");
+    std::vector<LiveSurfacePresentation> result;
+    result.reserve(live_surface_presentations_.size());
+    for (auto& [id, presentation] : live_surface_presentations_) {
+        static_cast<void>(id);
+        result.push_back(std::move(presentation));
+    }
+    live_surface_presentations_.clear();
+    return result;
 }
 
 void Window::set_paint_wake_handler(std::function<void()> wake) {
@@ -1196,23 +1294,35 @@ bool Window::request_focus(const Control::Ptr& control) {
     }
     if (previous) {
         focused_.reset();
-        metrics_.record_callback_emitted();
-        previous->on_focus_changed(false);
-        if (previous->is_alive()) previous->focus_observed_.emit(false);
-        if (previous->is_alive()) {
-            previous->invalidate(invalidation::focus);
-        }
+        previous->publish_change(
+            static_cast<const void*>(&previous->focus_observed_),
+            [this, previous] {
+                if (!previous->is_alive() || previous->window_ != this) return;
+                metrics_.record_callback_emitted();
+                previous->on_focus_changed(false);
+                if (previous->is_alive()) {
+                    previous->focus_observed_.emit(false);
+                }
+                if (previous->is_alive()) {
+                    previous->invalidate(invalidation::focus);
+                }
+            });
     }
     if (control && eligible(control) && control->focusable_) {
         focused_ = control;
-        metrics_.record_callback_emitted();
-        control->on_focus_changed(true);
-        if (control->is_alive()) control->focus_observed_.emit(true);
-        if (eligible(control)) {
-            control->invalidate(invalidation::focus);
-        } else {
-            focused_.reset();
-        }
+        control->publish_change(
+            static_cast<const void*>(&control->focus_observed_),
+            [this, control] {
+                if (!eligible(control)) return;
+                metrics_.record_callback_emitted();
+                control->on_focus_changed(true);
+                if (control->is_alive()) control->focus_observed_.emit(true);
+                if (eligible(control)) {
+                    control->invalidate(invalidation::focus);
+                } else {
+                    focused_.reset();
+                }
+            });
     }
     metrics_.record_focus_transition();
     return true;
@@ -1625,6 +1735,12 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
 
 bool Window::end_focus_scope(FocusScopeId scope,
                              FocusScopeCloseReason reason) {
+    return end_focus_scope(scope, reason, {});
+}
+
+bool Window::end_focus_scope(FocusScopeId scope,
+                             FocusScopeCloseReason reason,
+                             const Control::Ptr& notification_owner) {
     require_ui_thread("focus-scope exit");
     const auto found = std::find_if(
         focus_scopes_.begin(), focus_scopes_.end(),
@@ -1680,7 +1796,22 @@ bool Window::end_focus_scope(FocusScopeId scope,
     change.depth = depth;
     change.close_reason = reason;
     change.restored_focus = restored;
-    focus_scope_changed_.emit(change);
+    if (notification_owner && notification_owner->is_alive() &&
+        notification_owner->window_ == this) {
+        // Scope closure is an identity-bearing stream, not a scalar property.
+        // Preserve every nested scope transition rather than coalescing all
+        // Window scope notifications under one Event address.
+        const auto notification_key = std::make_shared<std::uint8_t>();
+        notification_owner->publish_change(
+            static_cast<const void*>(notification_key.get()),
+            [this, notification_owner, notification_key, change] {
+                if (!notification_owner->is_alive() ||
+                    notification_owner->window_ != this) return;
+                focus_scope_changed_.emit(change);
+            });
+    } else {
+        focus_scope_changed_.emit(change);
+    }
     return true;
 }
 
@@ -1801,7 +1932,18 @@ void Window::change_pointer_capture(const Control::Ptr& control,
     change.control_id = control ? control->runtime_id() : RuntimeId{};
     change.stable_id = control ? std::string(control->stable_id().value()) : std::string{};
     change.pointer_id = control ? pointer_id : 0;
-    pointer_capture_changed_.emit(change);
+    const Control::Ptr publication_owner = control ? control : previous;
+    if (publication_owner) {
+        publication_owner->publish_change(
+            static_cast<const void*>(&pointer_capture_changed_),
+            [this, publication_owner, change] {
+                if (!publication_owner->is_alive() ||
+                    publication_owner->window_ != this) return;
+                pointer_capture_changed_.emit(change);
+            });
+    } else {
+        pointer_capture_changed_.emit(change);
+    }
 }
 
 bool Window::dispatch_pointer(PointerEvent event) {
@@ -1822,7 +1964,8 @@ bool Window::dispatch_pointer(PointerEvent event) {
                 leave.handled = false;
                 metrics_.record_callback_emitted();
                 previous_hover->on_pointer(leave);
-                previous_hover->pointer_observed_.emit(leave);
+                previous_hover->publish_change(
+                    previous_hover->pointer_observed_, leave);
             }
             hovered_ = next_hover;
             if (next_hover && eligible(next_hover)) {
@@ -1833,7 +1976,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
                 enter.handled = false;
                 metrics_.record_callback_emitted();
                 next_hover->on_pointer(enter);
-                next_hover->pointer_observed_.emit(enter);
+                next_hover->publish_change(next_hover->pointer_observed_, enter);
             }
         }
     }
@@ -1895,7 +2038,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
         event.phase = EventPhase::target;
         metrics_.record_callback_emitted();
         target->on_pointer(event);
-        target->pointer_observed_.emit(event);
+        target->publish_change(target->pointer_observed_, event);
     }
     if (!event.handled) {
         event.phase = EventPhase::bubble;
@@ -2365,9 +2508,11 @@ void Window::detach_subtree(const Control::Ptr& control) {
     add_subtree_damage(control);
     unregister_subtree(control);
     std::vector<Control::Ptr> controls;
+    in_lifecycle_notification_ = true;
     std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
         current->lifecycle_notification_ = true;
         controls.push_back(current);
+        current->on_detaching_from_window(*this);
         current->window_ = nullptr;
         {
             std::scoped_lock lock(current->dispatcher_mutex_);
@@ -2378,7 +2523,6 @@ void Window::detach_subtree(const Control::Ptr& control) {
         }
     };
     detach(control);
-    in_lifecycle_notification_ = true;
     for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
         (*current)->on_detached_from_window();
         (*current)->lifecycle_notification_ = false;
@@ -2405,9 +2549,11 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
     add_subtree_damage(control);
     unregister_subtree(control);
     std::vector<Control::Ptr> controls;
+    in_lifecycle_notification_ = true;
     std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
         current->lifecycle_notification_ = true;
         controls.push_back(current);
+        current->on_detaching_from_window(*this);
         current->window_ = nullptr;
         {
             std::scoped_lock lock(current->dispatcher_mutex_);
@@ -2418,7 +2564,6 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
         }
     };
     detach(control);
-    in_lifecycle_notification_ = true;
     for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
         (*current)->on_detached_from_window();
         (*current)->lifecycle_notification_ = false;
@@ -2473,12 +2618,19 @@ void Window::revoke_interaction_for_subtree(const Control::Ptr& control,
         metrics_.record_focus_transition();
         metrics_.record_focus_revocation();
         if (notify_focus && focused && focused->is_alive()) {
-            metrics_.record_callback_emitted();
-            focused->on_focus_changed(false);
-            if (focused->is_alive()) focused->focus_observed_.emit(false);
-            if (focused->is_alive()) {
-                focused->invalidate(invalidation::focus);
-            }
+            focused->publish_change(
+                static_cast<const void*>(&focused->focus_observed_),
+                [this, focused] {
+                    if (!focused->is_alive() || focused->window_ != this) return;
+                    metrics_.record_callback_emitted();
+                    focused->on_focus_changed(false);
+                    if (focused->is_alive()) {
+                        focused->focus_observed_.emit(false);
+                    }
+                    if (focused->is_alive()) {
+                        focused->invalidate(invalidation::focus);
+                    }
+                });
         }
     }
     if (contains_control(control, captured_.lock())) {
@@ -2506,7 +2658,7 @@ void Window::close_focus_scopes_for_subtree(const Control::Ptr& control) {
     }
     for (FocusScopeId scope : closing) {
         static_cast<void>(end_focus_scope(
-            scope, FocusScopeCloseReason::owner_unavailable));
+            scope, FocusScopeCloseReason::owner_unavailable, control));
     }
 }
 
@@ -2555,7 +2707,13 @@ void Window::publish_control_availability(Control& control) {
     const ControlAvailabilityChange change{
         control.runtime_id(), std::string(control.stable_id().value()),
         control.effectively_visible(), control.effectively_enabled()};
-    control_availability_changed_.emit(change);
+    const auto retained = control.shared_from_this();
+    control.publish_change(
+        static_cast<const void*>(&control_availability_changed_),
+        [this, retained, change] {
+            if (!retained->is_alive() || retained->window_ != this) return;
+            control_availability_changed_.emit(change);
+        });
 }
 
 void Window::register_subtree(const Control::Ptr& control) {
@@ -2597,6 +2755,20 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     metrics_.record_mutation();
 
     if (has_dirty(requested_dirty, Dirty::layout)) {
+        static std::atomic<std::uint64_t> traced_layout_invalidations{};
+        if (std::getenv("GUI_FORMS_TRACE_LAYOUT_INVALIDATION") != nullptr) {
+            const std::uint64_t sequence =
+                traced_layout_invalidations.fetch_add(1U,
+                    std::memory_order_relaxed) + 1U;
+            if (sequence <= 2048U) {
+                std::fprintf(stderr,
+                    "gui-forms-layout-dirty=%llu|control:%.*s|flags:%u\n",
+                    static_cast<unsigned long long>(sequence),
+                    static_cast<int>(control.stable_id().value().size()),
+                    control.stable_id().value().data(),
+                    static_cast<unsigned>(requested_dirty));
+            }
+        }
         note_suspended_layout_request(control);
         for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
             ancestor->dirty_ |= Dirty::measure | Dirty::arrange;
@@ -2629,6 +2801,31 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
     } else {
         metrics_.record_dirty_mark(0.0);
     }
+}
+
+void Window::mark_paint_dirty(Control& control, Rect local_damage) {
+    require_ui_thread("localized paint mutation");
+    if (control.window_ != this) {
+        throw std::invalid_argument(
+            "localized paint mutation requires an attached control");
+    }
+    local_damage = Rect::intersection(local_damage, control.client_rectangle());
+    if (local_damage.empty()) return;
+
+    control.dirty_ |= Dirty::paint;
+    control.subtree_dirty_ |= Dirty::paint;
+    for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
+        ancestor->subtree_dirty_ |= Dirty::paint;
+    }
+    metrics_.record_mutation();
+    touch_paint();
+    paint_dirty_ = true;
+    const Rect bounds = absolute_bounds_of(control);
+    const Rect window_damage{bounds.x + local_damage.x,
+                             bounds.y + local_damage.y,
+                             local_damage.width, local_damage.height};
+    add_damage(window_damage, control.paint_plane_);
+    metrics_.record_dirty_mark(window_damage.area());
 }
 
 void Window::mark_child_layout_slot(Control& control) {
@@ -3120,7 +3317,8 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
             add_damage_all_planes(new_bounds);
             touch_paint();
             paint_dirty_ = true;
-            control->arranged_bounds_changed_.emit(new_bounds);
+            control->publish_change(control->arranged_bounds_changed_,
+                                    new_bounds);
         }
     }
     const std::vector<Control::Ptr> retained = control->children_;

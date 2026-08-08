@@ -201,6 +201,16 @@ void RecordingPainter::draw_image(ImageId image, Rect destination, double opacit
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_live_surface(std::shared_ptr<LiveSurface> surface,
+                                         Rect destination, double opacity) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_live_surface;
+    command.live_surface = std::move(surface);
+    command.rect = destination;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::draw_image_region(ImageId image, Rect source,
                                           Rect destination, double opacity) {
     DisplayCommand command;
@@ -209,6 +219,20 @@ void RecordingPainter::draw_image_region(ImageId image, Rect source,
     command.second = {source.width, source.height};
     command.rect = destination;
     command.image = image;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::draw_image_region_sampled(
+    ImageId image, Rect source, Rect destination, ImageSampling sampling,
+    double opacity) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_image_region_sampled;
+    command.first = {source.x, source.y};
+    command.second = {source.width, source.height};
+    command.rect = destination;
+    command.image = image;
+    command.image_sampling = sampling;
     command.scalar = opacity;
     commands_.push_back(std::move(command));
 }
@@ -293,12 +317,23 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
         case DisplayOperation::draw_image:
             painter.draw_image(command.image, command.rect, command.scalar);
             break;
+        case DisplayOperation::draw_live_surface:
+            painter.draw_live_surface(
+                command.live_surface, command.rect, command.scalar);
+            break;
         case DisplayOperation::draw_image_region:
             painter.draw_image_region(
                 command.image,
                 {command.first.x, command.first.y,
                  command.second.x, command.second.y},
                 command.rect, command.scalar);
+            break;
+        case DisplayOperation::draw_image_region_sampled:
+            painter.draw_image_region_sampled(
+                command.image,
+                {command.first.x, command.first.y,
+                 command.second.x, command.second.y},
+                command.rect, command.image_sampling, command.scalar);
             break;
         case DisplayOperation::fill_image_pattern:
             painter.fill_image_pattern(

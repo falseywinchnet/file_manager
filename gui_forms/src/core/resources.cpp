@@ -563,6 +563,96 @@ ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
     }
 }
 
+ImageLoadResult ImageRegistry::update_bgra32_premultiplied(
+    ImageId image, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, std::span<const std::byte> pixels) {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) ||
+        slot_index >= slots_.size()) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    if (slot.encoding != ImageResourceEncoding::bgra32_premultiplied ||
+        width != slot.metadata.width || height != slot.metadata.height) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    if (row_bytes < tight_row_bytes ||
+        row_bytes > std::numeric_limits<std::size_t>::max() ||
+        height > std::numeric_limits<std::size_t>::max() / row_bytes ||
+        pixels.size() != static_cast<std::size_t>(row_bytes) * height ||
+        slot.encoded.size() != static_cast<std::size_t>(tight_row_bytes) * height) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    for (std::uint32_t row = 0; row < height; ++row) {
+        std::copy_n(pixels.data() + static_cast<std::size_t>(row_bytes) * row,
+                    static_cast<std::size_t>(tight_row_bytes),
+                    slot.encoded.data() + static_cast<std::size_t>(tight_row_bytes) * row);
+    }
+    slot.content_hash = slot.content_hash ==
+            std::numeric_limits<std::uint64_t>::max()
+        ? 1U : slot.content_hash + 1U;
+    ++revision_;
+    return {.image = image};
+}
+
+ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
+    ImageId image, std::uint32_t x, std::uint32_t y,
+    std::uint32_t width, std::uint32_t height,
+    std::uint64_t source_row_bytes, std::span<const std::byte> pixels) {
+    std::size_t slot_index = 0;
+    std::uint64_t generation = 0;
+    if (!split_image_id(image, slot_index, generation) ||
+        slot_index >= slots_.size()) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    Slot& slot = slots_[slot_index];
+    if (!slot.occupied || slot.generation != generation) {
+        return {.error = ImageResourceError::stale_image_id};
+    }
+    if (slot.encoding != ImageResourceEncoding::bgra32_premultiplied) {
+        return {.error = ImageResourceError::unsupported_color_format};
+    }
+    const std::uint64_t right = static_cast<std::uint64_t>(x) + width;
+    const std::uint64_t bottom = static_cast<std::uint64_t>(y) + height;
+    const std::uint64_t patch_row_bytes = static_cast<std::uint64_t>(width) * 4U;
+    if (width == 0U || height == 0U || right > slot.metadata.width ||
+        bottom > slot.metadata.height || source_row_bytes < patch_row_bytes ||
+        source_row_bytes > std::numeric_limits<std::size_t>::max()) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+    const std::uint64_t required =
+        static_cast<std::uint64_t>(height - 1U) * source_row_bytes +
+        patch_row_bytes;
+    if (required > std::numeric_limits<std::size_t>::max() ||
+        pixels.size() < static_cast<std::size_t>(required)) {
+        return {.error = ImageResourceError::dimension_limit_exceeded};
+    }
+
+    const std::size_t destination_origin =
+        static_cast<std::size_t>(y) * static_cast<std::size_t>(slot.row_bytes) +
+        static_cast<std::size_t>(x) * 4U;
+    for (std::uint32_t row = 0; row < height; ++row) {
+        std::copy_n(pixels.data() +
+                        static_cast<std::size_t>(row) *
+                            static_cast<std::size_t>(source_row_bytes),
+                    static_cast<std::size_t>(patch_row_bytes),
+                    slot.encoded.data() + destination_origin +
+                        static_cast<std::size_t>(row) *
+                            static_cast<std::size_t>(slot.row_bytes));
+    }
+    slot.generation = next_generation(slot.generation);
+    slot.content_hash = hash_bytes(slot.encoded) ^
+        ((static_cast<std::uint64_t>(slot.metadata.width) << 32U) |
+         slot.metadata.height);
+    ++revision_;
+    return {.image = make_image_id(slot_index, slot.generation)};
+}
+
 bool ImageRegistry::remove(ImageId image) noexcept {
     std::size_t slot_index = 0;
     std::uint64_t generation = 0;

@@ -21,6 +21,8 @@ type Request struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+const MaxJSONLFrameBytes = 1_048_576
+
 type Response struct {
 	ID     string `json:"id"`
 	Result any    `json:"result,omitempty"`
@@ -50,14 +52,12 @@ func Serve(ctx context.Context, input io.Reader, output io.Writer, engine *servi
 	if engine == nil {
 		return errors.New("engine service is required")
 	}
-	decoder := json.NewDecoder(bufio.NewReader(input))
+	scanner := bufio.NewScanner(input)
+	scanner.Buffer(make([]byte, 4_096), MaxJSONLFrameBytes)
 	encoder := json.NewEncoder(output)
-	for {
+	for scanner.Scan() {
 		var incoming Request
-		if err := decoder.Decode(&incoming); err != nil {
-			if err == io.EOF {
-				return nil
-			}
+		if err := json.Unmarshal(scanner.Bytes(), &incoming); err != nil {
 			return fmt.Errorf("decode request: %w", err)
 		}
 		outgoing, shutdown := dispatch(ctx, engine, incoming)
@@ -68,6 +68,10 @@ func Serve(ctx context.Context, input io.Reader, output io.Writer, engine *servi
 			return nil
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read request: %w", err)
+	}
+	return nil
 }
 
 func dispatch(ctx context.Context, engine *service.Service, incoming Request) (Response, bool) {
@@ -81,7 +85,7 @@ func dispatch(ctx context.Context, engine *service.Service, incoming Request) (R
 	shutdown := false
 	switch incoming.Method {
 	case "version":
-		features := []string{"exact-reference", "integrity", "root-policy", "scan-reconcile"}
+		features := []string{"exact-reference", "integrity", "root-policy", "scan-reconcile", "live-query"}
 		if engine.Persistent() {
 			features = append(features, "immutable-generation-v1")
 		}
@@ -125,6 +129,11 @@ func dispatch(ctx context.Context, engine *service.Service, incoming Request) (R
 		var query api.Query
 		if err = decodeParams(incoming.Params, &query); err == nil {
 			result, err = engine.Query(ctx, query)
+		}
+	case "engine.query_live":
+		var query api.LiveQuery
+		if err = decodeParams(incoming.Params, &query); err == nil {
+			result, err = engine.QueryLive(ctx, query)
 		}
 	case "inspect", "engine.inspect":
 		var ref api.ObjectRef

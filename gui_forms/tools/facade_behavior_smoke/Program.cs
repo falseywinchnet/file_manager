@@ -70,6 +70,10 @@ if (args.Length == 1 && args[0] == "secondary-form")
 {
     return RunSecondaryFormHost();
 }
+if (args.Length == 1 && args[0] == "theme-inherited-paint")
+{
+    return RunInheritedThemePaintHost();
+}
 if (args.Length == 1 && args[0] == "form-semantics")
 {
     return RunFormSemantics();
@@ -81,6 +85,10 @@ if (args.Length == 1 && args[0] == "cursor")
 if (args.Length == 1 && args[0] == "dock-padding")
 {
     return RunDockPaddingSemantics();
+}
+if (args.Length == 1 && args[0] == "initial-dock-show")
+{
+    return RunInitialDockShowSemantics();
 }
 if (args.Length == 1 && args[0] == "control-geometry")
 {
@@ -109,6 +117,18 @@ if (args.Length == 1 && args[0] == "scroll-panel-live")
 if (args.Length == 1 && args[0] == "numeric-edit")
 {
     return RunNumericEditHost();
+}
+if (args.Length == 1 && args[0] == "numeric-topology")
+{
+    return RunNumericTopology();
+}
+if (args.Length == 1 && args[0] == "form-icon")
+{
+    return RunFormIconContract();
+}
+if (args.Length == 1 && args[0] == "constructor-callback-order")
+{
+    return RunConstructorCallbackOrder();
 }
 if (args.Length == 1 && args[0] == "text-edit")
 {
@@ -139,6 +159,11 @@ if (args.Length == 1 && args[0] == "native-surface")
     Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
     return RunNativeWindowSurfaceHost();
 }
+if (args.Length == 1 && args[0] == "native-surface-lifecycle")
+{
+    Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
+    return RunNativeWindowSurfaceLifecycleHost();
+}
 if (args.Length == 1 && args[0] == "native-surface-fallback")
 {
     Environment.SetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES", "PaintInputProbe");
@@ -163,6 +188,10 @@ if (args.Length == 1 && args[0] == "managed-damage")
 if (args.Length == 1 && args[0] == "visibility-paint")
 {
     return RunVisibilityPaintHost();
+}
+if (args.Length == 1 && args[0] == "property-grid")
+{
+    return RunPropertyGridProjection();
 }
 
 var form = new Form { Name = "behaviorForm", Text = "M11d behavior", Size = new Size(640, 420) };
@@ -353,7 +382,9 @@ Require(table.Controls.Count == 4 && table.Controls[1] == mode, "table collectio
 Require(mode.Items.Count == 3 && Equals(mode.SelectedItem, "NFM"), "combo state");
 Require(gain.Value == 12.5m && gain.Minimum == -20m && gain.Maximum == 80m, "numeric state");
 Require(mode.Text == "NFM" && gain.Text == "12.5", "field text projection");
-Require(gain.Controls.Count == 2 && gain.Controls[0] is Button && gain.Controls[1] is TextBox,
+Require(gain.Controls.Count == 2 &&
+        gain.Controls[0] is Button && gain.Controls[0].Name == "upDownButtons" &&
+        gain.Controls[1] is TextBox && gain.Controls[1].Name == "upDownEdit",
     "numeric composite children");
 using (var spin = new NumericProbe { Minimum = 0m, Maximum = 10m, Increment = 2m, Value = 5m, Size = new Size(120, 24) })
 {
@@ -806,6 +837,93 @@ static int RunSecondaryFormHost()
     return 0;
 }
 
+static int RunInheritedThemePaintHost()
+{
+    var main = new Form
+    {
+        Name = "themeMain",
+        Text = "Theme inheritance",
+        Size = new Size(520, 360),
+    };
+    var plugin = new Form
+    {
+        Name = "themePlugin",
+        Text = "Plugin",
+        Size = new Size(300, 220),
+    };
+    var container = new Panel
+    {
+        Name = "themeContainer",
+        Dock = DockStyle.Fill,
+    };
+    var painted = new ThemePaintProbe
+    {
+        Name = "themePaintedPluginControl",
+        Bounds = new Rectangle(12, 12, 180, 80),
+    };
+    container.Controls.Add(painted);
+    plugin.Controls.Add(container);
+
+    var snapshotMethod = typeof(Control).GetMethod("__ManagedPaintSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed paint diagnostics are unavailable");
+    Dictionary<string, string> Snapshot() => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(painted, null) ?? string.Empty));
+
+    using var timer = new System.Windows.Forms.Timer { Interval = 40 };
+    Dictionary<string, string>? before = null;
+    Dictionary<string, string>? touched = null;
+    var paintsBefore = 0;
+    var ticks = 0;
+    timer.Tick += (_, _) =>
+    {
+        ++ticks;
+        if (ticks == 1)
+        {
+            painted.Update();
+            before = Snapshot();
+            paintsBefore = painted.PaintCount;
+            plugin.BackColor = Color.FromArgb(24, 28, 33);
+            plugin.ForeColor = Color.FromArgb(235, 240, 245);
+            touched = Snapshot();
+            Require(touched["state"] == "dirty_queued" &&
+                SurfaceMetric(touched, "queued") == 1,
+                "one callback atomically queues an inherited plugin repaint");
+            return;
+        }
+
+        var after = Snapshot();
+        Require(before is not null && touched is not null &&
+            after["state"] == "clean" &&
+            SurfaceMetric(after, "leases-completed") ==
+                SurfaceMetric(before, "leases-completed") + 1 &&
+            painted.PaintCount == paintsBefore + 1,
+            "inherited theme colors publish one owner-painted plugin frame");
+        Require(painted.LastBackColor == plugin.BackColor &&
+            painted.LastForeColor == plugin.ForeColor,
+            "owner-painted plugin observes the new inherited theme colors");
+        timer.Stop();
+        plugin.Close();
+        main.Close();
+    };
+    main.Load += (_, _) =>
+    {
+        plugin.Show();
+        timer.Start();
+    };
+    Application.Run(main);
+    Require(ticks >= 2, $"theme change reaches its presentation boundary (ticks={ticks})");
+    Require(Application.CallbackFaultCount == 0,
+        $"theme change completes without callback faults ({Application.LastCallbackException})");
+    Console.WriteLine("theme-inherited-paint=plugin:true|callback:atomic|frame:one|colors:current|faults:zero");
+    painted.Dispose();
+    container.Dispose();
+    plugin.Dispose();
+    main.Dispose();
+    return 0;
+}
+
 static int RunSplitContainerSemantics()
 {
     var form = new Form { Name = "splitHost", Text = "Split container", ClientSize = new Size(420, 220) };
@@ -976,6 +1094,51 @@ static int RunDockPaddingSemantics()
     return 0;
 }
 
+static int RunInitialDockShowSemantics()
+{
+    using var form = new Form
+    {
+        Name = "initialDockForm",
+        Text = "Initial dock show",
+        ClientSize = new Size(360, 220),
+    };
+    using var toolbar = new Panel
+    {
+        Name = "initialToolbar",
+        Dock = DockStyle.Top,
+        Height = 36,
+    };
+    using var content = new Panel
+    {
+        Name = "initialContent",
+        Dock = DockStyle.Fill,
+    };
+
+    // This is the standard designer sequence: author while suspended, discard
+    // the stale queued request, and let first presentation perform a fresh
+    // layout from the final property values.
+    form.SuspendLayout();
+    form.Controls.Add(content);
+    form.Controls.Add(toolbar);
+    form.ResumeLayout(false);
+
+    var committedBeforeLoad = false;
+    form.Load += (_, _) =>
+    {
+        committedBeforeLoad = toolbar.Bounds == new Rectangle(0, 0, 360, 36) &&
+            content.Bounds == new Rectangle(0, 36, 360, 184);
+    };
+    var priorAutoClose = Environment.GetEnvironmentVariable("GUI_FORMS_AUTOMATION_CLOSE");
+    Environment.SetEnvironmentVariable("GUI_FORMS_AUTOMATION_CLOSE", "1");
+    try { Application.Run(form); }
+    finally { Environment.SetEnvironmentVariable("GUI_FORMS_AUTOMATION_CLOSE", priorAutoClose); }
+
+    Require(committedBeforeLoad,
+        "initial presentation must commit current Dock geometry before Load");
+    Console.WriteLine("initial-dock-show=resume-false:fresh|toolbar:reserved|fill:remaining|before-load:true");
+    return 0;
+}
+
 static int RunControlGeometrySemantics()
 {
     using var root = new GeometryPanel { Name = "geometryRoot", Size = new Size(200, 140) };
@@ -985,9 +1148,9 @@ static int RunControlGeometrySemantics()
         Name = "geometryFront", Bounds = new Rectangle(10, 12, 80, 60), TabIndex = 10 };
     using var nested = new Panel {
         Name = "geometryNested", Bounds = new Rectangle(2, 3, 12, 9), TabIndex = 5 };
-    front.Controls.Add(nested);
-    root.Controls.Add(back);
     root.Controls.Add(front);
+    root.Controls.Add(back);
+    front.Controls.Add(nested);
 
     Require(root.Controls.GetChildIndex(front) == 0 &&
         root.Controls.GetChildIndex(back) == 1 &&
@@ -1046,8 +1209,116 @@ static int RunControlGeometrySemantics()
         sizing.Size == new Size(55, 33) && autoSizeEvents == 1,
         "GrowAndShrink AutoSize derives child, margin, and padding extent once");
 
-    Console.WriteLine("control-geometry=zorder:coherent|lookup:filtered|bounds:masked|coordinates:roundtrip|tab-order:nested|autosize:shrink");
+    using var docking = new Panel { Name = "dockOrder", Size = new Size(200, 100) };
+    using var dockLeft = new Panel { Name = "dockLeft", Width = 50, Dock = DockStyle.Left };
+    using var dockFill = new Panel { Name = "dockFill", Dock = DockStyle.Fill };
+    docking.Controls.Add(dockFill);
+    docking.Controls.Add(dockLeft);
+    docking.PerformLayout();
+    Require(dockLeft.Bounds == new Rectangle(0, 0, 50, 100) &&
+        dockFill.Bounds == new Rectangle(50, 0, 150, 100),
+        "docking consumes client space from backmost to topmost z order");
+
+    using var autoDockOwner = new Panel { Name = "autoDockOwner", Size = new Size(240, 100) };
+    using var autoDock = new GeometryPanel {
+        Name = "autoDockTop", Size = new Size(400, 0), Dock = DockStyle.Top };
+    using var autoDockChild = new Panel {
+        Name = "autoDockChild", Height = 30, Dock = DockStyle.Top };
+    autoDock.SetMode(AutoSizeMode.GrowAndShrink);
+    autoDock.AutoSize = true;
+    autoDock.Controls.Add(autoDockChild);
+    autoDockOwner.Controls.Add(autoDock);
+    autoDockOwner.PerformLayout();
+    autoDock.PerformLayout();
+    Require(autoDock.Bounds == new Rectangle(0, 0, 240, 30),
+        $"Dock Top constrains AutoSize width while content determines height; actual={autoDock.Bounds}");
+
+    Console.WriteLine("control-geometry=zorder:coherent|lookup:filtered|bounds:masked|coordinates:roundtrip|tab-order:nested|autosize:shrink|dock:zorder");
     return 0;
+}
+
+static int RunPropertyGridProjection()
+{
+    using var grid = new PropertyGrid();
+    using var first = new Label { Name = "first", Text = "Alpha" };
+    using var second = new Label { Name = "second", Text = "Beta" };
+    var selectionChanges = 0;
+    var sortChanges = 0;
+    grid.SelectedObjectsChanged += (_, _) => ++selectionChanges;
+    grid.PropertySortChanged += (_, _) => ++sortChanges;
+    grid.SelectedObjects = new object[] { first, second };
+    var copy = grid.SelectedObjects;
+    copy[0] = second;
+    var cloned = ReferenceEquals(grid.SelectedObject, first);
+    grid.PropertySort = PropertySort.Alphabetical;
+    grid.Refresh();
+    var managedFirst = new ManagedPropertyFixture { Gain = 12, Mode = ReceiverMode.Fast, Level = new ReceiverLevel(2), RejectValue = 3 };
+    var managedSecond = new ManagedPropertyFixture { Gain = 12, Mode = ReceiverMode.Fast, Level = new ReceiverLevel(2), RejectValue = 3, RejectNine = true };
+    grid.SelectedObjects = new object[] { managedFirst, managedSecond };
+    grid.Refresh();
+    var arbitraryProjected = ReferenceEquals(grid.SelectedObject, managedFirst) &&
+        grid.SelectedObjects.Length == 2 && managedFirst.GetterCalls > 0 &&
+        managedSecond.GetterCalls > 0 && ReceiverLevelConverter.FormatCalls > 0 &&
+        ReceiverLevelConverter.LastCultureName ==
+            global::System.Globalization.CultureInfo.CurrentCulture.Name;
+    var trySet = typeof(PropertyGrid).GetMethod("__TrySetPropertyText",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("PropertyGrid text automation seam is unavailable");
+    var reset = typeof(PropertyGrid).GetMethod("__ResetProperty",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("PropertyGrid reset automation seam is unavailable");
+    var edit = typeof(PropertyGrid).GetMethod("__EditProperty",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("PropertyGrid editor automation seam is unavailable");
+    var proxySchemaClean = !(bool)trySet.Invoke(grid, new object[] { "Visible", "False" })!;
+    var dropDownEditor = (bool)edit.Invoke(grid, new object[] { "Mode" })! &&
+        managedFirst.Mode == ReceiverMode.Precise &&
+        managedSecond.Mode == ReceiverMode.Precise &&
+        ReceiverModeEditor.DropDownCalls == 1 &&
+        ReceiverModeEditor.CloseCalls == 1;
+    var modalEditor = (bool)edit.Invoke(grid, new object[] { "RejectValue" })! &&
+        managedFirst.RejectValue == 4 && managedSecond.RejectValue == 4 &&
+        ReceiverValueEditor.ModalCalls == 1 &&
+        ReceiverValueEditor.AcceptedCalls == 1;
+    var convertedCommit = (bool)trySet.Invoke(grid, new object[] { "Level", "1" })! &&
+        managedFirst.Level.Value == 1 && managedSecond.Level.Value == 1;
+    var nullableCommit = (bool)trySet.Invoke(grid, new object[] { "Gain", "" })! &&
+        managedFirst.Gain is null && managedSecond.Gain is null;
+    var resetCommit = (bool)trySet.Invoke(grid, new object[] { "Gain", "6" })! &&
+        (bool)reset.Invoke(grid, new object[] { "Gain" })! &&
+        managedFirst.Gain is null && managedSecond.Gain is null;
+    var rejectingCommit = (bool)trySet.Invoke(grid, new object[] { "RejectValue", "9" })!;
+    var atomicRollback = !rejectingCommit && managedFirst.RejectValue == 4 &&
+        managedSecond.RejectValue == 4;
+    var arbitraryRejected = false;
+    try { grid.SelectedObject = new UnsupportedPropertyFixture(); }
+    catch (NotSupportedException) { arbitraryRejected = true; }
+    var retainedAfterFailure = ReferenceEquals(grid.SelectedObject, managedFirst) &&
+        grid.SelectedObjects.Length == 2;
+    grid.SelectedObject = null!;
+    var cleared = grid.SelectedObject is null && grid.SelectedObjects.Length == 0;
+    Console.WriteLine("property-grid=native:true|multi:true|clone:" +
+        cloned.ToString().ToLowerInvariant() + "|sort:" +
+        (grid.PropertySort == PropertySort.Alphabetical).ToString().ToLowerInvariant() +
+        "|selection-events:" + selectionChanges + "|sort-events:" + sortChanges +
+        "|type-descriptor:" + arbitraryProjected.ToString().ToLowerInvariant() +
+        "|proxy-schema-clean:" + proxySchemaClean.ToString().ToLowerInvariant() +
+        "|dropdown-editor:" + dropDownEditor.ToString().ToLowerInvariant() +
+        "|modal-editor:" + modalEditor.ToString().ToLowerInvariant() +
+        "|converted-commit:" + convertedCommit.ToString().ToLowerInvariant() +
+        "|nullable-commit:" + nullableCommit.ToString().ToLowerInvariant() +
+        "|reset:" + resetCommit.ToString().ToLowerInvariant() +
+        "|atomic-rollback:" + atomicRollback.ToString().ToLowerInvariant() +
+        "|arbitrary-rejected:" + arbitraryRejected.ToString().ToLowerInvariant() +
+        "|retained-after-failure:" + retainedAfterFailure.ToString().ToLowerInvariant() +
+        "|cleared:" + cleared.ToString().ToLowerInvariant());
+    return cloned && arbitraryProjected && proxySchemaClean && dropDownEditor && modalEditor && convertedCommit && nullableCommit &&
+        resetCommit && atomicRollback && arbitraryRejected &&
+        retainedAfterFailure && cleared && selectionChanges == 3 &&
+        sortChanges == 1 ? 0 : 1;
 }
 
 static int RunLayoutTransactionSemantics()
@@ -1139,6 +1410,21 @@ static int RunDialogKeyLiveHost()
 
 static int RunScrollablePanelHost()
 {
+    using var painted = new ScrollablePaintProbe
+    {
+        Name = "paintedScrollViewport",
+        AutoScroll = true,
+        Size = new Size(120, 70),
+    };
+    painted.Controls.Add(new Control
+    {
+        Name = "paintedScrollContent",
+        Bounds = new Rectangle(4, 140, 40, 20),
+    });
+    Require(painted.VerticalScroll.Visible &&
+        painted.DisplayRectangle.Height >= 160,
+        "owner painting and scrolling must compose on one retained control");
+
     var panel = new ScrollProbe { Name = "scrollViewport", AutoScroll = true, Size = new Size(240, 120) };
     var upper = new Button { Name = "upperSetting", Text = "Upper", Bounds = new Rectangle(8, 8, 100, 24) };
     var lower = new Button { Name = "lowerSetting", Text = "Lower", Bounds = new Rectangle(8, 260, 100, 24) };
@@ -1192,7 +1478,7 @@ static int RunScrollablePanelHost()
         eventArgs.ScrollOrientation == ScrollOrientation.VerticalScroll &&
         eventCalls == 1 && ReferenceEquals(delivered, eventArgs),
         "ScrollEventArgs preserves exact event vocabulary and mutable new value");
-    Console.WriteLine("scroll-panel=retained:true|step:48|reached:true|reverse:true|into-view:true|manual-axis:true|event-args:true|event-delivery:true");
+    Console.WriteLine("scroll-panel=retained:true|paint-composed:true|step:48|reached:true|reverse:true|into-view:true|manual-axis:true|event-args:true|event-delivery:true");
     panel.Dispose();
     return 0;
 }
@@ -1266,6 +1552,55 @@ static int RunNumericEditHost()
     Require(numeric.Value == 7m && numeric.Text == "7.0", "numeric mouse drag replacement");
     Console.WriteLine("numeric-edit=select-all:true|replace:true|backspace:true|signed:true|commit:true|drag:true|changes:5");
     numeric.Dispose();
+    return 0;
+}
+
+static int RunNumericTopology()
+{
+    using var numeric = new NumericUpDown();
+    Require(numeric.Controls.Count == 2, "numeric child count");
+    Require(numeric.Controls[0] is Button && numeric.Controls[0].Name == "upDownButtons",
+        "numeric spinner child topology");
+    Require(numeric.Controls[1] is TextBox && numeric.Controls[1].Name == "upDownEdit",
+        "numeric edit child topology");
+    Console.WriteLine("numeric-topology=spinner:0|edit:1|theme-cast:non-null");
+    return 0;
+}
+
+static int RunFormIconContract()
+{
+    using var form = new Form();
+    var icon = form.Icon;
+    Require(icon is not null, "default form icon");
+    using (var bitmap = icon!.ToBitmap())
+        Require(bitmap.Width == 32 && bitmap.Height == 32, "default form icon decodes");
+    form.Icon = null!;
+    Require(form.Icon is not null, "null form icon restores default");
+    Console.WriteLine("form-icon=default:present|decode:32x32|null:restored");
+    return 0;
+}
+
+static int RunConstructorCallbackOrder()
+{
+    using var probe = new ConstructionReentryProbe();
+    Require(probe.EarlyResizeCalls == 0 && probe.EarlyLayoutCalls == 0,
+        "native initialization must not enter derived resize or layout overrides");
+    var textChanges = 0;
+    var visibleChanges = 0;
+    var enabledChanges = 0;
+    probe.TextChanged += (_, _) => ++textChanges;
+    probe.VisibleChanged += (_, _) => ++visibleChanges;
+    probe.EnabledChanged += (_, _) => ++enabledChanges;
+    probe.Text = "ready";
+    probe.Visible = false;
+    probe.Enabled = false;
+    Require(textChanges == 1 && visibleChanges == 1 && enabledChanges == 1,
+        "managed property mutations must raise one precise managed event");
+    probe.Size = new Size(200, 120);
+    probe.PerformLayout();
+    Require(probe.ResizeCalls >= 1 && probe.LayoutCalls >= 1,
+        "post-construction resize and layout must remain available");
+    Console.WriteLine($"constructor-callback-order=early-resize:{probe.EarlyResizeCalls}|early-layout:{probe.EarlyLayoutCalls}|text:{textChanges}|visible:{visibleChanges}|enabled:{enabledChanges}");
     return 0;
 }
 
@@ -2018,12 +2353,15 @@ static int RunNativeWindowSurfaceHost()
     form.Controls.Add(surface);
     var window = surface.Handle;
     Require(window != 0 && NativeSurfaceProbe.IsWindow(window), "control handle is a Win32 window");
+    var constructionDevice = NativeSurfaceProbe.GetDC(window);
+    Require(constructionDevice != 0,
+        "control HWND is compositor-backed before Handle escapes");
     Require(!NativeSurfaceProbe.IsWindowEnabled(window),
         "paint-only child HWND cannot become a second input authority");
     surface.Size = new Size(96, 48);
     Require(NativeSurfaceProbe.GetClientRect(window, out var resized) &&
-        resized.Right - resized.Left == 96 && resized.Bottom - resized.Top == 48,
-        "control HWND tracks retained client size");
+        resized.Right - resized.Left >= 96 && resized.Bottom - resized.Top >= 48,
+        "control HWND reserves durable retained-HDC capacity");
 
     var snapshotMethod = typeof(Control).GetMethod("__WindowSurfaceSnapshot",
         global::System.Reflection.BindingFlags.Instance |
@@ -2062,11 +2400,23 @@ static int RunNativeWindowSurfaceHost()
                 "bitmap-backed HDC lease accepts direct GDI mutation");
             _ = NativeSurfaceProbe.DeleteObject(leasedBrush);
             graphics.ReleaseHdc(leased);
+            var constructionBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
+            var constructionArea = new NativeSurfaceProbe.NativeRect
+            {
+                Left = 24, Top = 0, Right = 96, Bottom = 48,
+            };
+            Require(constructionBrush != 0 &&
+                NativeSurfaceProbe.FillRect(constructionDevice, ref constructionArea,
+                    constructionBrush) != 0,
+                "HDC retained from Handle construction remains writable after first show");
+            _ = NativeSurfaceProbe.DeleteObject(constructionBrush);
             var device = NativeSurfaceProbe.GetDC(window);
             Require(device != 0, "control HWND exposes a device context");
             paintedCompatibilitySurface =
-                NativeSurfaceProbe.GetPixel(device, 20, 20) != 0xffffffffu;
+                NativeSurfaceProbe.GetPixel(device, 20, 20) != 0xffffffffu &&
+                NativeSurfaceProbe.GetPixel(device, 48, 20) == 0x00664422u;
             _ = NativeSurfaceProbe.ReleaseDC(window, device);
+            _ = NativeSurfaceProbe.ReleaseDC(window, constructionDevice);
             during = ParseSurfaceSnapshot(Snapshot());
             Require(during["state"] == "dirty_queued" && SurfaceMetric(during, "queued") == 1,
                 "many flushes retain one queued compatibility drain before callback return");
@@ -2087,13 +2437,274 @@ static int RunNativeWindowSurfaceHost()
     };
     timer.Start();
     Application.Run(form);
-    Require(ticks == 2, "native surface crosses an event-loop presentation boundary");
+    Require(ticks >= 2, "native surface crosses an event-loop presentation boundary");
     Require(paintedCompatibilitySurface,
         "direct GDI targets the isolated compatibility HWND");
     surface.Dispose();
     Require(!NativeSurfaceProbe.IsWindow(window), "control HWND is destroyed with its owner");
     Console.WriteLine("native-surface=hwnd:true|input:retained-host|size:96x48|gdi:true|present-boundary:true|coalesced:true|single-drain:true|disposed:true");
     form.Dispose();
+    return 0;
+}
+
+static int RunNativeWindowSurfaceLifecycleHost()
+{
+    var traceLifecycle = Environment.GetEnvironmentVariable(
+        "GUI_FORMS_TRACE_NATIVE_SURFACES") == "1";
+    void TraceLifecycle(string value)
+    {
+        if (traceLifecycle) Console.Error.WriteLine(
+            "native-surface-lifecycle-stage=" + value);
+    }
+    TraceLifecycle("construct");
+    const int finalFrame = 2400;
+    var form = new Form
+    {
+        Name = "nativeSurfaceLifecycleForm",
+        Text = "Native surface lifecycle",
+        Size = new Size(320, 210),
+    };
+    var surface = new PaintInputProbe
+    {
+        Name = "nativeSurfaceLifecycle",
+        Bounds = new Rectangle(16, 16, 96, 48),
+        BackColor = Color.Black,
+    };
+    var cover = new Panel
+    {
+        Name = "nativeSurfaceCover",
+        Bounds = surface.Bounds,
+        BackColor = Color.Magenta,
+        Visible = false,
+    };
+    form.Controls.Add(surface);
+    form.Controls.Add(cover);
+
+    // This is the defining NativeBitmap behavior: acquire the control DC while
+    // the managed control is still being constructed and retain it across the
+    // entire hosted lifetime.
+    var window = surface.Handle;
+    TraceLifecycle("handle-acquired");
+    var constructionDevice = NativeSurfaceProbe.GetDC(window);
+    Require(window != 0 && constructionDevice != 0,
+        "construction-retained HWND/HDC lease is available");
+    Require(NativeSurfaceProbe.GetLayeredWindowAttributes(
+            window, out _, out var endpointAlpha, out var endpointLayerFlags) &&
+        endpointAlpha == 0 && (endpointLayerFlags & 0x00000002u) != 0 &&
+        !NativeSurfaceProbe.IsWindowEnabled(window) &&
+        NativeSurfaceProbe.GetParent(window) == 0,
+        "compatibility paint endpoint has zero presentation alpha and no input or parent authority");
+
+    var snapshotMethod = typeof(Control).GetMethod("__WindowSurfaceSnapshot",
+        global::System.Reflection.BindingFlags.Instance |
+        global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("window-surface diagnostics are unavailable");
+    Dictionary<string, string> Snapshot() => ParseSurfaceSnapshot(
+        (string)(snapshotMethod.Invoke(surface, null) ?? string.Empty));
+
+    static uint FrameColor(int frame) =>
+        (uint)((frame * 37 + 11) & 0xff) |
+        ((uint)((frame * 67 + 29) & 0xff) << 8) |
+        ((uint)((frame * 97 + 53) & 0xff) << 16);
+    var uiThread = Environment.CurrentManagedThreadId;
+    var drawWidth = 96;
+    var drawHeight = 48;
+    var framesWritten = 0;
+    var workerDone = 0;
+    Exception? workerFailure = null;
+    var producerClock = global::System.Diagnostics.Stopwatch.StartNew();
+    TimeSpan producerElapsed = TimeSpan.Zero;
+    var worker = new Thread(() =>
+    {
+        try
+        {
+            for (var frame = 0; frame <= finalFrame; ++frame)
+            {
+                var brush = NativeSurfaceProbe.CreateSolidBrush(FrameColor(frame));
+                try
+                {
+                    var area = new NativeSurfaceProbe.NativeRect
+                    {
+                        Right = Volatile.Read(ref drawWidth),
+                        Bottom = Volatile.Read(ref drawHeight),
+                    };
+                    if (brush == 0 || NativeSurfaceProbe.FillRect(
+                        constructionDevice, ref area, brush) == 0)
+                        throw new InvalidOperationException(
+                            "background GDI frame write failed");
+                }
+                finally
+                {
+                    if (brush != 0) _ = NativeSurfaceProbe.DeleteObject(brush);
+                }
+                Volatile.Write(ref framesWritten, frame + 1);
+                Thread.Sleep(1);
+            }
+        }
+        catch (Exception error) { workerFailure = error; }
+        finally
+        {
+            producerElapsed = producerClock.Elapsed;
+            Volatile.Write(ref workerDone, 1);
+        }
+    }) { IsBackground = true, Name = "NativeBitmap compatibility writer" };
+
+    var resized = false;
+    var hidden = false;
+    var shown = false;
+    var covered = false;
+    var revealed = false;
+    var deadline = global::System.Diagnostics.Stopwatch.StartNew();
+    Exception? uiFailure = null;
+    var tracedDevicePixels = false;
+    var uiTicks = 0;
+    TimeSpan? workerCompletedAt = null;
+    var captureHoldMilliseconds = int.TryParse(
+        Environment.GetEnvironmentVariable("GUI_FORMS_LIVE_SURFACE_CAPTURE_HOLD_MS"),
+        out var requestedCaptureHold)
+        ? Math.Clamp(requestedCaptureHold, 0, 10_000) : 0;
+    using var timer = new System.Windows.Forms.Timer { Interval = 10 };
+    form.Load += (_, _) => worker.Start();
+    form.Load += (_, _) => TraceLifecycle("form-load");
+    timer.Tick += (_, _) =>
+    {
+        try
+        {
+            ++uiTicks;
+            var completedFrames = Volatile.Read(ref framesWritten);
+            if (!resized && completedFrames >= 240)
+            {
+                TraceLifecycle("resize-begin");
+                surface.Size = new Size(128, 64);
+                TraceLifecycle("resize-end");
+                cover.Size = surface.Size;
+                Volatile.Write(ref drawWidth, 128);
+                Volatile.Write(ref drawHeight, 64);
+                resized = true;
+            }
+            if (!hidden && completedFrames >= 600)
+            {
+                surface.Visible = false;
+                hidden = true;
+            }
+            if (!shown && completedFrames >= 960)
+            {
+                surface.Visible = true;
+                shown = true;
+            }
+            if (!covered && completedFrames >= 1320)
+            {
+                cover.Visible = true;
+                cover.BringToFront();
+                covered = true;
+            }
+            if (!revealed && completedFrames >= 1800)
+            {
+                cover.SendToBack();
+                cover.Visible = false;
+                surface.BringToFront();
+                revealed = true;
+            }
+
+            if (Volatile.Read(ref workerDone) != 0)
+            {
+                if (workerFailure is not null) throw workerFailure;
+                workerCompletedAt ??= deadline.Elapsed;
+                // Leave several compositor opportunities after the producer's
+                // final write. No producer notification or import is involved.
+                if (deadline.Elapsed - workerCompletedAt.Value <
+                    TimeSpan.FromMilliseconds(200 + captureHoldMilliseconds)) return;
+                if (traceLifecycle && !tracedDevicePixels)
+                {
+                    tracedDevicePixels = true;
+                    TraceLifecycle("dc-pixels=" +
+                        NativeSurfaceProbe.GetPixel(constructionDevice, 1, 1).ToString("x8") + "," +
+                        NativeSurfaceProbe.GetPixel(constructionDevice, 126, 62).ToString("x8"));
+                }
+                var state = Snapshot();
+                if (traceLifecycle) TraceLifecycle("snapshot-" + string.Join(",",
+                    state.Select(item => item.Key + "=" + item.Value)));
+                Require(state["state"] == "live" &&
+                    !state.ContainsKey("captured") &&
+                    !state.ContainsKey("content-hash") &&
+                    !state.ContainsKey("drains-started"),
+                    "live endpoint has no observer, capture, hash, or drain state");
+                Require(resized && hidden && shown && covered && revealed,
+                    "resize, visibility, occlusion, and reveal stages completed");
+                Require(uiTicks >= 20,
+                    "UI dispatcher remained responsive during sustained producer writes");
+                Require(NativeSurfaceProbe.GetClientRect(window, out var bounds) &&
+                    bounds.Right - bounds.Left >= 128 &&
+                    bounds.Bottom - bounds.Top >= 64,
+                    "retained construction HDC capacity covers endpoint resize");
+                Require(NativeSurfaceProbe.GetPixel(constructionDevice, 1, 1) ==
+                        FrameColor(finalFrame) &&
+                    NativeSurfaceProbe.GetPixel(constructionDevice, 126, 62) ==
+                        FrameColor(finalFrame),
+                    "final frame is uniform rather than an echoed partial update");
+                Require(NativeSurfaceProbe.GetLayeredWindowAttributes(
+                        window, out _, out var finalEndpointAlpha,
+                        out var finalEndpointLayerFlags) &&
+                    finalEndpointAlpha == 0 &&
+                    (finalEndpointLayerFlags & 0x00000002u) != 0 &&
+                    !NativeSurfaceProbe.IsWindowEnabled(window) &&
+                    NativeSurfaceProbe.GetParent(window) == 0,
+                    "paint endpoint never acquired presentation, input, or parent authority");
+                Require(surface.PaintThreadIds.All(thread => thread == uiThread),
+                    "background GDI writes never re-enter managed paint");
+                timer.Stop();
+                _ = NativeSurfaceProbe.ReleaseDC(window, constructionDevice);
+                constructionDevice = 0;
+                form.Close();
+                return;
+            }
+            if (deadline.Elapsed > TimeSpan.FromSeconds(8))
+                throw new TimeoutException(
+                    "live NativeBitmap surface did not complete its sustained gate");
+        }
+        catch (Exception error)
+        {
+            uiFailure = error;
+            if (traceLifecycle) Console.Error.WriteLine(
+                "native-surface-lifecycle-failure=" + error);
+            timer.Stop();
+            form.Close();
+        }
+    };
+
+    timer.Start();
+    TraceLifecycle("run-begin");
+    Application.Run(form);
+    TraceLifecycle("run-end");
+    Require(worker.Join(TimeSpan.FromSeconds(2)),
+        "background NativeBitmap writer terminates");
+    if (constructionDevice != 0)
+        _ = NativeSurfaceProbe.ReleaseDC(window, constructionDevice);
+    if (uiFailure is not null) throw uiFailure;
+    if (workerFailure is not null) throw workerFailure;
+    Require(producerElapsed < TimeSpan.FromSeconds(5),
+        "producer was not serialized behind compositor/UI work");
+    ulong activeSurfaceTicks;
+    ulong framesPresented;
+    using (var trace = global::System.Text.Json.JsonDocument.Parse(
+        Application.LastHostTrace))
+    {
+        var metrics = trace.RootElement.GetProperty("window");
+        activeSurfaceTicks =
+            metrics.GetProperty("active_surface_ticks").GetUInt64();
+        framesPresented = metrics.GetProperty("frames_presented").GetUInt64();
+        Require(activeSurfaceTicks >= 30 && framesPresented >= 30,
+            "live surface sustained compositor frames beyond one screen of history");
+    }
+    surface.Dispose();
+    Require(!NativeSurfaceProbe.IsWindow(window),
+        "disposing the retained control releases its compatibility endpoint");
+    cover.Dispose();
+    form.Dispose();
+    Console.WriteLine(
+        "native-surface-lifecycle=construction-hdc:retained|writer:background|producer:uncoupled|compositor:continuous|resize:durable|hide-show:latest|occlusion:latest|echo:none|reentry:none|secondary-window:none|disposed:true");
+    Console.WriteLine(
+        $"native-surface-performance=producer-frames:{finalFrame + 1}|producer-ms:{producerElapsed.TotalMilliseconds:F0}|ui-ticks:{uiTicks}|active-surface-ticks:{activeSurfaceTicks}|frames-presented:{framesPresented}");
     return 0;
 }
 
@@ -2147,7 +2758,7 @@ static int RunNativeWindowSurfaceFallbackHost()
     };
     timer.Start();
     Application.Run(form);
-    Require(ticks == 2, "fallback probe crosses a bounded event-loop boundary");
+    Require(ticks >= 2, "fallback probe crosses a bounded event-loop boundary");
     surface.Dispose();
     form.Dispose();
     Console.WriteLine("native-surface-fallback=raw-gdi:true|bounded-probe:true|single-commit:true|disposed:true");
@@ -2548,6 +3159,132 @@ static void Require(bool condition, string name)
     if (!condition) throw new InvalidOperationException($"M11d behavior check failed: {name}");
 }
 
+enum ReceiverMode { Slow, Fast, Precise }
+
+sealed class ReceiverLevel
+{
+    internal ReceiverLevel(int value) { Value = value; }
+    internal int Value { get; }
+}
+
+sealed class ReceiverLevelConverter : global::System.ComponentModel.TypeConverter
+{
+    internal static int FormatCalls { get; private set; }
+    internal static string? LastCultureName { get; private set; }
+    public override bool CanConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context,
+        Type sourceType) => sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+    public override bool CanConvertTo(global::System.ComponentModel.ITypeDescriptorContext? context,
+        Type? destinationType) => destinationType == typeof(string) || base.CanConvertTo(context, destinationType);
+    public override object? ConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context,
+        global::System.Globalization.CultureInfo? culture, object value) =>
+        value is string text ? new ReceiverLevel(int.Parse(text, culture ?? global::System.Globalization.CultureInfo.CurrentCulture)) :
+        base.ConvertFrom(context, culture, value);
+    public override object? ConvertTo(global::System.ComponentModel.ITypeDescriptorContext? context,
+        global::System.Globalization.CultureInfo? culture, object? value, Type destinationType)
+    {
+        if (destinationType == typeof(string) && value is ReceiverLevel level)
+        {
+            ++FormatCalls;
+            LastCultureName = (culture ?? global::System.Globalization.CultureInfo.CurrentCulture).Name;
+            return level.Value.ToString(culture ?? global::System.Globalization.CultureInfo.CurrentCulture);
+        }
+        return base.ConvertTo(context, culture, value, destinationType);
+    }
+    public override bool GetStandardValuesSupported(
+        global::System.ComponentModel.ITypeDescriptorContext? context) => true;
+    public override bool GetStandardValuesExclusive(
+        global::System.ComponentModel.ITypeDescriptorContext? context) => true;
+    public override StandardValuesCollection GetStandardValues(
+        global::System.ComponentModel.ITypeDescriptorContext? context) =>
+        new(new object[] { new ReceiverLevel(1), new ReceiverLevel(2) });
+}
+
+sealed class ManagedPropertyFixture
+{
+    private int? gain;
+    private ReceiverMode mode;
+    private ReceiverLevel level = new(1);
+    private int rejectValue;
+    internal int GetterCalls { get; private set; }
+
+    [global::System.ComponentModel.DefaultValue(null)]
+    public int? Gain { get { ++GetterCalls; return gain; } set => gain = value; }
+    [global::System.ComponentModel.Editor(typeof(ReceiverModeEditor), typeof(global::System.Drawing.Design.UITypeEditor))]
+    public ReceiverMode Mode { get { ++GetterCalls; return mode; } set => mode = value; }
+    [global::System.ComponentModel.TypeConverter(typeof(ReceiverLevelConverter))]
+    public ReceiverLevel Level { get { ++GetterCalls; return level; } set => level = value; }
+    [global::System.ComponentModel.Editor(typeof(ReceiverValueEditor), typeof(global::System.Drawing.Design.UITypeEditor))]
+    public int RejectValue { get { ++GetterCalls; return rejectValue; } set { if (RejectNine && value == 9) throw new InvalidOperationException("fixture rejects nine"); rejectValue = value; } }
+    public string ReadOnlyStatus { get { ++GetterCalls; return "Ready"; } }
+    [global::System.ComponentModel.Browsable(false)]
+    public bool RejectNine { get; set; }
+}
+
+sealed class ReceiverModeEditor : global::System.Drawing.Design.UITypeEditor
+{
+    internal static int DropDownCalls { get; private set; }
+    internal static int CloseCalls { get; private set; }
+    public override global::System.Drawing.Design.UITypeEditorEditStyle GetEditStyle(
+        global::System.ComponentModel.ITypeDescriptorContext? context) =>
+        global::System.Drawing.Design.UITypeEditorEditStyle.DropDown;
+    public override object EditValue(
+        global::System.ComponentModel.ITypeDescriptorContext? context,
+        global::System.IServiceProvider provider, object? value)
+    {
+        var service = provider.GetService(typeof(global::System.Windows.Forms.Design.IWindowsFormsEditorService))
+            as global::System.Windows.Forms.Design.IWindowsFormsEditorService ??
+            throw new InvalidOperationException("Property editor service was not projected.");
+        using var choices = new ListBox { Name = "receiverModeChoices", Size = new Size(220, 96) };
+        choices.Items.Add(ReceiverMode.Slow);
+        choices.Items.Add(ReceiverMode.Fast);
+        choices.Items.Add(ReceiverMode.Precise);
+        var selected = value is ReceiverMode current ? current : ReceiverMode.Slow;
+        choices.ParentChanged += (_, _) =>
+        {
+            if (choices.Parent is null) return;
+            choices.BeginInvoke((Action)(() =>
+            {
+                selected = ReceiverMode.Precise;
+                ++CloseCalls;
+                service.CloseDropDown();
+            }));
+        };
+        ++DropDownCalls;
+        service.DropDownControl(choices);
+        return selected;
+    }
+}
+
+sealed class ReceiverValueEditor : global::System.Drawing.Design.UITypeEditor
+{
+    internal static int ModalCalls { get; private set; }
+    internal static int AcceptedCalls { get; private set; }
+    public override global::System.Drawing.Design.UITypeEditorEditStyle GetEditStyle(
+        global::System.ComponentModel.ITypeDescriptorContext? context) =>
+        global::System.Drawing.Design.UITypeEditorEditStyle.Modal;
+    public override object EditValue(
+        global::System.ComponentModel.ITypeDescriptorContext? context,
+        global::System.IServiceProvider provider, object? value)
+    {
+        var service = provider.GetService(typeof(global::System.Windows.Forms.Design.IWindowsFormsEditorService))
+            as global::System.Windows.Forms.Design.IWindowsFormsEditorService ??
+            throw new InvalidOperationException("Modal property editor service was not projected.");
+        using var dialog = new Form { Name = "receiverValueDialog", Text = "Receiver value", ClientSize = new Size(240, 96), FormBorderStyle = FormBorderStyle.FixedDialog, ShowInTaskbar = false };
+        dialog.Load += (_, _) => dialog.BeginInvoke((Action)(() => dialog.DialogResult = DialogResult.OK));
+        ++ModalCalls;
+        if (service.ShowDialog(dialog) != DialogResult.OK) return value!;
+        ++AcceptedCalls;
+        return 4;
+    }
+}
+
+sealed class UnsupportedPropertyFixture
+{
+    public UnsupportedProperty Value { get; set; } = new();
+}
+
+sealed class UnsupportedProperty { }
+
 sealed class LoadProbe : UserControl
 {
     internal int Loads { get; private set; }
@@ -2555,6 +3292,35 @@ sealed class LoadProbe : UserControl
     {
         ++Loads;
         base.OnLoad(e);
+    }
+}
+
+sealed class ConstructionReentryProbe : UserControl
+{
+    private bool constructionComplete;
+
+    internal ConstructionReentryProbe()
+    {
+        constructionComplete = true;
+    }
+
+    internal int EarlyResizeCalls { get; private set; }
+    internal int EarlyLayoutCalls { get; private set; }
+    internal int ResizeCalls { get; private set; }
+    internal int LayoutCalls { get; private set; }
+
+    protected override void OnResize(EventArgs e)
+    {
+        if (constructionComplete) ++ResizeCalls;
+        else ++EarlyResizeCalls;
+        base.OnResize(e);
+    }
+
+    protected override void OnLayout(LayoutEventArgs e)
+    {
+        if (constructionComplete) ++LayoutCalls;
+        else ++EarlyLayoutCalls;
+        base.OnLayout(e);
     }
 }
 
@@ -2674,6 +3440,7 @@ sealed class TextProbe : TextBox
 sealed class PaintInputProbe : Control
 {
     internal int Paints { get; private set; }
+    internal List<int> PaintThreadIds { get; } = new();
     internal int MouseDowns { get; private set; }
     internal int MouseUps { get; private set; }
     internal Point LastPoint { get; private set; }
@@ -2681,6 +3448,7 @@ sealed class PaintInputProbe : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         ++Paints;
+        PaintThreadIds.Add(Environment.CurrentManagedThreadId);
         base.OnPaint(e);
     }
 
@@ -2881,6 +3649,36 @@ sealed class ScrollProbe : Panel
     internal void RaiseScroll(ScrollEventArgs args) => OnScroll(args);
 }
 
+sealed class ScrollablePaintProbe : ScrollableControl
+{
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using var fill = new SolidBrush(Color.Navy);
+        e.Graphics.FillRectangle(fill, ClientRectangle);
+        base.OnPaint(e);
+    }
+}
+
+sealed class ThemePaintProbe : Control
+{
+    internal int PaintCount { get; private set; }
+    internal Color LastBackColor { get; private set; }
+    internal Color LastForeColor { get; private set; }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        ++PaintCount;
+        LastBackColor = BackColor;
+        LastForeColor = ForeColor;
+        using var background = new SolidBrush(BackColor);
+        using var foreground = new Pen(ForeColor);
+        e.Graphics.FillRectangle(background, ClientRectangle);
+        e.Graphics.DrawRectangle(foreground, 1, 1,
+            Math.Max(0, Width - 3), Math.Max(0, Height - 3));
+        base.OnPaint(e);
+    }
+}
+
 sealed class SplitContainerProbe : SplitContainer
 {
     internal void DragSplitter(int start, int end)
@@ -2960,6 +3758,13 @@ static class NativeSurfaceProbe
     [global::System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
     internal static extern bool IsWindowEnabled(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(nint window);
+    [global::System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
+    internal static extern bool GetLayeredWindowAttributes(
+        nint window, out uint colorKey, out byte alpha, out uint flags);
     [global::System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: global::System.Runtime.InteropServices.MarshalAs(global::System.Runtime.InteropServices.UnmanagedType.Bool)]
     internal static extern bool GetClientRect(nint window, out NativeRect bounds);

@@ -50,6 +50,20 @@ under `t.TempDir`; it never scans a user or repository tree. These M1 numbers
 are reference/control evidence. They do not establish the accepted one-million
 or ten-million durable-engine gates.
 
+## M1L live-query control
+
+The opt-in live-query campaign creates a 10,000-entry zero-byte flat corpus in
+`t.TempDir`, leaves the catalogue unreconciled, consumes every progressive
+page, and reports first-result time, full traversal time, Go allocation,
+descriptor high-water, work counters, and catalogue-generation invariance:
+
+```sh
+FILEMAN_ENGINE_LIVE_MEASURE=1 go test -v -run '^TestLiveQueryDistribution$' -count=1 ./benchmarks
+```
+
+This scale point is a local implementation check. It does not satisfy the
+required million-entry, deep-tree, RSS, CPU, bytes-read, NTFS, or ext4 gates.
+
 ## M2 durable-generation and SQLite control
 
 The M2 measurement is separately opt-in. `FILEMAN_ENGINE_RECORDS` defaults to

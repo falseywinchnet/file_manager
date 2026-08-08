@@ -442,6 +442,36 @@ void test_wrong_thread_property_mutation_is_rejected() {
             "reusable control properties must retain core UI-thread enforcement");
 }
 
+void test_fixed_label_text_is_paint_only() {
+    auto label = make_control<Label>(StableId("label.telemetry"), "0 kB/s");
+    label->set_requested_bounds({0.0, 0.0, 120.0, 24.0});
+    Window window(label, {120.0, 24.0});
+    window.perform_layout();
+    RecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 120.0, 24.0});
+    window.reset_activity_metrics();
+
+    label->set_text("999 kB/s");
+    const DamageRegion damage = window.take_damage();
+    require(!damage.empty(), "fixed label text must request repaint");
+    window.paint(painter, damage.bounds());
+    const MetricsSnapshot fixed = window.metrics_snapshot();
+    require(fixed.measure_passes == 0U && fixed.arrange_passes == 0U &&
+                fixed.paint_passes == 1U,
+            "fixed label text must repaint without remeasuring its ancestors");
+
+    label->set_auto_size(true);
+    window.perform_layout();
+    window.reset_activity_metrics();
+    label->set_text("content-sized telemetry");
+    const DamageRegion auto_damage = window.take_damage();
+    require(!auto_damage.empty(), "auto-sized label text must request repaint");
+    window.paint(painter, auto_damage.bounds());
+    const MetricsSnapshot sized = window.metrics_snapshot();
+    require(sized.measure_passes > 0U && sized.arrange_passes > 0U,
+            "auto-sized label text must continue to participate in layout");
+}
+
 void test_label_multiline_wrapping_and_alignment() {
     auto label = make_control<Label>(StableId("label.multiline"),
                                      "Retained labels wrap words\nand preserve breaks");
@@ -767,6 +797,7 @@ int main() {
         test_radio_group_scope_and_order();
         test_link_and_callback_disposal();
         test_wrong_thread_property_mutation_is_rejected();
+        test_fixed_label_text_is_paint_only();
         test_label_multiline_wrapping_and_alignment();
         test_label_inherits_theme_typography_until_explicitly_overridden();
         test_picture_box_modes_registry_and_semantics();

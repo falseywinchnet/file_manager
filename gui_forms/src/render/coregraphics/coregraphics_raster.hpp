@@ -66,6 +66,9 @@ public:
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
+    void draw_image_region_sampled(ImageId image, Rect source,
+                                   Rect destination, ImageSampling sampling,
+                                   double opacity) override;
     void fill_image_pattern(ImageId image, Size source_pixel_size,
                             Rect destination, Size logical_tile_size,
                             ImagePatternWrap wrap, double opacity) override;

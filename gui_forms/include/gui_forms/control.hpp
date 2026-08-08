@@ -24,6 +24,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -485,6 +486,10 @@ public:
     void set_paint_plane(PaintPlane plane);
     [[nodiscard]] std::optional<DisplayChunkInfo> display_chunk_info() const noexcept;
     void invalidate(Dirty dirty);
+    // Marks only a local client rectangle for repaint. The retained display
+    // chunk remains the authoritative complete presentation, while host
+    // damage and replay stay clipped to this bounded region.
+    void invalidate(Rect local_damage);
     void invalidate_subtree(Dirty dirty);
     void invalidate_declared(Dirty declared_effects);
 
@@ -605,8 +610,32 @@ protected:
     virtual bool process_mnemonic_self(char32_t character);
     virtual void notify_default(bool value);
     void define_bindable_property(BindableProperty property);
+    // Property/state notifications are synchronous outside initialization.
+    // During a nested BeginInit/EndInit scope, one latest-value publication is
+    // retained per event and released only after the outer scope has committed
+    // its accumulated invalidation. This prevents callbacks from observing or
+    // re-entering a partially initialized native control.
+    template <typename... EventArguments, typename... Values>
+    void publish_change(Event<EventArguments...>& event, Values&&... values) {
+        auto payload = std::make_tuple(
+            std::decay_t<Values>(std::forward<Values>(values))...);
+        publish_change(
+            static_cast<const void*>(&event),
+            [&event, payload = std::move(payload)]() mutable {
+                std::apply(
+                    [&event](auto&... stored) { event.emit(stored...); },
+                    payload);
+            });
+    }
+    // Language/object adapters may use Control solely as the retained lifetime
+    // and PropertyGrid owner. They clear the stock visual schema before
+    // defining the foreign object's own inert descriptors.
+    void clear_bindable_properties();
     virtual void on_attached_to_window();
     virtual void on_attachment_committed() noexcept;
+    // Last noexcept callback while the former Window is still available.
+    // Controls use it to retire window-owned resources before detachment.
+    virtual void on_detaching_from_window(Window& former_window) noexcept;
     virtual void on_detached_from_window() noexcept;
     // Derived disposal hooks that retain child controls must finish through
     // this base implementation; it owns the mutation-free child detach path.
@@ -633,7 +662,15 @@ private:
     [[nodiscard]] const BindableProperty* find_bindable_property(
         std::string_view name) const;
     [[nodiscard]] std::uint64_t subtree_size() const noexcept;
+    [[nodiscard]] bool initialization_blocked() const noexcept;
     void verify_dispose_thread() override;
+    void publish_change(const void* event_key,
+                        std::function<void()> publication);
+
+    struct DeferredInitializationChange final {
+        const void* event_key{};
+        std::function<void()> publication;
+    };
 
     static std::atomic<std::uint64_t> next_runtime_id_;
     RuntimeId runtime_id_;
@@ -710,6 +747,8 @@ private:
     Dirty pending_initialization_dirty_{Dirty::none};
     std::uint64_t initialization_depth_{};
     bool pending_initialization_subtree_{};
+    std::vector<DeferredInitializationChange>
+        pending_initialization_changes_;
     bool lifecycle_notification_{};
     std::uint32_t layout_suspend_depth_{};
     bool layout_deferred_{};

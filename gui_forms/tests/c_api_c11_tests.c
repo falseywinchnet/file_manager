@@ -229,7 +229,7 @@ static void test_version_negotiation(void) {
 
     memset(&api, 0, sizeof(api));
     api.struct_size = (uint32_t)sizeof(api);
-    require(gf_get_api_v0(GF_ABI_VERSION_0_21, &api) == GF_OK,
+    require(gf_get_api_v0(GF_ABI_VERSION_0_24, &api) == GF_OK,
             "full ABI table negotiation failed");
     require(api.struct_size == sizeof(api) && api.control_create != NULL &&
                 api.disconnect != NULL && api.control_create_kind != NULL &&
@@ -272,15 +272,329 @@ static void test_version_negotiation(void) {
                 api.suspend_layout != NULL && api.resume_layout != NULL &&
                 api.perform_control_layout != NULL &&
                 api.get_layout_state != NULL &&
-                api.abi_version == GF_ABI_VERSION_0_21,
+                api.property_grid_set_selected_controls != NULL &&
+                api.property_grid_set_sort != NULL &&
+                api.property_grid_get_sort != NULL &&
+                api.property_grid_refresh != NULL &&
+                api.property_object_define != NULL &&
+                api.property_object_notify_changed != NULL &&
+                api.property_grid_try_set_text != NULL &&
+                api.property_grid_reset_property != NULL &&
+                api.property_grid_activate_editor != NULL &&
+                api.abi_version == GF_ABI_VERSION_0_24,
             "negotiated ABI table is incomplete");
 
     gf_api_v0 unsupported;
     memset(&unsupported, 0, sizeof(unsupported));
     unsupported.struct_size = (uint32_t)sizeof(unsupported);
-    require(gf_get_api_v0(UINT32_C(0x00000016), &unsupported) ==
+    require(gf_get_api_v0(UINT32_C(0x00000019), &unsupported) ==
                 GF_ERROR_UNSUPPORTED_VERSION,
             "unsupported ABI version was accepted");
+}
+
+struct property_proxy_context {
+    double value;
+    unsigned gets;
+    unsigned sets;
+    unsigned resets;
+    unsigned serializes;
+    unsigned formats;
+    unsigned edits;
+};
+
+static uint32_t property_get(void* opaque, gf_property_value* value,
+                             char* output, uint64_t capacity,
+                             uint64_t* required) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    (void)output;
+    (void)capacity;
+    ++context->gets;
+    memset(value, 0, sizeof(*value));
+    value->kind = GF_PROPERTY_NUMBER;
+    value->number_value = context->value;
+    *required = 0U;
+    return GF_OK;
+}
+
+static uint32_t property_set(void* opaque,
+                             const gf_property_value* value) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    if (value == NULL || value->kind != GF_PROPERTY_NUMBER) {
+        return GF_ERROR_INVALID_ARGUMENT;
+    }
+    ++context->sets;
+    context->value = value->number_value;
+    return GF_OK;
+}
+
+static uint32_t property_reset(void* opaque) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    ++context->resets;
+    context->value = 1.0;
+    return GF_OK;
+}
+
+static uint32_t property_should_serialize(void* opaque,
+                                          uint32_t* result) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    ++context->serializes;
+    *result = context->value == 1.0 ? 0U : 1U;
+    return GF_OK;
+}
+
+static uint32_t property_format(void* opaque,
+                                const gf_property_value* value,
+                                char* output, uint64_t capacity,
+                                uint64_t* required) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    char formatted[64];
+    int length;
+    ++context->formats;
+    if (value == NULL || value->kind != GF_PROPERTY_NUMBER) {
+        return GF_ERROR_INVALID_ARGUMENT;
+    }
+    length = snprintf(formatted, sizeof(formatted), "%.1f units",
+                      value->number_value);
+    if (length < 0 || (size_t)length >= sizeof(formatted)) {
+        return GF_ERROR_INTERNAL;
+    }
+    *required = (uint64_t)length;
+    if (capacity < (uint64_t)length || output == NULL) {
+        return GF_ERROR_BUFFER_TOO_SMALL;
+    }
+    memcpy(output, formatted, (size_t)length);
+    return GF_OK;
+}
+
+static uint32_t property_parse(void* opaque, gf_string_view input,
+                               gf_property_value* value,
+                               char* output, uint64_t capacity,
+                               uint64_t* required) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    char buffer[64];
+    char* end = NULL;
+    double parsed;
+    (void)context;
+    (void)output;
+    (void)capacity;
+    if (input.size == 0U || input.size >= sizeof(buffer)) {
+        return GF_ERROR_INVALID_ARGUMENT;
+    }
+    memcpy(buffer, input.data, (size_t)input.size);
+    buffer[input.size] = '\0';
+    parsed = strtod(buffer, &end);
+    if (end == buffer) return GF_ERROR_INVALID_ARGUMENT;
+    memset(value, 0, sizeof(*value));
+    value->kind = GF_PROPERTY_NUMBER;
+    value->number_value = parsed;
+    *required = 0U;
+    return GF_OK;
+}
+
+static uint32_t property_edit(void* opaque,
+                              const gf_property_value* current,
+                              gf_property_value* edited,
+                              char* output, uint64_t capacity,
+                              uint64_t* required) {
+    struct property_proxy_context* context =
+        (struct property_proxy_context*)opaque;
+    (void)output;
+    (void)capacity;
+    if (current == NULL || edited == NULL || required == NULL ||
+        current->kind != GF_PROPERTY_NUMBER) {
+        return GF_ERROR_INVALID_ARGUMENT;
+    }
+    ++context->edits;
+    memset(edited, 0, sizeof(*edited));
+    edited->kind = GF_PROPERTY_NUMBER;
+    edited->number_value = 42.5;
+    *required = 0U;
+    return GF_OK;
+}
+
+static void test_abi_0_23_property_object_proxy(void) {
+    gf_handle grid = {0U, 0U};
+    gf_handle proxy = {0U, 0U};
+    gf_handle selected[1];
+    struct property_proxy_context context;
+    gf_property_value standards[2];
+    gf_property_descriptor_v1 descriptor;
+    gf_property_callbacks_v1 callbacks;
+    memset(&context, 0, sizeof(context));
+    memset(standards, 0, sizeof(standards));
+    memset(&descriptor, 0, sizeof(descriptor));
+    memset(&callbacks, 0, sizeof(callbacks));
+    context.value = 42.5;
+    standards[0].kind = GF_PROPERTY_NUMBER;
+    standards[0].number_value = 1.0;
+    standards[1].kind = GF_PROPERTY_NUMBER;
+    standards[1].number_value = 42.5;
+    descriptor.struct_size = (uint32_t)sizeof(descriptor);
+    descriptor.kind = GF_PROPERTY_NUMBER;
+    descriptor.flags = GF_PROPERTY_READABLE | GF_PROPERTY_WRITABLE |
+        GF_PROPERTY_BROWSABLE | GF_PROPERTY_RESETTABLE |
+        GF_PROPERTY_CHANGE_NOTIFICATIONS |
+        GF_PROPERTY_STANDARD_VALUES_EXCLUSIVE;
+    descriptor.name = text("Gain");
+    descriptor.category = text("Receiver");
+    descriptor.description = text("Foreign typed gain");
+    descriptor.standard_values = standards;
+    descriptor.standard_value_count = 2U;
+    descriptor.converter_name = text("fixture.gain.converter");
+    descriptor.editor_name = text("fixture.gain.editor");
+    callbacks.struct_size = (uint32_t)sizeof(callbacks);
+    callbacks.context = &context;
+    callbacks.get = property_get;
+    callbacks.set = property_set;
+    callbacks.reset = property_reset;
+    callbacks.should_serialize = property_should_serialize;
+    callbacks.format = property_format;
+    callbacks.parse = property_parse;
+    callbacks.edit = property_edit;
+
+    require(api.control_create_kind(GF_CONTROL_PROPERTY_GRID,
+                                    text("abi.property-proxy.grid"),
+                                    &grid) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_PROPERTY_OBJECT_PROXY,
+                                        text("abi.property-proxy.object"),
+                                        &proxy) == GF_OK,
+            "0.23 property-object fixtures failed");
+    require(api.property_object_define(proxy, &descriptor, &callbacks) == GF_OK,
+            "0.23 property definition failed");
+    {
+        gf_property_descriptor_v1 legacy_descriptor = descriptor;
+        gf_property_callbacks_v1 legacy_callbacks = callbacks;
+        legacy_descriptor.name = text("LegacyGain");
+        legacy_descriptor.editor_name = text("");
+        legacy_callbacks.struct_size =
+            (uint32_t)offsetof(gf_property_callbacks_v1, edit);
+        require(api.property_object_define(proxy, &legacy_descriptor,
+                                           &legacy_callbacks) == GF_OK,
+                "0.24 rejected the ABI 0.23 callback-record prefix");
+    }
+    selected[0] = proxy;
+    {
+        const gf_result selection_result =
+            api.property_grid_set_selected_controls(grid, selected, 1U);
+        if (selection_result != GF_OK) {
+            gf_error_view error = {0U, {NULL, 0U}};
+            if (api.last_error(&error) == GF_OK && error.message.data != NULL) {
+                fprintf(stderr, "0.23 selection error: %.*s\n",
+                        (int)error.message.size, error.message.data);
+            }
+        }
+        require(selection_result == GF_OK,
+            "0.23 property proxy selection failed");
+    }
+    require(context.gets > 0U,
+            "0.23 property proxy did not invoke its typed getter");
+    require(context.formats > 0U,
+            "0.23 property proxy did not invoke its managed converter");
+    require(context.serializes > 0U,
+            "0.23 property proxy did not invoke its serialization policy");
+    {
+        uint32_t committed = 0U;
+        require(api.property_grid_try_set_text(grid, text("Gain"), text("1.0 units"),
+                                               &committed) == GF_OK,
+                "0.23 converted property text call failed");
+        if (committed != 1U || context.sets != 1U || context.value != 1.0)
+            fprintf(stderr, "0.23 commit state: committed=%u sets=%u value=%f\n",
+                    committed, context.sets, context.value);
+        require(committed == 1U && context.sets == 1U && context.value == 1.0,
+                "0.23 converted property text did not reach the foreign setter");
+        committed = 1U;
+        require(api.property_grid_try_set_text(grid, text("Gain"), text("99"),
+                                               &committed) == GF_OK &&
+                    committed == 0U && context.sets == 1U,
+                "0.23 exclusive standards did not reject a converted value");
+        require(api.property_grid_reset_property(grid, text("Gain"),
+                                                 &committed) == GF_OK &&
+                    committed == 1U && context.resets == 1U,
+                "0.23 foreign reset callback was not committed");
+        {
+            uint32_t activated = 0U;
+            require(api.property_grid_activate_editor(
+                        grid, text("Gain"), &activated) == GF_OK &&
+                        activated == 1U && context.edits == 1U &&
+                        context.sets == 2U && context.value == 42.5,
+                    "0.24 retained foreign editor did not commit its typed result");
+        }
+        committed = 1U;
+        require(api.property_grid_try_set_text(grid, text("Visible"), text("false"),
+                                               &committed) == GF_OK &&
+                    committed == 0U,
+                "0.23 property proxy leaked stock Control metadata");
+    }
+    {
+        const unsigned prior_gets = context.gets;
+        gf_error_view notification_error = {0U, {NULL, 0U}};
+        context.value = 1.0;
+        {
+            const gf_result notification_result =
+                api.property_object_notify_changed(proxy, text("Gain"));
+            if (notification_result != GF_OK &&
+                api.last_error(&notification_error) == GF_OK &&
+                notification_error.message.data != NULL) {
+                fprintf(stderr, "0.23 notification error: %.*s\n",
+                        (int)notification_error.message.size,
+                        notification_error.message.data);
+            }
+            require(notification_result == GF_OK,
+                "0.23 external property notification call failed");
+        }
+        require(context.gets > prior_gets,
+                "0.23 external property notification did not refresh the grid");
+    }
+    require(api.property_object_notify_changed(proxy, text("Missing")) ==
+                GF_ERROR_INVALID_ARGUMENT &&
+                api.property_object_define(grid, &descriptor, &callbacks) ==
+                    GF_ERROR_WRONG_HANDLE_KIND &&
+                api.property_grid_activate_editor(
+                    proxy, text("Gain"), NULL) == GF_ERROR_INVALID_ARGUMENT,
+            "0.23 property proxy accepted a wrong property or handle kind");
+    require(api.property_grid_set_selected_controls(grid, NULL, 0U) == GF_OK &&
+                api.dispose(grid) == GF_OK && api.dispose(proxy) == GF_OK,
+            "0.23 property-object cleanup failed");
+}
+
+static void test_abi_0_22_property_grid_projection(void) {
+    gf_handle grid = {0U, 0U};
+    gf_handle first = {0U, 0U};
+    gf_handle second = {0U, 0U};
+    gf_handle selection[2];
+    uint32_t sort = 99U;
+    require(api.control_create_kind(GF_CONTROL_PROPERTY_GRID,
+                                    text("abi.property-grid"), &grid) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_LABEL,
+                                        text("abi.property-grid.first"),
+                                        &first) == GF_OK &&
+                api.control_create_kind(GF_CONTROL_LABEL,
+                                        text("abi.property-grid.second"),
+                                        &second) == GF_OK,
+            "0.22 PropertyGrid fixtures failed");
+    selection[0] = first;
+    selection[1] = second;
+    require(api.property_grid_set_selected_controls(grid, selection, 2U) ==
+                GF_OK &&
+                api.property_grid_set_sort(grid, 1U) == GF_OK &&
+                api.property_grid_get_sort(grid, &sort) == GF_OK &&
+                sort == 1U && api.property_grid_refresh(grid) == GF_OK,
+            "0.22 PropertyGrid selection/sort/refresh projection failed");
+    require(api.property_grid_set_selected_controls(first, selection, 2U) ==
+                GF_ERROR_WRONG_HANDLE_KIND &&
+                api.property_grid_set_sort(grid, 4U) ==
+                    GF_ERROR_INVALID_ARGUMENT,
+            "0.22 PropertyGrid projection accepted a wrong handle or sort");
+    require(api.property_grid_set_selected_controls(grid, NULL, 0U) == GF_OK &&
+                api.dispose(grid) == GF_OK && api.dispose(first) == GF_OK &&
+                api.dispose(second) == GF_OK,
+            "0.22 PropertyGrid projection cleanup failed");
 }
 
 static void test_abi_0_21_layout_transactions(void) {
@@ -1251,6 +1565,8 @@ static void test_event_tokens_and_callback_disposal(void) {
 
 int main(void) {
     test_version_negotiation();
+    test_abi_0_23_property_object_proxy();
+    test_abi_0_22_property_grid_projection();
     test_abi_0_21_layout_transactions();
     test_abi_0_20_scrollable_control_contract();
     test_abi_0_19_cursor_contract();

@@ -101,6 +101,69 @@ void geometry_and_color_are_deterministic() {
     CHECK(default_system_palette().control.argb() == UINT32_C(0xfff0f0f0));
 }
 
+void explicit_color_spaces_round_trip_and_report_gamut() {
+    const LinearSrgb red = srgb_to_linear(Color::from_name("red"));
+    CHECK(std::abs(red.red - 1.0) < 1e-12);
+    CHECK(std::abs(red.green) < 1e-12 && std::abs(red.blue) < 1e-12);
+    const XyzD65 xyz = linear_srgb_to_xyz_d65(red);
+    CHECK(std::abs(xyz.x - 0.4124564) < 1e-7);
+    CHECK(std::abs(xyz.y - 0.2126729) < 1e-7);
+    CHECK(std::abs(xyz.z - 0.0193339) < 1e-7);
+
+    const Oklab lab = linear_srgb_to_oklab(red);
+    CHECK(std::abs(lab.lightness - 0.62795536) < 1e-7);
+    CHECK(std::abs(lab.a - 0.22486306) < 1e-7);
+    CHECK(std::abs(lab.b - 0.12584630) < 1e-7);
+    const Oklch lch = oklab_to_oklch(lab);
+    CHECK(std::abs(lch.chroma - 0.25768331) < 1e-7);
+    CHECK(std::abs(lch.hue_degrees - 29.233885) < 1e-5);
+    CHECK(oklch_to_srgb(lch).color.argb() == Color::from_name("red").argb());
+
+    const Color samples[] = {
+        Color::from_argb(17, 0, 0, 0),
+        Color::from_argb(128, 12, 93, 201),
+        Color::from_argb(255, 255, 255, 255),
+        Color::from_argb(231, 44, 219, 71),
+    };
+    for (const Color sample : samples) {
+        const LinearSrgb linear = srgb_to_linear(sample);
+        const LinearSrgb xyz_round_trip =
+            xyz_d65_to_linear_srgb(linear_srgb_to_xyz_d65(linear));
+        const SrgbConversion xyz_result = linear_to_srgb(xyz_round_trip);
+        CHECK(xyz_result.in_gamut);
+        const auto channel_close = [](std::uint8_t first, std::uint8_t second) {
+            return std::abs(static_cast<int>(first) - static_cast<int>(second)) <= 1;
+        };
+        CHECK(channel_close(xyz_result.color.red(), sample.red()));
+        CHECK(channel_close(xyz_result.color.green(), sample.green()));
+        CHECK(channel_close(xyz_result.color.blue(), sample.blue()));
+        CHECK(channel_close(xyz_result.color.alpha(), sample.alpha()));
+
+        const SrgbConversion lab_result = linear_to_srgb(
+            oklab_to_linear_srgb(linear_srgb_to_oklab(linear)));
+        CHECK(lab_result.in_gamut);
+        CHECK(channel_close(lab_result.color.red(), sample.red()));
+        CHECK(channel_close(lab_result.color.green(), sample.green()));
+        CHECK(channel_close(lab_result.color.blue(), sample.blue()));
+    }
+
+    const Oklch requested{0.72, 0.42, 40.0, 0.65};
+    const SrgbConversion clipped = oklch_to_srgb(requested);
+    CHECK(!clipped.in_gamut && clipped.clipped);
+    const OklchGamutMapping mapped = map_oklch_to_srgb_gamut(requested);
+    CHECK(mapped.srgb.in_gamut && !mapped.srgb.clipped);
+    CHECK(mapped.mapped.chroma < requested.chroma);
+    CHECK(mapped.mapped.lightness == requested.lightness);
+    CHECK(mapped.mapped.hue_degrees == requested.hue_degrees);
+    CHECK(mapped.mapped.alpha == requested.alpha);
+    CHECK(mapped.srgb.color.alpha() == 166U);
+
+    CHECK_THROWS(std::invalid_argument,
+                 linear_to_srgb({0, 0, 0, 1.1}));
+    CHECK_THROWS(std::invalid_argument,
+                 oklch_to_oklab({0.5, -0.1, 20, 1}));
+}
+
 void transforms_resources_and_metrics_obey_contracts() {
     const Matrix transform = Matrix::translation(10.0, 20.0)
         .followed_by(Matrix::rotation_at(90.0, {10.0, 20.0}));
@@ -402,14 +465,80 @@ void bitmap_storage_and_leases_are_generation_safe() {
     CHECK(rejected.load());
 }
 
+void bounded_bitmap_edits_publish_local_damage_and_cancel_atomically() {
+    Bitmap bitmap(8, 6);
+    CHECK(bitmap.changes_since(1).empty());
+
+    const ImageSnapshot before = bitmap.snapshot();
+    BitmapEditView edit = bitmap.begin_edit({2, 1, 4, 3});
+    CHECK(edit.data == edit.writable_data);
+    CHECK(edit.bounds == (RectI{2, 1, 4, 3}));
+    CHECK(edit.row_bytes == 32U);
+    CHECK_THROWS(std::logic_error, bitmap.snapshot());
+    CHECK_THROWS(std::logic_error, bitmap.unlock(edit.token));
+
+    const auto write_blue = [&](std::int32_t x, std::int32_t y) {
+        std::byte* pixel = edit.writable_data +
+            static_cast<std::size_t>(y) * edit.row_bytes +
+            static_cast<std::size_t>(x) * 4U;
+        pixel[0] = std::byte{255};
+        pixel[1] = std::byte{0};
+        pixel[2] = std::byte{0};
+        pixel[3] = std::byte{255};
+    };
+    write_blue(0, 0);
+    write_blue(1, 0);
+    write_blue(0, 1);
+    write_blue(1, 1);
+    write_blue(3, 2);
+    CHECK(bitmap.commit_edit(edit.token) == 2U);
+    CHECK(bitmap.get_pixel(2, 1).argb() == Color::from_name("blue").argb());
+    CHECK(before.pixels()[static_cast<std::size_t>(1) * before.row_bytes() +
+                          static_cast<std::size_t>(2) * 4U + 3U] == std::byte{0});
+
+    BitmapDamageSnapshot damage = bitmap.changes_since(1);
+    CHECK(damage.history_complete);
+    CHECK(damage.from_generation == 1U && damage.to_generation == 2U);
+    CHECK(damage.rectangles.size() == 2U);
+    CHECK(damage.rectangles[0] == (RectI{2, 1, 2, 2}));
+    CHECK(damage.rectangles[1] == (RectI{5, 3, 1, 1}));
+    CHECK(bitmap.changes_since(2).empty());
+
+    edit = bitmap.begin_edit({2, 1, 1, 1});
+    edit.writable_data[0] = std::byte{0};
+    bitmap.cancel_edit(edit.token);
+    CHECK(bitmap.generation() == 2U);
+    CHECK(bitmap.get_pixel(2, 1).argb() == Color::from_name("blue").argb());
+    CHECK_THROWS(std::invalid_argument, bitmap.cancel_edit(edit.token));
+
+    edit = bitmap.begin_edit({0, 0, 1, 1});
+    CHECK(bitmap.commit_edit(edit.token) == 2U);
+    CHECK(bitmap.changes_since(2).empty());
+    CHECK_THROWS(std::invalid_argument, bitmap.begin_edit({-1, 0, 1, 1}));
+    CHECK_THROWS(std::invalid_argument, bitmap.begin_edit({7, 5, 2, 1}));
+    CHECK_THROWS(std::invalid_argument, bitmap.changes_since(3));
+
+    Bitmap history(1, 1);
+    for (std::size_t index = 0; index < Bitmap::maximum_damage_history + 1U;
+         ++index) {
+        history.set_pixel(0, 0, index % 2U == 0U
+            ? Color::from_name("red") : Color::from_name("blue"));
+    }
+    damage = history.changes_since(1);
+    CHECK(!damage.history_complete);
+    CHECK((damage.rectangles == std::vector<RectI>{{0, 0, 1, 1}}));
+}
+
 } // namespace
 
 int main() {
     geometry_and_color_are_deterministic();
+    explicit_color_spaces_round_trip_and_report_gamut();
     transforms_resources_and_metrics_obey_contracts();
     extended_vocabulary_snapshots_resources();
     curve_polygon_and_pie_paths_are_retained_and_bounded();
     bitmap_storage_and_leases_are_generation_safe();
+    bounded_bitmap_edits_publish_local_damage_and_cancel_atomically();
     const std::string trace = record_reference_trace();
     CHECK(trace == gui_drawing_expected_trace);
     CHECK(record_reference_trace() == trace);

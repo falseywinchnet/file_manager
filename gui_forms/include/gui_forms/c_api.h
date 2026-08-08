@@ -42,6 +42,9 @@ extern "C" {
 #define GF_ABI_VERSION_0_19 UINT32_C(0x00000013)
 #define GF_ABI_VERSION_0_20 UINT32_C(0x00000014)
 #define GF_ABI_VERSION_0_21 UINT32_C(0x00000015)
+#define GF_ABI_VERSION_0_22 UINT32_C(0x00000016)
+#define GF_ABI_VERSION_0_23 UINT32_C(0x00000017)
+#define GF_ABI_VERSION_0_24 UINT32_C(0x00000018)
 
 #define GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED UINT32_C(1)
 
@@ -106,6 +109,110 @@ typedef struct gf_layout_state {
     uint64_t requested_revision;
     uint64_t committed_revision;
 } gf_layout_state;
+
+/*
+ * ABI 0.23 property values are synchronous snapshots. Text output callbacks
+ * write into caller-owned buffers; no managed or foreign pointer is retained.
+ */
+typedef struct gf_property_value {
+    uint32_t kind;
+    uint32_t boolean_value;
+    int64_t signed_value;
+    uint64_t unsigned_value;
+    double number_value;
+    uint32_t color_argb;
+    gf_string_view text_value;
+} gf_property_value;
+
+typedef struct gf_property_enum_choice {
+    gf_string_view name;
+    int64_t value;
+} gf_property_enum_choice;
+
+typedef enum gf_property_value_kind {
+    GF_PROPERTY_NULL = 0,
+    GF_PROPERTY_BOOLEAN = 1,
+    GF_PROPERTY_SIGNED_INTEGER = 2,
+    GF_PROPERTY_UNSIGNED_INTEGER = 3,
+    GF_PROPERTY_NUMBER = 4,
+    GF_PROPERTY_TEXT = 5,
+    GF_PROPERTY_COLOR = 10,
+    GF_PROPERTY_ENUMERATION = 13
+} gf_property_value_kind;
+
+typedef enum gf_property_descriptor_flag {
+    GF_PROPERTY_READABLE = 1 << 0,
+    GF_PROPERTY_WRITABLE = 1 << 1,
+    GF_PROPERTY_BROWSABLE = 1 << 2,
+    GF_PROPERTY_NULLABLE = 1 << 3,
+    GF_PROPERTY_STANDARD_VALUES_EXCLUSIVE = 1 << 4,
+    GF_PROPERTY_RESETTABLE = 1 << 5,
+    GF_PROPERTY_CHANGE_NOTIFICATIONS = 1 << 6,
+    GF_PROPERTY_ENUM_FLAGS = 1 << 7
+} gf_property_descriptor_flag;
+
+typedef struct gf_property_descriptor_v1 {
+    uint32_t struct_size;
+    uint32_t kind;
+    uint32_t flags;
+    uint32_t reserved;
+    gf_string_view name;
+    gf_string_view category;
+    gf_string_view description;
+    gf_string_view enum_type_name;
+    const gf_property_enum_choice* enum_choices;
+    uint64_t enum_choice_count;
+    const gf_property_value* standard_values;
+    uint64_t standard_value_count;
+    gf_string_view converter_name;
+    gf_string_view editor_name;
+} gf_property_descriptor_v1;
+
+typedef uint32_t (*gf_property_get_callback)(
+    void* context,
+    gf_property_value* value,
+    char* text_buffer,
+    uint64_t text_capacity,
+    uint64_t* required_text_size);
+typedef uint32_t (*gf_property_set_callback)(
+    void* context, const gf_property_value* value);
+typedef uint32_t (*gf_property_reset_callback)(void* context);
+typedef uint32_t (*gf_property_should_serialize_callback)(
+    void* context, uint32_t* should_serialize);
+typedef uint32_t (*gf_property_format_callback)(
+    void* context,
+    const gf_property_value* value,
+    char* text_buffer,
+    uint64_t text_capacity,
+    uint64_t* required_text_size);
+typedef uint32_t (*gf_property_parse_callback)(
+    void* context,
+    gf_string_view text,
+    gf_property_value* value,
+    char* value_text_buffer,
+    uint64_t value_text_capacity,
+    uint64_t* required_value_text_size);
+typedef uint32_t (*gf_property_edit_callback)(
+    void* context,
+    const gf_property_value* current_value,
+    gf_property_value* edited_value,
+    char* edited_text_buffer,
+    uint64_t edited_text_capacity,
+    uint64_t* required_edited_text_size);
+
+typedef struct gf_property_callbacks_v1 {
+    uint32_t struct_size;
+    uint32_t reserved;
+    void* context;
+    gf_property_get_callback get;
+    gf_property_set_callback set;
+    gf_property_reset_callback reset;
+    gf_property_should_serialize_callback should_serialize;
+    gf_property_format_callback format;
+    gf_property_parse_callback parse;
+    /* ABI 0.24 optional tail; inspect struct_size before reading it. */
+    gf_property_edit_callback edit;
+} gf_property_callbacks_v1;
 
 typedef struct gf_field_edit_result {
     uint64_t anchor_utf8;
@@ -184,6 +291,9 @@ typedef enum gf_control_kind {
     GF_CONTROL_INPUT_TRANSPARENT = 19,
     /* Owner-painted retained surface which remains pointer transparent. */
     GF_CONTROL_INPUT_TRANSPARENT_CUSTOM = 20,
+    GF_CONTROL_PROPERTY_GRID = 21,
+    /* Nonvisual retained owner for foreign TypeDescriptor projections. */
+    GF_CONTROL_PROPERTY_OBJECT_PROXY = 22,
     GF_CONTROL_CUSTOM = 0x7fffffff
 } gf_control_kind;
 
@@ -456,6 +566,45 @@ typedef struct gf_api_v0 {
     gf_result (*resume_layout)(gf_handle control, uint32_t perform_layout);
     gf_result (*perform_control_layout)(gf_handle control);
     gf_result (*get_layout_state)(gf_handle control, gf_layout_state* state);
+
+    /* ABI 0.22 additions: native PropertyGrid managed-facade projection. */
+    gf_result (*property_grid_set_selected_controls)(
+        gf_handle property_grid,
+        const gf_handle* controls,
+        uint64_t count);
+    gf_result (*property_grid_set_sort)(gf_handle property_grid,
+                                        uint32_t property_sort);
+    gf_result (*property_grid_get_sort)(gf_handle property_grid,
+                                        uint32_t* property_sort);
+    gf_result (*property_grid_refresh)(gf_handle property_grid);
+
+    /*
+     * ABI 0.23 additions: bounded foreign-object property metadata and typed
+     * callbacks. Definitions are deep-copied during this call. Callback
+     * context remains caller-owned and must outlive the proxy handle.
+     */
+    gf_result (*property_object_define)(
+        gf_handle property_object,
+        const gf_property_descriptor_v1* descriptor,
+        const gf_property_callbacks_v1* callbacks);
+    gf_result (*property_object_notify_changed)(
+        gf_handle property_object,
+        gf_string_view property_name);
+    gf_result (*property_grid_try_set_text)(
+        gf_handle property_grid,
+        gf_string_view property_name,
+        gf_string_view text,
+        uint32_t* committed);
+    gf_result (*property_grid_reset_property)(
+        gf_handle property_grid,
+        gf_string_view property_name,
+        uint32_t* committed);
+
+    /* ABI 0.24: activate the retained editor for one projected property. */
+    gf_result (*property_grid_activate_editor)(
+        gf_handle property_grid,
+        gf_string_view property_name,
+        uint32_t* activated);
 } gf_api_v0;
 
 /*
@@ -464,6 +613,60 @@ typedef struct gf_api_v0 {
  */
 GF_C_API_EXPORT gf_result gf_get_api_v0(uint32_t requested_version,
                                         gf_api_v0* table);
+
+/*
+ * Windows-only compatibility paint endpoint extension. This is intentionally
+ * outside the portable retained-control ABI table: the returned value is a
+ * virtual WinForms handle understood by the compatibility shim, not an HWND or
+ * a GUI.Forms visual/input surface. Width/height changes preserve the token.
+ */
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_acquire_v1(
+    gf_handle control,
+    uint32_t width,
+    uint32_t height,
+    uint64_t* endpoint,
+    uintptr_t* compatibility_handle);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_configure_v1(
+    uint64_t endpoint,
+    uint32_t width,
+    uint32_t height);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_touch_v1(
+    uint64_t endpoint,
+    uint32_t explicit_boundary);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_drain_v1(
+    uint64_t endpoint);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_snapshot_v1(
+    uint64_t endpoint,
+    char* buffer,
+    uint64_t capacity,
+    uint64_t* required_size);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_submit_bgra_v1(
+    uintptr_t compatibility_handle,
+    uint32_t width,
+    uint32_t height,
+    uint64_t row_bytes,
+    const void* pixels);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_release_v1(
+    uint64_t endpoint);
+/* Internal compatibility-shim bridge. Unknown handles return STALE_HANDLE so
+ * the shim can fall through to the operating system implementation. */
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_get_dc_v1(
+    uintptr_t compatibility_handle,
+    uintptr_t* device_context);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_release_dc_v1(
+    uintptr_t compatibility_handle,
+    uintptr_t device_context);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_publish_dc_v1(
+    uintptr_t device_context);
+/* Short operation lease for compatibility destination writes. The lease owns
+ * the endpoint and serializes only the final GDI write/publish against resize
+ * and release; callers must end it synchronously on the acquiring thread. */
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_begin_write_v1(
+    uintptr_t device_context,
+    uint64_t* write_lease);
+GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_end_write_v1(
+    uint64_t write_lease,
+    uint32_t publish);
 
 
 #ifdef __cplusplus

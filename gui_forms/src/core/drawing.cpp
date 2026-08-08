@@ -306,6 +306,24 @@ void store_color(PixelStorage& storage, std::uint32_t x, std::uint32_t y,
                             unpremultiply(green, alpha), unpremultiply(blue, alpha));
 }
 
+[[nodiscard]] bool stored_color_equals(const PixelStorage& storage,
+                                       std::uint32_t x, std::uint32_t y,
+                                       Color color) noexcept {
+    const std::size_t offset = pixel_offset(storage, x, y);
+    const std::uint8_t alpha = color.is_empty() ? 0U : color.alpha();
+    const std::uint8_t red = premultiply(color.red(), alpha);
+    const std::uint8_t green = premultiply(color.green(), alpha);
+    const std::uint8_t blue = premultiply(color.blue(), alpha);
+    const std::uint8_t first = storage.pixel_format ==
+            PixelFormat::bgra32_premultiplied ? blue : red;
+    const std::uint8_t third = storage.pixel_format ==
+            PixelFormat::bgra32_premultiplied ? red : blue;
+    return std::to_integer<std::uint8_t>(storage.bytes[offset]) == first &&
+        std::to_integer<std::uint8_t>(storage.bytes[offset + 1U]) == green &&
+        std::to_integer<std::uint8_t>(storage.bytes[offset + 2U]) == third &&
+        std::to_integer<std::uint8_t>(storage.bytes[offset + 3U]) == alpha;
+}
+
 template <typename Enum>
 void require_enum(Enum value, unsigned maximum, std::string_view field) {
     using Underlying = std::underlying_type_t<Enum>;
@@ -720,6 +738,213 @@ double Color::brightness() const noexcept {
     const auto minimum = std::min({red(), green(), blue()});
     const auto maximum = std::max({red(), green(), blue()});
     return (static_cast<double>(minimum) + maximum) / 510.0;
+}
+
+namespace {
+
+void require_alpha(double alpha, std::string_view field) {
+    require_finite(alpha, field);
+    if (alpha < 0.0 || alpha > 1.0) {
+        throw std::invalid_argument(std::string(field) +
+                                    " must be in the unit interval");
+    }
+}
+
+void require_linear(LinearSrgb color) {
+    require_finite(color.red, "linear sRGB red");
+    require_finite(color.green, "linear sRGB green");
+    require_finite(color.blue, "linear sRGB blue");
+    require_alpha(color.alpha, "linear sRGB alpha");
+}
+
+void require_xyz(XyzD65 color) {
+    require_finite(color.x, "XYZ X");
+    require_finite(color.y, "XYZ Y");
+    require_finite(color.z, "XYZ Z");
+    require_alpha(color.alpha, "XYZ alpha");
+}
+
+void require_oklab(Oklab color) {
+    require_finite(color.lightness, "OKLab lightness");
+    require_finite(color.a, "OKLab a");
+    require_finite(color.b, "OKLab b");
+    require_alpha(color.alpha, "OKLab alpha");
+}
+
+[[nodiscard]] double normalized_hue(double degrees) noexcept {
+    double result = std::fmod(degrees, 360.0);
+    if (result < 0.0) result += 360.0;
+    return result == 360.0 ? 0.0 : result;
+}
+
+void require_oklch(Oklch color) {
+    require_finite(color.lightness, "OKLCH lightness");
+    require_finite(color.chroma, "OKLCH chroma");
+    require_finite(color.hue_degrees, "OKLCH hue");
+    require_alpha(color.alpha, "OKLCH alpha");
+    if (color.chroma < 0.0) {
+        throw std::invalid_argument("OKLCH chroma must be nonnegative");
+    }
+}
+
+[[nodiscard]] double decode_srgb(double value) noexcept {
+    return value <= 0.04045 ? value / 12.92 :
+        std::pow((value + 0.055) / 1.055, 2.4);
+}
+
+[[nodiscard]] double encode_srgb(double value) noexcept {
+    return value <= 0.0031308 ? value * 12.92 :
+        1.055 * std::pow(value, 1.0 / 2.4) - 0.055;
+}
+
+} // namespace
+
+LinearSrgb srgb_to_linear(Color color) {
+    if (color.is_empty()) return {};
+    return {decode_srgb(color.red() / 255.0),
+            decode_srgb(color.green() / 255.0),
+            decode_srgb(color.blue() / 255.0),
+            color.alpha() / 255.0};
+}
+
+SrgbConversion linear_to_srgb(LinearSrgb color) {
+    require_linear(color);
+    constexpr double epsilon = 5e-7;
+    const bool in_gamut = color.red >= -epsilon && color.red <= 1.0 + epsilon &&
+        color.green >= -epsilon && color.green <= 1.0 + epsilon &&
+        color.blue >= -epsilon && color.blue <= 1.0 + epsilon;
+    const double red = std::clamp(encode_srgb(color.red), 0.0, 1.0);
+    const double green = std::clamp(encode_srgb(color.green), 0.0, 1.0);
+    const double blue = std::clamp(encode_srgb(color.blue), 0.0, 1.0);
+    return {Color::from_argb(normalized_channel(color.alpha),
+                             normalized_channel(red),
+                             normalized_channel(green),
+                             normalized_channel(blue)),
+            color, in_gamut, !in_gamut};
+}
+
+XyzD65 linear_srgb_to_xyz_d65(LinearSrgb color) {
+    require_linear(color);
+    return {
+        0.4124564 * color.red + 0.3575761 * color.green +
+            0.1804375 * color.blue,
+        0.2126729 * color.red + 0.7151522 * color.green +
+            0.0721750 * color.blue,
+        0.0193339 * color.red + 0.1191920 * color.green +
+            0.9503041 * color.blue,
+        color.alpha};
+}
+
+LinearSrgb xyz_d65_to_linear_srgb(XyzD65 color) {
+    require_xyz(color);
+    return {
+         3.2404542 * color.x - 1.5371385 * color.y - 0.4985314 * color.z,
+        -0.9692660 * color.x + 1.8760108 * color.y + 0.0415560 * color.z,
+         0.0556434 * color.x - 0.2040259 * color.y + 1.0572252 * color.z,
+         color.alpha};
+}
+
+Oklab linear_srgb_to_oklab(LinearSrgb color) {
+    require_linear(color);
+    const double l = 0.4122214708 * color.red +
+                     0.5363325363 * color.green +
+                     0.0514459929 * color.blue;
+    const double m = 0.2119034982 * color.red +
+                     0.6806995451 * color.green +
+                     0.1073969566 * color.blue;
+    const double s = 0.0883024619 * color.red +
+                     0.2817188376 * color.green +
+                     0.6299787005 * color.blue;
+    const double l_root = std::cbrt(l);
+    const double m_root = std::cbrt(m);
+    const double s_root = std::cbrt(s);
+    return {
+        0.2104542553 * l_root + 0.7936177850 * m_root -
+            0.0040720468 * s_root,
+        1.9779984951 * l_root - 2.4285922050 * m_root +
+            0.4505937099 * s_root,
+        0.0259040371 * l_root + 0.7827717662 * m_root -
+            0.8086757660 * s_root,
+        color.alpha};
+}
+
+LinearSrgb oklab_to_linear_srgb(Oklab color) {
+    require_oklab(color);
+    const double l_root = color.lightness + 0.3963377774 * color.a +
+                          0.2158037573 * color.b;
+    const double m_root = color.lightness - 0.1055613458 * color.a -
+                          0.0638541728 * color.b;
+    const double s_root = color.lightness - 0.0894841775 * color.a -
+                          1.2914855480 * color.b;
+    const double l = l_root * l_root * l_root;
+    const double m = m_root * m_root * m_root;
+    const double s = s_root * s_root * s_root;
+    return {
+         4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+        color.alpha};
+}
+
+Oklab xyz_d65_to_oklab(XyzD65 color) {
+    return linear_srgb_to_oklab(xyz_d65_to_linear_srgb(color));
+}
+
+XyzD65 oklab_to_xyz_d65(Oklab color) {
+    return linear_srgb_to_xyz_d65(oklab_to_linear_srgb(color));
+}
+
+Oklch oklab_to_oklch(Oklab color) {
+    require_oklab(color);
+    const double chroma = std::hypot(color.a, color.b);
+    const double hue = chroma <= 1e-15 ? 0.0 : normalized_hue(
+        std::atan2(color.b, color.a) * 180.0 / std::acos(-1.0));
+    return {color.lightness, chroma, hue, color.alpha};
+}
+
+Oklab oklch_to_oklab(Oklch color) {
+    require_oklch(color);
+    const double radians = normalized_hue(color.hue_degrees) *
+                           std::acos(-1.0) / 180.0;
+    return {color.lightness, color.chroma * std::cos(radians),
+            color.chroma * std::sin(radians), color.alpha};
+}
+
+SrgbConversion oklch_to_srgb(Oklch color) {
+    return linear_to_srgb(oklab_to_linear_srgb(oklch_to_oklab(color)));
+}
+
+OklchGamutMapping map_oklch_to_srgb_gamut(Oklch color) {
+    require_oklch(color);
+    color.hue_degrees = normalized_hue(color.hue_degrees);
+    SrgbConversion requested = oklch_to_srgb(color);
+    if (requested.in_gamut) return {color, color, requested};
+
+    Oklch neutral = color;
+    neutral.chroma = 0.0;
+    SrgbConversion neutral_srgb = oklch_to_srgb(neutral);
+    if (!neutral_srgb.in_gamut) {
+        return {color, neutral, neutral_srgb};
+    }
+
+    double low = 0.0;
+    double high = color.chroma;
+    Oklch mapped = neutral;
+    SrgbConversion mapped_srgb = neutral_srgb;
+    for (std::size_t iteration = 0; iteration < 24U; ++iteration) {
+        const double candidate_chroma = (low + high) * 0.5;
+        Oklch candidate = color;
+        candidate.chroma = candidate_chroma;
+        SrgbConversion converted = oklch_to_srgb(candidate);
+        if (converted.in_gamut) {
+            low = candidate_chroma;
+            mapped = candidate;
+            mapped_srgb = converted;
+        } else {
+            high = candidate_chroma;
+        }
+    }
+    return {color, mapped, mapped_srgb};
 }
 
 const SystemPalette& default_system_palette() noexcept {
@@ -1755,6 +1980,7 @@ Bitmap::Bitmap(std::uint32_t width, std::uint32_t height,
     storage_->pixel_format = pixel_format;
     storage_->row_bytes = static_cast<std::size_t>(row_bytes);
     storage_->bytes.resize(static_cast<std::size_t>(byte_count));
+    damage_history_.reserve(maximum_damage_history);
     stable_id_ = next_bitmap_id.fetch_add(1U, std::memory_order_relaxed);
     if (stable_id_ == 0U) {
         throw std::overflow_error("bitmap identity space exhausted");
@@ -1792,27 +2018,73 @@ void Bitmap::set_pixel(std::uint32_t x, std::uint32_t y, Color color) {
     require_alive();
     require_unlocked();
     require_coordinate(x, y);
+    if (stored_color_equals(*storage_, x, y, color)) return;
     prepare_write();
     store_color(*storage_, x, y, color);
-    publish_mutation();
+    publish_mutation({RectI{static_cast<std::int32_t>(x),
+                            static_cast<std::int32_t>(y), 1, 1}});
 }
 
 void Bitmap::make_transparent(Color key) {
     require_alive();
     require_unlocked();
-    prepare_write();
-    bool changed = false;
-    for (std::uint32_t y = 0; y < storage_->height; ++y) {
+    bool found = false;
+    for (std::uint32_t y = 0; y < storage_->height && !found; ++y) {
         for (std::uint32_t x = 0; x < storage_->width; ++x) {
             const Color value = load_color(*storage_, x, y);
-            if (value.red() == key.red() && value.green() == key.green() &&
+            if (value.alpha() != 0U && value.red() == key.red() &&
+                value.green() == key.green() &&
                 value.blue() == key.blue()) {
-                store_color(*storage_, x, y, Color::from_argb(0U, 0U, 0U, 0U));
-                changed = true;
+                found = true;
+                break;
             }
         }
     }
-    if (changed) publish_mutation();
+    if (!found) return;
+
+    prepare_write();
+    std::vector<RectI> damage;
+    for (std::uint32_t y = 0; y < storage_->height; ++y) {
+        std::optional<std::uint32_t> run_start;
+        for (std::uint32_t x = 0; x < storage_->width; ++x) {
+            const Color value = load_color(*storage_, x, y);
+            if (value.alpha() != 0U && value.red() == key.red() &&
+                value.green() == key.green() &&
+                value.blue() == key.blue()) {
+                store_color(*storage_, x, y, Color::from_argb(0U, 0U, 0U, 0U));
+                if (!run_start) run_start = x;
+            } else if (run_start) {
+                damage.push_back({static_cast<std::int32_t>(*run_start),
+                                  static_cast<std::int32_t>(y),
+                                  static_cast<std::int32_t>(x - *run_start), 1});
+                run_start.reset();
+            }
+        }
+        if (run_start) {
+            damage.push_back({static_cast<std::int32_t>(*run_start),
+                              static_cast<std::int32_t>(y),
+                              static_cast<std::int32_t>(storage_->width - *run_start),
+                              1});
+        }
+        if (damage.size() > maximum_damage_rectangles) {
+            damage.assign(1U, RectI{0, 0,
+                static_cast<std::int32_t>(storage_->width),
+                static_cast<std::int32_t>(storage_->height)});
+            for (++y; y < storage_->height; ++y) {
+                for (std::uint32_t x = 0; x < storage_->width; ++x) {
+                    const Color value = load_color(*storage_, x, y);
+                    if (value.alpha() != 0U && value.red() == key.red() &&
+                        value.green() == key.green() &&
+                        value.blue() == key.blue()) {
+                        store_color(*storage_, x, y,
+                                    Color::from_argb(0U, 0U, 0U, 0U));
+                    }
+                }
+            }
+            break;
+        }
+    }
+    publish_mutation(std::move(damage));
 }
 
 std::unique_ptr<Bitmap> Bitmap::clone(RectI source) const {
@@ -1920,15 +2192,178 @@ void Bitmap::unlock(std::uint64_t token) {
     if (active_lock_token_ == 0U || token == 0U || token != active_lock_token_) {
         throw std::invalid_argument("bitmap lock token is invalid or already released");
     }
+    if (active_edit_) {
+        throw std::logic_error(
+            "a bounded bitmap edit must be committed or cancelled explicitly");
+    }
     const bool wrote = lock_mode_ != BitmapLockMode::read;
     active_lock_token_ = 0U;
     lock_mode_ = BitmapLockMode::read;
-    if (wrote) publish_mutation();
+    if (wrote) {
+        publish_mutation({RectI{0, 0,
+            static_cast<std::int32_t>(storage_->width),
+            static_cast<std::int32_t>(storage_->height)}});
+    }
 }
 
 bool Bitmap::locked() const {
     require_alive();
     return active_lock_token_ != 0U;
+}
+
+BitmapEditView Bitmap::begin_edit(RectI bounds) {
+    require_alive();
+    require_unlocked();
+    if (bounds.x < 0 || bounds.y < 0 || bounds.width <= 0 ||
+        bounds.height <= 0 || bounds.right() > storage_->width ||
+        bounds.bottom() > storage_->height) {
+        throw std::invalid_argument(
+            "bitmap edit rectangle must be nonempty and inside the image");
+    }
+    prepare_write();
+
+    const std::size_t edit_row_bytes =
+        static_cast<std::size_t>(bounds.width) * 4U;
+    active_edit_backup_.resize(
+        edit_row_bytes * static_cast<std::size_t>(bounds.height));
+    for (std::int32_t row = 0; row < bounds.height; ++row) {
+        const std::size_t source = pixel_offset(
+            *storage_, static_cast<std::uint32_t>(bounds.x),
+            static_cast<std::uint32_t>(bounds.y + row));
+        std::copy_n(storage_->bytes.data() + source, edit_row_bytes,
+                    active_edit_backup_.data() +
+                        static_cast<std::size_t>(row) * edit_row_bytes);
+    }
+
+    active_lock_token_ = next_lock_token_++;
+    if (active_lock_token_ == 0U) {
+        active_edit_backup_.clear();
+        throw std::overflow_error("bitmap lock token space exhausted");
+    }
+    active_edit_ = true;
+    active_edit_bounds_ = bounds;
+    lock_mode_ = BitmapLockMode::read_write;
+    const std::size_t origin = pixel_offset(
+        *storage_, static_cast<std::uint32_t>(bounds.x),
+        static_cast<std::uint32_t>(bounds.y));
+    return {storage_->bytes.data() + origin, storage_->bytes.data() + origin,
+            storage_->row_bytes, bounds, storage_->pixel_format,
+            active_lock_token_};
+}
+
+std::uint64_t Bitmap::commit_edit(std::uint64_t token) {
+    require_alive();
+    require_edit_token(token);
+    const std::size_t edit_row_bytes =
+        static_cast<std::size_t>(active_edit_bounds_.width) * 4U;
+    std::vector<RectI> damage;
+    bool compacted = false;
+
+    for (std::int32_t row = 0; row < active_edit_bounds_.height; ++row) {
+        const std::size_t storage_row = pixel_offset(
+            *storage_, static_cast<std::uint32_t>(active_edit_bounds_.x),
+            static_cast<std::uint32_t>(active_edit_bounds_.y + row));
+        const std::byte* current = storage_->bytes.data() + storage_row;
+        const std::byte* original = active_edit_backup_.data() +
+            static_cast<std::size_t>(row) * edit_row_bytes;
+        std::optional<std::int32_t> run_start;
+        for (std::int32_t column = 0; column < active_edit_bounds_.width;
+             ++column) {
+            const std::size_t pixel = static_cast<std::size_t>(column) * 4U;
+            const bool changed = !std::equal(current + pixel,
+                                             current + pixel + 4U,
+                                             original + pixel);
+            if (changed && !run_start) {
+                run_start = column;
+            } else if (!changed && run_start) {
+                const RectI span{active_edit_bounds_.x + *run_start,
+                                 active_edit_bounds_.y + row,
+                                 column - *run_start, 1};
+                if (!damage.empty() && damage.back().x == span.x &&
+                    damage.back().width == span.width &&
+                    damage.back().bottom() == span.y) {
+                    ++damage.back().height;
+                } else {
+                    damage.push_back(span);
+                }
+                run_start.reset();
+            }
+        }
+        if (run_start) {
+            const RectI span{active_edit_bounds_.x + *run_start,
+                             active_edit_bounds_.y + row,
+                             active_edit_bounds_.width - *run_start, 1};
+            if (!damage.empty() && damage.back().x == span.x &&
+                damage.back().width == span.width &&
+                damage.back().bottom() == span.y) {
+                ++damage.back().height;
+            } else {
+                damage.push_back(span);
+            }
+        }
+        if (damage.size() > maximum_damage_rectangles) {
+            compacted = true;
+            break;
+        }
+    }
+
+    if (compacted) {
+        damage.assign(1U, active_edit_bounds_);
+    }
+    finish_edit();
+    if (!damage.empty()) publish_mutation(std::move(damage));
+    return generation_;
+}
+
+void Bitmap::cancel_edit(std::uint64_t token) {
+    require_alive();
+    require_edit_token(token);
+    const std::size_t edit_row_bytes =
+        static_cast<std::size_t>(active_edit_bounds_.width) * 4U;
+    for (std::int32_t row = 0; row < active_edit_bounds_.height; ++row) {
+        const std::size_t destination = pixel_offset(
+            *storage_, static_cast<std::uint32_t>(active_edit_bounds_.x),
+            static_cast<std::uint32_t>(active_edit_bounds_.y + row));
+        std::copy_n(active_edit_backup_.data() +
+                        static_cast<std::size_t>(row) * edit_row_bytes,
+                    edit_row_bytes, storage_->bytes.data() + destination);
+    }
+    finish_edit();
+}
+
+BitmapDamageSnapshot Bitmap::changes_since(std::uint64_t generation) const {
+    require_alive();
+    require_unlocked();
+    if (generation > generation_) {
+        throw std::invalid_argument(
+            "bitmap damage generation is newer than the bitmap");
+    }
+    BitmapDamageSnapshot result{generation, generation_, true, {}};
+    if (generation == generation_) return result;
+
+    if (damage_history_.empty() ||
+        generation < damage_history_.front().generation - 1U) {
+        result.history_complete = false;
+        result.rectangles.push_back({0, 0,
+            static_cast<std::int32_t>(storage_->width),
+            static_cast<std::int32_t>(storage_->height)});
+        return result;
+    }
+
+    for (const DamageRecord& record : damage_history_) {
+        if (record.generation <= generation) continue;
+        if (result.rectangles.size() + record.rectangles.size() >
+            maximum_damage_rectangles) {
+            result.rectangles.assign(1U, RectI{0, 0,
+                static_cast<std::int32_t>(storage_->width),
+                static_cast<std::int32_t>(storage_->height)});
+            return result;
+        }
+        result.rectangles.insert(result.rectangles.end(),
+                                 record.rectangles.begin(),
+                                 record.rectangles.end());
+    }
+    return result;
 }
 
 ImageSnapshot Bitmap::snapshot() const {
@@ -2013,6 +2448,9 @@ BrushSnapshot TextureBrush::snapshot() const {
 
 void Bitmap::on_dispose() noexcept {
     active_lock_token_ = 0U;
+    active_edit_ = false;
+    active_edit_backup_.clear();
+    damage_history_.clear();
     storage_.reset();
 }
 
@@ -2028,6 +2466,14 @@ void Bitmap::require_coordinate(std::uint32_t x, std::uint32_t y) const {
     }
 }
 
+void Bitmap::require_edit_token(std::uint64_t token) const {
+    if (!active_edit_ || active_lock_token_ == 0U || token == 0U ||
+        token != active_lock_token_) {
+        throw std::invalid_argument(
+            "bitmap edit token is invalid or already released");
+    }
+}
+
 void Bitmap::prepare_write() {
     if (generation_ == std::numeric_limits<std::uint64_t>::max()) {
         throw std::overflow_error("bitmap generation space exhausted");
@@ -2037,8 +2483,22 @@ void Bitmap::prepare_write() {
     }
 }
 
-void Bitmap::publish_mutation() {
-    ++generation_;
+void Bitmap::publish_mutation(std::vector<RectI> damage) {
+    if (damage.empty()) return;
+    if (damage_history_.size() == maximum_damage_history) {
+        damage_history_.erase(damage_history_.begin());
+    }
+    const std::uint64_t next_generation = generation_ + 1U;
+    damage_history_.push_back({next_generation, std::move(damage)});
+    generation_ = next_generation;
+}
+
+void Bitmap::finish_edit() noexcept {
+    active_lock_token_ = 0U;
+    lock_mode_ = BitmapLockMode::read;
+    active_edit_ = false;
+    active_edit_bounds_ = {};
+    active_edit_backup_.clear();
 }
 
 GraphicsStateToken GraphicsRecorder::save() {

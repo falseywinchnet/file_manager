@@ -401,9 +401,9 @@ void test_damage_take_commits_layout_generated_geometry_damage() {
     auto left = make_control<CountingControl>(StableId("damage.layout.left"));
     left->set_requested_bounds({0.0, 0.0, 50.0, 20.0});
     left->set_dock(DockStyle::left);
-    root->add_child(fill);
-    root->add_child(top);
     root->add_child(left);
+    root->add_child(top);
+    root->add_child(fill);
     Window window(root, {300.0, 180.0});
     window.perform_layout();
     NullPainter painter;

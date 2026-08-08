@@ -30,6 +30,15 @@ impl EngineSearchOutcome {
 pub trait EngineSearchProvider {
     fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture;
     fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResultFixture;
+
+    fn live_available(&self) -> bool {
+        true
+    }
+}
+
+pub trait UnifiedEngineSearch: Send {
+    fn search(&mut self, request: &EngineSearchRequest) -> EngineSearchOutcome;
+    fn live_available(&self) -> bool;
 }
 
 #[derive(Debug)]
@@ -84,6 +93,16 @@ impl<P: EngineSearchProvider> EngineSearchBroker<P> {
 
     pub const fn provider_mut(&mut self) -> &mut P {
         &mut self.provider
+    }
+}
+
+impl<P: EngineSearchProvider + Send> UnifiedEngineSearch for EngineSearchBroker<P> {
+    fn search(&mut self, request: &EngineSearchRequest) -> EngineSearchOutcome {
+        self.search(request, EngineSearchPolicy::PreferCatalogue)
+    }
+
+    fn live_available(&self) -> bool {
+        self.provider.live_available()
     }
 }
 

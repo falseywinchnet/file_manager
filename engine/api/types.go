@@ -154,6 +154,53 @@ type QueryResponse struct {
 	Plan       QueryPlan  `json:"plan"`
 }
 
+const LiveFilesystemSource = "live_filesystem"
+
+// LiveQueryBudget is a per-page work constitution. The service clamps every
+// field to its own hard ceiling; a caller cannot expand server policy.
+type LiveQueryBudget struct {
+	MaxResults         uint32 `json:"max_results"`
+	MaxVisitedEntries  uint64 `json:"max_visited_entries"`
+	MaxStatCalls       uint64 `json:"max_stat_calls"`
+	MaxWallTimeMS      uint64 `json:"max_wall_time_ms"`
+	MaxOpenDirectories uint16 `json:"max_open_directories"`
+	MaxResponseBytes   uint64 `json:"max_response_bytes"`
+}
+
+type LiveQuery struct {
+	QueryID string          `json:"query_id"`
+	Scope   LiveQueryScope  `json:"scope"`
+	Text    string          `json:"text"`
+	Cursor  string          `json:"cursor,omitempty"`
+	Budget  LiveQueryBudget `json:"budget"`
+}
+
+type LiveQueryScope struct {
+	RootID       RootID `json:"root_id"`
+	RelativePath string `json:"relative_path,omitempty"`
+	Descendants  bool   `json:"descendants"`
+}
+
+type LiveQueryWork struct {
+	VisitedEntries uint64 `json:"visited_entries"`
+	StatCalls      uint64 `json:"stat_calls"`
+	ElapsedMS      uint64 `json:"elapsed_ms"`
+}
+
+// LiveQueryResponse deliberately has no catalogue generation. Its exact
+// observations were made during a mutable filesystem traversal identified by
+// ScanID and ordered only within that scan.
+type LiveQueryResponse struct {
+	Source           string        `json:"source"`
+	ScanID           string        `json:"scan_id"`
+	Complete         bool          `json:"complete"`
+	NextCursor       string        `json:"next_cursor,omitempty"`
+	Results          []Result      `json:"results"`
+	UnavailablePaths []string      `json:"unavailable_paths,omitempty"`
+	Work             LiveQueryWork `json:"work"`
+	Warnings         []string      `json:"warnings,omitempty"`
+}
+
 type QueryPlan struct {
 	Scopes          []Scope  `json:"scopes"`
 	Channels        []string `json:"channels"`
@@ -188,6 +235,7 @@ type IntegrityReport struct {
 type Engine interface {
 	Status(context.Context) (Status, error)
 	Query(context.Context, Query) (QueryResponse, error)
+	QueryLive(context.Context, LiveQuery) (LiveQueryResponse, error)
 	Inspect(context.Context, ObjectRef) (Result, error)
 	Integrity(context.Context) (IntegrityReport, error)
 }

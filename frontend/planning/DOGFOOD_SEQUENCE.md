@@ -6,8 +6,9 @@ Status: **future delivery order**.
 
 Using GUI.Forms, the live Core 1.0 Orchestrator bootstrap, and fake later
 provider ports, render the classic location window:
-custom title bar, menu/control shelf, breadcrumbs plus terminal path editor,
-search field, collapsible tree, content surface, and preview/properties pane.
+custom title bar, menu/control shelf, one dense inline-editing chevron
+breadcrumb, search field, collapsible tree, content surface, and
+preview/properties pane. The earlier pulled-down matrix is not the edit surface.
 Prove keyboard, selection, focus, resize, collapse and shutdown traces.
 Engine and later-provider states are explicitly simulated in this slice.
 Deterministic tests replay Orchestrator's canonical Core fixtures, but product

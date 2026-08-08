@@ -796,7 +796,6 @@ void CoreGraphicsRaster::draw_image(ImageId image, Rect destination, double opac
     CGContextTranslateCTM(impl_->context, destination.x,
                           destination.y + destination.height);
     CGContextScaleCTM(impl_->context, 1, -1);
-    CGContextSetInterpolationQuality(impl_->context, kCGInterpolationHigh);
     CGContextDrawImage(impl_->context,
                        CGRectMake(0, 0, destination.width, destination.height),
                        found->second.image);
@@ -805,6 +804,13 @@ void CoreGraphicsRaster::draw_image(ImageId image, Rect destination, double opac
 
 void CoreGraphicsRaster::draw_image_region(ImageId image, Rect source,
                                            Rect destination, double opacity) {
+    draw_image_region_sampled(image, source, destination,
+                              ImageSampling::linear, opacity);
+}
+
+void CoreGraphicsRaster::draw_image_region_sampled(
+    ImageId image, Rect source, Rect destination, ImageSampling sampling,
+    double opacity) {
     const auto found = impl_->images.find(image.value);
     if (impl_->context == nullptr || found == impl_->images.end() ||
         source.empty() || destination.empty() || !source.finite() ||
@@ -822,6 +828,9 @@ void CoreGraphicsRaster::draw_image_region(ImageId image, Rect source,
     if (cropped == nullptr) return;
     CGContextSaveGState(impl_->context);
     CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
+    CGContextSetInterpolationQuality(
+        impl_->context, sampling == ImageSampling::nearest
+            ? kCGInterpolationNone : kCGInterpolationHigh);
     CGContextTranslateCTM(impl_->context, destination.x,
                           destination.y + destination.height);
     CGContextScaleCTM(impl_->context, 1, -1);

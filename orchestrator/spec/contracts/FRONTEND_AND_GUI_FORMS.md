@@ -46,21 +46,30 @@ startup read. One successful response contains:
 - complete contract and availability catalogues;
 - normal integration route, Engine scope, and direct-Engine fallback
   registration, current eligibility, state, and reason;
-- shutdown/restart eligibility and a nullable redacted diagnostics locator;
+- shutdown/restart eligibility, restart strategy/effect, and a nullable
+  redacted diagnostics locator;
 - an attributed Frontend 001 opening projection that reports only
   Orchestrator's own gate as locally decidable, mirrors the current GUI.Forms
-  consumption-manifest state, and leaves architect direction explicitly
-  unreported.
+  consumption-manifest state, and attributes recorded architect direction.
 
 The opening projection deliberately has no aggregate `frontend_ready` or
 `implementation_authorized` boolean. Orchestrator is authoritative for its Core
 release and availability evidence, not for GUI.Forms owner approval or grand
 architect direction. Its `orchestrator_gate.satisfied` value requires both the
-Core release manifest and `frontend.bootstrap` capability to be ready; blockers
-carry exact release-requirement or capability evidence. The GUI.Forms gate is
+Core release manifest and `frontend.bootstrap` capability to be ready and the
+live daemon to expose the admitted supervisor restart path; blockers carry
+exact release-requirement, capability, or runtime-hosting evidence. The GUI.Forms gate is
 an attributed mirror of `gui_forms.consumption_manifest`. Architect direction
-is nullable and remains `not_reported` until an authority-owned recording
-mechanism is negotiated.
+is now `recorded` from the authority-owned 2026-08-07 frontend start record.
+
+Core restart is supervisor-mediated. A client requests clean shutdown, closes
+the old session, and reconnects through the stable launchd socket; the new
+snapshot must carry a new daemon instance identity. The bootstrap reports this
+as `shutdown_then_supervisor_reactivate`, not as an unimplemented in-process
+restart method.
+Unsupervised local and stdio processes report `restart_eligible: false`,
+`restart_strategy: unavailable`, and do not satisfy the live Orchestrator
+opening gate even when their embedded Core artifact is ready.
 
 Engine, Kolmogrov, settings, handlers, commands, plugins, and semantic facts
 remain visible through the full availability catalogue but do not enter the
@@ -85,6 +94,29 @@ explicitly stale, read-only state. It cannot authorize mutation, plugin work,
 or fallback routing that was not registered by that same compatible snapshot.
 `registered` and `eligible` are separate: the first records policy, while the
 second records whether the provider/transport can currently be used.
+
+## Unified frontend search
+
+`orchestrator.search` is the single frontend search operation in the additive
+ORC-FE-001 development projection. Its request carries the authorized root and
+relative scope, predicate, bounded work/result constitution, and an optional
+opaque source-bound cursor. It carries no catalogue/live selector. Orchestrator
+prefers a usable catalogue, falls back to live traversal only for unsupported,
+unavailable, stale, or quarantined catalogue outcomes, and never falls back
+around denied, invalid, budget, timeout, or cancellation outcomes. An
+authoritative catalogue no-match is terminal.
+
+The response uses one result identity shape and terminal vocabulary, plus
+`source`, `complete`, optional source-bound cursor, and source-specific
+generation or scan/work details. Frontend may display live, partial, stale, or
+complete state; it does not choose or switch lanes. Continuations preserve the
+selected lane until the caller starts a new cursorless query.
+
+**OBSERVED development conformance:** an authenticated local daemon spawns the
+separately built Go Engine development process, derives live availability from
+`engine.version`, and returns a match from an unreconciled root through this
+operation. The Rust integration client and independently built C++17 client
+pass. Installed Engine discovery/authentication remains a separate red gate.
 
 The C++ source client performs one synchronous bounded request and owns no
 thread or callback. File Manager calls it from a frontend-owned I/O worker and

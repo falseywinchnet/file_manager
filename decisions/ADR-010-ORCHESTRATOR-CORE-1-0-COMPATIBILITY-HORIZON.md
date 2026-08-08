@@ -1,6 +1,6 @@
 # ADR-010: Orchestrator Core 1.0 compatibility horizon
 
-Status: **accepted for implementation; release gates remain executable**.
+Status: **accepted and conformant for the first macOS Core 1.0 artifact**.
 
 Date: 2026-08-05.
 
@@ -130,9 +130,16 @@ major and a separately specified migration/dual-read interval.
 
 ## Unresolved edges
 
-- packaged macOS launchd bootstrap/reactivation/removal evidence (the ADR-011
-  adapter, client retry, and plist generator are implemented);
 - Windows named-pipe and Linux supervisor compatibility records;
 - later-family and long-run differential/resource suites beyond the Core macOS
   bootstrap corpus;
 - Core 2.x support duration.
+
+## First-artifact promotion evidence — 2026-08-07
+
+ADR-011's installed LaunchAgent trial passed activation, authenticated status,
+shutdown, supervisor reactivation within the five-second client bound with a
+fresh instance, bootout, and exact removal on macOS 14.8.7 arm64. The executable release manifest now
+reports every Core requirement satisfied. This promotes the first macOS Core
+1.0 artifact without claiming Windows, Linux, later providers, or package
+signing.

@@ -45,10 +45,12 @@ cross-project names use the `engine.*` family.
 ### Query surface
 
 - `query` — scoped exact/lexical/fuzzy query with filters, limit, and cursor.
-- `engine.query_live` — **required by ADR-008 but not implemented**; bounded
+- `engine.query_live` — **OBSERVED development implementation**; bounded
   filename/path traversal over an authorized filesystem scope without building,
-  persisting, or requiring a catalogue. Its draft semantics are `ORC-ENG-004`
-  and Engine negotiation round 006.
+  persisting, consulting, or requiring a catalogue. It returns process-local
+  expiring continuation cursors, exact live observations, work counters, and
+  named unavailable paths under `ORC-ENG-004`. Native NTFS/ext4, million-entry,
+  and installed-transport promotion evidence remains open.
 - `inspect` — exact record and all stored evidence/provenance.
 - `explain` — concise ordinary evidence, exclusions, staleness, and unavailable
   shards; complete query plans and internal candidate diagnostics require the

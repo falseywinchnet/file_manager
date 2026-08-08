@@ -1,5 +1,7 @@
 #include "skia_raster.hpp"
 
+#include "gui_forms/live_surface.hpp"
+
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 #include "harfbuzz_font_engine.hpp"
 #endif
@@ -428,6 +430,7 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             continue;
         }
         std::vector<std::byte> pixels;
+        sk_sp<SkData> pixel_data;
         if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
             if (resource->row_bytes != row_bytes ||
                 resource->encoded.size() != resource->metadata.decoded_byte_count) {
@@ -435,7 +438,8 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
                 synchronized = false;
                 continue;
             }
-            pixels.assign(resource->encoded.begin(), resource->encoded.end());
+            pixel_data = SkData::MakeWithCopy(
+                resource->encoded.data(), resource->encoded.size());
         } else {
             sk_sp<SkData> encoded = SkData::MakeWithCopy(
                 resource->encoded.data(), resource->encoded.size());
@@ -459,7 +463,9 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
                 continue;
             }
         }
-        sk_sp<SkData> pixel_data = SkData::MakeWithCopy(pixels.data(), pixels.size());
+        if (!pixel_data) {
+            pixel_data = SkData::MakeWithCopy(pixels.data(), pixels.size());
+        }
         sk_sp<SkImage> image =
             SkImages::RasterFromData(output_info, std::move(pixel_data), row_bytes);
         if (!image) {
@@ -740,8 +746,50 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
     }
 }
 
+void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
+                                   Rect destination, double opacity) {
+    SkCanvas* canvas = impl_->canvas();
+    if (canvas == nullptr || !surface || destination.empty() ||
+        !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
+        return;
+    }
+    LiveSurfaceFrame frame = surface->acquire_latest();
+    if (!frame || frame.width() == 0U || frame.height() == 0U ||
+        frame.row_bytes() < static_cast<std::uint64_t>(frame.width()) * 4U ||
+        frame.pixels().empty()) {
+        return;
+    }
+    const SkImageInfo info = SkImageInfo::Make(
+        static_cast<int>(frame.width()), static_cast<int>(frame.height()),
+        kBGRA_8888_SkColorType, kPremul_SkAlphaType,
+        SkColorSpace::MakeSRGB());
+    sk_sp<SkData> data = SkData::MakeWithoutCopy(
+        frame.pixels().data(), frame.pixels().size());
+    sk_sp<SkImage> image = SkImages::RasterFromData(
+        info, std::move(data), static_cast<size_t>(frame.row_bytes()));
+    if (!image) return;
+
+    SkPaint paint;
+    paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
+    paint.setAntiAlias(false);
+    canvas->drawImageRect(
+        image.get(),
+        SkRect::MakeWH(static_cast<SkScalar>(frame.width()),
+                       static_cast<SkScalar>(frame.height())),
+        to_sk_rect(destination),
+        SkSamplingOptions(SkFilterMode::kLinear), &paint,
+        SkCanvas::kStrict_SrcRectConstraint);
+}
+
 void SkiaRaster::draw_image_region(ImageId image, Rect source,
                                    Rect destination, double opacity) {
+    draw_image_region_sampled(image, source, destination,
+                              ImageSampling::linear, opacity);
+}
+
+void SkiaRaster::draw_image_region_sampled(
+    ImageId image, Rect source, Rect destination, ImageSampling sampling,
+    double opacity) {
     const auto found = impl_->images.find(image.value);
     SkCanvas* canvas = impl_->canvas();
     if (canvas == nullptr || found == impl_->images.end() || source.empty() ||
@@ -759,7 +807,9 @@ void SkiaRaster::draw_image_region(ImageId image, Rect source,
     paint.setAntiAlias(true);
     canvas->drawImageRect(found->second.image.get(), to_sk_rect(source),
                           to_sk_rect(destination),
-                          SkSamplingOptions(SkFilterMode::kLinear), &paint,
+                          SkSamplingOptions(sampling == ImageSampling::nearest
+                              ? SkFilterMode::kNearest : SkFilterMode::kLinear),
+                          &paint,
                           SkCanvas::kStrict_SrcRectConstraint);
 }
 

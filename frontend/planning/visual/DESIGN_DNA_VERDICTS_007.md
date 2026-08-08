@@ -202,9 +202,11 @@ rounding vocabulary.
 
 ### DDV-007-18 — Recent path count
 
-**GIVEN:** the path matrix recent-directory count is a user preference with a
-default of **5**. Each displayed row retains its full independently parseable
-breadcrumb stack.
+**SUPERSEDED 2026-08-07:** the path matrix no longer owns manual path editing.
+If recent full trails survive behind a separate history affordance, their count
+and row form return to **CANDIDATE** status. The first-order edit surface is the
+inline editor in the dense chevron breadcrumb cascade; see
+[`../OWNER_DIRECTION_2026-08-07.md`](../OWNER_DIRECTION_2026-08-07.md).
 
 ### DDV-007-19 — Safe path conveniences
 

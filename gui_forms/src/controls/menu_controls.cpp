@@ -858,7 +858,7 @@ MenuStrip::MenuStrip(StableId stable_id)
             if (!active_index_) return;
             active_index_.reset();
             invalidate(Dirty::paint | Dirty::semantics);
-            open_changed_.emit(active_index_);
+            publish_change(open_changed_, active_index_);
         });
 }
 
@@ -910,7 +910,7 @@ bool MenuStrip::open(std::size_t index) {
                   absolute.y + bounds[index].y + bounds[index].height - 1.0});
     switching_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    open_changed_.emit(active_index_);
+    publish_change(open_changed_, active_index_);
     return true;
 }
 

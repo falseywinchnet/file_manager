@@ -37,6 +37,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct ScrollState { internal uint AutoScroll; internal Point Position; internal Size Margin, MinimumContentSize; internal Rect DisplayRectangle, ViewportRectangle; internal ScrollAxisState Horizontal, Vertical; internal ulong EventRevision; internal uint EventType, EventOrientation; internal double EventOldValue, EventNewValue; }
     [StructLayout(LayoutKind.Sequential)] private struct LayoutState { internal uint SuspendDepth, Deferred; internal ulong RequestedRevision, CommittedRevision; }
     [StructLayout(LayoutKind.Sequential)] private struct FieldEditResult { internal ulong Anchor, Caret, Revision; internal uint Changed, CanUndo, CanRedo; }
+    [StructLayout(LayoutKind.Sequential)] private struct PropertyValue { internal uint Kind, BooleanValue; internal long SignedValue; internal ulong UnsignedValue; internal double NumberValue; internal uint ColorArgb; internal StringView TextValue; }
+    [StructLayout(LayoutKind.Sequential)] private struct PropertyEnumChoice { internal StringView Name; internal long Value; }
+    [StructLayout(LayoutKind.Sequential)] private struct PropertyDescriptorV1 { internal uint StructSize, Kind, Flags, Reserved; internal StringView Name, Category, Description, EnumTypeName; internal PropertyEnumChoice* EnumChoices; internal ulong EnumChoiceCount; internal PropertyValue* StandardValues; internal ulong StandardValueCount; internal StringView ConverterName, EditorName; }
+    [StructLayout(LayoutKind.Sequential)] private struct PropertyCallbacksV1 { internal uint StructSize, Reserved; internal void* Context; internal nint Get, Set, Reset, ShouldSerialize, Format, Parse, Edit; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfoHeader { internal uint Size; internal int Width, Height; internal ushort Planes, BitCount; internal uint Compression, SizeImage; internal int XPelsPerMeter, YPelsPerMeter; internal uint ClrUsed, ClrImportant; }
     [StructLayout(LayoutKind.Sequential)] private struct BitmapInfo { internal BitmapInfoHeader Header; internal uint Color; }
     [StructLayout(LayoutKind.Sequential)] private struct PaintStruct { internal nint Device; internal int Erase; internal int Left, Top, Right, Bottom; internal int Restore, IncUpdate; internal fixed byte Reserved[32]; }
@@ -67,16 +71,37 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         internal nint SetAutoScrollMinSize, SetAutoScrollPosition, GetScrollState;
         internal nint SetScrollAxisState, ScrollControlIntoView;
         internal nint SuspendLayout, ResumeLayout, PerformControlLayout, GetLayoutState;
+        internal nint PropertyGridSetSelectedControls, PropertyGridSetSort;
+        internal nint PropertyGridGetSort, PropertyGridRefresh;
+        internal nint PropertyObjectDefine, PropertyObjectNotifyChanged;
+        internal nint PropertyGridTrySetText, PropertyGridResetProperty;
+        internal nint PropertyGridActivateEditor;
     }
 
     [DllImport("gui_forms_abi0", EntryPoint = "gf_get_api_v0", CallingConvention = CallingConvention.Cdecl)]
     private static extern int GetApi(uint requestedVersion, ref Api api);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_acquire_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int AcquireWindowsPaintEndpoint(Handle control, uint width, uint height, ulong* endpoint, nint* window);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_configure_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ConfigureWindowsPaintEndpoint(ulong endpoint, uint width, uint height);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_touch_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int TouchWindowsPaintEndpoint(ulong endpoint, uint explicitBoundary);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_drain_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int DrainWindowsPaintEndpoint(ulong endpoint);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_snapshot_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int SnapshotWindowsPaintEndpoint(ulong endpoint, byte* buffer, ulong capacity, ulong* requiredSize);
+    [DllImport("gui_forms_abi0", EntryPoint = "gf_windows_paint_endpoint_release_v1", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int ReleaseWindowsPaintEndpoint(ulong endpoint);
     private static readonly Api api = LoadApi();
     private static readonly bool traceControls = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_CONTROLS") == "1";
     private static readonly bool traceDelegates = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DELEGATES") == "1";
+    private static readonly bool traceDirectGdiOwnership = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_DIRECT_GDI_OWNERSHIP") == "1";
     private const string windowSurfaceClassName = "GUIForms.ControlSurface.v1";
     private static readonly string[] directWindowSurfaceTypes = (Environment.GetEnvironmentVariable("GUI_FORMS_DIRECT_HWND_TYPES") ?? string.Empty)
         .Split(';', global::System.StringSplitOptions.RemoveEmptyEntries | global::System.StringSplitOptions.TrimEntries);
+    private static readonly global::System.Collections.Concurrent.ConcurrentDictionary<global::System.Reflection.Assembly, byte>
+        directGdiAssemblies = new();
+    private static nint directGdiShim;
     private static readonly bool windowSurfaceClassRegistered = RegisterWindowSurfaceClass();
     private static long nextId;
     private static long nextAsyncId;
@@ -111,10 +136,10 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private readonly global::System.Collections.Generic.List<Handle> subscriptions = new();
     private readonly int ownerThreadId;
     private readonly long surfaceId = Interlocked.Increment(ref nextSurfaceId);
-    private NativeChange pendingChange;
     private readonly object windowHandleGate = new();
     private readonly object stateGate = new();
     private nint windowHandle;
+    private ulong nativePaintEndpoint;
     private nint windowParent;
     private global::System.Drawing.Point windowPosition;
     private global::System.Drawing.Size windowSize;
@@ -170,26 +195,35 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 {
                     var width = global::System.Math.Max(1, cachedBounds.Width);
                     var height = global::System.Math.Max(1, cachedBounds.Height);
-                    if (!windowSurfaceClassRegistered) return 0;
-                    // A Handle remains available to unchanged WinForms consumers,
-                    // but only explicitly admitted direct-GDI types are projected
-                    // over the retained host. Ordinary custom-painted controls are
-                    // already carried by SetControlPixels and must retain ancestor
-                    // clipping instead of becoming flattened sibling HWNDs.
-                    windowHandle = CreateWindowExW(0x08000080u, windowSurfaceClassName, string.Empty, 0x80000000u,
-                        0, 0, width, height, 0, 0, 0, 0);
-                    if (windowHandle != 0)
+                    if (exposesWindowSurface)
                     {
-                        // This HWND is an offscreen paint lease for native
-                        // consumers, not a second compositor or input authority.
-                        // Direct GDI writes are sampled into the retained raster
-                        // below; the HWND itself is never attached or shown.
+                        nint compatibilityHandle;
+                        ulong endpoint;
+                        Check(AcquireWindowsPaintEndpoint(handle.Value,
+                            checked((uint)width), checked((uint)height),
+                            &endpoint, &compatibilityHandle));
+                        nativePaintEndpoint = endpoint;
+                        windowHandle = compatibilityHandle;
+                        if (traceDirectGdiOwnership)
+                            global::System.Console.Error.WriteLine("gui-forms-direct-gdi=acquire|surface:" + surfaceId +
+                                "|control:" + stableId + "|type:" + managedTypeName + "|endpoint:" + endpoint +
+                                "|virtual-handle:0x" + ((nuint)compatibilityHandle).ToString("x") + "|size:" + width + "x" + height +
+                                "|thread:" + global::System.Environment.CurrentManagedThreadId);
+                    }
+                    else
+                    {
+                        if (!windowSurfaceClassRegistered) return 0;
+                        // Ordinary compatibility handles remain identity/message
+                        // endpoints. Direct-GDI controls take the native-host path
+                        // above and never install this managed WndProc.
+                        windowHandle = CreateWindowExW(0x08000080u, windowSurfaceClassName, string.Empty, 0x80000000u,
+                            0, 0, width, height, 0, 0, 0, 0);
+                    }
+                    if (windowHandle != 0 && !exposesWindowSurface)
+                    {
                         _ = EnableWindow(windowHandle, false);
                         windowSurfaces[surfaceId] = new(this);
                         windowSurfacesByHandle[windowHandle] = new(this);
-                        if (exposesWindowSurface)
-                            windowSurfaceTimer = new global::System.Threading.Timer(_ => QueueWindowSurfaceProbe(),
-                                null, 0, global::System.Threading.Timeout.Infinite);
                     }
                 }
                 return windowHandle;
@@ -203,7 +237,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal event Func<NativeKey, bool>? KeyPreviewRaised;
     internal event Action<string, bool, int, int>? TextRaised;
 
-    private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName, bool scrollable)
+    private NativeControlBridge(SafeControlHandle handle, uint kind, string stableId, string managedTypeName, bool scrollable,
+                                global::System.Drawing.Size initialSize)
     {
         this.handle = handle;
         this.stableId = stableId;
@@ -213,11 +248,9 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             candidate => global::System.String.Equals(candidate, managedTypeName, global::System.StringComparison.Ordinal));
         promotesPointerClick = kind is 4u or 5u or 11u or 14u;
         ownerThreadId = Environment.CurrentManagedThreadId;
+        cachedBounds = new global::System.Drawing.Rectangle(
+            global::System.Drawing.Point.Empty, initialSize);
         callbackRoot = GCHandle.Alloc(this, GCHandleType.Weak);
-        Handle token;
-        Check(((delegate* unmanaged[Cdecl]<Handle, uint, delegate* unmanaged[Cdecl]<Handle, uint, void*, void>, void*, Handle*, int>)api.Subscribe)(
-            handle.Value, 1, &StateCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
-        subscriptions.Add(token);
         if (kind is 4u or 5u or 11u or 14u) SubscribeTyped(NativeEvent.Clicked);
         if (kind == 1u) { SubscribeTyped(NativeEvent.FormClosing); SubscribeTyped(NativeEvent.FormClosed); SubscribeTyped(NativeEvent.BoundsChanged); }
         if (kind == 10u) { SubscribeTyped(NativeEvent.RangeScroll); SubscribeTyped(NativeEvent.RangeValueChanged); }
@@ -226,13 +259,49 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         if (kind == 1u) SubscribeKeyPreview();
         if (kind is 6u or 8u or 9u or 16u or 18u) { SubscribeKey(); SubscribeText(); }
         else if (kind == 0x7fffffffu) SubscribeKey();
+        // A WinForms-compatible Handle is owned by the thread which created the
+        // control, not by whichever render worker happens to ask for it first.
+        // Direct-GDI controls therefore establish their native paint lease while
+        // the base Control constructor still runs on the owning UI thread.
+        if (exposesWindowSurface && global::System.OperatingSystem.IsWindows())
+            _ = WindowHandle;
     }
 
     internal bool PromotesPointerClick => promotesPointerClick;
 
+    private static void ConfigureDirectGdiImports(global::System.Reflection.Assembly assembly)
+    {
+        if (!global::System.OperatingSystem.IsWindows() ||
+            !directGdiAssemblies.TryAdd(assembly, 0)) return;
+        try
+        {
+            NativeLibrary.SetDllImportResolver(assembly, (libraryName, owner, searchPath) =>
+            {
+                if (!global::System.String.Equals(libraryName, "user32.dll", global::System.StringComparison.OrdinalIgnoreCase) &&
+                    !global::System.String.Equals(libraryName, "gdi32.dll", global::System.StringComparison.OrdinalIgnoreCase))
+                    return 0;
+                var loaded = global::System.Threading.Volatile.Read(ref directGdiShim);
+                if (loaded != 0) return loaded;
+                loaded = NativeLibrary.Load("gui_forms_win32_compat", owner, searchPath);
+                global::System.Threading.Interlocked.CompareExchange(ref directGdiShim, loaded, 0);
+                return global::System.Threading.Volatile.Read(ref directGdiShim);
+            });
+        }
+        catch
+        {
+            directGdiAssemblies.TryRemove(assembly, out _);
+            throw;
+        }
+    }
+
     internal static NativeControlBridge Create(Type managedType)
     {
         var stableId = $"forms.{managedType.Name}.{Interlocked.Increment(ref nextId)}";
+        var directWindowSurface = global::System.Array.Exists(
+            directWindowSurfaceTypes,
+            candidate => global::System.String.Equals(candidate,
+                managedType.FullName ?? managedType.Name,
+                global::System.StringComparison.Ordinal));
         var paintMethod = managedType.GetMethod("OnPaint", global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic);
         // DockPanelSuite's empty auto-hide strip reports the entire dock client
         // even when it owns no tabs. Painting that compatibility overlay would
@@ -249,7 +318,12 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             (toolStripSurface || buttonSurface || pictureBoxSurface || (!retainedField && !typeof(Form).IsAssignableFrom(managedType) &&
             !managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal) &&
             paintMethod?.DeclaringType?.Assembly != typeof(Control).Assembly));
-        var kind = managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal)
+        // A direct-GDI endpoint is sampled by the retained compositor as a
+        // RasterControl regardless of whether reflection can see an OnPaint
+        // override. Handle creation happens in the bridge constructor, so this
+        // backing choice must be complete before the bridge exists.
+        var kind = directWindowSurface ? 0x7fffffffu :
+            managedType.Name.Contains("AutoHideStrip", StringComparison.Ordinal)
             ? 19u : customPaint && transparentPaintSurface ? 20u : customPaint ? 0x7fffffffu : 0u;
         for (var current = managedType; current is not null && kind == 0u; current = current.BaseType)
         {
@@ -261,15 +335,28 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                 "TextBox" or "TextBoxBase" => 9u, "TrackBar" => 10u,
                 "RadioButton" => 11u, "GroupBox" => 12u, "ProgressBar" => 13u,
                 "LinkLabel" => 14u, "PictureBox" => 15u, "DataGridView" => 16u,
-                "ToolStrip" => 17u, "NumericUpDown" => 18u, _ => 0u,
+                "ToolStrip" => 17u, "NumericUpDown" => 18u,
+                "PropertyGrid" => 21u, _ => 0u,
             };
         }
         var bytes = Encoding.UTF8.GetBytes(stableId);
         Handle value;
         fixed (byte* data = bytes)
             Check(((delegate* unmanaged[Cdecl]<uint, StringView, Handle*, int>)api.ControlCreateKind)(kind, new StringView { Data = data, Size = (ulong)bytes.Length }, &value));
+        if (directWindowSurface)
+            ConfigureDirectGdiImports(managedType.Assembly);
         if (traceControls) Console.Error.WriteLine($"facade-control=create|id={stableId}|type={managedType.FullName}|kind={kind}");
-        return new NativeControlBridge(new SafeControlHandle(value), kind, stableId, managedType.FullName ?? managedType.Name, typeof(ScrollableControl).IsAssignableFrom(managedType));
+        // WinForms UserControl establishes a 150x150 client area before the
+        // derived constructor runs. A compatibility consumer may legitimately
+        // create HDC-backed bitmaps immediately after its base constructor returns.
+        // The compatibility handle and retained raster therefore need the same
+        // initial geometry; a later layout pass is too late.
+        var initialSize = typeof(UserControl).IsAssignableFrom(managedType)
+            ? new global::System.Drawing.Size(150, 150)
+            : global::System.Drawing.Size.Empty;
+        return new NativeControlBridge(new SafeControlHandle(value), kind, stableId,
+            managedType.FullName ?? managedType.Name,
+            typeof(ScrollableControl).IsAssignableFrom(managedType), initialSize);
     }
 
     private void EnsureAlive() { if (IsDisposed) throw new global::System.InvalidOperationException("GUI.Forms control is disposed."); }
@@ -285,7 +372,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal global::System.Drawing.Rectangle Bounds
     {
         get { EnsureAlive(); lock (stateGate) return cachedBounds; }
-        set { pendingChange = NativeChange.Bounds; lock (stateGate) cachedBounds = value; ResizeWindowSurface(value.Width, value.Height); Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)api.SetBounds)(handle.Value, new Rect { X = value.X, Y = value.Y, Width = value.Width, Height = value.Height })); }
+        set { lock (stateGate) cachedBounds = value; ResizeWindowSurface(value.Width, value.Height); Check(((delegate* unmanaged[Cdecl]<Handle, Rect, int>)api.SetBounds)(handle.Value, new Rect { X = value.X, Y = value.Y, Width = value.Width, Height = value.Height })); }
     }
     internal void SetAutoScrollOffset(global::System.Drawing.Point value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, Point, int>)api.SetAutoScrollOffset)(handle.Value, new Point { X = value.X, Y = value.Y })); }
     internal void SetAutoScroll(bool value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.SetAutoScroll)(handle.Value, value ? 1u : 0u)); }
@@ -299,10 +386,17 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void ResumeLayout(bool performLayout) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.ResumeLayout)(handle.Value, performLayout ? 1u : 0u)); }
     internal void PerformControlLayout() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.PerformControlLayout)(handle.Value)); }
     internal NativeLayoutState GetLayoutState() { EnsureAlive(); LayoutState value; Check(((delegate* unmanaged[Cdecl]<Handle, LayoutState*, int>)api.GetLayoutState)(handle.Value, &value)); return new(value.SuspendDepth, value.Deferred != 0, value.RequestedRevision, value.CommittedRevision); }
+    internal PropertyObjectAdapter[] SetPropertyGridSelectedObjects(object[] objects, PropertyGrid ownerGrid) { EnsureAlive(); objects ??= global::System.Array.Empty<object>(); if (ownerGrid is null) throw new global::System.ArgumentNullException(nameof(ownerGrid)); var values = new Handle[objects.Length]; var adapters = new global::System.Collections.Generic.List<PropertyObjectAdapter>(); try { for (var index = 0; index < objects.Length; ++index) { var value = objects[index] ?? throw new global::System.ArgumentNullException(nameof(objects)); if (value is Control control) values[index] = control.__native.handle.Value; else { var adapter = new PropertyObjectAdapter(value, ownerGrid); adapters.Add(adapter); values[index] = adapter.Value; } } fixed (Handle* data = values) Check(((delegate* unmanaged[Cdecl]<Handle, Handle*, ulong, int>)api.PropertyGridSetSelectedControls)(handle.Value, data, (ulong)values.Length)); return adapters.ToArray(); } catch { foreach (var adapter in adapters) adapter.Dispose(); throw; } }
+    internal bool TrySetPropertyGridText(string name, string value) { EnsureAlive(); var nameBytes = global::System.Text.Encoding.UTF8.GetBytes(name ?? throw new global::System.ArgumentNullException(nameof(name))); var valueBytes = global::System.Text.Encoding.UTF8.GetBytes(value ?? throw new global::System.ArgumentNullException(nameof(value))); uint committed; fixed (byte* nameData = nameBytes) fixed (byte* valueData = valueBytes) Check(((delegate* unmanaged[Cdecl]<Handle, StringView, StringView, uint*, int>)api.PropertyGridTrySetText)(handle.Value, new StringView { Data = nameData, Size = (ulong)nameBytes.Length }, new StringView { Data = valueData, Size = (ulong)valueBytes.Length }, &committed)); return committed != 0; }
+    internal bool ResetPropertyGridProperty(string name) { EnsureAlive(); var bytes = global::System.Text.Encoding.UTF8.GetBytes(name ?? throw new global::System.ArgumentNullException(nameof(name))); uint committed; fixed (byte* data = bytes) Check(((delegate* unmanaged[Cdecl]<Handle, StringView, uint*, int>)api.PropertyGridResetProperty)(handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length }, &committed)); return committed != 0; }
+    internal bool ActivatePropertyGridEditor(string name) { EnsureAlive(); var bytes = global::System.Text.Encoding.UTF8.GetBytes(name ?? throw new global::System.ArgumentNullException(nameof(name))); uint activated; fixed (byte* data = bytes) Check(((delegate* unmanaged[Cdecl]<Handle, StringView, uint*, int>)api.PropertyGridActivateEditor)(handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length }, &activated)); return activated != 0; }
+    internal void SetPropertyGridSort(uint value) { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.PropertyGridSetSort)(handle.Value, value)); }
+    internal uint GetPropertyGridSort() { EnsureAlive(); uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)api.PropertyGridGetSort)(handle.Value, &value)); return value; }
+    internal void RefreshPropertyGrid() { EnsureAlive(); Check(((delegate* unmanaged[Cdecl]<Handle, int>)api.PropertyGridRefresh)(handle.Value)); }
 
-    internal void AddChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=add|parent={stableId}|parent-type={managedTypeName}|child={child.stableId}|child-type={child.managedTypeName}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.AddChild)(handle.Value, child.handle.Value)); }
-    internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
-    internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); pendingChange = NativeChange.Tree; Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
+    internal void AddChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=add|parent={stableId}|parent-type={managedTypeName}|child={child.stableId}|child-type={child.managedTypeName}"); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.AddChild)(handle.Value, child.handle.Value)); }
+    internal void RemoveChild(NativeControlBridge child) { if (traceControls) Console.Error.WriteLine($"facade-control=remove|parent={stableId}|child={child.stableId}"); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, int>)api.RemoveChild)(handle.Value, child.handle.Value)); }
+    internal void SetChildIndex(NativeControlBridge child, int index) { if (index < 0) throw new global::System.ArgumentOutOfRangeException(nameof(index)); Check(((delegate* unmanaged[Cdecl]<Handle, Handle, ulong, int>)api.SetChildIndex)(handle.Value, child.handle.Value, (ulong)index)); }
     internal void SetColors(global::System.Drawing.Color foreground, global::System.Drawing.Color background) { Check(((delegate* unmanaged[Cdecl]<Handle, uint, uint, int>)api.SetControlColors)(handle.Value, unchecked((uint)foreground.ToArgb()), unchecked((uint)background.ToArgb()))); }
     internal void SetFieldSelection(int start, int length, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; start = global::System.Math.Clamp(start, 0, text.Length); length = global::System.Math.Clamp(length, 0, text.Length - start); var startBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, start)); var lengthBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(start, length)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldSelection)(handle.Value, (ulong)startBytes, (ulong)lengthBytes, caretVisible ? 1u : 0u)); }
     internal void SetFieldEditState(int anchor, int caret, bool caretVisible) { EnsureAlive(); string text; lock (stateGate) text = cachedText; anchor = global::System.Math.Clamp(anchor, 0, text.Length); caret = global::System.Math.Clamp(caret, 0, text.Length); var anchorBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, anchor)); var caretBytes = global::System.Text.Encoding.UTF8.GetByteCount(text.AsSpan(0, caret)); Check(((delegate* unmanaged[Cdecl]<Handle, ulong, ulong, uint, int>)api.SetFieldEditState)(handle.Value, (ulong)anchorBytes, (ulong)caretBytes, caretVisible ? 1u : 0u)); }
@@ -375,6 +469,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal string RunWindow(bool autoClose, bool forceHeadless, bool autoActivate, bool popup)
     {
         var flags = (autoClose ? 1u : 0u) | (forceHeadless ? 2u : 0u) | (autoActivate ? 4u : 0u) | (popup ? 8u : 0u);
+        if (traceControls) Console.Error.WriteLine($"facade-window=run|id={stableId}|type={managedTypeName}|popup={popup}|flags={flags}");
         Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)api.RunWindow)(handle.Value, flags));
         return GetString(api.LastHostTrace);
     }
@@ -439,6 +534,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private void ReleaseWindowHandle()
     {
         nint value;
+        ulong endpoint;
         windowSurfaceTimer?.Dispose();
         windowSurfaceTimer = null;
         global::System.Threading.Interlocked.Increment(ref windowSurfaceEpoch);
@@ -450,8 +546,20 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         {
             ReleaseCaptureSurface();
             value = windowHandle;
+            endpoint = nativePaintEndpoint;
             windowHandle = 0;
+            nativePaintEndpoint = 0;
             windowParent = 0;
+        }
+        if (endpoint != 0)
+        {
+            if (traceDirectGdiOwnership)
+                global::System.Console.Error.WriteLine("gui-forms-direct-gdi=release|surface:" + surfaceId +
+                    "|control:" + stableId + "|type:" + managedTypeName + "|endpoint:" + endpoint +
+                    "|virtual-handle:0x" + ((nuint)value).ToString("x") +
+                    "|thread:" + global::System.Environment.CurrentManagedThreadId);
+            _ = ReleaseWindowsPaintEndpoint(endpoint);
+            return;
         }
         if (value != 0) windowSurfacesByHandle.TryRemove(value, out _);
         if (value == 0 || !global::System.OperatingSystem.IsWindows()) return;
@@ -462,12 +570,26 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private void ResizeWindowSurface(int width, int height)
     {
         if (!global::System.OperatingSystem.IsWindows()) return;
+        width = global::System.Math.Max(1, width);
+        height = global::System.Math.Max(1, height);
+        ulong endpoint;
+        lock (windowHandleGate) endpoint = nativePaintEndpoint;
+        if (endpoint != 0)
+        {
+            if (traceDirectGdiOwnership)
+                global::System.Console.Error.WriteLine("gui-forms-direct-gdi=resize|surface:" + surfaceId +
+                    "|control:" + stableId + "|type:" + managedTypeName + "|endpoint:" + endpoint +
+                    "|size:" + width + "x" + height + "|thread:" +
+                    global::System.Environment.CurrentManagedThreadId);
+            Check(ConfigureWindowsPaintEndpoint(endpoint,
+                checked((uint)width), checked((uint)height)));
+            lock (windowHandleGate) windowSize = new(width, height);
+            return;
+        }
         var changed = false;
         lock (windowHandleGate)
         {
             if (windowHandle == 0) return;
-            width = global::System.Math.Max(1, width);
-            height = global::System.Math.Max(1, height);
             changed = windowSize.Width != width || windowSize.Height != height;
             windowSize = new(width, height);
             if (changed)
@@ -484,12 +606,31 @@ internal sealed unsafe class NativeControlBridge : IDisposable
                                          global::System.Drawing.Size size)
     {
         if (!global::System.OperatingSystem.IsWindows()) return;
+        var normalized = new global::System.Drawing.Size(
+            global::System.Math.Max(1, size.Width),
+            global::System.Math.Max(1, size.Height));
+        ulong endpoint;
+        lock (windowHandleGate) endpoint = nativePaintEndpoint;
+        if (endpoint != 0)
+        {
+            if (traceDirectGdiOwnership)
+                global::System.Console.Error.WriteLine("gui-forms-direct-gdi=configure|surface:" + surfaceId +
+                    "|control:" + stableId + "|type:" + managedTypeName + "|endpoint:" + endpoint +
+                    "|position:" + position.X + "," + position.Y + "|size:" + normalized.Width + "x" +
+                    normalized.Height + "|thread:" + global::System.Environment.CurrentManagedThreadId);
+            Check(ConfigureWindowsPaintEndpoint(endpoint,
+                checked((uint)normalized.Width), checked((uint)normalized.Height)));
+            lock (windowHandleGate)
+            {
+                windowPosition = position;
+                windowSize = normalized;
+                windowSurfaceConfigured = true;
+            }
+            return;
+        }
         var changed = false;
         lock (windowHandleGate)
         {
-            var normalized = new global::System.Drawing.Size(
-                global::System.Math.Max(1, size.Width),
-                global::System.Math.Max(1, size.Height));
             changed = !windowSurfaceConfigured || windowPosition != position ||
                 windowSize != normalized;
             windowPosition = position;
@@ -514,6 +655,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             Style = 0x0020u,
             WindowProcedure = windowSurfaceThunkPointer,
             Instance = instance,
+            Cursor = LoadCursorW(0, (nint)32512), // IDC_ARROW
             ClassName = windowSurfaceClassName,
         };
         var atom = RegisterClassW(ref value);
@@ -550,6 +692,13 @@ internal sealed unsafe class NativeControlBridge : IDisposable
 
     private void MarkWindowSurfaceDirty()
     {
+        ulong endpoint;
+        lock (windowHandleGate) endpoint = nativePaintEndpoint;
+        if (endpoint != 0)
+        {
+            Check(TouchWindowsPaintEndpoint(endpoint, 0));
+            return;
+        }
         global::System.Threading.Interlocked.Increment(ref windowSurfaceContentRevision);
         if (global::System.Threading.Volatile.Read(ref windowSurfaceDrainActive) != 0)
             global::System.Threading.Interlocked.Exchange(ref windowSurfaceDirtyAfterDrain, 1);
@@ -588,6 +737,13 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     internal void DrainWindowSurfaceNow()
     {
         if (IsDisposed || !exposesWindowSurface || windowHandle == 0) return;
+        ulong endpoint;
+        lock (windowHandleGate) endpoint = nativePaintEndpoint;
+        if (endpoint != 0)
+        {
+            Check(DrainWindowsPaintEndpoint(endpoint));
+            return;
+        }
         global::System.Threading.Interlocked.Exchange(ref windowSurfaceDrainQueued, 0);
         DrainWindowSurfaceCore();
     }
@@ -642,6 +798,19 @@ internal sealed unsafe class NativeControlBridge : IDisposable
 
     internal string WindowSurfaceSnapshot()
     {
+        ulong endpoint;
+        lock (windowHandleGate) endpoint = nativePaintEndpoint;
+        if (endpoint != 0)
+        {
+            ulong required = 0;
+            var result = SnapshotWindowsPaintEndpoint(endpoint, null, 0, &required);
+            if (result != 6 && result != 0) Check(result);
+            if (required == 0) return string.Empty;
+            var bytes = new byte[checked((int)required)];
+            fixed (byte* data = bytes)
+                Check(SnapshotWindowsPaintEndpoint(endpoint, data, required, &required));
+            return Encoding.UTF8.GetString(bytes);
+        }
         var content = global::System.Threading.Interlocked.Read(ref windowSurfaceContentRevision);
         var captured = global::System.Threading.Interlocked.Read(ref windowSurfaceCapturedRevision);
         var active = global::System.Threading.Volatile.Read(ref windowSurfaceDrainActive) != 0;
@@ -660,6 +829,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             "|drains-started:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsStarted) +
             "|drains-committed:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsCommitted) +
             "|drains-unchanged:" + global::System.Threading.Interlocked.Read(ref windowSurfaceDrainsUnchanged) +
+            "|content-hash:" + windowSurfaceContentHash.ToString("x16", global::System.Globalization.CultureInfo.InvariantCulture) +
             "|explicit:" + (hasExplicitPresentBoundary ? 1 : 0);
     }
 
@@ -835,6 +1005,8 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     private static extern nint GetDC(nint window);
     [DllImport("user32.dll")]
     private static extern int ReleaseDC(nint window, nint device);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint LoadCursorW(nint instance, nint cursorName);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnableWindow(nint window, bool enable);
@@ -870,7 +1042,6 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     {
         if (traceControls) Console.Error.WriteLine($"facade-control=set|id={stableId}|type={managedTypeName}|change={change}|value={value.Replace('\r', ' ').Replace('\n', ' ')}");
         var bytes = Encoding.UTF8.GetBytes(value);
-        pendingChange = change;
         lock (stateGate) { if (change == NativeChange.Name) cachedName = value; else cachedText = value; }
         fixed (byte* data = bytes)
             Check(((delegate* unmanaged[Cdecl]<Handle, StringView, int>)operation)(handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length }));
@@ -888,7 +1059,7 @@ internal sealed unsafe class NativeControlBridge : IDisposable
     }
 
     private bool GetBool(nint operation) { uint value; Check(((delegate* unmanaged[Cdecl]<Handle, uint*, int>)operation)(handle.Value, &value)); return value != 0; }
-    private void SetBool(nint operation, bool value, NativeChange change) { if (traceControls) Console.Error.WriteLine($"facade-control=set|id={stableId}|type={managedTypeName}|change={change}|value={value}"); pendingChange = change; if (change == NativeChange.Visible) cachedVisible = value; else cachedEnabled = value; Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)operation)(handle.Value, value ? 1u : 0u)); }
+    private void SetBool(nint operation, bool value, NativeChange change) { if (traceControls) Console.Error.WriteLine($"facade-control=set|id={stableId}|type={managedTypeName}|change={change}|value={value}"); if (change == NativeChange.Visible) cachedVisible = value; else cachedEnabled = value; Check(((delegate* unmanaged[Cdecl]<Handle, uint, int>)operation)(handle.Value, value ? 1u : 0u)); }
 
     private void SubscribeTyped(NativeEvent kind)
     {
@@ -960,17 +1131,6 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         Check(((delegate* unmanaged[Cdecl]<Handle, delegate* unmanaged[Cdecl]<Handle, StringView, uint, int, int, void*, uint>, void*, Handle*, int>)api.SubscribeText)(
             handle.Value, &TextCallback, (void*)GCHandle.ToIntPtr(callbackRoot), &token));
         subscriptions.Add(token);
-    }
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void StateCallback(Handle sender, uint kind, void* context)
-    {
-        if (kind != 1 || context == null) return;
-        if (GCHandle.FromIntPtr((nint)context).Target is not NativeControlBridge bridge) return;
-        ++nativeCallbackDepth;
-        try { bridge.Changed?.Invoke(bridge.pendingChange); }
-        catch (Exception error) { Application.__ReportCallbackException(error); }
-        finally { ExitNativeCallback(); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -1066,11 +1226,438 @@ internal sealed unsafe class NativeControlBridge : IDisposable
         }
     }
 
+    internal sealed unsafe class PropertyObjectAdapter : IDisposable
+    {
+        private readonly object target;
+        private readonly PropertyGrid ownerGrid;
+        private readonly SafeControlHandle handle;
+        private readonly global::System.Collections.Generic.List<PropertyState> properties = new();
+        private readonly int ownerThreadId = global::System.Environment.CurrentManagedThreadId;
+        private bool disposed;
+
+        internal PropertyObjectAdapter(object target, PropertyGrid ownerGrid)
+        {
+            this.target = target ?? throw new global::System.ArgumentNullException(nameof(target));
+            this.ownerGrid = ownerGrid ?? throw new global::System.ArgumentNullException(nameof(ownerGrid));
+            var stableId = "forms.PropertyObject." + global::System.Threading.Interlocked.Increment(ref nextId).ToString(global::System.Globalization.CultureInfo.InvariantCulture);
+            var stableBytes = global::System.Text.Encoding.UTF8.GetBytes(stableId);
+            Handle value;
+            fixed (byte* data = stableBytes)
+                Check(((delegate* unmanaged[Cdecl]<uint, StringView, Handle*, int>)api.ControlCreateKind)(22u, new StringView { Data = data, Size = (ulong)stableBytes.Length }, &value));
+            handle = new SafeControlHandle(value);
+            try
+            {
+                var descriptors = global::System.ComponentModel.TypeDescriptor.GetProperties(target);
+                var projectedCount = 0;
+                foreach (global::System.ComponentModel.PropertyDescriptor descriptor in descriptors)
+                {
+                    if (!descriptor.IsBrowsable) continue;
+                    if (++projectedCount > 256) throw new global::System.NotSupportedException("GUI.Forms projects at most 256 browsable properties per managed object.");
+                    var property = new PropertyState(this, descriptor);
+                    property.Define();
+                    properties.Add(property);
+                }
+            }
+            catch
+            {
+                foreach (var property in properties) property.Dispose();
+                handle.DisposeNative();
+                throw;
+            }
+        }
+
+        internal Handle Value => handle.Value;
+
+        private void Notify(PropertyState property)
+        {
+            if (disposed || property.SuppressNotifications != 0) return;
+            if (global::System.Environment.CurrentManagedThreadId != ownerThreadId)
+            {
+                _ = Application.__Post(ownerThreadId, () => Notify(property));
+                return;
+            }
+            var bytes = global::System.Text.Encoding.UTF8.GetBytes(property.Descriptor.Name);
+            fixed (byte* data = bytes)
+                Check(((delegate* unmanaged[Cdecl]<Handle, StringView, int>)api.PropertyObjectNotifyChanged)(handle.Value, new StringView { Data = data, Size = (ulong)bytes.Length }));
+        }
+
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            try { handle.DisposeNative(); }
+            finally
+            {
+                foreach (var property in properties) property.Dispose();
+                properties.Clear();
+                global::System.GC.SuppressFinalize(this);
+            }
+        }
+
+        private enum Projection : uint { Boolean = 1, Signed = 2, Unsigned = 3, Number = 4, Text = 5, Color = 10, Enumeration = 13 }
+
+        private sealed unsafe class Utf8Lease : IDisposable
+        {
+            private readonly global::System.Collections.Generic.List<nint> allocations = new();
+            internal StringView View(string? value)
+            {
+                value ??= string.Empty;
+                if (value.Length == 0) return default;
+                var bytes = global::System.Text.Encoding.UTF8.GetBytes(value);
+                var pointer = global::System.Runtime.InteropServices.Marshal.AllocHGlobal(bytes.Length);
+                allocations.Add(pointer);
+                global::System.Runtime.InteropServices.Marshal.Copy(bytes, 0, pointer, bytes.Length);
+                return new StringView { Data = (byte*)pointer, Size = (ulong)bytes.Length };
+            }
+            public void Dispose()
+            {
+                foreach (var pointer in allocations) global::System.Runtime.InteropServices.Marshal.FreeHGlobal(pointer);
+                allocations.Clear();
+            }
+        }
+
+        private sealed unsafe class PropertyState : IDisposable
+        {
+            private readonly PropertyObjectAdapter owner;
+            private readonly global::System.Type payloadType;
+            private readonly Projection projection;
+            private readonly global::System.ComponentModel.TypeConverter converter;
+            private readonly global::System.Drawing.Design.UITypeEditor? editor;
+            private readonly global::System.Drawing.Design.UITypeEditorEditStyle editorStyle;
+            private readonly bool nullable;
+            private readonly bool resettable;
+            private readonly global::System.EventHandler valueChanged;
+            private GCHandle callbackRoot;
+            private bool changeHooked;
+            internal int SuppressNotifications;
+            internal global::System.ComponentModel.PropertyDescriptor Descriptor { get; }
+
+            internal PropertyState(PropertyObjectAdapter owner, global::System.ComponentModel.PropertyDescriptor descriptor)
+            {
+                this.owner = owner;
+                Descriptor = descriptor;
+                nullable = !descriptor.PropertyType.IsValueType || global::System.Nullable.GetUnderlyingType(descriptor.PropertyType) is not null;
+                payloadType = global::System.Nullable.GetUnderlyingType(descriptor.PropertyType) ?? descriptor.PropertyType;
+                converter = descriptor.Converter;
+                projection = SelectProjection(payloadType, converter, descriptor.IsReadOnly);
+                if (projection == Projection.Enumeration && global::System.Enum.GetUnderlyingType(payloadType) == typeof(ulong))
+                    throw new global::System.NotSupportedException("GUI.Forms ABI 0.23 does not project UInt64-backed enums.");
+                resettable = !descriptor.IsReadOnly && (descriptor.Attributes[typeof(global::System.ComponentModel.DefaultValueAttribute)] is not null || descriptor.CanResetValue(owner.target));
+                if (!descriptor.IsReadOnly)
+                {
+                    editor = descriptor.GetEditor(typeof(global::System.Drawing.Design.UITypeEditor)) as global::System.Drawing.Design.UITypeEditor;
+                    if (editor is not null) editorStyle = editor.GetEditStyle(new EditorContext(owner.target, descriptor));
+                }
+                valueChanged = (_, _) => owner.Notify(this);
+            }
+
+            private static Projection SelectProjection(global::System.Type type, global::System.ComponentModel.TypeConverter converter, bool readOnly)
+            {
+                if (type == typeof(bool)) return Projection.Boolean;
+                if (type == typeof(sbyte) || type == typeof(short) || type == typeof(int) || type == typeof(long)) return Projection.Signed;
+                if (type == typeof(byte) || type == typeof(ushort) || type == typeof(uint) || type == typeof(ulong)) return Projection.Unsigned;
+                if (type == typeof(float) || type == typeof(double) || type == typeof(decimal)) return Projection.Number;
+                if (type == typeof(string) || type == typeof(char)) return Projection.Text;
+                if (type == typeof(global::System.Drawing.Color)) return Projection.Color;
+                if (type.IsEnum) return Projection.Enumeration;
+                if (converter.CanConvertTo(typeof(string)) && (readOnly || converter.CanConvertFrom(typeof(string)))) return Projection.Text;
+                throw new global::System.NotSupportedException("GUI.Forms cannot project managed property type " + type.FullName + " through ABI 0.23.");
+            }
+
+            private string ConverterIdentity()
+            {
+                var identity = "managed:" + (Descriptor.ComponentType?.FullName ?? "object") + ":" + Descriptor.Name + ":" + (converter.GetType().FullName ?? "converter");
+                if (identity.Length <= 240) return identity;
+                return "managed:" + identity.GetHashCode(global::System.StringComparison.Ordinal).ToString("X8", global::System.Globalization.CultureInfo.InvariantCulture) + ":" + Descriptor.Name;
+            }
+
+            private string EditorIdentity()
+            {
+                if (editor is null || editorStyle == global::System.Drawing.Design.UITypeEditorEditStyle.None) return string.Empty;
+                var identity = "managed-editor:" + (Descriptor.ComponentType?.FullName ?? "object") + ":" + Descriptor.Name + ":" + (editor.GetType().FullName ?? "editor") + ":" + editorStyle;
+                if (identity.Length <= 240) return identity;
+                return "managed-editor:" + identity.GetHashCode(global::System.StringComparison.Ordinal).ToString("X8", global::System.Globalization.CultureInfo.InvariantCulture) + ":" + Descriptor.Name;
+            }
+
+            internal void Define()
+            {
+                using var lease = new Utf8Lease();
+                var enumChoices = BuildEnumChoices(lease);
+                var standards = BuildStandards(lease);
+                var flags = 1u | 4u;
+                if (!Descriptor.IsReadOnly) flags |= 2u;
+                if (nullable) flags |= 8u;
+                if (converter.GetStandardValuesExclusive(null)) flags |= 16u;
+                if (resettable) flags |= 32u;
+                if (Descriptor.SupportsChangeEvents) flags |= 64u;
+                if (payloadType.IsEnum && payloadType.IsDefined(typeof(global::System.FlagsAttribute), false)) flags |= 128u;
+                callbackRoot = GCHandle.Alloc(this);
+                try
+                {
+                    fixed (PropertyEnumChoice* choiceData = enumChoices)
+                    fixed (PropertyValue* standardData = standards)
+                    {
+                        var descriptor = new PropertyDescriptorV1
+                        {
+                            StructSize = (uint)sizeof(PropertyDescriptorV1), Kind = (uint)projection, Flags = flags,
+                            Name = lease.View(Descriptor.Name), Category = lease.View(Descriptor.Category), Description = lease.View(Descriptor.Description),
+                            EnumTypeName = lease.View(payloadType.IsEnum ? payloadType.FullName : string.Empty),
+                            EnumChoices = choiceData, EnumChoiceCount = (ulong)enumChoices.Length,
+                            StandardValues = standardData, StandardValueCount = (ulong)standards.Length,
+                            ConverterName = lease.View(ConverterIdentity()), EditorName = lease.View(EditorIdentity()),
+                        };
+                        var callbacks = new PropertyCallbacksV1
+                        {
+                            StructSize = (uint)sizeof(PropertyCallbacksV1), Context = (void*)GCHandle.ToIntPtr(callbackRoot),
+                            Get = (nint)(delegate* unmanaged[Cdecl]<void*, PropertyValue*, byte*, ulong, ulong*, uint>)&GetCallback,
+                            Set = Descriptor.IsReadOnly ? 0 : (nint)(delegate* unmanaged[Cdecl]<void*, PropertyValue*, uint>)&SetCallback,
+                            Reset = resettable ? (nint)(delegate* unmanaged[Cdecl]<void*, uint>)&ResetCallback : 0,
+                            ShouldSerialize = (nint)(delegate* unmanaged[Cdecl]<void*, uint*, uint>)&ShouldSerializeCallback,
+                            Format = (nint)(delegate* unmanaged[Cdecl]<void*, PropertyValue*, byte*, ulong, ulong*, uint>)&FormatCallback,
+                            Parse = Descriptor.IsReadOnly ? 0 : (nint)(delegate* unmanaged[Cdecl]<void*, StringView, PropertyValue*, byte*, ulong, ulong*, uint>)&ParseCallback,
+                            Edit = editor is null || editorStyle == global::System.Drawing.Design.UITypeEditorEditStyle.None ? 0 : (nint)(delegate* unmanaged[Cdecl]<void*, PropertyValue*, PropertyValue*, byte*, ulong, ulong*, uint>)&EditCallback,
+                        };
+                        Check(((delegate* unmanaged[Cdecl]<Handle, PropertyDescriptorV1*, PropertyCallbacksV1*, int>)api.PropertyObjectDefine)(owner.handle.Value, &descriptor, &callbacks));
+                    }
+                    if (Descriptor.SupportsChangeEvents)
+                    {
+                        Descriptor.AddValueChanged(owner.target, valueChanged);
+                        changeHooked = true;
+                    }
+                }
+                catch
+                {
+                    if (callbackRoot.IsAllocated) callbackRoot.Free();
+                    throw;
+                }
+            }
+
+            private PropertyEnumChoice[] BuildEnumChoices(Utf8Lease lease)
+            {
+                if (!payloadType.IsEnum) return global::System.Array.Empty<PropertyEnumChoice>();
+                var names = global::System.Enum.GetNames(payloadType);
+                if (names.Length > 256) throw new global::System.NotSupportedException("GUI.Forms projects at most 256 enum choices.");
+                var result = new PropertyEnumChoice[names.Length];
+                for (var index = 0; index < names.Length; ++index)
+                {
+                    var value = global::System.Enum.Parse(payloadType, names[index]);
+                    result[index] = new PropertyEnumChoice { Name = lease.View(names[index]), Value = global::System.Convert.ToInt64(value, global::System.Globalization.CultureInfo.InvariantCulture) };
+                }
+                return result;
+            }
+
+            private PropertyValue[] BuildStandards(Utf8Lease lease)
+            {
+                if (!converter.GetStandardValuesSupported(null)) return global::System.Array.Empty<PropertyValue>();
+                var values = converter.GetStandardValues(null);
+                if (values is null || values.Count == 0) return global::System.Array.Empty<PropertyValue>();
+                if (values.Count > 256) throw new global::System.NotSupportedException("GUI.Forms projects at most 256 standard values.");
+                var result = new global::System.Collections.Generic.List<PropertyValue>();
+                var identities = new global::System.Collections.Generic.HashSet<string>(global::System.StringComparer.Ordinal);
+                foreach (var item in values)
+                {
+                    var value = Encode(item, out var valueText);
+                    if (valueText.Length != 0) value.TextValue = lease.View(valueText);
+                    var identity = value.Kind + ":" + value.BooleanValue + ":" + value.SignedValue + ":" + value.UnsignedValue + ":" + value.NumberValue.ToString("R", global::System.Globalization.CultureInfo.InvariantCulture) + ":" + value.ColorArgb + ":" + valueText;
+                    if (identities.Add(identity)) result.Add(value);
+                }
+                return result.ToArray();
+            }
+
+            private PropertyValue Encode(object? input, out string text)
+            {
+                text = string.Empty;
+                if (input is null) return new PropertyValue { Kind = 0u };
+                switch (projection)
+                {
+                    case Projection.Boolean: return new PropertyValue { Kind = (uint)projection, BooleanValue = (bool)global::System.Convert.ChangeType(input, typeof(bool), global::System.Globalization.CultureInfo.InvariantCulture) ? 1u : 0u };
+                    case Projection.Signed: return new PropertyValue { Kind = (uint)projection, SignedValue = global::System.Convert.ToInt64(input, global::System.Globalization.CultureInfo.InvariantCulture) };
+                    case Projection.Unsigned: return new PropertyValue { Kind = (uint)projection, UnsignedValue = global::System.Convert.ToUInt64(input, global::System.Globalization.CultureInfo.InvariantCulture) };
+                    case Projection.Number: return new PropertyValue { Kind = (uint)projection, NumberValue = global::System.Convert.ToDouble(input, global::System.Globalization.CultureInfo.InvariantCulture) };
+                    case Projection.Color: return new PropertyValue { Kind = (uint)projection, ColorArgb = unchecked((uint)((global::System.Drawing.Color)input).ToArgb()) };
+                    case Projection.Enumeration: text = global::System.Enum.Format(payloadType, input, "G"); return new PropertyValue { Kind = (uint)projection, SignedValue = global::System.Convert.ToInt64(input, global::System.Globalization.CultureInfo.InvariantCulture) };
+                    default: text = input is string stringValue ? stringValue : converter.ConvertToString(null, global::System.Globalization.CultureInfo.CurrentCulture, input) ?? string.Empty; return new PropertyValue { Kind = (uint)projection };
+                }
+            }
+
+            private object? Decode(PropertyValue* value)
+            {
+                if (value->Kind == 0u)
+                {
+                    if (!nullable) throw new global::System.InvalidOperationException("A non-nullable property cannot receive null.");
+                    return null;
+                }
+                if (value->Kind != (uint)projection) throw new global::System.InvalidOperationException("Native property kind does not match the managed descriptor.");
+                switch (projection)
+                {
+                    case Projection.Boolean: return value->BooleanValue != 0u;
+                    case Projection.Signed: return global::System.Convert.ChangeType(value->SignedValue, payloadType, global::System.Globalization.CultureInfo.InvariantCulture);
+                    case Projection.Unsigned: return global::System.Convert.ChangeType(value->UnsignedValue, payloadType, global::System.Globalization.CultureInfo.InvariantCulture);
+                    case Projection.Number: return global::System.Convert.ChangeType(value->NumberValue, payloadType, global::System.Globalization.CultureInfo.InvariantCulture);
+                    case Projection.Color: return global::System.Drawing.Color.FromArgb(unchecked((int)value->ColorArgb));
+                    case Projection.Enumeration: return global::System.Enum.ToObject(payloadType, value->SignedValue);
+                    default:
+                        var stringValue = Read(value->TextValue);
+                        if (payloadType == typeof(string)) return stringValue;
+                        if (payloadType == typeof(char)) return stringValue.Length == 1 ? stringValue[0] : throw new global::System.FormatException("Character properties require exactly one character.");
+                        return converter.ConvertFromString(null, global::System.Globalization.CultureInfo.CurrentCulture, stringValue);
+                }
+            }
+
+            private static string Read(StringView value) => value.Data == null || value.Size == 0 ? string.Empty : global::System.Text.Encoding.UTF8.GetString(value.Data, checked((int)value.Size));
+            private static uint Write(string text, byte* output, ulong capacity, ulong* required)
+            {
+                var bytes = global::System.Text.Encoding.UTF8.GetBytes(text ?? string.Empty);
+                *required = (ulong)bytes.Length;
+                if (capacity < (ulong)bytes.Length || (bytes.Length != 0 && output == null)) return 6u;
+                if (bytes.Length != 0) bytes.CopyTo(new global::System.Span<byte>(output, bytes.Length));
+                return 0u;
+            }
+            private static PropertyState? State(void* context) => context == null ? null : GCHandle.FromIntPtr((nint)context).Target as PropertyState;
+            private uint Failure(global::System.Exception error) { Application.__ReportCallbackException(error); return 8u; }
+
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint GetCallback(void* context, PropertyValue* value, byte* output, ulong capacity, ulong* required)
+            {
+                var state = State(context); if (state is null || value == null || required == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { *value = state.Encode(state.Descriptor.GetValue(state.owner.target), out var text); return Write(text, output, capacity, required); }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint SetCallback(void* context, PropertyValue* value)
+            {
+                var state = State(context); if (state is null || value == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { ++state.SuppressNotifications; try { state.Descriptor.SetValue(state.owner.target, state.Decode(value)); } finally { --state.SuppressNotifications; } return 0u; }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint ResetCallback(void* context)
+            {
+                var state = State(context); if (state is null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { ++state.SuppressNotifications; try { state.Descriptor.ResetValue(state.owner.target); } finally { --state.SuppressNotifications; } return 0u; }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint ShouldSerializeCallback(void* context, uint* result)
+            {
+                var state = State(context); if (state is null || result == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { *result = state.Descriptor.ShouldSerializeValue(state.owner.target) ? 1u : 0u; return 0u; }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint FormatCallback(void* context, PropertyValue* value, byte* output, ulong capacity, ulong* required)
+            {
+                var state = State(context); if (state is null || value == null || required == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { var managed = state.Decode(value); var text = managed is null ? string.Empty : state.converter.ConvertToString(null, global::System.Globalization.CultureInfo.CurrentCulture, managed) ?? string.Empty; return Write(text, output, capacity, required); }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint ParseCallback(void* context, StringView input, PropertyValue* value, byte* output, ulong capacity, ulong* required)
+            {
+                var state = State(context); if (state is null || value == null || required == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try { var text = Read(input); object? parsed; if (text.Length == 0 && state.nullable) parsed = null; else if (state.payloadType == typeof(string)) parsed = text; else if (state.payloadType == typeof(char)) parsed = text.Length == 1 ? text[0] : throw new global::System.FormatException("Character properties require exactly one character."); else parsed = state.converter.ConvertFromString(null, global::System.Globalization.CultureInfo.CurrentCulture, text); *value = state.Encode(parsed, out var valueText); return Write(valueText, output, capacity, required); }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+
+            [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+            private static uint EditCallback(void* context, PropertyValue* current, PropertyValue* edited, byte* output, ulong capacity, ulong* required)
+            {
+                var state = State(context); if (state is null || current == null || edited == null || required == null) return 1u;
+                if (global::System.Environment.CurrentManagedThreadId != state.owner.ownerThreadId) return 4u;
+                try
+                {
+                    if (state.editor is null || state.editorStyle == global::System.Drawing.Design.UITypeEditorEditStyle.None) return 5u;
+                    var descriptorContext = new EditorContext(state.owner.target, state.Descriptor);
+                    using var service = new EditorService(state.owner.ownerGrid);
+                    var result = state.editor.EditValue(descriptorContext, service, state.Decode(current)!);
+                    *edited = state.Encode(result, out var valueText);
+                    return Write(valueText, output, capacity, required);
+                }
+                catch (global::System.Exception error) { return state.Failure(error); }
+            }
+
+            private sealed class EditorContext : global::System.ComponentModel.ITypeDescriptorContext
+            {
+                private readonly object instance;
+                private readonly global::System.ComponentModel.PropertyDescriptor descriptor;
+                internal EditorContext(object instance, global::System.ComponentModel.PropertyDescriptor descriptor) { this.instance = instance; this.descriptor = descriptor; }
+                public global::System.ComponentModel.IContainer? Container => null;
+                public object Instance => instance;
+                public global::System.ComponentModel.PropertyDescriptor PropertyDescriptor => descriptor;
+                public object? GetService(global::System.Type serviceType) => null;
+                public void OnComponentChanged() { }
+                public bool OnComponentChanging() => true;
+            }
+
+            private sealed class EditorService : global::System.IServiceProvider, global::System.Windows.Forms.Design.IWindowsFormsEditorService, global::System.IDisposable
+            {
+                private readonly PropertyGrid grid;
+                private Form? dropDown;
+                private bool disposed;
+                internal EditorService(PropertyGrid grid) { this.grid = grid; }
+                public object? GetService(global::System.Type serviceType) => serviceType == typeof(global::System.Windows.Forms.Design.IWindowsFormsEditorService) ? this : null;
+                public void CloseDropDown() { if (dropDown is not null && !dropDown.IsDisposed) dropDown.Close(); }
+                public void DropDownControl(Control control)
+                {
+                    if (disposed) throw new global::System.ObjectDisposedException(nameof(EditorService));
+                    if (control is null) throw new global::System.ArgumentNullException(nameof(control));
+                    if (dropDown is not null) throw new global::System.InvalidOperationException("A property editor drop-down is already active.");
+                    if (control.Parent is not null) throw new global::System.ArgumentException("A property editor drop-down control must be unparented.", nameof(control));
+                    var priorBounds = control.Bounds;
+                    var width = global::System.Math.Clamp(priorBounds.Width > 0 ? priorBounds.Width : 240, 80, 1024);
+                    var height = global::System.Math.Clamp(priorBounds.Height > 0 ? priorBounds.Height : 180, 40, 768);
+                    using var host = new Form { Name = grid.Name + ".EditorDropDown", Text = string.Empty, FormBorderStyle = FormBorderStyle.FixedSingle, ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, ClientSize = new global::System.Drawing.Size(width, height) };
+                    var anchor = grid.PointToScreen(new global::System.Drawing.Point(global::System.Math.Max(0, grid.Width - width), grid.Height));
+                    host.Location = anchor;
+                    control.Bounds = new global::System.Drawing.Rectangle(0, 0, width, height);
+                    host.Controls.Add(control);
+                    dropDown = host;
+                    try
+                    {
+                        var owner = grid.FindForm();
+                        if (owner is null) host.ShowDialog(); else host.ShowDialog(owner);
+                    }
+                    finally
+                    {
+                        dropDown = null;
+                        host.Controls.Remove(control);
+                        if (!control.IsDisposed) control.Bounds = priorBounds;
+                    }
+                }
+                public DialogResult ShowDialog(Form dialog)
+                {
+                    if (disposed) throw new global::System.ObjectDisposedException(nameof(EditorService));
+                    if (dialog is null) throw new global::System.ArgumentNullException(nameof(dialog));
+                    if (dropDown is not null) throw new global::System.InvalidOperationException("A modal property editor cannot open inside a drop-down transaction.");
+                    var owner = grid.FindForm();
+                    return owner is null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
+                }
+                public void Dispose() { if (disposed) return; disposed = true; CloseDropDown(); }
+            }
+
+            public void Dispose()
+            {
+                if (changeHooked)
+                {
+                    Descriptor.RemoveValueChanged(owner.target, valueChanged);
+                    changeHooked = false;
+                }
+                if (callbackRoot.IsAllocated) callbackRoot.Free();
+            }
+        }
+    }
+
     private static Api LoadApi()
     {
         var value = new Api { StructSize = (uint)sizeof(Api) };
-        Check(GetApi(21, ref value));
-        if (value.AbiVersion != 21 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0 || value.SuspendLayout == 0 || value.ResumeLayout == 0 || value.PerformControlLayout == 0 || value.GetLayoutState == 0) throw new InvalidOperationException("GUI.Forms ABI 0.21 table is incomplete.");
+        Check(GetApi(24, ref value));
+        if (value.AbiVersion != 24 || value.BeginInvoke == 0 || value.RequestClose == 0 || value.SetControlPng == 0 || value.SetChildIndex == 0 || value.SetControlColors == 0 || value.SubscribePointer == 0 || value.SetCheckState == 0 || value.GetCheckState == 0 || value.SubscribeKey == 0 || value.SubscribeText == 0 || value.SetRange == 0 || value.GetRange == 0 || value.SetRangeValue == 0 || value.GetRangeValue == 0 || value.SetPointerCapture == 0 || value.GetPointerCapture == 0 || value.ShowPathDialog == 0 || value.LastDialogPath == 0 || value.ShowTooltip == 0 || value.HideTooltip == 0 || value.SetFieldSelection == 0 || value.SetFieldEditState == 0 || value.FieldPositionFromPoint == 0 || value.WriteClipboardText == 0 || value.ReadClipboardText == 0 || value.FieldNavigate == 0 || value.FieldReplace == 0 || value.FieldHistory == 0 || value.FieldClearHistory == 0 || value.SetControlPixels == 0 || value.GetControlAbsoluteBounds == 0 || value.SubscribeKeyPreview == 0 || value.SetCursor == 0 || value.GetCursor == 0 || value.SetAutoScrollOffset == 0 || value.SetAutoScroll == 0 || value.SetAutoScrollMargin == 0 || value.SetAutoScrollMinSize == 0 || value.SetAutoScrollPosition == 0 || value.GetScrollState == 0 || value.SetScrollAxisState == 0 || value.ScrollControlIntoView == 0 || value.SuspendLayout == 0 || value.ResumeLayout == 0 || value.PerformControlLayout == 0 || value.GetLayoutState == 0 || value.PropertyGridSetSelectedControls == 0 || value.PropertyGridSetSort == 0 || value.PropertyGridGetSort == 0 || value.PropertyGridRefresh == 0 || value.PropertyObjectDefine == 0 || value.PropertyObjectNotifyChanged == 0 || value.PropertyGridTrySetText == 0 || value.PropertyGridResetProperty == 0 || value.PropertyGridActivateEditor == 0) throw new InvalidOperationException("GUI.Forms ABI 0.24 table is incomplete.");
         return value;
     }
     private static void Check(int result)
@@ -1128,7 +1715,16 @@ internal sealed unsafe class NativeControlBridge : IDisposable
             if (global::System.Threading.Interlocked.CompareExchange(ref executionState, 1, 0) != 0) return;
             Untrack(this);
             if (traceThis) Console.Error.WriteLine($"facade-delegate=execute-begin|method={traceName}|thread={Environment.CurrentManagedThreadId}");
-            try { result = method.DynamicInvoke(); }
+            try
+            {
+                // BeginInvoke(Action) is the overwhelmingly common UI path and
+                // must not cross reflection's invocation trampoline. Besides
+                // avoiding avoidable latency, direct typed invocation preserves
+                // useful managed stacks through nested native callbacks and does
+                // not misclassify reverse-P/Invoke thunks reached by the action.
+                if (method is global::System.Action action) { action(); result = null; }
+                else result = method.DynamicInvoke();
+            }
             catch (Exception caught) { error = caught; throw; }
             finally
             {

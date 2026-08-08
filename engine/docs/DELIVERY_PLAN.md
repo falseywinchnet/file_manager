@@ -40,7 +40,14 @@ crash-loop/update policy, and bounded status subscription remain release gates.
 - measure first-result/page latency, CPU, RSS, descriptors, and bytes read on
   the guard workloads and native APFS/NTFS/ext4 fixtures.
 
-Status: **REQUIRED under ADR-008; not implemented; Engine reply 006 pending**.
+Status: **OBSERVED development implementation and Engine reply 006 recorded**.
+The Go service and JSONL projection pass zero-catalogue, pagination,
+source-bound cursor, symlink non-traversal, zero-catalogue-mutation, and
+cross-process Orchestrator/Rust/C++ tests. A 10,000-entry APFS control is
+measured in `results/M1L_LIVE_QUERY_001.md`. Million-entry/deep-tree,
+distribution, CPU/RSS/bytes-read, native NTFS/ext4, permission-identity,
+blocked-output cancellation, and installed authenticated transport remain
+promotion gates.
 
 ## M2 — custom durable generation
 

@@ -351,7 +351,7 @@ struct InstrumentRack::Impl final {
                     }
                     InstrumentFieldChange change{module_id, field_id, previous,
                                                  field->value, true};
-                    owner.field_changed_.emit(change);
+                    owner.publish_change(owner.field_changed_, change);
                     owner.field_committed_.emit(change);
                 });
         } else if (const auto text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
@@ -373,8 +373,9 @@ struct InstrumentRack::Impl final {
                             }
                         }
                     }
-                    owner.field_changed_.emit(
-                        {module_id, field_id, previous, value, false});
+                    owner.publish_change(owner.field_changed_,
+                        InstrumentFieldChange{
+                            module_id, field_id, previous, value, false});
                 });
             state.committed = text->committed().subscribe(
                 owner, [this, module_id, field_id](const std::string& value) {

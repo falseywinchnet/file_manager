@@ -69,6 +69,68 @@ std::string property_service_name(std::string_view name) {
     return canonical;
 }
 
+void require_conversion_context(const PropertyConversionContext& context) {
+    if (context.culture_name.empty() || context.culture_name.size() > 128U ||
+        context.decimal_separator.empty() ||
+        context.decimal_separator.size() > 8U ||
+        context.group_separator.size() > 8U ||
+        context.decimal_separator == context.group_separator ||
+        !validate_utf8(context.culture_name).valid() ||
+        !validate_utf8(context.decimal_separator).valid() ||
+        !validate_utf8(context.group_separator).valid()) {
+        throw std::invalid_argument(
+            "Property conversion context must use distinct bounded UTF-8 separators");
+    }
+}
+
+void replace_text(std::string& text, std::string_view from,
+                  std::string_view to) {
+    if (from.empty()) return;
+    std::size_t position = 0U;
+    while ((position = text.find(from, position)) != std::string::npos) {
+        text.replace(position, from.size(), to);
+        position += to.size();
+    }
+}
+
+std::string localize_number(std::string text,
+                            const PropertyConversionContext& context) {
+    const std::size_t decimal = text.find('.');
+    const std::size_t integer_end = decimal == std::string::npos
+        ? text.size() : decimal;
+    if (context.use_grouping && !context.group_separator.empty()) {
+        const std::size_t first_digit = !text.empty() &&
+                (text.front() == '-' || text.front() == '+')
+            ? 1U : 0U;
+        std::size_t digits = integer_end - first_digit;
+        while (digits > 3U) {
+            const std::size_t insertion = first_digit + digits - 3U;
+            text.insert(insertion, context.group_separator);
+            digits -= 3U;
+        }
+    }
+    if (context.decimal_separator != ".") {
+        const std::size_t localized_decimal = text.find('.', integer_end);
+        if (localized_decimal != std::string::npos) {
+            text.replace(localized_decimal, 1U, context.decimal_separator);
+        }
+    }
+    return text;
+}
+
+std::optional<std::string> invariant_number_text(
+    std::string_view text, const PropertyConversionContext& context) {
+    std::string normalized(text);
+    if (!context.group_separator.empty()) {
+        replace_text(normalized, context.group_separator, {});
+    }
+    if (context.decimal_separator != ".") {
+        if (normalized.find('.') != std::string::npos) return {};
+        replace_text(normalized, context.decimal_separator, ".");
+    }
+    return normalized;
+}
+
 std::uint64_t property_virtual_runtime_id(std::string_view id) noexcept {
     std::uint64_t hash = 1469598103934665603ULL;
     for (const unsigned char byte : id) {
@@ -400,7 +462,7 @@ void FlagsValueEditor::open_drop_down() {
     dropped_down_ = true;
     synchronize_popup();
     invalidate(Dirty::paint | Dirty::semantics);
-    drop_down_changed_.emit(true);
+    publish_change(drop_down_changed_, true);
 }
 
 void FlagsValueEditor::close_drop_down() {
@@ -421,7 +483,7 @@ void FlagsValueEditor::close_drop_down() {
     dropped_down_ = false;
     closing_popup_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void FlagsValueEditor::on_popup_revoked() {
@@ -441,7 +503,7 @@ void FlagsValueEditor::on_popup_revoked() {
     const bool changed = dropped_down_;
     dropped_down_ = false;
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) drop_down_changed_.emit(false);
+    if (changed) publish_change(drop_down_changed_, false);
 }
 
 void FlagsValueEditor::synchronize_popup() {
@@ -494,7 +556,7 @@ void FlagsValueEditor::apply_popup_choice(std::size_t popup_index,
     value_ = next;
     synchronize_popup();
     invalidate(Dirty::paint | Dirty::semantics);
-    value_changed_.emit(value_);
+    publish_change(value_changed_, value_);
 }
 
 void FlagsValueEditor::on_paint(Painter& painter, Rect damage) {
@@ -713,7 +775,7 @@ void ColorValueEditor::commit(std::string_view text) {
         synchronizing_ = false;
     }
     invalidate(Dirty::paint | Dirty::semantics);
-    if (changed) value_changed_.emit(value_);
+    if (changed) publish_change(value_changed_, value_);
 }
 
 void ColorValueEditor::cancel() {
@@ -784,7 +846,8 @@ void ColorValueEditor::on_dispose() noexcept {
 bool PropertyValueConverterRegistry::register_converter(
     std::string name, PropertyValueConverter converter) {
     const std::string canonical = property_service_name(name);
-    if (!converter.format || !converter.parse) {
+    if ((!converter.format && !converter.format_with_context) ||
+        (!converter.parse && !converter.parse_with_context)) {
         throw std::invalid_argument(
             "Property converters require format and parse callbacks");
     }
@@ -834,14 +897,17 @@ const PropertyValueConverter* PropertyValueConverterRegistry::find(
 
 std::string PropertyValueConverterRegistry::format(
     const BindingValue& value, const PropertyDescriptor& descriptor) const {
+    if (binding_value_kind(value) == BindingValueKind::null) return "(none)";
     std::string service = descriptor.converter_name;
     if (service.empty()) {
-        const auto mapped = converter_for(binding_value_kind(value));
+        const auto mapped = converter_for(descriptor.kind);
         if (mapped) service = *mapped;
     }
     const PropertyValueConverter* converter = find(service);
     std::string result = converter
-        ? converter->format(value, descriptor)
+        ? (converter->format_with_context
+               ? converter->format_with_context(value, descriptor, context_)
+               : converter->format(value, descriptor))
         : binding_value_to_string(value);
     if (result.size() > 64U * 1024U || !validate_utf8(result).valid()) {
         throw std::invalid_argument(
@@ -854,16 +920,35 @@ std::optional<BindingValue> PropertyValueConverterRegistry::parse(
     std::string_view text, const BindingValue& current,
     const PropertyDescriptor& descriptor) const {
     if (text.size() > 64U * 1024U || !validate_utf8(text).valid()) return {};
+    if (descriptor.nullable && (text.empty() || text == "(none)" ||
+                                text == "(None)")) {
+        return BindingValue{std::monostate{}};
+    }
+    for (const BindingValue& standard : descriptor.standard_values) {
+        if (format(standard, descriptor) == text) return standard;
+    }
+    if (descriptor.standard_values_exclusive) return {};
     std::string service = descriptor.converter_name;
     if (service.empty()) {
-        const auto mapped = converter_for(binding_value_kind(current));
+        const auto mapped = converter_for(descriptor.kind);
         if (mapped) service = *mapped;
     }
     const PropertyValueConverter* converter = find(service);
     if (!converter) return {};
-    const auto result = converter->parse(text, current, descriptor);
-    return result && valid_property_value_tree(*result)
-        ? result : std::optional<BindingValue>{};
+    const auto result = converter->parse_with_context
+        ? converter->parse_with_context(text, current, descriptor, context_)
+        : converter->parse(text, current, descriptor);
+    const auto converted = result
+        ? convert_property_value(*result, descriptor)
+        : std::optional<BindingValue>{};
+    return converted && valid_property_value_tree(*converted)
+        ? converted : std::optional<BindingValue>{};
+}
+
+void PropertyValueConverterRegistry::set_context(
+    PropertyConversionContext context) {
+    require_conversion_context(context);
+    context_ = std::move(context);
 }
 
 std::shared_ptr<PropertyValueConverterRegistry>
@@ -879,6 +964,35 @@ PropertyValueConverterRegistry::create_default() {
     };
     invariant.parse = [](std::string_view text, const BindingValue&,
                          const PropertyDescriptor& descriptor) {
+        return convert_property_value(BindingValue{std::string(text)},
+                                      descriptor);
+    };
+    invariant.format_with_context = [](
+        const BindingValue& value, const PropertyDescriptor& descriptor,
+        const PropertyConversionContext& context) {
+        if (const auto* boolean = std::get_if<bool>(&value)) {
+            return std::string(*boolean ? "True" : "False");
+        }
+        std::string formatted = binding_value_to_string(value);
+        return descriptor.kind == BindingValueKind::signed_integer ||
+                descriptor.kind == BindingValueKind::unsigned_integer ||
+                descriptor.kind == BindingValueKind::number
+            ? localize_number(std::move(formatted), context)
+            : formatted;
+    };
+    invariant.parse_with_context = [](
+        std::string_view text, const BindingValue&,
+        const PropertyDescriptor& descriptor,
+        const PropertyConversionContext& context)
+            -> std::optional<BindingValue> {
+        if (descriptor.kind == BindingValueKind::signed_integer ||
+            descriptor.kind == BindingValueKind::unsigned_integer ||
+            descriptor.kind == BindingValueKind::number) {
+            const auto normalized = invariant_number_text(text, context);
+            return normalized
+                ? convert_property_value(BindingValue{*normalized}, descriptor)
+                : std::optional<BindingValue>{};
+        }
         return convert_property_value(BindingValue{std::string(text)},
                                       descriptor);
     };
@@ -1292,8 +1406,9 @@ struct PropertyList::Impl final {
                     PropertyRowSpec& model = spec(*row);
                     const std::string previous = model.value;
                     model.value = value;
-                    owner.value_changed_.emit(
-                        {row_id, previous, model.value, false});
+                    owner.publish_change(owner.value_changed_,
+                        PropertyValueChange{
+                            row_id, previous, model.value, false});
                 });
             state.commit_subscription = text->committed().subscribe(
                 owner, [this, row_id](const std::string& value) {
@@ -1339,7 +1454,7 @@ struct PropertyList::Impl final {
                     model.value = std::string(editor->selected_text());
                     row->committed_value = model.value;
                     PropertyValueChange change{row_id, previous, model.value, true};
-                    owner.value_changed_.emit(change);
+                    owner.publish_change(owner.value_changed_, change);
                     owner.value_committed_.emit(change);
                 });
         } else if (const auto check =
@@ -1358,7 +1473,7 @@ struct PropertyList::Impl final {
                     editor->set_text(model.value);
                     PropertyValueChange change{
                         row_id, previous, model.value, true};
-                    owner.value_changed_.emit(change);
+                    owner.publish_change(owner.value_changed_, change);
                     owner.value_committed_.emit(change);
                 });
         }
@@ -1747,7 +1862,8 @@ bool PropertyList::set_group_expanded(std::string_view id, bool expanded) {
     impl_->arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
-    group_changed_.emit({found->stable_id, expanded});
+    publish_change(group_changed_,
+                   PropertyGroupChange{found->stable_id, expanded});
     return true;
 }
 
@@ -1762,7 +1878,8 @@ bool PropertyList::set_row_expanded(std::string_view id, bool expanded) {
     impl_->arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
-    row_expansion_changed_.emit({model.stable_id, expanded});
+    publish_change(row_expansion_changed_,
+                   PropertyRowExpansionChange{model.stable_id, expanded});
     return true;
 }
 
@@ -2178,6 +2295,7 @@ struct PropertyGrid::Impl final {
         std::string property_name;
         std::vector<PathSegment> path;
         bool writable{true};
+        PropertyDescriptor descriptor;
     };
 
     struct InstalledEditor final {
@@ -2243,7 +2361,9 @@ struct PropertyGrid::Impl final {
         const BindingValue& value, std::span<const PathSegment> path,
         const BindingValue& replacement) {
         if (path.empty()) {
-            return convert_binding_value(replacement, binding_value_kind(value));
+            return valid_property_value_tree(replacement)
+                ? std::optional<BindingValue>{replacement}
+                : std::optional<BindingValue>{};
         }
         const PathSegment& segment = path.front();
         const auto remainder = path.subspan(1U);
@@ -2303,6 +2423,14 @@ struct PropertyGrid::Impl final {
                         canonical_binding_name(right_member.name) ||
                     left_member.description != right_member.description ||
                     left_member.writable != right_member.writable ||
+                    left_member.declared_kind != right_member.declared_kind ||
+                    left_member.nullable != right_member.nullable ||
+                    left_member.enumeration != right_member.enumeration ||
+                    left_member.standard_values != right_member.standard_values ||
+                    left_member.standard_values_exclusive !=
+                        right_member.standard_values_exclusive ||
+                    left_member.converter_name != right_member.converter_name ||
+                    left_member.editor_name != right_member.editor_name ||
                     !same_shape(left_member.value, right_member.value)) {
                     return false;
                 }
@@ -2331,6 +2459,21 @@ struct PropertyGrid::Impl final {
         return true;
     }
 
+    [[nodiscard]] static bool compatible_descriptor(
+        const PropertyDescriptor& left,
+        const PropertyDescriptor& right) noexcept {
+        const bool enum_equal = (!left.enumeration && !right.enumeration) ||
+            (left.enumeration && right.enumeration &&
+             *left.enumeration == *right.enumeration);
+        return left.kind == right.kind && left.nullable == right.nullable &&
+            enum_equal && left.standard_values == right.standard_values &&
+            left.standard_values_exclusive ==
+                right.standard_values_exclusive &&
+            left.converter_name == right.converter_name &&
+            left.editor_name == right.editor_name &&
+            left.readable == right.readable && left.browsable == right.browsable;
+    }
+
     [[nodiscard]] std::string row_id(std::string_view property_name) const {
         return std::string(owner.stable_id().value()) + ".property." +
                canonical_binding_name(property_name);
@@ -2343,17 +2486,8 @@ struct PropertyGrid::Impl final {
 
     [[nodiscard]] std::string display_value(
         const BindingValue& value, const PropertyDescriptor& descriptor,
-        bool top_level) const {
-        PropertyDescriptor effective = descriptor;
-        effective.kind = binding_value_kind(value);
-        if (effective.kind != BindingValueKind::enumeration) {
-            effective.enumeration.reset();
-        }
-        if (!top_level) {
-            effective.converter_name.clear();
-            effective.editor_name.clear();
-        }
-        if (converters) return converters->format(value, effective);
+        bool) const {
+        if (converters) return converters->format(value, descriptor);
         if (const auto* boolean = std::get_if<bool>(&value)) {
             return *boolean ? "True" : "False";
         }
@@ -2366,6 +2500,10 @@ struct PropertyGrid::Impl final {
     [[nodiscard]] static PropertyEditorKind editor_kind(
         const PropertyDescriptor& descriptor) noexcept {
         if (!descriptor.writable) return PropertyEditorKind::read_only;
+        if (descriptor.nullable &&
+            !descriptor.standard_values_exclusive) {
+            return PropertyEditorKind::text;
+        }
         switch (descriptor.kind) {
         case BindingValueKind::boolean:
             return PropertyEditorKind::boolean;
@@ -2435,8 +2573,20 @@ struct PropertyGrid::Impl final {
     }
 
     [[nodiscard]] Control::Ptr target() const noexcept {
-        const Control::Ptr result = selected.lock();
+        if (selected.empty()) return {};
+        const Control::Ptr result = selected.front().lock();
         return result && result->is_alive() ? result : Control::Ptr{};
+    }
+
+    [[nodiscard]] std::vector<Control::Ptr> targets() const {
+        std::vector<Control::Ptr> result;
+        result.reserve(selected.size());
+        for (const Control::WeakPtr& candidate : selected) {
+            Control::Ptr retained = candidate.lock();
+            if (!retained || !retained->is_alive()) return {};
+            result.push_back(std::move(retained));
+        }
+        return result;
     }
 
     void append_projected_rows(
@@ -2452,7 +2602,9 @@ struct PropertyGrid::Impl final {
         std::vector<PathSegment> segments,
         bool top_level = false,
         std::optional<PropertyEditorKind> authored_editor = {},
-        std::vector<std::string> authored_choices = {}) {
+        std::vector<std::string> authored_choices = {},
+        std::string owner_property_name = {}) {
+        if (owner_property_name.empty()) owner_property_name = descriptor.name;
         const std::string canonical = canonical_binding_name(path);
         const std::string id = row_id(path);
         const bool expandable = expandable_value(value);
@@ -2462,18 +2614,27 @@ struct PropertyGrid::Impl final {
         const bool reset_enabled = resettable && object &&
             object->should_serialize_property(descriptor.name);
         PropertyEditorKind editor = authored_editor.value_or(
-            top_level ? editor_kind(descriptor)
-                      : editor_kind(binding_value_kind(value), writable));
+            editor_kind(descriptor));
         if (!writable && editor != PropertyEditorKind::read_only) {
             editor = PropertyEditorKind::read_only;
         }
-        if (top_level && authored_choices.empty() && descriptor.enumeration &&
+        if (authored_choices.empty() && descriptor.enumeration &&
             !descriptor.enumeration->flags) {
             authored_choices.reserve(descriptor.enumeration->choices.size());
             for (const PropertyEnumChoice& choice :
                  descriptor.enumeration->choices) {
                 authored_choices.push_back(choice.name);
             }
+        }
+        if (authored_choices.empty() &&
+            descriptor.standard_values_exclusive) {
+            authored_choices.reserve(descriptor.standard_values.size());
+            for (const BindingValue& standard : descriptor.standard_values) {
+                authored_choices.push_back(display_value(
+                    standard, descriptor, top_level));
+            }
+            editor = writable ? PropertyEditorKind::choice
+                              : PropertyEditorKind::read_only;
         }
         rows.emplace_back(
             id, std::move(display_name),
@@ -2485,7 +2646,8 @@ struct PropertyGrid::Impl final {
         property_to_row.insert_or_assign(canonical, id);
         row_to_property.insert_or_assign(id, path);
         edit_targets.insert_or_assign(
-            canonical, EditTarget{descriptor.name, segments, writable});
+            canonical, EditTarget{owner_property_name, segments, writable,
+                                  descriptor});
         values.insert_or_assign(canonical, value);
 
         if (!expandable || depth >= maximum_property_value_depth) return;
@@ -2497,12 +2659,20 @@ struct PropertyGrid::Impl final {
             child_segments.push_back(
                 {PathSegmentKind::compound_field, std::string(field.name), 0U});
             const std::string child_path = append_member_path(path, field.name);
+            PropertyDescriptor child_descriptor;
+            child_descriptor.name = std::string(field.name);
+            child_descriptor.kind = field.kind;
+            child_descriptor.category = descriptor.category;
+            child_descriptor.description =
+                std::string(field.name) + " component of " + path;
+            child_descriptor.writable = writable;
             append_projected_rows(
-                rows, descriptor, *field_value, child_path,
+                rows, child_descriptor, *field_value, child_path,
                 std::string(field.name),
-                std::string(field.name) + " component of " + path,
+                child_descriptor.description,
                 id, static_cast<std::uint8_t>(depth + 1U), writable,
-                std::move(child_segments), false, field.editor, field.choices);
+                std::move(child_segments), false, field.editor, field.choices,
+                owner_property_name);
         }
         if (const auto* nested_object =
                 std::get_if<PropertyObjectValue>(&value);
@@ -2512,14 +2682,29 @@ struct PropertyGrid::Impl final {
                 child_segments.push_back(
                     {PathSegmentKind::object_member, member.name, 0U});
                 const std::string child_path = append_member_path(path, member.name);
+                PropertyDescriptor member_descriptor;
+                member_descriptor.name = member.name;
+                member_descriptor.kind = member.declared_kind.value_or(
+                    binding_value_kind(member.value));
+                member_descriptor.category = descriptor.category;
+                member_descriptor.description = member.description;
+                member_descriptor.writable = writable && member.writable;
+                member_descriptor.nullable = member.nullable;
+                member_descriptor.enumeration = member.enumeration;
+                member_descriptor.standard_values = member.standard_values;
+                member_descriptor.standard_values_exclusive =
+                    member.standard_values_exclusive;
+                member_descriptor.converter_name = member.converter_name;
+                member_descriptor.editor_name = member.editor_name;
                 append_projected_rows(
-                    rows, descriptor, member.value, child_path, member.name,
+                    rows, member_descriptor, member.value, child_path, member.name,
                     member.description.empty()
                         ? member.name + " member of " +
                               std::string(nested_object->type_name())
                         : member.description,
                     id, static_cast<std::uint8_t>(depth + 1U),
-                    writable && member.writable, std::move(child_segments));
+                    writable && member.writable, std::move(child_segments),
+                    false, {}, {}, owner_property_name);
             }
         }
         if (const auto* collection =
@@ -2531,13 +2716,21 @@ struct PropertyGrid::Impl final {
                 child_segments.push_back(
                     {PathSegmentKind::collection_index, {}, index});
                 const std::string child_path = append_index_path(path, index);
-                append_projected_rows(
-                    rows, descriptor, items[index], child_path,
-                    "[" + std::to_string(index) + "]",
+                PropertyDescriptor item_descriptor;
+                item_descriptor.name = "[" + std::to_string(index) + "]";
+                item_descriptor.kind = collection->item_kind();
+                item_descriptor.category = descriptor.category;
+                item_descriptor.description =
                     "Item " + std::to_string(index) + " of " +
-                        std::string(collection->item_type_name()),
+                    std::string(collection->item_type_name());
+                item_descriptor.writable = writable;
+                append_projected_rows(
+                    rows, item_descriptor, items[index], child_path,
+                    "[" + std::to_string(index) + "]",
+                    item_descriptor.description,
                     id, static_cast<std::uint8_t>(depth + 1U), writable,
-                    std::move(child_segments));
+                    std::move(child_segments), false, {}, {},
+                    owner_property_name);
             }
         }
     }
@@ -2556,7 +2749,7 @@ struct PropertyGrid::Impl final {
 
         const Control::Ptr object = target();
         if (!object) {
-            selected.reset();
+            selected.clear();
             list->set_groups({});
             list->set_accessible_name("Properties");
             return;
@@ -2565,6 +2758,24 @@ struct PropertyGrid::Impl final {
         std::vector<PropertyDescriptor> visible;
         for (PropertyDescriptor descriptor : object->property_descriptors()) {
             if (!descriptor.browsable || !descriptor.readable) continue;
+            bool common = true;
+            for (const Control::Ptr& peer : targets()) {
+                if (peer.get() == object.get()) continue;
+                const auto peer_descriptor = peer->property_descriptor(
+                    descriptor.name);
+                const auto left_value = object->property_value(descriptor.name);
+                const auto right_value = peer->property_value(descriptor.name);
+                if (!peer_descriptor ||
+                    !compatible_descriptor(descriptor, *peer_descriptor) ||
+                    !left_value || !right_value ||
+                    !same_shape(*left_value, *right_value)) {
+                    common = false;
+                    break;
+                }
+                descriptor.writable = descriptor.writable &&
+                    peer_descriptor->writable;
+            }
+            if (!common) continue;
             visible.push_back(std::move(descriptor));
         }
         std::sort(visible.begin(), visible.end(),
@@ -2655,25 +2866,26 @@ struct PropertyGrid::Impl final {
             if (!target_spec.writable) continue;
             const auto value = values.find(canonical);
             const auto row = property_to_row.find(canonical);
-            const auto descriptor = descriptors.find(canonical_binding_name(
-                target_spec.property_name));
-            if (value == values.end() || row == property_to_row.end() ||
-                descriptor == descriptors.end()) {
+            if (value == values.end() || row == property_to_row.end()) {
                 continue;
             }
             PropertyEditorRequest request;
             request.stable_id = row->second + ".custom-editor";
             request.property_path = row_to_property.at(row->second);
-            request.descriptor = descriptor->second;
+            request.descriptor = target_spec.descriptor;
             request.value = value->second;
             request.writable = target_spec.writable;
             request.top_level = target_spec.path.empty();
             try {
                 auto binding = editors->create(request);
                 if (!binding) continue;
+                const Control::WeakPtr owner_lifetime = owner.weak_from_this();
                 SubscriptionToken committed = binding->connect_committed(
-                    owner, [this, path = request.property_path](
+                    owner, [this, owner_lifetime,
+                            path = request.property_path](
                                BindingValue proposed) {
+                        const Control::Ptr retained = owner_lifetime.lock();
+                        if (!retained || !retained->is_alive()) return;
                         static_cast<void>(set_value(path, std::move(proposed),
                                                     false));
                     });
@@ -2684,8 +2896,11 @@ struct PropertyGrid::Impl final {
                 SubscriptionToken failure;
                 if (binding->connect_failed) {
                     failure = binding->connect_failed(
-                        owner, [this, path = request.property_path](
+                        owner, [this, owner_lifetime,
+                                path = request.property_path](
                                    const PropertyEditorInputError& error) {
+                            const Control::Ptr retained = owner_lifetime.lock();
+                            if (!retained || !retained->is_alive()) return;
                             report_error(path, error.attempted_value,
                                          error.message);
                         });
@@ -2744,7 +2959,7 @@ struct PropertyGrid::Impl final {
                 values.insert_or_assign(path_name, *path_value);
                 static_cast<void>(list->set_value(
                     path_row->second,
-                    display_value(*path_value, descriptor->second,
+                    display_value(*path_value, target_spec.descriptor,
                                   target_spec.path.empty())));
                 if (const auto installed = installed_editors.find(path_name);
                     installed != installed_editors.end()) {
@@ -2768,7 +2983,7 @@ struct PropertyGrid::Impl final {
         if (publish && previous != *current) {
             PropertyGridValueChange change{
                 authored_name, previous, *current, origin, false};
-            owner.property_value_changed_.emit(change);
+            owner.publish_change(owner.property_value_changed_, change);
         }
     }
 
@@ -2789,7 +3004,8 @@ struct PropertyGrid::Impl final {
     bool set_value(std::string_view property_name, BindingValue value,
                    bool reset, bool structural = false) {
         const Control::Ptr object = target();
-        if (!object) return false;
+        const std::vector<Control::Ptr> objects = targets();
+        if (!object || objects.empty()) return false;
         const std::string canonical = canonical_binding_name(property_name);
         const auto edit_target = edit_targets.find(canonical);
         if (edit_target == edit_targets.end()) {
@@ -2813,33 +3029,112 @@ struct PropertyGrid::Impl final {
                                : "Property is not available for editing");
             return false;
         }
-        const auto previous_property = object->property_value(
-            descriptor_spec.name);
-        if (!previous_property) return false;
-        const auto previous_value = value_at(*previous_property,
-                                             target_spec.path);
-        if (!previous_value) return false;
+        struct OwnerEdit final {
+            Control::Ptr object;
+            PropertyDescriptor descriptor;
+            BindingValue previous_property;
+            BindingValue previous_value;
+            BindingValue next_property;
+        };
+        std::vector<OwnerEdit> edits;
+        edits.reserve(objects.size());
+        try {
+            for (const Control::Ptr& candidate : objects) {
+                const auto candidate_descriptor = candidate->property_descriptor(
+                    descriptor_spec.name);
+                const auto previous_property = candidate->property_value(
+                    descriptor_spec.name);
+                if (!candidate_descriptor || !candidate_descriptor->writable ||
+                    !previous_property ||
+                    !compatible_descriptor(descriptor_spec,
+                                           *candidate_descriptor)) {
+                    throw std::invalid_argument(
+                        "Every selected owner must expose the same writable property schema");
+                }
+                const auto previous_value = value_at(
+                    *previous_property, target_spec.path);
+                if (!previous_value) {
+                    throw std::invalid_argument(
+                        "Every selected owner must expose the same property path");
+                }
+                BindingValue next_property = *previous_property;
+                if (reset) {
+                    if (!candidate_descriptor->resettable) {
+                        throw std::invalid_argument(
+                            "Every selected owner must expose the same reset contract");
+                    }
+                } else {
+                    const auto converted = convert_property_value(
+                        value, target_spec.descriptor);
+                    const auto next = converted
+                        ? (target_spec.path.empty()
+                               ? std::optional<BindingValue>{*converted}
+                               : replace_at(*previous_property,
+                                            target_spec.path, *converted))
+                        : std::optional<BindingValue>{};
+                    if (!next) {
+                        throw std::invalid_argument(
+                            "Property path value cannot convert to its declared kind");
+                    }
+                    const auto owner_normalized = convert_property_value(
+                        *next, *candidate_descriptor);
+                    if (!owner_normalized) {
+                        throw std::invalid_argument(
+                            "Property owner rejected the preflight value schema");
+                    }
+                    next_property = *owner_normalized;
+                }
+                edits.push_back({candidate, *candidate_descriptor,
+                                 *previous_property, *previous_value,
+                                 std::move(next_property)});
+            }
+        } catch (const std::exception& error) {
+            report_error(authored_path,
+                         reset ? std::string("<reset>")
+                               : binding_value_to_string(value),
+                         error.what());
+            return false;
+        }
+        const BindingValue previous_value = edits.front().previous_value;
         committing = true;
         struct CommitReset final {
             bool& flag;
             ~CommitReset() { flag = false; }
         } commit_reset{committing};
         try {
-            if (reset) {
-                if (!object->reset_property(descriptor_spec.name)) {
-                    report_error(descriptor_spec.name, {},
-                                 "Property has no reset contract");
-                    return false;
+            std::size_t applied = 0U;
+            try {
+                for (; applied < edits.size(); ++applied) {
+                    if (reset) {
+                        if (!edits[applied].object->reset_property(
+                                edits[applied].descriptor.name)) {
+                            throw std::invalid_argument(
+                                "A selected owner rejected its reset contract");
+                        }
+                    } else {
+                        edits[applied].object->set_property_value(
+                            edits[applied].descriptor.name,
+                            edits[applied].next_property);
+                    }
                 }
-            } else {
-                const auto next = target_spec.path.empty()
-                    ? std::optional<BindingValue>{value}
-                    : replace_at(*previous_property, target_spec.path, value);
-                if (!next) {
-                    throw std::invalid_argument(
-                        "Property path value cannot convert to its declared kind");
+            } catch (...) {
+                bool rollback_failed = false;
+                const std::size_t rollback_count =
+                    std::min(applied + 1U, edits.size());
+                for (std::size_t index = rollback_count; index > 0U; --index) {
+                    try {
+                        edits[index - 1U].object->set_property_value(
+                            edits[index - 1U].descriptor.name,
+                            edits[index - 1U].previous_property);
+                    } catch (...) {
+                        rollback_failed = true;
+                    }
                 }
-                object->set_property_value(descriptor_spec.name, *next);
+                if (rollback_failed) {
+                    throw std::runtime_error(
+                        "Atomic property commit failed and a hostile setter also rejected rollback");
+                }
+                throw;
             }
             if (!owner.is_alive() || !object->is_alive()) return true;
             if (projection_revision != expected_projection ||
@@ -2855,13 +3150,13 @@ struct PropertyGrid::Impl final {
             if (structural) rebuild();
             else refresh_one(property_canonical, false);
             last_error.reset();
-            if (*current_value != *previous_value || reset) {
+            if (*current_value != previous_value || reset) {
                 const PropertyValueOrigin origin =
                     object->property_value_origin(descriptor_spec.name);
                 PropertyGridValueChange change{
-                    authored_path, *previous_value, *current_value,
+                    authored_path, previous_value, *current_value,
                     origin, reset};
-                owner.property_value_changed_.emit(change);
+                owner.publish_change(owner.property_value_changed_, change);
             }
             return true;
         } catch (const std::exception& error) {
@@ -2989,22 +3284,11 @@ struct PropertyGrid::Impl final {
         const auto target_spec = edit_targets.find(canonical);
         const auto current = values.find(canonical);
         if (target_spec == edit_targets.end() || current == values.end()) return;
-        const auto descriptor = descriptors.find(canonical_binding_name(
-            target_spec->second.property_name));
-        if (descriptor == descriptors.end()) return;
-        PropertyDescriptor effective = descriptor->second;
-        effective.kind = binding_value_kind(current->second);
-        if (effective.kind != BindingValueKind::enumeration) {
-            effective.enumeration.reset();
-        }
-        if (!target_spec->second.path.empty()) {
-            effective.converter_name.clear();
-            effective.editor_name.clear();
-        }
+        const PropertyDescriptor& effective = target_spec->second.descriptor;
         const auto converted = converters
             ? converters->parse(change.current_value, current->second, effective)
-            : convert_binding_value(BindingValue{change.current_value},
-                                    effective.kind);
+            : convert_property_value(BindingValue{change.current_value},
+                                     effective);
         if (!converted) {
             report_error(property->second, change.current_value,
                          "Property text cannot convert through its declared converter");
@@ -3019,7 +3303,7 @@ struct PropertyGrid::Impl final {
     std::shared_ptr<PropertyList> list;
     std::shared_ptr<PropertyValueConverterRegistry> converters;
     std::shared_ptr<PropertyEditorRegistry> editors;
-    Control::WeakPtr selected;
+    std::vector<Control::WeakPtr> selected;
     PropertySort sort{PropertySort::categorized};
     std::map<std::string, PropertyDescriptor> descriptors;
     std::map<std::string, std::string> property_to_row;
@@ -3087,19 +3371,38 @@ Control::Ptr PropertyGrid::selected_object() const noexcept {
 }
 
 void PropertyGrid::set_selected_object(Control::Ptr object) {
+    set_selected_objects(object ? std::vector<Control::Ptr>{std::move(object)}
+                                : std::vector<Control::Ptr>{});
+}
+
+std::vector<Control::Ptr> PropertyGrid::selected_objects() const {
+    return impl_->targets();
+}
+
+void PropertyGrid::set_selected_objects(std::vector<Control::Ptr> objects) {
     require_mutable();
     if (!impl_->list) initialize_control_tree();
-    if (object && !object->is_alive()) {
-        throw std::invalid_argument(
-            "PropertyGrid cannot select a disposed control");
+    std::unordered_set<Control*> identities;
+    for (const Control::Ptr& object : objects) {
+        if (!object || !object->is_alive() ||
+            !identities.insert(object.get()).second) {
+            throw std::invalid_argument(
+                "PropertyGrid selection requires unique live controls");
+        }
     }
-    if (impl_->selected.lock() == object) {
+    const std::vector<Control::Ptr> previous = impl_->targets();
+    if (previous == objects) {
         refresh_properties();
         return;
     }
-    impl_->selected = object;
+    impl_->selected.clear();
+    impl_->selected.reserve(objects.size());
+    for (const Control::Ptr& object : objects) {
+        impl_->selected.push_back(object);
+    }
     impl_->rebuild();
-    selected_object_changed_.emit(std::move(object));
+    publish_change(selected_object_changed_,
+                   objects.empty() ? Control::Ptr{} : objects.front());
 }
 
 PropertySort PropertyGrid::property_sort() const noexcept {
@@ -3186,23 +3489,20 @@ std::optional<PropertyDescriptor> PropertyGrid::selected_descriptor(
     std::string_view property_name) const {
     const std::string canonical = canonical_binding_name(property_name);
     const auto target = impl_->edit_targets.find(canonical);
-    const auto found = target == impl_->edit_targets.end()
-        ? impl_->descriptors.end()
-        : impl_->descriptors.find(canonical_binding_name(
-              target->second.property_name));
-    return found == impl_->descriptors.end()
+    return target == impl_->edit_targets.end()
         ? std::optional<PropertyDescriptor>{}
-        : std::optional<PropertyDescriptor>{found->second};
+        : std::optional<PropertyDescriptor>{target->second.descriptor};
 }
 
 std::optional<PropertyValueOrigin> PropertyGrid::selected_origin(
     std::string_view property_name) const {
     const auto selected = selected_object();
     if (!selected) return {};
-    const auto descriptor = selected_descriptor(property_name);
-    return descriptor
+    const auto target = impl_->edit_targets.find(
+        canonical_binding_name(property_name));
+    return target != impl_->edit_targets.end()
         ? std::optional<PropertyValueOrigin>{
-              selected->property_value_origin(descriptor->name)}
+              selected->property_value_origin(target->second.property_name)}
         : std::optional<PropertyValueOrigin>{};
 }
 
@@ -3234,6 +3534,35 @@ bool PropertyGrid::try_set_property_value(std::string_view property_name,
                                           BindingValue value) {
     require_mutable();
     return impl_->set_value(property_name, std::move(value), false);
+}
+
+bool PropertyGrid::try_set_property_text(std::string_view property_name,
+                                         std::string_view text) {
+    require_mutable();
+    if (!impl_->list) initialize_control_tree();
+    const std::string canonical = canonical_binding_name(property_name);
+    const auto target = impl_->edit_targets.find(canonical);
+    const auto current = impl_->values.find(canonical);
+    if (target == impl_->edit_targets.end() || current == impl_->values.end()) {
+        impl_->report_error(std::string(property_name), std::string(text),
+                            "Property is not available for text editing");
+        return false;
+    }
+    const auto parsed = impl_->converters->parse(
+        text, current->second, target->second.descriptor);
+    if (!parsed) {
+        impl_->report_error(std::string(property_name), std::string(text),
+                            "Property converter rejected the submitted text");
+        return false;
+    }
+    return impl_->set_value(property_name, *parsed, false);
+}
+
+bool PropertyGrid::activate_property_editor(std::string_view property_name) {
+    require_mutable();
+    const Control::Ptr retained = editor(property_name);
+    return retained && retained->is_alive() && retained->enabled() &&
+        retained->on_semantic_action(SemanticAction::press, {});
 }
 
 bool PropertyGrid::reset_property(std::string_view property_name) {
@@ -3291,7 +3620,7 @@ void PropertyGrid::on_dispose() noexcept {
     impl_->list_commit.disconnect();
     impl_->list_expansion.disconnect();
     impl_->list_reset.disconnect();
-    impl_->selected.reset();
+    impl_->selected.clear();
     impl_->list.reset();
     Control::on_dispose();
 }

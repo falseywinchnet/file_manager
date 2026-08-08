@@ -139,6 +139,96 @@ private:
     Event<double> level_changed_;
 };
 
+class NullablePropertyProbe final : public Control {
+public:
+    explicit NullablePropertyProbe(StableId stable_id)
+        : Control(std::move(stable_id)), settings_(make_settings()) {
+        PropertyDescriptor ratio;
+        ratio.name = "Ratio";
+        ratio.kind = BindingValueKind::number;
+        ratio.category = "Data";
+        ratio.description = "Optional finite ratio.";
+        ratio.default_value = BindingValue{std::monostate{}};
+        ratio.nullable = true;
+        ratio.standard_values = {
+            BindingValue{std::monostate{}}, BindingValue{1.5}, BindingValue{2.5}};
+        ratio.standard_values_exclusive = true;
+        define_bindable_property({
+            std::move(ratio),
+            [this] { return ratio_; },
+            [this](const BindingValue& value) {
+                ratio_ = value;
+                ratio_changed_.emit();
+            },
+            [this](Component& owner, std::function<void()> changed) {
+                return ratio_changed_.subscribe(owner, std::move(changed));
+            }});
+
+        PropertyDescriptor settings;
+        settings.name = "Settings";
+        settings.kind = BindingValueKind::object;
+        settings.category = "Data";
+        settings.description = "Member-service fixture.";
+        define_bindable_property({
+            std::move(settings),
+            [this] { return BindingValue{settings_}; },
+            [this](const BindingValue& value) {
+                settings_ = std::get<PropertyObjectValue>(value);
+            }});
+    }
+
+    [[nodiscard]] const BindingValue& ratio() const noexcept { return ratio_; }
+
+private:
+    static PropertyObjectValue make_settings() {
+        PropertyObjectMember member;
+        member.name = "Threshold";
+        member.description = "Nested percentage threshold.";
+        member.value = BindingValue{0.5};
+        member.declared_kind = BindingValueKind::number;
+        member.converter_name = "percent";
+        return make_property_object("OptionalSettings", {std::move(member)});
+    }
+
+    BindingValue ratio_{std::monostate{}};
+    PropertyObjectValue settings_;
+    Event<> ratio_changed_;
+};
+
+class AtomicPropertyProbe final : public Control {
+public:
+    AtomicPropertyProbe(StableId stable_id, double value,
+                        std::optional<double> rejected = {})
+        : Control(std::move(stable_id)), value_(value), rejected_(rejected) {
+        PropertyDescriptor descriptor;
+        descriptor.name = "Value";
+        descriptor.kind = BindingValueKind::number;
+        descriptor.category = "Data";
+        descriptor.description = "Atomic multi-owner fixture.";
+        define_bindable_property({
+            std::move(descriptor),
+            [this] { return BindingValue{value_}; },
+            [this](const BindingValue& value) {
+                const double proposed = std::get<double>(value);
+                if (rejected_ && proposed == *rejected_) {
+                    throw std::invalid_argument("Fixture owner rejected value");
+                }
+                value_ = proposed;
+                changed_.emit();
+            },
+            [this](Component& owner, std::function<void()> changed) {
+                return changed_.subscribe(owner, std::move(changed));
+            }});
+    }
+
+    [[nodiscard]] double value() const noexcept { return value_; }
+
+private:
+    double value_{};
+    std::optional<double> rejected_;
+    Event<> changed_;
+};
+
 void test_grouped_editors_commit_cancel_validation_and_semantics() {
     auto properties = make_properties();
     Window window(properties, {288.0, 260.0});
@@ -367,7 +457,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
                 changes.back().property_name == "Bounds.X" &&
                 std::get<double>(changes.back().current_value) == 31.5 &&
                 grid->selected_descriptor("Bounds.X")->kind ==
-                    BindingValueKind::rectangle,
+                    BindingValueKind::number,
             "editing a compound field path must rebuild and validate the owning typed value through its real setter");
     const double width_before = target->requested_bounds().width;
     require(!grid->try_set_property_value(
@@ -578,6 +668,111 @@ void test_instance_owned_converter_and_editor_registries() {
             "custom retained editor commits must reach the real setter and programmatic refresh must synchronize without feedback");
 }
 
+void test_nullable_standard_values_culture_and_nested_services() {
+    auto converters = PropertyValueConverterRegistry::create_default();
+    PropertyConversionContext culture;
+    culture.culture_name = "de-DE";
+    culture.decimal_separator = ",";
+    culture.group_separator = ".";
+    culture.use_grouping = true;
+    converters->set_context(culture);
+
+    PropertyDescriptor numeric;
+    numeric.name = "Amount";
+    numeric.kind = BindingValueKind::number;
+    const std::string localized = converters->format(
+        BindingValue{1234.5}, numeric);
+    const auto localized_parse = converters->parse(
+        "1.234,5", BindingValue{0.0}, numeric);
+    require(localized == "1.234,5" && localized_parse &&
+                binding_value_to_number(*localized_parse) == 1234.5,
+            "numeric conversion context must localize and parse per registry without mutating process locale");
+
+    PropertyValueConverter percent;
+    percent.format = [](const BindingValue& value, const PropertyDescriptor&) {
+        const auto number = binding_value_to_number(value);
+        return number ? std::to_string(*number * 100.0) + "%"
+                      : std::string{};
+    };
+    percent.parse = [](std::string_view text, const BindingValue&,
+                       const PropertyDescriptor& descriptor)
+            -> std::optional<BindingValue> {
+        if (text.empty() || text.back() != '%') return {};
+        const auto number = binding_value_to_number(BindingValue{
+            std::string(text.substr(0U, text.size() - 1U))});
+        return number
+            ? convert_property_value(BindingValue{*number / 100.0}, descriptor)
+            : std::optional<BindingValue>{};
+    };
+    require(converters->register_converter("percent", std::move(percent)),
+            "nested converter fixture must register once");
+
+    auto root = make_control<Panel>(StableId("inspection.nullable.root"));
+    auto target = make_control<NullablePropertyProbe>(
+        StableId("inspection.nullable.target"));
+    auto grid = make_control<PropertyGrid>(
+        StableId("inspection.nullable.grid"));
+    grid->set_requested_bounds({0.0, 0.0, 440.0, 260.0});
+    grid->set_converter_registry(converters);
+    root->add_child(target);
+    root->add_child(grid);
+    grid->set_selected_object(target);
+    Window window(root, {440.0, 260.0});
+    window.perform_layout();
+
+    const auto ratio_descriptor = grid->selected_descriptor("Ratio");
+    const auto threshold_descriptor =
+        grid->selected_descriptor("Settings.Threshold");
+    auto choice = std::dynamic_pointer_cast<ComboBox>(grid->editor("Ratio"));
+    require(ratio_descriptor && ratio_descriptor->nullable && choice &&
+                choice->items().size() == 3U &&
+                choice->items().front() == "(none)" &&
+                threshold_descriptor &&
+                threshold_descriptor->converter_name == "percent" &&
+                grid->property_list()->value(
+                    "inspection.nullable.grid.property.settings.threshold") ==
+                    "50.000000%",
+            "PropertyGrid must retain payload schema for null values and project member-specific converter identities");
+    choice->set_selected_index(1U);
+    require(target->ratio() == BindingValue{1.5} &&
+                grid->try_set_property_value(
+                    "Ratio", BindingValue{std::monostate{}}) &&
+                target->ratio() == BindingValue{std::monostate{}} &&
+                !grid->try_set_property_value("Ratio", BindingValue{9.0}),
+            "exclusive standard values must commit typed values, round-trip null, and reject values outside the finite set");
+}
+
+void test_multiple_owner_atomic_property_commit() {
+    auto root = make_control<Panel>(StableId("inspection.atomic.root"));
+    auto first = make_control<AtomicPropertyProbe>(
+        StableId("inspection.atomic.first"), 1.0);
+    auto second = make_control<AtomicPropertyProbe>(
+        StableId("inspection.atomic.second"), 2.0, 5.0);
+    auto grid = make_control<PropertyGrid>(
+        StableId("inspection.atomic.grid"));
+    root->add_child(first);
+    root->add_child(second);
+    root->add_child(grid);
+    grid->set_selected_objects({first, second});
+    Window window(root, {420.0, 180.0});
+    window.perform_layout();
+
+    std::size_t committed = 0U;
+    auto changed = grid->property_value_changed().subscribe(
+        [&committed](const PropertyGridValueChange&) { ++committed; });
+    require(grid->selected_objects() ==
+                std::vector<Control::Ptr>{first, second} &&
+                !grid->try_set_property_value("Value", BindingValue{5.0}) &&
+                first->value() == 1.0 && second->value() == 2.0 &&
+                committed == 0U,
+            "a rejecting second owner must roll the first owner back before publishing failure");
+    require(grid->try_set_property_value("Value", BindingValue{3.0}) &&
+                first->value() == 3.0 && second->value() == 3.0 &&
+                committed == 1U,
+            "a valid multiple-owner edit must commit every owner and publish one logical change");
+    static_cast<void>(changed);
+}
+
 void test_default_flags_and_color_property_editors() {
     auto root = make_control<Panel>(StableId("inspection.specialized.root"));
     auto target = make_control<Label>(StableId("inspection.specialized.target"),
@@ -659,7 +854,7 @@ void test_recursive_object_and_collection_projection_and_mutation() {
     window.perform_layout();
 
     require(grid->selected_descriptor("Settings.Endpoint.Host")->kind ==
-                BindingValueKind::object &&
+                BindingValueKind::text &&
                 grid->editor("Settings.Endpoint.Host") != nullptr &&
                 grid->editor("Settings.Modes[0]") != nullptr &&
                 !grid->editor("Settings.Endpoint.Host")->visible() &&
@@ -728,6 +923,8 @@ int main() {
         test_property_row_hierarchy_pointer_and_reset_contract();
         test_property_origins_and_metadata_driven_property_grid();
         test_instance_owned_converter_and_editor_registries();
+        test_nullable_standard_values_culture_and_nested_services();
+        test_multiple_owner_atomic_property_commit();
         test_default_flags_and_color_property_editors();
         test_recursive_object_and_collection_projection_and_mutation();
         std::cout << "gui_forms_inspection_controls_tests: all tests passed\n";

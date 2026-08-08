@@ -42,19 +42,34 @@ BOOL CALLBACK list_gui_forms_windows(HWND window, LPARAM) {
 BOOL CALLBACK list_visible_windows(HWND window, LPARAM) {
     if (!IsWindowVisible(window)) return TRUE;
     wchar_t title[512]{};
-    if (GetWindowTextW(window, title, 512) == 0 || title[0] == L'\0') return TRUE;
     wchar_t class_name[128]{};
     GetClassNameW(window, class_name, 128);
+    const bool gui_forms_endpoint =
+        std::wcscmp(class_name, L"GUIForms.CompatibilityPaint.v1") == 0;
+    if ((GetWindowTextW(window, title, 512) == 0 || title[0] == L'\0') &&
+        !gui_forms_endpoint) return TRUE;
     char title_utf8[2048]{};
     char class_utf8[512]{};
     DWORD process_id{};
+    RECT bounds{};
+    BYTE alpha = 255;
+    COLORREF color_key{};
+    DWORD layer_flags{};
     GetWindowThreadProcessId(window, &process_id);
+    GetWindowRect(window, &bounds);
+    GetLayeredWindowAttributes(window, &color_key, &alpha, &layer_flags);
     WideCharToMultiByte(CP_UTF8, 0, title, -1, title_utf8, 2048, nullptr, nullptr);
     WideCharToMultiByte(CP_UTF8, 0, class_name, -1, class_utf8, 512, nullptr, nullptr);
-    std::printf("window=%p pid=%lu class=%s title=%s enabled=%d\n",
+    std::printf("window=%p pid=%lu class=%s title=%s enabled=%d parent=%p owner=%p style=%llx exstyle=%llx bounds=%ld,%ld,%ld,%ld alpha=%u layer-flags=%lu\n",
                 static_cast<void*>(window), static_cast<unsigned long>(process_id),
                 class_utf8, title_utf8,
-                IsWindowEnabled(window));
+                IsWindowEnabled(window), static_cast<void*>(GetParent(window)),
+                static_cast<void*>(GetWindow(window, GW_OWNER)),
+                static_cast<unsigned long long>(GetWindowLongPtrW(window, GWL_STYLE)),
+                static_cast<unsigned long long>(GetWindowLongPtrW(window, GWL_EXSTYLE)),
+                bounds.left, bounds.top,
+                bounds.right, bounds.bottom, static_cast<unsigned>(alpha),
+                static_cast<unsigned long>(layer_flags));
     return TRUE;
 }
 
@@ -62,6 +77,46 @@ struct OwnedDialogSearch final {
     HWND owner{};
     HWND dialog{};
 };
+
+struct PaintEndpointOwnerSearch final {
+    HWND owner{};
+    DWORD process_id{};
+    unsigned attached{};
+    bool child{};
+};
+
+BOOL CALLBACK attach_paint_endpoint_owner(HWND candidate, LPARAM context_value) {
+    auto& context = *reinterpret_cast<PaintEndpointOwnerSearch*>(context_value);
+    wchar_t class_name[128]{};
+    DWORD process_id{};
+    GetWindowThreadProcessId(candidate, &process_id);
+    if (process_id != context.process_id ||
+        GetClassNameW(candidate, class_name, 128) == 0 ||
+        std::wcscmp(class_name, L"GUIForms.CompatibilityPaint.v1") != 0) {
+        return TRUE;
+    }
+    bool accepted = false;
+    if (context.child) {
+        const LONG_PTR style = GetWindowLongPtrW(candidate, GWL_STYLE);
+        SetLastError(ERROR_SUCCESS);
+        const LONG_PTR prior = SetWindowLongPtrW(
+            candidate, GWL_STYLE, (style & ~WS_POPUP) | WS_CHILD | WS_DISABLED);
+        accepted = prior != 0 || GetLastError() == ERROR_SUCCESS;
+        if (accepted) accepted = SetParent(candidate, context.owner) != nullptr;
+    } else {
+        SetLastError(ERROR_SUCCESS);
+        const LONG_PTR prior = SetWindowLongPtrW(
+            candidate, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(context.owner));
+        accepted = prior != 0 || GetLastError() == ERROR_SUCCESS;
+    }
+    if (accepted) {
+        ++context.attached;
+        SetWindowPos(candidate, HWND_BOTTOM, 0, 0, 0, 0, context.child
+            ? SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED
+            : SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+    return TRUE;
+}
 
 BOOL CALLBACK find_owned_dialog(HWND window, LPARAM context_value) {
     auto& context = *reinterpret_cast<OwnedDialogSearch*>(context_value);
@@ -249,6 +304,85 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "GUI.Forms window not found\n");
         return 3;
     }
+    if (std::strcmp(argv[1], "cursor-target") == 0) {
+        POINT screen{};
+        if (!GetCursorPos(&screen)) return 4;
+        HWND target = WindowFromPoint(screen);
+        std::printf("cursor-position=%ld,%ld target=%p root=%p expected=%p\n",
+                    screen.x, screen.y, static_cast<void*>(target),
+                    static_cast<void*>(target == nullptr ? nullptr :
+                        GetAncestor(target, GA_ROOT)), static_cast<void*>(window));
+        for (unsigned depth = 0; target != nullptr && depth < 16; ++depth) {
+            wchar_t class_name[128]{};
+            GetClassNameW(target, class_name, 128);
+            char class_utf8[512]{};
+            WideCharToMultiByte(CP_UTF8, 0, class_name, -1, class_utf8, 512,
+                                nullptr, nullptr);
+            const auto class_cursor = reinterpret_cast<HCURSOR>(
+                GetClassLongPtrW(target, GCLP_HCURSOR));
+            std::printf("cursor-window=%p depth=%u class=%s parent=%p owner=%p "
+                        "visible=%d enabled=%d class-cursor=%p style=%llx exstyle=%llx\n",
+                        static_cast<void*>(target), depth, class_utf8,
+                        static_cast<void*>(GetParent(target)),
+                        static_cast<void*>(GetWindow(target, GW_OWNER)),
+                        IsWindowVisible(target), IsWindowEnabled(target),
+                        static_cast<void*>(class_cursor),
+                        static_cast<unsigned long long>(
+                            GetWindowLongPtrW(target, GWL_STYLE)),
+                        static_cast<unsigned long long>(
+                            GetWindowLongPtrW(target, GWL_EXSTYLE)));
+            POINT client = screen;
+            if (!ScreenToClient(target, &client)) break;
+            HWND child = ChildWindowFromPointEx(
+                target, client,
+                CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT);
+            if (child == nullptr || child == target) break;
+            target = child;
+        }
+        return 0;
+    }
+    if (std::strcmp(argv[1], "input-state") == 0) {
+        DWORD process_id{};
+        const DWORD thread_id = GetWindowThreadProcessId(window, &process_id);
+        GUITHREADINFO state{};
+        state.cbSize = sizeof(state);
+        const bool queried = GetGUIThreadInfo(thread_id, &state) != FALSE;
+        const HWND foreground = GetForegroundWindow();
+        wchar_t foreground_class[128]{};
+        wchar_t foreground_title[256]{};
+        GetClassNameW(foreground, foreground_class, 128);
+        GetWindowTextW(foreground, foreground_title, 256);
+        char foreground_class_utf8[512]{};
+        char foreground_title_utf8[1024]{};
+        WideCharToMultiByte(CP_UTF8, 0, foreground_class, -1,
+                            foreground_class_utf8, 512, nullptr, nullptr);
+        WideCharToMultiByte(CP_UTF8, 0, foreground_title, -1,
+                            foreground_title_utf8, 1024, nullptr, nullptr);
+        DWORD foreground_process{};
+        const DWORD foreground_thread =
+            GetWindowThreadProcessId(foreground, &foreground_process);
+        std::printf(
+            "input-state=queried:%d thread:%lu process:%lu flags:%lx "
+            "foreground:%p active:%p focus:%p capture:%p menu:%p "
+            "move-size:%p caret:%p hung:%d foreground-thread:%lu "
+            "foreground-process:%lu foreground-visible:%d "
+            "foreground-enabled:%d foreground-class:%s foreground-title:%s\n",
+            queried, static_cast<unsigned long>(thread_id),
+            static_cast<unsigned long>(process_id),
+            static_cast<unsigned long>(state.flags),
+            static_cast<void*>(foreground),
+            static_cast<void*>(state.hwndActive),
+            static_cast<void*>(state.hwndFocus),
+            static_cast<void*>(state.hwndCapture),
+            static_cast<void*>(state.hwndMenuOwner),
+            static_cast<void*>(state.hwndMoveSize),
+            static_cast<void*>(state.hwndCaret), IsHungAppWindow(window),
+            static_cast<unsigned long>(foreground_thread),
+            static_cast<unsigned long>(foreground_process),
+            IsWindowVisible(foreground), IsWindowEnabled(foreground),
+            foreground_class_utf8, foreground_title_utf8);
+        return queried ? 0 : 5;
+    }
     if (std::strcmp(argv[1], "native-close") == 0) {
         if (!PostMessageW(window, WM_CLOSE, 0, 0)) {
             std::fprintf(stderr, "failed to post WM_CLOSE\n");
@@ -256,6 +390,25 @@ int main(int argc, char** argv) {
         }
         std::printf("posted=WM_CLOSE\n");
         return 0;
+    }
+    if (std::strcmp(argv[1], "own-paint-endpoints") == 0) {
+        PaintEndpointOwnerSearch search{window};
+        GetWindowThreadProcessId(window, &search.process_id);
+        EnumWindows(attach_paint_endpoint_owner,
+                    reinterpret_cast<LPARAM>(&search));
+        std::printf("owned-paint-endpoints=%u owner=%p\n", search.attached,
+                    static_cast<void*>(window));
+        return search.attached == 0 ? 5 : 0;
+    }
+    if (std::strcmp(argv[1], "child-paint-endpoints") == 0) {
+        PaintEndpointOwnerSearch search{window};
+        search.child = true;
+        GetWindowThreadProcessId(window, &search.process_id);
+        EnumWindows(attach_paint_endpoint_owner,
+                    reinterpret_cast<LPARAM>(&search));
+        std::printf("child-paint-endpoints=%u parent=%p\n", search.attached,
+                    static_cast<void*>(window));
+        return search.attached == 0 ? 5 : 0;
     }
     if (std::strcmp(argv[1], "dismiss-dialog") == 0) {
         OwnedDialogSearch search{window, nullptr};
@@ -316,6 +469,35 @@ int main(int argc, char** argv) {
         std::printf("moved=%ld,%ld\n", x, y);
         return 0;
     }
+    if (std::strcmp(argv[1], "native-cursor") == 0) {
+        if (argc != 4) return 2;
+        const long x = std::strtol(argv[2], nullptr, 10);
+        const long y = std::strtol(argv[3], nullptr, 10);
+        const LPARAM point = MAKELPARAM(static_cast<short>(x), static_cast<short>(y));
+        DWORD_PTR move_result{};
+        DWORD_PTR cursor_result{};
+        const bool moved = SendMessageTimeoutW(
+            window, WM_MOUSEMOVE, 0, point,
+            SMTO_ABORTIFHUNG | SMTO_BLOCK, 5000, &move_result) != 0;
+        const bool handled = SendMessageTimeoutW(
+            window, WM_SETCURSOR, reinterpret_cast<WPARAM>(window),
+            MAKELPARAM(HTCLIENT, WM_MOUSEMOVE),
+            SMTO_ABORTIFHUNG | SMTO_BLOCK, 5000, &cursor_result) != 0;
+        CURSORINFO info{};
+        info.cbSize = sizeof(info);
+        const bool inspected = GetCursorInfo(&info) != FALSE;
+        const auto class_cursor = reinterpret_cast<HCURSOR>(
+            GetClassLongPtrW(window, GCLP_HCURSOR));
+        std::printf("cursor=%p class=%p showing=%d message=%llu moved=%d inspected=%d\n",
+                    static_cast<void*>(info.hCursor),
+                    static_cast<void*>(class_cursor),
+                    inspected && (info.flags & CURSOR_SHOWING) != 0,
+                    static_cast<unsigned long long>(cursor_result),
+                    moved, inspected);
+        return moved && handled && inspected && info.hCursor != nullptr &&
+                       (info.flags & CURSOR_SHOWING) != 0
+            ? 0 : 5;
+    }
     if (std::strcmp(argv[1], "native-press-capture") == 0) {
         if (argc != 5) return 2;
         const long x = std::strtol(argv[2], nullptr, 10);
@@ -347,6 +529,28 @@ int main(int argc, char** argv) {
         }
         UpdateWindow(window);
         std::printf("resized=%dx%d\n", width, height);
+        return 0;
+    }
+    if (std::strcmp(argv[1], "capture-burst") == 0) {
+        if (argc != 5) return 2;
+        const int count = static_cast<int>(std::strtol(argv[2], nullptr, 10));
+        const DWORD interval = static_cast<DWORD>(
+            std::max<long>(0, std::strtol(argv[3], nullptr, 10)));
+        if (count <= 0 || count > 120) return 2;
+        for (int index = 0; index < count; ++index) {
+            const std::string path = std::string(argv[4]) + "-" +
+                std::to_string(index) + ".bmp";
+            DWORD_PTR result{};
+            const std::string capture_command =
+                std::string("GUI.Forms.Automation/1 capture ") + path;
+            if (!send_automation(window, capture_command, result) || result != TRUE) {
+                std::fprintf(stderr, "burst capture failed at frame %d\n", index);
+                return 4;
+            }
+            if (index + 1 < count && interval != 0) Sleep(interval);
+        }
+        std::printf("captured-burst=%d interval-ms=%lu prefix=%s\n",
+                    count, static_cast<unsigned long>(interval), argv[4]);
         return 0;
     }
     std::string command = "GUI.Forms.Automation/1 ";

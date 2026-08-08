@@ -21,7 +21,7 @@ func TestProtocolSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "{\"id\":\"1\",\"result\":{\"protocol\":\"engine.v0\",\"features\":[\"exact-reference\",\"integrity\",\"root-policy\",\"scan-reconcile\"]}}\n" +
+	want := "{\"id\":\"1\",\"result\":{\"protocol\":\"engine.v0\",\"features\":[\"exact-reference\",\"integrity\",\"root-policy\",\"scan-reconcile\",\"live-query\"]}}\n" +
 		"{\"id\":\"2\",\"result\":{\"accepted\":true}}\n"
 	if output.String() != want {
 		t.Fatalf("protocol output:\n%s\nwant:\n%s", output.String(), want)

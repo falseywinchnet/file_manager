@@ -785,26 +785,26 @@ void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
     top_second->set_requested_bounds({0.0, 0.0, 100.0, 25.0});
     top_second->set_dock(DockStyle::top);
     auto top_first = make_control<Button>(
-        StableId("showcase.dock.top.first"), "Top A · topmost");
+        StableId("showcase.dock.top.first"), "Top A · first edge");
     top_first->set_visual_style(ButtonVisualStyle::command);
     top_first->set_requested_bounds({0.0, 0.0, 100.0, 25.0});
     top_first->set_dock(DockStyle::top);
     auto left = make_control<Button>(StableId("showcase.dock.left"), "Left");
     left->set_requested_bounds({0.0, 0.0, 82.0, 30.0});
     left->set_dock(DockStyle::left);
-    dock_canvas->add_child(fill);
-    dock_canvas->add_child(bottom);
-    dock_canvas->add_child(right);
-    dock_canvas->add_child(top_second);
-    dock_canvas->add_child(top_first);
     dock_canvas->add_child(left);
+    dock_canvas->add_child(top_first);
+    dock_canvas->add_child(top_second);
+    dock_canvas->add_child(right);
+    dock_canvas->add_child(bottom);
+    dock_canvas->add_child(fill);
 
     auto toggle_left = make_control<Button>(
         StableId("showcase.dock.toggle-left"), "Hide left edge");
     toggle_left->set_visual_style(ButtonVisualStyle::accent);
     dock_group->add_at(toggle_left, {652.0, 52.0, 236.0, 34.0});
     auto swap_top = make_control<Button>(
-        StableId("showcase.dock.swap-top"), "Bring Top B to front");
+        StableId("showcase.dock.swap-top"), "Move Top B behind Top A");
     dock_group->add_at(swap_top, {652.0, 98.0, 236.0, 34.0});
     auto dock_note = label(
         "showcase.dock.note",
@@ -846,10 +846,13 @@ void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
             const auto swap = weak_swap.lock();
             if (!canvas || !first || !second || !swap) return;
             *top_b_front = !*top_b_front;
-            static_cast<void>(canvas->set_child_index(
-                (*top_b_front ? second : first)->runtime_id(), 0U));
-            swap->set_text(*top_b_front ? "Bring Top A to front"
-                                       : "Bring Top B to front");
+            const auto destination = canvas->child_index(
+                (*top_b_front ? first : second)->runtime_id());
+            if (!destination || !canvas->set_child_index(
+                    (*top_b_front ? second : first)->runtime_id(),
+                    *destination)) return;
+            swap->set_text(*top_b_front ? "Move Top A behind Top B"
+                                       : "Move Top B behind Top A");
             if (const auto context = weak_context.lock()) {
                 context->status->set_text(
                     *top_b_front ? "Dock · Top B now consumes the edge first"

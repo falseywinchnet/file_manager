@@ -1,4 +1,6 @@
 use fileman_orchestrator::common::{ApiError, ApiErrorCode, MAX_FRAME_BYTES};
+use fileman_orchestrator::engine_jsonl::EngineJsonlChild;
+use fileman_orchestrator::engine_port::EngineSearchBroker;
 #[cfg(unix)]
 use fileman_orchestrator::local_endpoint::{
     UnixEndpoint, connect_authenticated, default_runtime_directory,
@@ -14,6 +16,7 @@ use serde_json::Value;
 use std::env;
 use std::io::{self, BufRead, Write};
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::ExitCode;
 #[cfg(unix)]
 use std::time::Duration;
@@ -48,6 +51,7 @@ fn run() -> Result<(), String> {
     let mut arguments: Vec<String> = env::args().skip(1).collect();
     let json_output = remove_flag(&mut arguments, "--json");
     let runtime_directory = remove_option(&mut arguments, "--runtime-dir")?;
+    let engine_options = remove_engine_options(&mut arguments)?;
     let Some(command) = arguments.first().map(String::as_str) else {
         print_help();
         return Ok(());
@@ -59,9 +63,12 @@ fn run() -> Result<(), String> {
                 return Err("serve-local accepts only --runtime-dir".to_owned());
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
-            return serve_local(&runtime);
+            return serve_local(&runtime, engine_options);
         }
         "call-local" => {
+            if engine_options.is_some() {
+                return Err("Engine provider options are valid only with serve-local".to_owned());
+            }
             if arguments.len() != 2 {
                 return Err("call-local requires one operation".to_owned());
             }
@@ -73,6 +80,12 @@ fn run() -> Result<(), String> {
             return render_response(operation, &response, json_output);
         }
         "serve-launchd" => {
+            if engine_options.is_some() {
+                return Err(
+                    "the launchd projection does not yet admit the development Engine transport"
+                        .to_owned(),
+                );
+            }
             if json_output || arguments.len() != 1 {
                 return Err("serve-launchd accepts only --runtime-dir".to_owned());
             }
@@ -80,6 +93,9 @@ fn run() -> Result<(), String> {
             return serve_launchd(&runtime);
         }
         "launchd-plist" => {
+            if engine_options.is_some() {
+                return Err("Engine provider options are valid only with serve-local".to_owned());
+            }
             if json_output || arguments.len() != 1 {
                 return Err("launchd-plist accepts only --runtime-dir".to_owned());
             }
@@ -94,6 +110,9 @@ fn run() -> Result<(), String> {
             "--runtime-dir is valid only with serve-local, call-local, serve-launchd, or launchd-plist"
                 .to_owned(),
         );
+    }
+    if engine_options.is_some() {
+        return Err("Engine provider options are valid only with serve-local".to_owned());
     }
     if arguments.len() != 1 {
         return Err("expected one command and optional --json".to_owned());
@@ -113,6 +132,47 @@ fn run() -> Result<(), String> {
     let mut kernel = Kernel::new();
     let response = kernel.handle(Request::local("cli-1", method));
     render_response(command, &response, json_output)
+}
+
+struct EngineOptions {
+    binary: PathBuf,
+    sandbox_root: PathBuf,
+    root_id: String,
+    root_path: PathBuf,
+}
+
+fn remove_engine_options(arguments: &mut Vec<String>) -> Result<Option<EngineOptions>, String> {
+    let binary = remove_option(arguments, "--engine-binary")?;
+    let sandbox_root = remove_option(arguments, "--engine-sandbox-root")?;
+    let root_id = remove_option(arguments, "--engine-root-id")?;
+    let root_path = remove_option(arguments, "--engine-root-path")?;
+    if binary.is_none() && sandbox_root.is_none() && root_id.is_none() && root_path.is_none() {
+        return Ok(None);
+    }
+    let (Some(binary), Some(sandbox_root), Some(root_id), Some(root_path)) =
+        (binary, sandbox_root, root_id, root_path)
+    else {
+        return Err("--engine-binary, --engine-sandbox-root, --engine-root-id, and --engine-root-path must be supplied together".to_owned());
+    };
+    let binary = PathBuf::from(binary);
+    let sandbox_root = PathBuf::from(sandbox_root);
+    let root_path = PathBuf::from(root_path);
+    if !binary.is_absolute()
+        || !sandbox_root.is_absolute()
+        || !root_path.is_absolute()
+        || root_id.is_empty()
+    {
+        return Err(
+            "Engine binary, sandbox root, and root path must be absolute; root id must be nonempty"
+                .to_owned(),
+        );
+    }
+    Ok(Some(EngineOptions {
+        binary,
+        sandbox_root,
+        root_id,
+        root_path,
+    }))
 }
 
 #[cfg(unix)]
@@ -283,15 +343,32 @@ fn read_bounded_line<R: BufRead>(reader: &mut R, limit: usize) -> io::Result<Bou
 }
 
 #[cfg(unix)]
-fn serve_local(runtime_directory: &Path) -> Result<(), String> {
+fn serve_local(
+    runtime_directory: &Path,
+    engine_options: Option<EngineOptions>,
+) -> Result<(), String> {
     let endpoint = UnixEndpoint::bind(runtime_directory).map_err(|error| error.to_string())?;
-    let service_result = serve_local_loop(&endpoint, Kernel::for_local_daemon());
+    let mut kernel = Kernel::for_local_daemon();
+    if let Some(options) = engine_options {
+        let child = EngineJsonlChild::spawn(
+            &options.binary,
+            &options.sandbox_root,
+            &options.root_id,
+            &options.root_path,
+        )
+        .map_err(|error| error.to_string())?;
+        kernel = kernel.with_engine_search(EngineSearchBroker::new(child));
+    }
+    let service_result = serve_local_loop(&endpoint, kernel);
     let cleanup_result = endpoint.cleanup().map_err(|error| error.to_string());
     service_result.and(cleanup_result)
 }
 
 #[cfg(not(unix))]
-fn serve_local(_runtime_directory: &Path) -> Result<(), String> {
+fn serve_local(
+    _runtime_directory: &Path,
+    _engine_options: Option<EngineOptions>,
+) -> Result<(), String> {
     Err("serve-local is not implemented on this platform".to_owned())
 }
 
@@ -308,7 +385,7 @@ fn serve_launchd(runtime_directory: &Path) -> Result<(), String> {
     };
     let endpoint =
         UnixEndpoint::adopt(listener, runtime_directory).map_err(|error| error.to_string())?;
-    let service_result = serve_local_loop(&endpoint, Kernel::for_local_daemon());
+    let service_result = serve_local_loop(&endpoint, Kernel::for_supervised_daemon());
     let cleanup_result = endpoint.cleanup().map_err(|error| error.to_string());
     service_result.and(cleanup_result)
 }
@@ -367,6 +444,8 @@ fn launchd_plist_document(executable: &str, runtime_directory: &str, socket: &st
   </array>
   <key>ProcessType</key>
   <string>Background</string>
+  <key>ThrottleInterval</key>
+  <integer>1</integer>
   <key>Sockets</key>
   <dict>
     <key>orchestrator-control</key>

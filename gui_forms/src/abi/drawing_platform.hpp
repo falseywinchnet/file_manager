@@ -18,6 +18,10 @@ gd_result export_hbitmap(Bitmap& bitmap, Color background, std::uintptr_t& outpu
 gd_result import_hbitmap(std::uintptr_t source, std::unique_ptr<Bitmap>& output);
 gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
                           CapturedSurface& output);
+gd_result refresh_surface(std::uintptr_t source, std::uint32_t kind,
+                          Bitmap& bitmap, RectF& bounds);
+gd_result publish_retained_surface(std::uintptr_t destination,
+                                   std::uint32_t kind, Bitmap& bitmap);
 gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
                           Bitmap& bitmap);
 gd_result acquire_hdc(Bitmap& bitmap, std::uintptr_t& output,

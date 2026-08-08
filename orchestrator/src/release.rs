@@ -139,9 +139,9 @@ fn build_core_release_manifest() -> CoreReleaseManifest {
         .map(|id| contract_requirement(id))
         .collect();
     requirements.extend([
-        pending_requirement(
+        satisfied_requirement(
             "daemon.discovery",
-            "Rust and C++ clients implement the ADR-011 stable macOS path, bounded activation retry, and supervisor-listener adoption; real installed LaunchAgent bootstrap/removal evidence remains pending",
+            "a release-built macOS arm64 artifact passed installed LaunchAgent bootstrap, first-use activation, authenticated status, graceful shutdown, supervisor reactivation within the five-second client bound with fresh instance identity, second shutdown, bootout, and exact test-artifact removal on 2026-08-07",
         ),
         satisfied_requirement(
             "session.authentication",
@@ -297,12 +297,12 @@ mod tests {
     use super::{CORE_REQUIRED_CONTRACTS, RequirementState, core_release_manifest};
 
     #[test]
-    fn core_release_cannot_claim_readiness_while_requirements_are_pending() {
+    fn core_release_is_ready_only_when_every_requirement_is_satisfied() {
         let manifest = core_release_manifest();
         assert_eq!(manifest.target_version, "1.0.0");
         assert_eq!(manifest.required_contracts, CORE_REQUIRED_CONTRACTS);
-        assert!(!manifest.ready);
-        assert_eq!(manifest.state, "development");
+        assert!(manifest.ready);
+        assert_eq!(manifest.state, "ready");
         assert_eq!(manifest.provenance.algorithm, "sha256");
         assert_eq!(manifest.provenance.digest.len(), 64);
         assert_eq!(manifest.provenance.embedded_inputs, 19);
@@ -311,7 +311,7 @@ mod tests {
             manifest
                 .requirements
                 .iter()
-                .any(|requirement| requirement.state == RequirementState::Pending)
+                .all(|requirement| requirement.state == RequirementState::Satisfied)
         );
     }
 }

@@ -1,7 +1,7 @@
 # Frontend 001 specification
 
-Status: **DECIDED scope; waiting for Orchestrator Core 1.0, GUI.Forms go-ahead,
-and explicit architect start direction under ADR-004 and ADR-006**.
+Status: **DECIDED scope; architect start direction recorded 2026-08-07; waiting
+for Orchestrator Core 1.0 and the GUI.Forms go-ahead under ADR-004 and ADR-006**.
 
 Frontend 001 is the first executable File Manager application slice. It is a
 GUI.Forms consumer and a deterministic composition laboratory, not the first
@@ -14,6 +14,10 @@ Implementation begins only after all three are recorded:
 1. Orchestrator Core 1.0 is available through the real frontend bootstrap edge.
 2. GUI.Forms gives a named go-ahead for the consumption surface below.
 3. The grand architect explicitly directs File Manager frontend work to begin.
+
+Predicate 3 was satisfied on 2026-08-07. Predicates 1 and 2 remain open; see
+[`OWNER_DIRECTION_2026-08-07.md`](OWNER_DIRECTION_2026-08-07.md) and
+[`TOTAL_IMPLEMENTATION_PLAN.md`](TOTAL_IMPLEMENTATION_PLAN.md).
 
 Engine, plugin execution, semantic facts, and Kolmogrov readiness are not part
 of this predicate. Their actual states are supplied by the live Orchestrator as
@@ -66,8 +70,8 @@ frontend does not implement a shadow widget framework.
 - Watercolor identity and Office Pearl command zones above a subtle
   middle-value Workshop Graphite navigation chassis;
 - a compact labelled task shelf;
-- back, forward, up, breadcrumb/path, terminal `./`, and separate scoped-search
-  instruments;
+- back, forward, up, one dense chevron breadcrumb with a first-order inline path
+  editor, and a separate scoped-search instrument;
 - collapsible tree and selection/properties panes around the sole central file
   surface;
 - deterministic sample file objects, selection, focus, status, availability,
@@ -80,10 +84,11 @@ frontend does not implement a shadow widget framework.
 - explicit frontend ports for filesystem and Engine data, plus the real
   Orchestrator Core 1.0 bootstrap client.
 
-The path matrix, path editor, search-result expansion, direct property editing,
+The inline path editor, search-result expansion, direct property editing,
 drag/drop, motion, sound, and other debt-ledger objects enter 001 only to the
-extent supported by the GUI.Forms go-ahead and an existing GIVEN rule. Missing
-behavior is labelled, not improvised.
+extent supported by the GUI.Forms go-ahead and an existing GIVEN rule. The
+earlier pulled-down path matrix is not the primary edit surface. Missing behavior
+is labelled, not improvised.
 
 ## Design authority
 

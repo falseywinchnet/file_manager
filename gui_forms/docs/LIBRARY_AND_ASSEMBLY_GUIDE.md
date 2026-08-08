@@ -16,14 +16,14 @@ second UI engine.
 | Build object | Current role | Public-boundary status |
 |---|---|---|
 | `gui_forms_core` | retained tree, lifetime, events, invalidation, display chunks, scheduling, resources, portable host protocol | renderer-free C++ proving API; not frozen |
-| `gui_forms_controls` | reusable basic, container, lifecycle, and range controls | renderer-neutral C++ proving API; incomplete |
+| `gui_forms_controls` | reusable basic, container, lifecycle, range, and raster-canvas controls | renderer-neutral C++ proving API; incomplete |
 | `gui_forms_host_headless` | deterministic host/service oracle | test and automation adapter |
 | `gui_forms_host_macos` | AppKit translation and native window host | private platform adapter |
 | `gui_forms_host_windows` | Win32 translation and CPU DIB window host | private bounded platform adapter |
 | `gui_forms_skia` | private CPU raster adapter | never crosses the control or ABI seam |
-| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, input, edit, cursor, scrolling, layout transactions, and top-level-host experiment | ABI 0.21; not the eventual 1.0 table |
+| `gui_forms_c_api` | opaque-handle control/tree, callback, dispatcher, raster, input, edit, cursor, scrolling, layout/property transactions, and top-level-host experiment | ABI 0.24; not the eventual 1.0 table |
 | `gui_drawing_core` | portable geometry/color, drawing resources, state stack, paths, logical image references, and typed recording | renderer-free C++20 proving API; not frozen |
-| `gui_drawing_c_api` | generational drawing handles and command submission | independent experimental ABI 0.1; one exported negotiation symbol |
+| `gui_drawing_c_api` | generational drawing handles, transactional bitmap edits, damage, and command submission | independent experimental ABI 0.2 with a negotiable 0.1 prefix; one exported negotiation symbol |
 | Gallery model/application | visible dogfood and instrumentation | example, not library authority |
 
 The native core does not link .NET, AppKit, Win32, Wayland, X11, Skia types, or
@@ -37,10 +37,10 @@ The eventual consumer stack has one ownership system and several projections:
 application or trusted compatibility extension
         |
         +-- C++ RAII wrapper -------------------+
-        +-- generated C# facade (M11 experiment) --+--> ABI 0.21 --> native retained engine
+        +-- generated C# facade (M11 experiment) --+--> ABI 0.24 --> native retained engine
         +-- compiled DML handles ---------------+
                                                      |
-                                                     +--> GUI.Drawing ABI 0.1 command/image-reference core
+                                                     +--> GUI.Drawing ABI 0.2 command/image/edit core
                                                      +--> selected private host adapter
                                                      +--> selected private CPU renderer
 ```
@@ -92,6 +92,17 @@ compatibility identity, not a dependency on Microsoft's implementation. The
 Windows x64 private Skia DLL and unchanged zero-passthrough run remain open.
 See `../experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`.
 
+**MEASURED M12-P26 continuation:** the public `GUIForms::Drawing` target is now
+an exported dependency of `GUIForms::Controls`. GUI.Drawing bitmap edits are
+rectangular, cancellable, generation-safe, and damage-queryable through C++ and
+ABI 0.2. Public `RasterCanvas` consumes that contract with zoom/pan,
+nearest/linear retained sampling, transparency presentation, RGBA/BGRA
+normalization, resource retirement, and localized Window damage. The same
+renderer-free color core owns linear sRGB, XYZ D65, OKLab/OKLCH, gamut status,
+and chroma-only mapping. This is the Paint substrate, not a Paint document
+model or completed detailed Color dialog. See
+`../experiments/M12P26_EDITABLE_RASTER_CANVAS_AND_COLOR_TRUTH.md`.
+
 **MEASURED M11a experiment:** replacement assemblies named
 `System.Windows.Forms` and `System.Windows.Forms.Primitives` now contain all 797
 required captured facade identities. Their `Control` hot path projects a
@@ -114,7 +125,7 @@ exceptions are contained at the trampoline, reported through
 Win32/Wine runs produce the same one-per-stage lifecycle counts. See
 `../experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md`.
 
-**MEASURED M12-P15/P16/P17/P18/P19/P20/P21 native property substrate:** GUI.Forms now separates
+**MEASURED M12-P15/P16/P17/P18/P19/P20/P21/P22 native property substrate:** GUI.Forms now separates
 inert public property descriptors from private executable registrations. The
 typed value domain includes scalars, geometry, spacing, color, font,
 generational images, finite named/flags enums, bounded immutable objects, and
@@ -131,18 +142,35 @@ registries. Numeric values use a retained NumericUpDown factory; inert
 descriptor service names can select reusable custom formatting and editors
 without placing callbacks in metadata. FlagsValueEditor owns a tokenized
 multi-select CheckedListBox popup; ColorValueEditor owns canonical alpha-aware
-text, swatch, invalid-state, cancel, and typed failure behavior. Field edits reconstruct every immutable
+text, swatch, invalid-state, cancel, and typed failure behavior. Nullable payload
+schema, finite standard values, per-registry numeric culture, nested member
+services, and rollback-safe multiple-owner commits are native contracts rather
+than PropertyGrid exceptions. Field edits reconstruct every immutable
 ancestor and never parse its diagnostic display string. Stock `ComboBox.Items`
 dogfoods the content-collection contract. This is the native
 schema/tooling foundation for compiled DML and managed descriptors, not a DML
-parser or ABI projection; diagnostic value strings are not serialized source.
+parser; diagnostic value strings are not serialized source. Experimental ABI
+0.22 and the generated façade expose native PropertyGrid selection/sort/
+refresh for managed GUI.Forms Controls. ABI 0.23 adds owned nonvisual proxies
+for ordinary `TypeDescriptor`/`ICustomTypeDescriptor` objects with nullable
+typed values, finite standards, current-culture TypeConverter formatting and
+parsing, reset/serialization/change callbacks, selection-failure preservation,
+and rollback-safe multiple-owner editing. Managed `UITypeEditor` drop-down/
+modal hosting is implemented by ABI 0.24: the native row owns a real retained
+editor button, while the generated adapter supplies `ITypeDescriptorContext`,
+`IWindowsFormsEditorService`, blocking drop-down Control hosting, owned modal
+Forms, typed return, and atomic commit. It is not emitted as a nominal no-op.
 See `../experiments/M12P15_PROPERTY_METADATA_CENTER.md` and
 `../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md` and
 `../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md` and
 `../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md` and
 `../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md` and
 `../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md` and
-`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
+`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md` and
+`../experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md` and
+`../experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md` and
+`../experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md` and
+`../experiments/M12P25_MANAGED_UI_TYPE_EDITOR_ABI_0_24.md`.
 
 **MEASURED compatibility-laboratory evidence:** a consumer compiled against the
 authentic strong-named .NET 10 `System.Windows.Forms` reference can resolve in a
@@ -211,9 +239,10 @@ added to the base interface merely because one plugin might want it.
 
 GUI.Forms currently proves deterministic attach/detach order, one-shot
 `UserControl::loaded`, successful attachment counts, initialization batching,
-event tokens, focus/capture cleanup, disposal, UI timers, and renderer-free
-posted dispatch with shutdown revocation. Complete managed-handle unload and
-synchronous cross-thread invoke remain future gates.
+coalesced post-commit state events, event tokens, initialization-time
+focus/capture/input cleanup, disposal, UI timers, and renderer-free posted
+dispatch with shutdown revocation. Complete managed-handle unload remains a
+future gate.
 
 ## 5. Ownership and thread rules
 

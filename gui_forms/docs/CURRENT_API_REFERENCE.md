@@ -1,6 +1,6 @@
 # Current GUI.Forms API reference
 
-Status: **OBSERVED C++/C ABI 0.x surface as of 2026-08-06**. This is a concise
+Status: **OBSERVED C++/C ABI 0.x surface as of 2026-08-07**. This is a concise
 consumer map, not a stability guarantee. The completeness matrix, header files,
 and executable tests remain authoritative if this summary disagrees with code.
 
@@ -25,6 +25,22 @@ scale/rotate operations, cloning, deterministic traces, and CPU Skia execution.
 Identity-only `ImageReference` textures record honestly but cannot rasterize
 until pixels are supplied.
 
+Owned bitmaps now also expose transactional rectangular edits. A write lease is
+committed or cancelled exactly once; cancellation restores the leased bytes,
+no-op commits preserve the generation, and commits derive bounded local damage
+from actual byte changes. `changes_since` is multi-consumer and degrades
+explicitly to full-image damage if its 256-generation history was exceeded.
+`RasterCanvas` projects those generations into a retained zoom/pan viewport,
+nearest or linear sampling, RGBA/BGRA normalization, transparency grid,
+resource retirement, and local window damage. `Control::invalidate(Rect)` and
+raw-image registry patches preserve the same bounded damage through replay.
+
+Color conversion is explicit rather than theme-relative: IEC 61966-2-1 sRGB,
+linear sRGB, XYZ D65, OKLab, and OKLCH have named value types and checked
+conversions. sRGB projection reports unclamped values and gamut/clipping state;
+the deterministic OKLCH mapper reduces chroma only while preserving lightness,
+hue, and alpha. ICC/profile loading and a detailed `ColorDialog` remain open.
+
 The recorder owns a bounded state stack and typed snapshot commands for clear,
 rectangle, line, string, ellipse, polygon, path, and logical image operations.
 `gui.drawing.trace/v1` includes resource values, transforms, clip,
@@ -34,7 +50,8 @@ core until the shared text service is connected.
 
 The core remains renderer-free. A separately packaged private raster service
 executes retained commands and bounded PNG through CPU-only Skia. The current
-archive is measured on macOS arm64; Windows x64 packaging remains open.
+archive is measured on macOS arm64 and cross-built for Windows x64; physical
+Windows qualification and Linux host packaging remain open.
 
 ## Identity, lifetime, and events
 
@@ -152,8 +169,8 @@ Every control has a nonempty immutable `StableId` and a process-local
 
 ### State and geometry
 
-- mutable `name` is distinct from immutable `StableId` and has a synchronous
-  tokenized change event;
+- mutable `name` is distinct from immutable `StableId` and has a tokenized
+  change event (synchronous outside an initialization transaction);
 - requested bounds reject nonfinite/negative extents and honor retained
   minimum/maximum size; edge queries, client rectangle, containment,
   window-coordinate conversion, and bring/send z-order operations are public;
@@ -162,6 +179,8 @@ Every control has a nonempty immutable `StableId` and a process-local
 - `child_index` and `get_child_at_point` use index-zero-topmost direct-child
   order. Lookup can independently skip invisible, disabled, and explicitly
   hit-transparent children; ordinary pointer routing passes through the latter;
+- default Dock consumes children in reverse public z-order (backmost to
+  topmost), while paint remains back-to-front and hit testing front-to-back;
 - `get_next_control` returns the preceding/following live descendant in stable
   nested TabIndex order without wrapping or conflating traversal with focus;
 - `get_preferred_size`, `AutoSize`, and `AutoSizeMode` provide retained
@@ -206,12 +225,23 @@ truth.
 ### Initialization lifecycle
 
 - `begin_init()` and `end_init()` nest;
-- property events remain synchronous during initialization;
+- stock property/state events remain synchronous outside initialization and
+  coalesce by event identity during initialization; the final payloads publish
+  in first-event order only after the outer commit;
+- native custom controls use the protected `publish_change` helper for the
+  same policy; calling an independent `Event::emit` directly deliberately
+  retains its ordinary synchronous semantics;
 - dirty effects coalesce until the outer `end_init()`;
+- entering initialization revokes focus/capture and makes that control
+  ineligible for routed input, commands, and mnemonics until commit; cleanup
+  callbacks are deferred through the same boundary;
 - `initialization_completed()` emits the combined dirty flags and whether the
   operation required a subtree mark;
 - unmatched `end_init`, disposed mutation, and wrong-thread mutation are
   rejected.
+
+See `experiments/M12P27_INITIALIZATION_OWNERSHIP_AND_DOCK_ORDER.md` for the
+mutation-ownership and reverse-z geometry oracles.
 
 Subclass hooks `on_attached_to_window`, `on_attachment_committed`, and
 `on_detached_from_window` define the current deterministic lifecycle. Attachment
@@ -650,9 +680,11 @@ native registrations as binding. Descriptors include authored name,
 typed scalar/Point/Size/Rect/Insets/Color/Font/Image/enum/object/collection kind,
 category/description, default, declared dirty effects,
 local/subtree effect scope, serialization visibility, browse/bind/reset, and
-change-notification facts. Optional bounded `converter_name` and `editor_name`
-fields are inert service identities; executable callbacks never enter the
-descriptor snapshot.
+change-notification facts. `kind` remains the non-null payload schema while
+`nullable` independently admits null. At most 256 unique typed standard values
+may be declared and enforced as an exclusive finite set. Optional bounded
+converter, editor, and dynamic standard-value-provider names are inert service
+identities; executable callbacks never enter the descriptor snapshot.
 Executable access is live/UI-thread guarded, conversion precedes setters,
 change tokens are owner-revoked, and mutations retain the existing nested
 `BeginInit`/`EndInit` effect union.
@@ -697,8 +729,12 @@ homogeneous collections recurse through member/index paths such as
 `Settings.Endpoint.Host` and `Items[2]`; collection insert/remove/move rebuild
 one snapshot through `insert_collection_item`, `remove_collection_item`, and
 `move_collection_item`. Trees are bounded to depth 8, 256 members per object,
-4,096 items per collection, and 8,192 total nodes. A child edit reconstructs every typed ancestor and passes through
-the owning registered setter. Image/resource/null values remain read-only.
+4,096 items per collection, and 8,192 total nodes. Object members may own their
+payload/null/enum/standard-value schema and converter/editor identities. A child
+edit reconstructs every typed ancestor and passes through
+the owning registered setter. Nullable text/finite-choice values round-trip an
+explicit `(none)` representation; image/resource nulls without a specialized
+editor remain read-only.
 Commits normalize from
 the getter, expose typed change/error events, and preserve the complete parent
 on invalid conversion. Each resettable parent owns a real retained Reset button
@@ -706,20 +742,44 @@ whose enabled state follows `ShouldSerialize`; activation uses the real reset
 contract and resynchronizes every child. Truthfully observable properties
 refresh automatically;
 `refresh_properties()` is explicit for the rest. Selection is weak and
-callback-time target or grid disposal is contained. This is a native partial
-tooling control, not yet a managed WinForms PropertyGrid facade. Evidence:
+callback-time target or grid disposal is contained. Multiple selected controls
+project their common schema; edits preflight every owner, roll changed owners
+back if any setter rejects, and publish one logical change after success. This is a native partial
+tooling control. ABI 0.22 and the generated System.Windows.Forms façade project
+the real native PropertyGrid for managed GUI.Forms Control selections, including
+SelectedObject(s), PropertySort, refresh, and selection/sort events. ABI 0.23
+adds nonvisual foreign-object proxies for ordinary managed `TypeDescriptor` and
+`ICustomTypeDescriptor` metadata. Nullable scalar/text/Color/enum values,
+categories, descriptions, browsability, finite standards/exclusivity,
+current-culture TypeConverter display/parse, reset/ShouldSerialize, and
+supported change events cross synchronous bounded callbacks into the same
+native editor and atomic multiple-owner transaction. Unsupported writable
+types fail before replacing selection; descriptors and standard values are
+deep-copied and callback strings use caller-owned buffers. Managed
+`UITypeEditor` editors now cross ABI 0.24 through a real retained editor button.
+The adapter supplies `ITypeDescriptorContext` and
+`IWindowsFormsEditorService`; synchronous drop-down Control hosting,
+`CloseDropDown`, owned modal Forms, typed return, failure containment, and the
+same atomic multiple-owner commit are implemented. Evidence:
 `experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md` and
 `experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md` and
 `experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md` and
 `experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md` and
-`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
+`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md` and
+`experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md` and
+`experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md` and
+`experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md` and
+`experiments/M12P25_MANAGED_UI_TYPE_EDITOR_ABI_0_24.md`.
 
 `PropertyValueConverterRegistry` supplies canonical named format/parse services
 plus optional kind mappings. `PropertyEditorRegistry` supplies named factories
 which donate one unattached retained control, a non-emitting synchronization
 operation, a tokenized typed commit connector, and an optional tokenized input
 failure connector. Both registries are
-instance-owned by PropertyGrid rather than mutable process globals. Consumers
+instance-owned by PropertyGrid rather than mutable process globals. A bounded
+`PropertyConversionContext` supplies per-registry culture identity and decimal/
+group separators; default numeric conversion never mutates the process locale.
+Consumers
 may replace or deliberately share them. `PropertyList::replace_editor` retains
 the ordinary row ownership, scroll/focus layout, semantics, and disposal laws;
 invalid factories do not acquire ownership. Defaults map number to
@@ -728,20 +788,24 @@ ColorValueEditor/`color-hex`, while explicit descriptor service names permit spe
 editors without adding a switch case to PropertyGrid.
 OnValidation subscribes to its target's cancellable validation event, commits
 before focus loss, and cancels prevent-mode focus when parse/transfer fails.
-Nested data members, sort/filter, arbitrary culture providers, managed-object
-reflection, BindingNavigator, and DataGridView remain open. Evidence:
+Nested data members, sort/filter, arbitrary culture providers,
+BindingNavigator, and DataGridView remain open. Evidence:
 `experiments/M12P5_BINDING_CURRENCY_KERNEL.md` and
 `experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`. Heterogeneous dictionary,
-nullable-specialized, and modal-editor values, framework-wide stock registration
-and change events, atomic multi-owner rollback, DML, and managed descriptor
-projection remain open; see
+date/duration/path and modal-editor values, framework-wide stock registration
+and change events, dynamic standard-value providers, mixed-value editor visuals,
+DML, component-editor/designer services, and nested arbitrary managed
+object projection remain open; see
 `experiments/M12P15_PROPERTY_METADATA_CENTER.md`,
 `experiments/M12P16_COMPOUND_PROPERTY_VALUES.md`,
 `experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md`, and
 `experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md`, and
 `experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md`, and
 `experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md`, and
-`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`.
+`experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`, and
+`experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md`, and
+`experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md`, and
+`experiments/M12P25_MANAGED_UI_TYPE_EDITOR_ABI_0_24.md`.
 
 ## Nonvisual providers
 
@@ -1055,7 +1119,7 @@ ABI 0.x remains intentionally incomplete and is not a binary compatibility
 promise. C11, C++20, generated-managed, host-.NET, and Wine smoke lanes now
 exercise its high-frequency control spine.
 
-### Independent GUI.Drawing ABI 0.1
+### Independent GUI.Drawing ABI 0.2
 
 ```c
 #include <gui_forms/drawing_c_api.h>
@@ -1070,7 +1134,13 @@ other hosts return explicit unsupported results. The table exposes distinct
 stale-handle, wrong-kind, wrong-thread, disposed, buffer, version, and limit
 results; no exception crosses the boundary. The shared library exports no
 other symbol. This ABI is experimental and deliberately not merged with the
-GUI.Forms ABI 0.21 table.
+GUI.Forms ABI 0.24 table.
+
+ABI 0.2 appends bounded bitmap edit begin/commit/cancel and multi-consumer
+damage queries. ABI 0.1 remains negotiable through its size-prefixed prefix;
+the new table reports the version requested by the caller. C11 tests cover
+byte restoration, exact generation changes, stale token rejection, local
+rectangles, buffer sizing, and the legacy negotiation prefix.
 
 ## Compatibility laboratory
 

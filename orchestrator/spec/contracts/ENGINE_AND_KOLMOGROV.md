@@ -1,8 +1,9 @@
 # ORC-ENG / ORC-KOL: Engine and Kolmogrov contracts
 
 Status: **ORC-ENG-001/002 and the ORC-ENG-003 status snapshot semantic v0 are
-frozen for experimental implementation; required ORC-ENG-004, the
-status-subscription extension, and ORC-KOL-001 are negotiating**.
+frozen for experimental implementation; ORC-ENG-004 has a fixture-draft
+development implementation; the status-subscription extension and ORC-KOL-001
+are negotiating**.
 
 Authority: Orchestrator owns the cross-project meaning and capability map. The
 Go Engine owns exact catalogue observations, retrieval mechanics, and core
@@ -188,8 +189,10 @@ production availability.
 The engine currently supports manual reconcile followed by exact catalogue
 query. Continuous background indexing is optional. ADR-008 requires a true
 zero-catalogue live filesystem traversal provision as the separate
-`ORC-ENG-004` family; it is not inferred from `manual_reconcile` and remains
-`negotiating` until the Engine reply and conformance evidence are reconciled.
+`ORC-ENG-004` family; it is not inferred from `manual_reconcile`. Engine reply
+006 and the development provider/adapter are now observed. Native NTFS/ext4,
+million-entry resource evidence, and installed authenticated transport remain
+promotion gates.
 
 The required first slice is bounded name/path search over an already-authorized
 scope. It returns progressive pages without creating or requiring a persistent

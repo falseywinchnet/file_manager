@@ -16,6 +16,7 @@ import (
 	"filemanager/engine/internal/catalog"
 	"filemanager/engine/internal/exact"
 	"filemanager/engine/internal/generation"
+	"filemanager/engine/internal/live"
 	"filemanager/engine/internal/ranking"
 	"filemanager/engine/internal/sandbox"
 	"filemanager/engine/internal/scan"
@@ -37,6 +38,7 @@ type Service struct {
 	quarantined      int
 	quarantineError  string
 	background       backgroundObservation
+	live             *live.Manager
 }
 
 type metadataScanner interface {
@@ -54,7 +56,7 @@ func New(guard *sandbox.Guard) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{guard: guard, store: catalog.NewStore(), scanner: scan.Scanner{}, lifecycle: lifecycle}, nil
+	return &Service{guard: guard, store: catalog.NewStore(), scanner: scan.Scanner{}, lifecycle: lifecycle, live: live.NewManager()}, nil
 }
 
 // NewPersistent opens the one-root M2 durable service. The store directory
@@ -212,6 +214,7 @@ func (s *Service) applyRoots(ctx context.Context, roots []api.RootSpec, expected
 	if _, _, err := s.store.ApplyRoots(plan.Roots); err != nil {
 		return api.RootPlan{}, api.WrapFault(api.ErrorInvalidRequest, "apply root plan", err)
 	}
+	s.live.Reset()
 	s.invalidateBackground("approved root policy changed")
 	if s.durable != nil {
 		s.readerMu.Lock()
@@ -484,6 +487,30 @@ func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse
 		response.Warnings = append(response.Warnings, "query used a generation not reconciled through the active observation stream")
 	}
 	return response, nil
+}
+
+// QueryLive searches an already-approved filesystem scope without consulting
+// or creating a catalogue. Continuation state is process-local, bounded, and
+// discarded on expiry, root-policy change, completion, or shutdown.
+func (s *Service) QueryLive(ctx context.Context, query api.LiveQuery) (api.LiveQueryResponse, error) {
+	ctx, finish, err := s.beginOperation(ctx, operationQuery, "")
+	if err != nil {
+		return api.LiveQueryResponse{}, err
+	}
+	defer finish()
+	if err := ctx.Err(); err != nil {
+		return api.LiveQueryResponse{}, err
+	}
+	snapshot := s.store.Snapshot()
+	projection, exists := snapshot.Projection(query.Scope.RootID)
+	if !exists {
+		return api.LiveQueryResponse{}, api.NewFault(api.ErrorUnapprovedRoot, "live-query root is not in the approved root policy")
+	}
+	resolved, err := s.guard.ResolveDirectory(projection.Spec.Path)
+	if err != nil || resolved != projection.Spec.Path {
+		return api.LiveQueryResponse{}, api.WrapFault(api.ErrorUnapprovedRoot, "approved live-query root no longer resolves inside the sandbox", err)
+	}
+	return s.live.Query(ctx, projection.Spec, query, snapshot.Owns)
 }
 
 func (s *Service) Inspect(ctx context.Context, ref api.ObjectRef) (api.Result, error) {

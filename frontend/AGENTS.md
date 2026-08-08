@@ -5,14 +5,15 @@ multi-project workspace. It consumes Orchestrator as the normal integration
 authority, GUI.Forms in-process, and the systemwide Go engine through
 Orchestrator or the registered degraded fallback.
 
-## Current phase: Frontend 001 waiting on Core 1.0 and GUI.Forms
+## Current phase: owner direction recorded; Frontend 001 waiting on Core 1.0 and GUI.Forms
 
 Do not create application source, CMake/build files, generated bindings, product
 assets, packages, or prototypes until Orchestrator Core 1.0 is available through
-the real frontend bootstrap edge, GUI.Forms gives the named FM0/Frontend 001
-consumption go-ahead, and the grand architect explicitly directs this project to
-begin. Engine, Kolmogrov, plugin execution, and semantic facts retain separate
-gates; their actual states come from Orchestrator.
+the real frontend bootstrap edge and GUI.Forms gives the named FM0/Frontend 001
+consumption go-ahead. The grand architect supplied the third opening event on
+2026-08-07; see `planning/OWNER_DIRECTION_2026-08-07.md`. Engine, Kolmogrov,
+plugin execution, and semantic facts retain separate gates; their actual states
+come from Orchestrator.
 
 Permitted work before that start direction:
 

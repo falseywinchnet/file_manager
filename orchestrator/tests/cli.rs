@@ -34,7 +34,7 @@ fn human_status_is_concise() {
 }
 
 #[test]
-fn core_release_is_machine_readable_and_not_prematurely_ready() {
+fn core_release_is_machine_readable_and_ready_after_all_evidence_passes() {
     let output = Command::new(env!("CARGO_BIN_EXE_orchestrator"))
         .args(["release", "--json"])
         .output()
@@ -44,8 +44,8 @@ fn core_release_is_machine_readable_and_not_prematurely_ready() {
     assert_eq!(response["status"], "success");
     assert_eq!(response["result"]["profile"], "orchestrator-core");
     assert_eq!(response["result"]["target_version"], "1.0.0");
-    assert_eq!(response["result"]["state"], "development");
-    assert_eq!(response["result"]["ready"], false);
+    assert_eq!(response["result"]["state"], "ready");
+    assert_eq!(response["result"]["ready"], true);
 }
 
 #[cfg(target_os = "macos")]
@@ -67,6 +67,8 @@ fn launchd_plist_names_the_stable_socket_without_installing_it() {
     assert!(plist.contains(&format!("{runtime}/orchestrator.sock")));
     assert!(plist.contains("<string>--runtime-dir</string>"));
     assert!(plist.contains(&format!("<string>{runtime}</string>")));
+    assert!(plist.contains("<key>ThrottleInterval</key>"));
+    assert!(plist.contains("<integer>1</integer>"));
     assert!(plist.contains("<integer>384</integer>"));
     assert!(
         !Path::new(&runtime).exists(),

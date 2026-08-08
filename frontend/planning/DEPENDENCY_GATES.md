@@ -4,7 +4,10 @@ Status: **DECIDED split gates under ADR-004 and ADR-006**.
 
 The earlier global Gate F0 is superseded. Frontend 001 has two independent
 foundation gates—Orchestrator Core 1.0 and GUI.Forms FM0—plus explicit architect
-start direction. Other provider adapters retain their own later gates.
+start direction. The architect direction was recorded on 2026-08-07 in
+[`OWNER_DIRECTION_2026-08-07.md`](OWNER_DIRECTION_2026-08-07.md); the two
+technical foundation gates remain open. Other provider adapters retain their
+own later gates.
 
 ## Orchestrator Core 1.0 bootstrap gate
 

@@ -1,8 +1,8 @@
 # Orchestrator ↔ File Manager interface negotiation
 
-Status: **round 003 reconciled; live Core 1.0 bootstrap edge requires final
-launchd lifecycle evidence before
-Frontend 001 under ADR-006**.
+Status: **round 003 Core bootstrap reconciled; owner start/composition direction
+007 recorded; live Core 1.0 bootstrap edge still requires final launchd
+lifecycle evidence before Frontend 001 under ADR-006**.
 
 Participants: Orchestrator integration authority and the future C++ File
 Manager frontend. Canonical families: `ORC-COM-001`, `ORC-LIF-001`,
@@ -301,3 +301,44 @@ The frontend must later define:
 
 Contract IDs and implementation wait on the existing frontend opening and
 plugin/provider gates.
+
+## Architect frontend start and composition direction 007
+
+Date: 2026-08-07.
+
+Status: **GIVEN owner direction; technical dependency and later-contract gates
+remain independent**.
+
+The grand architect has now supplied the explicit Frontend 001 start direction.
+This satisfies the owner-direction predicate but does not change the current
+Orchestrator `ready: false` release manifest or manufacture the outstanding
+GUI.Forms FM0 reply.
+
+The same direction adds these frontend requirements:
+
+- an extensive product-owned multi-tab Settings surface that configures and
+  truthfully reports backend services;
+- installed Malkuth application access through OS-native menu-bar entries,
+  never an in-program styled suite launcher;
+- an inline path editor in one dense chevron breadcrumb cascade rather than the
+  former pulled-down path matrix; and
+- contained end-to-end dogfood with the live Orchestrator and Engine before
+  daily-root promotion.
+
+The frontend therefore requests future reconciliation of existing families,
+not invented payloads:
+
+1. `ORC-SET-001` supplies bounded typed schemas, immutable value revisions,
+   optimistic transactions, validation, reset/migration effects, terminal
+   results, and audit identity. It supplies no arbitrary controls.
+2. `ORC-UI-001` supplies service status and admitted control-command semantics
+   for Orchestrator, Engine, and later providers, including availability,
+   progress, restart effect, and redacted diagnostics.
+3. `ORC-APP-001` supplies immutable installed first-party application identity,
+   availability, launch intent, and native-menu eligibility. It does not open a
+   future application's implementation gate or make Orchestrator a launcher UI.
+
+GUI.Forms owns portable-to-native menu publication. File Manager owns menu
+grouping and Settings tab composition. Orchestrator owns the application and
+settings/service facts. The complete staged program is
+[`TOTAL_IMPLEMENTATION_PLAN.md`](TOTAL_IMPLEMENTATION_PLAN.md).

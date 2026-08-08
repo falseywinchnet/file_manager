@@ -1,7 +1,7 @@
 # File Manager frontend charter
 
-Status: **product responsibilities accepted; Frontend 001 scoped and waiting on
-Core 1.0, GUI.Forms, and architect opening events**.
+Status: **product responsibilities accepted; owner opening direction recorded
+2026-08-07; Frontend 001 waiting on Core 1.0 and GUI.Forms**.
 
 ## Mission
 

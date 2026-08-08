@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io::BufReader;
 use std::io::{BufRead, Read, Write};
+use std::path::Path;
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 pub const MAX_ENGINE_JSONL_FRAME_BYTES: usize = 1_048_576;
 
@@ -215,6 +218,91 @@ struct EngineLiveWireResponse {
 #[derive(Debug)]
 pub struct EngineJsonlSearchAdapter<R, W> {
     peer: EngineJsonlPeer<R, W>,
+}
+
+#[derive(Debug)]
+pub struct EngineJsonlChild {
+    adapter: EngineJsonlSearchAdapter<BufReader<ChildStdout>, ChildStdin>,
+    child: Child,
+    live_available: bool,
+}
+
+impl EngineJsonlChild {
+    /// Starts the separately built Engine development process. This is not the
+    /// installed authenticated Engine transport.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O or protocol error when the child cannot start, its
+    /// standard streams are unavailable, or its version handshake is invalid.
+    pub fn spawn(
+        binary: &Path,
+        sandbox_root: &Path,
+        root_id: &str,
+        root_path: &Path,
+    ) -> Result<Self, EngineJsonlError> {
+        let mut child = Command::new(binary)
+            .arg("--sandbox-root")
+            .arg(sandbox_root)
+            .arg("--root-id")
+            .arg(root_id)
+            .arg("--root-path")
+            .arg(root_path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()?;
+        let stdin = child.stdin.take().ok_or_else(|| {
+            EngineJsonlError::Io(std::io::Error::other("Engine child stdin was not piped"))
+        })?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            EngineJsonlError::Io(std::io::Error::other("Engine child stdout was not piped"))
+        })?;
+        let mut result = Self {
+            adapter: EngineJsonlSearchAdapter::new(EngineJsonlPeer::new(
+                BufReader::new(stdout),
+                stdin,
+            )),
+            child,
+            live_available: false,
+        };
+        let version = result
+            .adapter
+            .peer_mut()
+            .call("engine.version", &json!({}))?;
+        result.live_available = version["capabilities"]
+            .as_array()
+            .is_some_and(|capabilities| {
+                let available = |id: &str| {
+                    capabilities.iter().any(|capability| {
+                        capability["id"] == id && capability["state"] == "available"
+                    })
+                };
+                available("engine.live.query") && available("contract.ORC-ENG-004")
+            });
+        Ok(result)
+    }
+}
+
+impl EngineSearchProvider for EngineJsonlChild {
+    fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture {
+        self.adapter.query_catalogue(request)
+    }
+
+    fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResultFixture {
+        self.adapter.query_live(request)
+    }
+
+    fn live_available(&self) -> bool {
+        self.live_available
+    }
+}
+
+impl Drop for EngineJsonlChild {
+    fn drop(&mut self) {
+        let _ = self.adapter.peer_mut().call("engine.shutdown", &json!({}));
+        let _ = self.child.wait();
+    }
 }
 
 impl<R: BufRead, W: Write> EngineJsonlSearchAdapter<R, W> {

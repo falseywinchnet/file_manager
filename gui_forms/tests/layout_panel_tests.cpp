@@ -432,11 +432,11 @@ void test_default_dock_layout_all_directions_and_z_order() {
     right->set_dock(DockStyle::right);
     top->set_dock(DockStyle::top);
     left->set_dock(DockStyle::left);
-    root->add_child(fill);
-    root->add_child(bottom);
-    root->add_child(right);
-    root->add_child(top);
     root->add_child(left);
+    root->add_child(top);
+    root->add_child(right);
+    root->add_child(bottom);
+    root->add_child(fill);
 
     Window window(root, {300.0, 200.0});
     window.perform_layout();
@@ -445,7 +445,7 @@ void test_default_dock_layout_all_directions_and_z_order() {
                 right->arranged_bounds() == Rect{250.0, 30.0, 40.0, 160.0} &&
                 bottom->arranged_bounds() == Rect{40.0, 165.0, 210.0, 25.0} &&
                 fill->arranged_bounds() == Rect{40.0, 30.0, 210.0, 135.0},
-            "Dock must consume the padded client rectangle in topmost-first z order");
+            "Dock must consume the padded client rectangle in reverse public z order");
     require(fill->requested_bounds() == Rect{0.0, 0.0, 10.0, 10.0} &&
                 left->requested_bounds() == Rect{0.0, 0.0, 30.0, 10.0} &&
                 window.metrics_snapshot().bounded_pass_limit_hits == 0U,
@@ -466,15 +466,15 @@ void test_default_dock_layout_all_directions_and_z_order() {
     order_root->add_child(second);
     Window order_window(order_root, {100.0, 100.0});
     order_window.perform_layout();
-    require(second->arranged_bounds().y == 0.0 &&
-                first->arranged_bounds().y == 30.0,
-            "topmost docked sibling must consume its edge first");
+    require(first->arranged_bounds().y == 0.0 &&
+                second->arranged_bounds().y == 20.0,
+            "backmost docked sibling must consume its edge first");
     require(order_root->set_child_index(first->runtime_id(), 0U),
             "dock z-order specimen must accept child-index mutation");
     order_window.perform_layout();
-    require(first->arranged_bounds().y == 0.0 &&
-                second->arranged_bounds().y == 20.0,
-            "Dock order must update deterministically after SetChildIndex");
+    require(second->arranged_bounds().y == 0.0 &&
+                first->arranged_bounds().y == 30.0,
+            "reverse-z Dock order must update deterministically after SetChildIndex");
 }
 
 void test_compound_anchor_resize_runtime_rebase_and_validation() {

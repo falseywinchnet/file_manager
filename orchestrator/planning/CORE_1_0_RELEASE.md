@@ -1,7 +1,7 @@
 # Orchestrator Core 1.0 release profile
 
-Status: **DECIDED target under ADR-006; current executable reports
-`development`, not ready**.
+Status: **DECIDED and OBSERVED ready on the first macOS artifact under ADR-006,
+ADR-010, and ADR-011**.
 
 Core 1.0 is the headless authority required before Frontend 001 bootstraps. It
 does not mean every provider is complete and it does not collapse independent
@@ -74,8 +74,12 @@ fixture triggers the listener and rediscovers/authenticates the replacement
 within a five-second bound. The plist fixture also proves that an explicit
 runtime-directory override is carried into both the socket declaration and the
 daemon arguments, preventing listener adoption from validating a different
-path. The generated plist passes `plutil`; real installed LaunchAgent
-bootstrap/removal evidence and other platforms remain open.
+path. The generated plist passes `plutil`. The release-built installed
+LaunchAgent trial now passes bootstrap, first-use activation, authenticated
+status, shutdown, reactivation within the five-second client bound with a new
+instance, second shutdown, bootout, and exact test-artifact removal. The trial also exposed and
+closed macOS `sockaddr_un` NUL padding and launchd default-throttle defects.
+Other platforms remain open.
 
 ### O1.5 — independent client
 
@@ -120,10 +124,13 @@ audit, platform integrations, and federation keep their own contract gates.
 Core 1.0 may ship while one is unavailable, deferred, negotiating, or stubbed,
 provided the immutable availability snapshot states that condition exactly.
 
-## Current blocker
+## Current release state
 
 The executable `orchestrator release --json` is the authoritative projection.
-All Core-profile requirements except `daemon.discovery` are currently
-satisfied. That final requirement needs the real installed LaunchAgent
-bootstrap, first-use activation, shutdown, reactivation, bootout, and removal
-trial named by ADR-011; simulated listener adoption does not close it.
+Every Core-profile requirement is satisfied and the first macOS artifact
+reports `state: ready` and `ready: true`. GUI.Forms FM0, Engine live search,
+settings, plugins, and semantic facts retain their independent capability gates
+and are not implied by this release.
+
+The final promoted-artifact measurement is recorded in
+[`../conformance/evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md`](../conformance/evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md).

@@ -13,6 +13,11 @@ indefinite eight-run consolidation and same-trigger full-base replacement after
 their measured cumulative write amplification exceeds the gate. None is a
 live-format admission record.
 
+`M1L_LIVE_QUERY_001.md` records the first zero-catalogue live traversal,
+cross-process Orchestrator/C++ route, and 10,000-entry APFS resource control.
+It deliberately leaves the million-entry, NTFS/ext4, distribution, CPU/RSS,
+and installed-transport gates red.
+
 `M2_TIERED_COHORT_COMPACTION_003.md` retains cohort-only tiered compaction after
 22 epochs measure about 2.00x with eight visible runs. It separately rejects
 the current heap overlay at 10,000-change scale and requires disk-indexed query

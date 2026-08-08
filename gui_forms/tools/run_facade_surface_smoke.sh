@@ -44,7 +44,7 @@ GUI_FORMS_FORCE_HEADLESS=1 GUI_FORMS_AUTOMATION_ACTIVATE=1 \
   DYLD_LIBRARY_PATH="$mac_build" \
   dotnet "$smoke_output/GuiForms.FacadeSmoke.dll"
 behavior_host_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-host.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container lifecycle-order; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container property-grid lifecycle-order; do
   GUI_FORMS_FORCE_HEADLESS=1 DYLD_LIBRARY_PATH="$mac_build" \
     dotnet "$behavior_output/GuiForms.FacadeBehaviorSmoke.dll" "$behavior_mode" \
     >>"$behavior_host_log"
@@ -54,10 +54,11 @@ rg -q 'form-semantics=tab:nested\|accept:ordered\|cancel:ordered\|active-control
 rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|cancelled:true\|detached:true\|focus-restored:true\|loads:1\|closed:1' "$behavior_host_log"
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_host_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_host_log"
-rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink' "$behavior_host_log"
+rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink\|dock:zorder' "$behavior_host_log"
 rg -q 'layout-transactions=nested:coalesced\|committed:stable\|args:exact\|reentry:bounded\|resume-false:deferred\|unmatched:no-op\|fault:recoverable' "$behavior_host_log"
-rg -q 'scroll-panel=retained:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_host_log"
+rg -q 'scroll-panel=retained:true\|paint-composed:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_host_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_host_log"
+rg -q 'property-grid=native:true\|multi:true\|clone:true\|sort:true\|selection-events:3\|sort-events:1\|type-descriptor:true\|proxy-schema-clean:true\|dropdown-editor:true\|modal-editor:true\|converted-commit:true\|nullable-commit:true\|reset:true\|atomic-rollback:true\|arbitrary-rejected:true\|retained-after-failure:true\|cleared:true' "$behavior_host_log"
 rg -q 'lifecycle-order=load>input>closing>closed' "$behavior_host_log"
 unlink "$behavior_host_log"
 
@@ -67,9 +68,11 @@ cmake -S "$repo" -B "$windows_build" \
   -DGUI_FORMS_SKIA_PREBUILT=ON \
   -DGUI_FORMS_SKIA_OUT="$repo/third_party/skia/out/gui_forms-cpu-windows-mingw" \
   -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON -DGUI_FORMS_BUILD_TESTS=OFF
-cmake --build "$windows_build" --target gui_forms_c_api gui_drawing_c_api gui_drawing_raster_c_api gui_forms_windows_probe --parallel
+cmake --build "$windows_build" --target gui_forms_c_api gui_drawing_c_api gui_drawing_raster_c_api gui_forms_win32_compat gui_forms_windows_probe --parallel
 cp "$windows_build/gui_forms_abi0.dll" "$smoke_output/"
 cp "$windows_build/gui_forms_abi0.dll" "$behavior_output/"
+cp "$windows_build/gui_forms_win32_compat.dll" "$smoke_output/"
+cp "$windows_build/gui_forms_win32_compat.dll" "$behavior_output/"
 cp "$windows_build/gui_drawing_abi0.dll" "$smoke_output/"
 cp "$windows_build/gui_drawing_abi0.dll" "$behavior_output/"
 cp "$windows_build/gui_drawing_raster0.dll" "$smoke_output/"
@@ -116,7 +119,7 @@ rg -q 'callbacks=click:1\|dispatch:1\|closing:1\|closed:1\|faults:1' "$wine_log"
 unlink "$wine_log"
 
 behavior_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-behavior-wine.XXXXXX")
-for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container lifecycle-order; do
+for behavior_mode in form-semantics secondary-form cursor dock-padding control-geometry layout-transactions scroll-panel split-container property-grid lifecycle-order; do
   (cd "$behavior_output" && GUI_FORMS_FORCE_HEADLESS=1 WINEDEBUG=-all \
     "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
     GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$behavior_wine_log" 2>&1
@@ -126,10 +129,11 @@ rg -q 'form-semantics=tab:nested\|accept:ordered\|cancel:ordered\|active-control
 rg -q 'secondary-form=attached:true\|owned:true\|clamped:true\|reopened:true\|cancelled:true\|detached:true\|focus-restored:true\|loads:1\|closed:1' "$behavior_wine_log"
 rg -q 'cursor=identity:stable\|projection:roundtrip\|inherit:restored' "$behavior_wine_log"
 rg -q 'dock-padding=projection:owned\|fill:inset\|relayout:updated' "$behavior_wine_log"
-rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink' "$behavior_wine_log"
+rg -q 'control-geometry=zorder:coherent\|lookup:filtered\|bounds:masked\|coordinates:roundtrip\|tab-order:nested\|autosize:shrink\|dock:zorder' "$behavior_wine_log"
 rg -q 'layout-transactions=nested:coalesced\|committed:stable\|args:exact\|reentry:bounded\|resume-false:deferred\|unmatched:no-op\|fault:recoverable' "$behavior_wine_log"
-rg -q 'scroll-panel=retained:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_wine_log"
+rg -q 'scroll-panel=retained:true\|paint-composed:true\|step:48\|reached:true\|reverse:true\|into-view:true\|manual-axis:true\|event-args:true\|event-delivery:true' "$behavior_wine_log"
 rg -q 'split-container=geometry:constrained\|drag:live\|collapse:focus-transferred\|orientation:horizontal\|fixed:enforced' "$behavior_wine_log"
+rg -q 'property-grid=native:true\|multi:true\|clone:true\|sort:true\|selection-events:3\|sort-events:1\|type-descriptor:true\|proxy-schema-clean:true\|dropdown-editor:true\|modal-editor:true\|converted-commit:true\|nullable-commit:true\|reset:true\|atomic-rollback:true\|arbitrary-rejected:true\|retained-after-failure:true\|cleared:true' "$behavior_wine_log"
 rg -q 'lifecycle-order=load>input>closing>closed\|handle-created:1\|handle-destroyed:1\|early-close:suppressed' "$behavior_wine_log"
 unlink "$behavior_wine_log"
 
@@ -162,14 +166,16 @@ rg -q 'scroll-panel-live=events:1\|type:SmallIncrement\|orientation:vertical\|po
 unlink "$scroll_live_log"
 
 paint_lease_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-paint-lease-wine.XXXXXX")
-for behavior_mode in native-surface native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage; do
+for behavior_mode in native-surface native-surface-lifecycle native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage theme-inherited-paint; do
   (cd "$behavior_output" && MVK_CONFIG_LOG_LEVEL=0 WINEDEBUG=-all \
     "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
     GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$paint_lease_wine_log" 2>&1
 done
 cat "$paint_lease_wine_log"
 rg -q 'native-surface=hwnd:true\|input:retained-host\|size:96x48\|gdi:true\|present-boundary:true\|coalesced:true\|single-drain:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'native-surface-lifecycle=construction-hdc:retained\|writer:background\|producer:uncoupled\|compositor:continuous\|resize:durable\|hide-show:latest\|occlusion:latest\|echo:none\|reentry:none\|secondary-window:none\|disposed:true' "$paint_lease_wine_log"
 rg -q 'native-surface-fallback=raw-gdi:true\|bounded-probe:true\|single-commit:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'theme-inherited-paint=plugin:true\|callback:atomic\|frame:one\|colors:current\|faults:zero' "$paint_lease_wine_log"
 rg -q 'paint-reentry=recursive:false\|follow-up:one\|callback-boundary:true' "$paint_lease_wine_log"
 rg -q 'paint-input-deferral=order:pointer>key\|during-paint:false\|follow-up:one\|disposed:abandoned\|queue:zero' "$paint_lease_wine_log"
 rg -q 'managed-double-buffer=reflected:true\|phases:shared\|surface:reused\|burst:coalesced\|resize:stale-abandoned\|follow-up:one\|disabled:ephemeral\|fault:no-self-retry' "$paint_lease_wine_log"

@@ -39,7 +39,10 @@ internal static class IlSiteProbe
         }
         var selector = parts.Length == 4 ? parts[3] : null;
         var parameterCount = int.TryParse(selector, out var parsedCount) ? parsedCount : (int?)null;
-        var candidates = parts[2] == ".ctor"
+        var candidates = parts[2] == ".cctor"
+            ? new[] { type.TypeInitializer }.Where(candidate => candidate is not null)!
+                .Cast<MethodBase>()
+            : parts[2] == ".ctor"
             ? type.GetConstructors(flags).Where(candidate => !candidate.IsStatic).Cast<MethodBase>()
             : type.GetMethods(flags).Where(candidate => candidate.Name == parts[2]).Cast<MethodBase>();
         if (parameterCount.HasValue)
@@ -72,6 +75,52 @@ internal static class IlSiteProbe
             var operand = ReadOperand(method, bytes, ref offset, opcode.OperandType);
             Console.WriteLine($"il_{start:x4}={opcode.Name}{(operand.Length == 0 ? string.Empty : "|" + operand)}");
         }
+    }
+
+    internal static void WriteReferences(AssemblyLoadContext context,
+                                         string extractDirectory,
+                                         string specification)
+    {
+        var parts = specification.Split('|')
+            .Select(global::System.Uri.UnescapeDataString).ToArray();
+        if (parts.Length != 3 || parts.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException(
+                "GUI_FORMS_LOAD_PROBE_REFERENCES must be assembly|declaring-type|member.");
+        var path = Path.Combine(extractDirectory, parts[0] + ".dll");
+        var assembly = context.LoadFromAssemblyPath(path);
+        var sought = parts[1] + "." + parts[2];
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static |
+                                   BindingFlags.Public | BindingFlags.NonPublic |
+                                   BindingFlags.DeclaredOnly;
+        var matches = 0;
+        foreach (var type in assembly.GetTypes().OrderBy(value => value.MetadataToken))
+        foreach (var method in type.GetConstructors(flags).Cast<MethodBase>()
+                     .Concat(type.GetMethods(flags)).OrderBy(value => value.MetadataToken))
+        {
+            var bytes = method.GetMethodBody()?.GetILAsByteArray();
+            if (bytes is null) continue;
+            var offset = 0;
+            while (offset < bytes.Length)
+            {
+                var start = offset;
+                ushort value = bytes[offset++];
+                if (value == 0xfe) value = (ushort)(0xfe00 | bytes[offset++]);
+                if (!Opcodes.TryGetValue(value, out var opcode))
+                    throw new BadImageFormatException(
+                        $"Unknown IL opcode 0x{value:x4} at {type.FullName}.{method.Name}+0x{start:x4}.");
+                var operand = ReadOperand(method, bytes, ref offset, opcode.OperandType);
+                if ((opcode == OpCodes.Newobj || opcode == OpCodes.Call || opcode == OpCodes.Callvirt) &&
+                    string.Equals(operand, sought, StringComparison.Ordinal))
+                {
+                    ++matches;
+                    Console.WriteLine("il-reference=" + (type.FullName ?? type.Name) + "." +
+                        FormatMethod(method) + "|offset:il_" + start.ToString("x4") +
+                        "|opcode:" + opcode.Name + "|target:" + operand);
+                }
+            }
+        }
+        Console.WriteLine("il-reference-summary=assembly:" + parts[0] + "|target:" + sought +
+            "|count:" + matches);
     }
 
     private static string ReadOperand(MethodBase method, byte[] bytes, ref int offset,

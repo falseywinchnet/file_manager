@@ -19,7 +19,7 @@ void MaterialPanel::set_material(SurfaceMaterial material) {
     if (material_ == material) return;
     material_ = std::move(material);
     invalidate(invalidation::paint_only);
-    material_changed_.emit(material_);
+    publish_change(material_changed_, material_);
 }
 
 void MaterialPanel::on_attached_to_window() {

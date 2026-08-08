@@ -67,8 +67,8 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[
         id: "orchestrator.discovery.macos_launchd",
         provider: "orchestrator",
         required: true,
-        state: AvailabilityState::Degraded,
-        reason: "macOS launchd adoption, stable default, and restart-safe activation retry are executable; installed LaunchAgent lifecycle evidence remains open",
+        state: AvailabilityState::Available,
+        reason: "the installed macOS LaunchAgent passed first-use activation, authenticated status, graceful shutdown, bounded supervisor reactivation with fresh identity, bootout, and exact artifact removal",
     },
     CapabilityAvailability {
         id: "orchestrator.session.credential_auth",
@@ -116,8 +116,8 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[
         id: "engine.query.catalogue_free_fallback",
         provider: "engine",
         required: true,
-        state: AvailabilityState::Negotiating,
-        reason: "ADR-008 requires ORC-ENG-004; Engine implementation and conformance evidence are in progress",
+        state: AvailabilityState::Degraded,
+        reason: "ORC-ENG-004 is implemented and passes the development JSONL/Rust/C++ zero-catalogue route; installed transport and native NTFS/ext4 promotion evidence remain open",
     },
     CapabilityAvailability {
         id: "engine.background.currentness",
@@ -151,8 +151,8 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[
         id: "frontend.bootstrap",
         provider: "orchestrator",
         required: true,
-        state: AvailabilityState::Degraded,
-        reason: "the atomic ORC-FE-001 snapshot and independent C++ projection are executable; installed launchd lifecycle evidence remains open",
+        state: AvailabilityState::Available,
+        reason: "the live installed macOS Core 1.0 bootstrap edge and independent C++ projection pass the release gate",
     },
     CapabilityAvailability {
         id: "kolmogrov.candidates",

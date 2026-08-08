@@ -63,8 +63,8 @@ fn run_one_daemon_generation(client: &Path, runtime: &Path) -> String {
     assert_command_succeeded("C++ bootstrap probe", &probe);
     let output = String::from_utf8(probe.stdout).expect("UTF-8 C++ probe output");
     assert!(output.contains("component=orchestrator"));
-    assert!(output.contains("release=development"));
-    assert!(output.contains("ready=false"));
+    assert!(output.contains("release=ready"));
+    assert!(output.contains("ready=true"));
     let digest = output
         .split_ascii_whitespace()
         .find_map(|field| field.strip_prefix("digest="))
@@ -88,10 +88,11 @@ fn run_one_daemon_generation(client: &Path, runtime: &Path) -> String {
     assert!(output.contains("route=orchestrator"));
     assert!(output.contains("fallback=deferred"));
     assert!(output.contains("shutdown=eligible"));
+    assert!(output.contains("restart=unavailable"));
     assert!(output.contains("orchestrator-gate=blocked"));
     assert!(output.contains("gui-forms-gate=negotiating"));
-    assert!(output.contains("architect-gate=not_reported"));
-    assert!(output.contains("opening-blockers=2"));
+    assert!(output.contains("architect-gate=recorded"));
+    assert!(output.contains("opening-blockers=1"));
     let instance = output
         .split_ascii_whitespace()
         .find_map(|field| field.strip_prefix("instance="))

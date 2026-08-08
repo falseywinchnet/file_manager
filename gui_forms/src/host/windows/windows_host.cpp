@@ -1,5 +1,6 @@
 #include "windows_host.hpp"
 
+#include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
 
 #include <windows.h>
@@ -11,18 +12,23 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <iomanip>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -35,7 +41,53 @@ constexpr wchar_t window_class_name[] = L"GUIForms.Window.v1";
 constexpr wchar_t tooltip_class_name[] = L"GUIForms.ToolTip.v1";
 constexpr UINT_PTR scheduler_timer = 1;
 constexpr UINT managed_dispatch_message = WM_APP + 0x41U;
+constexpr UINT render_dispatch_message = WM_APP + 0x42U;
 constexpr std::size_t maximum_automation_command = 4096;
+
+struct CompatibilityPaintMetrics final {
+    std::atomic<std::uint64_t> active{};
+    std::atomic<std::uint64_t> requests{};
+    std::atomic<std::uint64_t> commits{};
+    std::atomic<std::uint64_t> coalesced{};
+    std::atomic<std::uint64_t> drops{};
+    std::atomic<std::uint64_t> copy_duration_nanoseconds{};
+    std::atomic<std::uint64_t> worst_copy_duration_nanoseconds{};
+};
+
+CompatibilityPaintMetrics compatibility_paint_metrics;
+
+void record_compatibility_copy_duration(std::uint64_t duration) noexcept {
+    compatibility_paint_metrics.copy_duration_nanoseconds.fetch_add(
+        duration, std::memory_order_relaxed);
+    auto worst = compatibility_paint_metrics.worst_copy_duration_nanoseconds.load(
+        std::memory_order_relaxed);
+    while (duration > worst &&
+           !compatibility_paint_metrics.worst_copy_duration_nanoseconds.
+               compare_exchange_weak(worst, duration,
+                                     std::memory_order_relaxed)) {}
+}
+
+std::string compatibility_paint_metrics_json() {
+    std::ostringstream result;
+    result << "{\"active\":"
+           << compatibility_paint_metrics.active.load(std::memory_order_relaxed)
+           << ",\"requests\":"
+           << compatibility_paint_metrics.requests.load(std::memory_order_relaxed)
+           << ",\"commits\":"
+           << compatibility_paint_metrics.commits.load(std::memory_order_relaxed)
+           << ",\"coalesced\":"
+           << compatibility_paint_metrics.coalesced.load(std::memory_order_relaxed)
+           << ",\"drops\":"
+           << compatibility_paint_metrics.drops.load(std::memory_order_relaxed)
+           << ",\"copy_duration_nanoseconds\":"
+           << compatibility_paint_metrics.copy_duration_nanoseconds.load(
+                  std::memory_order_relaxed)
+           << ",\"worst_copy_duration_nanoseconds\":"
+           << compatibility_paint_metrics.worst_copy_duration_nanoseconds.load(
+                  std::memory_order_relaxed)
+           << '}';
+    return result.str();
+}
 
 bool trace_win32_input() noexcept {
     static const bool enabled = [] {
@@ -343,6 +395,39 @@ LPCWSTR native_cursor_identifier(CursorKind cursor) noexcept {
     return IDC_ARROW;
 }
 
+HCURSOR load_system_cursor(LPCWSTR identifier) noexcept {
+    HCURSOR cursor = LoadCursorW(nullptr, identifier);
+    if (cursor == nullptr && identifier != IDC_ARROW) {
+        cursor = LoadCursorW(nullptr, IDC_ARROW);
+    }
+    if (cursor == nullptr) {
+        cursor = reinterpret_cast<HCURSOR>(LoadImageW(
+            nullptr, IDC_ARROW, IMAGE_CURSOR, 0, 0,
+            LR_DEFAULTSIZE | LR_SHARED));
+    }
+    return cursor;
+}
+
+bool apply_system_cursor(CursorKind kind) noexcept {
+    const LPCWSTR identifier = native_cursor_identifier(kind);
+    HCURSOR cursor = load_system_cursor(identifier);
+    if (cursor == nullptr) return false;
+    HCURSOR previous = SetCursor(cursor);
+    HCURSOR installed = GetCursor();
+    const bool applied = installed != nullptr;
+    if (trace_win32_input()) {
+        std::fprintf(stderr,
+                     "win32-input=cursor|kind:%u|identifier:%p|loaded:%p|"
+                     "previous:%p|installed:%p|applied:%d\n",
+                     static_cast<unsigned>(kind),
+                     static_cast<const void*>(identifier),
+                     static_cast<void*>(cursor), static_cast<void*>(previous),
+                     static_cast<void*>(installed), applied);
+        std::fflush(stderr);
+    }
+    return applied;
+}
+
 double native_monitor_scale(HMONITOR monitor) noexcept {
     using GetDpiForMonitorFn = HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
     static const GetDpiForMonitorFn get_dpi_for_monitor = [] {
@@ -405,8 +490,9 @@ protected:
     }
 
     HostServiceStatus set_cursor_impl(CursorKind cursor) override {
-        SetCursor(LoadCursorW(nullptr, native_cursor_identifier(cursor)));
-        return {};
+        return apply_system_cursor(cursor)
+            ? HostServiceStatus{}
+            : HostServiceStatus{HostServiceError::backend_failure};
     }
 
     HostServiceStatus set_pointer_capture_impl(bool captured,
@@ -706,11 +792,6 @@ public:
         }
         if (&registry != image_registry_) images_.clear();
         IWICImagingFactory* factory{};
-        if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
-                                    CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))) {
-            images_synchronized_ = false;
-            return false;
-        }
         bool synchronized = true;
         std::unordered_set<std::uint64_t> active;
         for (const ImageId id : registry.image_ids()) {
@@ -734,13 +815,30 @@ public:
                     synchronized = false;
                     continue;
                 }
+                if (existing != images_.end() &&
+                    existing->second.width == decoded.width &&
+                    existing->second.height == decoded.height) {
+                    existing->second.content_hash = decoded.content_hash;
+                    std::memcpy(existing->second.pixels.data(),
+                                resource->encoded.data(), expected);
+                    continue;
+                }
                 decoded.pixels.resize(
                     static_cast<std::size_t>(decoded.width) * decoded.height);
                 std::memcpy(decoded.pixels.data(), resource->encoded.data(), expected);
-            } else if (!decode_png(*factory, *resource, decoded)) {
-                images_.erase(id.value);
-                synchronized = false;
-                continue;
+            } else {
+                if (factory == nullptr && FAILED(CoCreateInstance(
+                        CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                        IID_PPV_ARGS(&factory)))) {
+                    images_.erase(id.value);
+                    synchronized = false;
+                    continue;
+                }
+                if (!decode_png(*factory, *resource, decoded)) {
+                    images_.erase(id.value);
+                    synchronized = false;
+                    continue;
+                }
             }
             images_.insert_or_assign(id.value, std::move(decoded));
         }
@@ -748,16 +846,37 @@ public:
             iterator = active.contains(iterator->first) ? std::next(iterator)
                                                         : images_.erase(iterator);
         }
-        factory->Release();
+        if (factory != nullptr) factory->Release();
         image_registry_ = &registry;
         image_revision_ = snapshot.revision;
         images_synchronized_ = synchronized;
         return synchronized;
     }
 
-    [[nodiscard]] bool present(HDC target) const {
+    [[nodiscard]] bool present(HDC target, const RECT& damage) const {
         if (target == nullptr || memory_dc_ == nullptr) return false;
-        return BitBlt(target, 0, 0, width_, height_, memory_dc_, 0, 0, SRCCOPY) != FALSE;
+        const int left = std::clamp<int>(damage.left, 0, width_);
+        const int top = std::clamp<int>(damage.top, 0, height_);
+        const int right = std::clamp<int>(damage.right, left, width_);
+        const int bottom = std::clamp<int>(damage.bottom, top, height_);
+        if (right == left || bottom == top) return true;
+        return BitBlt(target, left, top, right - left, bottom - top,
+                      memory_dc_, left, top, SRCCOPY) != FALSE;
+    }
+
+    [[nodiscard]] bool present_live_surface(
+        HDC target, const LiveSurfacePresentation& presentation) {
+        if (target == nullptr || !presentation.surface ||
+            presentation.destination.empty() || presentation.clip.empty()) {
+            return false;
+        }
+        begin_frame();
+        states_.back().clip = presentation.clip;
+        draw_live_surface(
+            presentation.surface, presentation.destination, 1.0);
+        const PixelRect pixels = pixel_rect(presentation.clip);
+        RECT damage{pixels.left, pixels.top, pixels.right, pixels.bottom};
+        return present(target, damage);
     }
 
     bool save_bmp(std::wstring_view path) const {
@@ -1061,6 +1180,79 @@ public:
             {0.0, 0.0, static_cast<double>(found->second.width),
              static_cast<double>(found->second.height)},
             destination, opacity);
+    }
+
+    void draw_live_surface(std::shared_ptr<LiveSurface> surface,
+                           Rect destination, double opacity) override {
+        const PixelRect area = pixel_rect(destination);
+        if (!surface || area.empty() || destination.empty() ||
+            !destination.finite() ||
+            !std::isfinite(opacity) || opacity <= 0.0 || memory_dc_ == nullptr) {
+            return;
+        }
+        LiveSurfaceFrame frame = surface->acquire_latest();
+        if (!frame || frame.width() == 0U || frame.height() == 0U ||
+            frame.row_bytes() != static_cast<std::uint64_t>(frame.width()) * 4U ||
+            frame.pixels().empty()) {
+            return;
+        }
+        const int saved = SaveDC(memory_dc_);
+        IntersectClipRect(memory_dc_, area.left, area.top, area.right, area.bottom);
+        SetStretchBltMode(memory_dc_, COLORONCOLOR);
+        const int destination_x = logical_x(destination.x);
+        const int destination_y = logical_y(destination.y);
+        const int destination_width = std::max(
+            1, static_cast<int>(std::lround(destination.width * scale_)));
+        const int destination_height = std::max(
+            1, static_cast<int>(std::lround(destination.height * scale_)));
+        if (opacity >= 1.0 &&
+            destination_width == static_cast<int>(frame.width()) &&
+            destination_height == static_cast<int>(frame.height())) {
+            // The retained Win32 surface and compatibility/live producer are
+            // both top-down packed BGRA DIBs. A same-size frame needs no GDI
+            // object construction or resampling; copying only the active clip
+            // keeps high-rate surfaces on the compositor's memory fast path.
+            // This is equivalent to the existing SRCCOPY realization.
+            const int copy_left = std::max(area.left, destination_x);
+            const int copy_top = std::max(area.top, destination_y);
+            const int copy_right = std::min(
+                area.right, destination_x + destination_width);
+            const int copy_bottom = std::min(
+                area.bottom, destination_y + destination_height);
+            if (copy_right > copy_left && copy_bottom > copy_top) {
+                const std::size_t copy_bytes =
+                    static_cast<std::size_t>(copy_right - copy_left) * 4U;
+                const std::size_t source_stride =
+                    static_cast<std::size_t>(frame.row_bytes());
+                const auto* source = frame.pixels().data();
+                for (int y = copy_top; y < copy_bottom; ++y) {
+                    const std::size_t source_y =
+                        static_cast<std::size_t>(y - destination_y);
+                    const std::size_t source_x =
+                        static_cast<std::size_t>(copy_left - destination_x) * 4U;
+                    std::memcpy(
+                        reinterpret_cast<std::byte*>(pixels_) +
+                            (static_cast<std::size_t>(y) * width_ + copy_left) * 4U,
+                        source + source_y * source_stride + source_x,
+                        copy_bytes);
+                }
+            }
+            if (saved != 0) RestoreDC(memory_dc_, saved);
+            return;
+        }
+        BITMAPINFO info{};
+        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = static_cast<LONG>(frame.width());
+        info.bmiHeader.biHeight = -static_cast<LONG>(frame.height());
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        static_cast<void>(StretchDIBits(
+            memory_dc_, destination_x, destination_y,
+            destination_width, destination_height, 0, 0,
+            static_cast<int>(frame.width()), static_cast<int>(frame.height()),
+            frame.pixels().data(), &info, DIB_RGB_COLORS, SRCCOPY));
+        if (saved != 0) RestoreDC(memory_dc_, saved);
     }
 
     void draw_image_region(ImageId image, Rect source_rect, Rect destination,
@@ -1696,9 +1888,7 @@ public:
             }
         });
         model_->set_paint_wake_handler([this] {
-            if (hwnd_ != nullptr) {
-                PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
-            }
+            request_render_wake();
         });
         if (options_.host_ready) {
             options_.host_ready(
@@ -1773,11 +1963,45 @@ public:
                 std::fflush(stderr);
             }
             break;
-        case WM_PAINT: paint(); return 0;
+        case WM_SETCURSOR:
+            if (LOWORD(lparam) == HTCLIENT) {
+                POINT point{};
+                bool applied = false;
+                if (GetCursorPos(&point) && ScreenToClient(hwnd_, &point)) {
+                    applied = update_cursor({point.x / scale_, point.y / scale_});
+                } else {
+                    applied = apply_system_cursor(CursorKind::arrow);
+                }
+                // Only consume WM_SETCURSOR after installing a valid cursor.
+                // Returning TRUE after SetCursor(nullptr) leaves the cursor
+                // hidden and prevents DefWindowProc from restoring hCursor.
+                if (applied) return TRUE;
+            }
+            break;
+        case WM_PAINT:
+            // A render wake remains coalesced until the host actually begins
+            // the paint transaction. Releasing it here allows content that
+            // changes during this frame to request one later frame without
+            // turning the posted wake itself into a synchronous paint loop.
+            render_dispatch_pending_ = false;
+            presentation_pending_ = false;
+            paint();
+            return 0;
         case managed_dispatch_message:
             static_cast<void>(model_->drain_posted_work());
             if (options_.dispatch_pending) options_.dispatch_pending();
-            collect_damage(); return 0;
+            collect_damage();
+            return 0;
+        case render_dispatch_message:
+            // Gather damage in this asynchronous turn, but let the outer host
+            // loop drain its bounded message batch before presenting. A
+            // continuously animated surface must not monopolize the posted-
+            // message lane ahead of pointer and keyboard input.
+            render_dispatch_pending_ = false;
+            collect_damage();
+            presentation_pending_ =
+                GetUpdateRect(hwnd_, nullptr, FALSE) != FALSE;
+            return 0;
         case WM_TIMER:
             if (wparam == scheduler_timer) {
                 KillTimer(hwnd_, scheduler_timer);
@@ -1839,7 +2063,18 @@ public:
     std::string metrics_json() const { return model_->metrics_snapshot().to_json(); }
     std::string host_json() const {
         return "{\"session\":" + session_.snapshot().to_json() +
-               ",\"services\":" + services_.snapshot().to_json() + "}";
+               ",\"services\":" + services_.snapshot().to_json() +
+               ",\"compatibility_surfaces\":" +
+               compatibility_paint_metrics_json() + "}";
+    }
+
+    void present_pending_frame() {
+        if (hwnd_ == nullptr) return;
+        if (presentation_pending_) {
+            presentation_pending_ = false;
+            if (GetUpdateRect(hwnd_, nullptr, FALSE) != FALSE) paint();
+        }
+        present_live_surface_updates();
     }
 
 private:
@@ -1884,7 +2119,7 @@ private:
         native_class.cbSize = sizeof(native_class);
         native_class.lpfnWndProc = tooltip_window_procedure;
         native_class.hInstance = GetModuleHandleW(nullptr);
-        native_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+        native_class.hCursor = load_system_cursor(IDC_ARROW);
         native_class.lpszClassName = tooltip_class_name;
         if (RegisterClassExW(&native_class) == 0 &&
             GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
@@ -2030,8 +2265,25 @@ private:
         static_cast<void>(model_->poll_frame_schedule(FrameClock::now()));
         DamageRegion damage = model_->take_damage();
         if (!damage.empty()) {
-            pending_damage_.add(damage.bounds());
-            InvalidateRect(hwnd_, nullptr, FALSE);
+            const Rect bounds = damage.bounds();
+            pending_damage_.add(bounds);
+            RECT client{};
+            GetClientRect(hwnd_, &client);
+            RECT native_damage{
+                std::clamp<LONG>(static_cast<LONG>(std::floor(bounds.x * scale_)),
+                                 client.left, client.right),
+                std::clamp<LONG>(static_cast<LONG>(std::floor(bounds.y * scale_)),
+                                 client.top, client.bottom),
+                std::clamp<LONG>(static_cast<LONG>(std::ceil(
+                                     (bounds.x + bounds.width) * scale_)),
+                                 client.left, client.right),
+                std::clamp<LONG>(static_cast<LONG>(std::ceil(
+                                     (bounds.y + bounds.height) * scale_)),
+                                 client.top, client.bottom)};
+            if (native_damage.right > native_damage.left &&
+                native_damage.bottom > native_damage.top) {
+                InvalidateRect(hwnd_, &native_damage, FALSE);
+            }
         }
         KillTimer(hwnd_, scheduler_timer);
         if (const auto wake = model_->next_wake()) {
@@ -2040,6 +2292,27 @@ private:
             SetTimer(hwnd_, scheduler_timer,
                      static_cast<UINT>(std::clamp<std::int64_t>(milliseconds, 1, 60'000)), nullptr);
         }
+    }
+
+    void request_render_wake() noexcept {
+        if (hwnd_ == nullptr || render_dispatch_pending_ ||
+            presentation_pending_) return;
+        render_dispatch_pending_ = true;
+        if (!PostMessageW(hwnd_, render_dispatch_message, 0, 0)) {
+            render_dispatch_pending_ = false;
+        }
+    }
+
+    void present_live_surface_updates() {
+        std::vector<LiveSurfacePresentation> updates =
+            model_->take_live_surface_presentations();
+        if (updates.empty() || hwnd_ == nullptr) return;
+        HDC target = GetDC(hwnd_);
+        if (target == nullptr) return;
+        for (const auto& update : updates) {
+            static_cast<void>(raster_.present_live_surface(target, update));
+        }
+        ReleaseDC(hwnd_, target);
     }
 
     void paint() {
@@ -2055,7 +2328,7 @@ private:
         static_cast<void>(raster_.synchronize_images(model_->image_resources()));
         const std::optional<PaintReceipt> receipt =
             model_->paint(raster_, pending_damage_.bounds());
-        const bool presented = receipt && raster_.present(dc);
+        const bool presented = receipt && raster_.present(dc, paint_state.rcPaint);
         EndPaint(hwnd_, &paint_state);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - started);
@@ -2093,7 +2366,6 @@ private:
         }
         dispatch(std::move(event));
         synchronize_capture();
-        update_cursor(client_point(lparam));
         collect_damage();
     }
 
@@ -2143,21 +2415,14 @@ private:
         if (!requested && GetCapture() == hwnd_) ReleaseCapture();
     }
 
-    void update_cursor(Point position) const {
+    bool update_cursor(Point position) const {
         const auto target = model_->hit_test(position);
         const CursorKind cursor = target ? target->effective_cursor() : CursorKind::arrow;
-        LPCWSTR identifier = IDC_ARROW;
-        switch (cursor) {
-        case CursorKind::text: identifier = IDC_IBEAM; break;
-        case CursorKind::hand: identifier = IDC_HAND; break;
-        case CursorKind::crosshair: identifier = IDC_CROSS; break;
-        case CursorKind::resize_horizontal: identifier = IDC_SIZEWE; break;
-        case CursorKind::resize_vertical: identifier = IDC_SIZENS; break;
-        case CursorKind::wait: identifier = IDC_WAIT; break;
-        case CursorKind::forbidden: identifier = IDC_NO; break;
-        case CursorKind::arrow: break;
-        }
-        SetCursor(LoadCursorW(nullptr, identifier));
+        // The class cursor is authoritative for the ordinary pointer. Let
+        // DefWindowProc complete WM_SETCURSOR for that case instead of writing
+        // process-global cursor state again from every WM_MOUSEMOVE turn.
+        if (cursor == CursorKind::arrow) return false;
+        return apply_system_cursor(cursor);
     }
 
     void minimum_size(MINMAXINFO* info) const {
@@ -2512,6 +2777,8 @@ private:
     std::uint64_t next_sequence_{1};
     std::uint64_t native_callback_faults_{};
     wchar_t pending_high_surrogate_{};
+    bool render_dispatch_pending_{};
+    bool presentation_pending_{};
     bool closed_{};
     NativePhase native_phase_{NativePhase::creating};
     std::vector<std::wstring> private_font_paths_;
@@ -2531,6 +2798,441 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
 }
 
 } // namespace
+
+struct WindowsCompatibilityPaintEndpoint::Implementation final {
+    ~Implementation() { release(); }
+
+    static std::uintptr_t allocate_compatibility_handle() noexcept {
+        static std::atomic<std::uint64_t> next{1U};
+        for (std::size_t attempt = 0; attempt < 1024U; ++attempt) {
+            const std::uint64_t sequence =
+                next.fetch_add(1U, std::memory_order_relaxed);
+            std::uintptr_t candidate{};
+            if constexpr (sizeof(std::uintptr_t) >= sizeof(std::uint64_t)) {
+                candidate = static_cast<std::uintptr_t>(
+                    0x47460000e7000000ULL |
+                    ((sequence & 0x000000ffff000000ULL) << 16U) |
+                    (sequence & 0x0000000000ffffffULL));
+            } else {
+                candidate = static_cast<std::uintptr_t>(
+                    0xe7000000UL | (sequence & 0x00ffffffUL));
+            }
+            // Wine treats many HWND operations as 32-bit USER-handle lookups,
+            // so a high 64-bit tag alone is insufficient. Reject any candidate
+            // the active host happens to recognize as a native window.
+            if (candidate != 0U &&
+                IsWindow(reinterpret_cast<HWND>(candidate)) == FALSE) {
+                return candidate;
+            }
+        }
+        return 0U;
+    }
+
+    bool create(std::uint32_t requested_width,
+                std::uint32_t requested_height) noexcept {
+        owner_thread = GetCurrentThreadId();
+        width = std::max<std::uint32_t>(1U, requested_width);
+        height = std::max<std::uint32_t>(1U, requested_height);
+        surface = LiveSurface::create({width, height});
+        if (!surface || !create_backing(width, height)) return false;
+        compatibility_handle = allocate_compatibility_handle();
+        if (compatibility_handle == 0U) return false;
+        try {
+            publisher_thread = std::thread([this] { publisher_loop(); });
+        } catch (...) {
+            return false;
+        }
+        metrics_registered = true;
+        compatibility_paint_metrics.active.fetch_add(
+            1U, std::memory_order_relaxed);
+        return true;
+    }
+
+    bool create_backing(std::uint32_t requested_width,
+                        std::uint32_t requested_height) noexcept {
+        if (memory_dc == nullptr) memory_dc = CreateCompatibleDC(nullptr);
+        if (memory_dc == nullptr) return false;
+        BITMAPINFO info{};
+        info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth = static_cast<LONG>(requested_width);
+        info.bmiHeader.biHeight = -static_cast<LONG>(requested_height);
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        void* next_pixels{};
+        HBITMAP next_bitmap = CreateDIBSection(
+            memory_dc, &info, DIB_RGB_COLORS, &next_pixels, nullptr, 0);
+        if (next_bitmap == nullptr || next_pixels == nullptr) return false;
+        HGDIOBJ replaced = SelectObject(memory_dc, next_bitmap);
+        if (replaced == nullptr || replaced == HGDI_ERROR) {
+            DeleteObject(next_bitmap);
+            return false;
+        }
+        if (bitmap != nullptr) DeleteObject(bitmap);
+        else stock_bitmap = replaced;
+        bitmap = next_bitmap;
+        pixels = static_cast<std::uint32_t*>(next_pixels);
+        std::memset(pixels, 0,
+                    static_cast<std::size_t>(requested_width) *
+                        requested_height * 4U);
+        return true;
+    }
+
+    bool configure(std::uint32_t requested_width,
+                   std::uint32_t requested_height) noexcept {
+        if (GetCurrentThreadId() != owner_thread) return false;
+        const auto next_width = std::max<std::uint32_t>(1U, requested_width);
+        const auto next_height = std::max<std::uint32_t>(1U, requested_height);
+        std::scoped_lock lock(state_mutex);
+        if (released || compatibility_handle == 0U) return false;
+        if (width == next_width && height == next_height) return true;
+        if (!surface->reconfigure({next_width, next_height}) ||
+            !create_backing(next_width, next_height)) {
+            return false;
+        }
+        width = next_width;
+        height = next_height;
+        ++epoch;
+        return true;
+    }
+
+    bool publish_locked() noexcept {
+        if (released || pixels == nullptr || !surface) return false;
+        const auto started = std::chrono::steady_clock::now();
+        auto lease = surface->try_acquire_write(false);
+        if (!lease) return false;
+        std::span<std::byte> destination = lease.pixels();
+        if (destination.size() !=
+            static_cast<std::size_t>(width) * height * 4U) return false;
+        const auto* source = reinterpret_cast<const std::byte*>(pixels);
+        std::memcpy(destination.data(), source, destination.size());
+        // Conventional GDI drawing does not preserve the alpha byte. The
+        // endpoint is an opaque WinForms Control surface, so publish opaque
+        // premultiplied pixels into the retained compositor contract.
+        for (std::size_t index = 3; index < destination.size(); index += 4U) {
+            destination[index] = std::byte{0xff};
+        }
+        const bool result = lease.publish() != 0U;
+        record_compatibility_copy_duration(
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - started).count()));
+        return result;
+    }
+
+    bool request_publish_locked(bool explicit_boundary = false) noexcept {
+        if (released || pixels == nullptr || !surface) return false;
+        ++content_revision;
+        ++publish_requests;
+        compatibility_paint_metrics.requests.fetch_add(
+            1U, std::memory_order_relaxed);
+        if (explicit_boundary) explicit_present = true;
+        if (publish_requested) {
+            ++publish_coalesced;
+            compatibility_paint_metrics.coalesced.fetch_add(
+                1U, std::memory_order_relaxed);
+        }
+        publish_requested = true;
+        publish_wake.notify_one();
+        return true;
+    }
+
+    void publisher_loop() noexcept {
+        std::unique_lock lock(state_mutex);
+        for (;;) {
+            publish_wake.wait(lock, [this] {
+                return publisher_stop || publish_requested;
+            });
+            if (publisher_stop) return;
+
+            const std::uint64_t requested_revision = content_revision;
+            publish_requested = false;
+            if (publish_locked()) {
+                published_revision = requested_revision;
+                ++publish_commits;
+                compatibility_paint_metrics.commits.fetch_add(
+                    1U, std::memory_order_relaxed);
+            } else {
+                ++publish_drops;
+                compatibility_paint_metrics.drops.fetch_add(
+                    1U, std::memory_order_relaxed);
+            }
+        }
+    }
+
+    bool drain() noexcept {
+        std::scoped_lock lock(state_mutex);
+        if (released) return false;
+        publish_requested = false;
+        const bool result = publish_locked();
+        if (result) {
+            published_revision = content_revision;
+            ++publish_commits;
+            compatibility_paint_metrics.commits.fetch_add(
+                1U, std::memory_order_relaxed);
+        } else {
+            ++publish_drops;
+            compatibility_paint_metrics.drops.fetch_add(
+                1U, std::memory_order_relaxed);
+        }
+        return result;
+    }
+
+    bool begin_write(std::uintptr_t requested_dc) noexcept {
+        if (requested_dc == 0U) return false;
+        state_mutex.lock();
+        if (released || memory_dc == nullptr ||
+            requested_dc != reinterpret_cast<std::uintptr_t>(memory_dc)) {
+            state_mutex.unlock();
+            return false;
+        }
+        write_thread = GetCurrentThreadId();
+        write_active = true;
+        return true;
+    }
+
+    bool end_write(std::uintptr_t requested_dc, bool should_publish) noexcept {
+        // begin_write and end_write are one synchronous shim call on the same
+        // thread. Do not attempt to acquire state_mutex here: this thread owns
+        // it until the destination GDI operation and publication are complete.
+        if (!write_active || write_thread != GetCurrentThreadId() ||
+            requested_dc != reinterpret_cast<std::uintptr_t>(memory_dc)) {
+            return false;
+        }
+        const bool result = !should_publish || request_publish_locked();
+        write_active = false;
+        write_thread = 0;
+        state_mutex.unlock();
+        return result;
+    }
+
+    bool submit(std::uint32_t submitted_width,
+                std::uint32_t submitted_height,
+                std::uint64_t submitted_row_bytes,
+                std::span<const std::byte> submitted) noexcept {
+        if (submitted_width == 0U || submitted_height == 0U ||
+            submitted_row_bytes < static_cast<std::uint64_t>(submitted_width) * 4U ||
+            submitted.size() < submitted_row_bytes * submitted_height) {
+            return false;
+        }
+        std::scoped_lock lock(state_mutex);
+        if (released || pixels == nullptr || submitted_width != width ||
+            submitted_height != height) return false;
+        auto lease = surface->try_acquire_write(false);
+        if (!lease) return false;
+        const std::size_t packed_row = static_cast<std::size_t>(width) * 4U;
+        for (std::uint32_t row = 0; row < height; ++row) {
+            std::memcpy(reinterpret_cast<std::byte*>(pixels) + row * packed_row,
+                        submitted.data() + row * submitted_row_bytes, packed_row);
+            std::memcpy(lease.pixels().data() + row * packed_row,
+                        submitted.data() + row * submitted_row_bytes, packed_row);
+        }
+        ++content_revision;
+        ++publish_requests;
+        compatibility_paint_metrics.requests.fetch_add(
+            1U, std::memory_order_relaxed);
+        explicit_present = true;
+        const bool result = lease.publish() != 0U;
+        if (result) {
+            published_revision = content_revision;
+            ++publish_commits;
+            compatibility_paint_metrics.commits.fetch_add(
+                1U, std::memory_order_relaxed);
+        } else {
+            ++publish_drops;
+            compatibility_paint_metrics.drops.fetch_add(
+                1U, std::memory_order_relaxed);
+        }
+        return result;
+    }
+
+    std::string snapshot() const {
+        std::scoped_lock lock(state_mutex);
+        const char* state = released || compatibility_handle == 0U
+            ? "retired" : "live";
+        std::ostringstream result;
+        result << "state:" << state
+               << "|content:" << content_revision
+               << "|published:" << published_revision
+               << "|publish-requests:" << publish_requests
+               << "|publish-commits:" << publish_commits
+               << "|publish-coalesced:" << publish_coalesced
+               << "|publish-drops:" << publish_drops
+               << "|epoch:" << epoch
+               << "|size:" << width << 'x' << height
+               << "|transport:virtual-handle-memory-dc"
+               << "|explicit:" << (explicit_present ? 1 : 0);
+        return result.str();
+    }
+
+    void release() noexcept {
+        {
+            std::scoped_lock lock(state_mutex);
+            if (released) return;
+            released = true;
+            compatibility_handle = 0U;
+            publisher_stop = true;
+            publish_wake.notify_all();
+        }
+        if (publisher_thread.joinable() &&
+            publisher_thread.get_id() != std::this_thread::get_id()) {
+            publisher_thread.join();
+        }
+        std::scoped_lock lock(state_mutex);
+        if (metrics_registered) {
+            metrics_registered = false;
+            compatibility_paint_metrics.active.fetch_sub(
+                1U, std::memory_order_relaxed);
+        }
+        if (memory_dc != nullptr && stock_bitmap != nullptr) {
+            SelectObject(memory_dc, stock_bitmap);
+        }
+        if (bitmap != nullptr) DeleteObject(bitmap);
+        if (memory_dc != nullptr) DeleteDC(memory_dc);
+        bitmap = nullptr;
+        memory_dc = nullptr;
+        stock_bitmap = nullptr;
+        pixels = nullptr;
+        surface.reset();
+    }
+
+    mutable std::mutex state_mutex;
+    std::condition_variable publish_wake;
+    std::thread publisher_thread;
+    std::uintptr_t compatibility_handle{};
+    HDC memory_dc{};
+    HBITMAP bitmap{};
+    HGDIOBJ stock_bitmap{};
+    std::uint32_t* pixels{};
+    std::shared_ptr<LiveSurface> surface;
+    DWORD owner_thread{};
+    std::uint32_t width{1};
+    std::uint32_t height{1};
+    std::uint64_t epoch{1};
+    std::uint64_t content_revision{};
+    std::uint64_t published_revision{};
+    std::uint64_t publish_requests{};
+    std::uint64_t publish_commits{};
+    std::uint64_t publish_coalesced{};
+    std::uint64_t publish_drops{};
+    bool explicit_present{};
+    bool publish_requested{};
+    bool publisher_stop{};
+    bool metrics_registered{};
+    bool released{};
+    bool write_active{};
+    DWORD write_thread{};
+};
+
+WindowsCompatibilityPaintEndpoint::WindowsCompatibilityPaintEndpoint(
+    std::unique_ptr<Implementation> implementation) noexcept
+    : implementation_(std::move(implementation)) {}
+
+WindowsCompatibilityPaintEndpoint::~WindowsCompatibilityPaintEndpoint() {
+    release();
+}
+
+std::shared_ptr<WindowsCompatibilityPaintEndpoint>
+WindowsCompatibilityPaintEndpoint::acquire(
+    std::uint32_t width, std::uint32_t height) {
+    auto implementation = std::make_unique<Implementation>();
+    if (!implementation->create(width, height)) return {};
+    return std::shared_ptr<WindowsCompatibilityPaintEndpoint>(
+        new WindowsCompatibilityPaintEndpoint(std::move(implementation)));
+}
+
+std::uintptr_t WindowsCompatibilityPaintEndpoint::compatibility_handle() const noexcept {
+    if (!implementation_) return 0;
+    std::scoped_lock lock(implementation_->state_mutex);
+    return implementation_->compatibility_handle;
+}
+
+std::uintptr_t WindowsCompatibilityPaintEndpoint::device_context() const noexcept {
+    if (!implementation_) return 0;
+    std::scoped_lock lock(implementation_->state_mutex);
+    return reinterpret_cast<std::uintptr_t>(implementation_->memory_dc);
+}
+
+std::shared_ptr<LiveSurface>
+WindowsCompatibilityPaintEndpoint::live_surface() const noexcept {
+    if (!implementation_) return {};
+    std::scoped_lock lock(implementation_->state_mutex);
+    return implementation_->surface;
+}
+
+bool WindowsCompatibilityPaintEndpoint::publish_device_context(
+    std::uintptr_t device_context) noexcept {
+    if (!implementation_ || device_context == 0U) return false;
+    std::scoped_lock lock(implementation_->state_mutex);
+    if (device_context !=
+        reinterpret_cast<std::uintptr_t>(implementation_->memory_dc)) {
+        return false;
+    }
+    implementation_->explicit_present = true;
+    ++implementation_->content_revision;
+    ++implementation_->publish_requests;
+    compatibility_paint_metrics.requests.fetch_add(
+        1U, std::memory_order_relaxed);
+    implementation_->publish_requested = false;
+    const bool result = implementation_->publish_locked();
+    if (result) {
+        implementation_->published_revision =
+            implementation_->content_revision;
+        ++implementation_->publish_commits;
+        compatibility_paint_metrics.commits.fetch_add(
+            1U, std::memory_order_relaxed);
+    } else {
+        ++implementation_->publish_drops;
+        compatibility_paint_metrics.drops.fetch_add(
+            1U, std::memory_order_relaxed);
+    }
+    return result;
+}
+
+bool WindowsCompatibilityPaintEndpoint::begin_device_context_write(
+    std::uintptr_t device_context) noexcept {
+    return implementation_ && implementation_->begin_write(device_context);
+}
+
+bool WindowsCompatibilityPaintEndpoint::end_device_context_write(
+    std::uintptr_t device_context, bool publish) noexcept {
+    return implementation_ &&
+        implementation_->end_write(device_context, publish);
+}
+
+bool WindowsCompatibilityPaintEndpoint::configure(
+    std::uint32_t width, std::uint32_t height) noexcept {
+    return implementation_ && implementation_->configure(width, height);
+}
+
+bool WindowsCompatibilityPaintEndpoint::submit_bgra32_premultiplied(
+    std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
+    std::span<const std::byte> pixels) noexcept {
+    return implementation_ && implementation_->submit(
+        width, height, row_bytes, pixels);
+}
+
+void WindowsCompatibilityPaintEndpoint::touch(bool explicit_boundary) noexcept {
+    if (implementation_) {
+        std::scoped_lock lock(implementation_->state_mutex);
+        static_cast<void>(
+            implementation_->request_publish_locked(explicit_boundary));
+    }
+}
+
+bool WindowsCompatibilityPaintEndpoint::drain_now() noexcept {
+    if (!implementation_ ||
+        GetCurrentThreadId() != implementation_->owner_thread) return false;
+    return implementation_->drain();
+}
+
+std::string WindowsCompatibilityPaintEndpoint::snapshot() const {
+    return implementation_ ? implementation_->snapshot() : "state:retired";
+}
+
+void WindowsCompatibilityPaintEndpoint::release() noexcept {
+    if (implementation_) implementation_->release();
+}
 
 HostCapabilities windows_capabilities() {
     return {HostCapabilities::current_protocol_version,
@@ -2559,7 +3261,7 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     native_class.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     native_class.lpfnWndProc = window_procedure;
     native_class.hInstance = instance;
-    native_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    native_class.hCursor = load_system_cursor(IDC_ARROW);
     native_class.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
     native_class.hbrBackground = nullptr;
     native_class.lpszClassName = window_class_name;
@@ -2603,9 +3305,32 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     }
 
     MSG message{};
-    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+    bool quit{};
+    while (!quit) {
+        const BOOL received = GetMessageW(&message, nullptr, 0, 0);
+        if (received <= 0) break;
         TranslateMessage(&message);
         DispatchMessageW(&message);
+
+        // Drain a bounded batch before presentation. This gives already queued
+        // input and control work priority while still guaranteeing one newest-
+        // frame presentation under a continuous message stream.
+        for (std::size_t drained = 1U; drained < 256U; ++drained) {
+            MSG pending{};
+            if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
+            if (pending.message == WM_QUIT) {
+                message = pending;
+                quit = true;
+                break;
+            }
+            TranslateMessage(&pending);
+            DispatchMessageW(&pending);
+            if (!options.quit_thread_on_close && !IsWindow(window)) {
+                quit = true;
+                break;
+            }
+        }
+        if (!quit && IsWindow(window)) state.present_pending_frame();
         if (!options.quit_thread_on_close && !IsWindow(window)) break;
     }
     const std::string metrics = state.metrics_json();
@@ -2645,7 +3370,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     native_class.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     native_class.lpfnWndProc = window_procedure;
     native_class.hInstance = instance;
-    native_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    native_class.hCursor = load_system_cursor(IDC_ARROW);
     native_class.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
     native_class.hbrBackground = nullptr;
     native_class.lpszClassName = window_class_name;
@@ -2734,9 +3459,26 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     }
 
     MSG message{};
-    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+    bool quit{};
+    while (!quit) {
+        const BOOL received = GetMessageW(&message, nullptr, 0, 0);
+        if (received <= 0) break;
         TranslateMessage(&message);
         DispatchMessageW(&message);
+        for (std::size_t drained = 1U; drained < 256U; ++drained) {
+            MSG pending{};
+            if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
+            if (pending.message == WM_QUIT) {
+                message = pending;
+                quit = true;
+                break;
+            }
+            TranslateMessage(&pending);
+            DispatchMessageW(&pending);
+        }
+        if (!quit) {
+            for (const auto& state : states) state->present_pending_frame();
+        }
     }
     for (HWND window : handles) if (IsWindow(window)) DestroyWindow(window);
     for (std::size_t index = 0; index < windows.size(); ++index) {

@@ -996,6 +996,74 @@ gd_result api_bitmap_unlock(gd_handle handle, std::uint64_t token) {
         });
 }
 
+gd_result api_bitmap_edit_begin(gd_handle handle, gd_rect_i bounds,
+                                gd_bitmap_edit_view* view) {
+    if (view == nullptr) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "bounded bitmap edit requires a view output");
+    }
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [=](gui_drawing::Bitmap& bitmap) {
+            const auto native = bitmap.begin_edit(
+                {bounds.x, bounds.y, bounds.width, bounds.height});
+            *view = {native.data, native.writable_data, native.row_bytes,
+                     {native.bounds.x, native.bounds.y, native.bounds.width,
+                      native.bounds.height},
+                     static_cast<std::uint32_t>(native.pixel_format),
+                     native.token};
+            return GD_OK;
+        });
+}
+
+gd_result api_bitmap_edit_commit(gd_handle handle, std::uint64_t token,
+                                 std::uint64_t* generation) {
+    if (generation == nullptr) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "bounded bitmap commit requires a generation output");
+    }
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [=](gui_drawing::Bitmap& bitmap) {
+            *generation = bitmap.commit_edit(token);
+            return GD_OK;
+        });
+}
+
+gd_result api_bitmap_edit_cancel(gd_handle handle, std::uint64_t token) {
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [=](gui_drawing::Bitmap& bitmap) {
+            bitmap.cancel_edit(token);
+            return GD_OK;
+        });
+}
+
+gd_result api_bitmap_changes_since(gd_handle handle, std::uint64_t generation,
+                                   gd_rect_i* rectangles,
+                                   std::uint64_t capacity,
+                                   std::uint64_t* required_count,
+                                   gd_bitmap_damage_summary* summary) {
+    if (required_count == nullptr || summary == nullptr) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "bitmap damage query requires count and summary outputs");
+    }
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [=](gui_drawing::Bitmap& bitmap) {
+            const auto damage = bitmap.changes_since(generation);
+            *required_count = damage.rectangles.size();
+            *summary = {damage.from_generation, damage.to_generation,
+                        damage.history_complete ? 1U : 0U};
+            if (capacity < damage.rectangles.size() ||
+                (!damage.rectangles.empty() && rectangles == nullptr)) {
+                return fail(GD_ERROR_BUFFER_TOO_SMALL,
+                            "bitmap damage buffer is smaller than the required count");
+            }
+            for (std::size_t index = 0; index < damage.rectangles.size(); ++index) {
+                const auto& rect = damage.rectangles[index];
+                rectangles[index] = {rect.x, rect.y, rect.width, rect.height};
+            }
+            return GD_OK;
+        });
+}
+
 gd_result api_bitmap_clone(gd_handle handle, gd_rect_i source,
                            gd_handle* output) {
     if (output == nullptr) {
@@ -1616,6 +1684,41 @@ gd_result api_native_surface_present(std::uintptr_t destination,
         });
 }
 
+gd_result api_native_surface_refresh(std::uintptr_t source, std::uint32_t kind,
+                                     gd_handle handle, gd_rect* refreshed_bounds) {
+    if (source == 0U || refreshed_bounds == nullptr ||
+        kind > GD_NATIVE_SURFACE_HWND) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "native surface refresh requires a handle, kind, and bounds output");
+    }
+    *refreshed_bounds = {};
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [&](gui_drawing::Bitmap& bitmap) {
+            gui_drawing::RectF bounds;
+            const gd_result result = gui_drawing::abi::platform::refresh_surface(
+                source, kind, bitmap, bounds);
+            if (result != GD_OK) {
+                return fail(result, "native surface refresh is unavailable");
+            }
+            *refreshed_bounds = {bounds.x, bounds.y, bounds.width, bounds.height};
+            return GD_OK;
+        });
+}
+
+gd_result api_native_surface_publish_retained(std::uintptr_t destination,
+                                              std::uint32_t kind,
+                                              gd_handle handle) {
+    if (destination == 0U || kind > GD_NATIVE_SURFACE_HWND) {
+        return fail(GD_ERROR_INVALID_ARGUMENT,
+                    "retained surface publication requires a handle and kind");
+    }
+    return registry().with<gui_drawing::Bitmap>(
+        handle, GD_OBJECT_BITMAP, [&](gui_drawing::Bitmap& bitmap) {
+            return gui_drawing::abi::platform::publish_retained_surface(
+                destination, kind, bitmap);
+        });
+}
+
 gd_result api_bitmap_acquire_hdc(gd_handle handle, std::uintptr_t* output,
                                  std::uint64_t* lease_token) {
     if (output == nullptr || lease_token == nullptr) {
@@ -1659,7 +1762,7 @@ gd_result api_bitmap_release_hdc(gd_handle handle, std::uint64_t lease_token) {
 }
 
 const gd_api_v0 api_table{
-    sizeof(gd_api_v0), GD_ABI_VERSION_0_1,
+    sizeof(gd_api_v0), GD_ABI_VERSION_0_2,
     &api_last_error, &api_retain, &api_release, &api_dispose,
     &api_object_state, &api_object_kind,
     &api_solid_brush_create, &api_pen_create, &api_pen_set_width,
@@ -1713,6 +1816,10 @@ const gd_api_v0 api_table{
     &api_bitmap_acquire_hdc, &api_bitmap_release_hdc,
     &api_measure_string,
     &api_recorder_execute_from,
+    &api_bitmap_edit_begin, &api_bitmap_edit_commit,
+    &api_bitmap_edit_cancel, &api_bitmap_changes_since,
+    &api_native_surface_refresh,
+    &api_native_surface_publish_retained,
 };
 
 } // namespace
@@ -1723,14 +1830,17 @@ extern "C" GD_C_API_EXPORT gd_result gd_get_api_v0(
         return fail(GD_ERROR_INVALID_ARGUMENT,
                     "drawing ABI negotiation requires a size-prefixed table");
     }
-    if (requested_version != GD_ABI_VERSION_0_1) {
+    if (requested_version != GD_ABI_VERSION_0_1 &&
+        requested_version != GD_ABI_VERSION_0_2) {
         return fail(GD_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Drawing ABI version is unsupported");
     }
     const std::uint32_t caller_size = table->struct_size;
-    const std::size_t copied = std::min<std::size_t>(caller_size, sizeof(api_table));
+    const std::size_t available = requested_version == GD_ABI_VERSION_0_1
+        ? offsetof(gd_api_v0, bitmap_edit_begin) : sizeof(api_table);
+    const std::size_t copied = std::min<std::size_t>(caller_size, available);
     std::memcpy(table, &api_table, copied);
-    table->struct_size = sizeof(api_table);
-    table->abi_version = GD_ABI_VERSION_0_1;
+    table->struct_size = static_cast<std::uint32_t>(available);
+    table->abi_version = requested_version;
     return GD_OK;
 }

@@ -5,11 +5,14 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
 
 namespace gui_forms {
+
+class LiveSurface;
 
 struct Point {
     double x{};
@@ -150,6 +153,11 @@ enum class ImagePatternWrap : std::uint8_t {
     tile,
 };
 
+enum class ImageSampling : std::uint8_t {
+    nearest,
+    linear,
+};
+
 class Painter {
 public:
     virtual ~Painter() = default;
@@ -203,6 +211,12 @@ public:
     virtual void draw_image(ImageId image,
                             Rect destination,
                             double opacity = 1.0) = 0;
+    // A live raster is a retained renderer-neutral resource whose producer may
+    // publish independently of the UI dispatcher. Display lists retain the
+    // resource and terminal renderers sample only its newest complete frame.
+    virtual void draw_live_surface(std::shared_ptr<LiveSurface> surface,
+                                   Rect destination,
+                                   double opacity = 1.0);
     // Source-region replay is the renderer-neutral primitive behind image
     // strips, texture fills, and nine-patch materials. `source` is expressed
     // in source-image pixels. Minimal painters may preserve coherence by
@@ -210,6 +224,9 @@ public:
     virtual void draw_image_region(ImageId image, Rect source,
                                    Rect destination,
                                    double opacity = 1.0);
+    virtual void draw_image_region_sampled(
+        ImageId image, Rect source, Rect destination, ImageSampling sampling,
+        double opacity = 1.0);
     // One retained command regardless of repetition count. Production
     // painters realize the pattern exactly; the base implementation is a
     // bounded compatibility fallback for deliberately minimal hosts.

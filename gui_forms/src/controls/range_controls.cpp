@@ -282,9 +282,9 @@ void RangeControl::set_range(double minimum_value, double maximum_value) {
     maximum_ = maximum_value;
     value_ = std::clamp(value_, minimum_, maximum_);
     invalidate(Dirty::paint | Dirty::semantics);
-    range_changed_.emit(minimum_, maximum_);
+    publish_change(range_changed_, minimum_, maximum_);
     if (is_alive() && old_value != value_) {
-        value_changed_.emit(value_);
+        publish_change(value_changed_, value_);
     }
 }
 
@@ -307,7 +307,7 @@ void RangeControl::set_value(double value) {
     }
     value_ = value;
     invalidate(Dirty::paint | Dirty::semantics);
-    value_changed_.emit(value_);
+    publish_change(value_changed_, value_);
 }
 
 void RangeControl::set_small_change(double change) {
@@ -377,7 +377,7 @@ bool RangeControl::set_value_from_input(double value, RangeAction action) {
     invalidate(Dirty::paint | Dirty::semantics);
     scroll_.emit(event);
     if (is_alive()) {
-        value_changed_.emit(value_);
+        publish_change(value_changed_, value_);
     }
     return true;
 }

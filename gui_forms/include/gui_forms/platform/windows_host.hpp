@@ -3,8 +3,11 @@
 #include "gui_forms/host.hpp"
 #include "gui_forms/window.hpp"
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -42,6 +45,55 @@ struct WindowsApplicationWindow final {
     std::unique_ptr<Window> model;
     WindowsHostOptions options;
     bool tool_window{};
+};
+
+// A virtual WinForms-handle/HDC endpoint for compatibility frontends whose
+// callers retain GetDC(Control.Handle). The compatibility handle is only a
+// registry token understood by the GDI shim; it is deliberately not an HWND
+// and can never enter native window, input, focus, capture, z-order, or cursor
+// state. The retained renderer samples the durable live raster directly;
+// endpoint writes never call back into the control or enqueue UI work.
+class WindowsCompatibilityPaintEndpoint final {
+public:
+    static std::shared_ptr<WindowsCompatibilityPaintEndpoint> acquire(
+        std::uint32_t width, std::uint32_t height);
+
+    ~WindowsCompatibilityPaintEndpoint();
+
+    WindowsCompatibilityPaintEndpoint(
+        const WindowsCompatibilityPaintEndpoint&) = delete;
+    WindowsCompatibilityPaintEndpoint& operator=(
+        const WindowsCompatibilityPaintEndpoint&) = delete;
+
+    [[nodiscard]] std::uintptr_t compatibility_handle() const noexcept;
+    [[nodiscard]] std::uintptr_t device_context() const noexcept;
+    [[nodiscard]] std::shared_ptr<LiveSurface> live_surface() const noexcept;
+    [[nodiscard]] bool publish_device_context(
+        std::uintptr_t device_context) noexcept;
+    // A compatibility writer may retain the HDC for the control lifetime, but
+    // each destination operation must take this short lease. It prevents a
+    // resize or release from replacing/deleting the selected DIB while GDI is
+    // writing it. The producer's private DC is deliberately outside the lease.
+    [[nodiscard]] bool begin_device_context_write(
+        std::uintptr_t device_context) noexcept;
+    [[nodiscard]] bool end_device_context_write(
+        std::uintptr_t device_context, bool publish) noexcept;
+    [[nodiscard]] bool configure(std::uint32_t width,
+                                 std::uint32_t height) noexcept;
+    [[nodiscard]] bool submit_bgra32_premultiplied(
+        std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
+        std::span<const std::byte> pixels) noexcept;
+    void touch(bool explicit_boundary = false) noexcept;
+    [[nodiscard]] bool drain_now() noexcept;
+    [[nodiscard]] std::string snapshot() const;
+    void release() noexcept;
+
+private:
+    struct Implementation;
+    explicit WindowsCompatibilityPaintEndpoint(
+        std::unique_ptr<Implementation> implementation) noexcept;
+
+    std::unique_ptr<Implementation> implementation_;
 };
 
 [[nodiscard]] HostCapabilities windows_capabilities();

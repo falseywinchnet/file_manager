@@ -4,14 +4,14 @@
 #include <string>
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 3) {
-        std::cerr << "usage: orchestrator-cpp-client [RUNTIME_DIR] probe|shutdown\n";
+    if (argc != 2 && argc != 3 && argc != 5) {
+		std::cerr << "usage: orchestrator-cpp-client [RUNTIME_DIR] probe|shutdown|search ROOT_ID TEXT\n";
         return 2;
     }
     try {
-        auto client = argc == 3 ? fileman::orchestrator::Client::connect(argv[1])
+        auto client = argc >= 3 ? fileman::orchestrator::Client::connect(argv[1])
                                 : fileman::orchestrator::Client::connect_default();
-        const std::string command = argv[argc - 1];
+        const std::string command = argc >= 3 ? argv[2] : argv[1];
         if (command == "probe") {
             const auto snapshot = client.bootstrap();
             std::cout << "instance=" << snapshot.session.instance_id
@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
                       << " fallback=" << snapshot.routing.direct_engine_fallback.state
                       << " shutdown="
                       << (snapshot.service_controls.shutdown_eligible ? "eligible" : "ineligible")
+                      << " restart=" << snapshot.service_controls.restart_strategy
                       << " orchestrator-gate="
                       << (snapshot.orchestrator_gate_ready() ? "ready" : "blocked")
                       << " gui-forms-gate=" << snapshot.frontend_opening.gui_forms_gate.state
@@ -35,6 +36,14 @@ int main(int argc, char** argv) {
                       << snapshot.frontend_opening.architect_direction_gate.state
                       << " opening-blockers="
                       << snapshot.frontend_opening.orchestrator_gate.blockers.size() << '\n';
+        } else if (command == "search" && argc == 5) {
+            const auto page = client.search(argv[3], argv[4]);
+            std::cout << "terminal=" << page.terminal
+                      << " source=" << page.source
+                      << " complete=" << (page.complete ? "true" : "false")
+                      << " results=" << page.names.size();
+            if (!page.names.empty()) std::cout << " first=" << page.names.front();
+            std::cout << '\n';
         } else if (command == "shutdown") {
             client.shutdown();
             std::cout << "shutdown=success\n";

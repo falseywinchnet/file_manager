@@ -1,7 +1,8 @@
 # File Manager search engine
 
-Status: **M1 exact reference, M2 durable-generation candidates, and an
-experimental M4 macOS background-currentness slice; not yet promoted**.
+Status: **M1 exact reference, M1L development live query, M2
+durable-generation candidates, and an experimental M4 macOS
+background-currentness slice; not yet promoted**.
 
 This directory is the future purpose-built catalogue, indexing, and retrieval
 backend for File Manager. It is designed to become independently testable,
@@ -147,12 +148,16 @@ The current integration-readiness rubric is
 [`docs/INTEGRATED_DOGFOOD_READINESS.md`](docs/INTEGRATED_DOGFOOD_READINESS.md).
 
 ADR-008 now requires `ORC-ENG-004`: bounded filename/path search directly over
-an authorized filesystem scope when no catalogue is available. The current
-`scan.reconcile`-then-query path does not satisfy that requirement. Engine
-negotiation round 006 specifies progressive pages, containment, cancellation,
-work ceilings, zero durable writes, and native measurement gates. The provider
-continues to report `engine.live.query` unavailable until that operation and
-its conformance evidence exist.
+an authorized filesystem scope when no catalogue is available. The development
+service now implements that distinct `engine.query_live` operation with
+streaming metadata-only traversal, expiring process-local cursors, fixed
+session and descriptor ceilings, symlink non-traversal, exact observed
+identity, and explicit partial paths. It advertises `engine.live.query` and
+`contract.ORC-ENG-004` as available for the running development provider. The
+10,000-entry APFS control and authenticated Orchestrator/Rust/C++ zero-catalogue
+route pass; million-entry/deep-tree, native NTFS/ext4, CPU/RSS/bytes-read, and
+installed authenticated Engine transport remain release gates. See
+[`results/M1L_LIVE_QUERY_001.md`](results/M1L_LIVE_QUERY_001.md).
 
 The first Kolmogrov history-tuple transfer is internally dogfooded against a
 pinned persistent-service generation but remains unavailable to service

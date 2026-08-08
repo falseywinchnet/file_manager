@@ -46,6 +46,7 @@ add_library(gui_forms_core STATIC
     src/core/unicode_grapheme.cpp
     src/core/metrics.cpp
     src/core/resources.cpp
+    src/core/live_surface.cpp
     src/core/semantics.cpp
     src/core/host.cpp
     src/core/feedback.cpp
@@ -125,7 +126,8 @@ add_library(gui_drawing_core STATIC
     src/core/drawing.cpp
 )
 target_include_directories(gui_drawing_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(gui_drawing_core PUBLIC cxx_std_20)
 set_target_properties(gui_drawing_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -170,6 +172,7 @@ target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 
 add_library(gui_forms_controls STATIC
     src/controls/basic_controls.cpp
+    src/controls/canvas.cpp
     src/controls/collection_controls.cpp
     src/controls/composition_controls.cpp
     src/controls/commands.cpp
@@ -192,7 +195,7 @@ target_include_directories(gui_forms_controls PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(gui_forms_controls PUBLIC gui_forms_core)
+target_link_libraries(gui_forms_controls PUBLIC gui_forms_core gui_drawing_core)
 
 add_library(gui_forms_c_api SHARED
     src/abi/c_api.cpp
@@ -218,10 +221,12 @@ endif()
 
 add_library(GUIForms::Core ALIAS gui_forms_core)
 add_library(GUIForms::Controls ALIAS gui_forms_controls)
+add_library(GUIForms::Drawing ALIAS gui_drawing_core)
 set_target_properties(gui_forms_core PROPERTIES EXPORT_NAME Core)
 set_target_properties(gui_forms_controls PROPERTIES EXPORT_NAME Controls)
+set_target_properties(gui_drawing_core PROPERTIES EXPORT_NAME Drawing)
 
-install(TARGETS gui_forms_core gui_forms_controls
+install(TARGETS gui_forms_core gui_forms_controls gui_drawing_core
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -547,10 +552,22 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     )
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE gdi32 ole32 windowscodecs comdlg32 shell32 usp10
+        PRIVATE user32 gdi32 ole32 windowscodecs comdlg32 shell32 usp10
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
+    add_library(gui_forms_win32_compat SHARED
+        src/host/windows/win32_compat_shim.cpp
+        src/host/windows/win32_compat_shim.def
+    )
+    target_compile_features(gui_forms_win32_compat PRIVATE cxx_std_20)
+    target_compile_definitions(gui_forms_win32_compat PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+    )
+    target_link_libraries(gui_forms_win32_compat PRIVATE user32 gdi32)
+    set_target_properties(gui_forms_win32_compat PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "gui_forms_win32_compat")
     add_executable(gui_forms_windows_probe
         tools/windows_automation_probe.cpp
     )
@@ -572,6 +589,40 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     target_link_options(gui_drawing_windows_probe PRIVATE
         -static -static-libgcc
     )
+    if(GUI_FORMS_BUILD_TESTS)
+        add_executable(gui_forms_windows_live_surface_endpoint_tests
+            tests/windows_live_surface_endpoint_tests.cpp
+        )
+        target_compile_definitions(
+            gui_forms_windows_live_surface_endpoint_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        )
+        target_link_libraries(gui_forms_windows_live_surface_endpoint_tests PRIVATE
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_windows_live_surface_endpoint_tests PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        add_test(NAME gui_forms_windows_live_surface_endpoint_tests
+                 COMMAND gui_forms_windows_live_surface_endpoint_tests)
+        add_executable(gui_forms_windows_gdi_compat_shim_tests
+            tests/windows_gdi_compat_shim_tests.cpp
+        )
+        target_compile_definitions(
+            gui_forms_windows_gdi_compat_shim_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        )
+        target_link_libraries(gui_forms_windows_gdi_compat_shim_tests PRIVATE
+            gui_forms_c_api gdi32 user32
+        )
+        target_link_options(gui_forms_windows_gdi_compat_shim_tests PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        add_dependencies(gui_forms_windows_gdi_compat_shim_tests
+                         gui_forms_win32_compat)
+        add_test(NAME gui_forms_windows_gdi_compat_shim_tests
+                 COMMAND gui_forms_windows_gdi_compat_shim_tests)
+    endif()
 endif()
 
 if(GUI_FORMS_BUILD_GALLERY)
@@ -796,6 +847,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_drawing_core_tests PRIVATE gui_drawing_core)
     add_test(NAME gui_drawing_core_tests COMMAND gui_drawing_core_tests)
 
+    add_executable(gui_forms_canvas_tests tests/canvas_tests.cpp)
+    target_link_libraries(gui_forms_canvas_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_canvas_tests COMMAND gui_forms_canvas_tests)
+
     add_executable(gui_drawing_c_api_c11_tests tests/drawing_c_api_c11_tests.c)
     target_link_libraries(gui_drawing_c_api_c11_tests PRIVATE gui_drawing_c_api)
     add_test(NAME gui_drawing_c_api_c11_tests COMMAND gui_drawing_c_api_c11_tests)
@@ -833,6 +888,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
+
+    add_executable(gui_forms_live_surface_tests tests/live_surface_tests.cpp)
+    target_link_libraries(gui_forms_live_surface_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_live_surface_tests COMMAND gui_forms_live_surface_tests)
 
     add_executable(gui_forms_text_store_tests tests/text_store_tests.cpp)
     target_link_libraries(gui_forms_text_store_tests PRIVATE gui_forms_core)

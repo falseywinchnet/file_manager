@@ -2,6 +2,8 @@
 
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/control.hpp"
+#include "gui_forms/inspection_controls.hpp"
+#include "gui_forms/live_surface.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/scrolling.hpp"
 #include "gui_forms/text.hpp"
@@ -15,13 +17,16 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <deque>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -550,15 +555,22 @@ private:
         static_cast<std::uint8_t>((argb >> 24U) & 0xffU));
 }
 
-class RasterControl final : public Control {
+// A compatibility control may be both owner-painted and scrollable. WinForms
+// exposes those as independent capabilities through inheritance and styles;
+// treating the ABI kind as an exclusive class choice makes legitimate custom
+// ScrollableControl subclasses impossible to construct. Keep the raster surface
+// on the scrolling substrate. For ordinary owner-painted Control subclasses the
+// additional capability is dormant (AutoScroll and both axes default off).
+class RasterControl final : public gui_forms::ScrollableControl {
 public:
     explicit RasterControl(StableId stable_id, bool input_transparent = false)
-        : Control(std::move(stable_id)), input_transparent_(input_transparent) {
+        : ScrollableControl(std::move(stable_id)),
+          input_transparent_(input_transparent) {
         set_focusable(!input_transparent_);
     }
 
     [[nodiscard]] bool hit_test_local(gui_forms::Point point) const override {
-        return !input_transparent_ && Control::hit_test_local(point);
+        return !input_transparent_ && ScrollableControl::hit_test_local(point);
     }
 
     [[nodiscard]] gui_forms::Event<const RasterPointerSample&>& pointer_input() noexcept {
@@ -618,27 +630,32 @@ public:
         if (pixels.empty()) {
             return set_png({});
         }
-        std::vector<std::byte> replacement;
-        try {
-            replacement.assign(pixels.begin(), pixels.end());
-        } catch (const std::bad_alloc&) {
-            return false;
-        }
         bool replacement_invalidated = false;
         if (window() != nullptr) {
             const bool replacing = image_.value != 0;
-            const auto loaded = replacing
+            const bool same_size = replacing && width == pixel_width_ &&
+                height == pixel_height_;
+            const auto loaded = same_size
+                ? window()->update_bgra32_premultiplied(
+                    image_, width, height, row_bytes, pixels, *this)
+                : replacing
                 ? window()->replace_bgra32_premultiplied(
-                    image_, width, height, row_bytes, replacement, *this)
+                    image_, width, height, row_bytes, pixels, *this)
                 : window()->load_bgra32_premultiplied(
-                    width, height, row_bytes, replacement);
+                    width, height, row_bytes, pixels);
             if (!loaded) {
                 return false;
             }
             image_ = loaded.image;
             replacement_invalidated = replacing;
+            encoded_.clear();
+        } else {
+            try {
+                encoded_.assign(pixels.begin(), pixels.end());
+            } catch (const std::bad_alloc&) {
+                return false;
+            }
         }
-        encoded_ = std::move(replacement);
         encoding_ = ImageResourceEncoding::bgra32_premultiplied;
         pixel_width_ = width;
         pixel_height_ = height;
@@ -649,11 +666,55 @@ public:
         return true;
     }
 
+    void set_live_surface(std::shared_ptr<gui_forms::LiveSurface> surface) {
+        require_mutable();
+        if (live_surface_ == surface) return;
+        disconnect_live_surface_wake();
+        live_surface_ = std::move(surface);
+        connect_live_surface_wake();
+        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+    }
+
+    void clear_live_surface(const std::shared_ptr<gui_forms::LiveSurface>& surface) {
+        require_mutable();
+        if (!live_surface_ || (surface && live_surface_ != surface)) {
+            return;
+        }
+        disconnect_live_surface_wake();
+        live_surface_.reset();
+        invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
+    }
+
     void on_paint(gui_forms::Painter& painter, Rect) override {
+        const Rect bounds = committed_arranged_bounds();
+        if (live_surface_) {
+            const std::uint64_t candidate_generation =
+                live_surface_->snapshot().published_generation;
+            painter.draw_live_surface(live_surface_,
+                                      {0.0, 0.0, bounds.width, bounds.height},
+                                      1.0);
+            // A live wake stays coalesced until the retained paint consumes a
+            // candidate, not merely until its dispatcher callback runs. This
+            // prevents a fast producer from filling the UI queue while one
+            // frame is still waiting to render. If publication raced the
+            // paint, latest-frame semantics request exactly one follow-up.
+            const auto wake_state = live_wake_state_;
+            if (wake_state && wake_state->connected.load(
+                                  std::memory_order_acquire)) {
+                wake_state->queued.store(false, std::memory_order_release);
+                if (live_surface_->snapshot().published_generation !=
+                    candidate_generation) {
+                    queue_live_surface_paint(
+                        std::static_pointer_cast<RasterControl>(
+                            shared_from_this()),
+                        wake_state);
+                }
+            }
+            return;
+        }
         if (image_.value == 0) {
             return;
         }
-        const Rect bounds = committed_arranged_bounds();
         painter.draw_image(image_, {0.0, 0.0, bounds.width, bounds.height}, 1.0);
     }
 
@@ -688,7 +749,7 @@ public:
 
 protected:
     void on_attached_to_window() override {
-        Control::on_attached_to_window();
+        ScrollableControl::on_attached_to_window();
         if (!encoded_.empty() && image_.value == 0) {
             const auto loaded = encoding_ == ImageResourceEncoding::png
                 ? window()->load_png(encoded_)
@@ -698,17 +759,98 @@ protected:
                 image_ = loaded.image;
             }
         }
+        connect_live_surface_wake();
     }
 
     void on_detached_from_window() noexcept override {
+        disconnect_live_surface_wake();
         if (window() != nullptr && image_.value != 0) {
+            if (const auto resource = window()->image_resources().find(image_);
+                resource &&
+                resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+                try {
+                    encoded_.assign(resource->encoded.begin(), resource->encoded.end());
+                } catch (...) {
+                    encoded_.clear();
+                }
+            }
             static_cast<void>(window()->remove_image(image_));
         }
         image_ = {};
-        Control::on_detached_from_window();
+        ScrollableControl::on_detached_from_window();
     }
 
 private:
+    struct LiveWakeState final {
+        std::atomic<bool> connected{true};
+        std::atomic<bool> queued{};
+    };
+
+    static void queue_live_surface_paint(
+        const std::weak_ptr<RasterControl>& weak_target,
+        const std::weak_ptr<LiveWakeState>& weak_state) noexcept {
+        const auto state = weak_state.lock();
+        if (!state || !state->connected.load(std::memory_order_acquire) ||
+            state->queued.exchange(true, std::memory_order_acq_rel)) {
+            return;
+        }
+        const auto target = weak_target.lock();
+        if (!target) {
+            state->queued.store(false, std::memory_order_release);
+            return;
+        }
+        try {
+            static_cast<void>(target->begin_invoke(
+                [weak_target, weak_state] {
+                    const auto queued_state = weak_state.lock();
+                    if (!queued_state || !queued_state->connected.load(
+                                             std::memory_order_acquire)) {
+                        return;
+                    }
+                    if (const auto queued_target = weak_target.lock()) {
+                        if (auto* owner = queued_target->window();
+                            owner != nullptr &&
+                            owner->queue_live_surface_presentation(
+                                queued_target, queued_target->live_surface_)) {
+                            // The host consumes the newest immutable generation
+                            // as a compositor layer. Rearm publication now;
+                            // no retained paint transaction is outstanding.
+                            queued_state->queued.store(
+                                false, std::memory_order_release);
+                            return;
+                        }
+                        queued_target->invalidate(
+                            gui_forms::invalidation::paint_only);
+                    }
+                    // Do not rearm here. The retained paint transaction owns
+                    // release after it samples the newest complete candidate.
+                }));
+        } catch (...) {
+            state->queued.store(false, std::memory_order_release);
+        }
+    }
+
+    void connect_live_surface_wake() {
+        disconnect_live_surface_wake();
+        if (!live_surface_ || window() == nullptr) return;
+        auto wake_state = std::make_shared<LiveWakeState>();
+        live_wake_state_ = wake_state;
+        const std::weak_ptr<RasterControl> weak_target =
+            std::static_pointer_cast<RasterControl>(shared_from_this());
+        live_wake_ = live_surface_->connect_presentation_wake(
+            [weak_target, weak_state = std::weak_ptr<LiveWakeState>(wake_state)] {
+                queue_live_surface_paint(weak_target, weak_state);
+            });
+    }
+
+    void disconnect_live_surface_wake() noexcept {
+        if (live_wake_state_) {
+            live_wake_state_->connected.store(false, std::memory_order_release);
+        }
+        live_wake_.disconnect();
+        live_wake_state_.reset();
+    }
+
     bool input_transparent_{};
     std::vector<std::byte> encoded_;
     ImageResourceEncoding encoding_{ImageResourceEncoding::png};
@@ -716,8 +858,612 @@ private:
     std::uint32_t pixel_height_{};
     std::uint64_t pixel_row_bytes_{};
     gui_forms::ImageId image_{};
+    std::shared_ptr<gui_forms::LiveSurface> live_surface_;
+    gui_forms::LiveSurfaceWakeConnection live_wake_;
+    std::shared_ptr<LiveWakeState> live_wake_state_;
     gui_forms::Event<const RasterPointerSample&> pointer_input_;
     gui_forms::Event<const RasterKeySample&> key_input_;
+};
+
+// A foreign object is represented to the native property engine as an
+// ordinary retained Control whose registrations happen to dispatch through a
+// bounded C callback table. The proxy is intentionally nonvisual and never
+// retains a foreign pointer other than the caller-owned callback context.
+class AbiPropertyObjectControl final : public Control {
+    struct PropertyState;
+
+public:
+    explicit AbiPropertyObjectControl(StableId stable_id)
+        : Control(std::move(stable_id)) {
+        clear_bindable_properties();
+    }
+
+    void define(const gf_property_descriptor_v1& authored,
+                const gf_property_callbacks_v1& callbacks) {
+        require_mutable();
+        constexpr std::size_t minimum_callback_size =
+            offsetof(gf_property_callbacks_v1, parse) +
+            sizeof(gf_property_parse_callback);
+        if (authored.struct_size < sizeof(gf_property_descriptor_v1) ||
+            callbacks.struct_size < minimum_callback_size) {
+            throw std::invalid_argument(
+                "property proxy definitions require complete size-prefixed records");
+        }
+        auto state = std::make_shared<PropertyState>();
+        std::memcpy(&state->callbacks, &callbacks,
+                    std::min<std::size_t>(callbacks.struct_size,
+                                          sizeof(state->callbacks)));
+        state->descriptor = copy_descriptor(authored);
+        if (state->descriptor.readable && callbacks.get == nullptr) {
+            throw std::invalid_argument(
+                "readable foreign properties require a getter callback");
+        }
+        if (state->descriptor.writable && callbacks.set == nullptr) {
+            throw std::invalid_argument(
+                "writable foreign properties require a setter callback");
+        }
+        if (state->descriptor.resettable && callbacks.reset == nullptr) {
+            throw std::invalid_argument(
+                "resettable foreign properties require a reset callback");
+        }
+        if (!state->descriptor.editor_name.empty() &&
+            state->callbacks.edit == nullptr) {
+            throw std::invalid_argument(
+                "foreign property editor identities require an edit callback");
+        }
+        const std::string canonical = gui_forms::canonical_binding_name(
+            state->descriptor.name);
+        if (properties_.contains(canonical)) {
+            throw std::invalid_argument(
+                "foreign property names must be unique ignoring case");
+        }
+
+        gui_forms::PropertyRegistration registration;
+        registration.descriptor = state->descriptor;
+        if (registration.descriptor.readable) {
+            registration.get = [state] { return state->get(); };
+        }
+        if (registration.descriptor.writable) {
+            registration.set = [state](const gui_forms::BindingValue& value) {
+                state->set(value);
+                state->changed.emit();
+            };
+        }
+        if (registration.descriptor.change_notifications) {
+            registration.connect_changed = [state](
+                gui_forms::Component& owner, std::function<void()> changed) {
+                return state->changed.subscribe(owner, std::move(changed));
+            };
+        }
+        if (registration.descriptor.resettable) {
+            registration.reset = [state] {
+                state->reset();
+                state->changed.emit();
+            };
+        }
+        if (callbacks.should_serialize != nullptr) {
+            registration.should_serialize = [state] {
+                return state->should_serialize();
+            };
+            registration.origin = [state] {
+                return state->should_serialize()
+                    ? gui_forms::PropertyValueOrigin::local
+                    : gui_forms::PropertyValueOrigin::defaulted;
+            };
+        }
+        define_bindable_property(std::move(registration));
+        properties_.emplace(canonical, std::move(state));
+    }
+
+    void notify_changed(std::string_view name) {
+        require_mutable();
+        const auto found = properties_.find(
+            gui_forms::canonical_binding_name(name));
+        if (found == properties_.end()) {
+            throw std::invalid_argument(
+                "foreign property change names must identify a definition");
+        }
+        found->second->changed.emit();
+    }
+
+    void install_converters(gui_forms::PropertyValueConverterRegistry& target) {
+        for (const auto& [canonical, state] : properties_) {
+            static_cast<void>(canonical);
+            const std::string& name = state->descriptor.converter_name;
+            if (name.empty() || target.find(name) != nullptr ||
+                state->callbacks.format == nullptr) {
+                continue;
+            }
+            gui_forms::PropertyValueConverter converter;
+            if (state->callbacks.format != nullptr) {
+                converter.format = [weak = std::weak_ptr<PropertyState>(state)](
+                    const gui_forms::BindingValue& value,
+                    const gui_forms::PropertyDescriptor&) {
+                    const auto current = weak.lock();
+                    if (!current) {
+                        throw std::logic_error(
+                            "foreign property converter outlived its proxy");
+                    }
+                    return current->format(value);
+                };
+            }
+            converter.parse = [weak = std::weak_ptr<PropertyState>(state)](
+                std::string_view text, const gui_forms::BindingValue&,
+                const gui_forms::PropertyDescriptor&) {
+                const auto current = weak.lock();
+                if (!current) {
+                    throw std::logic_error(
+                        "foreign property converter outlived its proxy");
+                }
+                return current->parse(text);
+            };
+            if (!target.register_converter(name, std::move(converter))) {
+                throw std::logic_error(
+                    "foreign property converter identity collision");
+            }
+        }
+    }
+
+    void install_editors(gui_forms::PropertyEditorRegistry& target,
+                         std::set<std::string>& installed) {
+        for (const auto& [canonical, state] : properties_) {
+            static_cast<void>(canonical);
+            const std::string& name = state->descriptor.editor_name;
+            if (name.empty() || state->callbacks.edit == nullptr ||
+                !installed.insert(name).second) {
+                continue;
+            }
+            const bool registered = target.register_factory(
+                name, [weak = std::weak_ptr<PropertyState>(state)](
+                          const gui_forms::PropertyEditorRequest& request)
+                    -> std::optional<gui_forms::PropertyEditorBinding> {
+                    const auto retained = weak.lock();
+                    if (!retained) {
+                        throw std::logic_error(
+                            "foreign property editor outlived its proxy");
+                    }
+                    auto button = gui_forms::make_control<gui_forms::Button>(
+                        StableId(request.stable_id));
+                    auto current = std::make_shared<gui_forms::BindingValue>(
+                        request.value);
+                    auto failures = std::make_shared<
+                        gui_forms::Event<const gui_forms::PropertyEditorInputError&>>();
+                    const auto update_text = [weak_button =
+                            std::weak_ptr<gui_forms::Button>(button), weak](
+                            const gui_forms::BindingValue& value) {
+                        const auto editor = weak_button.lock();
+                        const auto state = weak.lock();
+                        if (!editor || !state) return;
+                        std::string display = state->format(value);
+                        if (display.size() > 96U) {
+                            display.resize(93U);
+                            display += "...";
+                        }
+                        editor->set_text(display.empty()
+                            ? std::string("Edit \xE2\x80\xA6")
+                            : display + "  \xE2\x80\xA6");
+                    };
+                    update_text(*current);
+                    button->set_accessible_name(request.property_path);
+                    button->set_accessible_description(
+                        request.descriptor.description);
+                    button->set_enabled(request.writable);
+
+                    gui_forms::PropertyEditorBinding binding;
+                    binding.control = button;
+                    binding.synchronize = [current, update_text](
+                        const gui_forms::BindingValue& value) {
+                        *current = value;
+                        update_text(value);
+                    };
+                    binding.connect_committed =
+                        [weak_button = std::weak_ptr<gui_forms::Button>(button),
+                         weak, current, failures](
+                            gui_forms::Component& owner,
+                            std::function<void(gui_forms::BindingValue)> committed) {
+                            const auto editor = weak_button.lock();
+                            if (!editor) return gui_forms::SubscriptionToken{};
+                            return editor->clicked().subscribe(
+                                owner, [weak, current, failures,
+                                        committed = std::move(committed)](
+                                           gui_forms::ButtonBase&) {
+                                    const auto state = weak.lock();
+                                    if (!state) return;
+                                    try {
+                                        committed(state->edit(*current));
+                                    } catch (const std::exception& error) {
+                                        const gui_forms::PropertyEditorInputError failure{
+                                            state->format(*current), error.what()};
+                                        failures->emit(failure);
+                                    }
+                                });
+                        };
+                    binding.connect_failed =
+                        [failures](gui_forms::Component& owner,
+                                   std::function<void(
+                                       const gui_forms::PropertyEditorInputError&)>
+                                       failed) {
+                            return failures->subscribe(owner, std::move(failed));
+                        };
+                    return binding;
+                });
+            if (!registered) {
+                throw std::logic_error(
+                    "foreign property editor identity collision");
+            }
+        }
+    }
+
+private:
+    static constexpr std::uint64_t maximum_callback_text_bytes =
+        1024ULL * 1024ULL;
+
+    static std::string copy_text(gf_string_view view,
+                                 std::size_t maximum,
+                                 std::string_view field) {
+        if ((view.size != 0U && view.data == nullptr) ||
+            view.size > maximum ||
+            view.size > static_cast<std::uint64_t>(
+                std::numeric_limits<std::size_t>::max())) {
+            throw std::invalid_argument(
+                std::string(field) + " is not a bounded string view");
+        }
+        std::string result;
+        if (view.size != 0U) {
+            result.assign(view.data, static_cast<std::size_t>(view.size));
+        }
+        if (result.find('\0') != std::string::npos ||
+            !gui_forms::validate_utf8(result).valid()) {
+            throw std::invalid_argument(
+                std::string(field) + " must contain valid UTF-8 without NUL");
+        }
+        return result;
+    }
+
+    static gui_forms::BindingValueKind native_kind(std::uint32_t kind) {
+        switch (kind) {
+        case GF_PROPERTY_BOOLEAN:
+            return gui_forms::BindingValueKind::boolean;
+        case GF_PROPERTY_SIGNED_INTEGER:
+            return gui_forms::BindingValueKind::signed_integer;
+        case GF_PROPERTY_UNSIGNED_INTEGER:
+            return gui_forms::BindingValueKind::unsigned_integer;
+        case GF_PROPERTY_NUMBER:
+            return gui_forms::BindingValueKind::number;
+        case GF_PROPERTY_TEXT:
+            return gui_forms::BindingValueKind::text;
+        case GF_PROPERTY_COLOR:
+            return gui_forms::BindingValueKind::color;
+        case GF_PROPERTY_ENUMERATION:
+            return gui_forms::BindingValueKind::enumeration;
+        default:
+            throw std::invalid_argument(
+                "foreign property kind is not supported by ABI 0.23");
+        }
+    }
+
+    static std::uint32_t abi_kind(gui_forms::BindingValueKind kind) {
+        switch (kind) {
+        case gui_forms::BindingValueKind::null: return GF_PROPERTY_NULL;
+        case gui_forms::BindingValueKind::boolean: return GF_PROPERTY_BOOLEAN;
+        case gui_forms::BindingValueKind::signed_integer:
+            return GF_PROPERTY_SIGNED_INTEGER;
+        case gui_forms::BindingValueKind::unsigned_integer:
+            return GF_PROPERTY_UNSIGNED_INTEGER;
+        case gui_forms::BindingValueKind::number: return GF_PROPERTY_NUMBER;
+        case gui_forms::BindingValueKind::text: return GF_PROPERTY_TEXT;
+        case gui_forms::BindingValueKind::color: return GF_PROPERTY_COLOR;
+        case gui_forms::BindingValueKind::enumeration:
+            return GF_PROPERTY_ENUMERATION;
+        default:
+            throw std::invalid_argument(
+                "property value cannot cross the ABI 0.23 scalar channel");
+        }
+    }
+
+    static gf_property_value to_abi(const gui_forms::BindingValue& value) {
+        gf_property_value result{};
+        result.kind = abi_kind(gui_forms::binding_value_kind(value));
+        if (const auto* item = std::get_if<bool>(&value)) {
+            result.boolean_value = *item ? 1U : 0U;
+        } else if (const auto* item = std::get_if<std::int64_t>(&value)) {
+            result.signed_value = *item;
+        } else if (const auto* item = std::get_if<std::uint64_t>(&value)) {
+            result.unsigned_value = *item;
+        } else if (const auto* item = std::get_if<double>(&value)) {
+            result.number_value = *item;
+        } else if (const auto* item = std::get_if<std::string>(&value)) {
+            result.text_value = {item->data(), item->size()};
+        } else if (const auto* item = std::get_if<gui_forms::Color>(&value)) {
+            result.color_argb =
+                (static_cast<std::uint32_t>(item->alpha) << 24U) |
+                (static_cast<std::uint32_t>(item->red) << 16U) |
+                (static_cast<std::uint32_t>(item->green) << 8U) |
+                static_cast<std::uint32_t>(item->blue);
+        } else if (const auto* item =
+                       std::get_if<gui_forms::PropertyEnumValue>(&value)) {
+            result.signed_value = item->value;
+            result.text_value = {item->name.data(), item->name.size()};
+        }
+        return result;
+    }
+
+    static gui_forms::BindingValue from_abi(
+        const gf_property_value& value, std::string text,
+        const gui_forms::PropertyDescriptor& descriptor) {
+        if (value.kind == GF_PROPERTY_NULL) {
+            return gui_forms::BindingValue{};
+        }
+        const auto expected = native_kind(value.kind);
+        if (expected != descriptor.kind) {
+            throw std::invalid_argument(
+                "foreign callback returned a value outside its declared kind");
+        }
+        switch (value.kind) {
+        case GF_PROPERTY_BOOLEAN:
+            if (value.boolean_value > 1U) {
+                throw std::invalid_argument(
+                    "foreign Boolean callback returned a non-Boolean value");
+            }
+            return gui_forms::BindingValue{value.boolean_value != 0U};
+        case GF_PROPERTY_SIGNED_INTEGER:
+            return gui_forms::BindingValue{value.signed_value};
+        case GF_PROPERTY_UNSIGNED_INTEGER:
+            return gui_forms::BindingValue{value.unsigned_value};
+        case GF_PROPERTY_NUMBER:
+            if (!std::isfinite(value.number_value)) {
+                throw std::invalid_argument(
+                    "foreign numeric callback returned a non-finite value");
+            }
+            return gui_forms::BindingValue{value.number_value};
+        case GF_PROPERTY_TEXT:
+            return gui_forms::BindingValue{std::move(text)};
+        case GF_PROPERTY_COLOR:
+            return gui_forms::BindingValue{color_from_argb(value.color_argb)};
+        case GF_PROPERTY_ENUMERATION: {
+            std::string name = std::move(text);
+            if (name.empty() && descriptor.enumeration) {
+                const auto found = std::find_if(
+                    descriptor.enumeration->choices.begin(),
+                    descriptor.enumeration->choices.end(),
+                    [&](const gui_forms::PropertyEnumChoice& choice) {
+                        return choice.value == value.signed_value;
+                    });
+                if (found != descriptor.enumeration->choices.end()) {
+                    name = found->name;
+                }
+            }
+            return gui_forms::BindingValue{gui_forms::PropertyEnumValue{
+                descriptor.enumeration ? descriptor.enumeration->type_name
+                                       : std::string{},
+                std::move(name), value.signed_value}};
+        }
+        default:
+            throw std::invalid_argument(
+                "foreign callback returned an unsupported property kind");
+        }
+    }
+
+    static std::string callback_text(
+        const std::function<std::uint32_t(char*, std::uint64_t,
+                                          std::uint64_t*)>& invoke,
+        std::string_view operation) {
+        std::vector<char> buffer(256U);
+        for (std::size_t attempt = 0U; attempt < 2U; ++attempt) {
+            std::uint64_t required = 0U;
+            const std::uint32_t result = invoke(
+                buffer.data(), buffer.size(), &required);
+            if (required > maximum_callback_text_bytes) {
+                throw std::invalid_argument(
+                    std::string(operation) + " exceeded the 1 MiB text bound");
+            }
+            if ((result == GF_ERROR_BUFFER_TOO_SMALL ||
+                 required > buffer.size()) && attempt == 0U) {
+                buffer.resize(std::max<std::size_t>(
+                    1U, static_cast<std::size_t>(required)));
+                continue;
+            }
+            if (result != GF_OK) {
+                throw std::runtime_error(
+                    std::string(operation) + " callback failed with result " +
+                    std::to_string(result));
+            }
+            if (required > buffer.size()) {
+                throw std::invalid_argument(
+                    std::string(operation) + " callback reported an unstable size");
+            }
+            std::string text(buffer.data(), static_cast<std::size_t>(required));
+            if (text.find('\0') != std::string::npos ||
+                !gui_forms::validate_utf8(text).valid()) {
+                throw std::invalid_argument(
+                    std::string(operation) + " callback returned invalid UTF-8");
+            }
+            return text;
+        }
+        throw std::runtime_error(
+            std::string(operation) + " callback did not stabilize");
+    }
+
+    static gui_forms::PropertyDescriptor copy_descriptor(
+        const gf_property_descriptor_v1& authored) {
+        gui_forms::PropertyDescriptor result;
+        result.name = copy_text(authored.name, 256U, "property name");
+        result.category = copy_text(authored.category, 256U, "property category");
+        result.description = copy_text(
+            authored.description, 4096U, "property description");
+        result.converter_name = copy_text(
+            authored.converter_name, 256U, "property converter name");
+        result.editor_name = copy_text(
+            authored.editor_name, 256U, "property editor name");
+        result.kind = native_kind(authored.kind);
+        result.readable =
+            (authored.flags & GF_PROPERTY_READABLE) != 0U;
+        result.writable =
+            (authored.flags & GF_PROPERTY_WRITABLE) != 0U;
+        result.browsable =
+            (authored.flags & GF_PROPERTY_BROWSABLE) != 0U;
+        result.nullable =
+            (authored.flags & GF_PROPERTY_NULLABLE) != 0U;
+        result.standard_values_exclusive =
+            (authored.flags & GF_PROPERTY_STANDARD_VALUES_EXCLUSIVE) != 0U;
+        result.resettable =
+            (authored.flags & GF_PROPERTY_RESETTABLE) != 0U;
+        result.change_notifications =
+            (authored.flags & GF_PROPERTY_CHANGE_NOTIFICATIONS) != 0U;
+        result.invalidation_effects = gui_forms::Dirty::paint |
+                                      gui_forms::Dirty::semantics;
+        if (result.name.empty() || (!result.readable && !result.writable)) {
+            throw std::invalid_argument(
+                "foreign property definitions require a name and access mode");
+        }
+        if (authored.enum_choice_count >
+                gui_forms::maximum_property_enum_choices ||
+            (authored.enum_choice_count != 0U &&
+             authored.enum_choices == nullptr)) {
+            throw std::invalid_argument(
+                "foreign enum choices are missing or unbounded");
+        }
+        if (result.kind == gui_forms::BindingValueKind::enumeration) {
+            auto enumeration =
+                std::make_shared<gui_forms::PropertyEnumDescriptor>();
+            enumeration->type_name = copy_text(
+                authored.enum_type_name, 256U, "property enum type");
+            enumeration->flags =
+                (authored.flags & GF_PROPERTY_ENUM_FLAGS) != 0U;
+            enumeration->choices.reserve(
+                static_cast<std::size_t>(authored.enum_choice_count));
+            for (std::uint64_t index = 0U;
+                 index < authored.enum_choice_count; ++index) {
+                enumeration->choices.push_back({
+                    copy_text(authored.enum_choices[index].name,
+                              gui_forms::maximum_property_enum_text_bytes,
+                              "property enum choice"),
+                    authored.enum_choices[index].value});
+            }
+            result.enumeration = std::move(enumeration);
+        } else if (authored.enum_choice_count != 0U ||
+                   authored.enum_type_name.size != 0U) {
+            throw std::invalid_argument(
+                "only enumeration properties may define enum metadata");
+        }
+        if (authored.standard_value_count >
+                gui_forms::maximum_property_standard_values ||
+            (authored.standard_value_count != 0U &&
+             authored.standard_values == nullptr)) {
+            throw std::invalid_argument(
+                "foreign standard values are missing or unbounded");
+        }
+        result.standard_values.reserve(
+            static_cast<std::size_t>(authored.standard_value_count));
+        for (std::uint64_t index = 0U;
+             index < authored.standard_value_count; ++index) {
+            const gf_property_value& value = authored.standard_values[index];
+            const std::string value_text = copy_text(
+                value.text_value, maximum_callback_text_bytes,
+                "property standard value");
+            result.standard_values.push_back(from_abi(
+                value, value_text, result));
+        }
+        return result;
+    }
+
+    struct PropertyState final {
+        gui_forms::PropertyDescriptor descriptor;
+        gf_property_callbacks_v1 callbacks{};
+        gui_forms::Event<> changed;
+
+        [[nodiscard]] gui_forms::BindingValue get() const {
+            gf_property_value value{};
+            const std::string text = callback_text(
+                [&](char* buffer, std::uint64_t capacity,
+                    std::uint64_t* required) {
+                    return callbacks.get(callbacks.context, &value, buffer,
+                                         capacity, required);
+                }, "property getter");
+            return from_abi(value, text, descriptor);
+        }
+
+        void set(const gui_forms::BindingValue& value) const {
+            gf_property_value native = to_abi(value);
+            const std::uint32_t result = callbacks.set(
+                callbacks.context, &native);
+            if (result != GF_OK) {
+                throw std::runtime_error(
+                    "property setter callback failed with result " +
+                    std::to_string(result));
+            }
+        }
+
+        void reset() const {
+            const std::uint32_t result = callbacks.reset(callbacks.context);
+            if (result != GF_OK) {
+                throw std::runtime_error(
+                    "property reset callback failed with result " +
+                    std::to_string(result));
+            }
+        }
+
+        [[nodiscard]] bool should_serialize() const {
+            std::uint32_t result_value = 0U;
+            const std::uint32_t result = callbacks.should_serialize(
+                callbacks.context, &result_value);
+            if (result != GF_OK || result_value > 1U) {
+                throw std::runtime_error(
+                    "property serialization callback failed or returned a non-Boolean value");
+            }
+            return result_value != 0U;
+        }
+
+        [[nodiscard]] std::string format(
+            const gui_forms::BindingValue& value) const {
+            gf_property_value native = to_abi(value);
+            return callback_text(
+                [&](char* buffer, std::uint64_t capacity,
+                    std::uint64_t* required) {
+                    return callbacks.format(callbacks.context, &native,
+                                            buffer, capacity, required);
+                }, "property formatter");
+        }
+
+        [[nodiscard]] std::optional<gui_forms::BindingValue> parse(
+            std::string_view text) const {
+            if (callbacks.parse == nullptr) return {};
+            gf_property_value value{};
+            const gf_string_view input{text.data(), text.size()};
+            try {
+                const std::string value_text = callback_text(
+                    [&](char* buffer, std::uint64_t capacity,
+                        std::uint64_t* required) {
+                        return callbacks.parse(callbacks.context, input, &value,
+                                               buffer, capacity, required);
+                    }, "property parser");
+                return from_abi(value, value_text, descriptor);
+            } catch (const std::invalid_argument&) {
+                return {};
+            } catch (const std::runtime_error&) {
+                return {};
+            }
+        }
+
+        [[nodiscard]] gui_forms::BindingValue edit(
+            const gui_forms::BindingValue& current) const {
+            if (callbacks.edit == nullptr) {
+                throw std::logic_error(
+                    "foreign property editor callback is unavailable");
+            }
+            gf_property_value input = to_abi(current);
+            gf_property_value output{};
+            const std::string value_text = callback_text(
+                [&](char* buffer, std::uint64_t capacity,
+                    std::uint64_t* required) {
+                    return callbacks.edit(callbacks.context, &input, &output,
+                                          buffer, capacity, required);
+                }, "property editor");
+            return from_abi(output, value_text, descriptor);
+        }
+    };
+
+    std::map<std::string, std::shared_ptr<PropertyState>> properties_;
 };
 
 thread_local gf_result last_error_code = GF_OK;
@@ -906,6 +1652,17 @@ public:
         case GF_CONTROL_INPUT_TRANSPARENT_CUSTOM:
             record->control =
                 std::make_shared<RasterControl>(std::move(native_id), true);
+            break;
+        case GF_CONTROL_PROPERTY_GRID: {
+            auto property_grid =
+                std::make_shared<gui_forms::PropertyGrid>(std::move(native_id));
+            property_grid->initialize_control_tree();
+            record->control = std::move(property_grid);
+            break;
+        }
+        case GF_CONTROL_PROPERTY_OBJECT_PROXY:
+            record->control =
+                std::make_shared<AbiPropertyObjectControl>(std::move(native_id));
             break;
         case GF_CONTROL_CUSTOM:
             record->control = std::make_shared<RasterControl>(std::move(native_id));
@@ -1304,6 +2061,279 @@ public:
         return GF_OK;
     }
 
+    gf_result property_grid_set_selected_controls(
+        gf_handle grid_handle, const gf_handle* handles, std::uint64_t count) {
+        if (count > 1024U || (count != 0U && handles == nullptr) ||
+            count > static_cast<std::uint64_t>(
+                std::numeric_limits<std::size_t>::max())) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid selection requires at most 1024 handles");
+        }
+        std::shared_ptr<ControlRecord> grid_record;
+        if (const gf_result result = get_control(grid_handle, grid_record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            grid_record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "PropertyGrid selection requires a PropertyGrid handle");
+        }
+        std::vector<Control::Ptr> controls;
+        controls.reserve(static_cast<std::size_t>(count));
+        for (std::uint64_t index = 0U; index < count; ++index) {
+            std::shared_ptr<ControlRecord> candidate;
+            if (const gf_result result = get_control(handles[index], candidate);
+                result != GF_OK) {
+                return result;
+            }
+            if (candidate->ui_thread != grid_record->ui_thread) {
+                return fail(GF_ERROR_WRONG_THREAD,
+                            "PropertyGrid selections must share one UI thread");
+            }
+            controls.push_back(candidate->control);
+        }
+        const std::vector<Control::Ptr> previous = grid->selected_objects();
+        const auto previous_converters = grid->converter_registry();
+        const auto previous_editors = grid->editor_registry();
+        auto converters =
+            gui_forms::PropertyValueConverterRegistry::create_default();
+        auto editors = gui_forms::PropertyEditorRegistry::create_default();
+        std::set<std::string> installed_editor_names;
+        for (const Control::Ptr& control : controls) {
+            if (const auto proxy =
+                    std::dynamic_pointer_cast<AbiPropertyObjectControl>(control)) {
+                proxy->install_converters(*converters);
+                proxy->install_editors(*editors, installed_editor_names);
+            }
+        }
+        try {
+            grid->set_converter_registry(converters);
+            grid->set_editor_registry(editors);
+            grid->set_selected_objects(std::move(controls));
+        } catch (...) {
+            try {
+                grid->set_converter_registry(previous_converters);
+                grid->set_editor_registry(previous_editors);
+                grid->set_selected_objects(previous);
+            } catch (...) {
+                throw std::runtime_error(
+                    "PropertyGrid selection failed and its previous projection could not be restored");
+            }
+            throw;
+        }
+        emit_changed(grid_handle, grid_record);
+        return GF_OK;
+    }
+
+    gf_result property_object_define(
+        gf_handle handle, const gf_property_descriptor_v1* descriptor,
+        const gf_property_callbacks_v1* callbacks) {
+        if (descriptor == nullptr || callbacks == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "property_object_define requires descriptor and callback records");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto proxy =
+            std::dynamic_pointer_cast<AbiPropertyObjectControl>(record->control);
+        if (!proxy) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "property definitions require a property-object proxy");
+        }
+        proxy->define(*descriptor, *callbacks);
+        return GF_OK;
+    }
+
+    gf_result property_object_notify_changed(
+        gf_handle handle, gf_string_view property_name) {
+        if ((property_name.size != 0U && property_name.data == nullptr) ||
+            property_name.size > 256U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "property change notification requires a bounded name");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto proxy =
+            std::dynamic_pointer_cast<AbiPropertyObjectControl>(record->control);
+        if (!proxy) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "property change notification requires a property-object proxy");
+        }
+        proxy->notify_changed(std::string_view(
+            property_name.data, static_cast<std::size_t>(property_name.size)));
+        return GF_OK;
+    }
+
+    gf_result property_grid_try_set_text(
+        gf_handle handle, gf_string_view property_name,
+        gf_string_view text_value, std::uint32_t* committed) {
+        if (committed == nullptr || property_name.data == nullptr ||
+            property_name.size == 0U || property_name.size > 256U ||
+            (text_value.size != 0U && text_value.data == nullptr) ||
+            text_value.size > 1024ULL * 1024ULL) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid text commits require bounded name, text, and output");
+        }
+        const std::string name(property_name.data,
+                               static_cast<std::size_t>(property_name.size));
+        std::string text;
+        if (text_value.size != 0U) {
+            text.assign(text_value.data,
+                        static_cast<std::size_t>(text_value.size));
+        }
+        if (name.find('\0') != std::string::npos ||
+            text.find('\0') != std::string::npos ||
+            !gui_forms::validate_utf8(name).valid() ||
+            !gui_forms::validate_utf8(text).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid text commits require valid UTF-8 without NUL");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "property text commits require a PropertyGrid handle");
+        }
+        *committed = grid->try_set_property_text(name, text) ? 1U : 0U;
+        return GF_OK;
+    }
+
+    gf_result property_grid_reset_property(
+        gf_handle handle, gf_string_view property_name,
+        std::uint32_t* committed) {
+        if (committed == nullptr || property_name.data == nullptr ||
+            property_name.size == 0U || property_name.size > 256U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid reset requires a bounded name and output");
+        }
+        const std::string name(property_name.data,
+                               static_cast<std::size_t>(property_name.size));
+        if (name.find('\0') != std::string::npos ||
+            !gui_forms::validate_utf8(name).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid reset names require valid UTF-8 without NUL");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "property reset requires a PropertyGrid handle");
+        }
+        *committed = grid->reset_property(name) ? 1U : 0U;
+        return GF_OK;
+    }
+
+    gf_result property_grid_activate_editor(
+        gf_handle handle, gf_string_view property_name,
+        std::uint32_t* activated) {
+        if (activated == nullptr || property_name.data == nullptr ||
+            property_name.size == 0U || property_name.size > 256U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid editor activation requires a bounded name and output");
+        }
+        const std::string name(property_name.data,
+                               static_cast<std::size_t>(property_name.size));
+        if (name.find('\0') != std::string::npos ||
+            !gui_forms::validate_utf8(name).valid()) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid editor names require valid UTF-8 without NUL");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "property editor activation requires a PropertyGrid handle");
+        }
+        *activated = grid->activate_property_editor(name) ? 1U : 0U;
+        return GF_OK;
+    }
+
+    gf_result property_grid_set_sort(gf_handle grid_handle,
+                                     std::uint32_t property_sort) {
+        if (property_sort > 3U) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid sort is outside the Forms flag range");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(grid_handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "PropertyGrid sort requires a PropertyGrid handle");
+        }
+        grid->set_property_sort(property_sort == 1U
+            ? gui_forms::PropertySort::alphabetical
+            : gui_forms::PropertySort::categorized);
+        emit_changed(grid_handle, record);
+        return GF_OK;
+    }
+
+    gf_result property_grid_get_sort(gf_handle grid_handle,
+                                     std::uint32_t* property_sort) {
+        if (property_sort == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "PropertyGrid sort read requires an output");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(grid_handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "PropertyGrid sort requires a PropertyGrid handle");
+        }
+        *property_sort = grid->property_sort() ==
+                gui_forms::PropertySort::alphabetical
+            ? 1U : 3U;
+        return GF_OK;
+    }
+
+    gf_result property_grid_refresh(gf_handle grid_handle) {
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(grid_handle, record);
+            result != GF_OK) {
+            return result;
+        }
+        const auto grid = std::dynamic_pointer_cast<gui_forms::PropertyGrid>(
+            record->control);
+        if (!grid) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "PropertyGrid refresh requires a PropertyGrid handle");
+        }
+        grid->refresh_properties();
+        return GF_OK;
+    }
+
     gf_result set_control_png(gf_handle handle, const std::uint8_t* encoded,
                               std::uint64_t encoded_size) {
         if ((encoded_size != 0U && encoded == nullptr) ||
@@ -1378,6 +2408,28 @@ public:
             return fail(GF_ERROR_INVALID_ARGUMENT,
                         "set_control_pixels rejected an invalid or unbounded surface");
         }
+        return GF_OK;
+    }
+
+    gf_result compatibility_paint_target(
+        gf_handle handle,
+        std::weak_ptr<RasterControl>* target,
+        std::thread::id* owner_thread) {
+        if (target == nullptr || owner_thread == nullptr) {
+            return fail(GF_ERROR_INVALID_ARGUMENT,
+                        "compatibility paint target requires outputs");
+        }
+        std::shared_ptr<ControlRecord> record;
+        if (const gf_result result = get_control(handle, record); result != GF_OK) {
+            return result;
+        }
+        const auto raster = std::dynamic_pointer_cast<RasterControl>(record->control);
+        if (!raster) {
+            return fail(GF_ERROR_WRONG_HANDLE_KIND,
+                        "compatibility paint endpoint requires a raster control");
+        }
+        *target = raster;
+        *owner_thread = record->ui_thread;
         return GF_OK;
     }
 
@@ -3147,8 +4199,12 @@ private:
                 std::dynamic_pointer_cast<gui_forms::ButtonBase>(root)) {
             return button;
         }
-        for (const auto& child : root->children()) {
-            if (auto button = first_button(child)) return button;
+        const auto children = root->children();
+        // The retained vector is painter order, while public child index zero
+        // is topmost. Automation follows public order so the selected target
+        // stays stable when z-order and docking use their native semantics.
+        for (auto child = children.rbegin(); child != children.rend(); ++child) {
+            if (auto button = first_button(*child)) return button;
         }
         return {};
     }
@@ -3160,8 +4216,9 @@ private:
             std::dynamic_pointer_cast<gui_forms::RangeControl>(root)) {
             return root;
         }
-        for (const auto& child : root->children()) {
-            if (auto target = first_pointer_control(child)) return target;
+        const auto children = root->children();
+        for (auto child = children.rbegin(); child != children.rend(); ++child) {
+            if (auto target = first_pointer_control(*child)) return target;
         }
         return {};
     }
@@ -3339,6 +4396,334 @@ Registry& registry() {
     return instance;
 }
 
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+std::mutex compatibility_paint_endpoints_mutex;
+std::unordered_map<std::uint64_t,
+    std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>>
+    compatibility_paint_endpoints;
+struct CompatibilityPaintBinding final {
+    std::weak_ptr<RasterControl> target;
+    std::thread::id owner_thread;
+    std::shared_ptr<gui_forms::LiveSurface> surface;
+};
+std::unordered_map<std::uint64_t, CompatibilityPaintBinding>
+    compatibility_paint_bindings;
+std::uint64_t next_compatibility_paint_endpoint{1};
+struct CompatibilityPaintWrite final {
+    std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint> endpoint;
+    std::uintptr_t device_context{};
+    std::thread::id owner_thread;
+};
+std::unordered_map<std::uint64_t, CompatibilityPaintWrite>
+    compatibility_paint_writes;
+std::uint64_t next_compatibility_paint_write{1};
+
+std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>
+compatibility_paint_endpoint(std::uint64_t token) {
+    std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+    const auto found = compatibility_paint_endpoints.find(token);
+    return found == compatibility_paint_endpoints.end() ? nullptr : found->second;
+}
+
+std::vector<std::shared_ptr<
+    gui_forms::host::WindowsCompatibilityPaintEndpoint>>
+compatibility_paint_endpoint_snapshot() {
+    std::vector<std::shared_ptr<
+        gui_forms::host::WindowsCompatibilityPaintEndpoint>> result;
+    std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+    result.reserve(compatibility_paint_endpoints.size());
+    for (const auto& [token, endpoint] : compatibility_paint_endpoints) {
+        static_cast<void>(token);
+        if (endpoint) result.push_back(endpoint);
+    }
+    return result;
+}
+
+std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>
+compatibility_paint_endpoint_for_handle(std::uintptr_t handle) {
+    for (const auto& endpoint : compatibility_paint_endpoint_snapshot()) {
+        if (endpoint->compatibility_handle() == handle) return endpoint;
+    }
+    return {};
+}
+
+std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>
+compatibility_paint_endpoint_for_dc(std::uintptr_t device_context) {
+    for (const auto& endpoint : compatibility_paint_endpoint_snapshot()) {
+        if (endpoint->device_context() == device_context) return endpoint;
+    }
+    return {};
+}
+
+gf_result api_windows_paint_endpoint_acquire(
+    gf_handle control, std::uint32_t width, std::uint32_t height,
+    std::uint64_t* token, std::uintptr_t* compatibility_handle) {
+    if (token == nullptr || compatibility_handle == nullptr || width == 0U || height == 0U ||
+        width > 32768U || height > 32768U ||
+        static_cast<std::uint64_t>(width) * height > 268435456ULL) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint requires bounded dimensions and outputs");
+    }
+    std::weak_ptr<RasterControl> target;
+    std::thread::id owner_thread;
+    if (const gf_result result = registry().compatibility_paint_target(
+            control, &target, &owner_thread); result != GF_OK) {
+        return result;
+    }
+    if (std::this_thread::get_id() != owner_thread) {
+        return fail(GF_ERROR_WRONG_THREAD,
+                    "paint endpoint must be acquired on its control owner thread");
+    }
+    auto endpoint = gui_forms::host::WindowsCompatibilityPaintEndpoint::acquire(
+        width, height);
+    if (!endpoint || endpoint->compatibility_handle() == 0U) {
+        return fail(GF_ERROR_INTERNAL,
+                    "virtual Windows paint endpoint could not be created");
+    }
+    const std::uintptr_t virtual_handle = endpoint->compatibility_handle();
+    const auto live_surface = endpoint->live_surface();
+    if (const auto raster = target.lock()) {
+        raster->set_live_surface(live_surface);
+    }
+    std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+    const std::uint64_t allocated = next_compatibility_paint_endpoint++;
+    compatibility_paint_endpoints.emplace(allocated, endpoint);
+    compatibility_paint_bindings.emplace(
+        allocated, CompatibilityPaintBinding{target, owner_thread, live_surface});
+    *token = allocated;
+    *compatibility_handle = virtual_handle;
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_configure(
+    std::uint64_t token, std::uint32_t width, std::uint32_t height) {
+    if (width == 0U || height == 0U || width > 32768U || height > 32768U) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint configure requires bounded dimensions");
+    }
+    const auto endpoint = compatibility_paint_endpoint(token);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "paint endpoint token is not active");
+    }
+    if (!endpoint->configure(width, height)) {
+        return fail(GF_ERROR_WRONG_THREAD,
+                    "paint endpoint configure requires its owner thread");
+    }
+    CompatibilityPaintBinding binding;
+    {
+        std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+        const auto found = compatibility_paint_bindings.find(token);
+        if (found != compatibility_paint_bindings.end()) binding = found->second;
+    }
+    if (const auto raster = binding.target.lock()) {
+        raster->set_live_surface(endpoint->live_surface());
+    }
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_touch(std::uint64_t token,
+                                           std::uint32_t explicit_boundary) {
+    if (explicit_boundary > 1U) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint explicit flag must be zero or one");
+    }
+    const auto endpoint = compatibility_paint_endpoint(token);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "paint endpoint token is not active");
+    }
+    endpoint->touch(explicit_boundary != 0U);
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_drain(std::uint64_t token) {
+    const auto endpoint = compatibility_paint_endpoint(token);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "paint endpoint token is not active");
+    }
+    return endpoint->drain_now() ? GF_OK :
+        fail(GF_ERROR_WRONG_THREAD,
+             "paint endpoint drain requires its owner thread");
+}
+
+gf_result api_windows_paint_endpoint_snapshot(
+    std::uint64_t token, char* buffer, std::uint64_t capacity,
+    std::uint64_t* required_size) {
+    if (required_size == nullptr) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint snapshot requires a size output");
+    }
+    const auto endpoint = compatibility_paint_endpoint(token);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "paint endpoint token is not active");
+    }
+    const std::string value = endpoint->snapshot();
+    *required_size = value.size();
+    if (capacity < value.size() || (!value.empty() && buffer == nullptr)) {
+        return fail(GF_ERROR_BUFFER_TOO_SMALL,
+                    "paint endpoint snapshot buffer is too small");
+    }
+    if (!value.empty()) std::memcpy(buffer, value.data(), value.size());
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_submit_bgra(
+    std::uintptr_t compatibility_handle, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, const void* pixels) {
+    if (compatibility_handle == 0U || pixels == nullptr || width == 0U || height == 0U ||
+        row_bytes < static_cast<std::uint64_t>(width) * 4U ||
+        height > std::numeric_limits<std::size_t>::max() / row_bytes) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint submission requires bounded BGRA pixels");
+    }
+    const auto endpoint = compatibility_paint_endpoint_for_handle(compatibility_handle);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "handle is not a compatibility paint endpoint");
+    }
+    const auto bytes = std::span<const std::byte>(
+        static_cast<const std::byte*>(pixels),
+        static_cast<std::size_t>(row_bytes) * height);
+    return endpoint->submit_bgra32_premultiplied(
+        width, height, row_bytes, bytes) ? GF_OK :
+        fail(GF_ERROR_INVALID_ARGUMENT,
+             "paint endpoint rejected the submitted frame");
+}
+
+gf_result api_windows_paint_endpoint_release(std::uint64_t token) {
+    std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint> endpoint;
+    CompatibilityPaintBinding binding;
+    {
+        std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+        const auto found = compatibility_paint_endpoints.find(token);
+        if (found == compatibility_paint_endpoints.end()) {
+            return fail(GF_ERROR_STALE_HANDLE,
+                        "paint endpoint token is not active");
+        }
+        endpoint = std::move(found->second);
+        compatibility_paint_endpoints.erase(found);
+        const auto bound = compatibility_paint_bindings.find(token);
+        if (bound != compatibility_paint_bindings.end()) {
+            binding = bound->second;
+            compatibility_paint_bindings.erase(bound);
+        }
+    }
+    // Managed finalizers may release from a worker. Native retained state is
+    // never mutated from that thread; an invalid HWND becomes an inert draw
+    // source and normal control disposal revokes its frame lease. The ordinary
+    // owner-thread path clears the binding immediately.
+    if (std::this_thread::get_id() == binding.owner_thread) {
+        if (const auto raster = binding.target.lock()) {
+            raster->clear_live_surface(binding.surface);
+        }
+    }
+    endpoint->release();
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_get_dc(
+    std::uintptr_t compatibility_handle, std::uintptr_t* device_context) {
+    if (compatibility_handle == 0U || device_context == nullptr) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint GetDC requires a handle and output");
+    }
+    const auto endpoint = compatibility_paint_endpoint_for_handle(compatibility_handle);
+    if (!endpoint) return fail(
+        GF_ERROR_STALE_HANDLE,
+        "handle is not a compatibility paint endpoint");
+    *device_context = endpoint->device_context();
+    return *device_context != 0U ? GF_OK :
+        fail(GF_ERROR_STALE_HANDLE,
+             "paint endpoint has no active memory DC");
+}
+
+gf_result api_windows_paint_endpoint_release_dc(
+    std::uintptr_t compatibility_handle, std::uintptr_t device_context) {
+    if (compatibility_handle == 0U || device_context == 0U) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint ReleaseDC requires both handles");
+    }
+    const auto endpoint = compatibility_paint_endpoint_for_handle(compatibility_handle);
+    if (endpoint && endpoint->device_context() == device_context) return GF_OK;
+    return fail(GF_ERROR_STALE_HANDLE,
+                "DC is not owned by the compatibility paint endpoint");
+}
+
+gf_result api_windows_paint_endpoint_publish_dc(
+    std::uintptr_t device_context) {
+    if (device_context == 0U) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint publish requires a DC");
+    }
+    const auto endpoint = compatibility_paint_endpoint_for_dc(device_context);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "DC is not a compatibility paint endpoint");
+    }
+    return endpoint->publish_device_context(device_context) ? GF_OK :
+        fail(GF_ERROR_INTERNAL, "paint endpoint frame could not publish");
+}
+
+gf_result api_windows_paint_endpoint_begin_write(
+    std::uintptr_t device_context, std::uint64_t* write_lease) {
+    if (device_context == 0U || write_lease == nullptr) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint write requires a DC and lease output");
+    }
+    const auto endpoint = compatibility_paint_endpoint_for_dc(device_context);
+    if (!endpoint) {
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "DC is not a compatibility paint endpoint");
+    }
+    std::uint64_t allocated{};
+    {
+        std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+        allocated = next_compatibility_paint_write++;
+        compatibility_paint_writes.emplace(
+            allocated, CompatibilityPaintWrite{
+                endpoint, device_context, std::this_thread::get_id()});
+    }
+    if (!endpoint->begin_device_context_write(device_context)) {
+        std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+        compatibility_paint_writes.erase(allocated);
+        return fail(GF_ERROR_STALE_HANDLE,
+                    "paint endpoint retired before its write began");
+    }
+    *write_lease = allocated;
+    return GF_OK;
+}
+
+gf_result api_windows_paint_endpoint_end_write(
+    std::uint64_t write_lease, std::uint32_t publish) {
+    if (write_lease == 0U || publish > 1U) {
+        return fail(GF_ERROR_INVALID_ARGUMENT,
+                    "paint endpoint end-write requires a lease and boolean");
+    }
+    CompatibilityPaintWrite operation;
+    {
+        std::scoped_lock lock(compatibility_paint_endpoints_mutex);
+        const auto found = compatibility_paint_writes.find(write_lease);
+        if (found == compatibility_paint_writes.end()) {
+            return fail(GF_ERROR_STALE_HANDLE,
+                        "paint endpoint write lease is not active");
+        }
+        if (found->second.owner_thread != std::this_thread::get_id()) {
+            return fail(GF_ERROR_WRONG_THREAD,
+                        "paint endpoint write must end on its acquiring thread");
+        }
+        operation = std::move(found->second);
+        compatibility_paint_writes.erase(found);
+    }
+    return operation.endpoint->end_device_context_write(
+        operation.device_context, publish != 0U) ? GF_OK :
+        fail(GF_ERROR_INTERNAL,
+             "paint endpoint write could not finish or publish");
+}
+#endif
+
 gf_result api_last_error(gf_error_view* error) noexcept {
     if (error == nullptr) {
         return fail(GF_ERROR_INVALID_ARGUMENT, "last_error requires an output");
@@ -3483,6 +4868,71 @@ gf_result api_perform_control_layout(gf_handle handle) noexcept {
 gf_result api_get_layout_state(gf_handle handle,
                                gf_layout_state* state) noexcept {
     return translate([&] { return registry().get_layout_state(handle, state); });
+}
+gf_result api_property_grid_set_selected_controls(
+    gf_handle property_grid, const gf_handle* controls,
+    std::uint64_t count) noexcept {
+    return translate([&] {
+        return registry().property_grid_set_selected_controls(
+            property_grid, controls, count);
+    });
+}
+gf_result api_property_grid_set_sort(gf_handle property_grid,
+                                     std::uint32_t property_sort) noexcept {
+    return translate([&] {
+        return registry().property_grid_set_sort(property_grid, property_sort);
+    });
+}
+gf_result api_property_grid_get_sort(gf_handle property_grid,
+                                     std::uint32_t* property_sort) noexcept {
+    return translate([&] {
+        return registry().property_grid_get_sort(property_grid, property_sort);
+    });
+}
+gf_result api_property_grid_refresh(gf_handle property_grid) noexcept {
+    return translate([&] {
+        return registry().property_grid_refresh(property_grid);
+    });
+}
+gf_result api_property_object_define(
+    gf_handle property_object,
+    const gf_property_descriptor_v1* descriptor,
+    const gf_property_callbacks_v1* callbacks) noexcept {
+    return translate([&] {
+        return registry().property_object_define(
+            property_object, descriptor, callbacks);
+    });
+}
+gf_result api_property_object_notify_changed(
+    gf_handle property_object, gf_string_view property_name) noexcept {
+    return translate([&] {
+        return registry().property_object_notify_changed(
+            property_object, property_name);
+    });
+}
+gf_result api_property_grid_try_set_text(
+    gf_handle property_grid, gf_string_view property_name,
+    gf_string_view text, std::uint32_t* committed) noexcept {
+    return translate([&] {
+        return registry().property_grid_try_set_text(
+            property_grid, property_name, text, committed);
+    });
+}
+gf_result api_property_grid_reset_property(
+    gf_handle property_grid, gf_string_view property_name,
+    std::uint32_t* committed) noexcept {
+    return translate([&] {
+        return registry().property_grid_reset_property(
+            property_grid, property_name, committed);
+    });
+}
+gf_result api_property_grid_activate_editor(
+    gf_handle property_grid, gf_string_view property_name,
+    std::uint32_t* activated) noexcept {
+    return translate([&] {
+        return registry().property_grid_activate_editor(
+            property_grid, property_name, activated);
+    });
 }
 gf_result api_run_window(gf_handle handle, std::uint32_t flags) noexcept {
     return translate([&] { return registry().run_window(handle, flags); });
@@ -3684,6 +5134,187 @@ gf_result api_field_clear_history(gf_handle control) noexcept {
 
 } // namespace
 
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_acquire_v1(
+    gf_handle control, std::uint32_t width, std::uint32_t height,
+    std::uint64_t* endpoint, std::uintptr_t* compatibility_handle) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_acquire(
+            control, width, height, endpoint, compatibility_handle);
+    });
+#else
+    static_cast<void>(control);
+    static_cast<void>(width);
+    static_cast<void>(height);
+    static_cast<void>(endpoint);
+    static_cast<void>(compatibility_handle);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_configure_v1(
+    std::uint64_t endpoint, std::uint32_t width, std::uint32_t height) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_configure(endpoint, width, height);
+    });
+#else
+    static_cast<void>(endpoint);
+    static_cast<void>(width);
+    static_cast<void>(height);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_touch_v1(
+    std::uint64_t endpoint, std::uint32_t explicit_boundary) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_touch(endpoint, explicit_boundary);
+    });
+#else
+    static_cast<void>(endpoint);
+    static_cast<void>(explicit_boundary);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_drain_v1(
+    std::uint64_t endpoint) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_drain(endpoint);
+    });
+#else
+    static_cast<void>(endpoint);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_snapshot_v1(
+    std::uint64_t endpoint, char* buffer, std::uint64_t capacity,
+    std::uint64_t* required_size) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_snapshot(
+            endpoint, buffer, capacity, required_size);
+    });
+#else
+    static_cast<void>(endpoint);
+    static_cast<void>(buffer);
+    static_cast<void>(capacity);
+    static_cast<void>(required_size);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_release_v1(
+    std::uint64_t endpoint) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_release(endpoint);
+    });
+#else
+    static_cast<void>(endpoint);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_submit_bgra_v1(
+    std::uintptr_t compatibility_handle, std::uint32_t width, std::uint32_t height,
+    std::uint64_t row_bytes, const void* pixels) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_submit_bgra(
+            compatibility_handle, width, height, row_bytes, pixels);
+    });
+#else
+    static_cast<void>(compatibility_handle);
+    static_cast<void>(width);
+    static_cast<void>(height);
+    static_cast<void>(row_bytes);
+    static_cast<void>(pixels);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_get_dc_v1(
+    std::uintptr_t compatibility_handle, std::uintptr_t* device_context) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_get_dc(compatibility_handle, device_context);
+    });
+#else
+    static_cast<void>(compatibility_handle);
+    static_cast<void>(device_context);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_release_dc_v1(
+    std::uintptr_t compatibility_handle, std::uintptr_t device_context) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_release_dc(compatibility_handle, device_context);
+    });
+#else
+    static_cast<void>(compatibility_handle);
+    static_cast<void>(device_context);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_publish_dc_v1(
+    std::uintptr_t device_context) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_publish_dc(device_context);
+    });
+#else
+    static_cast<void>(device_context);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_begin_write_v1(
+    std::uintptr_t device_context, std::uint64_t* write_lease) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_begin_write(
+            device_context, write_lease);
+    });
+#else
+    static_cast<void>(device_context);
+    static_cast<void>(write_lease);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
+extern "C" GF_C_API_EXPORT gf_result gf_windows_paint_endpoint_end_write_v1(
+    std::uint64_t write_lease, std::uint32_t publish) {
+#if defined(GF_C_API_HAS_WINDOWS_HOST)
+    return translate([&] {
+        return api_windows_paint_endpoint_end_write(write_lease, publish);
+    });
+#else
+    static_cast<void>(write_lease);
+    static_cast<void>(publish);
+    return fail(GF_ERROR_UNSUPPORTED_VERSION,
+                "Windows paint endpoints require the Win32 host");
+#endif
+}
+
 extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_version,
                                                     gf_api_v0* table) {
     if (table == nullptr || table->struct_size < sizeof(std::uint32_t) * 2U) {
@@ -3710,7 +5341,10 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         requested_version != GF_ABI_VERSION_0_18 &&
         requested_version != GF_ABI_VERSION_0_19 &&
         requested_version != GF_ABI_VERSION_0_20 &&
-        requested_version != GF_ABI_VERSION_0_21) {
+        requested_version != GF_ABI_VERSION_0_21 &&
+        requested_version != GF_ABI_VERSION_0_22 &&
+        requested_version != GF_ABI_VERSION_0_23 &&
+        requested_version != GF_ABI_VERSION_0_24) {
         return fail(GF_ERROR_UNSUPPORTED_VERSION,
                     "requested GUI.Forms experimental ABI version is unsupported");
     }
@@ -3790,6 +5424,15 @@ extern "C" GF_C_API_EXPORT gf_result gf_get_api_v0(std::uint32_t requested_versi
         &api_resume_layout,
         &api_perform_control_layout,
         &api_get_layout_state,
+        &api_property_grid_set_selected_controls,
+        &api_property_grid_set_sort,
+        &api_property_grid_get_sort,
+        &api_property_grid_refresh,
+        &api_property_object_define,
+        &api_property_object_notify_changed,
+        &api_property_grid_try_set_text,
+        &api_property_grid_reset_property,
+        &api_property_grid_activate_editor,
     };
     const std::size_t copy_size = std::min<std::size_t>(caller_size, sizeof(implementation));
     std::memcpy(table, &implementation, copy_size);

@@ -14,8 +14,11 @@ sharing Rust layout, or depending on frontend/GUI.Forms code. The client:
 - materializes typed version, release, lifecycle, and availability snapshots;
 - obtains contracts, availability, routing/fallback, and service controls in one
   atomic `ORC-FE-001` bootstrap read;
+- invokes the single `orchestrator.search` operation and parses common result
+  names/source/completeness plus successful or partial terminal state without
+  selecting catalogue versus live traversal;
 - verifies one daemon/cache generation and computes only the Orchestrator-owned
-  Frontend 001 gate without treating a running development daemon as released;
+  Frontend 001 gate from the ready release evidence;
 - materializes the separately attributed GUI.Forms and architect gates without
   claiming authority to satisfy or combine them.
 
@@ -40,6 +43,8 @@ cmake -S orchestrator/conformance/clients/cpp \
 cmake --build /tmp/fileman-orchestrator-cpp-build
 /tmp/fileman-orchestrator-cpp-build/orchestrator-cpp-client \
   /absolute/private/runtime-leaf probe
+/tmp/fileman-orchestrator-cpp-build/orchestrator-cpp-client \
+  /absolute/private/runtime-leaf search docs needle
 ```
 
 On macOS the runtime argument may be omitted to use the same stable Application

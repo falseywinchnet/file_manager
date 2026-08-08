@@ -1,8 +1,8 @@
 # Orchestrator ↔ Engine interface negotiation
 
 Status: **ORC-ENG round 001 reconciled under ADR-007; semantic v0 frozen for
-experimental implementation; required catalogue-independent fallback round 006
-awaits Engine reply under ADR-008**.
+experimental implementation; catalogue-independent fallback reply 006 is
+recorded under ADR-008 with cross-platform promotion evidence still open**.
 
 Participants: Orchestrator integration authority and the systemwide Go engine.
 Canonical families: `ORC-COM-001`, `ORC-LIF-001`, `ORC-ENG-001`,
@@ -553,7 +553,7 @@ Source locators: `api/service.go`, `internal/observation`,
 ## Orchestrator requirement 006 — catalogue-independent live search
 
 Status: **required proposal issued 2026-08-05 under accepted ADR-008; Engine
-reply and implementation evidence required**.
+reply 006 recorded with development implementation and partial native evidence**.
 
 The grand architect has clarified that search must work without a catalogue.
 Manual reconciliation followed by catalogue query does not satisfy that
@@ -677,11 +677,69 @@ Compatibility environments may exercise protocol and broad behavior, but
 native filesystem promotion evidence remains required. The first implementation
 may be basic-name/path-only; unsupported richer predicates must be explicit.
 
-## Engine reply 006 — reserved
+## Engine reply 006 — bounded live query development slice
 
-Status: **awaiting Engine reply**.
+Status: **ACCEPTED for experimental implementation 2026-08-07; cross-platform
+production promotion remains open**.
 
-The Engine should record accepted items, counterproposals, implementation
-locators, measured budgets, and red fixtures here. It must not answer this
-requirement by renaming `scan.reconcile` or by constructing a disposable full
-catalogue before returning the first result.
+The Engine accepts the separate `engine.query_live` operation, already-approved
+root/scope authority, zero-catalogue/no-write rule, basic name/relative-path
+predicate, exact observed identity, discovery order, source-bound cursors,
+symlink non-traversal, partial/unavailable subtree reporting, narrow fallback
+allowlist, and frontend-hidden source selection.
+
+The initial numeric constitution is accepted as server hard ceilings, not as
+performance claims: 1,000 results, 1,000,000 visited entries, 65,536 metadata
+calls, 5 seconds, 32 open directories, and 1 MiB response allowance. Defaults
+remain 128 / 100,000 / 4,096 / 250 ms / 8 / 256 KiB. Additionally, the
+implementation admits at most 32 live sessions per process and expires each
+cursor 30 seconds after creation.
+
+Counterproposal and disclosed limitation: `max_open_directories` is currently
+also a traversal-depth ceiling. A deeper subtree is named unavailable and the
+terminal page is partial; the implementation does not rewalk ancestors,
+materialize directory contents, or retain an unbounded pending queue to evade
+that ceiling. Response-byte accounting uses a conservative per-result
+allowance under the 1 MiB JSONL frame; exact encoded-byte accounting is a red
+promotion item.
+
+Implementation locators:
+
+- `api/types.go`: live request/budget/page/work types;
+- `internal/live/manager.go`: streaming traversal, sessions, cursors, budgets,
+  identity observations, and cleanup;
+- `internal/service/service.go`: approved-root dispatch and catalogue
+  separation;
+- `internal/transport/jsonl.go`: `engine.query_live` dispatch;
+- `internal/service/live_query_test.go` and
+  `internal/transport/jsonl_test.go`: no-catalogue, pagination, link, state,
+  and wire conformance;
+- `benchmarks/live_query_test.go` and
+  `results/M1L_LIVE_QUERY_001.md`: opt-in APFS control;
+- `orchestrator/tests/live_search.rs`: authenticated daemon plus independently
+  built Rust/C++ client route.
+
+**MEASURED** on the named 10,000-entry APFS fixture: 82.875 µs first result,
+40.802 ms complete traversal over 80 pages, 30,251,504 total allocated bytes,
+9,992 retained heap bytes after GC, and descriptor count 6 → 9 → 6. Catalogue
+generation remained unchanged. These are one-run scale-point values, not
+p50/p95/p99 or cross-platform claims.
+
+Red reply items retained without euphemism:
+
+1. catalogue-damaged fallback is policy-tested, while corrupt durable-provider
+   cross-process execution remains red;
+2. APFS native containment/identity passes; native NTFS/ext4 remain red;
+3. million-entry wide/deep resource gates remain red;
+4. p50/p95/p99/max, CPU, RSS, and bytes-read distributions remain red;
+5. context cancellation is checked during enumeration, but metadata-block and
+   blocked-output native campaigns remain red;
+6. symlink non-traversal and cursor invalidation pass; distinct-identity
+   permission, root replacement, concurrent mutation, mount-boundary, and
+   forced-expiry campaigns remain incomplete;
+7. zero catalogue generation side effects and unchanged persistent-store tree
+   fingerprints pass; block/device-level write tracing remains red; and
+8. exact observation equivalence to a later quiescent reconcile remains red.
+
+This reply does not rename `scan.reconcile`, build a disposable catalogue, or
+claim that the development JSONL adapter is the installed Engine transport.

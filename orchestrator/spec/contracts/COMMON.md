@@ -22,11 +22,11 @@ Current fixtures: `../../conformance/fixtures/bootstrap/`.
 
 `orchestrator.release` is the executable `ORC-LIF-001` readiness projection for
 the Core 1.0 profile. It returns target and build versions, a readiness Boolean,
-and every named unsatisfied requirement. It reports `development` until the
+and every named unsatisfied requirement. It now reports `ready` because the
 contract, discovery, authentication, transport, independent-client,
-cross-version, hostile-fixture, and provenance gates in
+cross-version, hostile-fixture, provenance, and installed LaunchAgent gates in
 [`../../planning/CORE_1_0_RELEASE.md`](../../planning/CORE_1_0_RELEASE.md) pass.
-A running lifecycle is not evidence that Core 1.0 is ready.
+A running lifecycle alone remains insufficient evidence.
 
 The release result includes `provenance.algorithm`, `scope`, `digest`,
 `signed`, and `embedded_inputs`. Digest scope v1 covers the manifest identity,
@@ -89,12 +89,15 @@ explicit test/development override. A self-bound daemon proves effective
 ownership before publication. A launchd-started daemon adopts and validates the
 named supervisor socket without unlinking it, then publishes a new instance and
 credential. Clients use one bounded activation/rediscovery interval so stale
-credentials fail closed across process generations. Installed LaunchAgent
-lifecycle evidence remains a separate gate. The macOS server now also verifies
-the kernel-vouched effective peer UID before reading the bearer hello. Endpoint
-publication uses exact private modes, no-follow descriptor reads, file and
-directory synchronization around atomic renames, and secure drop-time erasure
-for Rust-held credential values.
+credentials fail closed across process generations. The installed LaunchAgent
+trial proves first-use activation, shutdown, bounded supervisor reactivation,
+fresh instance publication, bootout, and exact artifact removal. The generated
+plist selects a one-second launchd throttle so restart remains inside the
+five-second client bound. The macOS server also verifies the kernel-vouched
+effective peer UID before reading the bearer hello. Endpoint publication uses
+exact private modes, no-follow descriptor reads, file and directory
+synchronization around atomic renames, and secure drop-time erasure for
+Rust-held credential values.
 
 `orchestrator.status` and the embedded frontend status carry optional
 `runtime_health`. These saturating counters expose worker/queue ceilings,
