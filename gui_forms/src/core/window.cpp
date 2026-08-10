@@ -747,21 +747,37 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         std::vector<Control::Ptr> popup_roots;
         popup_roots.reserve(popups_.size());
         for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
-        for (std::size_t index = 0; index < paint_plane_count; ++index) {
-            const PaintPlane plane = static_cast<PaintPlane>(index);
+        const auto paint_plane_bounds = [this, &requested_damage, &paint_bounds,
+                                         &window_bounds](std::size_t index) {
             Rect plane_bounds = paint_bounds;
             if (requested_damage.empty()) {
                 plane_bounds = Rect::intersection(plane_damage_[index].bounds(),
                                                   window_bounds);
             }
+            return plane_bounds;
+        };
+        // Complete the application root across every paint plane before any
+        // popup root. A popup is one composited retained surface; interleaving
+        // its backplane with later application planes lets ordinary content
+        // paint over the popup and leaves only overlay-plane pixels visible.
+        for (std::size_t index = 0; index < paint_plane_count; ++index) {
+            const Rect plane_bounds = paint_plane_bounds(index);
             if (plane_bounds.empty()) continue;
+            const PaintPlane plane = static_cast<PaintPlane>(index);
             paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes,
                             painted_controls, consumed_invalidations, chunks_rebuilt,
                             chunks_reused, commands_replayed);
-            // Window-owned popup roots are composited after application content
-            // in opening order, independent of consumer layout.
-            for (const Control::Ptr& overlay : popup_roots) {
-                if (overlay && overlay->is_alive() && overlay->window_ == this) {
+        }
+        // Window-owned popup roots are composited after all application
+        // content, in opening order and independently of consumer layout.
+        for (const Control::Ptr& overlay : popup_roots) {
+            if (!overlay || !overlay->is_alive() || overlay->window_ != this) {
+                continue;
+            }
+            for (std::size_t index = 0; index < paint_plane_count; ++index) {
+                const Rect plane_bounds = paint_plane_bounds(index);
+                if (!plane_bounds.empty()) {
+                    const PaintPlane plane = static_cast<PaintPlane>(index);
                     paint_recursive(overlay, candidate, plane_bounds, plane,
                                     visited_nodes, painted_controls,
                                     consumed_invalidations, chunks_rebuilt,
@@ -876,9 +892,10 @@ bool Window::queue_live_surface_presentation(
     }
     auto [entry, inserted] = live_surface_registrations_.try_emplace(
         control->runtime_id().value,
-        LiveSurfaceRegistration{control, surface, 0U, 0U});
+        LiveSurfaceRegistration{control, surface, 0U, 0U, false});
     if (!inserted && entry->second.surface != surface) {
-        entry->second = LiveSurfaceRegistration{control, std::move(surface), 0U, 0U};
+        entry->second =
+            LiveSurfaceRegistration{control, std::move(surface), 0U, 0U, false};
     } else {
         entry->second.control = control;
         entry->second.surface = std::move(surface);
@@ -891,6 +908,61 @@ Window::take_live_surface_presentations() {
     require_ui_thread("live-surface presentation drain");
     std::vector<LiveSurfacePresentation> result;
     result.reserve(live_surface_registrations_.size());
+
+    // Direct live presentation is a fast path through retained composition,
+    // not an always-on-top plane. Gather overlay ownership once, then subtract
+    // those pixels from each live presentation. Uncovered spectrum/video pixels
+    // therefore keep advancing while a menu is open without allowing the live
+    // lane to paint over the menu.
+    std::vector<Rect> overlay_rectangles;
+    const auto collect_visible_overlays =
+        [this, &overlay_rectangles](const auto& self,
+                                    const Control::Ptr& candidate) -> void {
+            if (!candidate || !candidate->is_alive() ||
+                candidate->window_ != this || !candidate->effectively_visible()) {
+                return;
+            }
+            if (candidate->paint_plane_ == PaintPlane::overlay) {
+                const Rect bounds = Rect::intersection(
+                    absolute_bounds_of(*candidate),
+                    {0.0, 0.0, client_size_.width, client_size_.height});
+                if (!bounds.empty()) overlay_rectangles.push_back(bounds);
+            }
+            for (const Control::Ptr& child : candidate->children_) {
+                self(self, child);
+            }
+        };
+    collect_visible_overlays(collect_visible_overlays, root_);
+    for (const auto& popup : popups_) {
+        if (popup) {
+            collect_visible_overlays(collect_visible_overlays, popup->popup());
+        }
+    }
+
+    const auto subtract_rectangle = [](const Rect& source, const Rect& cover) {
+        std::vector<Rect> fragments;
+        const Rect overlap = Rect::intersection(source, cover);
+        if (overlap.empty()) {
+            fragments.push_back(source);
+            return fragments;
+        }
+        const double source_right = source.x + source.width;
+        const double source_bottom = source.y + source.height;
+        const double overlap_right = overlap.x + overlap.width;
+        const double overlap_bottom = overlap.y + overlap.height;
+        const Rect candidates[] = {
+            {source.x, source.y, source.width, overlap.y - source.y},
+            {source.x, overlap_bottom, source.width,
+             source_bottom - overlap_bottom},
+            {source.x, overlap.y, overlap.x - source.x, overlap.height},
+            {overlap_right, overlap.y, source_right - overlap_right,
+             overlap.height},
+        };
+        for (const Rect& candidate : candidates) {
+            if (!candidate.empty()) fragments.push_back(candidate);
+        }
+        return fragments;
+    };
     for (auto iterator = live_surface_registrations_.begin();
          iterator != live_surface_registrations_.end();) {
         const Control::Ptr control = iterator->second.control.lock();
@@ -906,10 +978,7 @@ Window::take_live_surface_presentations() {
         }
 
         const LiveSurfaceSnapshot snapshot = iterator->second.surface->snapshot();
-        if (!snapshot.has_frame ||
-            (iterator->second.sampled_epoch == snapshot.epoch &&
-             iterator->second.sampled_generation ==
-                 snapshot.published_generation)) {
+        if (!snapshot.has_frame) {
             ++iterator;
             continue;
         }
@@ -933,11 +1002,36 @@ Window::take_live_surface_presentations() {
                        viewport.width, viewport.height});
         }
         if (valid && !clip.empty()) {
-            result.push_back(LiveSurfacePresentation{
-                control->runtime_id(), iterator->second.surface,
-                destination, clip});
+            std::vector<Rect> clips{clip};
+            bool clipped_by_overlay = false;
+            for (const Rect& overlay : overlay_rectangles) {
+                std::vector<Rect> remaining;
+                for (const Rect& candidate : clips) {
+                    if (!Rect::intersection(candidate, overlay).empty()) {
+                        clipped_by_overlay = true;
+                    }
+                    auto fragments = subtract_rectangle(candidate, overlay);
+                    remaining.insert(remaining.end(), fragments.begin(),
+                                     fragments.end());
+                }
+                clips = std::move(remaining);
+                if (clips.empty()) break;
+            }
+            const bool same_generation =
+                iterator->second.sampled_epoch == snapshot.epoch &&
+                iterator->second.sampled_generation ==
+                    snapshot.published_generation;
+            if (!same_generation || clipped_by_overlay ||
+                iterator->second.sampled_with_overlay_clip) {
+                for (const Rect& visible_clip : clips) {
+                    result.push_back(LiveSurfacePresentation{
+                        control->runtime_id(), iterator->second.surface,
+                        destination, visible_clip});
+                }
+            }
             iterator->second.sampled_epoch = snapshot.epoch;
             iterator->second.sampled_generation = snapshot.published_generation;
+            iterator->second.sampled_with_overlay_clip = clipped_by_overlay;
         }
         ++iterator;
     }

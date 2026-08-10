@@ -22,7 +22,10 @@ public:
     void restore() override { ++restore_count; }
     void translate(Point) override {}
     void clip_rect(Rect) override {}
-    void fill_rect(Rect, Color) override { ++draw_count; }
+    void fill_rect(Rect, Color color) override {
+        ++draw_count;
+        fill_colors.push_back(color);
+    }
     void stroke_rect(Rect, Color, double) override { ++draw_count; }
     void draw_line(Point, Point, Color, double) override { ++draw_count; }
     void draw_text_utf8(Point, std::string_view, FontSpec font, Color) override {
@@ -35,6 +38,7 @@ public:
     std::uint64_t restore_count{};
     std::uint64_t draw_count{};
     std::optional<FontSpec> last_font;
+    std::vector<Color> fill_colors;
 };
 
 class ProbeControl : public Control {
@@ -949,6 +953,59 @@ void test_damage_and_idle_metrics() {
             "machine snapshot must declare CPU-only renderer capability");
 }
 
+void test_popup_surface_composites_after_every_application_plane() {
+    const Color application_overlay = Color::rgba(170, 20, 30);
+    const Color popup_backplane = Color::rgba(20, 170, 30);
+    auto root = make_control<ProbeControl>(StableId("popup-order.root"));
+    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    root->set_paint_plane(PaintPlane::overlay);
+    auto owner = make_control<ProbeControl>(StableId("popup-order.owner"));
+    owner->set_requested_bounds({0.0, 0.0, 40.0, 20.0});
+    root->add_child(owner);
+    Window window(root, {120.0, 80.0});
+
+    class ColoredPopup final : public Control {
+    public:
+        ColoredPopup(StableId id, Color color)
+            : Control(std::move(id)), color_(color) {
+            set_paint_plane(PaintPlane::backplane);
+        }
+        void on_paint(Painter& painter, Rect damage) override {
+            painter.fill_rect(damage, color_);
+        }
+    private:
+        Color color_;
+    };
+
+    // ProbeControl's fixed paint is replaced by a child overlay so the final
+    // application command has a distinctive color.
+    class ColoredOverlay final : public Control {
+    public:
+        ColoredOverlay(StableId id, Color color)
+            : Control(std::move(id)), color_(color) {
+            set_paint_plane(PaintPlane::overlay);
+        }
+        void on_paint(Painter& painter, Rect damage) override {
+            painter.fill_rect(damage, color_);
+        }
+    private:
+        Color color_;
+    };
+    auto application = make_control<ColoredOverlay>(
+        StableId("popup-order.application-overlay"), application_overlay);
+    application->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    root->add_child(application);
+    auto popup = make_control<ColoredPopup>(
+        StableId("popup-order.popup"), popup_backplane);
+    popup->set_requested_bounds({10.0, 10.0, 60.0, 40.0});
+    auto token = window.open_popup(owner, popup);
+    RecordingPainter painter;
+    window.paint(painter);
+    require(token.connected() && !painter.fill_colors.empty() &&
+                painter.fill_colors.back() == popup_backplane,
+            "a popup backplane must composite after the application's overlay plane");
+}
+
 void test_tokenized_accelerator_runs_after_focused_route() {
     Fixture fixture;
     require(fixture.window->request_focus(fixture.child),
@@ -1129,6 +1186,7 @@ int main() {
         test_cursor_inheritance_and_override();
         test_control_identity_geometry_constraints_and_z_order();
         test_damage_and_idle_metrics();
+        test_popup_surface_composites_after_every_application_plane();
         test_tokenized_accelerator_runs_after_focused_route();
         test_presentation_settings_separate_text_and_device_scale();
         test_semantic_feedback_is_clocked_bounded_and_sound_optional();

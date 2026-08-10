@@ -8,10 +8,10 @@
     <DebugSymbols>false</DebugSymbols>
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AssemblyName>GuiForms.FacadeLoadRunner</AssemblyName>
-    <RootNamespace>GuiForms.CompatCapture</RootNamespace>
+    <AssemblyName>GuiForms.SdrSharpReflectionRunner</AssemblyName>
+    <RootNamespace>GuiForms.SdrSharpReflectionSystem</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../compat_capture/BundleReader.cs" Link="BundleReader.cs" />
+    <Compile Include="../../tools/compat_capture/BundleReader.cs" Link="BundleReader.cs" />
   </ItemGroup>
 </Project>

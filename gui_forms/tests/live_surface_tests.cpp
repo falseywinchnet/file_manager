@@ -1,4 +1,4 @@
-#include "gui_forms/live_surface.hpp"
+#include "gui_forms/gui_forms.hpp"
 
 #include <cassert>
 #include <atomic>
@@ -102,4 +102,43 @@ int main() {
     fill(disconnected_write, std::byte{0x55});
     assert(disconnected_write.publish() == 2U);
     assert(wakes == 5U);
+
+    auto root = make_control<Control>(StableId("live.root"));
+    auto live_control = make_control<Control>(StableId("live.content"));
+    auto overlay = make_control<Control>(StableId("live.overlay"));
+    root->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    live_control->set_requested_bounds({10.0, 10.0, 70.0, 50.0});
+    overlay->set_requested_bounds({20.0, 20.0, 30.0, 20.0});
+    overlay->set_paint_plane(PaintPlane::overlay);
+    root->add_child(live_control);
+    root->add_child(overlay);
+    Window window(root, {100.0, 80.0});
+    window.perform_layout();
+
+    auto composited_surface = LiveSurface::create({4U, 3U});
+    assert(composited_surface);
+    auto composited_write = composited_surface->try_acquire_write();
+    assert(composited_write);
+    fill(composited_write, std::byte{0x31});
+    assert(composited_write.publish() == 1U);
+    assert(window.queue_live_surface_presentation(live_control,
+                                                  composited_surface));
+    // An intersecting retained overlay owns only its pixels. The direct lane
+    // continues presenting every uncovered fragment around it.
+    const auto clipped = window.take_live_surface_presentations();
+    assert(clipped.size() == 4U);
+    for (const auto& presentation : clipped) {
+        assert(presentation.control == live_control->runtime_id());
+        assert(Rect::intersection(presentation.clip,
+                                  {20.0, 20.0, 30.0, 20.0}).empty());
+    }
+
+    overlay->set_visible(false);
+    auto resumed_write = composited_surface->try_acquire_write();
+    assert(resumed_write);
+    fill(resumed_write, std::byte{0x32});
+    assert(resumed_write.publish() == 2U);
+    const auto resumed = window.take_live_surface_presentations();
+    assert(resumed.size() == 1U &&
+           resumed.front().control == live_control->runtime_id());
 }

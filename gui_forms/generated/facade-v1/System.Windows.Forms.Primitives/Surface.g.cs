@@ -3,11 +3,17 @@
 #pragma warning disable 0067,0108,0109,0114,0169,0649,8600,8601,8602,8603,8618,8625
 namespace System.Windows.Forms {
     public partial struct Message {
-        public nint HWnd { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_HWnd|System.IntPtr ()");  return global::System.Windows.Forms.FacadeStubDiagnostics.Value<nint>("System.Windows.Forms.Message.HWnd"); } }
-        public nint LParam { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_LParam|System.IntPtr ()");  return global::System.Windows.Forms.FacadeStubDiagnostics.Value<nint>("System.Windows.Forms.Message.LParam"); } }
-        public int Msg { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_Msg|System.Int32 ()");  return global::System.Windows.Forms.FacadeStubDiagnostics.Value<int>("System.Windows.Forms.Message.Msg"); } }
-        public nint Result { set { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|set_Result|System.Void (System.IntPtr)");  } }
-        public nint WParam { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_WParam|System.IntPtr ()");  return global::System.Windows.Forms.FacadeStubDiagnostics.Value<nint>("System.Windows.Forms.Message.WParam"); } }
+        private nint __hWnd;
+        private int __msg;
+        private nint __wParam;
+        private nint __lParam;
+        private nint __result;
+        public static Message Create(nint hWnd, int msg, nint wParam, nint lParam) { return new Message { __hWnd = hWnd, __msg = msg, __wParam = wParam, __lParam = lParam }; }
+        public nint HWnd { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_HWnd|System.IntPtr ()");  return __hWnd; } }
+        public nint LParam { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_LParam|System.IntPtr ()");  return __lParam; } }
+        public int Msg { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_Msg|System.Int32 ()");  return __msg; } }
+        public nint Result { set { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|set_Result|System.Void (System.IntPtr)");  __result = value; } }
+        public nint WParam { get { global::System.Windows.Forms.FacadeCallTelemetry.Hit("System.Windows.Forms.Primitives|System.Windows.Forms.Message|get_WParam|System.IntPtr ()");  return __wParam; } }
     }
     public partial struct Padding {
         private int __left;

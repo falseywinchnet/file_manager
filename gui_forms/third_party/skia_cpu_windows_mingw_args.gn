@@ -19,13 +19,13 @@ extra_cflags = [
   # private intrinsic directory here shadows them and breaks zlib's SSE path.
   # Keep the target CRT after libstdc++ so its include_next directives can
   # resolve stdlib.h/math.h while Clang's built-in intrinsics stay first.
-  "-idirafter/opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/include",
+  "-idirafter/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include",
 ]
 extra_cflags_cc = [
   "-nostdinc++",
-  "-isystem/opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/include/c++/15.2.0",
-  "-isystem/opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/include/c++/15.2.0/x86_64-w64-mingw32",
-  "-isystem/opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/include/c++/15.2.0/backward",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0/x86_64-w64-mingw32",
+  "-isystem/opt/homebrew/opt/mingw-w64/toolchain-x86_64/x86_64-w64-mingw32/include/c++/16.1.0/backward",
 ]
 
 skia_enable_ganesh = false

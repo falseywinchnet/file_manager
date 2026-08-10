@@ -74,6 +74,14 @@ if (args.Length == 1 && args[0] == "theme-inherited-paint")
 {
     return RunInheritedThemePaintHost();
 }
+if (args.Length == 1 && args[0] == "background-only-paint")
+{
+    return RunBackgroundOnlyPaintHost();
+}
+if (args.Length == 1 && args[0] == "theme-restore-transaction")
+{
+    return RunThemeRestoreTransactionHost();
+}
 if (args.Length == 1 && args[0] == "form-semantics")
 {
     return RunFormSemantics();
@@ -315,10 +323,22 @@ lateAutoSizeTable.Controls.Add(lateAutoSizeLabel, 0, 0);
 lateAutoSizeTable.Controls.Add(pictureBox, 1, 0);
 lateAutoSizeLabel.Text = "Zoom";
 pictureBox.Image = pictureImage;
+var anchoredAutoSizeTable = new TableLayoutPanel
+{
+    Size = new Size(87, 26), ColumnCount = 1, RowCount = 1, Padding = new Padding(0),
+};
+anchoredAutoSizeTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+anchoredAutoSizeTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+var anchoredAutoSizeLabel = new Label
+{
+    AutoSize = true, Text = "Zoom", Size = new Size(59, 20), Margin = new Padding(3),
+    Anchor = AnchorStyles.Left | AnchorStyles.Right, TextAlign = ContentAlignment.MiddleCenter,
+};
+anchoredAutoSizeTable.Controls.Add(anchoredAutoSizeLabel, 0, 0);
 var autoPercentTable = new TableLayoutPanel
 {
     Size = new Size(240, 0), ColumnCount = 1, RowCount = 2, Padding = new Padding(0),
-    Dock = DockStyle.Top, AutoSize = true,
+    Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
 };
 autoPercentTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 autoPercentTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -332,7 +352,22 @@ autoPercentTable.Controls.Add(autoPercentFooter, 0, 1);
 var autoPercentExpandedHeight = autoPercentTable.Height;
 autoPercentPanel.Visible = false;
 var autoPercentCollapsedHeight = autoPercentTable.Height;
+var autoPercentCollapsedFooterTop = autoPercentFooter.Top;
 autoPercentPanel.Visible = true;
+var hiddenAutoRowTable = new TableLayoutPanel
+{
+    Size = new Size(180, 90), ColumnCount = 1, RowCount = 3, Padding = new Padding(0),
+};
+hiddenAutoRowTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+hiddenAutoRowTable.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+hiddenAutoRowTable.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+hiddenAutoRowTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+var hiddenAutoRow = new Label { Text = "not laid out", Size = new Size(180, 31), Margin = new Padding(0), Visible = false };
+var visibleAutoRow = new Label { Text = "visible", Size = new Size(180, 19), Margin = new Padding(0) };
+var remainingAutoRow = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+hiddenAutoRowTable.Controls.Add(hiddenAutoRow, 0, 0);
+hiddenAutoRowTable.Controls.Add(visibleAutoRow, 0, 1);
+hiddenAutoRowTable.Controls.Add(remainingAutoRow, 0, 2);
 var flowProbe = new FlowLayoutPanel { Size = new Size(170, 80), Padding = new Padding(0), WrapContents = true };
 var flowFirst = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
 var flowSecond = new Button { Size = new Size(80, 20), Margin = new Padding(0) };
@@ -643,11 +678,16 @@ Require(oversizedAuto.Right <= boundedTable.ClientSize.Width &&
     "table layout containment");
 Require(lateAutoSizeLabel.Width > 0 && lateAutoSizeLabel.Height > 0,
     "late text invalidates label auto-size layout");
+Require(anchoredAutoSizeLabel.Bounds == new Rectangle(3, 3, 81, 20),
+    $"parent table bounds remain authoritative during anchored AutoSize child relayout; actual={anchoredAutoSizeLabel.Bounds}");
 Require(pictureBox.Width >= pictureImage.Width && pictureBox.Height >= pictureImage.Height,
     "picture image contributes auto-size preferred dimensions");
 Require(autoPercentPanel.Height == 30 && autoPercentExpandedHeight == 50 &&
     autoPercentCollapsedHeight == 20 && autoPercentTable.Height == 50,
-    "auto-size table preserves percent-row content and reacts to visibility");
+    $"auto-size table preserves percent-row content and reacts to visibility (panel={autoPercentPanel.Height}, collapsed-footer-top={autoPercentCollapsedFooterTop}, footer-top={autoPercentFooter.Top}, expanded={autoPercentExpandedHeight}, collapsed={autoPercentCollapsedHeight}, restored={autoPercentTable.Height})");
+Require(visibleAutoRow.Top == 0 && visibleAutoRow.Height == 19 &&
+    remainingAutoRow.Top == 19 && remainingAutoRow.Height == 71,
+    "invisible controls do not reserve auto-sized table rows");
 Require(flowFirst.Location == Point.Empty && flowSecond.Location == new Point(80, 0) &&
     flowThird.Location == new Point(0, 20), "flow layout wrapping");
 Require(listProbe.Items.Count == 2 && Equals(listProbe.Items[0], "alpha") &&
@@ -786,7 +826,11 @@ static int RunSecondaryFormHost()
 {
     var main = new Form { Name = "secondaryMain", Text = "Secondary owner", Size = new Size(640, 480) };
     var mainField = new TextBox { Name = "mainFocus", Bounds = new Rectangle(16, 16, 140, 24) };
+    var standardClick = new StandardClickProbe { Name = "standardClick", Bounds = new Rectangle(180, 16, 40, 24) };
+    var standardClicks = 0;
+    standardClick.Click += (_, _) => ++standardClicks;
     main.Controls.Add(mainField);
+    main.Controls.Add(standardClick);
     var secondary = new Form
     {
         Name = "secondaryPanel",
@@ -794,8 +838,34 @@ static int RunSecondaryFormHost()
         Location = new Point(520, 410),
         Size = new Size(300, 260)
     };
-    var secondaryAction = new Button { Name = "secondaryAction", Text = "Apply", Bounds = new Rectangle(16, 36, 96, 26) };
+    var nestedContentEnters = 0;
+    var nestedContent = new Form
+    {
+        Name = "nestedDockContent",
+        TopLevel = false,
+        FormBorderStyle = FormBorderStyle.None,
+        Bounds = new Rectangle(8, 30, 132, 70),
+        TabIndex = 0,
+        TabStop = true,
+    };
+    nestedContent.Enter += (_, _) => ++nestedContentEnters;
+    var secondaryAction = new Button { Name = "secondaryAction", Text = "Apply", Bounds = new Rectangle(16, 108, 96, 26), TabIndex = 1 };
+    secondary.Controls.Add(nestedContent);
     secondary.Controls.Add(secondaryAction);
+    var propertyShown = new Form
+    {
+        Name = "visiblePropertyPanel",
+        Text = "Property shown",
+        Size = new Size(240, 180)
+    };
+    var propertyShownContent = new Panel
+    {
+        Name = "visiblePropertyContent",
+        Bounds = new Rectangle(0, 0, 240, 180)
+    };
+    var propertyShownInner = new Panel { Bounds = new Rectangle(0, 0, 240, 180) };
+    propertyShownContent.Controls.Add(propertyShownInner);
+    propertyShown.Controls.Add(propertyShownContent);
     var loads = 0;
     var closes = 0;
     var cancelFirstClose = true;
@@ -812,9 +882,56 @@ static int RunSecondaryFormHost()
             "non-modal form attaches to the active retained host");
         Require(ReferenceEquals(secondary.Owner, main) && main.OwnedForms.Length == 1,
             "non-modal form records bidirectional ownership");
-        Require(secondaryAction.Focused, "secondary form establishes its own initial focus");
+        Require(nestedContent.Focused && nestedContentEnters == 1,
+            "hosted form gives its nested non-top-level form WinForms Enter focus semantics");
+        Require(secondaryAction.Focus(), "secondary action remains focusable after nested form activation");
         Require(secondary.Right <= main.Width && secondary.Bottom <= main.Height,
             "non-modal form remains inside host bounds");
+        var captionField = typeof(Form).GetField("__hostedCaptionPanel",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+            throw new InvalidOperationException("hosted caption projection unavailable");
+        var caption = captionField.GetValue(secondary) as Control ??
+            throw new InvalidOperationException("hosted caption surface unavailable");
+        var injectPointer = typeof(Control).GetMethod("__InjectManagedPointer",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+            throw new InvalidOperationException("managed pointer injection unavailable");
+        _ = injectPointer.Invoke(standardClick, new object[] { 6u, 10d, 10d, 0d, 1u });
+        _ = injectPointer.Invoke(standardClick, new object[] { 7u, 10d, 10d, 0d, 0u });
+        Require(standardClicks == 1,
+            "standard Control click survives a buttonless native mouse-up");
+        var beforeDrag = secondary.Bounds;
+        _ = injectPointer.Invoke(caption, new object[] { 6u, 20d, 12d, 0d, 1u });
+        _ = injectPointer.Invoke(caption, new object[] { 5u, -80d, -48d, 0d, 0u });
+        _ = injectPointer.Invoke(caption, new object[] { 7u, -80d, -48d, 0d, 0u });
+        Require(secondary.Left == beforeDrag.Left - 100 &&
+            secondary.Top == beforeDrag.Top - 60 && !caption.Capture,
+            "hosted caption drag moves the popup and releases capture on buttonless mouse-up");
+        propertyShown.Visible = true;
+        Require(ReferenceEquals(propertyShown.Parent, main) && propertyShown.Visible &&
+            ReferenceEquals(propertyShown.Owner, main),
+            "setting Visible presents a top-level form through the retained host");
+        Require(propertyShownContent.Top == 0 && propertyShownContent.Padding.Top == 25 &&
+            propertyShownInner.Top == 25 && propertyShownInner.Height == 155,
+            "property-presented form reserves caption space outside its client content");
+        Require(propertyShown.Controls.Count == 1 &&
+            propertyShownContent.Controls.Count == 1,
+            "hosted caption projection preserves the consumer form tree");
+        var closeField = typeof(Form).GetField("__hostedCaptionClose",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+            throw new InvalidOperationException("hosted caption close projection unavailable");
+        var closeButton = closeField.GetValue(propertyShown) as Button ??
+            throw new InvalidOperationException("hosted caption close button unavailable");
+        Require(closeButton.Parent?.Name == "__guiFormsHostedCaption" &&
+            closeButton.Parent.Parent?.Name == "__guiFormsHostedProjection",
+            "hosted caption is projected into the topmost overlay");
+        Require(closeButton.Visible,
+            "hosted caption exposes a retained close hit target");
+        closeButton.PerformClick();
+        Require(propertyShown.Parent is null && !propertyShown.Visible,
+            "hosted caption close detaches a property-presented form deterministically");
         secondary.Hide();
         secondary.Show();
         Require(loads == 1 && secondary.Visible, "non-modal form reopens without duplicate load");
@@ -831,8 +948,11 @@ static int RunSecondaryFormHost()
         main.BeginInvoke((Action)main.Close);
     };
     Application.Run(main);
-    Console.WriteLine("secondary-form=attached:true|owned:true|clamped:true|reopened:true|cancelled:true|detached:true|focus-restored:true|loads:1|closed:1");
+    Console.WriteLine("secondary-form=attached:true|owned:true|clamped:true|reopened:true|cancelled:true|detached:true|focus-restored:true|loads:1|closed:1|standard-click:true");
     secondary.Dispose();
+    propertyShownInner.Dispose();
+    propertyShownContent.Dispose();
+    propertyShown.Dispose();
     main.Dispose();
     return 0;
 }
@@ -921,6 +1041,97 @@ static int RunInheritedThemePaintHost()
     container.Dispose();
     plugin.Dispose();
     main.Dispose();
+    return 0;
+}
+
+static int RunBackgroundOnlyPaintHost()
+{
+    var form = new Form
+    {
+        Name = "backgroundOnlyMain",
+        Text = "Background-only owner paint",
+        BackColor = Color.FromArgb(43, 43, 43),
+        Size = new Size(360, 220),
+    };
+    var surface = new BackgroundOnlyPanelProbe
+    {
+        Name = "backgroundOnlySurface",
+        BackColor = Color.FromArgb(43, 43, 43),
+        Bounds = new Rectangle(16, 16, 240, 140),
+    };
+    form.Controls.Add(surface);
+    surface.Update();
+    Require(surface.Backgrounds > 0,
+        "a container overriding only OnPaintBackground owns a managed raster surface");
+    Require(surface.LastPaintedColor == Color.FromArgb(25, 25, 25) &&
+        surface.BackColor == Color.FromArgb(43, 43, 43),
+        "background-only owner paint can project an application surface distinct from BackColor");
+    Console.WriteLine($"background-only-paint=backgrounds:{surface.Backgrounds}|managed:rgb25|property:rgb43");
+    surface.Dispose();
+    form.Dispose();
+    return 0;
+}
+
+static int RunThemeRestoreTransactionHost()
+{
+    var form = new Form
+    {
+        Name = "themeTransactionMain",
+        Text = "Theme restore transaction",
+        Size = new Size(720, 480),
+    };
+    var panel = new Panel { Dock = DockStyle.Fill };
+    var probes = new List<ThemePaintProbe>();
+    for (var index = 0; index < 24; ++index)
+    {
+        var probe = new ThemePaintProbe
+        {
+            Name = "themeTransactionProbe" + index,
+            Bounds = new Rectangle(8 + index % 6 * 112, 8 + index / 6 * 96, 104, 88),
+        };
+        probes.Add(probe);
+        panel.Controls.Add(probe);
+    }
+    form.Controls.Add(panel);
+
+    using var timer = new System.Windows.Forms.Timer { Interval = 40 };
+    int[]? beforeRestore = null;
+    var ticks = 0;
+    timer.Tick += (_, _) =>
+    {
+        ++ticks;
+        if (ticks == 1)
+        {
+            form.Visible = false;
+            panel.SuspendLayout();
+            for (var index = 0; index < probes.Count; ++index)
+            {
+                probes[index].BackColor = index % 2 == 0 ? Color.FromArgb(24, 28, 33) : Color.FromArgb(36, 40, 45);
+                probes[index].ForeColor = Color.FromArgb(235, 240, 245);
+            }
+            panel.ResumeLayout(true);
+            beforeRestore = probes.Select(probe => probe.PaintCount).ToArray();
+            form.Visible = true;
+            Require(probes.Select(probe => probe.PaintCount).SequenceEqual(beforeRestore),
+                "theme visibility restore must queue rather than synchronously replay descendant paint");
+            return;
+        }
+
+        Require(beforeRestore is not null, "theme restore baseline exists");
+        Require(probes.Select((probe, index) => probe.PaintCount == beforeRestore![index] + 1).All(value => value),
+            "theme restore publishes one coalesced final paint per raster descendant");
+        timer.Stop();
+        form.Close();
+    };
+    form.Load += (_, _) => timer.Start();
+    Application.Run(form);
+    Require(ticks >= 2, $"theme restore reaches one later presentation turn (ticks={ticks})");
+    Require(Application.CallbackFaultCount == 0,
+        $"theme restore completes without callback faults ({Application.LastCallbackException})");
+    Console.WriteLine("theme-restore-transaction=restore:queued|descendants:coalesced|callback:returned|faults:zero");
+    foreach (var probe in probes) probe.Dispose();
+    panel.Dispose();
+    form.Dispose();
     return 0;
 }
 
@@ -1056,8 +1267,8 @@ static int RunFormSemantics()
 static int RunCursorSemantics()
 {
     using var panel = new Panel { Name = "cursorPanel" };
-    Require(ReferenceEquals(Cursors.HSplit, Cursors.SizeWE),
-        "horizontal split cursors share retained identity");
+    Require(ReferenceEquals(Cursors.VSplit, Cursors.SizeWE),
+        "vertical splitter and west-east resize cursors share retained identity");
     Require(!ReferenceEquals(Cursors.HSplit, Cursors.VSplit) &&
         !ReferenceEquals(Cursors.Default, Cursors.Hand),
         "distinct cursor roles retain distinct identity");
@@ -1194,6 +1405,13 @@ static int RunControlGeometrySemantics()
         ReferenceEquals(root.GetNextControl(nested, true), back) &&
         root.GetNextControl(back, true) is null,
         "GetNextControl traverses stable nested TabIndex order without wrapping");
+    using var pointer = new PointerPositionProbe {
+        Name = "geometryPointer", Bounds = new Rectangle(40, 50, 30, 20) };
+    root.Controls.Add(pointer);
+    pointer.InjectDown(7, 9);
+    Require(pointer.LastClientMousePosition == new Point(7, 9) &&
+        Control.MousePosition == new Point(47, 59),
+        "native pointer ingress publishes WinForms screen MousePosition before callbacks");
 
     using var sizing = new GeometryPanel {
         Name = "geometryAutoSize", Size = new Size(100, 80),
@@ -1233,7 +1451,7 @@ static int RunControlGeometrySemantics()
     Require(autoDock.Bounds == new Rectangle(0, 0, 240, 30),
         $"Dock Top constrains AutoSize width while content determines height; actual={autoDock.Bounds}");
 
-    Console.WriteLine("control-geometry=zorder:coherent|lookup:filtered|bounds:masked|coordinates:roundtrip|tab-order:nested|autosize:shrink|dock:zorder");
+    Console.WriteLine("control-geometry=zorder:coherent|lookup:filtered|bounds:masked|coordinates:roundtrip|mouse-position:screen|tab-order:nested|autosize:shrink|dock:zorder");
     return 0;
 }
 
@@ -1876,12 +2094,21 @@ static int RunComboHost()
     Require(dropDown is not null && dropDown.Visible && dropDown.Parent == form,
         "combo retained owned drop-down");
     var activeDropDown = dropDown ?? throw new InvalidOperationException("combo drop-down missing");
+    typeof(Application).GetMethod("__CloseActiveMenu",
+        global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic)!.Invoke(null, null);
+    Require(!activeDropDown.Visible && activeDropDown.Parent is null && opened == 1 && closed == 1,
+        "outside dismissal releases combo drop-down state");
+    combo.ReleaseAt(combo.Width - 6, combo.Height / 2);
+    dropDown = null;
+    foreach (Control child in form.Controls)
+        if (child is ContextMenuStrip candidate) dropDown = candidate;
+    activeDropDown = dropDown ?? throw new InvalidOperationException("reopened combo drop-down missing");
     typeof(ToolStrip).GetMethod("OnMouseUp",
         global::System.Reflection.BindingFlags.Instance | global::System.Reflection.BindingFlags.NonPublic)!
         .Invoke(activeDropDown, [new MouseEventArgs(MouseButtons.Left, 1, 50, 34, 0)]);
     Require(combo.SelectedIndex == 1 && combo.Text == "sdr://localhost:5555",
         "combo drop-down selection");
-    Require(opened == 1 && closed == 1 && !activeDropDown.Visible && activeDropDown.Parent is null,
+    Require(opened == 2 && closed == 2 && !activeDropDown.Visible && activeDropDown.Parent is null,
         "combo drop-down lifecycle");
     Console.WriteLine($"combo=opened:{opened}|closed:{closed}|selected:{combo.SelectedIndex}|text:{combo.Text}|editable:{editable.Text}|field:{textBox.Text}|reset-events:{capabilitySelectionEvents}|stream-format:{streamFormatCombo.SelectedIndex}|bounds:pass|retained:true");
     capabilityCombo.Dispose();
@@ -2343,22 +2570,35 @@ static int RunDialogHost()
 
 static int RunNativeWindowSurfaceHost()
 {
+    var traceSurface = Environment.GetEnvironmentVariable("GUI_FORMS_TRACE_NATIVE_SURFACES") == "1";
+    void TraceSurface(string stage)
+    {
+        if (traceSurface) Console.Error.WriteLine("native-surface-stage=" + stage);
+    }
+    TraceSurface("construct-form");
     var form = new Form { Name = "nativeSurfaceForm", Text = "Native surface", Size = new Size(240, 140) };
+    TraceSurface("construct-surface");
     var surface = new PaintInputProbe
     {
         Name = "nativeSurface",
         Bounds = new Rectangle(12, 12, 80, 40),
         BackColor = Color.Black,
     };
+    TraceSurface("attach-surface");
     form.Controls.Add(surface);
+    TraceSurface("request-handle");
     var window = surface.Handle;
+    TraceSurface("validate-handle");
     Require(window != 0 && NativeSurfaceProbe.IsWindow(window), "control handle is a Win32 window");
+    TraceSurface("get-construction-dc");
     var constructionDevice = NativeSurfaceProbe.GetDC(window);
+    TraceSurface("validate-construction-dc");
     Require(constructionDevice != 0,
         "control HWND is compositor-backed before Handle escapes");
     Require(!NativeSurfaceProbe.IsWindowEnabled(window),
         "paint-only child HWND cannot become a second input authority");
     surface.Size = new Size(96, 48);
+    TraceSurface("validate-resize");
     Require(NativeSurfaceProbe.GetClientRect(window, out var resized) &&
         resized.Right - resized.Left >= 96 && resized.Bottom - resized.Top >= 48,
         "control HWND reserves durable retained-HDC capacity");
@@ -2375,74 +2615,105 @@ static int RunNativeWindowSurfaceHost()
     Dictionary<string, string>? before = null;
     Dictionary<string, string>? during = null;
     Dictionary<string, string>? after = null;
+    Exception? failure = null;
+    var newestReached = false;
     timer.Tick += (_, _) =>
     {
-        ++ticks;
-        if (ticks == 1)
+        try
         {
-            // Drain creation/resize work first so the deltas below measure only
-            // this callback's high-rate backing-surface commits.
-            surface.Update();
-            before = ParseSurfaceSnapshot(Snapshot());
-            using var graphics = Graphics.FromHwnd(window);
-            for (var frame = 0; frame < 16; ++frame)
+            ++ticks;
+            if (ticks == 1)
             {
-                using var brush = new SolidBrush(Color.FromArgb(
-                    255, 32 + frame * 8, 48 + frame * 3, 96 + frame * 4));
-                graphics.FillRectangle(brush, 0, 0, 96, 48);
-                graphics.Flush();
+                // Drain creation/resize work first so the deltas below measure only
+                // this callback's high-rate backing-surface commits.
+                surface.Update();
+                before = ParseSurfaceSnapshot(Snapshot());
+                using var graphics = Graphics.FromHwnd(window);
+                for (var frame = 0; frame < 16; ++frame)
+                {
+                    using var brush = new SolidBrush(Color.FromArgb(
+                        255, 32 + frame * 8, 48 + frame * 3, 96 + frame * 4));
+                    graphics.FillRectangle(brush, 0, 0, 96, 48);
+                    graphics.Flush();
+                }
+                var leased = graphics.GetHdc();
+                var leasedBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
+                var leasedArea = new NativeSurfaceProbe.NativeRect { Right = 24, Bottom = 16 };
+                Require(leased != 0 && leasedBrush != 0 &&
+                    NativeSurfaceProbe.FillRect(leased, ref leasedArea, leasedBrush) != 0,
+                    "bitmap-backed HDC lease accepts direct GDI mutation");
+                _ = NativeSurfaceProbe.DeleteObject(leasedBrush);
+                graphics.ReleaseHdc(leased);
+                var constructionBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
+                var constructionArea = new NativeSurfaceProbe.NativeRect
+                {
+                    Left = 24, Top = 0, Right = 96, Bottom = 48,
+                };
+                Require(constructionBrush != 0 &&
+                    NativeSurfaceProbe.FillRect(constructionDevice, ref constructionArea,
+                        constructionBrush) != 0,
+                    "HDC retained from Handle construction remains writable after first show");
+                _ = NativeSurfaceProbe.DeleteObject(constructionBrush);
+                var device = NativeSurfaceProbe.GetDC(window);
+                Require(device != 0, "control HWND exposes a device context");
+                paintedCompatibilitySurface =
+                    NativeSurfaceProbe.GetPixel(device, 20, 20) != 0xffffffffu &&
+                    NativeSurfaceProbe.GetPixel(device, 48, 20) == 0x00664422u;
+                _ = NativeSurfaceProbe.ReleaseDC(window, device);
+                _ = NativeSurfaceProbe.ReleaseDC(window, constructionDevice);
+                during = ParseSurfaceSnapshot(Snapshot());
+                if (traceSurface) Console.Error.WriteLine("native-surface-snapshot=during|" + Snapshot());
+                Require(before is not null && during["state"] == "live" &&
+                    SurfaceMetric(during, "content") >= SurfaceMetric(before, "content") + 18 &&
+                    SurfaceMetric(during, "published") <= SurfaceMetric(during, "content") &&
+                    SurfaceMetric(during, "explicit") == 1,
+                    "completed producer boundaries publish without an ordinary UI paint drain");
+                return;
             }
-            var leased = graphics.GetHdc();
-            var leasedBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
-            var leasedArea = new NativeSurfaceProbe.NativeRect { Right = 24, Bottom = 16 };
-            Require(leased != 0 && leasedBrush != 0 &&
-                NativeSurfaceProbe.FillRect(leased, ref leasedArea, leasedBrush) != 0,
-                "bitmap-backed HDC lease accepts direct GDI mutation");
-            _ = NativeSurfaceProbe.DeleteObject(leasedBrush);
-            graphics.ReleaseHdc(leased);
-            var constructionBrush = NativeSurfaceProbe.CreateSolidBrush(0x00664422u);
-            var constructionArea = new NativeSurfaceProbe.NativeRect
+            if (!newestReached)
             {
-                Left = 24, Top = 0, Right = 96, Bottom = 48,
-            };
-            Require(constructionBrush != 0 &&
-                NativeSurfaceProbe.FillRect(constructionDevice, ref constructionArea,
-                    constructionBrush) != 0,
-                "HDC retained from Handle construction remains writable after first show");
-            _ = NativeSurfaceProbe.DeleteObject(constructionBrush);
-            var device = NativeSurfaceProbe.GetDC(window);
-            Require(device != 0, "control HWND exposes a device context");
-            paintedCompatibilitySurface =
-                NativeSurfaceProbe.GetPixel(device, 20, 20) != 0xffffffffu &&
-                NativeSurfaceProbe.GetPixel(device, 48, 20) == 0x00664422u;
-            _ = NativeSurfaceProbe.ReleaseDC(window, device);
-            _ = NativeSurfaceProbe.ReleaseDC(window, constructionDevice);
-            during = ParseSurfaceSnapshot(Snapshot());
-            Require(during["state"] == "dirty_queued" && SurfaceMetric(during, "queued") == 1,
-                "many flushes retain one queued compatibility drain before callback return");
-            return;
+                after = ParseSurfaceSnapshot(Snapshot());
+                if (traceSurface) Console.Error.WriteLine("native-surface-snapshot=after|" + Snapshot());
+                Require(before is not null && during is not null &&
+                    after["state"] == "live" &&
+                    SurfaceMetric(after, "published") == SurfaceMetric(after, "content") &&
+                    SurfaceMetric(after, "publish-requests") - SurfaceMetric(before, "publish-requests") >= 18 &&
+                    SurfaceMetric(after, "publish-drops") == SurfaceMetric(before, "publish-drops") &&
+                    SurfaceMetric(after, "explicit") == 1,
+                    "the newest complete producer generation reaches the live slot by the next display turn");
+                newestReached = true;
+                return;
+            }
+            timer.Stop();
+            form.Close();
         }
-        after = ParseSurfaceSnapshot(Snapshot());
-        Require(before is not null && during is not null &&
-            after["state"] == "clean" &&
-            SurfaceMetric(after, "content") == SurfaceMetric(after, "captured") &&
-            SurfaceMetric(after, "drains-queued") - SurfaceMetric(before, "drains-queued") == 1 &&
-            SurfaceMetric(after, "drains-started") - SurfaceMetric(before, "drains-started") == 1 &&
-            SurfaceMetric(after, "drains-committed") - SurfaceMetric(before, "drains-committed") == 1 &&
-            SurfaceMetric(after, "drains-coalesced") - SurfaceMetric(before, "drains-coalesced") >= 16 &&
-            SurfaceMetric(after, "explicit") == 1,
-            "sixteen backing flushes plus HDC release must collapse into one retained capture/import drain");
-        timer.Stop();
-        form.Close();
+        catch (Exception error)
+        {
+            failure = error;
+            timer.Stop();
+            form.Close();
+        }
     };
     timer.Start();
+    TraceSurface("run");
     Application.Run(form);
+    if (failure is not null) throw failure;
     Require(ticks >= 2, "native surface crosses an event-loop presentation boundary");
     Require(paintedCompatibilitySurface,
         "direct GDI targets the isolated compatibility HWND");
+    using (var trace = global::System.Text.Json.JsonDocument.Parse(Application.LastHostTrace))
+    {
+        var live = trace.RootElement.GetProperty("host").GetProperty("live_presentations");
+        if (traceSurface) Console.Error.WriteLine("native-surface-host=" + Application.LastHostTrace);
+        Require(live.GetProperty("clock_signals").GetUInt64() >= 1 &&
+            live.GetProperty("drains").GetUInt64() >= 1 &&
+            live.GetProperty("updates_presented").GetUInt64() >= 1 &&
+            live.GetProperty("updates_failed").GetUInt64() == 0,
+            "the display clock samples and presents the live surface independently");
+    }
     surface.Dispose();
     Require(!NativeSurfaceProbe.IsWindow(window), "control HWND is destroyed with its owner");
-    Console.WriteLine("native-surface=hwnd:true|input:retained-host|size:96x48|gdi:true|present-boundary:true|coalesced:true|single-drain:true|disposed:true");
+    Console.WriteLine("native-surface=handle:virtual|input:retained-host|size:96x48|gdi:true|producer:uncoupled|newest-frame:true|display-clock:true|disposed:true");
     form.Dispose();
     return 0;
 }
@@ -2684,16 +2955,31 @@ static int RunNativeWindowSurfaceLifecycleHost()
     if (workerFailure is not null) throw workerFailure;
     Require(producerElapsed < TimeSpan.FromSeconds(5),
         "producer was not serialized behind compositor/UI work");
-    ulong activeSurfaceTicks;
-    ulong framesPresented;
+    ulong displayClockSignals;
+    ulong livePresentationDrains;
+    ulong liveUpdatesPresented;
+    ulong liveUpdatesFailed;
+    ulong retainedFramesPresented;
     using (var trace = global::System.Text.Json.JsonDocument.Parse(
         Application.LastHostTrace))
     {
+        if (traceLifecycle) Console.Error.WriteLine(
+            "native-surface-lifecycle-host=" + Application.LastHostTrace);
         var metrics = trace.RootElement.GetProperty("window");
-        activeSurfaceTicks =
-            metrics.GetProperty("active_surface_ticks").GetUInt64();
-        framesPresented = metrics.GetProperty("frames_presented").GetUInt64();
-        Require(activeSurfaceTicks >= 30 && framesPresented >= 30,
+        retainedFramesPresented =
+            metrics.GetProperty("frames_presented").GetUInt64();
+        var live = trace.RootElement.GetProperty("host")
+            .GetProperty("live_presentations");
+        displayClockSignals = live.GetProperty("clock_signals").GetUInt64();
+        livePresentationDrains = live.GetProperty("drains").GetUInt64();
+        liveUpdatesPresented =
+            live.GetProperty("updates_presented").GetUInt64();
+        liveUpdatesFailed = live.GetProperty("updates_failed").GetUInt64();
+        // Direct live surfaces deliberately bypass retained active-surface
+        // invalidation. Judge sustained animation by the terminal host's
+        // display clock and presentation lane, not by ordinary paint polls.
+        Require(displayClockSignals >= 30 && livePresentationDrains >= 30 &&
+            liveUpdatesPresented >= 30 && liveUpdatesFailed == 0,
             "live surface sustained compositor frames beyond one screen of history");
     }
     surface.Dispose();
@@ -2704,7 +2990,7 @@ static int RunNativeWindowSurfaceLifecycleHost()
     Console.WriteLine(
         "native-surface-lifecycle=construction-hdc:retained|writer:background|producer:uncoupled|compositor:continuous|resize:durable|hide-show:latest|occlusion:latest|echo:none|reentry:none|secondary-window:none|disposed:true");
     Console.WriteLine(
-        $"native-surface-performance=producer-frames:{finalFrame + 1}|producer-ms:{producerElapsed.TotalMilliseconds:F0}|ui-ticks:{uiTicks}|active-surface-ticks:{activeSurfaceTicks}|frames-presented:{framesPresented}");
+        $"native-surface-performance=producer-frames:{finalFrame + 1}|producer-ms:{producerElapsed.TotalMilliseconds:F0}|ui-ticks:{uiTicks}|display-clock-signals:{displayClockSignals}|live-drains:{livePresentationDrains}|live-updates-presented:{liveUpdatesPresented}|live-updates-failed:{liveUpdatesFailed}|retained-frames-presented:{retainedFramesPresented}");
     return 0;
 }
 
@@ -2729,39 +3015,51 @@ static int RunNativeWindowSurfaceFallbackHost()
     using var timer = new System.Windows.Forms.Timer { Interval = 300 };
     Dictionary<string, string>? before = null;
     var ticks = 0;
+    Exception? failure = null;
     timer.Tick += (_, _) =>
     {
-        ++ticks;
-        if (ticks == 1)
+        try
         {
-            surface.Update();
-            before = Snapshot();
-            var device = NativeSurfaceProbe.GetDC(window);
-            Require(device != 0, "fallback surface exposes a device context");
-            var brush = NativeSurfaceProbe.CreateSolidBrush(0x003322ccu);
-            var area = new NativeSurfaceProbe.NativeRect { Right = 96, Bottom = 48 };
-            Require(brush != 0 && NativeSurfaceProbe.FillRect(device, ref area, brush) != 0,
-                "unobservable raw GDI fill succeeds");
-            _ = NativeSurfaceProbe.DeleteObject(brush);
-            _ = NativeSurfaceProbe.ReleaseDC(window, device);
-            return;
+            ++ticks;
+            if (ticks == 1)
+            {
+                surface.Update();
+                before = Snapshot();
+                var device = NativeSurfaceProbe.GetDC(window);
+                Require(device != 0, "compatibility surface exposes a device context");
+                var brush = NativeSurfaceProbe.CreateSolidBrush(0x003322ccu);
+                var area = new NativeSurfaceProbe.NativeRect { Right = 96, Bottom = 48 };
+                Require(brush != 0 && NativeSurfaceProbe.FillRect(device, ref area, brush) != 0,
+                    "raw GDI fill succeeds through the compatibility endpoint");
+                _ = NativeSurfaceProbe.DeleteObject(brush);
+                _ = NativeSurfaceProbe.ReleaseDC(window, device);
+                return;
+            }
+            var after = Snapshot();
+            Require(before is not null && after["state"] == "live" &&
+                SurfaceMetric(after, "content") >= SurfaceMetric(before, "content") + 1 &&
+                SurfaceMetric(after, "published") == SurfaceMetric(after, "content") &&
+                SurfaceMetric(after, "publish-requests") -
+                    SurfaceMetric(before, "publish-requests") == 1 &&
+                SurfaceMetric(after, "explicit") == 0,
+                "the intercepted GDI boundary publishes one newest-frame update");
+            timer.Stop();
+            form.Close();
         }
-        var after = Snapshot();
-        Require(before is not null && after["state"] == "clean" &&
-            SurfaceMetric(after, "content") == SurfaceMetric(after, "captured") &&
-            SurfaceMetric(after, "drains-committed") -
-                SurfaceMetric(before, "drains-committed") == 1 &&
-            SurfaceMetric(after, "explicit") == 0,
-            "bounded hash fallback imports one otherwise unobservable raw GDI mutation");
-        timer.Stop();
-        form.Close();
+        catch (Exception error)
+        {
+            failure = error;
+            timer.Stop();
+            form.Close();
+        }
     };
     timer.Start();
     Application.Run(form);
+    if (failure is not null) throw failure;
     Require(ticks >= 2, "fallback probe crosses a bounded event-loop boundary");
     surface.Dispose();
     form.Dispose();
-    Console.WriteLine("native-surface-fallback=raw-gdi:true|bounded-probe:true|single-commit:true|disposed:true");
+    Console.WriteLine("native-surface-fallback=raw-gdi:true|shim-boundary:true|newest-frame:true|disposed:true");
     return 0;
 }
 
@@ -3550,6 +3848,21 @@ sealed class ManagedDoubleBufferProbe : Control
     }
 }
 
+sealed class BackgroundOnlyPanelProbe : Panel
+{
+    internal int Backgrounds { get; private set; }
+    internal Color LastPaintedColor { get; private set; }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        ++Backgrounds;
+        base.OnPaintBackground(e);
+        LastPaintedColor = Color.FromArgb(25, 25, 25);
+        using var surface = new SolidBrush(LastPaintedColor);
+        e.Graphics.FillRectangle(surface, ClientRectangle);
+    }
+}
+
 sealed class DeferredInputPaintProbe : Control
 {
     private static readonly global::System.Reflection.MethodInfo InjectPointer =
@@ -3625,6 +3938,25 @@ sealed class GeometryPanel : Panel
     {
         BackColor = Color.White;
         SetStyle(ControlStyles.SupportsTransparentBackColor, false);
+    }
+}
+
+sealed class PointerPositionProbe : Panel
+{
+    private static readonly global::System.Reflection.MethodInfo InjectPointer =
+        typeof(Control).GetMethod("__InjectManagedPointer",
+            global::System.Reflection.BindingFlags.Instance |
+            global::System.Reflection.BindingFlags.NonPublic) ??
+        throw new InvalidOperationException("managed pointer injection is unavailable");
+
+    internal Point LastClientMousePosition { get; private set; }
+    internal void InjectDown(int x, int y) =>
+        _ = InjectPointer.Invoke(this, new object[] { 6u, (double)x, (double)y, 0d, 1u });
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        LastClientMousePosition = PointToClient(Control.MousePosition);
+        base.OnMouseDown(e);
     }
 }
 
@@ -3744,6 +4076,15 @@ sealed class DragSliderProbe : Control
         e.Graphics.FillRectangle(track, 4, Height / 2 - 2, Math.Max(0, Width - 8), 4);
         var x = 4 + (int)Math.Round(Math.Max(0, Width - 16) * Value / 100d);
         e.Graphics.FillRectangle(thumb, x, 4, 12, Math.Max(1, Height - 8));
+    }
+}
+
+sealed class StandardClickProbe : Control
+{
+    internal StandardClickProbe()
+    {
+        SetStyle(ControlStyles.StandardClick, true);
+        TabStop = false;
     }
 }
 

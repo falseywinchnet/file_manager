@@ -82,12 +82,8 @@ cp "$windows_build/fonts/PortsmouthRapids.ttf" "$smoke_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids-Bold.ttf" "$smoke_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids.ttf" "$behavior_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids-Bold.ttf" "$behavior_output/fonts/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll "$smoke_output/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/lib/libstdc++-6.dll "$smoke_output/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/bin/libwinpthread-1.dll "$smoke_output/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/lib/libgcc_s_seh-1.dll "$behavior_output/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/lib/libstdc++-6.dll "$behavior_output/"
-cp /opt/homebrew/Cellar/mingw-w64/13.0.0_2/toolchain-x86_64/x86_64-w64-mingw32/bin/libwinpthread-1.dll "$behavior_output/"
+"$repo/tools/stage_mingw_runtime.sh" "$smoke_output"
+"$repo/tools/stage_mingw_runtime.sh" "$behavior_output"
 for dependency in Microsoft.Win32.SystemEvents.dll System.Formats.Nrbf.dll System.Private.Windows.Core.dll System.Private.Windows.GdiPlus.dll; do
   cp "$windows_runtime/$dependency" "$smoke_output/"
   cp "$windows_runtime/$dependency" "$behavior_output/"
@@ -166,16 +162,17 @@ rg -q 'scroll-panel-live=events:1\|type:SmallIncrement\|orientation:vertical\|po
 unlink "$scroll_live_log"
 
 paint_lease_wine_log=$(mktemp "${TMPDIR:-/tmp}/gui-forms-paint-lease-wine.XXXXXX")
-for behavior_mode in native-surface native-surface-lifecycle native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage theme-inherited-paint; do
+for behavior_mode in native-surface native-surface-lifecycle native-surface-fallback paint-reentry paint-input-deferral managed-double-buffer managed-damage theme-inherited-paint theme-restore-transaction; do
   (cd "$behavior_output" && MVK_CONFIG_LOG_LEVEL=0 WINEDEBUG=-all \
     "$wine_binary" 'C:\Program Files\dotnet\dotnet.exe' \
     GuiForms.FacadeBehaviorSmoke.dll "$behavior_mode") >>"$paint_lease_wine_log" 2>&1
 done
 cat "$paint_lease_wine_log"
-rg -q 'native-surface=hwnd:true\|input:retained-host\|size:96x48\|gdi:true\|present-boundary:true\|coalesced:true\|single-drain:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'native-surface=handle:virtual\|input:retained-host\|size:96x48\|gdi:true\|producer:uncoupled\|newest-frame:true\|display-clock:true\|disposed:true' "$paint_lease_wine_log"
 rg -q 'native-surface-lifecycle=construction-hdc:retained\|writer:background\|producer:uncoupled\|compositor:continuous\|resize:durable\|hide-show:latest\|occlusion:latest\|echo:none\|reentry:none\|secondary-window:none\|disposed:true' "$paint_lease_wine_log"
-rg -q 'native-surface-fallback=raw-gdi:true\|bounded-probe:true\|single-commit:true\|disposed:true' "$paint_lease_wine_log"
+rg -q 'native-surface-fallback=raw-gdi:true\|shim-boundary:true\|newest-frame:true\|disposed:true' "$paint_lease_wine_log"
 rg -q 'theme-inherited-paint=plugin:true\|callback:atomic\|frame:one\|colors:current\|faults:zero' "$paint_lease_wine_log"
+rg -q 'theme-restore-transaction=restore:queued\|descendants:coalesced\|callback:returned\|faults:zero' "$paint_lease_wine_log"
 rg -q 'paint-reentry=recursive:false\|follow-up:one\|callback-boundary:true' "$paint_lease_wine_log"
 rg -q 'paint-input-deferral=order:pointer>key\|during-paint:false\|follow-up:one\|disposed:abandoned\|queue:zero' "$paint_lease_wine_log"
 rg -q 'managed-double-buffer=reflected:true\|phases:shared\|surface:reused\|burst:coalesced\|resize:stale-abandoned\|follow-up:one\|disabled:ephemeral\|fault:no-self-retry' "$paint_lease_wine_log"

@@ -45,6 +45,8 @@ extern "C" {
 #define GF_ABI_VERSION_0_22 UINT32_C(0x00000016)
 #define GF_ABI_VERSION_0_23 UINT32_C(0x00000017)
 #define GF_ABI_VERSION_0_24 UINT32_C(0x00000018)
+#define GF_ABI_VERSION_0_25 UINT32_C(0x00000019)
+#define GF_ABI_VERSION_0_26 UINT32_C(0x0000001a)
 
 #define GF_PIXEL_FORMAT_BGRA32_PREMULTIPLIED UINT32_C(1)
 
@@ -294,6 +296,8 @@ typedef enum gf_control_kind {
     GF_CONTROL_PROPERTY_GRID = 21,
     /* Nonvisual retained owner for foreign TypeDescriptor projections. */
     GF_CONTROL_PROPERTY_OBJECT_PROXY = 22,
+    /* Owner-painted surface composited above ordinary retained and live content. */
+    GF_CONTROL_OVERLAY_CUSTOM = 23,
     GF_CONTROL_CUSTOM = 0x7fffffff
 } gf_control_kind;
 
@@ -605,6 +609,23 @@ typedef struct gf_api_v0 {
         gf_handle property_grid,
         gf_string_view property_name,
         uint32_t* activated);
+
+    /* ABI 0.25: retained presentation properties used by facade controls. */
+    gf_result (*set_control_text_alignment)(gf_handle control,
+                                            uint32_t content_alignment);
+    gf_result (*set_button_appearance)(gf_handle button,
+                                       uint32_t visual_style,
+                                       double flat_border_width);
+    gf_result (*set_panel_border_style)(gf_handle panel,
+                                        uint32_t border_style);
+
+    /*
+     * ABI 0.26: attach a detached retained root to the window-owned popup
+     * composition lane. The owner remains the lifetime/input authority; the
+     * popup is laid out in root-client coordinates and is not a layout child.
+     */
+    gf_result (*attach_popup)(gf_handle owner, gf_handle popup);
+    gf_result (*detach_popup)(gf_handle popup);
 } gf_api_v0;
 
 /*

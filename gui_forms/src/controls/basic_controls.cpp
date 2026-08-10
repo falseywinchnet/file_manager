@@ -448,7 +448,8 @@ void GroupBox::on_paint(Painter& painter, Rect) {
     painter.fill_rect({9.0, 1.0, caption_width, caption_height}, background());
     painter.draw_text_utf8({13.0, std::max(font.size, rule_y + font.size * 0.36)},
                            caption, font,
-                           enabled() ? style().text : style().disabled_text);
+                           effectively_enabled() ? style().text
+                                                 : style().disabled_text);
 }
 
 bool GroupBox::mnemonic_matches(char32_t character) const noexcept {
@@ -1603,6 +1604,16 @@ void Button::set_visual_style(ButtonVisualStyle style) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void Button::set_flat_border_width(double width) {
+    require_mutable();
+    if (!std::isfinite(width) || width < 0.0) {
+        throw std::invalid_argument("button flat border width must be finite and nonnegative");
+    }
+    if (flat_border_width_ == width) return;
+    flat_border_width_ = width;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
 void Button::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
     const std::string display = display_text();
@@ -1625,9 +1636,15 @@ void Button::on_paint(Painter& painter, Rect) {
     case ButtonVisualStyle::flat:
         painter.fill_rect(bounds, pressed_visual() ? style().accent_light
                                                    : style().face_light);
-        painter.stroke_rect({0.5, 0.5, std::max(0.0, bounds.width - 1.0),
-                             std::max(0.0, bounds.height - 1.0)},
-                            default_button_ ? style().accent : style().border, 1.0);
+        if (flat_border_width_ > 0.0) {
+            const double inset = flat_border_width_ * 0.5;
+            painter.stroke_rect(
+                {inset, inset,
+                 std::max(0.0, bounds.width - flat_border_width_),
+                 std::max(0.0, bounds.height - flat_border_width_)},
+                default_button_ ? style().accent : style().border,
+                flat_border_width_);
+        }
         paint_button_text(painter, bounds, display);
         break;
     case ButtonVisualStyle::accent: {
@@ -1640,7 +1657,7 @@ void Button::on_paint(Painter& painter, Rect) {
                             style().dark_border, 1.0);
         const double offset = pressed_visual() ? 1.0 : 0.0;
         paint_button_content(painter, bounds, display,
-                             enabled() ? style().paper : style().disabled_text,
+                             effectively_enabled() ? style().paper : style().disabled_text,
                              {offset, offset});
         break;
     }
@@ -1652,7 +1669,7 @@ void Button::on_paint(Painter& painter, Rect) {
                              std::max(0.0, bounds.height - 1.0)},
                             style().border, 1.0);
         paint_button_content(painter, bounds, display,
-                             enabled() ? style().text : style().disabled_text,
+                             effectively_enabled() ? style().text : style().disabled_text,
                              {}, false, true);
         break;
     }
@@ -1832,7 +1849,7 @@ void CheckBox::on_paint(Painter& painter, Rect) {
         painter,
         {box.x + box.width + 1.0, 0.0,
          std::max(0.0, bounds.width - box.x - box.width - 1.0), bounds.height},
-        display_text(), enabled() ? colors.text : colors.disabled_text, {}, checked());
+        display_text(), effectively_enabled() ? colors.text : colors.disabled_text, {}, checked());
 }
 
 Insets CheckBox::visual_outsets() const noexcept {
@@ -2012,7 +2029,7 @@ void RadioButton::on_paint(Painter& painter, Rect) {
             {track.x + track.width + 1.0, 0.0,
              std::max(0.0, bounds.width - track.x - track.width - 1.0),
              bounds.height},
-            display_text(), enabled() ? colors.text : colors.disabled_text, {}, checked_);
+            display_text(), effectively_enabled() ? colors.text : colors.disabled_text, {}, checked_);
         return;
     }
     const Color ring = indicator_style_ == ChoiceIndicatorStyle::modern && checked_
@@ -2027,7 +2044,7 @@ void RadioButton::on_paint(Painter& painter, Rect) {
     }
     paint_button_content(
         painter, {17.0, 0.0, std::max(0.0, bounds.width - 17.0), bounds.height},
-        display_text(), enabled() ? colors.text : colors.disabled_text, {}, checked_);
+        display_text(), effectively_enabled() ? colors.text : colors.disabled_text, {}, checked_);
 }
 
 Insets RadioButton::visual_outsets() const noexcept {

@@ -98,6 +98,146 @@ Performance proposals require a baseline and workload. Preserve negative
 results. Optimize the measured bottleneck. A clever data structure is not a
 relevance model, and a relevance model is not an identity store.
 
+## M4 Mac mini remote build and GUI operation
+
+The Neo checkout is the authoritative working tree. From anywhere inside this
+repository, use the passwordless `m4mini-awdl` SSH alias for direct inspection
+and `/Users/ultimussecundai/.local/bin/m4build` for compute work. `m4build`
+rsyncs the local tree to a deterministic directory below the Mini's
+`$HOME/Developer/CodexBuilds/`, prints that resolved directory, and then runs the
+given command there. A useful orientation sequence is:
+
+```sh
+ssh m4mini-awdl '/usr/bin/sw_vers; /usr/bin/uname -m'
+/Users/ultimussecundai/.local/bin/m4build --sync-only
+/Users/ultimussecundai/.local/bin/m4build -- <command> [arguments...]
+```
+
+Do not edit the mirrored source as the primary copy. Make source changes on the
+Neo and run `m4build` again. The helper intentionally excludes `.git/` and
+preserves remote `build/`, `.build/`, `target/`, `DerivedData/`, and
+`node_modules/` directories, so large build products survive source syncs and
+are not copied back. Use direct SSH for read-only checks of remote products,
+processes, and logs. Quote remote commands as one shell argument so local path
+expansion does not leak into them.
+
+The private AWDL route shares the Mini's physical wireless adapter with Screen
+Sharing and does not give the Mini Internet access. Fetch dependencies on the
+Neo first, then mirror them. Expect high-volume sync/build traffic and frequent
+screen captures to contend with the interactive display; avoid needless live
+refreshes while a build is moving large files.
+
+### GUI operation through Screen Sharing
+
+An SSH process does not inherit the Mini's logged-in Aqua GUI session. SSH is
+therefore reliable for builds and noninteractive tests but is the wrong place
+to launch a Wine program that must be seen or manipulated. Use this sequence:
+
+1. Keep a relay terminal open on the Neo:
+
+   ```sh
+   ssh -N -o ExitOnForwardFailure=yes \
+     -L 5901:127.0.0.1:5900 m4mini-awdl
+   ```
+
+2. In another Neo terminal, open `vnc://127.0.0.1:5901`, for example with
+   `open 'vnc://127.0.0.1:5901'`. Screen Sharing may request the Mini login or
+   VNC password. Let the user enter it; never record a credential in this
+   repository or a launch script.
+3. Open Terminal *inside the remote desktop* and launch the interactive program
+   there. A `.command` file is convenient because it runs in the correct GUI
+   session and keeps lengthy Wine environment setup out of keyboard entry.
+4. Keep shell inspection and builds in ordinary local terminals. Use Screen
+   Sharing only for interaction and visual comparison.
+
+For Codex desktop sessions, load the `computer-use` skill before operating the
+Screen Sharing app. Target `Screen Sharing` and inspect its screenshot after
+each meaningful action. The remote framebuffer and Wine controls may expose
+little or no accessibility tree, so coordinate clicks and key presses based on
+the fresh screenshot are sometimes necessary. Do not reuse coordinates after a
+window moves, a menu opens, or the remote resolution changes. Screen Sharing
+keyboard synthesis has occasionally dropped underscores; paste paths when
+possible, or make a short temporary symlink below `CodexRuns/` and remove it
+afterward. Never rename the authoritative or mirrored source tree as a typing
+workaround.
+
+The Screen Sharing session is part of GUI verification, not proof by itself.
+Compare the stock and reflected program, exercise controls, close and reopen
+owned/plugin windows, and pair that observation with focused automated tests.
+Avoid resetting Wine while another useful instance is running; a wineserver
+reset ends every process in that Wine session.
+
+### GUI.Forms build details
+
+The `m4mini-awdl` relay shell does not include Homebrew in `PATH`, and the
+relay is noninteractive. Use absolute Homebrew tool paths. Fetch the pinned
+ignored dependencies into the authoritative local tree first:
+
+```sh
+/bin/sh gui_forms/third_party/fetch_text_stack.sh
+/bin/sh gui_forms/third_party/fetch_skia_cpu.sh
+```
+
+`m4build` deliberately omits nested `.git` directories. Build the already
+fetched and patched Skia sources directly into the persistent remote build
+directory, then configure GUI.Forms to consume those archives:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- \
+  gui_forms/third_party/build_skia_cpu.sh \
+  gui_forms/build/skia-cpu-release
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /opt/homebrew/bin/cmake -S gui_forms -B gui_forms/build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DGUI_FORMS_SKIA_PREBUILT=ON \
+  -DGUI_FORMS_SKIA_OUT=gui_forms/build/skia-cpu-release
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /opt/homebrew/bin/cmake --build gui_forms/build --parallel
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /opt/homebrew/bin/ctest --test-dir gui_forms/build \
+  --output-on-failure --parallel 8
+```
+
+The Windows/MinGW renderer build uses persistent `.build/` projections because
+`m4build` preserves that directory across synchronizations. The recorded Skia
+patch selects only the MinGW-compatible Windows file/logging ports; it does not
+enable Skia GPU backends or WIC:
+
+```sh
+/bin/sh gui_forms/third_party/fetch_skia_cpu.sh
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh gui_forms/third_party/build_skia_cpu_windows_mingw.sh \
+  gui_forms/.build/skia-windows-mingw
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh gui_forms/tools/configure_windows_mingw_m4.sh \
+  gui_forms/.build/windows-x64-skia-make \
+  gui_forms/.build/skia-windows-mingw
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /usr/bin/env PATH=/opt/homebrew/bin:/usr/bin:/bin \
+  /opt/homebrew/bin/cmake --build \
+  gui_forms/.build/windows-x64-skia-make --parallel 10
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh gui_forms/tools/stage_mingw_runtime.sh \
+  gui_forms/.build/windows-x64-skia-make
+```
+
+The Mini's native arm64 .NET 10 SDK is user-scoped at
+`$HOME/.local/share/dotnet-sdk-10.0.105`; the separate Windows x64 SDK/runtime
+used by Wine and as the Windows Desktop reference source is at
+`$HOME/.local/share/dotnet-win-x64-sdk-10.0.105`. Build the compatibility facade
+and runner into persistent remote output with:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh gui_forms/tools/build_managed_facade_m4.sh gui_forms
+```
+
+Proprietary specimens, writable profiles, extracted bundles, and runtime logs
+stay outside Git under the Mini's `$HOME/Developer/CodexRuns/`; never place them
+in the mirrored source tree. Keep MME out of radio-consumer profiles: it did not
+work in this Wine setup. Enumerate the actual host endpoints and pin the
+applicable WASAPI input/output names.
+
 ## Voice
 
 Be direct, curious, and exact. Name the object, its status, its evidence, and
