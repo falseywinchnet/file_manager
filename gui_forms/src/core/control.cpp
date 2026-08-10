@@ -3,7 +3,7 @@
 #include "gui_forms/binding.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
-#include "display_chunk.hpp"
+#include "display/chunk/display_chunk.hpp"
 
 #include <algorithm>
 #include <cmath>

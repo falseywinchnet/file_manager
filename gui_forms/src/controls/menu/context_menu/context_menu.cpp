@@ -1,0 +1,730 @@
+#include "gui_forms/components/context_menu/context_menu.hpp"
+
+#include "../menu_utilities.hpp"
+
+#include "gui_forms/basic_controls.hpp"
+#include "gui_forms/text.hpp"
+#include "gui_forms/window.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <optional>
+#include <stdexcept>
+#include <unordered_set>
+#include <utility>
+
+namespace gui_forms {
+
+using namespace menu_detail;
+
+struct ContextMenu::Impl final {
+    class MenuLayer;
+    class MenuPanel;
+    class MenuRow;
+
+    struct PanelState final {
+        std::shared_ptr<MenuPanel> panel;
+        std::vector<std::shared_ptr<MenuRow>> rows;
+        const std::vector<MenuSnapshot>* items{};
+        std::optional<std::size_t> parent_index;
+        std::optional<std::size_t> child_source_index;
+        double scroll_offset{};
+        double content_height{};
+        double viewport_height{};
+        double width{};
+    };
+
+    explicit Impl(ContextMenu& public_owner) : owner(public_owner) {}
+
+    [[nodiscard]] double text_scale() const noexcept {
+        return window ? window->presentation_settings().text_scale : 1.0;
+    }
+
+    class MenuLayer final : public Panel {
+    public:
+        MenuLayer(StableId id, Impl& impl) : Panel(std::move(id)), impl_(impl) {
+            set_paint_plane(PaintPlane::overlay);
+            set_border_style(BorderStyle::none);
+            set_background(Color::rgba(0, 0, 0, 0));
+        }
+
+        void on_pointer(PointerEvent& event) override {
+            if (impl_.outside_pointer_handler &&
+                impl_.outside_pointer_handler(event)) {
+                event.handled = true;
+                return;
+            }
+            if (event.phase == EventPhase::target &&
+                event.action == PointerAction::down &&
+                event.button != PointerButton::none) {
+                impl_.close();
+                event.handled = true;
+            }
+        }
+
+        [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+            SemanticDescriptor descriptor;
+            descriptor.exposed = false;
+            descriptor.include_descendants = true;
+            return descriptor;
+        }
+
+    private:
+        Impl& impl_;
+    };
+
+    class MenuPanel final : public Panel {
+    public:
+        MenuPanel(StableId id, Impl& impl, std::size_t depth)
+            : Panel(std::move(id)), impl_(impl), depth_(depth) {
+            set_paint_plane(PaintPlane::overlay);
+            set_background(Color::rgba(250, 253, 255));
+            set_border_style(BorderStyle::line);
+        }
+
+        void on_pointer(PointerEvent& event) override {
+            if (event.action == PointerAction::wheel && event.wheel_delta.y != 0.0) {
+                impl_.scroll(depth_, event.wheel_delta.y > 0.0 ? -3 : 3);
+                event.handled = true;
+            } else if (event.action == PointerAction::down &&
+                       event.button != PointerButton::none) {
+                event.handled = true;
+            }
+        }
+
+        void on_pointer_bubble(PointerEvent& event) override {
+            if (!event.handled && event.action == PointerAction::wheel &&
+                event.wheel_delta.y != 0.0) {
+                impl_.scroll(depth_, event.wheel_delta.y > 0.0 ? -3 : 3);
+                event.handled = true;
+            }
+        }
+
+        [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+            SemanticDescriptor descriptor;
+            descriptor.role = SemanticRole::menu;
+            descriptor.name = "Menu";
+            descriptor.exposed = true;
+            descriptor.include_descendants = true;
+            return descriptor;
+        }
+
+    private:
+        Impl& impl_;
+        std::size_t depth_{};
+    };
+
+    class MenuRow final : public Control {
+    public:
+        MenuRow(StableId id, Impl& impl, std::size_t depth, std::size_t index,
+                const MenuSnapshot& item)
+            : Control(std::move(id)), impl_(impl), depth_(depth), index_(index),
+              item_(item) {
+            set_paint_plane(PaintPlane::overlay);
+            set_focusable(item.kind != MenuItemKind::separator && enabled_item());
+            set_cursor(item.kind == MenuItemKind::separator
+                ? std::optional<CursorKind>{} : CursorKind::hand);
+        }
+
+        [[nodiscard]] bool enabled_item() const noexcept {
+            return item_.kind == MenuItemKind::submenu || item_.command_state.enabled;
+        }
+
+        void set_hot(bool hot) {
+            if (hot_ == hot) return;
+            hot_ = hot;
+            invalidate(Dirty::paint);
+        }
+
+        void on_paint(Painter& painter, Rect) override {
+            const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
+                              committed_arranged_bounds().height};
+            const BasicControlStyle style;
+            if (item_.kind == MenuItemKind::separator) {
+                painter.draw_line({30.0, bounds.height * .5},
+                                  {std::max(31.0, bounds.width - 7.0),
+                                   bounds.height * .5},
+                                  style.border, 1.0);
+                return;
+            }
+            if (hot_ || focused_) {
+                painter.fill_rect({2.0, 1.0, std::max(0.0, bounds.width - 4.0),
+                                   std::max(0.0, bounds.height - 2.0)},
+                                  enabled_item() ? style.accent_light
+                                                 : style.face_light);
+                painter.stroke_rect({2.5, 1.5, std::max(0.0, bounds.width - 5.0),
+                                     std::max(0.0, bounds.height - 3.0)},
+                                    enabled_item() ? style.border
+                                                   : style.face, 1.0);
+            }
+            const Color ink = menu_ink(item_, style);
+            if ((item_.kind == MenuItemKind::check ||
+                 item_.kind == MenuItemKind::radio) && item_.command_state.checked) {
+                if (item_.kind == MenuItemKind::check) {
+                    painter.draw_line({8.0, 14.0}, {12.0, 18.0}, ink, 1.8);
+                    painter.draw_line({12.0, 18.0}, {20.0, 8.0}, ink, 1.8);
+                } else {
+                    painter.stroke_rect({9.5, 8.5, 11.0, 11.0}, ink, 1.0);
+                    painter.fill_rect({13.0, 12.0, 5.0, 5.0}, ink);
+                }
+            }
+            const FontSpec font = effective_font({FontRole::control, 11.0,
+                                static_cast<std::uint16_t>(
+                                    item_.command_state.default_action ? 700 : 400),
+                                false, 0.12});
+            const double baseline = std::max(font.size,
+                                              bounds.height * 0.5 + font.size * 0.35);
+            painter.draw_text_utf8({30.0, baseline},
+                                   menu_display_text(item_.text), font, ink);
+            if (!item_.command_state.shortcut.empty()) {
+                const FontSpec shortcut_font = effective_font(
+                    {FontRole::content, 10.0, 400, false});
+                const Size size = painter.measure_text_utf8(
+                    item_.command_state.shortcut, shortcut_font);
+                painter.draw_text_utf8(
+                    {std::max(34.0, bounds.width - size.width - 25.0), baseline},
+                    item_.command_state.shortcut, shortcut_font,
+                    enabled_item() ? style.disabled_text : style.face);
+            }
+            if (item_.kind == MenuItemKind::submenu) {
+                const double x = bounds.width - 13.0;
+                painter.draw_line({x - 3.0, 9.0}, {x + 1.0, 14.0}, ink, 1.2);
+                painter.draw_line({x + 1.0, 14.0}, {x - 3.0, 19.0}, ink, 1.2);
+            }
+        }
+
+        void on_pointer(PointerEvent& event) override {
+            if (item_.kind == MenuItemKind::separator) return;
+            if (event.action == PointerAction::move) {
+                impl_.hover(depth_, index_);
+                event.handled = true;
+            } else if (event.action == PointerAction::down &&
+                       event.button == PointerButton::primary) {
+                pressed_ = true;
+                impl_.hover(depth_, index_);
+                event.handled = true;
+            } else if (event.action == PointerAction::up &&
+                       event.button == PointerButton::primary) {
+                const bool invoke = pressed_ && absolute_bounds().contains(event.position);
+                pressed_ = false;
+                if (invoke) impl_.activate(depth_, index_);
+                event.handled = true;
+            } else if (event.action == PointerAction::leave) {
+                pressed_ = false;
+            }
+        }
+
+        void on_key(KeyEvent& event) override {
+            if (!focused_ || event.action != KeyAction::down) return;
+            if (event.physical_key == PhysicalKey::down) {
+                impl_.move_focus(depth_, index_, 1);
+            } else if (event.physical_key == PhysicalKey::up) {
+                impl_.move_focus(depth_, index_, -1);
+            } else if (event.physical_key == PhysicalKey::home) {
+                impl_.focus_edge(depth_, false);
+            } else if (event.physical_key == PhysicalKey::end) {
+                impl_.focus_edge(depth_, true);
+            } else if (event.physical_key == PhysicalKey::right) {
+                if (item_.kind == MenuItemKind::submenu) {
+                    impl_.open_submenu(depth_, index_, true);
+                } else if (depth_ == 0U) {
+                    static_cast<void>(impl_.navigate_root(1));
+                }
+            } else if (event.physical_key == PhysicalKey::left) {
+                impl_.close_submenu(depth_);
+            } else if (event.physical_key == PhysicalKey::enter ||
+                       event.physical_key == PhysicalKey::space) {
+                impl_.activate(depth_, index_);
+            } else if (event.physical_key == PhysicalKey::escape) {
+                impl_.close();
+            } else {
+                return;
+            }
+            event.handled = true;
+        }
+
+        void on_focus_changed(bool focused) override {
+            focused_ = focused;
+            set_hot(focused);
+            if (focused) impl_.ensure_visible(depth_, index_);
+            invalidate(Dirty::paint | Dirty::semantics);
+        }
+
+        [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+            SemanticDescriptor descriptor;
+            descriptor.role = item_.kind == MenuItemKind::separator
+                ? SemanticRole::separator : SemanticRole::menu_item;
+            descriptor.name = menu_display_text(item_.text);
+            descriptor.description = item_.command_state.description;
+            if (!item_.command_state.shortcut.empty()) {
+                if (!descriptor.description.empty()) descriptor.description += " · ";
+                descriptor.description += item_.command_state.shortcut;
+            }
+            if (!enabled_item() && !item_.command_state.availability_reason.empty()) {
+                if (!descriptor.description.empty()) descriptor.description += " · ";
+                descriptor.description += item_.command_state.availability_reason;
+            }
+            if (item_.command_state.checked) descriptor.states |= SemanticState::checked;
+            if (item_.kind == MenuItemKind::submenu &&
+                impl_.submenu_open(depth_, index_)) {
+                descriptor.states |= SemanticState::expanded;
+            }
+            descriptor.exposed = true;
+            descriptor.actions = item_.kind == MenuItemKind::submenu
+                ? std::vector<SemanticAction>{SemanticAction::focus,
+                                              SemanticAction::expand,
+                                              SemanticAction::collapse}
+                : item_.kind == MenuItemKind::separator
+                    ? std::vector<SemanticAction>{}
+                    : std::vector<SemanticAction>{SemanticAction::focus,
+                                                  SemanticAction::press};
+            return descriptor;
+        }
+
+        bool on_semantic_action(SemanticAction action,
+                                std::string_view) override {
+            if (action == SemanticAction::focus) {
+                if (window()) return window()->request_focus(shared_from_this());
+                return false;
+            }
+            if (action == SemanticAction::press &&
+                item_.kind != MenuItemKind::submenu && enabled_item()) {
+                impl_.activate(depth_, index_);
+                return true;
+            }
+            if (action == SemanticAction::expand &&
+                item_.kind == MenuItemKind::submenu) {
+                impl_.open_submenu(depth_, index_, true);
+                return true;
+            }
+            if (action == SemanticAction::collapse &&
+                item_.kind == MenuItemKind::submenu) {
+                impl_.remove_panels_after(depth_);
+                return true;
+            }
+            return false;
+        }
+
+    protected:
+        [[nodiscard]] bool mnemonic_matches(
+            char32_t character) const noexcept override {
+            return item_.kind != MenuItemKind::separator && enabled_item() &&
+                   is_mnemonic(character, item_.text);
+        }
+
+        bool process_mnemonic_self(char32_t character) override {
+            if (!mnemonic_matches(character)) return false;
+            impl_.activate(depth_, index_);
+            return true;
+        }
+
+    private:
+        Impl& impl_;
+        std::size_t depth_{};
+        std::size_t index_{};
+        const MenuSnapshot& item_;
+        bool hot_{};
+        bool focused_{};
+        bool pressed_{};
+    };
+
+    void show(const Control::Ptr& invoker, Point position,
+              const std::vector<MenuItemSpec>& specs) {
+        close();
+        if (!invoker || !invoker->attached_window()) {
+            throw std::logic_error("ContextMenu requires an attached owner control");
+        }
+        snapshot = snapshot_items(specs);
+        if (snapshot.empty()) {
+            throw std::logic_error("ContextMenu has no visible items to show");
+        }
+        window = invoker->attached_window();
+        owner_control = invoker;
+        const Size client = window->client_size();
+        layer = make_control<MenuLayer>(
+            StableId(owner.stable_id_ + ".popup.layer"), *this);
+        layer->set_requested_bounds({0.0, 0.0, client.width, client.height});
+        open_panel(0U, snapshot, position.x, position.y, {});
+        popup_token = window->open_popup(invoker, layer);
+        if (Event<>* closed = popup_token.closed_event()) {
+            popup_revocation = closed->subscribe(owner, [this] {
+                on_popup_revoked();
+            });
+        }
+        Control::Ptr preferred = first_focusable(0U);
+        focus_scope = window->begin_focus_scope(layer, preferred);
+        open = true;
+        owner.open_changed_.emit(true);
+    }
+
+    void close() noexcept {
+        if (closing) return;
+        closing = true;
+        if (window && focus_scope) {
+            try {
+                static_cast<void>(window->end_focus_scope(focus_scope));
+            } catch (...) {
+            }
+        }
+        focus_scope = {};
+        popup_token.disconnect();
+        popup_revocation.disconnect();
+        const bool changed = open;
+        reset_visual_state();
+        closing = false;
+        if (changed && owner.is_alive()) owner.open_changed_.emit(false);
+    }
+
+    void on_popup_revoked() noexcept {
+        if (closing) return;
+        if (window && focus_scope) {
+            try {
+                static_cast<void>(window->end_focus_scope(
+                    focus_scope, FocusScopeCloseReason::owner_unavailable));
+            } catch (...) {
+            }
+        }
+        focus_scope = {};
+        popup_revocation.disconnect();
+        const bool changed = open;
+        reset_visual_state();
+        if (changed && owner.is_alive()) owner.open_changed_.emit(false);
+    }
+
+    void reset_visual_state() noexcept {
+        panels.clear();
+        layer.reset();
+        owner_control.reset();
+        window = nullptr;
+        snapshot.clear();
+        open = false;
+    }
+
+    void open_panel(std::size_t depth, const std::vector<MenuSnapshot>& items,
+                    double requested_x, double requested_y,
+                    std::optional<std::size_t> parent_index) {
+        if (!layer || !window || depth >= maximum_menu_depth) return;
+        remove_panels_from(depth);
+        const Size client = window->client_size();
+        const double panel_width = std::max(
+            0.0, std::min(owner.preferred_width_ * text_scale(),
+                          client.width - 8.0));
+        double content = menu_border * 2.0;
+        for (const MenuSnapshot& item : items) content += row_height(item, text_scale());
+        const double maximum_height = std::max(command_row_height + menu_border * 2.0,
+                                                client.height - 8.0);
+        const double viewport = std::min(content, maximum_height);
+        const double x = std::clamp(requested_x, 4.0,
+                                    std::max(4.0, client.width - panel_width - 4.0));
+        const double y = std::clamp(requested_y, 4.0,
+                                    std::max(4.0, client.height - viewport - 4.0));
+        PanelState state;
+        state.items = &items;
+        state.parent_index = parent_index;
+        state.content_height = content;
+        state.viewport_height = viewport;
+        state.width = panel_width;
+        state.panel = make_control<MenuPanel>(
+            StableId(owner.stable_id_ + ".popup.panel." + std::to_string(depth)),
+            *this, depth);
+        state.panel->set_requested_bounds({x, y, panel_width, viewport});
+        state.rows.reserve(items.size());
+        for (std::size_t index = 0; index < items.size(); ++index) {
+            auto row = make_control<MenuRow>(
+                StableId(owner.stable_id_ + ".popup.row." + items[index].stable_id),
+                *this, depth, index, items[index]);
+            state.panel->add_child(row);
+            state.rows.push_back(std::move(row));
+        }
+        layer->add_child(state.panel);
+        panels.push_back(std::move(state));
+        layout_rows(depth);
+    }
+
+    void layout_rows(std::size_t depth) {
+        if (depth >= panels.size()) return;
+        PanelState& state = panels[depth];
+        double y = menu_border - state.scroll_offset;
+        for (std::size_t index = 0; index < state.rows.size(); ++index) {
+            const double height = row_height((*state.items)[index], text_scale());
+            state.rows[index]->set_requested_bounds(
+                {menu_border, y,
+                 std::max(0.0, state.width - menu_border * 2.0), height});
+            state.rows[index]->set_visible(
+                y + height > menu_border && y < state.viewport_height - menu_border);
+            y += height;
+        }
+    }
+
+    void remove_panels_from(std::size_t depth) {
+        while (panels.size() > depth) {
+            const auto panel = panels.back().panel;
+            panels.pop_back();
+            if (layer && panel && panel->parent().get() == layer.get()) {
+                static_cast<void>(layer->remove_child(panel->runtime_id()));
+            }
+        }
+        if (depth > 0U && depth - 1U < panels.size()) {
+            panels[depth - 1U].child_source_index.reset();
+        }
+    }
+
+    void remove_panels_after(std::size_t depth) {
+        remove_panels_from(depth + 1U);
+    }
+
+    [[nodiscard]] Control::Ptr first_focusable(std::size_t depth) const {
+        if (depth >= panels.size()) return {};
+        for (const auto& row : panels[depth].rows) {
+            if (row->focusable() && row->effectively_visible()) return row;
+        }
+        for (const auto& row : panels[depth].rows) {
+            if (row->focusable()) return row;
+        }
+        return {};
+    }
+
+    void ensure_visible(std::size_t depth, std::size_t index) {
+        if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
+        PanelState& state = panels[depth];
+        double top = menu_border;
+        for (std::size_t current = 0; current < index; ++current) {
+            top += row_height((*state.items)[current], text_scale());
+        }
+        const double bottom = top + row_height((*state.items)[index], text_scale());
+        const double visible_top = state.scroll_offset + menu_border;
+        const double visible_bottom = state.scroll_offset + state.viewport_height - menu_border;
+        if (top < visible_top) state.scroll_offset = std::max(0.0, top - menu_border);
+        else if (bottom > visible_bottom) {
+            state.scroll_offset = std::min(
+                std::max(0.0, state.content_height - state.viewport_height),
+                bottom - state.viewport_height + menu_border);
+        }
+        layout_rows(depth);
+    }
+
+    void scroll(std::size_t depth, int rows) {
+        if (depth >= panels.size()) return;
+        PanelState& state = panels[depth];
+        const double maximum = std::max(0.0,
+            state.content_height - state.viewport_height);
+        const double next = std::clamp(
+            state.scroll_offset + static_cast<double>(rows) * command_row_height *
+                text_scale(),
+            0.0, maximum);
+        if (next == state.scroll_offset) return;
+        state.scroll_offset = next;
+        layout_rows(depth);
+    }
+
+    void hover(std::size_t depth, std::size_t index) {
+        if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
+        for (std::size_t current = 0; current < panels[depth].rows.size(); ++current) {
+            panels[depth].rows[current]->set_hot(current == index);
+        }
+        if (window && panels[depth].rows[index]->focusable()) {
+            static_cast<void>(window->request_focus(panels[depth].rows[index]));
+        }
+        const MenuSnapshot& item = (*panels[depth].items)[index];
+        if (item.kind == MenuItemKind::submenu) {
+            open_submenu(depth, index, false);
+        } else {
+            remove_panels_after(depth);
+        }
+    }
+
+    void open_submenu(std::size_t depth, std::size_t index, bool focus_first) {
+        if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
+        const MenuSnapshot& item = (*panels[depth].items)[index];
+        if (item.kind != MenuItemKind::submenu || item.children.empty()) return;
+        if (panels[depth].child_source_index != index ||
+            panels.size() <= depth + 1U) {
+            const Rect parent = panels[depth].panel->absolute_bounds();
+            const Rect row = panels[depth].rows[index]->absolute_bounds();
+            const Size client = window->client_size();
+            const double child_width = std::max(
+                0.0, std::min(owner.preferred_width_ * text_scale(),
+                              client.width - 8.0));
+            double x = parent.x + parent.width - 3.0;
+            if (x + child_width + 4.0 > client.width) {
+                x = parent.x - child_width + 3.0;
+            }
+            panels[depth].child_source_index = index;
+            open_panel(depth + 1U, item.children, x, row.y, index);
+            panels[depth].child_source_index = index;
+        }
+        if (focus_first && window) {
+            if (const Control::Ptr first = first_focusable(depth + 1U)) {
+                static_cast<void>(window->request_focus(first));
+            }
+        }
+    }
+
+    void close_submenu(std::size_t depth) {
+        if (depth == 0U) {
+            if (navigate_root(-1)) return;
+            close();
+            return;
+        }
+        const std::optional<std::size_t> parent = panels[depth].parent_index;
+        remove_panels_from(depth);
+        if (window && parent && depth - 1U < panels.size() &&
+            *parent < panels[depth - 1U].rows.size()) {
+            static_cast<void>(window->request_focus(
+                panels[depth - 1U].rows[*parent]));
+        }
+    }
+
+    void move_focus(std::size_t depth, std::size_t index, int direction) {
+        if (depth >= panels.size() || panels[depth].rows.empty()) return;
+        const std::size_t count = panels[depth].rows.size();
+        for (std::size_t step = 1U; step <= count; ++step) {
+            const std::ptrdiff_t raw = static_cast<std::ptrdiff_t>(index) +
+                static_cast<std::ptrdiff_t>(direction) *
+                    static_cast<std::ptrdiff_t>(step);
+            const std::size_t candidate = static_cast<std::size_t>(
+                (raw % static_cast<std::ptrdiff_t>(count) +
+                 static_cast<std::ptrdiff_t>(count)) %
+                static_cast<std::ptrdiff_t>(count));
+            if (panels[depth].rows[candidate]->focusable()) {
+                ensure_visible(depth, candidate);
+                if (window) static_cast<void>(window->request_focus(
+                    panels[depth].rows[candidate]));
+                return;
+            }
+        }
+    }
+
+    void focus_edge(std::size_t depth, bool last) {
+        if (depth >= panels.size()) return;
+        auto& rows = panels[depth].rows;
+        if (last) {
+            for (std::size_t index = rows.size(); index > 0U; --index) {
+                if (rows[index - 1U]->focusable()) {
+                    ensure_visible(depth, index - 1U);
+                    if (window) static_cast<void>(window->request_focus(rows[index - 1U]));
+                    return;
+                }
+            }
+        } else {
+            for (std::size_t index = 0U; index < rows.size(); ++index) {
+                if (rows[index]->focusable()) {
+                    ensure_visible(depth, index);
+                    if (window) static_cast<void>(window->request_focus(rows[index]));
+                    return;
+                }
+            }
+        }
+    }
+
+    void activate(std::size_t depth, std::size_t index) {
+        if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
+        const MenuSnapshot& item = (*panels[depth].items)[index];
+        if (item.kind == MenuItemKind::submenu) {
+            open_submenu(depth, index, true);
+            return;
+        }
+        if (item.kind == MenuItemKind::separator || !item.command ||
+            !item.command_state.enabled) return;
+        const std::string source_id = std::string(
+            panels[depth].rows[index]->stable_id().value());
+        const std::string command_id = item.command->stable_id();
+        if (!item.command->execute(source_id)) return;
+        MenuItemInvocation invocation{owner.stable_id_, item.stable_id,
+                                      command_id, source_id};
+        owner.item_invoked_.emit(invocation);
+        close();
+    }
+
+    [[nodiscard]] bool submenu_open(std::size_t depth,
+                                    std::size_t index) const noexcept {
+        return depth < panels.size() &&
+               panels[depth].child_source_index == index &&
+               panels.size() > depth + 1U;
+    }
+
+    [[nodiscard]] bool navigate_root(int direction) {
+        return root_navigation_handler && root_navigation_handler(direction);
+    }
+
+    ContextMenu& owner;
+    Window* window{};
+    Control::Ptr owner_control;
+    std::shared_ptr<MenuLayer> layer;
+    std::vector<MenuSnapshot> snapshot;
+    std::vector<PanelState> panels;
+    PopupToken popup_token;
+    SubscriptionToken popup_revocation;
+    FocusScopeId focus_scope{};
+    bool open{};
+    bool closing{};
+    std::function<bool(int)> root_navigation_handler;
+    std::function<bool(const PointerEvent&)> outside_pointer_handler;
+};
+
+ContextMenu::ContextMenu(std::string stable_id)
+    : stable_id_(std::move(stable_id)), impl_(std::make_unique<Impl>(*this)) {
+    if (stable_id_.empty() || !validate_utf8(stable_id_).valid()) {
+        throw std::invalid_argument("ContextMenu identity must be valid UTF-8");
+    }
+}
+
+ContextMenu::~ContextMenu() {
+    close();
+}
+
+void ContextMenu::set_items(std::vector<MenuItemSpec> items) {
+    if (!is_alive()) throw std::logic_error("disposed ContextMenu cannot change items");
+    std::unordered_set<std::string> identities;
+    std::size_t count{};
+    validate_specs(items, identities, 1U, count);
+    close();
+    items_ = std::move(items);
+}
+
+void ContextMenu::set_preferred_width(double width) {
+    if (!is_alive()) {
+        throw std::logic_error(
+            "disposed ContextMenu cannot change preferred width");
+    }
+    if (!std::isfinite(width) || width < 120.0 || width > 1024.0) {
+        throw std::invalid_argument(
+            "ContextMenu preferred width must be finite and between 120 and 1024");
+    }
+    if (preferred_width_ == width) return;
+    close();
+    preferred_width_ = width;
+}
+
+void ContextMenu::show(const Control::Ptr& owner, Point window_position) {
+    if (!is_alive()) throw std::logic_error("disposed ContextMenu cannot open");
+    if (!std::isfinite(window_position.x) || !std::isfinite(window_position.y)) {
+        throw std::invalid_argument("ContextMenu position must be finite");
+    }
+    impl_->show(owner, window_position, items_);
+}
+
+void ContextMenu::close() noexcept {
+    if (impl_) impl_->close();
+}
+
+bool ContextMenu::is_open() const noexcept {
+    return impl_ && impl_->open;
+}
+
+void ContextMenu::set_root_navigation_handler(
+    std::function<bool(int)> handler) {
+    impl_->root_navigation_handler = std::move(handler);
+}
+
+void ContextMenu::set_outside_pointer_handler(
+    std::function<bool(const PointerEvent&)> handler) {
+    impl_->outside_pointer_handler = std::move(handler);
+}
+
+void ContextMenu::on_dispose() noexcept {
+    close();
+}
+
+} // namespace gui_forms

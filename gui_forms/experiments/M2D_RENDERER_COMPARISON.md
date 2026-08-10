@@ -22,13 +22,13 @@ implementations. Gate R1 remains open; this record is not a renderer ADR.
 
 ## Implementation delivered
 
-- `src/render/coregraphics/coregraphics_raster.*`: private CPU RGBA8 adapter for
+- `src/render/coregraphics/raster/coregraphics_raster.*`: private CPU RGBA8 adapter for
   rectangle, line, text, PNG, clipping, translation, and damage-clipped frames.
   PNG bytes arrive only through the bounded registry and are eagerly decoded.
 - `benchmarks/renderer_benchmark.cpp`: identical retained Gallery and active-band
   workloads; structured p50/p95/p99/worst/mean timing, CPU time, RSS snapshots,
   exact copied/damaged pixels, chunk metrics, checksums, and artifacts.
-- `src/core/device_damage.hpp`: one internal device-pixel alignment contract used
+- `src/core/damage/device_damage/device_damage.hpp`: one internal device-pixel alignment contract used
   by the macOS host, comparison raster, and benchmark. Fractional logical damage
   is expanded outward before both tree traversal and raster clipping.
 - `cmake/check_renderer_boundaries.cmake`: build-enforced core/public-header

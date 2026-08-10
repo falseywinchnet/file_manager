@@ -1,175 +1,223 @@
 # NumericUpDown
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → NumericUpDown`  
-Declaration: `include/gui_forms/input_controls.hpp:370`  
-Definition: `src/controls/input_controls.cpp`
+- Status: **OBSERVED: bundle 004 split and button-width enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → NumericUpDown`
+- Declaration: `include/gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp:12`
+- Definition: `src/controls/panel/numeric_up_down/numeric_up_down.cpp`
 
-NumericUpDown is a visual retained control declared in include/gui_forms/input_controls.hpp.
+NumericUpDown is a retained composite numeric editor over an owned TextBox and source-private SpinButtons. It enforces ordered ranges, bounded step/precision/button geometry, decimal or hexadecimal formatting, commit synchronization, semantic range actions, and one authoritative value event.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![NumericUpDown](../captures/numeric_up_down.png)
 
-## Public methods
+## Declared methods
 
-### `NumericUpDown`
+### `NumericUpDown` (public)
 
 ```cpp
 explicit NumericUpDown(StableId stable_id)
 ```
 
-Constructs or tears down the retained NumericUpDown object according to its ownership contract.
+Constructs owned editor and spin controls while deferring child attachment until shared ownership exists.
 
-### `initialize_control_tree`
+### `initialize_control_tree` (public)
 
 ```cpp
 void initialize_control_tree()
 ```
 
-Idempotently attaches lazily constructed internal controls before layout or use.
+Attaches owned children and subscriptions exactly once, then synchronizes presentation.
 
-### `minimum`
+### `minimum` (public)
 
 ```cpp
 [[nodiscard]] double minimum() const noexcept
 ```
 
-Reports the current minimum value without mutation.
+Returns the inclusive lower value bound.
 
-### `maximum`
+### `maximum` (public)
 
 ```cpp
 [[nodiscard]] double maximum() const noexcept
 ```
 
-Reports the current maximum value without mutation.
+Returns the inclusive upper value bound.
 
-### `set_range`
+### `set_range` (public)
 
 ```cpp
 void set_range(double minimum, double maximum)
 ```
 
-Synchronously updates the retained range property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finite ordered bounds, constrains the current value, and refreshes editor and semantics atomically.
 
-### `value`
+### `value` (public)
 
 ```cpp
 [[nodiscard]] double value() const noexcept
 ```
 
-Reports the current value value without mutation.
+Returns the authoritative constrained numeric value.
 
-### `set_value`
+### `set_value` (public)
 
 ```cpp
 void set_value(double value)
 ```
 
-Synchronously updates the retained value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finiteness, clamps to the range, synchronizes text, and publishes a real value change.
 
-### `increment`
+### `increment` (public)
 
 ```cpp
 [[nodiscard]] double increment() const noexcept
 ```
 
-Reports the current increment value without mutation.
+Returns the positive step magnitude.
 
-### `set_increment`
+### `set_increment` (public)
 
 ```cpp
 void set_increment(double increment)
 ```
 
-Synchronously updates the retained increment property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite positive increment and refreshes semantic range metadata.
 
-### `decimal_places`
+### `decimal_places` (public)
 
 ```cpp
 [[nodiscard]] std::uint8_t decimal_places() const noexcept
 ```
 
-Reports the current decimal places value without mutation.
+Returns the bounded fixed-point precision used outside hexadecimal mode.
 
-### `set_decimal_places`
+### `set_decimal_places` (public)
 
 ```cpp
 void set_decimal_places(std::uint8_t places)
 ```
 
-Synchronously updates the retained decimal places property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts supported precision and reformats the owned editor.
 
-### `hexadecimal`
+### `hexadecimal` (public)
 
 ```cpp
 [[nodiscard]] bool hexadecimal() const noexcept
 ```
 
-Reports the current hexadecimal value without mutation.
+Reports whether integral hexadecimal presentation and parsing are active.
 
-### `set_hexadecimal`
+### `set_hexadecimal` (public)
 
 ```cpp
 void set_hexadecimal(bool hexadecimal)
 ```
 
-Synchronously updates the retained hexadecimal property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles hexadecimal policy and synchronizes editor projection.
 
-### `editor`
+### `button_width` (public)
+
+```cpp
+[[nodiscard]] double button_width() const noexcept
+```
+
+Returns the logical allocation reserved for the spin-button column.
+
+### `set_button_width` (public)
+
+```cpp
+void set_button_width(double width)
+```
+
+Accepts a finite 12–64 logical-pixel width and invalidates composite layout.
+
+### `editor` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<TextBox> editor() const noexcept
 ```
 
-Reports the current editor value without mutation.
+Returns the owned TextBox for composition-aware inspection and focus routing.
 
-### `value_changed`
+### `value_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<double>& value_changed() noexcept
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after authoritative value commits.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Allocates the editor and trailing button column from current button-width policy.
 
-### `on_key_preview`
+### `on_key_preview` (public)
 
 ```cpp
 void on_key_preview(KeyEvent& event) override
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Handles Up/Down stepping before the focused TextBox consumes the key.
 
-### `on_pointer_preview`
+### `on_pointer_preview` (public)
 
 ```cpp
 void on_pointer_preview(PointerEvent& event) override
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Initializes the owned control tree before routed pointer interaction.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a spin-button role with numeric range, current value, step actions, and formatted text.
 
-### `on_semantic_action`
+### `on_semantic_action` (public)
 
 ```cpp
 bool on_semantic_action(SemanticAction action, std::string_view value) override
 ```
 
+Routes increment, decrement, and set-value through common validation and commit logic.
+
+### `step` (private)
+
+```cpp
+void step(int direction)
+```
+
 Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `commit_editor_text` (private)
+
+```cpp
+void commit_editor_text()
+```
+
+Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `synchronize_editor` (private)
+
+```cpp
+void synchronize_editor()
+```
+
+Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `formatted_value` (private)
+
+```cpp
+[[nodiscard]] std::string formatted_value() const
+```
+
+Reports the current formatted value value without mutation.

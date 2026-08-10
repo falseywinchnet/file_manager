@@ -1,5 +1,3 @@
-#![cfg(unix)]
-
 use crate::local_session::{
     ClientHello, LOCAL_WIRE_FAMILY, LOCAL_WIRE_MAJOR, LOCAL_WIRE_MINOR, ServerHello,
     SessionAuthError, SessionToken, authenticate_client,

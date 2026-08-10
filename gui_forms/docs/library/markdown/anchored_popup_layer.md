@@ -1,159 +1,167 @@
 # AnchoredPopupLayer
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → AnchoredPopupLayer`  
-Declaration: `include/gui_forms/popup_controls.hpp:57`  
-Definition: `src/controls/popup_controls.cpp`
+- Status: **OBSERVED: bundle 005 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → AnchoredPopupLayer`
+- Declaration: `include/gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp:22`
+- Definition: `src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp`
 
-AnchoredPopupLayer is a visual retained control declared in include/gui_forms/popup_controls.hpp.
+AnchoredPopupLayer is a renderer-neutral retained popup boundary tied to a live anchor. It owns one content control, resolves and updates bounded client-relative geometry, centralizes click-away and Escape dismissal requests, and projects dialog semantics while the Window retains the actual popup lease.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![AnchoredPopupLayer](../captures/anchored_popup_layer.png)
 
-## Public methods
+## Declared methods
 
-### `AnchoredPopupLayer`
+### `AnchoredPopupLayer` (public)
 
 ```cpp
 AnchoredPopupLayer(StableId stable_id, Control::Ptr anchor, AnchoredPopupPlacement placement =
 ```
 
-Constructs or tears down the retained AnchoredPopupLayer object according to its ownership contract.
+Constructs a full-client popup boundary around a required live anchor and validated placement policy.
 
-### `anchor`
+### `anchor` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr anchor() const noexcept
 ```
 
-Reports the current anchor value without mutation.
+Returns the current strong anchor reference used for geometry and ownership association.
 
-### `set_anchor`
+### `set_anchor` (public)
 
 ```cpp
 void set_anchor(Control::Ptr anchor)
 ```
 
-Synchronously updates the retained anchor property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and replaces the anchor, then resolves geometry against the next arrangement.
 
-### `content`
+### `content` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr content() const noexcept
 ```
 
-Reports the current content value without mutation.
+Returns the optional retained control hosted inside the resolved popup bounds.
 
-### `set_content`
+### `set_content` (public)
 
 ```cpp
 void set_content(Control::Ptr content)
 ```
 
-Synchronously updates the retained content property. Validation, typed invalidation, and notifications are defined by the implementation.
+Replaces the single content role with normal parent/attachment bookkeeping and layout invalidation.
 
-### `placement`
+### `placement` (public)
 
 ```cpp
 [[nodiscard]] AnchoredPopupPlacement placement() const noexcept
 ```
 
-Reports the current placement value without mutation.
+Returns the caller-authored popup geometry policy.
 
-### `set_placement`
+### `set_placement` (public)
 
 ```cpp
 void set_placement(AnchoredPopupPlacement placement)
 ```
 
-Synchronously updates the retained placement property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits placement policy, then invalidates geometry and semantics.
 
-### `resolved_placement`
+### `resolved_placement` (public)
 
 ```cpp
 [[nodiscard]] AnchoredPopupPlacementResult resolved_placement() const noexcept
 ```
 
-Reports the current resolved placement value without mutation.
+Returns the last arranged bounds and side/clamping result.
 
-### `dismiss_on_click_away`
+### `dismiss_on_click_away` (public)
 
 ```cpp
 [[nodiscard]] bool dismiss_on_click_away() const noexcept
 ```
 
-Reports the current dismiss on click away value without mutation.
+Reports whether primary presses outside resolved bounds request dismissal.
 
-### `set_dismiss_on_click_away`
+### `set_dismiss_on_click_away` (public)
 
 ```cpp
 void set_dismiss_on_click_away(bool enabled)
 ```
 
-Synchronously updates the retained dismiss on click away property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles click-away policy without changing popup ownership.
 
-### `dismiss_on_escape`
+### `dismiss_on_escape` (public)
 
 ```cpp
 [[nodiscard]] bool dismiss_on_escape() const noexcept
 ```
 
-Reports the current dismiss on escape value without mutation.
+Reports whether Escape preview requests dismissal.
 
-### `set_dismiss_on_escape`
+### `set_dismiss_on_escape` (public)
 
 ```cpp
 void set_dismiss_on_escape(bool enabled)
 ```
 
-Synchronously updates the retained dismiss on escape property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles Escape policy without changing focus or popup leases.
 
-### `dismiss_requested`
+### `dismiss_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<PopupDismissReason>& dismiss_requested() noexcept
 ```
 
-Public AnchoredPopupLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event carrying click-away or Escape reason for the owning coordinator to close.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Consumes the available client boundary while measuring content against preferred popup size.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Resolves placement against live anchor/client geometry and arranges content inside exact bounded results.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Detects qualified outside primary presses, raises dismissal, and prevents click-through.
 
-### `on_key_preview`
+### `on_key_preview` (public)
 
 ```cpp
 void on_key_preview(KeyEvent& event) override
 ```
 
-Public AnchoredPopupLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Intercepts Escape before descendants when enabled and raises a typed dismissal request.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a transient dialog boundary with expanded content ownership.
+
+### `validate_anchor` (private)
+
+```cpp
+void validate_anchor(const Control::Ptr& anchor) const
+```
+
+Reports the current validate anchor value without mutation.

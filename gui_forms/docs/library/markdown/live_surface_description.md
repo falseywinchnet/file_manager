@@ -1,17 +1,17 @@
 # LiveSurfaceDescription
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `LiveSurfaceDescription`  
-Declaration: `include/gui_forms/live_surface.hpp:17`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 008 buffer configuration review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `LiveSurfaceDescription`
+- Declaration: `include/gui_forms/live_surface/types/live_surface_types.hpp:18`
+- Definition: `inline/header-only`
 
-LiveSurfaceDescription is a struct declared in include/gui_forms/live_surface.hpp.
+LiveSurfaceDescription declares positive bounded pixel dimensions, the admitted premultiplied-sRGB BGRA format, and a configurable two-to-eight-buffer pool whose default remains triple buffering.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

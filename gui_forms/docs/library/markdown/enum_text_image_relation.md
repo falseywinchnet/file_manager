@@ -1,7 +1,7 @@
 # TextImageRelation
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/controls/button_base/button_base.hpp:28`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/button_base/button_base.hpp:28`
 
 ## Declared values
 

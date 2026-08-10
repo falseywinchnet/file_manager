@@ -1,7 +1,7 @@
 # ImageListChangeKind
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/image_list.hpp:32`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/image_list.hpp:32`
 
 ## Declared values
 

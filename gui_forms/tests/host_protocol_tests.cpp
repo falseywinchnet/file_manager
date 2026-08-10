@@ -356,6 +356,7 @@ void test_semantic_sound_cues_are_bounded_and_deterministic() {
     const HostServicesSnapshot snapshot = services.snapshot();
     require(snapshot.sound_requests == 3U && snapshot.sound_playbacks == 1U &&
                 snapshot.sound_coalesced == 1U && snapshot.sound_muted == 1U &&
+                snapshot.sound_coalescing_window_nanoseconds == 50'000'000U &&
                 services.sound_trace() ==
                     "sound=notification timestamp=1000000000 gain=0.8\n",
             "headless sound accounting and adapter trace must be exact");
@@ -363,6 +364,22 @@ void test_semantic_sound_cues_are_bounded_and_deterministic() {
                 {HostSoundCue::warning, 1.0, start - 1U}).error ==
                     HostServiceError::invalid_argument,
             "sound timestamps must remain monotonic across cue identities");
+
+    require(services.set_sound_cue_coalescing_window(
+                std::chrono::nanoseconds::zero()).accepted() &&
+                services.sound_cue_coalescing_window() ==
+                    std::chrono::nanoseconds::zero(),
+            "host sound burst coalescing must be explicitly disableable");
+    require(services.play_sound_cue(
+                {HostSoundCue::notification, 0.5, start + 80'000'000U}).accepted() &&
+                services.play_sound_cue(
+                {HostSoundCue::notification, 0.5, start + 80'000'001U}).accepted(),
+            "a zero coalescing window must preserve consecutive semantic cues");
+    require(services.snapshot().sound_playbacks == 3U &&
+                services.set_sound_cue_coalescing_window(
+                    std::chrono::seconds(6)).error ==
+                    HostServiceError::invalid_argument,
+            "sound coalescing customization must enforce its declared bound");
 
     HostServiceStatus wrong_thread;
     std::thread worker([&] {

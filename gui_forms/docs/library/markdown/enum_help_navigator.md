@@ -1,7 +1,7 @@
 # HelpNavigator
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/guidance.hpp:181`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/components/help_provider/help_provider.hpp:30`
 
 ## Declared values
 

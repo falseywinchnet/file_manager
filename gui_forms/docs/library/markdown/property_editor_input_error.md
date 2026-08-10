@@ -1,17 +1,17 @@
 # PropertyEditorInputError
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEditorInputError`  
-Declaration: `include/gui_forms/inspection_controls.hpp:97`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 edit-error value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyEditorInputError`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:31`
+- Definition: `inline/header-only`
 
-PropertyEditorInputError is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyEditorInputError carries the exact attempted text and a user-facing validation message from a retained editor.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyEditorInputError](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

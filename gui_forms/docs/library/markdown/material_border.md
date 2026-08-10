@@ -1,23 +1,23 @@
 # MaterialBorder
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MaterialBorder`  
-Declaration: `include/gui_forms/surface_material.hpp:71`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 material border review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `MaterialBorder`
+- Declaration: `include/gui_forms/surface_material/types/surface_material_types.hpp:63`
+- Definition: `inline/header-only`
 
-MaterialBorder is a struct declared in include/gui_forms/surface_material.hpp.
+MaterialBorder pairs an authored color and logical stroke width.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const MaterialBorder&, const MaterialBorder&) = default
 ```
 
-Public MaterialBorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares color and width.

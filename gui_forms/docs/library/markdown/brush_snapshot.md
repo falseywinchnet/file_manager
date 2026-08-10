@@ -1,17 +1,17 @@
 # BrushSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `BrushSnapshot`  
-Declaration: `include/gui_forms/drawing.hpp:344`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 brush snapshot review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `BrushSnapshot`
+- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:69`
+- Definition: `inline/header-only`
 
-BrushSnapshot is a struct declared in include/gui_forms/drawing.hpp.
+BrushSnapshot is the complete renderer-neutral union record for solid, hatch, gradient, path-gradient, or texture recipes.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

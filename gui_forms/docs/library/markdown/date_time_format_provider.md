@@ -1,23 +1,23 @@
 # DateTimeFormatProvider
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `DateTimeFormatProvider`  
-Declaration: `include/gui_forms/date_time_picker.hpp:36`  
-Definition: `src/controls/date_time_picker.cpp`
+- Status: **OBSERVED: bundle 004 value-provider split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `DateTimeFormatProvider`
+- Declaration: `include/gui_forms/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.hpp:10`
+- Definition: `src/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.cpp`
 
-DateTimeFormatProvider is a struct declared in include/gui_forms/date_time_picker.hpp.
+DateTimeFormatProvider is an immutable caller-substitutable vocabulary and pattern bundle for DateTimePicker formatting. It separates locale-shaped presentation from civil-value authority without introducing a platform locale runtime dependency.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![DateTimeFormatProvider](../captures/date_time_picker.png)
 
-## Public methods
+## Declared methods
 
-### `english_united_states`
+### `english_united_states` (public)
 
 ```cpp
 [[nodiscard]] static DateTimeFormatProvider english_united_states()
 ```
 
-Public DateTimeFormatProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the library's canonical English month/day names and short, long, time, and month-year patterns.

@@ -1,7 +1,7 @@
 # ErrorBlinkStyle
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/guidance.hpp:31`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/components/error_provider/error_provider.hpp:31`
 
 ## Declared values
 

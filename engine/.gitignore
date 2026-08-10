@@ -1,7 +1,11 @@
 /bin/
+/build/
+/dist/
+/tmp/
 /coverage/
 /sandbox/work/
 /results/raw/
 *.test
 *.prof
 *.out
+*.coverprofile

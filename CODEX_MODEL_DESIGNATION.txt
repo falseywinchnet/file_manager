@@ -1,0 +1,3 @@
+Codex, based on GPT-5
+
+The exact deployed model variant is not exposed to this executor.

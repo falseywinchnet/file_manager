@@ -33,6 +33,7 @@ GUI framework, index store, semantic pipeline, or plugin ABI.
 | `gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` | Theme/language assemblies, PNG boundary, safe fallback, and retired compatibility specimen-informed mutable configuration candidates |
 | `../gui_forms/planning/FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md` | Generous File Manager control/layout/popup/transfer/accessibility/typography/drawing shopping list promoted into GUI.Forms landmarks |
 | `../gui_forms/planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md` | Paint/Text Editor/Games/dialog/plugin-host capability profile and the non-File-Manager no-panel topology |
+| `../web_forms/` | Planning-stage bounded HTML/CSS authoring and build-time C++ generation companion to GUI.Forms; no JavaScript or runtime browser |
 | `search/SEARCH_RECONCILIATION_001.md` | Search identity, root ownership, offline-catalogue, result-motion, mutation-boundary, ConeDAG, and semantic-deferral constraints from the first completed board export |
 | `../decisions/ADR-001-ENGINE-REFERENCE-AND-STORAGE-SPINE.md` | Accepted engine object model, root/volume topology, immutable-generation spine, update/ranking/API policy, external placement, scale behavior, and initial performance constitution |
 | `../decisions/ADR-002-ORACLE-CONTRACT-AUTHORITY-AND-PROGRAM-SEQUENCE.md` | Superseded historical Oracle name and global dependency gate |

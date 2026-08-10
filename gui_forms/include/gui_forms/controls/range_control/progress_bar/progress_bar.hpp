@@ -1,0 +1,109 @@
+#pragma once
+
+#include "gui_forms/controls/range_control/range_control.hpp"
+
+#include <cstdint>
+
+namespace gui_forms {
+
+enum class ProgressBarVisualStyle : std::uint8_t {
+    blocks,
+    continuous,
+    marquee,
+    pulse,
+    luminance_pulse = pulse,
+    marching_stripes,
+    laser_etch,
+};
+
+enum class ProgressBarOverlayStyle : std::uint8_t {
+    none,
+    moving_stripes,
+    marching_stripes = moving_stripes,
+};
+
+struct ProgressBarAnimationAppearance final {
+    Color luminance_color{Color::rgba(255, 255, 255, 92)};
+    Color stripe_color{Color::rgba(224, 241, 252, 116)};
+    Color laser_phase_color{Color::rgba(130, 222, 247, 108)};
+    Color laser_edge_color{Color::rgba(196, 246, 255, 226)};
+    Color laser_spark_color{Color::rgba(238, 253, 255, 236)};
+    double pulse_extent{0.32};
+    double laser_edge_extent{13.0};
+    double laser_phase_pitch{10.0};
+
+    friend constexpr bool operator==(const ProgressBarAnimationAppearance&,
+                                     const ProgressBarAnimationAppearance&) = default;
+};
+
+class ProgressBar : public RangeControl {
+public:
+    explicit ProgressBar(StableId stable_id);
+
+    [[nodiscard]] ProgressBarVisualStyle visual_style() const noexcept {
+        return visual_style_;
+    }
+    void set_visual_style(ProgressBarVisualStyle style);
+    [[nodiscard]] ProgressBarOverlayStyle overlay_style() const noexcept {
+        return overlay_style_;
+    }
+    void set_overlay_style(ProgressBarOverlayStyle style);
+    [[nodiscard]] double stripe_width() const noexcept { return stripe_width_; }
+    void set_stripe_width(double width);
+    [[nodiscard]] const ProgressBarAnimationAppearance& animation_appearance()
+        const noexcept { return animation_appearance_; }
+    void set_animation_appearance(ProgressBarAnimationAppearance appearance);
+    [[nodiscard]] bool animation_enabled() const noexcept {
+        return animation_enabled_;
+    }
+    void set_animation_enabled(bool enabled);
+    [[nodiscard]] bool animation_paused() const noexcept {
+        return motion_policy_.paused;
+    }
+    void set_animation_paused(bool paused);
+    [[nodiscard]] bool reduced_motion() const noexcept {
+        return motion_policy_.reduced;
+    }
+    void set_reduced_motion(bool reduced);
+    void set_motion_policy(bool paused, bool reduced_motion);
+    void set_motion_policy(MotionPolicy policy);
+    [[nodiscard]] MotionPolicy motion_policy() const noexcept {
+        return motion_policy_;
+    }
+    [[nodiscard]] MotionPolicy effective_motion_policy() const noexcept;
+    [[nodiscard]] FrameInterval animation_period() const noexcept {
+        return animation_period_;
+    }
+    void set_animation_period(FrameInterval period);
+    [[nodiscard]] double animation_phase() const noexcept {
+        return animation_phase_;
+    }
+
+    [[nodiscard]] Size measure(Size available) override;
+    void on_paint(Painter& painter, Rect local_damage) override;
+    void on_frame(FrameTime now) override;
+    [[nodiscard]] bool hit_test_local(Point local_point) const override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+
+protected:
+    void on_attached_to_window() override;
+    void on_detached_from_window() noexcept override;
+
+private:
+    void update_animation_registration();
+    [[nodiscard]] bool animated_style() const noexcept;
+
+    ProgressBarVisualStyle visual_style_{ProgressBarVisualStyle::continuous};
+    ProgressBarOverlayStyle overlay_style_{ProgressBarOverlayStyle::none};
+    ProgressBarAnimationAppearance animation_appearance_{};
+    double stripe_width_{7.0};
+    FrameRequestToken animation_frames_;
+    SubscriptionToken presentation_subscription_;
+    FrameInterval animation_period_{std::chrono::milliseconds(1400)};
+    FrameTime last_animation_frame_{};
+    double animation_phase_{};
+    bool animation_enabled_{true};
+    MotionPolicy motion_policy_{};
+};
+
+} // namespace gui_forms

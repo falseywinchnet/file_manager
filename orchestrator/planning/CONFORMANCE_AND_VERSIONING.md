@@ -65,17 +65,17 @@ consumer gate. Windows named pipes remain a separate platform projection.
 ADR-007 freezes the transport-neutral `ORC-ENG-001/002` semantic-v0 subset for
 experimental implementation. Its Rust fixture projection proves that
 Orchestrator preserves cached-stale, authoritative no-match, provider-absent,
-and currently unsupported-live-query outcomes as distinct states. ADR-008 now
-requires that missing lane through the separate `ORC-ENG-004` negotiation. Its
-draft fixtures prove source-explicit progressive pages, partial traversal, and
-non-bypass of authority errors.
+and unsupported-live-query outcomes as distinct states. ADR-008 requires the
+separate `ORC-ENG-004` lane. Its fixtures prove source-explicit progressive
+pages, partial traversal, and non-bypass of authority errors.
 
-**OBSERVED:** the Rust development JSONL adapter now performs a real
-cross-process exact query against a separately built Go Engine after canonical
-root plan/apply and reconciliation. This is implementation evidence for
-`ORC-ENG-001`; it does not promote JSONL to the production wire or close the
-installed discovery/authentication gate. `ORC-ENG-004` still lacks its Engine
-provider implementation and remains negotiating.
+**OBSERVED:** the Rust development JSONL adapter performs real cross-process
+exact and catalogue-independent live queries against a separately built Go
+Engine. The live route passes through authenticated `orchestrator.search` in
+both Rust and independent C++ consumers without exposing lane selection. This
+is implementation evidence for `ORC-ENG-001` and the fixture-draft
+`ORC-ENG-004`; it does not promote JSONL to the production wire or close the
+installed discovery/authentication, native NTFS/ext4, or million-entry gates.
 
 ## Required conformance corpus
 

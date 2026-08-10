@@ -1,7 +1,7 @@
 # SmoothingMode
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/drawing.hpp:301`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:26`
 
 ## Declared values
 

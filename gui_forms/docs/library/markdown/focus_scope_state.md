@@ -1,17 +1,17 @@
 # FocusScopeState
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FocusScopeState`  
-Declaration: `include/gui_forms/window.hpp:667`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 source-private focus state review; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `FocusScopeState`
+- Declaration: `include/gui_forms/window/window.hpp:595`
+- Definition: `inline/header-only`
 
-FocusScopeState is a struct declared in include/gui_forms/window.hpp.
+FocusScopeState retains weak root/prior focus, stable/runtime identity, policy, and active state for one nested focus boundary.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

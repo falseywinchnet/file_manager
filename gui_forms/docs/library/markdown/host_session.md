@@ -1,87 +1,87 @@
 # HostSession
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `HostSession`  
-Declaration: `include/gui_forms/host.hpp:469`  
-Definition: `src/core/host.cpp`
+- Status: **OBSERVED: bundle 007 lifecycle state-machine split; M4 macOS/MinGW builds and focused tests pass**
+- Kind: **class**
+- Hierarchy: `HostSession`
+- Declaration: `include/gui_forms/host/session/host_session.hpp:13`
+- Definition: `src/core/host/session/host_session.cpp`
 
-HostSession is a class declared in include/gui_forms/host.hpp.
+HostSession is the foreign-boundary lifecycle machine between one native top-level presentation and one retained Window. It validates sequence, phase, geometry, typed drag payload, modal suppression, callback containment, close authorization, and terminal cleanup without admitting platform handles.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![HostSession](../captures/native_window_host.png)
 
-## Public methods
+## Declared methods
 
-### `HostSession`
+### `HostSession` (public)
 
 ```cpp
 HostSession(Window& window, HostCapabilities capabilities, HostServices* services = nullptr)
 ```
 
-Constructs or tears down the retained HostSession object according to its ownership contract.
+Binds one Window, capability set, optional service seam, UI thread, capture synchronization, and modal observation.
 
-### `~HostSession`
+### `~HostSession` (public)
 
 ```cpp
 ~HostSession()
 ```
 
-Constructs or tears down the retained HostSession object according to its ownership contract.
+Idempotently shuts down and removes the Window service seam.
 
-### `HostSession`
+### `HostSession` (public)
 
 ```cpp
 HostSession(const HostSession&) = delete
 ```
 
-Constructs or tears down the retained HostSession object according to its ownership contract.
+Binds one Window, capability set, optional service seam, UI thread, capture synchronization, and modal observation.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 HostSession& operator=(const HostSession&) = delete
 ```
 
-Public HostSession operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Is deleted because one event sequence and lifecycle phase belong to one native attachment.
 
-### `dispatch`
+### `dispatch` (public)
 
 ```cpp
 [[nodiscard]] HostDispatchResult dispatch(HostEvent event)
 ```
 
-Public HostSession operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates thread/sequence/phase/geometry/payload, suppresses modal input, translates the event into retained operations, contains callback faults at the foreign boundary, publishes observation, and returns exact outcome.
 
-### `shutdown`
+### `shutdown` (public)
 
 ```cpp
 void shutdown() noexcept
 ```
 
-Public HostSession operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Idempotently revokes dispatcher, frame, pointer, drag, service attachment, and active/occluded state before committing terminal phase.
 
-### `closing`
+### `closing` (public)
 
 ```cpp
 [[nodiscard]] Event<HostCloseRequest&>& closing() noexcept
 ```
 
-Public HostSession operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the cancelable close-request event evaluated before close authorization.
 
-### `observed`
+### `observed` (public)
 
 ```cpp
 [[nodiscard]] Event<const HostEvent&, const HostDispatchResult&>& observed() noexcept
 ```
 
-Public HostSession operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the post-dispatch event carrying the original host event and exact portable result.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] HostSessionSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Returns capability, phase, sequence, acceptance, fault, close, display, modal, drag, attachment, activation, occlusion, and terminal telemetry.

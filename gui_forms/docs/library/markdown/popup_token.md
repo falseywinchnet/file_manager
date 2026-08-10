@@ -1,87 +1,95 @@
 # PopupToken
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `PopupToken`  
-Declaration: `include/gui_forms/window.hpp:43`  
-Definition: `src/core/window.cpp`
+- Status: **OBSERVED: bundle 007 token/attachment split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `PopupToken`
+- Declaration: `include/gui_forms/window/window.hpp:44`
+- Definition: `src/core/window/popup/popup_token.cpp`
 
-PopupToken is a class declared in include/gui_forms/window.hpp.
+PopupToken is a move-only revocation handle for one Window-owned retained overlay root; dropping or disconnecting it closes the overlay through the same ordered state machine.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PopupToken](../captures/native_window_host.png)
 
-## Public methods
+## Declared methods
 
-### `PopupToken`
+### `PopupToken` (public)
 
 ```cpp
 PopupToken() = default
 ```
 
-Constructs or tears down the retained PopupToken object according to its ownership contract.
+Creates an empty token, transfers one attachment on move, prohibits copying, or is privately constructed by Window for an opened overlay.
 
-### `~PopupToken`
+### `~PopupToken` (public)
 
 ```cpp
 ~PopupToken()
 ```
 
-Constructs or tears down the retained PopupToken object according to its ownership contract.
+Disconnects any remaining popup lease.
 
-### `PopupToken`
+### `PopupToken` (public)
 
 ```cpp
 PopupToken(PopupToken&& other) noexcept : attachment_(std::move(other.attachment_))
 ```
 
-Constructs or tears down the retained PopupToken object according to its ownership contract.
+Creates an empty token, transfers one attachment on move, prohibits copying, or is privately constructed by Window for an opened overlay.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 PopupToken& operator=(PopupToken&& other) noexcept
 ```
 
-Public PopupToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes the current lease before accepting a moved attachment.
 
-### `PopupToken`
+### `PopupToken` (public)
 
 ```cpp
 PopupToken(const PopupToken&) = delete
 ```
 
-Constructs or tears down the retained PopupToken object according to its ownership contract.
+Creates an empty token, transfers one attachment on move, prohibits copying, or is privately constructed by Window for an opened overlay.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 PopupToken& operator=(const PopupToken&) = delete
 ```
 
-Public PopupToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes the current lease before accepting a moved attachment.
 
-### `disconnect`
+### `disconnect` (public)
 
 ```cpp
 void disconnect() noexcept
 ```
 
-Public PopupToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Idempotently closes the Window attachment and releases the observation handle.
 
-### `connected`
+### `connected` (public)
 
 ```cpp
 [[nodiscard]] bool connected() const noexcept
 ```
 
-Reports the current connected value without mutation.
+Reports whether the underlying attachment remains live.
 
-### `closed_event`
+### `closed_event` (public)
 
 ```cpp
 [[nodiscard]] Event<>* closed_event() noexcept
 ```
 
-Public PopupToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the attachment's ordered close event while connected.
+
+### `PopupToken` (private)
+
+```cpp
+explicit PopupToken(std::shared_ptr<detail::PopupAttachment> attachment) : attachment_(std::move(attachment))
+```
+
+Creates an empty token, transfers one attachment on move, prohibits copying, or is privately constructed by Window for an opened overlay.

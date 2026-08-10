@@ -1,17 +1,17 @@
 # ColorBlend
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ColorBlend`  
-Declaration: `include/gui_forms/drawing.hpp:339`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 gradient value review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ColorBlend`
+- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:64`
+- Definition: `inline/header-only`
 
-ColorBlend is a struct declared in include/gui_forms/drawing.hpp.
+ColorBlend owns equal-length color and monotonic position vectors validated by consuming brushes.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

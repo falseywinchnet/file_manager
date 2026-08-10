@@ -1,23 +1,23 @@
 # ThemeMotionTokens
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ThemeMotionTokens`  
-Declaration: `include/gui_forms/theme.hpp:152`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 motion token review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ThemeMotionTokens`
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:111`
+- Definition: `inline/header-only`
 
-ThemeMotionTokens is a struct declared in include/gui_forms/theme.hpp.
+ThemeMotionTokens defines quick, standard, emphasized, and busy-cycle durations without prescribing an animation engine.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ThemeMotionTokens&, const ThemeMotionTokens&) = default
 ```
 
-Public ThemeMotionTokens operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all durations.

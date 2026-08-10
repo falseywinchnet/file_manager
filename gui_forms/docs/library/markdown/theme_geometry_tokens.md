@@ -1,23 +1,23 @@
 # ThemeGeometryTokens
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ThemeGeometryTokens`  
-Declaration: `include/gui_forms/theme.hpp:124`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 geometry token review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ThemeGeometryTokens`
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:87`
+- Definition: `inline/header-only`
 
-ThemeGeometryTokens is a struct declared in include/gui_forms/theme.hpp.
+ThemeGeometryTokens centralizes control heights, touch targets, splitter geometry, navigation extents, and compact breakpoint.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ThemeGeometryTokens&, const ThemeGeometryTokens&) = default
 ```
 
-Public ThemeGeometryTokens operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every geometry token.

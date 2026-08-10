@@ -51,6 +51,10 @@ void require(bool condition, const char* message) {
 
 void test_tree_visibility_identity_and_navigation() {
     auto tree = make_control<TreeView>(StableId("tree"));
+    tree->set_show_expanders(false);
+    require(!tree->show_expanders(),
+            "TreeView must retain explicit expander visibility policy");
+    tree->set_show_expanders(true);
     tree->set_requested_bounds({0.0, 0.0, 240.0, 140.0});
     tree->set_items({
         {"tree.local", "Local", 0, true, true},
@@ -139,6 +143,10 @@ void test_tree_and_object_view_consume_keyed_image_list() {
 
 void test_object_virtualization_view_preservation_and_input() {
     auto objects = make_control<ObjectView>(StableId("objects"));
+    objects->set_show_secondary_text(false);
+    require(!objects->show_secondary_text(),
+            "ObjectView must retain secondary-text visibility policy");
+    objects->set_show_secondary_text(true);
     objects->set_requested_bounds({0.0, 0.0, 420.0, 190.0});
     std::vector<ObjectViewItem> model;
     model.reserve(1000U);
@@ -370,6 +378,18 @@ void test_shared_command_binding() {
     require(!ribbon->enabled() && !status->enabled() &&
                 trace == "view.mode@ribbon.view\nview.mode@status.view\n",
             "disabled command state must synchronize and reject execution");
+
+    auto local_command = std::make_shared<Command>("local.enabled", "Local");
+    auto local_button = make_control<Button>(StableId("local.enabled.button"),
+                                             "Local");
+    local_button->set_enabled(false);
+    CommandBindingOptions local_options;
+    local_options.synchronize_enabled = false;
+    CommandBinding local_binding(local_command, local_button, local_options);
+    local_command->set_enabled(false);
+    local_command->set_enabled(true);
+    require(!local_button->enabled(),
+            "command bindings may preserve locally managed enabled state");
 }
 
 std::vector<CorrespondenceItem> correspondence_fixture(std::size_t count) {
@@ -396,6 +416,20 @@ std::vector<CorrespondenceItem> correspondence_fixture(std::size_t count) {
 }
 
 void test_correspondence_virtualization_and_anchor_stability() {
+    auto customization = make_control<CorrespondenceView>(
+        StableId("correspondence.customization"));
+    customization->set_status_rail_width(7.0);
+    require(customization->status_rail_width() == 7.0,
+            "CorrespondenceView must retain explicit status-rail width");
+    bool rejected_rail = false;
+    try {
+        customization->set_status_rail_width(0.0);
+    } catch (const std::invalid_argument&) {
+        rejected_rail = true;
+    }
+    require(rejected_rail,
+            "CorrespondenceView must reject nonvisual status-rail widths");
+
     auto records = make_control<CorrespondenceView>(
         StableId("correspondence.records"));
     records->set_requested_bounds({0.0, 0.0, 820.0, 230.0});

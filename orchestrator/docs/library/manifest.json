@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "title": "Orchestrator service atlas",
+  "status": "OBSERVED source and accepted-decision navigator; capability states remain governed by the executable snapshot and contract registry",
+  "entries": [
+    {
+      "kind": "guide",
+      "category": "Start here",
+      "title": "Service system overview",
+      "page": "pages/overview.html",
+      "status": "DECIDED topology; OBSERVED macOS Core 1.0 implementation",
+      "search": "service system overview orchestrator is the user-scoped, headless integration authority. the refactored service system separates command presentation, runtime hosts, transport/authentication, semantic dispatch, provider ports, and release evidence without changing the stable core 1.0 contract meanings. main.rs is only the process exit boundary. cli.rs parses commands and renders human or structured projections. service/ owns stdio, bounded unix hosting, and launchd activation. local_endpoint, local_session, and local_wire own discovery, authentication, and framing. kernel.rs validates and dispatches semantic operations over transport-neutral request and response values. engine_port and engine_jsonl keep provider selection behind a typed port; jsonl remains development-only. release.rs, contract.rs, and availability.rs publish readiness and capability truth. orchestrator owns cross-project contract meaning, policy, routing, and availability truth. the go engine owns exact catalogue observations and live filesystem traversal implementation. gui.forms owns retained ui mechanics; orchestrator has no gui. the frontend owns interaction and composition; it does not define orchestrator semantics. plugin, settings, handler, hive, and semantic-fact implementation remains separately gated."
+    },
+    {
+      "kind": "guide",
+      "category": "Runtime",
+      "title": "Authenticated request path",
+      "page": "pages/request_path.html",
+      "status": "OBSERVED implementation of accepted ADR-009 framing and session law",
+      "search": "authenticated request path a local request crosses narrowly separated discovery, authentication, queueing, framing, validation, dispatch, and response-budget stages. no stage grants more authority because a later stage succeeds. a client derives the stable private runtime leaf or uses an explicit fixture override. discovery opens no-follow private files and validates owner, mode, type, size, instance, and socket identity. the client connects and sends the credential/version hello as the first bounded orc1 frame. the daemon verifies the kernel-vouched peer uid on macos and authenticates the rotating token. a fixed four-worker pool receives through an eight-session bounded queue; excess peers are closed. the authenticated worker reads one-mib-capped frames and serializes access to the stateful kernel. the kernel validates request identity, shape, critical extensions, cancellation, deadline, and contract range before dispatch. the response is bounded, framed, written, and counted only as non-authoritative runtime health. authentication failure receives no server hello. malformed, partial, oversized, stalled, and saturated sessions do not create unbounded threads or allocations. a worker panic requests complete daemon shutdown instead of leaving silent reduced capacity. shutdown closes active socket clones, joins workers, and then performs endpoint cleanup according to endpoint ownership."
+    },
+    {
+      "kind": "guide",
+      "category": "Runtime",
+      "title": "Activation, lifecycle, and restart",
+      "page": "pages/activation_lifecycle.html",
+      "status": "DECIDED and MEASURED for the first macOS launchd artifact",
+      "search": "activation, lifecycle, and restart the same local wire supports a self-bound development daemon and a launchd-supervised installed daemon, but only the supervised projection reports the accepted restart capability. serve-local binds and publishes its own private unix socket. it may attach the explicitly configured development engine child adapter. on shutdown it removes the socket, credential, discovery record, and empty fixture runtime leaf. it reports restart_strategy unavailable because no admitted supervisor owns reactivation. serve-launchd adopts the named orchestrator-control descriptor and validates its exact path and private mode. it rotates daemon instance identity and credential publication without unlinking the supervisor socket. clients may use one bounded activation and rediscovery interval after stale publication or stopped service. the plist generator is pure and non-installing; installation remains an explicit packaging action. the accepted restart strategy is shutdown_then_supervisor_reactivate and produces a new instance identity."
+    },
+    {
+      "kind": "guide",
+      "category": "Frontend handoff",
+      "title": "Frontend bootstrap contract",
+      "page": "pages/frontend_bootstrap.html",
+      "status": "Stable ORC-FE-001 1.0 Core projection; GUI.Forms gate remains external",
+      "search": "frontend bootstrap contract orchestrator.frontend.bootstrap returns one immutable authority snapshot. it proves the orchestrator side of startup without manufacturing an aggregate permission to begin frontend implementation. core release identity, readiness, provenance digest, lifecycle, and runtime health. complete contract and availability catalogues. normal orchestrator route plus registered but currently ineligible direct-engine fallback state. shutdown and supervisor-restart eligibility. an orchestrator-owned gate plus attributed gui.forms and architect-direction evidence. the cache key is daemon instance identity plus lifecycle and configuration generations. a changed instance or generation replaces the snapshot; records from different keys are never merged. a disconnected snapshot may remain visible only as stale display state. provider absence outside the core bootstrap profile does not block the orchestrator gate. frontend 001 still requires the independent gui.forms go-ahead and explicit architect direction."
+    },
+    {
+      "kind": "guide",
+      "category": "Provider integration",
+      "title": "Engine search route",
+      "page": "pages/engine_route.html",
+      "status": "OBSERVED development adapter; installed Engine transport remains open",
+      "search": "engine search route the frontend submits one orchestrator.search request without selecting catalogue or live lanes. the broker preserves the accepted fallback law and projects one result shape while keeping source and completeness explicit. a usable catalogue is preferred. authoritative catalogue no-match is terminal. unsupported, unavailable, stale, or quarantined catalogue outcomes may fall back to live traversal. denied, invalid, budget-exceeded, timeout, and cancelled outcomes never route around authority or cost limits. a continuation cursor remains bound to its selected source lane."
+    },
+    {
+      "kind": "guide",
+      "category": "Operations",
+      "title": "Failure and security model",
+      "page": "pages/failure_security.html",
+      "status": "OBSERVED Core boundary; broader plugin and platform threat models remain gated",
+      "search": "failure and security model core 1.0 protects its same-user local control plane with private publication, rotating credentials, bounded work, typed terminal results, and fail-closed compatibility. it does not claim containment from root compromise or same-user token theft. private 0700 runtime leaf and same-owner 0600 publication objects. no-follow descriptor reads, exact type/mode/owner validation, atomic publication, and directory synchronization. fresh os-random 256-bit credential and daemon instance identity per process generation. constant-time credential comparison and secure erasure of rust-held secret buffers. one-mib framing, bounded envelope identifiers, response budgets, deadlines, queue ceilings, and session timeouts. unknown critical semantics and incompatible major versions fail closed. same-user processes share the accepted cli authority class. root compromise and same-user credential theft are outside the core 1.0 boundary. runtime health counters are relaxed observability and never authorize routing or mutation. windows named-pipe acl/token behavior and linux supervisor packaging need their own promotion evidence. hostile third-party plugin execution remains outside this trusted process and is not implemented by core 1.0."
+    },
+    {
+      "kind": "guide",
+      "category": "Operations",
+      "title": "Build and verification",
+      "page": "pages/build_verify.html",
+      "status": "MEASURED on the M4 Mac by the current refactor campaign",
+      "search": "build and verification the component declares rust 1.87 as its minimum supported compiler, uses the checked-in lockfile, resolves homebrew cmake and go explicitly in cross-language tests, and keeps all build products outside version control. /users/ultimussecundai/.local/bin/m4build -- rustup run stable cargo fmt --manifest-path orchestrator/cargo.toml -- --check /users/ultimussecundai/.local/bin/m4build -- rustup run stable cargo test --manifest-path orchestrator/cargo.toml /users/ultimussecundai/.local/bin/m4build -- rustup run stable cargo clippy --manifest-path orchestrator/cargo.toml --all-targets --all-features -- -d warnings /users/ultimussecundai/.local/bin/m4build -- python3 orchestrator/tools/generate_service_docs.py --check /users/ultimussecundai/.local/bin/m4build -- rustup run stable cargo build --manifest-path orchestrator/cargo.toml --release --locked unit tests cover lifecycle, contract/capability catalogues, framing, authentication, publication, kernel validation, routing, and release digest. integration tests cover cli/stdio, real daemon discovery, slow and saturated peers, hostile framing, independent c++ bootstrap/restart, and a separately built go engine live-search route. the documentation check proves the checked-in html and markdown mirrors match manual.json and the current rust declaration inventory. the previous installed launchd measurement remains historical evidence; this verification does not install or mutate the user's persistent launchagent."
+    },
+    {
+      "kind": "module",
+      "category": "Executable edge",
+      "title": "src/main.rs",
+      "page": "pages/module_src_main_rs.html",
+      "status": "OBSERVED thin process boundary",
+      "search": "src/main.rs maps the library cli result to process exit status and a single stderr diagnostic prefix. collect process arguments. return success or failure exit status. keep runtime and semantic policy out of the binary root. main"
+    },
+    {
+      "kind": "module",
+      "category": "Executable edge",
+      "title": "src/cli.rs",
+      "page": "pages/module_src_cli_rs.html",
+      "status": "OBSERVED refactored command and presentation layer",
+      "search": "src/cli.rs parses bounded command shapes, selects a service host or semantic method, and renders human or structured responses. validate command-specific option combinations. keep the four development engine options atomic. map cli names to canonical orchestrator methods. render the common response projection. run remove_engine_options resolve_runtime_directory resolve_runtime_directory remove_flag remove_option method_for_command render_response print_human print_contracts print_availability string_field integer_field boolean_field print_help command_projection_is_explicit engine_provider_options_are_atomic"
+    },
+    {
+      "kind": "module",
+      "category": "Service hosts",
+      "title": "src/service/mod.rs",
+      "page": "pages/module_src_service_mod_rs.html",
+      "status": "OBSERVED service-host composition boundary",
+      "search": "src/service/mod.rs collects platform-independent stdio, unix local-daemon, and macos launchd hosts behind the cli. name executable service projections. carry the complete development engine provider configuration. return explicit unsupported-platform errors. engineproviderconfig serve_local call_local serve_launchd print_launchd_plist"
+    },
+    {
+      "kind": "module",
+      "category": "Service hosts",
+      "title": "src/service/stdio.rs",
+      "page": "pages/module_src_service_stdio_rs.html",
+      "status": "OBSERVED bounded conformance laboratory",
+      "search": "src/service/stdio.rs runs newline-delimited json requests through the same kernel while draining oversized or invalid records without losing stream alignment. enforce the one-mib line ceiling before unbounded allocation. return typed invalid/budget errors. flush one response per request. stop on the shared kernel shutdown lifecycle. serve_stdio serve boundedline read_bounded_line bounded_line_drains_oversized_records_and_preserves_the_next_one stdio_host_and_kernel_share_shutdown_lifecycle"
+    },
+    {
+      "kind": "module",
+      "category": "Service hosts",
+      "title": "src/service/local.rs",
+      "page": "pages/module_src_service_local_rs.html",
+      "status": "OBSERVED bounded Unix daemon host",
+      "search": "src/service/local.rs owns fixed worker-pool concurrency, bounded pending sessions, authentication handoff, serialized kernel dispatch, fail-closed panic containment, and coordinated shutdown. bind or serve an owned unixendpoint. attach the optional development engine child. limit workers and pending sessions. interrupt active sessions and join workers during shutdown. record relaxed runtime health counters. accept_poll session_idle_timeout serve_local serve_owned serve_endpoint run_contained_worker serve_connection accept_sessions session_worker activesessionhealth new drop close_active_sessions remove_active_session call_local worker_panic_requests_daemon_shutdown"
+    },
+    {
+      "kind": "module",
+      "category": "Service hosts",
+      "title": "src/service/launchd.rs",
+      "page": "pages/module_src_service_launchd_rs.html",
+      "status": "OBSERVED ADR-011 macOS adapter",
+      "search": "src/service/launchd.rs adopts the named launchd listener, hosts a supervised kernel, and prints the pure non-installing launchagent definition. adopt fd://orchestrator-control through service-binding. preserve supervisor socket ownership. select the supervised restart projection. escape paths in generated xml. retain the accepted one-second throttle and 0600 socket mode. serve_launchd print_launchd_plist launchd_plist_document xml_escape plist_preserves_the_accepted_activation_contract"
+    },
+    {
+      "kind": "module",
+      "category": "Semantic core",
+      "title": "src/common.rs",
+      "page": "pages/module_src_common_rs.html",
+      "status": "Stable Core 1.0 projection",
+      "search": "src/common.rs defines common request, response, terminal status, error, version, and envelope bounds shared by every core host. represent exactly one terminal success result or typed error. carry deadlines, cancellation identity, critical extensions, contract reference, and response budget. publish structured cli protocol identity and fixed envelope ceilings. protocol_family protocol_major protocol_minor max_frame_bytes max_request_id_bytes max_method_bytes max_contract_id_bytes max_cancellation_id_bytes max_critical_extensions max_critical_extension_bytes terminalstatus apierrorcode apierror new contractref request local response success result failure is_well_formed response_has_exactly_one_terminal_payload"
+    },
+    {
+      "kind": "module",
+      "category": "Semantic core",
+      "title": "src/kernel.rs",
+      "page": "pages/module_src_kernel_rs.html",
+      "status": "OBSERVED Core 1.0 semantic dispatcher",
+      "search": "src/kernel.rs validates transport-neutral requests, dispatches core methods, projects immutable status/bootstrap state, brokers search, and owns deterministic shutdown state. validate attacker-controlled envelope fields before reflection. enforce critical-extension, cancellation, deadline, contract, and response-budget law. build status and frontend bootstrap snapshots from canonical catalogues. route unified search through the typed provider port. keep plugin and semantic-fact operations explicit stubs. kernel default live_search_available new for_local_daemon for_supervised_daemon with_engine_search runtime_health handle is_stopped lifecycle_generation status_result status_result_with frontend_bootstrap_result availability_result availability_count search_response shutdown_result frontend_opening_result validate_critical_extensions validate_request_id validate_request_shape validate_cancellation version_result search_error_code stub_result stub_error internal_serialization_error validate_deadline validate_contract enforce_response_budget kernel_reports_stubs_without_fact_or_plugin_operations shutdown_is_terminal frontend_bootstrap_is_one_bounded_immutable_snapshot separately_gated_provider_absence_does_not_block_a_ready_core_projection attacker_controlled_envelope_fields_are_bounded_before_error_reflection"
+    },
+    {
+      "kind": "module",
+      "category": "Semantic core",
+      "title": "src/lifecycle.rs",
+      "page": "pages/module_src_lifecycle_rs.html",
+      "status": "OBSERVED deterministic lifecycle state machine",
+      "search": "src/lifecycle.rs represents initialization, ready, draining, stopped, and failed transitions with a monotonically changing generation. reject invalid state transitions. publish immutable lifecycle snapshots. support restart as a new process or explicit lifecycle generation. lifecyclestate lifecycleerror fmt lifecyclesnapshot lifecycle default started snapshot start begin_shutdown finish_shutdown fault transition lifecycle_is_deterministic_and_restartable invalid_transition_is_rejected"
+    },
+    {
+      "kind": "module",
+      "category": "Canonical catalogues",
+      "title": "src/contract.rs",
+      "page": "pages/module_src_contract_rs.html",
+      "status": "OBSERVED executable registry projection",
+      "search": "src/contract.rs projects contract identifiers, ownership, stage, and core method-version requirements used by request validation and frontend snapshots. keep executable contract identifiers unique. map stable core methods to accepted contract ranges. expose stages without promoting code existence. contractstage contractdescriptor supportedcontract supported_contract_for_method contracts identifiers_are_unique contract_identifiers_are_unique"
+    },
+    {
+      "kind": "module",
+      "category": "Canonical catalogues",
+      "title": "src/availability.rs",
+      "page": "pages/module_src_availability_rs.html",
+      "status": "OBSERVED provider-honest availability projection",
+      "search": "src/availability.rs defines required capabilities and their available, degraded, negotiating, unavailable, deferred, or stubbed state. separate requirement from runtime availability. name provider and reason for every capability. keep plugins and semantic facts explicit stubs. avoid promoting a development engine adapter to installed transport. availabilitystate capabilityavailability capabilities state_count facts_and_plugins_are_explicit_stubs development_engine_adapter_does_not_claim_installed_transport"
+    },
+    {
+      "kind": "module",
+      "category": "Canonical catalogues",
+      "title": "src/release.rs",
+      "page": "pages/module_src_release_rs.html",
+      "status": "OBSERVED ready macOS Core 1.0 manifest",
+      "search": "src/release.rs builds the deterministic core release manifest and domain-separated sha-256 provenance digest over named manifest and contract inputs. list every core readiness requirement and evidence locator. report ready only when all requirements are satisfied. pin contract stages and first platform. publish digest scope while keeping signed false explicit. core_profile_id core_target_version core_first_platform core_required_contracts requirementstate releaserequirement releaseprovenance corereleasemanifest provenance_domain provenance_scope provenance_inputs core_release_manifest core_release_manifest build_core_release_manifest contract_requirement pending_requirement satisfied_requirement release_provenance digest_field stage_name core_release_is_ready_only_when_every_requirement_is_satisfied"
+    },
+    {
+      "kind": "module",
+      "category": "Canonical catalogues",
+      "title": "src/runtime_health.rs",
+      "page": "pages/module_src_runtime_health_rs.html",
+      "status": "OBSERVED relaxed non-authoritative telemetry",
+      "search": "src/runtime_health.rs tracks saturating local-session pressure and request counters without participating in authority, routing, or permissions. publish worker and queue ceilings. count accepted, rejected, active, authenticated, failed, malformed, and completed observations. saturate counters and prevent active-session underflow. local_session_workers local_pending_sessions runtimehealthsnapshot runtimehealth in_process local_daemon new record_accepted_session record_rejected_session record_session_opened record_session_closed record_authenticated_session record_authentication_failure record_completed_request record_malformed_session snapshot saturating_increment counters_never_underflow_and_snapshot_is_explicitly_non_authoritative"
+    },
+    {
+      "kind": "module",
+      "category": "Local transport",
+      "title": "src/local_wire.rs",
+      "page": "pages/module_src_local_wire_rs.html",
+      "status": "Stable orchestrator.local 1.0 framing projection",
+      "search": "src/local_wire.rs encodes and decodes orc1 magic, unsigned big-endian payload length, and nonempty utf-8 json within the one-mib hard ceiling. reject bad magic, empty frames, oversized declarations, truncated payloads, invalid utf-8, and invalid json. preserve fragmented and coalesced frame boundaries. serialize without exposing rust layout. local_wire_magic local_wire_header_bytes max_local_wire_frame_bytes localwireerror fmt source write_json_frame read_json_frame read_header map_payload_read_error from round_trip_and_coalesced_frames_preserve_boundaries oversized_header_is_rejected_before_payload_allocation bad_magic_and_truncated_payload_fail_closed"
+    },
+    {
+      "kind": "module",
+      "category": "Local transport",
+      "title": "src/local_session.rs",
+      "page": "pages/module_src_local_session_rs.html",
+      "status": "Stable Core 1.0 hello/authentication projection",
+      "search": "src/local_session.rs defines rotating session tokens, bounded client/server hello values, local-wire version negotiation, and constant-time credential comparison. generate credentials from os randomness. encode/decode exact token length. redact token debug output and erase secret buffers. reject incompatible wire ranges and wrong credentials. local_wire_family local_wire_major local_wire_minor session_token_bytes max_client_name_bytes sessiontoken generate encode decode matches fmt clienthello fmt new serverhello sessionautherror fmt authenticate_client credential_round_trip_authenticates_and_debug_is_redacted wrong_credential_and_major_fail_closed"
+    },
+    {
+      "kind": "module",
+      "category": "Local transport",
+      "title": "src/local_endpoint.rs",
+      "page": "pages/module_src_local_endpoint_rs.html",
+      "status": "OBSERVED macOS/Unix discovery, publication, and activation implementation",
+      "search": "src/local_endpoint.rs owns the private runtime layout, self-bound or adopted unix endpoint, discovery publication, no-follow reads, peer identity verification, stale recovery, activation retry, and ownership-aware cleanup. derive the stable macos application support location. validate unix socket path bounds. publish credential and discovery records atomically with exact modes. refuse active endpoints and recover only proven private stale sockets. authenticate accepted streams and activate/rediscover a rotated supervised generation. discovery_file credential_file socket_file default_runtime_leaf activation_wait activation_poll handshake_timeout max_discovery_bytes max_credential_bytes max_unix_socket_path_bytes max_unix_socket_path_bytes max_unix_socket_path_bytes localendpointerror fmt source from from from endpointlayout new default_runtime_directory discoveryrecord unixendpoint endpointownership bind adopt layout instance_id accept set_nonblocking try_accept authenticate cleanup supervisor_socket_path_matches supervisor_socket_path_matches connect_authenticated discoveredunixendpoint connect_authenticated discover prepare_runtime_directory validate_process_owns_directory validate_runtime_directory recover_stale_socket publish_endpoint atomic_private_write validate_private_file validate_socket read_private_file open_private_file sync_directory nix_io_error validate_peer_identity validate_peer_identity validate_peer_identity random_identifier remove_if_present discovery_and_authenticated_handshake_agree_on_instance insecure_existing_runtime_directory_is_rejected discovery_reads_reject_symlinks_and_noncanonical_private_modes accepting_endpoint_is_not_replaced same_owner_private_stale_socket_is_recovered platform_default_is_absolute_and_socket_sized supervisor_path_accepts_only_trailing_nul_padding restart_rotates_credential_and_rejects_the_old_one adopted_listener_rotates_publication_without_unlinking_supervisor_socket client_activation_rediscovers_a_rotated_supervisor_credential temporary_runtime"
+    },
+    {
+      "kind": "module",
+      "category": "Provider integration",
+      "title": "src/engine_contract.rs",
+      "page": "pages/module_src_engine_contract_rs.html",
+      "status": "Frozen experimental Engine semantic v0 and live-query draft projection",
+      "search": "src/engine_contract.rs defines typed engine capabilities, currentness, search request/budget/cursor, catalogue results, live results, and work counters used by fixtures and the provider port. keep catalogue and live source identities distinct. enforce numeric live-search hard ceilings. validate source-bound cursors and request shape. represent partial and unavailable work explicitly. engine_semantic_major engine_semantic_minor engine_live_semantic_major engine_live_semantic_minor live_query_default_results live_query_max_results live_query_default_visited_entries live_query_max_visited_entries live_query_default_stat_calls live_query_max_stat_calls live_query_default_wall_time_ms live_query_max_wall_time_ms live_query_default_open_directories live_query_max_open_directories engineflag new is_set from enginecapabilitystate enginecapability is_well_formed enginecurrentness engineworksnapshot enginestatussnapshot is_well_formed capability enginequeryresultfixture is_well_formed enginesearchbudget default is_well_formed enginesearchrequest enginesearchcursorsource enginesearchcursor is_well_formed engineresultsource enginelivework enginelivequeryresultfixture is_well_formed"
+    },
+    {
+      "kind": "module",
+      "category": "Provider integration",
+      "title": "src/engine_port.rs",
+      "page": "pages/module_src_engine_port_rs.html",
+      "status": "OBSERVED provider-neutral broker",
+      "search": "src/engine_port.rs defines the search provider trait and narrow catalogue-to-live fallback allowlist consumed by kernel. prefer catalogue unless policy or cursor selects live. keep continuation on its original lane. never fall back around denied, invalid, budget, timeout, or cancellation outcomes. treat authoritative catalogue no-match as terminal. enginesearchpolicy enginesearchoutcome terminal enginesearchprovider query_catalogue query_live live_available unifiedenginesearch search live_available enginesearchbroker new search into_provider provider_mut search live_available may_fall_back_to_live fallback_terminal_allowlist_is_narrow_and_authority_safe"
+    },
+    {
+      "kind": "module",
+      "category": "Provider integration",
+      "title": "src/engine_jsonl.rs",
+      "page": "pages/module_src_engine_jsonl_rs.html",
+      "status": "OBSERVED bounded development adapter; not production IPC",
+      "search": "src/engine_jsonl.rs supervises a separately built go engine over correlated bounded jsonl and projects its catalogue/live responses into typed orchestrator outcomes. bound engine jsonl frames. correlate exactly one response to each request. validate version and required live-query capabilities. map remote errors without empty-success substitution. terminate the child on adapter drop. max_engine_jsonl_frame_bytes enginejsonlfault enginejsonlerror fmt source from enginejsonlrequest enginejsonlresponse enginejsonlpeer new call into_parts enginecataloguewireplan enginecataloguewireresponse enginelivewireresponse enginejsonlsearchadapter enginejsonlchild spawn query_catalogue query_live live_available drop new into_peer peer_mut catalogue_params live_params query_catalogue query_live catalogue_failure live_failure project_engine_error error_kind bounded_peer_correlates_one_successful_response remote_fault_is_not_an_empty_success response_identity_mismatch_fails_closed oversized_response_is_rejected_without_unbounded_allocation exact_wire_result_projects_generation_cursor_and_partial_roots unavailable_live_method_projects_typed_unsupported_result missing_catalogue_projects_unavailable_not_unsupported search_request"
+    }
+  ]
+}

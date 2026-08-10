@@ -29,7 +29,12 @@ rendering.
 Active dialogue:
 
 - `../../../gui_forms/docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`;
-- `../../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`.
+- `../../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`;
+- `../../../web_forms/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the
+  proposed build-time `ORC-GUI-002` authoring/capability-manifest edge. It adds
+  no runtime Orchestrator, Rust, or browser dependency. That proposal also
+  requires nested ambient layout/surface/state capability and a C++17-compatible
+  orthodox code-generation seam.
 
 Frontend 001 product startup uses the live Core 1.0 Orchestrator edge. Tests may
 replay canonical Orchestrator fixtures; application-owned fixture schemas do not

@@ -1,311 +1,319 @@
 # PropertyList
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → PropertyList`  
-Declaration: `include/gui_forms/inspection_controls.hpp:318`  
-Definition: `src/controls/inspection_controls.cpp`
+- Status: **OBSERVED: bundle 006 control/Impl source split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → PropertyList`
+- Declaration: `include/gui_forms/controls/panel/property_list/property_list.hpp:13`
+- Definition: `src/controls/panel/property_list/property_list.cpp`
 
-PropertyList is a visual retained control declared in include/gui_forms/inspection_controls.hpp.
+PropertyList is a lightweight retained settings/property surface over caller-authored stable groups and rows. It owns stock or replacement child editors, reset buttons, optional header content, one vertical scroll plane, validation/disclosure layout, focus reveal, typed events, renderer-neutral painting, and virtual semantics while consumers retain domain meaning.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyList](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
-### `PropertyList`
+### `PropertyList` (public)
 
 ```cpp
 explicit PropertyList(StableId stable_id)
 ```
 
-Constructs or tears down the retained PropertyList object according to its ownership contract.
+Constructs the grouped row coordinator and source-private retained state.
 
-### `~PropertyList`
+### `~PropertyList` (public)
 
 ```cpp
 ~PropertyList() override
 ```
 
-Constructs or tears down the retained PropertyList object according to its ownership contract.
+Releases row/editor subscriptions and owned implementation state after disposal.
 
-### `groups`
+### `groups` (public)
 
 ```cpp
 [[nodiscard]] const std::vector<PropertyGroupSpec>& groups() const noexcept
 ```
 
-Reports the current groups value without mutation.
+Returns the normalized authored group and row model.
 
-### `set_groups`
+### `set_groups` (public)
 
 ```cpp
 void set_groups(std::vector<PropertyGroupSpec> groups)
 ```
 
-Synchronously updates the retained groups property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates stable UTF-8 identities/topology, rebuilds real editors and reset controls, and reconciles focus, scrolling, and semantics.
 
-### `set_value`
+### `set_value` (public)
 
 ```cpp
 bool set_value(std::string_view row_id, std::string value)
 ```
 
-Synchronously updates the retained value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits one row's text, synchronizes its editor without user publication, and emits a noncommitted model change.
 
-### `set_description`
+### `set_description` (public)
 
 ```cpp
 bool set_description(std::string_view row_id, std::string description)
 ```
 
-Synchronously updates the retained description property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits row description and refreshes editor/virtual semantic metadata.
 
-### `set_validation`
+### `set_validation` (public)
 
 ```cpp
 bool set_validation(std::string_view row_id, std::string message)
 ```
 
-Synchronously updates the retained validation property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits validation text, updates visual status/description, and recomputes variable row height.
 
-### `set_reset_enabled`
+### `set_reset_enabled` (public)
 
 ```cpp
 bool set_reset_enabled(std::string_view row_id, bool enabled)
 ```
 
-Synchronously updates the retained reset enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits per-row reset availability and synchronizes the real reset button.
 
-### `set_group_expanded`
+### `set_group_expanded` (public)
 
 ```cpp
 bool set_group_expanded(std::string_view group_id, bool expanded)
 ```
 
-Synchronously updates the retained group expanded property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits group disclosure, reflows the single scroll plane, and publishes a real transition.
 
-### `set_row_expanded`
+### `set_row_expanded` (public)
 
 ```cpp
 bool set_row_expanded(std::string_view row_id, bool expanded)
 ```
 
-Synchronously updates the retained row expanded property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits a hierarchical row disclosure, updates descendant visibility/layout, and publishes a real transition.
 
-### `row_expanded`
+### `row_expanded` (public)
 
 ```cpp
 [[nodiscard]] std::optional<bool> row_expanded( std::string_view row_id) const
 ```
 
-Reports the current row expanded value without mutation.
+Returns retained disclosure state for an existing row.
 
-### `value`
+### `value` (public)
 
 ```cpp
-[[nodiscard]] std::optional<std::string> value(std::string_view row_id) const
+[[nodiscard]] std::optional<std::string> value( std::string_view row_id) const
 ```
 
-Reports the current value value without mutation.
+Returns retained text for an existing row.
 
-### `editor`
+### `editor` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr editor(std::string_view row_id) const
 ```
 
-Reports the current editor value without mutation.
+Returns the ordinary retained editor owned by a stable row.
 
-### `replace_editor`
+### `replace_editor` (public)
 
 ```cpp
 bool replace_editor(std::string_view row_id, Control::Ptr editor)
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an unparented live control, assumes ownership, preserves row layout/focus/semantics, and disposes the replaced editor.
 
-### `reset_button`
+### `reset_button` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<Button> reset_button( std::string_view row_id) const
 ```
 
-Returns button to its inherited or default policy.
+Returns the real retained reset control for a resettable row.
 
-### `set_header_content`
+### `set_header_content` (public)
 
 ```cpp
 void set_header_content(Control::Ptr content, double height)
 ```
 
-Synchronously updates the retained header content property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and owns optional preview/summary content in the same scroll plane with bounded height.
 
-### `header_content`
+### `header_content` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr header_content() const noexcept
 ```
 
-Reports the current header content value without mutation.
+Returns the optional caller-owned header subtree.
 
-### `header_height`
+### `header_height` (public)
 
 ```cpp
 [[nodiscard]] double header_height() const noexcept
 ```
 
-Reports the current header height value without mutation.
+Returns retained logical header extent.
 
-### `set_header_height`
+### `set_header_height` (public)
 
 ```cpp
 void set_header_height(double height)
 ```
 
-Synchronously updates the retained header height property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates nonnegative bounded height and reflows content.
 
-### `label_width`
+### `label_width` (public)
 
 ```cpp
 [[nodiscard]] double label_width() const noexcept
 ```
 
-Reports the current label width value without mutation.
+Returns the logical name-column width.
 
-### `set_label_width`
+### `set_label_width` (public)
 
 ```cpp
 void set_label_width(double width)
 ```
 
-Synchronously updates the retained label width property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded label width and refreshes editor/value geometry.
 
-### `scroll_offset`
+### `scroll_offset` (public)
 
 ```cpp
 [[nodiscard]] double scroll_offset() const noexcept
 ```
 
-Reports the current scroll offset value without mutation.
+Returns the retained vertical scroll origin.
 
-### `set_scroll_offset`
+### `set_scroll_offset` (public)
 
 ```cpp
 void set_scroll_offset(double offset)
 ```
 
-Synchronously updates the retained scroll offset property. Validation, typed invalidation, and notifications are defined by the implementation.
+Clamps offset to content/viewport bounds, re-arranges children, and refreshes paint/hit testing/semantics.
 
-### `content_height`
+### `content_height` (public)
 
 ```cpp
 [[nodiscard]] double content_height() const noexcept
 ```
 
-Reports the current content height value without mutation.
+Returns total logical header, group, row, validation, and spacing height.
 
-### `value_changed`
+### `value_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyValueChange&>& value_changed() noexcept
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for live row value transitions.
 
-### `value_committed`
+### `value_committed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyValueChange&>& value_committed() noexcept
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for qualified editor commits.
 
-### `group_changed`
+### `group_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyGroupChange&>& group_changed() noexcept
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for committed group disclosure transitions.
 
-### `row_expansion_changed`
+### `row_expansion_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyRowExpansionChange&>& row_expansion_changed() noexcept
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for committed row disclosure transitions.
 
-### `reset_requested`
+### `reset_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyResetRequest&>& reset_requested() noexcept
 ```
 
-Returns requested to its inherited or default policy.
+Returns the event requesting consumer-authorized reset of a stable row.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Computes desired viewport extent from available size and content height.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Commits viewport bounds, clamps scrolling, and arranges only current group/row/header child roles.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records group bars, row labels/value backplanes, hierarchy guides, disclosures, validation, required/reset cues, hover, and focus.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Handles wheel scrolling and group/row disclosure hit targets while real editors retain their own input.
 
-### `on_key`
+### `on_key` (public)
 
 ```cpp
 void on_key(KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Implements disclosure and scrolling keys from the PropertyList surface.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a grouped property/settings surface with row count and descendant inclusion.
 
-### `semantic_virtual_children`
+### `semantic_virtual_children` (public)
 
 ```cpp
 [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override
 ```
 
-Reports the current semantic virtual children value without mutation.
+Exposes stable group and row nodes, hierarchy/disclosure state, validation, values, and actions around real editor descendants.
 
-### `on_semantic_child_action`
+### `on_semantic_child_action` (public)
 
 ```cpp
 bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
+```
+
+Maps virtual selection, expand/collapse, set-value, and reset actions through ordinary row state and events.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
 ```
 
 Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

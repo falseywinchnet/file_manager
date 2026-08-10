@@ -1,39 +1,17 @@
 # PropertyEditorBinding
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEditorBinding`  
-Declaration: `include/gui_forms/inspection_controls.hpp:210`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 editor-binding value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyEditorBinding`
+- Declaration: `include/gui_forms/inspection/property_editor_registry/property_editor_registry.hpp:14`
+- Definition: `inline/header-only`
 
-PropertyEditorBinding is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyEditorBinding bundles one unparented retained control with nonpublishing synchronization and tokenized commit/failure connection functions. PropertyList assumes ownership only after the registry validates all required seams.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyEditorBinding](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
-### `void`
-
-```cpp
-std::function<void(const BindingValue&)> synchronize
-```
-
-Public PropertyEditorBinding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
-
-### `SubscriptionToken`
-
-```cpp
-std::function<SubscriptionToken( Component&, std::function<void(BindingValue)>)> connect_committed
-```
-
-Public PropertyEditorBinding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
-
-### `SubscriptionToken`
-
-```cpp
-std::function<SubscriptionToken( Component&, std::function<void(const PropertyEditorInputError&)>)> connect_failed
-```
-
-Public PropertyEditorBinding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+No public methods were discovered in this declaration.

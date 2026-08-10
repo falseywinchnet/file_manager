@@ -1,17 +1,17 @@
 # PropertyGridEditError
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyGridEditError`  
-Declaration: `include/gui_forms/inspection_controls.hpp:408`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 edit-error value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyGridEditError`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:108`
+- Definition: `inline/header-only`
 
-PropertyGridEditError is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyGridEditError carries exact property path, attempted representation, and failure message after a rejected or rolled-back edit.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyGridEditError](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

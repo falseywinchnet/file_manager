@@ -1,17 +1,17 @@
 # AnchoredPopupPlacementResult
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `AnchoredPopupPlacementResult`  
-Declaration: `include/gui_forms/popup_controls.hpp:32`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 005 deterministic-result split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `AnchoredPopupPlacementResult`
+- Declaration: `include/gui_forms/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.hpp:32`
+- Definition: `inline/header-only`
 
-AnchoredPopupPlacementResult is a struct declared in include/gui_forms/popup_controls.hpp.
+AnchoredPopupPlacementResult is the exact output of placement resolution: client-relative bounds plus whether the popup moved above its anchor or had either dimension clamped.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![AnchoredPopupPlacementResult](../captures/anchored_popup_layer.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

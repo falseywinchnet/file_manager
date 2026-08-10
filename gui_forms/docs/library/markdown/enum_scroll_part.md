@@ -1,7 +1,7 @@
 # ScrollPart
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/scrolling.hpp:200`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/scrollable_control/scrollable_control.hpp:105`
 
 ## Declared values
 

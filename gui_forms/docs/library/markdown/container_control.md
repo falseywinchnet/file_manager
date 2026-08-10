@@ -1,111 +1,119 @@
 # ContainerControl
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `ScrollableControl → ContainerControl`  
-Declaration: `include/gui_forms/container_controls.hpp:20`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ScrollableControl → ContainerControl`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/container_control.hpp:7`
+- Definition: `src/controls/scrollable_control/container_control/container_control.cpp`
 
-ContainerControl is a visual retained control declared in include/gui_forms/container_controls.hpp.
+ContainerControl adds descendant-scoped active-control authority and inherited validation policy to ScrollableControl, making focus and validation explicit retained container state rather than incidental child behavior.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ContainerControl](../captures/container_focus.png)
 
-## Public methods
+## Declared methods
 
-### `ContainerControl`
+### `ContainerControl` (public)
 
 ```cpp
 explicit ContainerControl(StableId stable_id)
 ```
 
-Constructs or tears down the retained ContainerControl object according to its ownership contract.
+Constructs a scroll-capable semantic group with inherited automatic-validation policy.
 
-### `contains_descendant`
+### `contains_descendant` (public)
 
 ```cpp
 [[nodiscard]] bool contains_descendant(const Control::Ptr& control) const noexcept
 ```
 
-Reports the current contains descendant value without mutation.
+Reports whether a live control belongs below this container, excluding unrelated trees.
 
-### `active_control`
+### `active_control` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr active_control() const noexcept
 ```
 
-Reports the current active control value without mutation.
+Returns the live focused/activated descendant recorded for this scope, or null when none remains.
 
-### `request_active_control`
+### `request_active_control` (public)
 
 ```cpp
 bool request_active_control(const Control::Ptr& control)
 ```
 
-Public ContainerControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates descendant membership, runs focus/validation gates, and asks the attached Window to establish focus before committing scope state.
 
-### `clear_active_control`
+### `clear_active_control` (public)
 
 ```cpp
 bool clear_active_control()
 ```
 
-Removes the explicit active control value and restores fallback behavior.
+Clears the scope's active descendant and relinquishes Window focus when that descendant owns it.
 
-### `auto_validate`
+### `auto_validate` (public)
 
 ```cpp
 [[nodiscard]] AutoValidate auto_validate() const noexcept
 ```
 
-Reports the current auto validate value without mutation.
+Returns the authored inherit/enable/disable validation policy.
 
-### `effective_auto_validate`
+### `effective_auto_validate` (public)
 
 ```cpp
 [[nodiscard]] AutoValidate effective_auto_validate() const noexcept
 ```
 
-Reports the current effective auto validate value without mutation.
+Walks the container ancestry to resolve inherited validation policy to an operative value.
 
-### `set_auto_validate`
+### `set_auto_validate` (public)
 
 ```cpp
 void set_auto_validate(AutoValidate value)
 ```
 
-Synchronously updates the retained auto validate property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the closed policy vocabulary, commits a real change, and publishes auto_validate_changed.
 
-### `auto_validate_changed`
+### `auto_validate_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<AutoValidate>& auto_validate_changed() noexcept
 ```
 
-Public ContainerControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after authored validation policy commits.
 
-### `validate`
+### `validate` (public)
 
 ```cpp
 bool validate(bool check_auto_validate = false)
 ```
 
-Public ContainerControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates this container and optionally honors the resolved automatic-validation policy.
 
-### `validate_children`
+### `validate_children` (public)
 
 ```cpp
 bool validate_children( ValidationConstraints constraints = ValidationConstraints::selectable)
 ```
 
-Public ContainerControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Traverses stable child snapshots and validates descendants matching the supplied constraints, tolerating mutation and disposal.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects an optional group role and current validation/focus state over the inherited scrollable descriptor.
+
+### `authored_auto_validate` (private)
+
+```cpp
+[[nodiscard]] AutoValidate authored_auto_validate() const noexcept override
+```
+
+Reports the current authored auto validate value without mutation.

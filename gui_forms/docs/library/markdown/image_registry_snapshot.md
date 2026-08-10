@@ -1,17 +1,17 @@
 # ImageRegistrySnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageRegistrySnapshot`  
-Declaration: `include/gui_forms/resources.hpp:113`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 registry telemetry review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ImageRegistrySnapshot`
+- Declaration: `include/gui_forms/resources/types/image_resource_types.hpp:87`
+- Definition: `inline/header-only`
 
-ImageRegistrySnapshot is a struct declared in include/gui_forms/resources.hpp.
+ImageRegistrySnapshot reports revision, resource count, and aggregate encoded and decoded byte commitments.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

@@ -1,23 +1,23 @@
 # SemanticFeedbackRecord
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SemanticFeedbackRecord`  
-Declaration: `include/gui_forms/feedback.hpp:31`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 010 semantic feedback record review; focused M4 core tests pass**
+- Kind: **struct**
+- Hierarchy: `SemanticFeedbackRecord`
+- Declaration: `include/gui_forms/feedback/types/feedback_types.hpp:21`
+- Definition: `inline/header-only`
 
-SemanticFeedbackRecord is a struct declared in include/gui_forms/feedback.hpp.
+SemanticFeedbackRecord preserves ordered kind, chosen cue, monotonic timestamp, user sound policy, host acceptance, and actual presentation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const SemanticFeedbackRecord&, const SemanticFeedbackRecord&) = default
 ```
 
-Public SemanticFeedbackRecord operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete feedback result.

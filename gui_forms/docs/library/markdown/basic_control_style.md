@@ -1,23 +1,23 @@
 # BasicControlStyle
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `BasicControlStyle`  
-Declaration: `include/gui_forms/theme.hpp:17`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 compatibility palette review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `BasicControlStyle`
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:12`
+- Definition: `inline/header-only`
 
-BasicControlStyle is a struct declared in include/gui_forms/theme.hpp.
+BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const BasicControlStyle&, const BasicControlStyle&) = default
 ```
 
-Public BasicControlStyle operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every compatibility color.

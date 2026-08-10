@@ -159,6 +159,28 @@ void test_placeholder_and_validation() {
     require(invalid, "TextBox must reject selections outside its text store");
 }
 
+void test_text_box_maximum_length_bounds_user_edits() {
+    auto field = make_control<TextBox>(StableId("input.maximum_length"));
+    field->set_maximum_length(3U);
+    field->set_requested_bounds({0.0, 0.0, 180.0, 30.0});
+    Window window(field, {180.0, 30.0});
+    require(window.request_focus(field) && window.dispatch_text({"ab"}) &&
+                window.dispatch_text({"🚀"}) && field->text() == "ab🚀" &&
+                !window.dispatch_text({"c"}) && field->text() == "ab🚀",
+            "TextBox maximum length must count Unicode scalars and reject only the overflowing user edit");
+    field->set_text("programmatic value");
+    require(field->text() == "programmatic value",
+            "TextBox maximum length must not truncate explicit programmatic assignment");
+    bool invalid{};
+    try {
+        field->set_maximum_length(16U * 1024U * 1024U + 1U);
+    } catch (const std::out_of_range&) {
+        invalid = true;
+    }
+    require(invalid && field->maximum_length() == 3U,
+            "TextBox maximum-length validation must be bounded and transactional");
+}
+
 void test_word_navigation_and_deletion() {
     auto field = make_control<TextBox>(StableId("input.words"),
                                        "alpha  日本語, bravo");
@@ -326,6 +348,7 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     auto root = make_control<Panel>(StableId("combo.root"));
     auto combo = make_control<ComboBox>(StableId("combo.field"));
     combo->set_items({"Low latency", "Balanced", "High fidelity", "Archive"});
+    combo->set_drop_down_width(260.0);
     combo->set_placeholder_text("Choose a profile");
     combo->set_requested_bounds({20.0, 20.0, 220.0, 32.0});
     root->add_child(combo);
@@ -371,6 +394,8 @@ void test_combo_box_popup_commit_dismiss_and_owner_revocation() {
     const auto popup = window.find("combo.field.popup.list");
     window.perform_layout();
     const Rect bounds = popup->absolute_bounds();
+    require(bounds.width == 260.0 && combo->drop_down_width() == 260.0,
+            "ComboBox must honor an explicit bounded popup width independently of its field width");
     const DamageRegion opening_damage = window.take_damage();
     RecordingPainter opening_painter;
     window.paint(opening_painter, opening_damage.bounds());
@@ -432,11 +457,13 @@ void test_numeric_up_down_composite_edit_spinner_and_keys() {
     numeric->set_range(-10.0, 10.0);
     numeric->set_increment(0.5);
     numeric->set_decimal_places(1U);
+    numeric->set_button_width(30.0);
     numeric->set_value(1.5);
     numeric->set_requested_bounds({0.0, 0.0, 180.0, 32.0});
     Window window(numeric, {180.0, 32.0});
     window.perform_layout();
-    require(numeric->editor() && numeric->editor()->text() == "1.5",
+    require(numeric->editor() && numeric->editor()->text() == "1.5" &&
+                window.find("input.numeric.spinner")->absolute_bounds().width == 30.0,
             "NumericUpDown must expose its public TextBox editor and formatted value");
     std::string values;
     auto changed = numeric->value_changed().subscribe(
@@ -508,6 +535,7 @@ int main() {
         test_keyboard_text_input_and_read_only();
         test_pointer_drag_paint_and_caret_deadline();
         test_placeholder_and_validation();
+        test_text_box_maximum_length_bounds_user_edits();
         test_word_navigation_and_deletion();
         test_clipboard_commands_and_protected_text();
         test_list_box_selection_navigation_and_mutation();

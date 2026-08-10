@@ -1,10 +1,10 @@
 # MacApplicationWindow
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MacApplicationWindow`  
-Declaration: `include/gui_forms/platform/macos_host.hpp:45`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `MacApplicationWindow`
+- Declaration: `include/gui_forms/platform/macos_host.hpp:45`
+- Definition: `inline/header-only`
 
 MacApplicationWindow is a struct declared in include/gui_forms/platform/macos_host.hpp.
 
@@ -12,6 +12,6 @@ MacApplicationWindow is a struct declared in include/gui_forms/platform/macos_ho
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

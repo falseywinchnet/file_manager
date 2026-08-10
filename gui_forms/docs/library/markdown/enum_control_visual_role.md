@@ -1,7 +1,7 @@
 # ControlVisualRole
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/theme.hpp:35`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:29`
 
 ## Declared values
 

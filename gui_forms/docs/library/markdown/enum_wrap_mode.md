@@ -1,7 +1,7 @@
 # WrapMode
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/drawing.hpp:308`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:33`
 
 ## Declared values
 

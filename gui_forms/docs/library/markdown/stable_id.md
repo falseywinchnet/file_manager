@@ -1,10 +1,10 @@
 # StableId
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `StableId`  
-Declaration: `include/gui_forms/control.hpp:48`  
-Definition: `src/core/control.cpp`
+- Status: **generated inventory; detailed review pending**
+- Kind: **class**
+- Hierarchy: `StableId`
+- Declaration: `include/gui_forms/control.hpp:48`
+- Definition: `src/core/control.cpp`
 
 StableId is a class declared in include/gui_forms/control.hpp.
 
@@ -12,9 +12,9 @@ StableId is a class declared in include/gui_forms/control.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `StableId`
+### `StableId` (public)
 
 ```cpp
 explicit StableId(std::string value)
@@ -22,7 +22,7 @@ explicit StableId(std::string value)
 
 Constructs or tears down the retained StableId object according to its ownership contract.
 
-### `value`
+### `value` (public)
 
 ```cpp
 [[nodiscard]] std::string_view value() const noexcept
@@ -30,7 +30,7 @@ Constructs or tears down the retained StableId object according to its ownership
 
 Reports the current value value without mutation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const StableId&, const StableId&) = default

@@ -1,7 +1,7 @@
 # DisplayOperation
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `src/core/display_chunk.hpp:13`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `src/core/display/command/display_command.hpp:13`
 
 ## Declared values
 

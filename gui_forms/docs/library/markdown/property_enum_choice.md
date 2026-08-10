@@ -1,20 +1,20 @@
 # PropertyEnumChoice
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEnumChoice`  
-Declaration: `include/gui_forms/binding_types.hpp:176`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `PropertyEnumChoice`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:176`
+- Definition: `inline/header-only`
 
-PropertyEnumChoice is a struct declared in include/gui_forms/binding_types.hpp.
+PropertyEnumChoice is a struct declared in include/gui_forms/binding/value/binding_value.hpp.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyEnumChoice&, const PropertyEnumChoice&) = default

@@ -1,17 +1,17 @@
 # RegionSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `RegionSnapshot`  
-Declaration: `include/gui_forms/drawing.hpp:559`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 region snapshot review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `RegionSnapshot`
+- Declaration: `include/gui_forms/drawing/region/region.hpp:7`
+- Definition: `inline/header-only`
 
-RegionSnapshot is a struct declared in include/gui_forms/drawing.hpp.
+RegionSnapshot owns rectangle/path union parts and rectangular exclusions.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

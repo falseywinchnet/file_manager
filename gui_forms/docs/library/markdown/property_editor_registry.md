@@ -1,71 +1,71 @@
 # PropertyEditorRegistry
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `PropertyEditorRegistry`  
-Declaration: `include/gui_forms/inspection_controls.hpp:223`  
-Definition: `src/controls/inspection_controls.cpp`
+- Status: **OBSERVED: bundle 006 registry source split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `PropertyEditorRegistry`
+- Declaration: `include/gui_forms/inspection/property_editor_registry/property_editor_registry.hpp:27`
+- Definition: `src/controls/inspection/property_editor_registry/property_editor_registry.cpp, src/controls/panel/property_grid/property_grid.cpp`
 
-PropertyEditorRegistry is a class declared in include/gui_forms/inspection_controls.hpp.
+PropertyEditorRegistry is an instance-owned canonical service map from explicit editor names or value-kind defaults to retained-control factories. It validates returned ownership and synchronization seams, honors read-only policy, and supplies default numeric, flags, and color editors without a global mutable table.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyEditorRegistry](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
-### `register_factory`
+### `register_factory` (public)
 
 ```cpp
 bool register_factory(std::string name, PropertyEditorFactory factory)
 ```
 
-Public PropertyEditorRegistry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Canonicalizes a bounded name, requires a callback, and inserts without replacing an existing service.
 
-### `unregister_factory`
+### `unregister_factory` (public)
 
 ```cpp
 bool unregister_factory(std::string_view name)
 ```
 
-Public PropertyEditorRegistry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes a factory and every value-kind mapping that referred to it.
 
-### `map_kind`
+### `map_kind` (public)
 
 ```cpp
 void map_kind(BindingValueKind kind, std::string factory_name)
 ```
 
-Public PropertyEditorRegistry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps a value kind to an already registered factory.
 
-### `clear_kind`
+### `clear_kind` (public)
 
 ```cpp
 void clear_kind(BindingValueKind kind)
 ```
 
-Removes the explicit kind value and restores fallback behavior.
+Removes the default factory mapping for one value kind.
 
-### `factory_for`
+### `factory_for` (public)
 
 ```cpp
 [[nodiscard]] std::optional<std::string> factory_for( BindingValueKind kind) const
 ```
 
-Reports the current factory for value without mutation.
+Returns the canonical default factory name for a value kind.
 
-### `create`
+### `create` (public)
 
 ```cpp
 [[nodiscard]] std::optional<PropertyEditorBinding> create( const PropertyEditorRequest& request) const
 ```
 
-Reports the current create value without mutation.
+Selects explicit/top-level or kind-default service and validates the returned unparented live control and synchronization callbacks.
 
-### `create_default`
+### `create_default` (public)
 
 ```cpp
 [[nodiscard]] static std::shared_ptr<PropertyEditorRegistry> create_default()
 ```
 
-Public PropertyEditorRegistry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates numeric, independent-bit flags, and canonical color editor factories with safe typed subscriptions.

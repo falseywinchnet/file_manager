@@ -1,47 +1,47 @@
 # SplitterPanel
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `ContainerControl → SplitterPanel`  
-Declaration: `include/gui_forms/container_controls.hpp:400`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ContainerControl → SplitterPanel`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.hpp:7`
+- Definition: `src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp`
 
-SplitterPanel is a visual retained control declared in include/gui_forms/container_controls.hpp.
+SplitterPanel is the allocated scroll-capable pane surface owned by SplitContainer, with explicit retained background painting so movement never exposes an invisible allocation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![SplitterPanel](../captures/container_focus.png)
 
-## Public methods
+## Declared methods
 
-### `SplitterPanel`
+### `SplitterPanel` (public)
 
 ```cpp
 explicit SplitterPanel(StableId stable_id)
 ```
 
-Constructs or tears down the retained SplitterPanel object according to its ownership contract.
+Constructs a transparent ContainerControl pane whose allocation is owned by SplitContainer.
 
-### `background`
+### `background` (public)
 
 ```cpp
 [[nodiscard]] Color background() const noexcept
 ```
 
-Reports the current background value without mutation.
+Returns the explicit pane fill color.
 
-### `set_background`
+### `set_background` (public)
 
 ```cpp
 void set_background(Color color)
 ```
 
-Synchronously updates the retained background property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits a real color change and invalidates pane painting.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records the pane background from committed local bounds before descendant content paints.

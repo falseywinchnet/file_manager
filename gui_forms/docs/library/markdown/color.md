@@ -1,151 +1,167 @@
 # Color
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Color`  
-Declaration: `include/gui_forms/drawing.hpp:96`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 GUI.Drawing color split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Color`
+- Declaration: `include/gui_forms/drawing/color/color.hpp:10`
+- Definition: `src/core/drawing/color/color.cpp`
 
-Color is a class declared in include/gui_forms/drawing.hpp.
+gui_drawing::Color is a compact empty/known/ARGB value with deterministic named/HTML parsing and explicit linear-sRGB, XYZ D65, OKLab, and OKLCH conversion support.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Color`
+### `Color` (public)
 
 ```cpp
 constexpr Color() noexcept = default
 ```
 
-Constructs or tears down the retained Color object according to its ownership contract.
+Constructs empty color publicly or exact private ARGB/empty/known state for validated factories.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] static constexpr Color empty() noexcept
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the explicit no-color sentinel.
 
-### `from_argb`
+### `from_argb` (public)
 
 ```cpp
 [[nodiscard]] static constexpr Color from_argb(std::uint32_t argb) noexcept
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Constructs straight-alpha ARGB from packed or channel values.
 
-### `from_argb`
+### `from_argb` (public)
 
 ```cpp
 [[nodiscard]] static constexpr Color from_argb(std::uint8_t alpha, std::uint8_t red, std::uint8_t green, std::uint8_t blue) noexcept
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Constructs straight-alpha ARGB from packed or channel values.
 
-### `from_rgb`
+### `from_rgb` (public)
 
 ```cpp
 [[nodiscard]] static constexpr Color from_rgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue) noexcept
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Constructs an opaque RGB color.
 
-### `with_alpha`
+### `with_alpha` (public)
 
 ```cpp
 [[nodiscard]] static constexpr Color with_alpha(std::uint8_t alpha, Color color) noexcept
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces alpha while preserving empty and known-color identity semantics.
 
-### `from_name`
+### `from_name` (public)
 
 ```cpp
 [[nodiscard]] static Color from_name(std::string_view name)
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Performs case-insensitive lookup in the bounded admitted named-color vocabulary and returns empty when unknown.
 
-### `from_html`
+### `from_html` (public)
 
 ```cpp
 [[nodiscard]] static Color from_html(std::string_view value)
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Parses admitted names or #RGB/#RRGGBB/#AARRGGBB forms and rejects malformed lengths/digits.
 
-### `is_empty`
+### `is_empty` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool is_empty() const noexcept
 ```
 
-Reports the current is empty value without mutation.
+Reports the explicit no-color sentinel.
 
-### `is_known`
+### `is_known` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool is_known() const noexcept
 ```
 
-Reports the current is known value without mutation.
+Reports construction through the admitted named-color table.
 
-### `argb`
+### `argb` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::uint32_t argb() const noexcept
 ```
 
-Reports the current argb value without mutation.
+Returns packed straight-alpha ARGB.
 
-### `alpha`
+### `alpha` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::uint8_t alpha() const noexcept
 ```
 
-Reports the current alpha value without mutation.
+Returns the alpha channel.
 
-### `red`
+### `red` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::uint8_t red() const noexcept
 ```
 
-Reports the current red value without mutation.
+Returns the red channel.
 
-### `green`
+### `green` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::uint8_t green() const noexcept
 ```
 
-Reports the current green value without mutation.
+Returns the green channel.
 
-### `blue`
+### `blue` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::uint8_t blue() const noexcept
 ```
 
-Reports the current blue value without mutation.
+Returns the blue channel.
 
-### `brightness`
+### `brightness` (public)
 
 ```cpp
 [[nodiscard]] double brightness() const noexcept
 ```
 
-Reports the current brightness value without mutation.
+Returns deterministic HSL-style lightness from channel extrema, or zero for empty.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const Color&, const Color&) = default
 ```
 
-Public Color operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares packed channels plus empty/known identity flags.
+
+### `Color` (private)
+
+```cpp
+constexpr Color(std::uint32_t argb, bool empty, bool known) noexcept : argb_(argb), empty_(empty), known_(known)
+```
+
+Constructs empty color publicly or exact private ARGB/empty/known state for validated factories.
+
+### `known` (private)
+
+```cpp
+[[nodiscard]] static constexpr Color known(std::uint32_t argb) noexcept
+```
+
+Privately constructs a table-recognized color.

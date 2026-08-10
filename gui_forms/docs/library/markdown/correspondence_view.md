@@ -1,303 +1,519 @@
 # CorrespondenceView
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → CorrespondenceView`  
-Declaration: `include/gui_forms/collection_controls.hpp:346`  
-Definition: `src/controls/collection_controls.cpp`
+- Status: **OBSERVED: bundle 005 split and status-rail enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → CorrespondenceView`
+- Declaration: `include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp:74`
+- Definition: `src/controls/panel/correspondence_view/correspondence_view.cpp`
 
-CorrespondenceView is a visual retained control declared in include/gui_forms/collection_controls.hpp.
+CorrespondenceView is a virtualized search/result correspondence surface whose stable rows can expand in response to explicit pinning or hover intent. It separates focus, selection, hover, and pin authority; preserves scroll anchors while variable row heights change; bounds realization; and exposes exact virtual semantics.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![CorrespondenceView](../captures/correspondence_view.png)
 
-## Public methods
+## Declared methods
 
-### `CorrespondenceView`
+### `CorrespondenceView` (public)
 
 ```cpp
 explicit CorrespondenceView(StableId stable_id)
 ```
 
-Constructs or tears down the retained CorrespondenceView object according to its ownership contract.
+Constructs a focusable variable-height result surface with hover-intent scheduling and stable anchoring.
 
-### `items`
+### `items` (public)
 
 ```cpp
 [[nodiscard]] std::span<const CorrespondenceItem> items() const noexcept
 ```
 
-Reports the current items value without mutation.
+Returns the authored correspondence records in ranking order.
 
-### `set_items`
+### `set_items` (public)
 
 ```cpp
 void set_items(std::vector<CorrespondenceItem> items)
 ```
 
-Synchronously updates the retained items property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates stable identities, replaces the result model, and reconciles selection, focus, hover, pinning, and scroll anchoring.
 
-### `selected_id`
+### `selected_id` (public)
 
 ```cpp
 [[nodiscard]] std::string_view selected_id() const noexcept
 ```
 
-Reports the current selected id value without mutation.
+Returns the authoritative selected result identity.
 
-### `set_selected_id`
+### `set_selected_id` (public)
 
 ```cpp
 void set_selected_id(std::string_view stable_id)
 ```
 
-Synchronously updates the retained selected id property. Validation, typed invalidation, and notifications are defined by the implementation.
+Selects an admitted result, ensures visibility, and publishes only a real transition.
 
-### `focused_id`
+### `focused_id` (public)
 
 ```cpp
 [[nodiscard]] std::string_view focused_id() const noexcept
 ```
 
-Reports the current focused id value without mutation.
+Returns the keyboard-focused result independently of selection.
 
-### `hovered_id`
+### `hovered_id` (public)
 
 ```cpp
 [[nodiscard]] std::string_view hovered_id() const noexcept
 ```
 
-Reports the current hovered id value without mutation.
+Returns the result currently under hover intent, if any.
 
-### `pinned_id`
+### `pinned_id` (public)
 
 ```cpp
 [[nodiscard]] std::string_view pinned_id() const noexcept
 ```
 
-Reports the current pinned id value without mutation.
+Returns the result explicitly retained in expanded presentation.
 
-### `set_pinned_id`
+### `set_pinned_id` (public)
 
 ```cpp
 void set_pinned_id(std::string_view stable_id)
 ```
 
-Synchronously updates the retained pinned id property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits or clears the pinned result, preserves the viewport anchor, and publishes expansion deltas.
 
-### `expanded`
+### `expanded` (public)
 
 ```cpp
 [[nodiscard]] bool expanded(std::string_view stable_id) const
 ```
 
-Reports the current expanded value without mutation.
+Reports whether a result is expanded by pin or active hover intent.
 
-### `compact_height`
+### `compact_height` (public)
 
 ```cpp
 [[nodiscard]] double compact_height() const noexcept
 ```
 
-Reports the current compact height value without mutation.
+Returns logical height of a collapsed result row.
 
-### `set_compact_height`
+### `set_compact_height` (public)
 
 ```cpp
 void set_compact_height(double height)
 ```
 
-Synchronously updates the retained compact height property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates compact geometry and restores the viewport anchor after recomputation.
 
-### `expanded_height`
+### `expanded_height` (public)
 
 ```cpp
 [[nodiscard]] double expanded_height() const noexcept
 ```
 
-Reports the current expanded height value without mutation.
+Returns logical height of an expanded correspondence row.
 
-### `set_expanded_height`
+### `set_expanded_height` (public)
 
 ```cpp
 void set_expanded_height(double height)
 ```
 
-Synchronously updates the retained expanded height property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates expanded geometry and preserves visible content across the change.
 
-### `hover_intent_delay`
+### `status_rail_width` (public)
+
+```cpp
+[[nodiscard]] double status_rail_width() const noexcept
+```
+
+Returns the logical width of the per-result status rail.
+
+### `set_status_rail_width` (public)
+
+```cpp
+void set_status_rail_width(double width)
+```
+
+Validates bounded rail width and refreshes the correspondence visual without changing result state.
+
+### `hover_intent_delay` (public)
 
 ```cpp
 [[nodiscard]] std::chrono::milliseconds hover_intent_delay() const noexcept
 ```
 
-Reports the current hover intent delay value without mutation.
+Returns the delay before a hovered row gains transient expansion.
 
-### `set_hover_intent_delay`
+### `set_hover_intent_delay` (public)
 
 ```cpp
 void set_hover_intent_delay(std::chrono::milliseconds delay)
 ```
 
-Synchronously updates the retained hover intent delay property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates nonnegative timing and safely re-arms or cancels pending hover work.
 
-### `scroll_offset`
+### `scroll_offset` (public)
 
 ```cpp
 [[nodiscard]] double scroll_offset() const noexcept
 ```
 
-Reports the current scroll offset value without mutation.
+Returns the logical pixel offset into variable-height content.
 
-### `set_scroll_offset`
+### `set_scroll_offset` (public)
 
 ```cpp
 void set_scroll_offset(double offset)
 ```
 
-Synchronously updates the retained scroll offset property. Validation, typed invalidation, and notifications are defined by the implementation.
+Clamps and commits scrolling against computed content height.
 
-### `content_height`
+### `content_height` (public)
 
 ```cpp
 [[nodiscard]] double content_height() const noexcept
 ```
 
-Reports the current content height value without mutation.
+Returns total logical height of compact and expanded rows.
 
-### `realized_count`
+### `realized_count` (public)
 
 ```cpp
 [[nodiscard]] std::size_t realized_count() const noexcept
 ```
 
-Reports the current realized count value without mutation.
+Returns the number of rows intersecting the current virtualization window.
 
-### `item_bounds`
+### `item_bounds` (public)
 
 ```cpp
 [[nodiscard]] std::optional<Rect> item_bounds( std::string_view stable_id) const noexcept
 ```
 
-Reports the current item bounds value without mutation.
+Returns a result's logical viewport-relative bounds when its identity exists.
 
-### `font`
+### `font` (public)
 
 ```cpp
 [[nodiscard]] FontSpec font() const noexcept
 ```
 
-Reports the current font value without mutation.
+Returns the retained typography for titles, paths, and correspondence text.
 
-### `set_font`
+### `set_font` (public)
 
 ```cpp
 void set_font(FontSpec font)
 ```
 
-Synchronously updates the retained font property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates typography and refreshes paint and semantics.
 
-### `selection_changed`
+### `selection_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const CorrespondenceSelectionChange&>& selection_changed() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after authoritative result selection changes.
 
-### `pin_changed`
+### `pin_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const CorrespondencePinChange&>& pin_changed() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event carrying the old and new explicitly pinned identities.
 
-### `expansion_changed`
+### `expansion_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const CorrespondenceExpansionChange&>& expansion_changed() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event describing rows entering or leaving expanded projection.
 
-### `item_activated`
+### `item_activated` (public)
 
 ```cpp
 [[nodiscard]] Event<const std::string&>& item_activated() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event carrying the qualified activated result.
 
-### `context_requested`
+### `context_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<const ObjectContextRequest&>& context_requested() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event carrying result identity and position for owned context UI.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Commits viewport size, clamps offset, and maintains the selected/focused result's reachability.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records only realized compact or expanded rows, status rails, matched excerpts, hover, selection, and focus.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Handles hover intent, selection, pin toggling, context requests, capture qualification, and activation.
 
-### `on_key`
+### `on_key` (public)
 
 ```cpp
 void on_key(KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Implements variable-height navigation, paging, expansion/pinning, activation, and context request.
 
-### `on_focus_changed`
+### `on_focus_changed` (public)
 
 ```cpp
 void on_focus_changed(bool focused) override
 ```
 
-Updates focus-dependent retained state and invalidates affected presentation/semantics.
+Commits focus appearance and restores a usable focused result on entry.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a result list with total and realized counts plus current selection.
 
-### `semantic_virtual_children`
+### `semantic_virtual_children` (public)
 
 ```cpp
 [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override
 ```
 
-Reports the current semantic virtual children value without mutation.
+Exposes stable result nodes with correspondence descriptions, expanded/selected state, and actions.
 
-### `on_semantic_child_action`
+### `on_semantic_child_action` (public)
 
 ```cpp
 bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 ```
 
+Routes virtual selection, expansion, collapse, and press through ordinary retained transitions.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
 Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `item_index` (private)
+
+```cpp
+[[nodiscard]] std::optional<std::size_t> item_index( std::string_view stable_id) const noexcept
+```
+
+Reports the current item index value without mutation.
+
+### `expanded_indices` (private)
+
+```cpp
+[[nodiscard]] std::vector<std::size_t> expanded_indices() const
+```
+
+Reports the current expanded indices value without mutation.
+
+### `expanded_index` (private)
+
+```cpp
+[[nodiscard]] bool expanded_index(std::size_t index) const noexcept
+```
+
+Reports the current expanded index value without mutation.
+
+### `scaled_compact_height` (private)
+
+```cpp
+[[nodiscard]] double scaled_compact_height() const noexcept
+```
+
+Reports the current scaled compact height value without mutation.
+
+### `scaled_expanded_height` (private)
+
+```cpp
+[[nodiscard]] double scaled_expanded_height() const noexcept
+```
+
+Reports the current scaled expanded height value without mutation.
+
+### `row_height` (private)
+
+```cpp
+[[nodiscard]] double row_height(std::size_t index) const noexcept
+```
+
+Reports the current row height value without mutation.
+
+### `row_top` (private)
+
+```cpp
+[[nodiscard]] double row_top(std::size_t index) const noexcept
+```
+
+Reports the current row top value without mutation.
+
+### `viewport_height` (private)
+
+```cpp
+[[nodiscard]] double viewport_height() const noexcept
+```
+
+Reports the current viewport height value without mutation.
+
+### `maximum_scroll_offset` (private)
+
+```cpp
+[[nodiscard]] double maximum_scroll_offset() const noexcept
+```
+
+Reports the current maximum scroll offset value without mutation.
+
+### `first_visible_index` (private)
+
+```cpp
+[[nodiscard]] std::size_t first_visible_index() const noexcept
+```
+
+Reports the current first visible index value without mutation.
+
+### `realized_range` (private)
+
+```cpp
+[[nodiscard]] std::pair<std::size_t, std::size_t> realized_range() const noexcept
+```
+
+Reports the current realized range value without mutation.
+
+### `item_bounds` (private)
+
+```cpp
+[[nodiscard]] Rect item_bounds(std::size_t index) const noexcept
+```
+
+Returns a result's logical viewport-relative bounds when its identity exists.
+
+### `index_at` (private)
+
+```cpp
+[[nodiscard]] std::optional<std::size_t> index_at(Point absolute) const noexcept
+```
+
+Reports the current index at value without mutation.
+
+### `capture_anchor` (private)
+
+```cpp
+[[nodiscard]] ScrollAnchor capture_anchor(std::size_t preferred) const noexcept
+```
+
+Reports the current capture anchor value without mutation.
+
+### `restore_anchor` (private)
+
+```cpp
+void restore_anchor(ScrollAnchor anchor)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `clamp_scroll_offset` (private)
+
+```cpp
+void clamp_scroll_offset() noexcept
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `ensure_visible` (private)
+
+```cpp
+void ensure_visible(std::size_t index)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `focus_index` (private)
+
+```cpp
+void focus_index(std::size_t index, CorrespondenceExpansionReason reason)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `set_hovered_index` (private)
+
+```cpp
+void set_hovered_index(std::optional<std::size_t> index)
+```
+
+Synchronously updates the retained hovered index property. Validation, typed invalidation, and notifications are defined by the implementation.
+
+### `schedule_hover_intent` (private)
+
+```cpp
+void schedule_hover_intent(std::size_t index)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `clear_hover_intent` (private)
+
+```cpp
+void clear_hover_intent(bool clear_expansion)
+```
+
+Removes the explicit hover intent value and restores fallback behavior.
+
+### `apply_hover_expansion` (private)
+
+```cpp
+void apply_hover_expansion(std::string stable_id)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `emit_expansion_delta` (private)
+
+```cpp
+void emit_expansion_delta(std::string_view stable_id, bool before, bool after, CorrespondenceExpansionReason reason)
+```
+
+Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `paint_glyph` (private)
+
+```cpp
+void paint_glyph(Painter& painter, Rect bounds, ObjectGlyph glyph, bool enabled) const
+```
+
+Reports the current paint glyph value without mutation.

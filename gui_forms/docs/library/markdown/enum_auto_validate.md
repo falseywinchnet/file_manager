@@ -1,7 +1,7 @@
 # AutoValidate
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/control.hpp:106`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/control.hpp:106`
 
 ## Declared values
 

@@ -2,7 +2,7 @@
 name = "fileman-orchestrator"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.87"
 description = "File Manager headless integration-authority core"
 license = "UNLICENSED"
 publish = false

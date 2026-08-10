@@ -1,79 +1,87 @@
 # FrameRequestToken
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `FrameRequestToken`  
-Declaration: `include/gui_forms/scheduler.hpp:50`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 008 scheduler token review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `FrameRequestToken`
+- Declaration: `include/gui_forms/scheduler/frame_request_token/frame_request_token.hpp:11`
+- Definition: `src/core/scheduler/frame_request_token/frame_request_token.cpp`
 
-FrameRequestToken is a class declared in include/gui_forms/scheduler.hpp.
+FrameRequestToken is move-only revocable ownership of one Window frame request, with destruction providing deterministic cancellation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `FrameRequestToken`
+### `FrameRequestToken` (public)
 
 ```cpp
 FrameRequestToken() = default
 ```
 
-Constructs or tears down the retained FrameRequestToken object according to its ownership contract.
+Constructs a disconnected token, moves request ownership, rejects copying, or privately binds one Window-created Revocable.
 
-### `~FrameRequestToken`
+### `~FrameRequestToken` (public)
 
 ```cpp
 ~FrameRequestToken()
 ```
 
-Constructs or tears down the retained FrameRequestToken object according to its ownership contract.
+Disconnects the request before releasing its shared ownership edge.
 
-### `FrameRequestToken`
+### `FrameRequestToken` (public)
 
 ```cpp
-FrameRequestToken(FrameRequestToken&& other) noexcept : revocable_(std::move(other.revocable_))
+FrameRequestToken(FrameRequestToken&& other) noexcept
 ```
 
-Constructs or tears down the retained FrameRequestToken object according to its ownership contract.
+Constructs a disconnected token, moves request ownership, rejects copying, or privately binds one Window-created Revocable.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 FrameRequestToken& operator=(FrameRequestToken&& other) noexcept
 ```
 
-Public FrameRequestToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects any prior request before taking move ownership; copying is prohibited.
 
-### `FrameRequestToken`
+### `FrameRequestToken` (public)
 
 ```cpp
 FrameRequestToken(const FrameRequestToken&) = delete
 ```
 
-Constructs or tears down the retained FrameRequestToken object according to its ownership contract.
+Constructs a disconnected token, moves request ownership, rejects copying, or privately binds one Window-created Revocable.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 FrameRequestToken& operator=(const FrameRequestToken&) = delete
 ```
 
-Public FrameRequestToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects any prior request before taking move ownership; copying is prohibited.
 
-### `disconnect`
+### `disconnect` (public)
 
 ```cpp
 void disconnect() noexcept
 ```
 
-Public FrameRequestToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Idempotently revokes and releases the owned request.
 
-### `connected`
+### `connected` (public)
 
 ```cpp
 [[nodiscard]] bool connected() const noexcept
 ```
 
-Reports the current connected value without mutation.
+Reports whether a revocable is present and still admits delivery.
+
+### `FrameRequestToken` (private)
+
+```cpp
+explicit FrameRequestToken(std::shared_ptr<detail::Revocable> revocable)
+```
+
+Constructs a disconnected token, moves request ownership, rejects copying, or privately binds one Window-created Revocable.

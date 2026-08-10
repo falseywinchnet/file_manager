@@ -1,39 +1,39 @@
 # Revocable
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Revocable`  
-Declaration: `include/gui_forms/component.hpp:11`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 010 revocation contract split; focused M4 lifecycle tests pass**
+- Kind: **class**
+- Hierarchy: `Revocable`
+- Declaration: `include/gui_forms/component/revocable/revocable.hpp:5`
+- Definition: `inline/header-only`
 
-Revocable is a class declared in include/gui_forms/component.hpp.
+Revocable is the minimal lifetime authority owned weakly by Component for subscriptions, timers, and queued work.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `~Revocable`
+### `~Revocable` (public)
 
 ```cpp
 virtual ~Revocable() = default
 ```
 
-Constructs or tears down the retained Revocable object according to its ownership contract.
+Provides polymorphic destruction.
 
-### `disconnect`
+### `disconnect` (public)
 
 ```cpp
 virtual void disconnect() noexcept = 0
 ```
 
-Public Revocable operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Idempotently revokes the underlying work or observation.
 
-### `connected`
+### `connected` (public)
 
 ```cpp
 [[nodiscard]] virtual bool connected() const noexcept = 0
 ```
 
-Reports the current connected value without mutation.
+Reports whether revocable work remains active.

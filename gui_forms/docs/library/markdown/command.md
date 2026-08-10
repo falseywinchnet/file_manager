@@ -1,159 +1,167 @@
 # Command
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → Command`  
-Declaration: `include/gui_forms/commands.hpp:39`  
-Definition: `src/controls/commands.cpp`
+- Status: **OBSERVED: bundle 010 command authority split; focused M4 collection tests pass**
+- Kind: **class**
+- Hierarchy: `Component → Command`
+- Declaration: `include/gui_forms/commands/command/command.hpp:13`
+- Definition: `src/controls/commands/command/command.cpp`
 
-Command is a class declared in include/gui_forms/commands.hpp.
+Command is the shared retained authority for multiple presentations, with validated UTF-8 state and ordered enabled-only invocation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Command`
+### `Command` (public)
 
 ```cpp
 Command(std::string stable_id, std::string text)
 ```
 
-Constructs or tears down the retained Command object according to its ownership contract.
+Validates stable identity and initial UTF-8 text.
 
-### `stable_id`
+### `stable_id` (public)
 
 ```cpp
 [[nodiscard]] const std::string& stable_id() const noexcept
 ```
 
-Reports the current stable id value without mutation.
+Returns immutable command identity.
 
-### `state`
+### `state` (public)
 
 ```cpp
 [[nodiscard]] const CommandState& state() const noexcept
 ```
 
-Reports the current state value without mutation.
+Returns the current generation-stamped snapshot.
 
-### `set_text`
+### `set_text` (public)
 
 ```cpp
 void set_text(std::string text)
 ```
 
-Synchronously updates the retained text property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed display text.
 
-### `set_description`
+### `set_description` (public)
 
 ```cpp
 void set_description(std::string description)
 ```
 
-Synchronously updates the retained description property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed descriptive text.
 
-### `set_icon_id`
+### `set_icon_id` (public)
 
 ```cpp
 void set_icon_id(std::string icon_id)
 ```
 
-Synchronously updates the retained icon id property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed icon identity.
 
-### `set_shortcut`
+### `set_shortcut` (public)
 
 ```cpp
 void set_shortcut(std::string shortcut)
 ```
 
-Synchronously updates the retained shortcut property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed shortcut text.
 
-### `set_mnemonic`
+### `set_mnemonic` (public)
 
 ```cpp
 void set_mnemonic(std::string mnemonic)
 ```
 
-Synchronously updates the retained mnemonic property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed mnemonic text.
 
-### `set_key_tip`
+### `set_key_tip` (public)
 
 ```cpp
 void set_key_tip(std::string key_tip)
 ```
 
-Synchronously updates the retained key tip property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed key-tip text.
 
-### `set_availability_reason`
+### `set_availability_reason` (public)
 
 ```cpp
 void set_availability_reason(std::string reason)
 ```
 
-Synchronously updates the retained availability reason property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and publishes changed disabled-state rationale.
 
-### `set_enabled`
+### `set_enabled` (public)
 
 ```cpp
 void set_enabled(bool enabled)
 ```
 
-Synchronously updates the retained enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Publishes a changed execution gate.
 
-### `set_visible`
+### `set_visible` (public)
 
 ```cpp
 void set_visible(bool visible)
 ```
 
-Synchronously updates the retained visible property. Validation, typed invalidation, and notifications are defined by the implementation.
+Publishes changed presentation visibility.
 
-### `set_checked`
+### `set_checked` (public)
 
 ```cpp
 void set_checked(bool checked)
 ```
 
-Synchronously updates the retained checked property. Validation, typed invalidation, and notifications are defined by the implementation.
+Publishes changed check state.
 
-### `set_default_action`
+### `set_default_action` (public)
 
 ```cpp
 void set_default_action(bool is_default)
 ```
 
-Synchronously updates the retained default action property. Validation, typed invalidation, and notifications are defined by the implementation.
+Publishes changed default-action state.
 
-### `set_destructive`
+### `set_destructive` (public)
 
 ```cpp
 void set_destructive(bool destructive)
 ```
 
-Synchronously updates the retained destructive property. Validation, typed invalidation, and notifications are defined by the implementation.
+Publishes changed destructive-action metadata.
 
-### `execute`
+### `execute` (public)
 
 ```cpp
 bool execute(std::string_view source_id =
 ```
 
-Public Command operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Rejects disposed, disabled, or invalid-source execution and otherwise emits one sequenced invocation.
 
-### `state_changed`
+### `state_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const CommandState&>& state_changed() noexcept
 ```
 
-Public Command operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the state observation event.
 
-### `invoked`
+### `invoked` (public)
 
 ```cpp
 [[nodiscard]] Event<const CommandInvocation&>& invoked() noexcept
 ```
 
-Public Command operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the admitted invocation event.
+
+### `publish_state` (private)
+
+```cpp
+void publish_state()
+```
+
+Advances generation then emits the complete snapshot.

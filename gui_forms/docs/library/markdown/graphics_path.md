@@ -1,191 +1,199 @@
 # GraphicsPath
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → GraphicsPath`  
-Declaration: `include/gui_forms/drawing.hpp:525`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 path state-machine split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → GraphicsPath`
+- Declaration: `include/gui_forms/drawing/graphics_path/graphics_path.hpp:40`
+- Definition: `src/core/drawing/graphics_path/graphics_path.cpp`
 
-GraphicsPath is a class declared in include/gui_forms/drawing.hpp.
+GraphicsPath is a bounded retained vector-geometry state machine with explicit figure boundaries, line/quadratic/cubic/polygon/rectangle/ellipse/arc/pie vocabulary, affine transformation, hit testing, cloning, bounds, and immutable snapshots.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `GraphicsPath`
+### `GraphicsPath` (public)
 
 ```cpp
 explicit GraphicsPath(FillMode fill_mode = FillMode::alternate)
 ```
 
-Constructs or tears down the retained GraphicsPath object according to its ownership contract.
+Validates and retains the initial fill rule.
 
-### `fill_mode`
+### `fill_mode` (public)
 
 ```cpp
 [[nodiscard]] FillMode fill_mode() const
 ```
 
-Reports the current fill mode value without mutation.
+Requires liveness and returns alternate or winding fill policy.
 
-### `set_fill_mode`
+### `set_fill_mode` (public)
 
 ```cpp
 void set_fill_mode(FillMode fill_mode)
 ```
 
-Synchronously updates the retained fill mode property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits fill policy.
 
-### `reset`
+### `reset` (public)
 
 ```cpp
 void reset()
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears all retained elements while preserving fill policy.
 
-### `start_figure`
+### `start_figure` (public)
 
 ```cpp
 void start_figure()
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Appends an explicit new-figure marker.
 
-### `close_figure`
+### `close_figure` (public)
 
 ```cpp
 void close_figure()
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Appends a close marker when a figure is active.
 
-### `add_line`
+### `add_line` (public)
 
 ```cpp
 void add_line(PointF from, PointF to)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and appends an authored line segment.
 
-### `add_quadratic`
+### `add_quadratic` (public)
 
 ```cpp
 void add_quadratic(PointF from, PointF control, PointF to)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and appends one quadratic Bézier segment.
 
-### `add_bezier`
+### `add_bezier` (public)
 
 ```cpp
 void add_bezier(PointF from, PointF control1, PointF control2, PointF to)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and appends one cubic Bézier segment.
 
-### `add_beziers`
+### `add_beziers` (public)
 
 ```cpp
 void add_beziers(std::span<const PointF> points)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates the 3n+1 point law and appends cubic segments transactionally.
 
-### `add_polygon`
+### `add_polygon` (public)
 
 ```cpp
 void add_polygon(std::span<const PointF> points)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates a bounded polygon, starts it, appends lines, and closes it.
 
-### `add_rectangle`
+### `add_rectangle` (public)
 
 ```cpp
 void add_rectangle(RectF rectangle)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and appends a rectangle element.
 
-### `add_ellipse`
+### `add_ellipse` (public)
 
 ```cpp
 void add_ellipse(RectF bounds)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and appends an ellipse element.
 
-### `add_arc`
+### `add_arc` (public)
 
 ```cpp
 void add_arc(RectF bounds, double start_angle, double sweep_angle)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounds/angles and appends an arc element.
 
-### `add_pie`
+### `add_pie` (public)
 
 ```cpp
 void add_pie(RectF bounds, double start_angle, double sweep_angle)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds a closed center-to-arc pie figure from validated geometry.
 
-### `add_path`
+### `add_path` (public)
 
 ```cpp
 void add_path(const GraphicsPath& path, bool connect)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies another live snapshot with optional connection while enforcing total element capacity.
 
-### `transform`
+### `transform` (public)
 
 ```cpp
 void transform(const Matrix& matrix)
 ```
 
-Public GraphicsPath operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requires a finite matrix and transforms every retained geometry field.
 
-### `is_visible`
+### `is_visible` (public)
 
 ```cpp
 [[nodiscard]] bool is_visible(PointF point) const
 ```
 
-Reports the current is visible value without mutation.
+Projects a snapshot through deterministic fill-rule hit testing.
 
-### `path_points`
+### `path_points` (public)
 
 ```cpp
 [[nodiscard]] std::vector<PointF> path_points() const
 ```
 
-Reports the current path points value without mutation.
+Flattens retained element control/end points into an inspectable ordered vector.
 
-### `clone`
+### `clone` (public)
 
 ```cpp
 [[nodiscard]] std::unique_ptr<GraphicsPath> clone() const
 ```
 
-Reports the current clone value without mutation.
+Creates an independent path with identical fill policy and elements.
 
-### `bounds`
+### `bounds` (public)
 
 ```cpp
 [[nodiscard]] RectF bounds() const
 ```
 
-Reports the current bounds value without mutation.
+Computes conservative bounds across every retained geometry form.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] PathSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Copies fill rule and the complete immutable element sequence.
+
+### `append` (private)
+
+```cpp
+void append(PathElement element)
+```
+
+Enforces maximum element capacity before committing one internal element.

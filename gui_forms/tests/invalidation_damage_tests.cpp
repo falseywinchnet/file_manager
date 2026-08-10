@@ -1,5 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
-#include "../src/core/device_damage.hpp"
+#include "../src/core/damage/device_damage/device_damage.hpp"
 
 #include <cstdlib>
 #include <exception>

@@ -1,17 +1,17 @@
 # PropertyGridValueChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyGridValueChange`  
-Declaration: `include/gui_forms/inspection_controls.hpp:400`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 typed-transaction event split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyGridValueChange`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:100`
+- Definition: `inline/header-only`
 
-PropertyGridValueChange is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyGridValueChange is the post-transaction typed publication for a property edit or reset, including authoritative origin.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyGridValueChange](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

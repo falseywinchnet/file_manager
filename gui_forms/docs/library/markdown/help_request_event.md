@@ -1,17 +1,17 @@
 # HelpRequestEvent
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HelpRequestEvent`  
-Declaration: `include/gui_forms/guidance.hpp:190`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 005 policy-free request value split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `HelpRequestEvent`
+- Declaration: `include/gui_forms/components/help_provider/help_provider.hpp:39`
+- Definition: `inline/header-only`
 
-HelpRequestEvent is a struct declared in include/gui_forms/guidance.hpp.
+HelpRequestEvent is the mutable dispatch payload for policy-free help routing. It identifies the target and position, carries authored namespace/string/keyword/navigator metadata and keyboard origin, and lets a consumer mark the request handled.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![HelpRequestEvent](../captures/tool_tip_error_provider.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

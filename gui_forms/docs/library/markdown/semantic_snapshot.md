@@ -1,23 +1,23 @@
 # SemanticSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SemanticSnapshot`  
-Declaration: `include/gui_forms/semantics.hpp:122`  
-Definition: `src/core/semantics.cpp`
+- Status: **OBSERVED: bundle 009 semantic projection split; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `SemanticSnapshot`
+- Declaration: `include/gui_forms/semantics/types/semantic_types.hpp:88`
+- Definition: `src/core/semantics/snapshot/semantic_snapshot.cpp`
 
-SemanticSnapshot is a struct declared in include/gui_forms/semantics.hpp.
+SemanticSnapshot is an immutable generation-tagged forest of exact retained accessibility nodes with counted topology.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `to_json`
+### `to_json` (public)
 
 ```cpp
 [[nodiscard]] std::string to_json() const
 ```
 
-Reports the current to json value without mutation.
+Serializes roles, states, actions, values, bounds, identities, and child topology with stable vocabulary.

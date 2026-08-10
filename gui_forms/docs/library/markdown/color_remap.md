@@ -1,23 +1,23 @@
 # ColorRemap
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ColorRemap`  
-Declaration: `include/gui_forms/drawing.hpp:599`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 color-remap value review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ColorRemap`
+- Declaration: `include/gui_forms/drawing/image_attributes/image_attributes.hpp:16`
+- Definition: `inline/header-only`
 
-ColorRemap is a struct declared in include/gui_forms/drawing.hpp.
+ColorRemap maps one exact authored color to another.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ColorRemap&, const ColorRemap&) = default
 ```
 
-Public ColorRemap operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares old and new colors.

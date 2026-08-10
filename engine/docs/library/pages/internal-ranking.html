@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>internal/ranking</title><link rel="stylesheet" href="../assets/page.css"></head>
+<body><header><p class="eyebrow">File Manager Engine service atlas</p><h1>internal/ranking</h1>
+<p class="status">OBSERVED deterministic exact mapping</p></header><main>
+<section class="lede"><p>Maps exact matches and records into evidence-preserving result order without pretending later fusion is implemented.</p><p>Package ranking converts channel-preserving candidates into public results. M1 has one exact tier; no unrelated raw scores are fused here.</p></section>
+<section><h2>Boundary and ownership</h2><ul><li>Exact evidence remains named and reconstructable.</li></ul></section>
+<section><h2>Internal dependencies</h2><div class="chips"><a class="chip" href="api.html">api</a><a class="chip" href="internal-catalog.html">internal/catalog</a><a class="chip" href="internal-exact.html">internal/exact</a></div></section>
+<section><h2>Inventory</h2><dl class="metrics"><div><dt>Production files</dt><dd>1</dd></div>
+<div><dt>Production lines</dt><dd>34</dd></div><div><dt>Test files</dt><dd>0</dd></div>
+<div><dt>Test lines</dt><dd>0</dd></div><div><dt>Declarations</dt><dd>2</dd></div></dl></section>
+<section><h2>Declarations</h2><article class="symbol" id="exact"><div class="symbol-head"><h3>Exact</h3><span>function</span></div><pre><code>func Exact(matches []exact.Match, generation api.Generation) []api.Result</code></pre><p>No package documentation comment is present.</p><p class="source"><a href="../../../internal/ranking/exact.go#L11">internal/ranking/exact.go:11</a></p></article><article class="symbol" id="record"><div class="symbol-head"><h3>Record</h3><span>function</span></div><pre><code>func Record(record catalog.Record, generation api.Generation, rank int, evidence []api.Evidence) api.Result</code></pre><p>No package documentation comment is present.</p><p class="source"><a href="../../../internal/ranking/exact.go#L19">internal/ranking/exact.go:19</a></p></article></section>
+<section><details><summary>Verification entry points (0)</summary><ul class="tests"><li>No top-level Go test or benchmark entry points.</li></ul></details></section>
+<section><details><summary>Source files (1)</summary><ul><li><code>internal/ranking/exact.go</code></li></ul></details></section>
+</main></body></html>

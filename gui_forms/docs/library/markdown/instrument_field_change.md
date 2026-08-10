@@ -1,17 +1,17 @@
 # InstrumentFieldChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `InstrumentFieldChange`  
-Declaration: `include/gui_forms/instrument_controls.hpp:49`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 event value split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `InstrumentFieldChange`
+- Declaration: `include/gui_forms/instrument/instrument_types.hpp:41`
+- Definition: `inline/header-only`
 
-InstrumentFieldChange is a struct declared in include/gui_forms/instrument_controls.hpp.
+InstrumentFieldChange carries stable module and field identities, previous/current text, and whether the transition is a committed edit.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![InstrumentFieldChange](../captures/instrument_rack.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

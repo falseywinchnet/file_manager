@@ -1,175 +1,263 @@
 # HelpProvider
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → HelpProvider`  
-Declaration: `include/gui_forms/guidance.hpp:211`  
-Definition: `src/controls/guidance.cpp`
+- Status: **OBSERVED: bundle 005 split and policy review; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class**
+- Hierarchy: `Component → HelpProvider`
+- Declaration: `include/gui_forms/components/help_provider/help_provider.hpp:60`
+- Definition: `src/controls/guidance/help_provider/help_provider.cpp`
 
-HelpProvider is a class declared in include/gui_forms/guidance.hpp.
+HelpProvider is a nonvisual, window-bound metadata and request router. It tokenizes per-control help strings, keywords, navigator policy, and explicit visibility; publishes semantic descriptions; owns an F1 accelerator; and emits policy-free requests that consumers or capability-gated plugins may handle. It never opens a browser, help file, or network resource itself.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![HelpProvider](../captures/tool_tip_error_provider.png)
 
-## Public methods
+## Declared methods
 
-### `HelpProvider`
+### `HelpProvider` (public)
 
 ```cpp
 explicit HelpProvider(Window& window)
 ```
 
-Constructs or tears down the retained HelpProvider object according to its ownership contract.
+Binds help metadata and the F1 accelerator to one live Window lifetime.
 
-### `~HelpProvider`
+### `~HelpProvider` (public)
 
 ```cpp
 ~HelpProvider() override
 ```
 
-Constructs or tears down the retained HelpProvider object according to its ownership contract.
+Disconnects accelerator, target mappings, semantics, and lifetime state before destruction.
 
-### `can_extend`
+### `can_extend` (public)
 
 ```cpp
 [[nodiscard]] bool can_extend(const std::shared_ptr<Control>& target) const
 ```
 
-Reports the current can extend value without mutation.
+Reports whether a shared control is live and belongs to the bound Window.
 
-### `set_help_string`
+### `set_help_string` (public)
 
 ```cpp
 void set_help_string(const std::shared_ptr<Control>& target, std::string text)
 ```
 
-Synchronously updates the retained help string property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates a target, commits explanatory text, updates its semantic description, and removes empty mappings.
 
-### `help_string`
+### `help_string` (public)
 
 ```cpp
 [[nodiscard]] std::string help_string(const Control& target) const
 ```
 
-Reports the current help string value without mutation.
+Returns retained explanatory text for the target.
 
-### `set_help_keyword`
+### `set_help_keyword` (public)
 
 ```cpp
 void set_help_keyword(const std::shared_ptr<Control>& target, std::string keyword)
 ```
 
-Synchronously updates the retained help keyword property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits a policy-neutral lookup keyword and refreshes target semantics.
 
-### `help_keyword`
+### `help_keyword` (public)
 
 ```cpp
 [[nodiscard]] std::string help_keyword(const Control& target) const
 ```
 
-Reports the current help keyword value without mutation.
+Returns the target's retained lookup keyword.
 
-### `set_help_navigator`
+### `set_help_navigator` (public)
 
 ```cpp
 void set_help_navigator(const std::shared_ptr<Control>& target, HelpNavigator navigator)
 ```
 
-Synchronously updates the retained help navigator property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits the target's requested navigation mode without performing navigation.
 
-### `help_navigator`
+### `help_navigator` (public)
 
 ```cpp
 [[nodiscard]] HelpNavigator help_navigator(const Control& target) const
 ```
 
-Reports the current help navigator value without mutation.
+Returns the target's requested navigation mode.
 
-### `set_show_help`
+### `set_show_help` (public)
 
 ```cpp
 void set_show_help(const std::shared_ptr<Control>& target, bool show)
 ```
 
-Synchronously updates the retained show help property. Validation, typed invalidation, and notifications are defined by the implementation.
+Sets an explicit per-target eligibility override and refreshes semantic publication.
 
-### `show_help`
+### `show_help` (public)
 
 ```cpp
 [[nodiscard]] bool show_help(const Control& target) const
 ```
 
-Reports the current show help value without mutation.
+Reports effective help eligibility after default and explicit override policy.
 
-### `reset_show_help`
+### `reset_show_help` (public)
 
 ```cpp
 void reset_show_help(const Control& target)
 ```
 
-Returns show help to its inherited or default policy.
+Removes a target's explicit eligibility override and returns to metadata-derived behavior.
 
-### `clear`
+### `clear` (public)
 
 ```cpp
 void clear()
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes every mapping and restores affected semantic descriptions.
 
-### `help_namespace`
+### `help_namespace` (public)
 
 ```cpp
 [[nodiscard]] const std::string& help_namespace() const noexcept
 ```
 
-Reports the current help namespace value without mutation.
+Returns the provider-wide policy-neutral help namespace string.
 
-### `set_help_namespace`
+### `set_help_namespace` (public)
 
 ```cpp
 void set_help_namespace(std::string value)
 ```
 
-Synchronously updates the retained help namespace property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits namespace metadata for future requests without opening any resource.
 
-### `tag`
+### `tag` (public)
 
 ```cpp
 [[nodiscard]] const std::any& tag() const noexcept
 ```
 
-Reports the current tag value without mutation.
+Returns caller-owned opaque provider metadata.
 
-### `set_tag`
+### `set_tag` (public)
 
 ```cpp
 void set_tag(std::any tag)
 ```
 
-Synchronously updates the retained tag property. Validation, typed invalidation, and notifications are defined by the implementation.
+Replaces caller-owned opaque provider metadata without changing help routing.
 
-### `request_help`
+### `request_help` (public)
 
 ```cpp
 bool request_help(const std::shared_ptr<Control>& target, Point position, bool keyboard_initiated = false)
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds and publishes a request for an eligible live target, updates counters, and returns handled state.
 
-### `help_requested`
+### `help_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<HelpRequestEvent&>& help_requested() noexcept
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the mutable event through which consumers handle policy-free help requests.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] HelpProviderSnapshot snapshot() const noexcept
 ```
 
-Reports the current snapshot value without mutation.
+Returns exact mapping and request counters for diagnostics and tests.
+
+### `verify_dispose_thread` (protected)
+
+```cpp
+void verify_dispose_thread() override
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `bound_window` (private)
+
+```cpp
+[[nodiscard]] Window* bound_window() const noexcept
+```
+
+Reports the current bound window value without mutation.
+
+### `require_access` (private)
+
+```cpp
+void require_access(std::string_view operation) const
+```
+
+Reports the current require access value without mutation.
+
+### `find_entry` (private)
+
+```cpp
+[[nodiscard]] Entry* find_entry(const Control& target)
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `find_entry` (private)
+
+```cpp
+[[nodiscard]] const Entry* find_entry(const Control& target) const
+```
+
+Reports the current find entry value without mutation.
+
+### `require_entry` (private)
+
+```cpp
+[[nodiscard]] Entry& require_entry(const std::shared_ptr<Control>& target)
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `entry_effective` (private)
+
+```cpp
+[[nodiscard]] bool entry_effective(const Entry& entry) const noexcept
+```
+
+Reports the current entry effective value without mutation.
+
+### `publish_semantics` (private)
+
+```cpp
+void publish_semantics(Entry& entry)
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `erase_if_empty` (private)
+
+```cpp
+void erase_if_empty(std::uint64_t runtime_id)
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `request_focused_help` (private)
+
+```cpp
+bool request_focused_help()
+```
+
+Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

@@ -1,79 +1,79 @@
 # MaterialFillLayer
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MaterialFillLayer`  
-Declaration: `include/gui_forms/surface_material.hpp:29`  
-Definition: `src/core/theme.cpp`
+- Status: **OBSERVED: bundle 009 surface-material value split; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `MaterialFillLayer`
+- Declaration: `include/gui_forms/surface_material/types/surface_material_types.hpp:21`
+- Definition: `src/core/theme/theme/theme.cpp`
 
-MaterialFillLayer is a struct declared in include/gui_forms/surface_material.hpp.
+MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![MaterialFillLayer](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `solid`
+### `solid` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer solid(Color color)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates one solid-color layer.
 
-### `linear`
+### `linear` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer linear( Point start, Point end, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized, GradientSpreadMode spread = GradientSpreadMode::pad)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a linear gradient with owned stops, coordinate space, and spread.
 
-### `repeating_linear`
+### `repeating_linear` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer repeating_linear( Point start, Point end, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::logical)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a logical-coordinate repeating linear gradient.
 
-### `radial`
+### `radial` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer radial( Point center, Size radii, std::vector<GradientStop> stops, MaterialCoordinateSpace space = MaterialCoordinateSpace::normalized)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a radial gradient with owned stops and explicit center/radii space.
 
-### `stretched_image`
+### `stretched_image` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer stretched_image( ImageId image, Size pixel_size, double opacity = 1.0)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a stretched image layer with source pixel size and bounded opacity.
 
-### `tiled_image`
+### `tiled_image` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer tiled_image( ImageId image, Size pixel_size, double source_pixels_per_logical_pixel = 1.0, double opacity = 1.0)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a tiled image layer with explicit source-pixel scale.
 
-### `nine_patch`
+### `nine_patch` (public)
 
 ```cpp
 [[nodiscard]] static MaterialFillLayer nine_patch( ImageId image, Size pixel_size, Insets source_slice, double source_pixels_per_logical_pixel = 1.0, double opacity = 1.0)
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates a nine-slice image layer with source insets and scale.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const MaterialFillLayer&, const MaterialFillLayer&) = default
 ```
 
-Public MaterialFillLayer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete authored fill recipe.

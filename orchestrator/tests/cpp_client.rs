@@ -1,5 +1,7 @@
 #![cfg(unix)]
 
+mod support;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -28,13 +30,18 @@ fn independently_built_cpp_client_bootstraps_and_reconnects_after_restart() {
     );
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance/clients/cpp");
 
-    let configure = Command::new("cmake")
+    let cmake = support::program(
+        "CMAKE",
+        &["/opt/homebrew/bin/cmake", "/usr/local/bin/cmake"],
+        "cmake",
+    );
+    let configure = Command::new(&cmake)
         .args(["-S", path(&source), "-B", path(&build.0)])
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .output()
         .expect("configure independent C++ client");
     assert_command_succeeded("configure C++ client", &configure);
-    let compile = Command::new("cmake")
+    let compile = Command::new(&cmake)
         .args(["--build", path(&build.0), "--parallel"])
         .output()
         .expect("build independent C++ client");

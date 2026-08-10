@@ -2,6 +2,12 @@
 
 Status: **architecture interview; no backend selected**.
 
+Source-language refinement: the 2026-08-10 architect intake opens
+`../../web_forms/` and replaces the separate DML syntax candidate with a
+bounded browser-valid HTML/CSS authoring profile. References to DML below retain
+their historical/IR meaning until that profile and the GUI.Forms authoring
+manifest are approved; they do not authorize a second source language.
+
 The original questions below are preserved as the first shortlist. The
 architect's resolutions, expanded alternatives, gains, losses, and new
 subquestions are now authoritative in

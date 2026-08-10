@@ -1,7 +1,7 @@
 # ObjectSelectionMode
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/collection_controls.hpp:159`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/panel/object_view/object_view.hpp:48`
 
 ## Declared values
 

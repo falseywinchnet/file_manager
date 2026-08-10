@@ -1,95 +1,95 @@
 # SemanticFeedback
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → SemanticFeedback`  
-Declaration: `include/gui_forms/feedback.hpp:43`  
-Definition: `src/core/feedback.cpp`
+- Status: **OBSERVED: bundle 010 semantic feedback split; focused M4 core tests pass**
+- Kind: **class**
+- Hierarchy: `Component → SemanticFeedback`
+- Declaration: `include/gui_forms/feedback/semantic_feedback/semantic_feedback.hpp:18`
+- Definition: `src/core/feedback/semantic_feedback/semantic_feedback.cpp`
 
-SemanticFeedback is a class declared in include/gui_forms/feedback.hpp.
+SemanticFeedback turns one-shot application transitions into bounded traceable host cues without treating ordinary visual interaction as semantic sound.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `SemanticFeedback`
+### `SemanticFeedback` (public)
 
 ```cpp
 explicit SemanticFeedback(Window& window, Clock clock =
 ```
 
-Constructs or tears down the retained SemanticFeedback object according to its ownership contract.
+Binds a Window and installs either the supplied deterministic clock or steady-clock nanoseconds.
 
-### `emit`
+### `emit` (public)
 
 ```cpp
 [[nodiscard]] SemanticFeedbackRecord emit(SemanticFeedbackKind kind)
 ```
 
-Public SemanticFeedback operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies affinity, establishes a strictly increasing timestamp, asks the host to present the mapped cue, bounds history, and publishes the record.
 
-### `records`
+### `records` (public)
 
 ```cpp
 [[nodiscard]] std::span<const SemanticFeedbackRecord> records() const noexcept
 ```
 
-Reports the current records value without mutation.
+Returns retained chronological feedback.
 
-### `dropped_record_count`
+### `dropped_record_count` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t dropped_record_count() const noexcept
 ```
 
-Reports the current dropped record count value without mutation.
+Returns the number evicted by the history bound.
 
-### `maximum_records`
+### `maximum_records` (public)
 
 ```cpp
 [[nodiscard]] std::size_t maximum_records() const noexcept
 ```
 
-Reports the current maximum records value without mutation.
+Returns the active history capacity.
 
-### `set_maximum_records`
+### `set_maximum_records` (public)
 
 ```cpp
 void set_maximum_records(std::size_t maximum)
 ```
 
-Synchronously updates the retained maximum records property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates 1 through 65536 and evicts oldest excess records.
 
-### `clear`
+### `clear` (public)
 
 ```cpp
 void clear()
 ```
 
-Public SemanticFeedback operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears history and the eviction count on the owner thread.
 
-### `trace`
+### `trace` (public)
 
 ```cpp
 [[nodiscard]] std::string trace() const
 ```
 
-Reports the current trace value without mutation.
+Serializes stable line-oriented feedback diagnostics.
 
-### `emitted`
+### `emitted` (public)
 
 ```cpp
 [[nodiscard]] Event<const SemanticFeedbackRecord&>& emitted() noexcept
 ```
 
-Public SemanticFeedback operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the committed-record event.
 
-### `cue_for`
+### `cue_for` (public)
 
 ```cpp
 [[nodiscard]] static HostSoundCue cue_for( SemanticFeedbackKind kind) noexcept
 ```
 
-Public SemanticFeedback operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps the closed semantic-kind vocabulary to a host cue.

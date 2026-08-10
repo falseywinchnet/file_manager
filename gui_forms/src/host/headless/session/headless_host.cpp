@@ -1,0 +1,71 @@
+#include "headless_host.hpp"
+
+#include <sstream>
+
+namespace gui_forms::host {
+HeadlessHost::HeadlessHost(Window& window)
+    : window_(&window), services_(),
+      session_(window, headless_capabilities(), &services_) {
+    window.set_dispatch_wake_handler([this] {
+        dispatcher_wake_pending_.store(true, std::memory_order_release);
+    });
+    window.set_paint_wake_handler([this] {
+        paint_wake_pending_.store(true, std::memory_order_release);
+    });
+    observation_ = session_.observed().subscribe(
+        [this](const HostEvent& event, const HostDispatchResult& result) {
+            const HostSessionSnapshot snapshot = session_.snapshot();
+            const HostServicesSnapshot services = services_.snapshot();
+            std::ostringstream line;
+            line << "seq=" << event.sequence
+                 << " time_ns=" << event.timestamp_nanoseconds
+                 << " event=" << host_event_name(event.payload)
+                 << " accepted=" << (result.accepted() ? 1 : 0)
+                 << " handled=" << (result.handled ? 1 : 0)
+                 << " input_deferred=" << (result.input_deferred ? 1 : 0)
+                 << " input_rejected="
+                 << (result.input_capacity_rejected ? 1 : 0)
+                 << " drag_effect=" << drag_effect_name(result.drag_effect)
+                 << " close_allowed=" << (result.close_allowed ? 1 : 0)
+                 << " error=" << host_dispatch_error_name(result.error)
+                 << " phase=" << host_lifecycle_phase_name(snapshot.phase)
+                 << " attached=" << (snapshot.attached ? 1 : 0)
+                 << " active=" << (snapshot.active ? 1 : 0)
+                 << " occluded=" << (snapshot.occluded ? 1 : 0)
+                 << " display_changes=" << snapshot.display_changes
+                 << " monitors=" << snapshot.monitor_count
+                 << " captured=" << (services.pointer_captured ? 1 : 0)
+                 << " pointer_id=" << services.captured_pointer_id
+                 << " modal_depth=" << snapshot.modal_depth
+                 << " modal_suppressed=" << snapshot.modal_input_suppressions
+                 << " drag_events=" << snapshot.drag_events
+                 << " drag_drops=" << snapshot.drag_drops
+                 << " closed=" << (snapshot.closed ? 1 : 0)
+                 << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
+            trace_ += line.str();
+        });
+}
+
+HeadlessHost::~HeadlessHost() {
+    if (window_ != nullptr) {
+        window_->set_paint_wake_handler({});
+        window_->set_dispatch_wake_handler({});
+    }
+}
+
+DispatchDrainResult HeadlessHost::pump_dispatcher(
+    std::size_t maximum_callbacks) {
+    dispatcher_wake_pending_.store(false, std::memory_order_release);
+    return window_->drain_posted_work(maximum_callbacks);
+}
+
+HostDispatchResult HeadlessHost::dispatch(HostEventPayload payload,
+                                          std::uint64_t timestamp_nanoseconds) {
+    HostEvent event;
+    event.sequence = next_sequence_++;
+    event.timestamp_nanoseconds = timestamp_nanoseconds;
+    event.payload = std::move(payload);
+    return session_.dispatch(std::move(event));
+}
+
+} // namespace gui_forms::host

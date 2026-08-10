@@ -135,6 +135,15 @@ platform accessibility identifier.
 - The native API may improve names and type safety. A generated C# facade keeps
   familiar Forms/Modern.Forms shapes. GUI.Forms never depends on .NET.
 
+**GIVEN refinement, 2026-08-10:** Web.Forms now owns the proposed authoritative
+round-trippable visual source as a bounded, browser-valid HTML/CSS profile. This
+supersedes a separate Athene-like DML source syntax, not the accepted stable-ID,
+compiled-metadata, disposable-code, or deterministic-order requirements. The
+no-authored-JavaScript profile and nested ambient landscape are approved
+Web.Forms boundaries. The checked-in Gallery DML/header remain provisional compiled-description
+evidence. Parser/compiler implementation and the GUI.Forms authoring manifest
+remain gated under `../../web_forms/`.
+
 ### GF017 — tree ownership plus ARC
 
 **GIVEN:** combine tree ownership with automatic reference counting.

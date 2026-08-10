@@ -1,23 +1,23 @@
 # PropertyConversionContext
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyConversionContext`  
-Declaration: `include/gui_forms/inspection_controls.hpp:29`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 conversion-policy split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyConversionContext`
+- Declaration: `include/gui_forms/inspection/property_value_converter_registry/property_value_converter_registry.hpp:14`
+- Definition: `inline/header-only`
 
-PropertyConversionContext is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyConversionContext is an inspector-local culture label, decimal/group separator policy, and grouping flag. It never mutates process locale, so two grids can format independently and deterministic tests remain stable.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyConversionContext](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyConversionContext&, const PropertyConversionContext&) = default
 ```
 
-Public PropertyConversionContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares culture name, separators, and grouping policy exactly.

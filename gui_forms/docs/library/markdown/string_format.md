@@ -1,79 +1,79 @@
 # StringFormat
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → StringFormat`  
-Declaration: `include/gui_forms/drawing.hpp:482`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 string-format split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → StringFormat`
+- Declaration: `include/gui_forms/drawing/string_format/string_format.hpp:15`
+- Definition: `src/core/drawing/string_format/string_format.cpp`
 
-StringFormat is a class declared in include/gui_forms/drawing.hpp.
+StringFormat retains renderer-neutral alignment, line alignment, trimming, and compatibility flags.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `StringFormat`
+### `StringFormat` (public)
 
 ```cpp
 StringFormat() = default
 ```
 
-Constructs or tears down the retained StringFormat object according to its ownership contract.
+Constructs defaults, explicit flags, or a live snapshot copy.
 
-### `StringFormat`
+### `StringFormat` (public)
 
 ```cpp
 explicit StringFormat(std::uint32_t flags)
 ```
 
-Constructs or tears down the retained StringFormat object according to its ownership contract.
+Constructs defaults, explicit flags, or a live snapshot copy.
 
-### `StringFormat`
+### `StringFormat` (public)
 
 ```cpp
 explicit StringFormat(const StringFormat& source)
 ```
 
-Constructs or tears down the retained StringFormat object according to its ownership contract.
+Constructs defaults, explicit flags, or a live snapshot copy.
 
-### `set_alignment`
+### `set_alignment` (public)
 
 ```cpp
 void set_alignment(StringAlignment alignment)
 ```
 
-Synchronously updates the retained alignment property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits horizontal alignment.
 
-### `set_line_alignment`
+### `set_line_alignment` (public)
 
 ```cpp
 void set_line_alignment(StringAlignment alignment)
 ```
 
-Synchronously updates the retained line alignment property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits line-block alignment.
 
-### `set_trimming`
+### `set_trimming` (public)
 
 ```cpp
 void set_trimming(StringTrimming trimming)
 ```
 
-Synchronously updates the retained trimming property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits the closed trimming vocabulary.
 
-### `set_flags`
+### `set_flags` (public)
 
 ```cpp
 void set_flags(std::uint32_t flags)
 ```
 
-Synchronously updates the retained flags property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits compatibility flags under liveness/thread rules.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] StringFormatSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and returns the complete text-layout recipe.

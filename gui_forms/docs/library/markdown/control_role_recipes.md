@@ -1,23 +1,23 @@
 # ControlRoleRecipes
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ControlRoleRecipes`  
-Declaration: `include/gui_forms/theme.hpp:97`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 role recipe matrix review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ControlRoleRecipes`
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:66`
+- Definition: `inline/header-only`
 
-ControlRoleRecipes is a struct declared in include/gui_forms/theme.hpp.
+ControlRoleRecipes stores complete ordinary, selected, high-contrast, and high-contrast-selected recipes across the closed surface-state axis.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const ControlRoleRecipes&, const ControlRoleRecipes&) = default
 ```
 
-Public ControlRoleRecipes operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all four state matrices.

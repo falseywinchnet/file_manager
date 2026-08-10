@@ -1,23 +1,23 @@
 # ImageLoadResult
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageLoadResult`  
-Declaration: `include/gui_forms/resources.hpp:95`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 image load result review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ImageLoadResult`
+- Declaration: `include/gui_forms/resources/types/image_resource_types.hpp:70`
+- Definition: `inline/header-only`
 
-ImageLoadResult is a struct declared in include/gui_forms/resources.hpp.
+ImageLoadResult couples a stable nonzero image identity to a closed registry error.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports success only for a nonzero identity and no error.

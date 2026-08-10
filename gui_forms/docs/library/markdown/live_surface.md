@@ -1,87 +1,95 @@
 # LiveSurface
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `enable_shared_from_this → LiveSurface`  
-Declaration: `include/gui_forms/live_surface.hpp:147`  
-Definition: `src/core/live_surface.cpp`
+- Status: **OBSERVED: bundle 008 high-throughput surface review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `enable_shared_from_this → LiveSurface`
+- Declaration: `include/gui_forms/live_surface/surface/live_surface.hpp:20`
+- Definition: `src/core/live_surface/surface/live_surface.cpp`
 
-LiveSurface is a class declared in include/gui_forms/live_surface.hpp.
+LiveSurface is a renderer-neutral newest-frame exchange with configurable retained buffering, nonblocking producer acquisition, immutable reader leases, bounded configuration, telemetry, and revocable wake signaling.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `create`
+### `create` (public)
 
 ```cpp
 static std::shared_ptr<LiveSurface> create( LiveSurfaceDescription description)
 ```
 
-Public LiveSurface operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates dimensions, pixel format, and two-to-eight buffer depth, allocates the full pool before publication, and returns null on invalid input or allocation failure.
 
-### `~LiveSurface`
+### `~LiveSurface` (public)
 
 ```cpp
 ~LiveSurface()
 ```
 
-Constructs or tears down the retained LiveSurface object according to its ownership contract.
+Releases the protocol state after outstanding frame, write, and wake handles release their own shared edges.
 
-### `LiveSurface`
+### `LiveSurface` (public)
 
 ```cpp
 LiveSurface(const LiveSurface&) = delete
 ```
 
-Constructs or tears down the retained LiveSurface object according to its ownership contract.
+Privately binds a validated shared protocol state; copying is prohibited so construction remains factory-controlled.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurface& operator=(const LiveSurface&) = delete
 ```
 
-Public LiveSurface operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Prohibits copying of the factory-owned surface identity.
 
-### `reconfigure`
+### `reconfigure` (public)
 
 ```cpp
 [[nodiscard]] bool reconfigure(LiveSurfaceDescription description)
 ```
 
-Public LiveSurface operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Allocates a complete replacement pool before locking, refuses an active writer, resets generation/frame state, advances epoch, and signals consumers after commit.
 
-### `try_acquire_write`
+### `try_acquire_write` (public)
 
 ```cpp
 [[nodiscard]] LiveSurfaceWriteLease try_acquire_write( bool preserve_published_contents = false) noexcept
 ```
 
-Public LiveSurface operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Never blocks: selects a nonpublished buffer held only by state, optionally copies newest pixels, or counts and returns a dropped acquisition when no slot is safe.
 
-### `acquire_latest`
+### `acquire_latest` (public)
 
 ```cpp
 [[nodiscard]] LiveSurfaceFrame acquire_latest() const noexcept
 ```
 
-Reports the current acquire latest value without mutation.
+Returns the newest immutable published buffer and records sampling telemetry, or an empty frame before the first publish.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] LiveSurfaceSnapshot snapshot() const noexcept
 ```
 
-Reports the current snapshot value without mutation.
+Copies the complete configuration and protocol counters under the state mutex.
 
-### `connect_presentation_wake`
+### `connect_presentation_wake` (public)
 
 ```cpp
 [[nodiscard]] LiveSurfaceWakeConnection connect_presentation_wake( std::function<void()> wake)
 ```
 
-Public LiveSurface operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Allocates a sequenced revocable callback record and appends it under the state mutex; callbacks are scheduling signals, not paint authority.
+
+### `LiveSurface` (private)
+
+```cpp
+explicit LiveSurface(std::shared_ptr<detail::LiveSurfaceState> state) noexcept
+```
+
+Privately binds a validated shared protocol state; copying is prohibited so construction remains factory-controlled.

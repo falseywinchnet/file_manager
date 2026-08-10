@@ -1,10 +1,10 @@
 # ReviewRecord
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ReviewRecord`  
-Declaration: `include/gui_forms/controls/panel/card/review_card/review_card.hpp:21`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `ReviewRecord`
+- Declaration: `include/gui_forms/controls/panel/card/review_card/review_card.hpp:21`
+- Definition: `inline/header-only`
 
 ReviewRecord is a struct declared in include/gui_forms/controls/panel/card/review_card/review_card.hpp.
 
@@ -12,9 +12,9 @@ ReviewRecord is a struct declared in include/gui_forms/controls/panel/card/revie
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const ReviewRecord&, const ReviewRecord&) = default

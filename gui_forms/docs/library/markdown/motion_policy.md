@@ -1,10 +1,10 @@
 # MotionPolicy
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MotionPolicy`  
-Declaration: `include/gui_forms/animation.hpp:53`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `MotionPolicy`
+- Declaration: `include/gui_forms/animation.hpp:53`
+- Definition: `inline/header-only`
 
 MotionPolicy is a struct declared in include/gui_forms/animation.hpp.
 
@@ -12,9 +12,9 @@ MotionPolicy is a struct declared in include/gui_forms/animation.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `active`
+### `active` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool active() const noexcept
@@ -22,7 +22,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
 Reports the current active value without mutation.
 
-### `quiescent`
+### `quiescent` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool quiescent() const noexcept
@@ -30,7 +30,7 @@ Reports the current active value without mutation.
 
 Reports the current quiescent value without mutation.
 
-### `frame_interval`
+### `frame_interval` (public)
 
 ```cpp
 [[nodiscard]] constexpr FrameInterval frame_interval( FrameInterval full_motion_interval) const noexcept
@@ -38,7 +38,7 @@ Reports the current quiescent value without mutation.
 
 Reports the current frame interval value without mutation.
 
-### `speed_scale`
+### `speed_scale` (public)
 
 ```cpp
 [[nodiscard]] constexpr double speed_scale() const noexcept
@@ -46,7 +46,7 @@ Reports the current frame interval value without mutation.
 
 Reports the current speed scale value without mutation.
 
-### `presentation_phase`
+### `presentation_phase` (public)
 
 ```cpp
 [[nodiscard]] constexpr double presentation_phase(double phase) const noexcept
@@ -54,7 +54,7 @@ Reports the current speed scale value without mutation.
 
 Reports the current presentation phase value without mutation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const MotionPolicy&, const MotionPolicy&) noexcept = default

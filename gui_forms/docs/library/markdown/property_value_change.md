@@ -1,17 +1,17 @@
 # PropertyValueChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyValueChange`  
-Declaration: `include/gui_forms/inspection_controls.hpp:293`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 event value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyValueChange`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:79`
+- Definition: `inline/header-only`
 
-PropertyValueChange is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyValueChange carries stable authored row identity, previous/current text, and whether the transition is committed.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyValueChange](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

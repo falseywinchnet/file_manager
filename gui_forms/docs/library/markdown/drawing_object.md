@@ -1,95 +1,111 @@
 # DrawingObject
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject`  
-Declaration: `include/gui_forms/drawing.hpp:265`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 drawing lifetime split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject`
+- Declaration: `include/gui_forms/drawing/object/drawing_object.hpp:10`
+- Definition: `src/core/drawing/object/drawing_object.cpp`
 
-DrawingObject is a class declared in include/gui_forms/drawing.hpp.
+DrawingObject is the thread-affine disposable base for mutable drawing resources, with explicit alive/disposing/disposed transitions and controlled serialized handoff.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `DrawingObject`
+### `DrawingObject` (public)
 
 ```cpp
 DrawingObject()
 ```
 
-Constructs or tears down the retained DrawingObject object according to its ownership contract.
+Captures the constructing thread as the initial exclusive owner; copying is prohibited.
 
-### `~DrawingObject`
+### `~DrawingObject` (public)
 
 ```cpp
 virtual ~DrawingObject()
 ```
 
-Constructs or tears down the retained DrawingObject object according to its ownership contract.
+Provides polymorphic destruction without implicitly invoking application-visible disposal work.
 
-### `DrawingObject`
+### `DrawingObject` (public)
 
 ```cpp
 DrawingObject(const DrawingObject&) = delete
 ```
 
-Constructs or tears down the retained DrawingObject object according to its ownership contract.
+Captures the constructing thread as the initial exclusive owner; copying is prohibited.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 DrawingObject& operator=(const DrawingObject&) = delete
 ```
 
-Public DrawingObject operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Prohibits copying of stateful drawing identity.
 
-### `dispose`
+### `dispose` (public)
 
 ```cpp
 void dispose()
 ```
 
-Public DrawingObject operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies thread access, performs the single alive-to-disposing-to-disposed transition, and calls the subtype cleanup hook once.
 
-### `state`
+### `state` (public)
 
 ```cpp
 [[nodiscard]] ObjectState state() const
 ```
 
-Reports the current state value without mutation.
+Verifies access and returns the authoritative lifecycle phase.
 
-### `is_disposed`
+### `is_disposed` (public)
 
 ```cpp
 [[nodiscard]] bool is_disposed() const
 ```
 
-Reports the current is disposed value without mutation.
+Verifies access and reports terminal disposal.
 
-### `owner_thread`
+### `owner_thread` (public)
 
 ```cpp
 [[nodiscard]] std::thread::id owner_thread() const noexcept
 ```
 
-Reports the current owner thread value without mutation.
+Returns the current exclusive owner thread identity.
 
-### `verify_access`
+### `verify_access` (public)
 
 ```cpp
 void verify_access() const
 ```
 
-Reports the current verify access value without mutation.
+Throws when mutable drawing state is touched from a nonowner thread.
 
-### `handoff_to_current_thread`
+### `handoff_to_current_thread` (public)
 
 ```cpp
 void handoff_to_current_thread()
 ```
 
-Public DrawingObject operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transfers serialized ownership to the caller's thread; it does not authorize concurrent access.
+
+### `require_alive` (protected)
+
+```cpp
+void require_alive() const
+```
+
+Requires owner-thread access and the alive phase.
+
+### `on_dispose` (protected)
+
+```cpp
+virtual void on_dispose() noexcept
+```
+
+Provides the no-throw subtype cleanup hook.

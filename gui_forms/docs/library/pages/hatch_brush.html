@@ -2,11 +2,11 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>HatchBrush · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
 <body><article><header><p class="eyebrow">class · library</p>
-<h1>HatchBrush</h1><p class="summary">HatchBrush is a class declared in include/gui_forms/drawing.hpp.</p>
-<div class="badges"><span>generated inventory; detailed review pending</span><span>grouped migration pending</span></div></header>
+<h1>HatchBrush</h1><p class="summary">HatchBrush retains one validated hatch vocabulary value plus foreground/background colors.</p>
+<div class="badges"><span>OBSERVED: bundle 009 hatch brush split; focused M4 tests pass</span><span>isolated per type</span></div></header>
 <section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>Brush → HatchBrush</dd>
-<dt>Declaration</dt><dd>include/gui_forms/drawing.hpp:375</dd><dt>Definition</dt><dd>src/core/drawing.cpp</dd></dl></section>
-<section><h2>Public methods</h2><section class="method"><h3>HatchBrush</h3><code>HatchBrush(HatchStyle style, Color foreground, Color background = Color::from_argb(0U, 0U, 0U, 0U))</code><p>Constructs or tears down the retained HatchBrush object according to its ownership contract.</p></section><section class="method"><h3>snapshot</h3><code>[[nodiscard]] BrushSnapshot snapshot() const override</code><p>Reports the current snapshot value without mutation.</p></section></section>
+<dt>Declaration</dt><dd>include/gui_forms/drawing/brush/hatch_brush.hpp:7</dd><dt>Definition</dt><dd>src/core/drawing/brush/hatch_brush.cpp</dd></dl></section>
+<section><h2>Declared methods</h2><section class="method"><h3>HatchBrush <span class="access">public</span></h3><code>HatchBrush(HatchStyle style, Color foreground, Color background = Color::from_argb(0U, 0U, 0U, 0U))</code><p>Validates the closed hatch vocabulary and retains its two colors.</p></section><section class="method"><h3>snapshot <span class="access">public</span></h3><code>[[nodiscard]] BrushSnapshot snapshot() const override</code><p>Requires liveness and projects a hatch BrushSnapshot.</p></section></section>
 <footer><a href="../markdown/hatch_brush.md">AI-readable Markdown source</a></footer>
 </article></body></html>

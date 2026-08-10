@@ -1,71 +1,79 @@
 # ScaledPanel
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → ScaledPanel`  
-Declaration: `include/gui_forms/container_controls.hpp:77`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → ScaledPanel`
+- Declaration: `include/gui_forms/controls/panel/scaled_panel/scaled_panel.hpp:10`
+- Definition: `src/controls/panel/scaled_panel/scaled_panel.cpp`
 
-ScaledPanel is a visual retained control declared in include/gui_forms/container_controls.hpp.
+ScaledPanel maps caller-authored design-space child rectangles into current content bounds, retaining slot identity independently of child order and reconciling removed children safely.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ScaledPanel](../captures/layout_panels.png)
 
-## Public methods
+## Declared methods
 
-### `ScaledPanel`
+### `ScaledPanel` (public)
 
 ```cpp
 explicit ScaledPanel(StableId stable_id, Size design_size =
 ```
 
-Constructs or tears down the retained ScaledPanel object according to its ownership contract.
+Constructs a Panel with a validated positive design-space extent.
 
-### `design_size`
+### `design_size` (public)
 
 ```cpp
 [[nodiscard]] Size design_size() const noexcept
 ```
 
-Reports the current design size value without mutation.
+Returns the width and height that define authored design coordinates.
 
-### `set_design_size`
+### `set_design_size` (public)
 
 ```cpp
 void set_design_size(Size size)
 ```
 
-Synchronously updates the retained design size property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finite positive dimensions and invalidates arrangement when the design coordinate system changes.
 
-### `add_at`
+### `add_at` (public)
 
 ```cpp
 void add_at(Control::Ptr child, Rect design_bounds)
 ```
 
-Public ScaledPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an unparented child and finite nonnegative design rectangle, adds it, and records its stable-id slot atomically.
 
-### `set_design_bounds`
+### `set_design_bounds` (public)
 
 ```cpp
 void set_design_bounds(const Control& child, Rect design_bounds)
 ```
 
-Synchronously updates the retained design bounds property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires an existing direct child, validates its design rectangle, and updates the stable slot.
 
-### `design_bounds`
+### `design_bounds` (public)
 
 ```cpp
 [[nodiscard]] std::optional<Rect> design_bounds(const Control& child) const
 ```
 
-Reports the current design bounds value without mutation.
+Returns the authored design-space rectangle for a current child, if assigned.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Reconciles live slots and scales each authored rectangle independently into final content bounds.
+
+### `reconcile_slots` (private)
+
+```cpp
+void reconcile_slots()
+```
+
+Public ScaledPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

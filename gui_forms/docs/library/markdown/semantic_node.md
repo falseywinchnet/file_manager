@@ -1,17 +1,17 @@
 # SemanticNode
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SemanticNode`  
-Declaration: `include/gui_forms/semantics.hpp:106`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 semantic tree review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `SemanticNode`
+- Declaration: `include/gui_forms/semantics/types/semantic_types.hpp:72`
+- Definition: `inline/header-only`
 
-SemanticNode is a struct declared in include/gui_forms/semantics.hpp.
+SemanticNode is the immutable snapshot form of one exposed control, with exact runtime/stable identity, bounds, values, states, actions, and children.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

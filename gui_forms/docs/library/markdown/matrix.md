@@ -1,135 +1,135 @@
 # Matrix
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Matrix`  
-Declaration: `include/gui_forms/drawing.hpp:232`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 affine matrix split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Matrix`
+- Declaration: `include/gui_forms/drawing/matrix/matrix.hpp:7`
+- Definition: `src/core/drawing/matrix/matrix.cpp`
 
-Matrix is a class declared in include/gui_forms/drawing.hpp.
+Matrix is an immutable-value 2D affine transform with finite validation, point/bounds transformation, explicit composition order, and inspectable coefficients.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Matrix`
+### `Matrix` (public)
 
 ```cpp
 constexpr Matrix() noexcept = default
 ```
 
-Constructs or tears down the retained Matrix object according to its ownership contract.
+Constructs identity or explicit six-coefficient affine state.
 
-### `Matrix`
+### `Matrix` (public)
 
 ```cpp
 constexpr Matrix(double m11, double m12, double m21, double m22, double dx, double dy) noexcept : m11_(m11), m12_(m12), m21_(m21), m22_(m22), dx_(dx), dy_(dy)
 ```
 
-Constructs or tears down the retained Matrix object according to its ownership contract.
+Constructs identity or explicit six-coefficient affine state.
 
-### `translation`
+### `translation` (public)
 
 ```cpp
 [[nodiscard]] static Matrix translation(double x, double y)
 ```
 
-Public Matrix operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and creates a translation.
 
-### `rotation_at`
+### `rotation_at` (public)
 
 ```cpp
 [[nodiscard]] static Matrix rotation_at(double degrees, PointF center)
 ```
 
-Public Matrix operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates angle/center and composes a rotation about that point.
 
-### `finite`
+### `finite` (public)
 
 ```cpp
 [[nodiscard]] bool finite() const noexcept
 ```
 
-Reports the current finite value without mutation.
+Reports whether every coefficient is finite.
 
-### `transform`
+### `transform` (public)
 
 ```cpp
 [[nodiscard]] PointF transform(PointF point) const
 ```
 
-Reports the current transform value without mutation.
+Applies the affine map to one validated point.
 
-### `transform_bounds`
+### `transform_bounds` (public)
 
 ```cpp
 [[nodiscard]] RectF transform_bounds(RectF rect) const
 ```
 
-Reports the current transform bounds value without mutation.
+Transforms four rectangle corners and returns their axis-aligned bounds.
 
-### `followed_by`
+### `followed_by` (public)
 
 ```cpp
 [[nodiscard]] Matrix followed_by(const Matrix& next) const
 ```
 
-Reports the current followed by value without mutation.
+Composes this transform followed by the supplied transform in authored order.
 
-### `m11`
+### `m11` (public)
 
 ```cpp
 [[nodiscard]] constexpr double m11() const noexcept
 ```
 
-Reports the current m11 value without mutation.
+Returns the first scale/rotation coefficient.
 
-### `m12`
+### `m12` (public)
 
 ```cpp
 [[nodiscard]] constexpr double m12() const noexcept
 ```
 
-Reports the current m12 value without mutation.
+Returns the second rotation/shear coefficient.
 
-### `m21`
+### `m21` (public)
 
 ```cpp
 [[nodiscard]] constexpr double m21() const noexcept
 ```
 
-Reports the current m21 value without mutation.
+Returns the third rotation/shear coefficient.
 
-### `m22`
+### `m22` (public)
 
 ```cpp
 [[nodiscard]] constexpr double m22() const noexcept
 ```
 
-Reports the current m22 value without mutation.
+Returns the second scale/rotation coefficient.
 
-### `dx`
+### `dx` (public)
 
 ```cpp
 [[nodiscard]] constexpr double dx() const noexcept
 ```
 
-Reports the current dx value without mutation.
+Returns x translation.
 
-### `dy`
+### `dy` (public)
 
 ```cpp
 [[nodiscard]] constexpr double dy() const noexcept
 ```
 
-Reports the current dy value without mutation.
+Returns y translation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const Matrix&, const Matrix&) = default
 ```
 
-Public Matrix operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all six coefficients exactly.

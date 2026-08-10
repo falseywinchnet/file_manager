@@ -1,17 +1,17 @@
 # SavedState
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SavedState`  
-Declaration: `include/gui_forms/drawing.hpp:857`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 private recorder stack review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `SavedState`
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:137`
+- Definition: `inline/header-only`
 
-SavedState is a struct declared in include/gui_forms/drawing.hpp.
+SavedState couples one exact restore token to the retained GraphicsState it protects.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

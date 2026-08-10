@@ -123,9 +123,20 @@ void test_error_semantics_geometry_rtl_and_lifetime() {
 
     errors.set_icon_alignment(fixture.target, ErrorIconAlignment::top_left);
     errors.set_icon_padding(fixture.target, 4.0);
+    errors.set_icon_size(24.0);
     ErrorProviderSnapshot left = errors.snapshot();
-    require(left.icons.front().bounds.right() <= target_bounds.x - 4.0,
-            "left alignment and padding must be reflected in retained geometry");
+    require(left.icons.front().bounds.right() <= target_bounds.x - 4.0 &&
+                left.icons.front().bounds.width == 24.0 &&
+                errors.icon_size() == 24.0,
+            "left alignment, padding, and explicit icon size must shape retained geometry");
+    bool rejected_icon_size = false;
+    try {
+        errors.set_icon_size(2.0);
+    } catch (const std::invalid_argument&) {
+        rejected_icon_size = true;
+    }
+    require(rejected_icon_size,
+            "ErrorProvider must reject unusably small icon geometry");
     int direction_changes = 0;
     auto direction = errors.right_to_left_changed().subscribe(
         [&](bool value) { if (value) ++direction_changes; });

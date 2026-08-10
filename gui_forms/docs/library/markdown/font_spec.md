@@ -1,10 +1,10 @@
 # FontSpec
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FontSpec`  
-Declaration: `include/gui_forms/types.hpp:128`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `FontSpec`
+- Declaration: `include/gui_forms/types.hpp:128`
+- Definition: `inline/header-only`
 
 FontSpec is a struct declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ FontSpec is a struct declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const FontSpec&, const FontSpec&) = default

@@ -1,79 +1,79 @@
 # Region
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → Region`  
-Declaration: `include/gui_forms/drawing.hpp:565`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 region split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → Region`
+- Declaration: `include/gui_forms/drawing/region/region.hpp:13`
+- Definition: `src/core/drawing/region/region.cpp`
 
-Region is a class declared in include/gui_forms/drawing.hpp.
+Region is a retained union of rectangles and path snapshots with explicit rectangular exclusions, deterministic visibility, and conservative bounds.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Region`
+### `Region` (public)
 
 ```cpp
 explicit Region(RectF rectangle)
 ```
 
-Constructs or tears down the retained Region object according to its ownership contract.
+Constructs from one validated rectangle or one live GraphicsPath snapshot.
 
-### `Region`
+### `Region` (public)
 
 ```cpp
 explicit Region(const GraphicsPath& path)
 ```
 
-Constructs or tears down the retained Region object according to its ownership contract.
+Constructs from one validated rectangle or one live GraphicsPath snapshot.
 
-### `unite`
+### `unite` (public)
 
 ```cpp
 void unite(RectF rectangle)
 ```
 
-Public Region operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a validated rectangle or path snapshot to the retained union.
 
-### `unite`
+### `unite` (public)
 
 ```cpp
 void unite(const GraphicsPath& path)
 ```
 
-Public Region operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a validated rectangle or path snapshot to the retained union.
 
-### `exclude`
+### `exclude` (public)
 
 ```cpp
 void exclude(RectF rectangle)
 ```
 
-Public Region operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a validated rectangular exclusion.
 
-### `is_visible`
+### `is_visible` (public)
 
 ```cpp
 [[nodiscard]] bool is_visible(PointF point) const
 ```
 
-Reports the current is visible value without mutation.
+Tests union membership and then removes any exclusion membership.
 
-### `bounds`
+### `bounds` (public)
 
 ```cpp
 [[nodiscard]] RectF bounds() const
 ```
 
-Reports the current bounds value without mutation.
+Returns conservative union bounds, accounting for empty retained parts.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] RegionSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Copies rectangles, path snapshots, and exclusions.

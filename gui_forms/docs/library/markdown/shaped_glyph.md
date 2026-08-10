@@ -1,23 +1,23 @@
 # ShapedGlyph
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ShapedGlyph`  
-Declaration: `src/render/text/harfbuzz_font_engine.hpp:16`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 HarfBuzz glyph result review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ShapedGlyph`
+- Declaration: `src/render/text/harfbuzz/harfbuzz_font_engine.hpp:16`
+- Definition: `inline/header-only`
 
-ShapedGlyph is a struct declared in src/render/text/harfbuzz_font_engine.hpp.
+ShapedGlyph carries one font-local glyph, UTF-8 cluster, absolute pen position, and two-axis advance.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ShapedGlyph&, const ShapedGlyph&) = default
 ```
 
-Public ShapedGlyph operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every shaped glyph field.

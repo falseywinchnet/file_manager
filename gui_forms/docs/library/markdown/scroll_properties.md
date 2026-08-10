@@ -1,143 +1,167 @@
 # ScrollProperties
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `ScrollProperties`  
-Declaration: `include/gui_forms/scrolling.hpp:61`  
-Definition: `src/controls/scrolling.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class**
+- Hierarchy: `ScrollProperties`
+- Declaration: `include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp:58`
+- Definition: `src/controls/scrollable_control/scroll_properties/scroll_properties.cpp`
 
-ScrollProperties is a class declared in include/gui_forms/scrolling.hpp.
+ScrollProperties is the owner-bound, per-axis state model for enabled/visible state, authored or automatic range increments, clamped position, orientation, and inspectable snapshot projection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ScrollProperties](../captures/scrollable_control.png)
 
-## Public methods
+## Declared methods
 
-### `enabled`
+### `enabled` (public)
 
 ```cpp
 [[nodiscard]] bool enabled() const noexcept
 ```
 
-Reports the current enabled value without mutation.
+Reports whether user-driven movement is admitted on this axis.
 
-### `set_enabled`
+### `set_enabled` (public)
 
 ```cpp
 void set_enabled(bool enabled)
 ```
 
-Synchronously updates the retained enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits axis availability and routes the change through the owning ScrollableControl's retained invalidation path.
 
-### `visible`
+### `visible` (public)
 
 ```cpp
 [[nodiscard]] bool visible() const noexcept
 ```
 
-Reports the current visible value without mutation.
+Reports the resolved or explicitly requested scrollbar visibility.
 
-### `set_visible`
+### `set_visible` (public)
 
 ```cpp
 void set_visible(bool visible)
 ```
 
-Synchronously updates the retained visible property. Validation, typed invalidation, and notifications are defined by the implementation.
+Sets explicit axis visibility and asks the owner to recompute viewport, geometry, paint, and semantics.
 
-### `minimum`
+### `minimum` (public)
 
 ```cpp
 [[nodiscard]] double minimum() const noexcept
 ```
 
-Reports the current minimum value without mutation.
+Returns the inclusive authored minimum scroll value.
 
-### `set_minimum`
+### `set_minimum` (public)
 
 ```cpp
 void set_minimum(double minimum)
 ```
 
-Synchronously updates the retained minimum property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates a finite bound, preserves an ordered range, clamps the current position, and notifies the owner atomically.
 
-### `maximum`
+### `maximum` (public)
 
 ```cpp
 [[nodiscard]] double maximum() const noexcept
 ```
 
-Reports the current maximum value without mutation.
+Returns the inclusive content-range maximum before large-change viewport reduction.
 
-### `set_maximum`
+### `set_maximum` (public)
 
 ```cpp
 void set_maximum(double maximum)
 ```
 
-Synchronously updates the retained maximum property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates a finite bound, preserves an ordered range, clamps the current position, and notifies the owner atomically.
 
-### `large_change`
+### `large_change` (public)
 
 ```cpp
 [[nodiscard]] double large_change() const noexcept
 ```
 
-Reports the current large change value without mutation.
+Returns the authored page increment or the automatic viewport-sized increment.
 
-### `set_large_change`
+### `set_large_change` (public)
 
 ```cpp
 void set_large_change(double value)
 ```
 
-Synchronously updates the retained large change property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite nonnegative increment, marks it caller-authored, and recomputes axis geometry.
 
-### `small_change`
+### `small_change` (public)
 
 ```cpp
 [[nodiscard]] double small_change() const noexcept
 ```
 
-Reports the current small change value without mutation.
+Returns the authored line/wheel increment or the automatic default.
 
-### `set_small_change`
+### `set_small_change` (public)
 
 ```cpp
 void set_small_change(double value)
 ```
 
-Synchronously updates the retained small change property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite nonnegative increment, marks it caller-authored, and recomputes axis behavior.
 
-### `value`
+### `value` (public)
 
 ```cpp
 [[nodiscard]] double value() const noexcept
 ```
 
-Reports the current value value without mutation.
+Returns the committed axis position within the effective maximum-position interval.
 
-### `set_value`
+### `set_value` (public)
 
 ```cpp
 void set_value(double value)
 ```
 
-Synchronously updates the retained value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and clamps a requested position, then commits it through the owner's display-rectangle state without synthesizing user input.
 
-### `orientation`
+### `orientation` (public)
 
 ```cpp
 [[nodiscard]] ScrollOrientation orientation() const noexcept
 ```
 
-Reports the current orientation value without mutation.
+Returns the immutable horizontal or vertical identity assigned by the owner.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] ScrollAxisSnapshot snapshot() const noexcept
 ```
 
-Reports the current snapshot value without mutation.
+Returns a value-only copy of the complete resolved axis state for inspection and tests.
+
+### `ScrollProperties` (private)
+
+```cpp
+ScrollProperties(ScrollableControl& owner, ScrollOrientation orientation) : owner_(&owner), orientation_(orientation)
+```
+
+Constructs or tears down the retained ScrollProperties object according to its ownership contract.
+
+### `set_automatic` (private)
+
+```cpp
+void set_automatic(double viewport_extent, double content_extent, double value) noexcept
+```
+
+Synchronously updates the retained automatic property. Validation, typed invalidation, and notifications are defined by the implementation.
+
+### `maximum_position` (private)
+
+```cpp
+[[nodiscard]] double maximum_position() const noexcept
+```
+
+Reports the current maximum position value without mutation.

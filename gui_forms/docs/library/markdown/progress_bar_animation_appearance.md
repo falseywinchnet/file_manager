@@ -1,23 +1,23 @@
 # ProgressBarAnimationAppearance
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ProgressBarAnimationAppearance`  
-Declaration: `include/gui_forms/range_controls.hpp:54`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 004 animation-value review; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `ProgressBarAnimationAppearance`
+- Declaration: `include/gui_forms/controls/range_control/progress_bar/progress_bar.hpp:25`
+- Definition: `inline/header-only`
 
-ProgressBarAnimationAppearance is a struct declared in include/gui_forms/range_controls.hpp.
+ProgressBarAnimationAppearance is the validated value object for stripe width, gap, angle, and opacity used by painter-neutral progress animation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ProgressBarAnimationAppearance](../captures/range_controls.png)
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ProgressBarAnimationAppearance&, const ProgressBarAnimationAppearance&) = default
 ```
 
-Public ProgressBarAnimationAppearance operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every animation appearance field exactly.

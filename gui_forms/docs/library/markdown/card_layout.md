@@ -1,10 +1,10 @@
 # CardLayout
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `CardLayout`  
-Declaration: `include/gui_forms/controls/panel/card/card.hpp:10`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `CardLayout`
+- Declaration: `include/gui_forms/controls/panel/card/card.hpp:10`
+- Definition: `inline/header-only`
 
 CardLayout is a struct declared in include/gui_forms/controls/panel/card/card.hpp.
 
@@ -12,9 +12,9 @@ CardLayout is a struct declared in include/gui_forms/controls/panel/card/card.hp
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const CardLayout&, const CardLayout&) = default

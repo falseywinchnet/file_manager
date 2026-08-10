@@ -19,6 +19,7 @@ and existing implementation do not silently create decisions.
 | [`ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md`](ADR-012-MALKUTH-SUITE-IDENTITY-AND-RELEASE-HORIZONS.md) | accepted | Malkuth suite identity, Curious/Concise/Friendly mission, independent-component release manifests, and 1.0/2.0/3.0 horizons |
 | [`ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md`](ADR-013-FUTURE-UTILITY-SCOPE-AND-SURFACE-TOPOLOGY.md) | accepted | Future Games/Lexicon/plugin/built-in scope, desktop boundary, and the rule that persistent side panels belong only to File Manager and its embedded picker/browser |
 | [`ADR-014-GUI-FORMS-INITIALIZATION-AND-HANDLE-LIFECYCLE.md`](ADR-014-GUI-FORMS-INITIALIZATION-AND-HANDLE-LIFECYCLE.md) | accepted for implementation | Portable GUI.Forms host, managed presentation, retained attachment, native identity, and compatibility-handle lifecycle order |
+| [`ADR-015-ENGINE-M4-DOGFOOD-ROOT-ADMISSION-AND-LAUNCHD.md`](ADR-015-ENGINE-M4-DOGFOOD-ROOT-ADMISSION-AND-LAUNCHD.md) | accepted; named M4 installed evidence passed | Host-bound Engine root manifest, per-user launchd supervision, authenticated query/admin sockets, and exact reversal scope |
 
 Each record retains its alternatives, consequences, reversal path, and
 unresolved implementation edges. Engine workers consume ADR-001 through

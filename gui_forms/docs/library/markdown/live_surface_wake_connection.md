@@ -1,79 +1,87 @@
 # LiveSurfaceWakeConnection
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `LiveSurfaceWakeConnection`  
-Declaration: `include/gui_forms/live_surface.hpp:49`  
-Definition: `src/core/live_surface.cpp`
+- Status: **OBSERVED: bundle 008 wake lifetime review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `LiveSurfaceWakeConnection`
+- Declaration: `include/gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp:17`
+- Definition: `src/core/live_surface/wake_connection/live_surface_wake_connection.cpp`
 
-LiveSurfaceWakeConnection is a class declared in include/gui_forms/live_surface.hpp.
+LiveSurfaceWakeConnection is the move-only revocable ownership edge between a producer publication and a retained consumer's best-effort scheduling signal.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `LiveSurfaceWakeConnection`
+### `LiveSurfaceWakeConnection` (public)
 
 ```cpp
 LiveSurfaceWakeConnection() = default
 ```
 
-Constructs or tears down the retained LiveSurfaceWakeConnection object according to its ownership contract.
+Constructs a disconnected token, moves exclusive connection ownership, or privately binds one state/wake pair for LiveSurface.
 
-### `~LiveSurfaceWakeConnection`
+### `~LiveSurfaceWakeConnection` (public)
 
 ```cpp
 ~LiveSurfaceWakeConnection()
 ```
 
-Constructs or tears down the retained LiveSurfaceWakeConnection object according to its ownership contract.
+Disconnects idempotently so token retirement cannot retain a stale consumer callback.
 
-### `LiveSurfaceWakeConnection`
+### `LiveSurfaceWakeConnection` (public)
 
 ```cpp
 LiveSurfaceWakeConnection(LiveSurfaceWakeConnection&&) noexcept
 ```
 
-Constructs or tears down the retained LiveSurfaceWakeConnection object according to its ownership contract.
+Constructs a disconnected token, moves exclusive connection ownership, or privately binds one state/wake pair for LiveSurface.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceWakeConnection& operator=(LiveSurfaceWakeConnection&&) noexcept
 ```
 
-Public LiveSurfaceWakeConnection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects any prior connection before taking move ownership; copying is prohibited.
 
-### `LiveSurfaceWakeConnection`
+### `LiveSurfaceWakeConnection` (public)
 
 ```cpp
 LiveSurfaceWakeConnection(const LiveSurfaceWakeConnection&) = delete
 ```
 
-Constructs or tears down the retained LiveSurfaceWakeConnection object according to its ownership contract.
+Constructs a disconnected token, moves exclusive connection ownership, or privately binds one state/wake pair for LiveSurface.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceWakeConnection& operator=(const LiveSurfaceWakeConnection&) = delete
 ```
 
-Public LiveSurfaceWakeConnection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects any prior connection before taking move ownership; copying is prohibited.
 
-### `connected`
+### `connected` (public)
 
 ```cpp
 [[nodiscard]] bool connected() const noexcept
 ```
 
-Reports the current connected value without mutation.
+Reads the wake's atomic revocation bit without entering the surface mutex.
 
-### `disconnect`
+### `disconnect` (public)
 
 ```cpp
 void disconnect() noexcept
 ```
 
-Public LiveSurfaceWakeConnection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Atomically revokes delivery, erases the exact wake sequence under the state mutex when the surface remains alive, and releases both ownership edges.
+
+### `LiveSurfaceWakeConnection` (private)
+
+```cpp
+LiveSurfaceWakeConnection( std::weak_ptr<detail::LiveSurfaceState> state, std::shared_ptr<detail::LiveSurfaceWake> wake) noexcept
+```
+
+Constructs a disconnected token, moves exclusive connection ownership, or privately binds one state/wake pair for LiveSurface.

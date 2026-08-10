@@ -1,17 +1,17 @@
 # HostFolderDialogRequest
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HostFolderDialogRequest`  
-Declaration: `include/gui_forms/host.hpp:190`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 typed-dialog request review; M4 builds and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `HostFolderDialogRequest`
+- Declaration: `include/gui_forms/host/types/host_types.hpp:187`
+- Definition: `inline/header-only`
 
-HostFolderDialogRequest is a struct declared in include/gui_forms/host.hpp.
+HostFolderDialogRequest declares portable title and initial directory for one folder selection.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

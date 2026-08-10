@@ -1,47 +1,47 @@
 # Font
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → Font`  
-Declaration: `include/gui_forms/drawing.hpp:460`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 font value split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → Font`
+- Declaration: `include/gui_forms/drawing/font/font.hpp:18`
+- Definition: `src/core/drawing/font/font.cpp`
 
-Font is a class declared in include/gui_forms/drawing.hpp.
+Font retains validated UTF-8 family, bounded size, style bits, unit, and charset without exposing a platform font object.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Font`
+### `Font` (public)
 
 ```cpp
 Font(std::string family, double size, FontStyle style = FontStyle::regular, GraphicsUnit unit = GraphicsUnit::point, std::uint8_t charset = 1)
 ```
 
-Constructs or tears down the retained Font object according to its ownership contract.
+Validates family, size, style mask, unit, and charset, or derives a style variant from another live Font.
 
-### `Font`
+### `Font` (public)
 
 ```cpp
 Font(const Font& source, FontStyle style)
 ```
 
-Constructs or tears down the retained Font object according to its ownership contract.
+Validates family, size, style mask, unit, and charset, or derives a style variant from another live Font.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] FontSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and returns the complete renderer-neutral font recipe.
 
-### `deterministic_height`
+### `deterministic_height` (public)
 
 ```cpp
 [[nodiscard]] std::int32_t deterministic_height() const
 ```
 
-Reports the current deterministic height value without mutation.
+Converts size/unit to a bounded deterministic logical height for compatibility callers.

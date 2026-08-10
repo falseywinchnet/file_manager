@@ -1,87 +1,127 @@
 # Timer
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → Timer`  
-Declaration: `include/gui_forms/timer.hpp:17`  
-Definition: `src/core/timer.cpp`
+- Status: **OBSERVED: bundle 010 UI timer split; focused M4 timer tests pass**
+- Kind: **class**
+- Hierarchy: `Component → Timer`
+- Declaration: `include/gui_forms/timer/timer/timer.hpp:17`
+- Definition: `src/core/timer/timer/timer.cpp`
 
-Timer is a class declared in include/gui_forms/timer.hpp.
+Timer schedules coalescing callbacks through the owning Window scheduler and serializes ticks with input, layout, and paint on the UI thread.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Timer`
+### `Timer` (public)
 
 ```cpp
 explicit Timer(Window& window, std::chrono::milliseconds interval = std::chrono::milliseconds(100))
 ```
 
-Constructs or tears down the retained Timer object according to its ownership contract.
+Validates owner affinity and a minimum one-millisecond interval, then creates callback indirection.
 
-### `~Timer`
+### `~Timer` (public)
 
 ```cpp
 ~Timer() override
 ```
 
-Constructs or tears down the retained Timer object according to its ownership contract.
+Disconnects the frame request and clears callback ownership.
 
-### `interval`
+### `interval` (public)
 
 ```cpp
 [[nodiscard]] std::chrono::milliseconds interval() const noexcept
 ```
 
-Reports the current interval value without mutation.
+Returns the retained interval.
 
-### `set_interval`
+### `set_interval` (public)
 
 ```cpp
 void set_interval(std::chrono::milliseconds interval)
 ```
 
-Synchronously updates the retained interval property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates affinity and minimum duration, then reschedules an enabled timer from now.
 
-### `enabled`
+### `enabled` (public)
 
 ```cpp
 [[nodiscard]] bool enabled() const noexcept
 ```
 
-Reports the current enabled value without mutation.
+Requires both logical enablement and a connected scheduler request.
 
-### `start`
+### `start` (public)
 
 ```cpp
 void start()
 ```
 
-Public Timer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Schedules the first deadline at now plus interval unless already active.
 
-### `start_at`
+### `start_at` (public)
 
 ```cpp
 void start_at(FrameTime first_deadline)
 ```
 
-Public Timer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces any request with an explicit deterministic first deadline.
 
-### `stop`
+### `stop` (public)
 
 ```cpp
 void stop()
 ```
 
-Public Timer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears logical enablement and disconnects the request.
 
-### `tick`
+### `tick` (public)
 
 ```cpp
 [[nodiscard]] Event<>& tick() noexcept
 ```
 
-Public Timer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the serialized tick event.
+
+### `verify_dispose_thread` (protected)
+
+```cpp
+void verify_dispose_thread() override
+```
+
+Enforces Window affinity while its lifetime remains available.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Revokes scheduling, callback ownership, events, and Window lifetime.
+
+### `bound_window` (private)
+
+```cpp
+[[nodiscard]] Window* bound_window() const noexcept
+```
+
+Resolves the weak Window lifetime without prolonging ownership.
+
+### `require_mutable_timer` (private)
+
+```cpp
+void require_mutable_timer(std::string_view operation) const
+```
+
+Rejects disposed, retired-window, or wrong-thread mutation.
+
+### `schedule` (private)
+
+```cpp
+void schedule(FrameTime first_deadline)
+```
+
+Creates the repeating coalescing UI-timer request through Window.

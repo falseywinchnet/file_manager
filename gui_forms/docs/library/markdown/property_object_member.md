@@ -1,20 +1,20 @@
 # PropertyObjectMember
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyObjectMember`  
-Declaration: `include/gui_forms/binding_types.hpp:99`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `PropertyObjectMember`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:99`
+- Definition: `inline/header-only`
 
-PropertyObjectMember is a struct declared in include/gui_forms/binding_types.hpp.
+PropertyObjectMember is a struct declared in include/gui_forms/binding/value/binding_value.hpp.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyObjectMember&, const PropertyObjectMember&) = default

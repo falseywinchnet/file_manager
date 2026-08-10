@@ -1,71 +1,79 @@
 # ScaledGroupBox
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `GroupBox → ScaledGroupBox`  
-Declaration: `include/gui_forms/container_controls.hpp:94`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `GroupBox → ScaledGroupBox`
+- Declaration: `include/gui_forms/controls/panel/group_box/scaled_group_box/scaled_group_box.hpp:11`
+- Definition: `src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp`
 
-ScaledGroupBox is a visual retained control declared in include/gui_forms/container_controls.hpp.
+ScaledGroupBox combines GroupBox caption/mnemonic semantics with stable design-space child slots and proportional retained arrangement.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ScaledGroupBox](../captures/layout_panels.png)
 
-## Public methods
+## Declared methods
 
-### `ScaledGroupBox`
+### `ScaledGroupBox` (public)
 
 ```cpp
 explicit ScaledGroupBox(StableId stable_id, std::string text =
 ```
 
-Constructs or tears down the retained ScaledGroupBox object according to its ownership contract.
+Constructs a titled GroupBox with a validated positive design coordinate system.
 
-### `design_size`
+### `design_size` (public)
 
 ```cpp
 [[nodiscard]] Size design_size() const noexcept
 ```
 
-Reports the current design size value without mutation.
+Returns the width and height that define authored design coordinates.
 
-### `set_design_size`
+### `set_design_size` (public)
 
 ```cpp
 void set_design_size(Size size)
 ```
 
-Synchronously updates the retained design size property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finite positive dimensions and invalidates arrangement when the design coordinate system changes.
 
-### `add_at`
+### `add_at` (public)
 
 ```cpp
 void add_at(Control::Ptr child, Rect design_bounds)
 ```
 
-Public ScaledGroupBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an unparented child and finite nonnegative design rectangle, adds it, and records its stable-id slot atomically.
 
-### `set_design_bounds`
+### `set_design_bounds` (public)
 
 ```cpp
 void set_design_bounds(const Control& child, Rect design_bounds)
 ```
 
-Synchronously updates the retained design bounds property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires an existing direct child, validates its design rectangle, and updates the stable slot.
 
-### `design_bounds`
+### `design_bounds` (public)
 
 ```cpp
 [[nodiscard]] std::optional<Rect> design_bounds(const Control& child) const
 ```
 
-Reports the current design bounds value without mutation.
+Returns the authored design-space rectangle for a current child, if assigned.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Reconciles live slots and scales each authored rectangle into the caption-aware GroupBox content area.
+
+### `reconcile_slots` (private)
+
+```cpp
+void reconcile_slots()
+```
+
+Public ScaledGroupBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

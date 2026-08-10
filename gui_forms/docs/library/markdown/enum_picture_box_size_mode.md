@@ -1,7 +1,7 @@
 # PictureBoxSizeMode
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/controls/panel/picture_box/picture_box.hpp:13`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/panel/picture_box/picture_box.hpp:13`
 
 ## Declared values
 

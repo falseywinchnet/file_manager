@@ -1,7 +1,7 @@
 # EasingCurve
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/animation.hpp:9`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/animation.hpp:9`
 
 ## Declared values
 

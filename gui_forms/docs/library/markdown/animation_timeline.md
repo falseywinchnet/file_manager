@@ -1,10 +1,10 @@
 # AnimationTimeline
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `AnimationTimeline`  
-Declaration: `include/gui_forms/animation.hpp:86`  
-Definition: `src/core/animation.cpp`
+- Status: **generated inventory; detailed review pending**
+- Kind: **class**
+- Hierarchy: `AnimationTimeline`
+- Declaration: `include/gui_forms/animation.hpp:86`
+- Definition: `src/core/animation.cpp`
 
 AnimationTimeline is a class declared in include/gui_forms/animation.hpp.
 
@@ -12,9 +12,9 @@ AnimationTimeline is a class declared in include/gui_forms/animation.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `AnimationTimeline`
+### `AnimationTimeline` (public)
 
 ```cpp
 AnimationTimeline() = default
@@ -22,7 +22,7 @@ AnimationTimeline() = default
 
 Constructs or tears down the retained AnimationTimeline object according to its ownership contract.
 
-### `AnimationTimeline`
+### `AnimationTimeline` (public)
 
 ```cpp
 explicit AnimationTimeline(AnimationSpec specification)
@@ -30,7 +30,7 @@ explicit AnimationTimeline(AnimationSpec specification)
 
 Constructs or tears down the retained AnimationTimeline object according to its ownership contract.
 
-### `set_specification`
+### `set_specification` (public)
 
 ```cpp
 void set_specification(AnimationSpec specification)
@@ -38,7 +38,7 @@ void set_specification(AnimationSpec specification)
 
 Synchronously updates the retained specification property. Validation, typed invalidation, and notifications are defined by the implementation.
 
-### `specification`
+### `specification` (public)
 
 ```cpp
 [[nodiscard]] const AnimationSpec& specification() const noexcept
@@ -46,7 +46,7 @@ Synchronously updates the retained specification property. Validation, typed inv
 
 Reports the current specification value without mutation.
 
-### `start`
+### `start` (public)
 
 ```cpp
 void start(FrameTime start_time) noexcept
@@ -54,7 +54,7 @@ void start(FrameTime start_time) noexcept
 
 Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `pause`
+### `pause` (public)
 
 ```cpp
 void pause(FrameTime pause_time) noexcept
@@ -62,7 +62,7 @@ void pause(FrameTime pause_time) noexcept
 
 Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `resume`
+### `resume` (public)
 
 ```cpp
 void resume(FrameTime resume_time) noexcept
@@ -70,7 +70,7 @@ void resume(FrameTime resume_time) noexcept
 
 Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `stop`
+### `stop` (public)
 
 ```cpp
 void stop() noexcept
@@ -78,7 +78,7 @@ void stop() noexcept
 
 Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `running`
+### `running` (public)
 
 ```cpp
 [[nodiscard]] bool running() const noexcept
@@ -86,7 +86,7 @@ Public AnimationTimeline operation. Its exact signature is inventoried here; fol
 
 Reports the current running value without mutation.
 
-### `paused`
+### `paused` (public)
 
 ```cpp
 [[nodiscard]] bool paused() const noexcept
@@ -94,7 +94,7 @@ Reports the current running value without mutation.
 
 Reports the current paused value without mutation.
 
-### `sample`
+### `sample` (public)
 
 ```cpp
 [[nodiscard]] AnimationSample sample(FrameTime now) const noexcept

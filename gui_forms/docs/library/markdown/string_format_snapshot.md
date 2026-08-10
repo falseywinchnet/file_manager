@@ -1,17 +1,17 @@
 # StringFormatSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `StringFormatSnapshot`  
-Declaration: `include/gui_forms/drawing.hpp:475`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 string-format snapshot review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `StringFormatSnapshot`
+- Declaration: `include/gui_forms/drawing/string_format/string_format.hpp:8`
+- Definition: `inline/header-only`
 
-StringFormatSnapshot is a struct declared in include/gui_forms/drawing.hpp.
+StringFormatSnapshot carries horizontal/line alignment, trimming, and compatibility flags.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

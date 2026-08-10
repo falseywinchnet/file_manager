@@ -1,79 +1,87 @@
 # CommandBinding
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `CommandBinding`  
-Declaration: `include/gui_forms/commands.hpp:84`  
-Definition: `src/controls/commands.cpp`
+- Status: **OBSERVED: bundle 010 command presentation split; focused M4 collection tests pass**
+- Kind: **class**
+- Hierarchy: `CommandBinding`
+- Declaration: `include/gui_forms/commands/command_binding/command_binding.hpp:11`
+- Definition: `src/controls/commands/command_binding/command_binding.cpp`
 
-CommandBinding is a class declared in include/gui_forms/commands.hpp.
+CommandBinding owns deterministic subscriptions between one shared command and one ButtonBase while honoring independent synchronization options.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `CommandBinding`
+### `CommandBinding` (public)
 
 ```cpp
 CommandBinding(std::shared_ptr<Command> command, std::shared_ptr<ButtonBase> button, CommandBindingOptions options =
 ```
 
-Constructs or tears down the retained CommandBinding object according to its ownership contract.
+Validates both shared owners, applies initial state, routes clicks to execute, and observes future state; copying is prohibited and moves transfer subscriptions.
 
-### `~CommandBinding`
+### `~CommandBinding` (public)
 
 ```cpp
 ~CommandBinding() = default
 ```
 
-Constructs or tears down the retained CommandBinding object according to its ownership contract.
+Disconnects through owned subscription-token destruction.
 
-### `CommandBinding`
+### `CommandBinding` (public)
 
 ```cpp
 CommandBinding(CommandBinding&&) noexcept = default
 ```
 
-Constructs or tears down the retained CommandBinding object according to its ownership contract.
+Validates both shared owners, applies initial state, routes clicks to execute, and observes future state; copying is prohibited and moves transfer subscriptions.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 CommandBinding& operator=(CommandBinding&&) noexcept = default
 ```
 
-Public CommandBinding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Move assignment transfers authority while copy assignment is prohibited.
 
-### `CommandBinding`
+### `CommandBinding` (public)
 
 ```cpp
 CommandBinding(const CommandBinding&) = delete
 ```
 
-Constructs or tears down the retained CommandBinding object according to its ownership contract.
+Validates both shared owners, applies initial state, routes clicks to execute, and observes future state; copying is prohibited and moves transfer subscriptions.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 CommandBinding& operator=(const CommandBinding&) = delete
 ```
 
-Public CommandBinding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Move assignment transfers authority while copy assignment is prohibited.
 
-### `command`
+### `command` (public)
 
 ```cpp
 [[nodiscard]] const std::shared_ptr<Command>& command() const noexcept
 ```
 
-Reports the current command value without mutation.
+Returns the retained command owner.
 
-### `button`
+### `button` (public)
 
 ```cpp
 [[nodiscard]] const std::shared_ptr<ButtonBase>& button() const noexcept
 ```
 
-Reports the current button value without mutation.
+Returns the retained presentation owner.
+
+### `apply` (private)
+
+```cpp
+void apply(const CommandState& state)
+```
+
+Applies only the enabled synchronization axes to the button.

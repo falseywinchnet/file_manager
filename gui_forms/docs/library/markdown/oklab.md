@@ -1,23 +1,23 @@
 # Oklab
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `Oklab`  
-Declaration: `include/gui_forms/drawing.hpp:179`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 color-space value review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `Oklab`
+- Declaration: `include/gui_forms/drawing/color/color.hpp:93`
+- Definition: `inline/header-only`
 
-Oklab is a struct declared in include/gui_forms/drawing.hpp.
+Oklab carries perceptual lightness/opponent axes plus straight alpha.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const Oklab&, const Oklab&) = default
 ```
 
-Public Oklab operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all components.

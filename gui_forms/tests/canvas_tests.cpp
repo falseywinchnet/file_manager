@@ -56,6 +56,7 @@ void canvas_projects_bitmap_changes_as_local_window_damage() {
     root->set_requested_bounds({0, 0, 120, 90});
     canvas->set_requested_bounds({10, 20, 80, 60});
     canvas->set_zoom(2.0);
+    canvas->set_transparency_cell_size(12.0);
     auto bitmap = std::make_shared<gui_drawing::Bitmap>(4, 4);
     canvas->set_bitmap(bitmap);
     root->add_child(canvas);
@@ -64,6 +65,7 @@ void canvas_projects_bitmap_changes_as_local_window_damage() {
     window.perform_layout();
     CHECK(window.image_resource_snapshot().resource_count == 1U);
     CHECK(canvas->presented_generation() == 1U);
+    CHECK(canvas->transparency_cell_size() == 12.0);
     CHECK(canvas->client_to_bitmap({4, 6}) ==
           (gui_drawing::PointF{2, 3}));
     CHECK(canvas->bitmap_to_client({1, 1, 2, 2}) ==

@@ -1,7 +1,7 @@
 # Utf8ValidationError
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/text.hpp:53`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/text/types/text_types.hpp:45`
 
 ## Declared values
 

@@ -1,31 +1,31 @@
 # PointF
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PointF`  
-Declaration: `include/gui_forms/drawing.hpp:24`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `PointF`
+- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:15`
+- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
 
-PointF is a struct declared in include/gui_forms/drawing.hpp.
+PointF is a finite logical-coordinate pair.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `offset`
+### `offset` (public)
 
 ```cpp
 void offset(double dx, double dy)
 ```
 
-Public PointF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates finite inputs/result before committing translation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const PointF&, const PointF&) = default
 ```
 
-Public PointF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares both coordinates.

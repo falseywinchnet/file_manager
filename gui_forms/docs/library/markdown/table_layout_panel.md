@@ -1,255 +1,295 @@
 # TableLayoutPanel
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `ContainerControl → TableLayoutPanel`  
-Declaration: `include/gui_forms/container_controls.hpp:188`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ContainerControl → TableLayoutPanel`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp:47`
+- Definition: `src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp`
 
-TableLayoutPanel is a visual retained control declared in include/gui_forms/container_controls.hpp.
+TableLayoutPanel is a retained grid solver with bounded rows/columns, fixed/add-row/add-column growth, absolute/percent/auto tracks, explicit or automatic placement, row/column spans, cell borders, overflow inspection, and content-driven sizing.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![TableLayoutPanel](../captures/layout_panels.png)
 
-## Public methods
+## Declared methods
 
-### `TableLayoutPanel`
+### `TableLayoutPanel` (public)
 
 ```cpp
 explicit TableLayoutPanel(StableId stable_id)
 ```
 
-Constructs or tears down the retained TableLayoutPanel object according to its ownership contract.
+Constructs a one-by-one table that may add rows during automatic placement.
 
-### `column_count`
+### `column_count` (public)
 
 ```cpp
 [[nodiscard]] std::size_t column_count() const noexcept
 ```
 
-Reports the current column count value without mutation.
+Returns the authored base column count.
 
-### `set_column_count`
+### `set_column_count` (public)
 
 ```cpp
 void set_column_count(std::size_t count)
 ```
 
-Synchronously updates the retained column count property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the bounded nonzero count, resizes style storage, reconciles placement, and invalidates layout.
 
-### `row_count`
+### `row_count` (public)
 
 ```cpp
 [[nodiscard]] std::size_t row_count() const noexcept
 ```
 
-Reports the current row count value without mutation.
+Returns the authored base row count.
 
-### `set_row_count`
+### `set_row_count` (public)
 
 ```cpp
 void set_row_count(std::size_t count)
 ```
 
-Synchronously updates the retained row count property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the bounded nonzero count, resizes style storage, reconciles placement, and invalidates layout.
 
-### `grow_style`
+### `grow_style` (public)
 
 ```cpp
 [[nodiscard]] TableLayoutGrowStyle grow_style() const noexcept
 ```
 
-Reports the current grow style value without mutation.
+Returns fixed-size, add-rows, or add-columns automatic placement policy.
 
-### `set_grow_style`
+### `set_grow_style` (public)
 
 ```cpp
 void set_grow_style(TableLayoutGrowStyle style)
 ```
 
-Synchronously updates the retained grow style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates growth vocabulary and invalidates the table solution.
 
-### `auto_size`
+### `auto_size` (public)
 
 ```cpp
 [[nodiscard]] bool auto_size() const noexcept override
 ```
 
-Reports the current auto size value without mutation.
+Returns whether desired size follows the resolved grid extent.
 
-### `set_auto_size`
+### `set_auto_size` (public)
 
 ```cpp
 void set_auto_size(bool auto_size) override
 ```
 
-Synchronously updates the retained auto size property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits content-driven sizing and invalidates table measurement/arrangement.
 
-### `cell_border_style`
+### `cell_border_style` (public)
 
 ```cpp
 [[nodiscard]] TableCellBorderStyle cell_border_style() const noexcept
 ```
 
-Reports the current cell border style value without mutation.
+Returns none, single, inset, or outset cell-frame policy.
 
-### `set_cell_border_style`
+### `set_cell_border_style` (public)
 
 ```cpp
 void set_cell_border_style(TableCellBorderStyle style)
 ```
 
-Synchronously updates the retained cell border style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the closed border vocabulary and invalidates painting and semantics.
 
-### `column_styles`
+### `column_styles` (public)
 
 ```cpp
 [[nodiscard]] std::span<const TableLayoutStyle> column_styles() const noexcept
 ```
 
-Reports the current column styles value without mutation.
+Returns a read-only span over current authored column track policies.
 
-### `row_styles`
+### `row_styles` (public)
 
 ```cpp
 [[nodiscard]] std::span<const TableLayoutStyle> row_styles() const noexcept
 ```
 
-Reports the current row styles value without mutation.
+Returns a read-only span over current authored row track policies.
 
-### `set_column_style`
+### `set_column_style` (public)
 
 ```cpp
 void set_column_style(std::size_t column, TableLayoutStyle style)
 ```
 
-Synchronously updates the retained column style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates column index and finite nonnegative absolute/percent/auto track data before invalidating the solution.
 
-### `set_row_style`
+### `set_row_style` (public)
 
 ```cpp
 void set_row_style(std::size_t row, TableLayoutStyle style)
 ```
 
-Synchronously updates the retained row style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates row index and finite nonnegative absolute/percent/auto track data before invalidating the solution.
 
-### `set_cell_position`
+### `set_cell_position` (public)
 
 ```cpp
 void set_cell_position(const Control& child, TableLayoutCellPosition position)
 ```
 
-Synchronously updates the retained cell position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a direct child, validates explicit row/column coordinates, and records stable placement metadata.
 
-### `clear_cell_position`
+### `clear_cell_position` (public)
 
 ```cpp
 void clear_cell_position(const Control& child)
 ```
 
-Removes the explicit cell position value and restores fallback behavior.
+Removes explicit placement so the direct child returns to deterministic automatic allocation.
 
-### `cell_position`
+### `cell_position` (public)
 
 ```cpp
 [[nodiscard]] std::optional<TableLayoutCellPosition> cell_position( const Control& child) const
 ```
 
-Reports the current cell position value without mutation.
+Returns the explicit authored cell, not the transient automatically resolved cell.
 
-### `set_column_span`
+### `set_column_span` (public)
 
 ```cpp
 void set_column_span(const Control& child, std::size_t span)
 ```
 
-Synchronously updates the retained column span property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a direct child and records a bounded positive column span.
 
-### `column_span`
+### `column_span` (public)
 
 ```cpp
 [[nodiscard]] std::size_t column_span(const Control& child) const
 ```
 
-Reports the current column span value without mutation.
+Returns the retained column span or one when no metadata exists.
 
-### `set_row_span`
+### `set_row_span` (public)
 
 ```cpp
 void set_row_span(const Control& child, std::size_t span)
 ```
 
-Synchronously updates the retained row span property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a direct child and records a bounded positive row span.
 
-### `row_span`
+### `row_span` (public)
 
 ```cpp
 [[nodiscard]] std::size_t row_span(const Control& child) const
 ```
 
-Reports the current row span value without mutation.
+Returns the retained row span or one when no metadata exists.
 
-### `control_from_position`
+### `control_from_position` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr control_from_position(std::size_t column, std::size_t row) const
 ```
 
-Reports the current control from position value without mutation.
+Returns the live control whose resolved cell/span covers the requested coordinate.
 
-### `column_widths`
+### `column_widths` (public)
 
 ```cpp
 [[nodiscard]] std::span<const double> column_widths() const noexcept
 ```
 
-Reports the current column widths value without mutation.
+Returns the most recently resolved logical track widths for inspection.
 
-### `row_heights`
+### `row_heights` (public)
 
 ```cpp
 [[nodiscard]] std::span<const double> row_heights() const noexcept
 ```
 
-Reports the current row heights value without mutation.
+Returns the most recently resolved logical track heights for inspection.
 
-### `layout_overflowed`
+### `layout_overflowed` (public)
 
 ```cpp
 [[nodiscard]] bool layout_overflowed() const noexcept
 ```
 
-Reports the current layout overflowed value without mutation.
+Reports that fixed growth policy could not place every child without mutating the authored table shape.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Resolves placement and track demands without assignment and returns content extent when auto-sized.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Solves tracks against final bounds, commits resolved cells/track extents, and assigns span-aware margin-reduced child rectangles.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Paints the inherited container surface and records resolved cell borders with the selected frame policy.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a named table as a group and reports overflow state without inventing a platform-native grid identity.
+
+### `metadata_for` (private)
+
+```cpp
+[[nodiscard]] CellMetadata& metadata_for(const Control& child)
+```
+
+Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `metadata_for` (private)
+
+```cpp
+[[nodiscard]] const CellMetadata* metadata_for(const Control& child) const
+```
+
+Reports the current metadata for value without mutation.
+
+### `reconcile_metadata` (private)
+
+```cpp
+void reconcile_metadata()
+```
+
+Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `layout_children` (private)
+
+```cpp
+[[nodiscard]] Size layout_children(Size available, bool assign)
+```
+
+Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `validate_style` (private)
+
+```cpp
+static void validate_style(TableLayoutStyle style)
+```
+
+Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

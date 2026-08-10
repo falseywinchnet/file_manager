@@ -9,6 +9,14 @@ rules. Items marked **GIVEN** may constrain implementation. Items marked
 **CANDIDATE** require the named gate and, where reversal cost is high, a numbered
 ADR with grand-architect approval before they become **DECIDED**.
 
+**GIVEN refinement, 2026-08-10:** the sibling `../../web_forms/` project now
+owns the proposed authoritative round-trippable authoring source as bounded
+browser-valid HTML/CSS. Its no-authored-JavaScript profile and nested ambient
+layout/paint/state landscape are approved Web.Forms boundaries. The provisional Gallery DML remains
+evidence, and older “DML” rows below continue to name authoring-schema coverage
+debt until migrated; they do not authorize a second compiler/source language
+inside GUI.Forms.
+
 The program is deliberately sliceable. “Implement GUI.Forms” is not one task;
 it is a chain of independently testable contracts. Every milestone must leave
 the lower `gui_forms/` build working without reading File Manager sources.
@@ -25,7 +33,7 @@ the lower `gui_forms/` build working without reading File Manager sources.
   initialize, or probe GPU APIs. OS composition of a finished CPU bitmap is
   outside this prohibition.
 - The renderer is private. No Skia or platform object crosses the public C,
-  C++, C#, DML, control, plugin, or test seam.
+  C++, C#, Web.Forms authoring, control, plugin, or test seam.
 - PNG is the sole renderer/resource-core decoder. Other media decoders belong
   in isolated plugins.
 - Application objects own semantic application state. GUI.Forms retains the
@@ -39,8 +47,10 @@ the lower `gui_forms/` build working without reading File Manager sources.
 - Top-level composition uses a GUI.Forms flex algorithm. Forms/sub-panel layout
   uses explicit anchor/dock, grid/table, flow, stack, split, canvas, and virtual
   control-specific families. “Flex” does not mean HTML or CSS.
-- DML is authoritative and round-trippable; generated code is disposable.
-  Production retains compiled schema, stable IDs, and inspection metadata.
+- Web.Forms source is the proposed authoritative round-trippable authoring
+  surface; generated code is disposable. Production retains compiled schema,
+  stable IDs, and inspection metadata. Exact source/compiler semantics remain
+  gated in the sibling project.
 - Tree ownership and reference counting are combined: parent-to-child strong,
   child-to-parent weak, detached objects retained only by external strong
   references. Event subscriptions are tokenized and weak by default where a
@@ -68,8 +78,9 @@ the lower `gui_forms/` build working without reading File Manager sources.
   experiment, not an earlier milestone gate (ADR-002).
 - GUI.Forms publishes one deterministic event/property order selected for its
   retained model. Captured retired compatibility specimen sequences are checked pragmatically for blocking
-  incompatibilities; alternate historical orders are not supported. DML
-  preserves authored initialization assignment order (ADR-003).
+  incompatibilities; alternate historical orders are not supported. Any
+  authoring compiler, including Web.Forms, preserves authored initialization
+  assignment order (ADR-003).
 - Accessibility, tooltips, guidance, automation, and AI-readable inspection use
   a retained semantic-hook graph. Controls can exist without authored hook
   metadata, but supported stock controls provide default semantic adapters.
@@ -136,7 +147,8 @@ GUI.Forms 1.0 is complete when all of the following are true:
 1. Every row in `CONTROL_COMPLETENESS_MATRIX.md` is marked `supported`,
    `supported by named optional package`, or `explicitly excluded`, with tests
    and documentation matching the status. A constructor alone is not support.
-2. The retained kernel, DML schema, C ABI, C++ wrapper, renderer vocabulary,
+2. The retained kernel, public authoring/capability schema consumed by
+   Web.Forms, C ABI, C++ wrapper, renderer vocabulary,
    host protocol, text model, semantic-hook graph, style/resource model, and
    event order are versioned contracts with accepted ADRs.
 3. macOS, Windows, Wayland, and X11 hosts pass the shared headless/event-trace
@@ -147,9 +159,9 @@ GUI.Forms 1.0 is complete when all of the following are true:
 4. The framework has no idle redraw loop and meets approved launch, memory,
    input, layout, raster, allocation, and package-size budgets on named reference
    machines and workloads.
-5. DML parses, validates, compiles reproducibly, round-trips losslessly for its
-   authored subset, emits native bindings, and can be inspected without running
-   application code.
+5. The approved Web.Forms subset parses, validates, compiles reproducibly,
+   round-trips losslessly, emits native bindings, and can be inspected without
+   running application code.
 6. Theme and language packs are deterministic data-only assemblies with bounded
    parsers, safe fallback, provenance, compatibility ranges, and fuzz coverage.
 7. C and C++ applications link without Skia/platform types crossing the ABI.
@@ -189,7 +201,7 @@ This is the architecture the milestones are organized around. **CANDIDATE**
 choices remain reversible behind named seams until their gates accept them.
 
 ```text
-authoritative DML source ----> parser / validator / typed IR
+bounded Web.Forms source ----> validator / compiler / typed IR
        |                                  |
        |                     binary schema + generated handles
        |                                  |
@@ -435,10 +447,10 @@ prove byte-reproducible compilation and recovery from truncated, corrupt,
 incompatible, oversized, and partially translated packs. Decide signatures,
 parent-locale chaining, and live replacement in ADRs.
 
-### 4.9 DML compiler, generated code, and designer
+### 4.9 Web.Forms compiler edge, generated code, and designer
 
-The DML toolchain is a compiler project, not a runtime text parser embedded in
-every application:
+The Web.Forms toolchain is a sibling compiler project, not a runtime HTML/CSS
+parser embedded in GUI.Forms or every application:
 
 1. lossless source lexer/parser with comments and source spans;
 2. schema/type registry for controls, components, properties, events, layouts,
@@ -451,20 +463,24 @@ every application:
 7. inspect/diff/lint/format/decompile tools;
 8. development hot reload by stable-ID transaction, kept out of release runtime;
 9. round-trip edit model preserving unknown compatible fields and comments;
-10. visual designer using the same compiler APIs and producing DML, never
-    treating generated C++/C# as authoritative.
+10. visual designer using the same compiler APIs and producing Web.Forms
+    HTML/CSS, never treating generated C++/C# as authoritative.
 
 The compiler rejects unknown required controls/properties, duplicate or unstable
 IDs, invalid ownership, undeclared invalidation, illegal backplane input,
 resource/type mismatch, event signature mismatch, and unsafe limits. Production
-does not execute arbitrary expressions from DML; imperative post-construction
-logic is a generated-code hook, not a serialized programming language.
+does not execute arbitrary expressions from markup; imperative
+post-construction logic is application C++ attached to generated typed handles,
+not a serialized programming language.
 
-**Gate D1:** compile the existing gallery DML and delete the hand-maintained
-header only after deterministic output, diagnostics, source maps, and malformed
-input tests pass. **Gate D2:** parse-format-parse and designer round trips preserve
-semantic IR and authored trivia. **Gate D3:** schema migration supports the two
-previous minor versions or gives a deterministic upgrade error and tool.
+**Gate W1:** GUI.Forms publishes/accepts the public authoring capability manifest
+proposed in `../../web_forms/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`.
+**Gate W2:** compile an admitted Web.Forms Gallery source and delete the
+hand-maintained header only after deterministic output, diagnostics, source
+maps, malformed-input tests, and fidelity gates pass. **Gate W3:**
+parse-format-parse and designer round trips preserve semantic IR and authored
+trivia. **Gate W4:** schema migration supports the two previous minor versions
+or gives a deterministic upgrade error and tool.
 
 ### 4.10 C ABI, C++ API, and C# bridge
 
@@ -867,18 +883,19 @@ Exit: corrupt/partial packs cannot make the interface unusable; reproducible
 pack output and fallback/fuzz suites pass; theme/language switch is one bounded
 transaction.
 
-### M10 — DML compiler, code generation, hot reload, and designer foundation
+### M10 — GUI.Forms authoring manifest and Web.Forms conformance
 
-Deliver the ten-stage toolchain in section 4.9. Start by replacing
-`demo/gallery_dml.hpp`; then build typed property/event/layout/resource/semantic
-coverage and C++ generation against the experimental ABI. C# generation may be
-exercised here as a toolchain preview, but it is not distributed or promised
-until M11. The designer begins only after round-trip source and schema migrations
-are proven.
+GUI.Forms delivers the versioned public control/property/event/layout/style/
+resource/semantic capability manifest and conformance fixtures required by
+section 4.9. The sibling Web.Forms project owns parser, HTML/CSS profile,
+lowering, generated C++, source maps, round trip, and any designer. Replacing
+`demo/gallery_dml.hpp` waits for Web.Forms' independent opening gates and a
+converted admitted source fixture. C# generation may be exercised as a later
+toolchain preview, but it is not distributed or promised until M11.
 
-Exit: all shipped examples originate from DML, generated files are reproducible
-and marked, production needs no source parser, and round-trip tests preserve
-authored intent.
+Exit: the public manifest truthfully covers shipped examples, Web.Forms
+conformance output is reproducible and marked, production needs no source
+parser, and round-trip tests preserve authored intent.
 
 File Manager schema coverage includes collapse priority, command binding,
 hosted command items, popup ownership, breadcrumb segments, virtual item-model

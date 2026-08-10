@@ -1,7 +1,7 @@
 # FrameRequestKind
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `src/core/frame_scheduler.hpp:10`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `src/core/scheduler/request/scheduled_frame_request.hpp:10`
 
 ## Declared values
 

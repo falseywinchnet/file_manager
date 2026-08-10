@@ -1,23 +1,23 @@
 # SurfaceMaterial
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SurfaceMaterial`  
-Declaration: `include/gui_forms/surface_material.hpp:87`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 surface-material aggregate review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `SurfaceMaterial`
+- Declaration: `include/gui_forms/surface_material/types/surface_material_types.hpp:77`
+- Definition: `inline/header-only`
 
-SurfaceMaterial is a struct declared in include/gui_forms/surface_material.hpp.
+SurfaceMaterial is a bounded ordered fill stack plus optional border, bounded shadow stack, and shared corner radius.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![SurfaceMaterial](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const SurfaceMaterial&, const SurfaceMaterial&) = default
 ```
 
-Public SurfaceMaterial operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every fill, shadow, border, and radius property.

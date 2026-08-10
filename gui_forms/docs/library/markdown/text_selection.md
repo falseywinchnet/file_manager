@@ -1,55 +1,55 @@
 # TextSelection
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `TextSelection`  
-Declaration: `include/gui_forms/input_controls.hpp:19`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 004 split and Unicode edit-policy review; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `TextSelection`
+- Declaration: `include/gui_forms/controls/panel/text_box/text_box.hpp:17`
+- Definition: `inline/header-only`
 
-TextSelection is a struct declared in include/gui_forms/input_controls.hpp.
+TextSelection is TextBox's normalized byte-boundary selection value. It keeps anchor and active endpoints distinct while exposing ordered ranges for mutation and painting.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![TextSelection](../captures/text_box.png)
 
-## Public methods
+## Declared methods
 
-### `start`
+### `start` (public)
 
 ```cpp
 [[nodiscard]] Utf8Offset start() const noexcept
 ```
 
-Reports the current start value without mutation.
+Returns the lesser UTF-8 byte boundary regardless of selection direction.
 
-### `end`
+### `end` (public)
 
 ```cpp
 [[nodiscard]] Utf8Offset end() const noexcept
 ```
 
-Reports the current end value without mutation.
+Returns the greater UTF-8 byte boundary regardless of selection direction.
 
-### `length`
+### `length` (public)
 
 ```cpp
 [[nodiscard]] std::size_t length() const noexcept
 ```
 
-Reports the current length value without mutation.
+Returns the selected byte count between normalized endpoints.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports whether anchor and active endpoints identify the same insertion position.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const TextSelection&, const TextSelection&) = default
 ```
 
-Public TextSelection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares both directional endpoints exactly.

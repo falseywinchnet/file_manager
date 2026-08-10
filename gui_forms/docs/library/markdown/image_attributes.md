@@ -1,63 +1,63 @@
 # ImageAttributes
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → ImageAttributes`  
-Declaration: `include/gui_forms/drawing.hpp:608`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 image-attribute split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → ImageAttributes`
+- Declaration: `include/gui_forms/drawing/image_attributes/image_attributes.hpp:25`
+- Definition: `src/core/drawing/image_attributes/image_attributes.cpp`
 
-ImageAttributes is a class declared in include/gui_forms/drawing.hpp.
+ImageAttributes retains an optional finite 5x5 color matrix and bounded unique remap table under DrawingObject lifetime rules.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `set_color_matrix`
+### `set_color_matrix` (public)
 
 ```cpp
 void set_color_matrix(std::span<const double, 25> matrix)
 ```
 
-Synchronously updates the retained color matrix property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates every coefficient is finite and commits the complete 5x5 matrix.
 
-### `reset_color_matrix`
+### `reset_color_matrix` (public)
 
 ```cpp
 void reset_color_matrix()
 ```
 
-Returns color matrix to its inherited or default policy.
+Disables and clears the color-matrix transform.
 
-### `set_remap_table`
+### `set_remap_table` (public)
 
 ```cpp
 void set_remap_table(std::span<const ImageAttributesSnapshot::ColorRemap> table)
 ```
 
-Synchronously updates the retained remap table property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded unique old colors and owns the complete remap collection.
 
-### `reset_remap_table`
+### `reset_remap_table` (public)
 
 ```cpp
 void reset_remap_table()
 ```
 
-Returns remap table to its inherited or default policy.
+Clears retained remapping.
 
-### `clone`
+### `clone` (public)
 
 ```cpp
 [[nodiscard]] std::unique_ptr<ImageAttributes> clone() const
 ```
 
-Reports the current clone value without mutation.
+Creates an independent live ImageAttributes with identical state.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] ImageAttributesSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and copies matrix and remap state.

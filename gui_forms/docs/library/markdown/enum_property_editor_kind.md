@@ -1,7 +1,7 @@
 # PropertyEditorKind
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/inspection_controls.hpp:18`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:14`
 
 ## Declared values
 

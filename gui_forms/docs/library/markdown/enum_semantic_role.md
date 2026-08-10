@@ -1,7 +1,7 @@
 # SemanticRole
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/semantics.hpp:13`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/semantics/types/semantic_types.hpp:12`
 
 ## Declared values
 

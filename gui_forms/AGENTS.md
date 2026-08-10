@@ -16,7 +16,8 @@ Build a native macOS control-gallery demonstration and automated tests proving:
 - nested update scopes and bounded flushes;
 - damage-limited CPU painting;
 - Forms-like focus, pointer, keyboard, and activation behavior;
-- a DML-like compiled/static form description with stable IDs;
+- a Web.Forms-produced compiled/static form description with stable IDs, with
+  the checked-in Gallery DML retained only as provisional evidence;
 - instrumentation visible in logs and an optional on-screen diagnostics panel;
 - CPU-only Skia hidden behind GUI.Forms drawing vocabulary;
 - and a native AppKit host which can be launched, inspected, and closed.
@@ -79,7 +80,9 @@ mandatory for work in that directory.
 - Skia implementation lives under `src/render/skia/`.
 - Native macOS code lives under `src/host/macos/`.
 - Native Windows code lives under `src/host/windows/`.
-- Demonstrations and their static/DML descriptions live under `demo/`.
+- Demonstrations and their provisional static descriptions live under `demo/`;
+  authoritative Web.Forms language work lives in the sibling `web_forms/`
+  project and consumes only an explicitly negotiated public manifest.
 - The standalone fixture-backed File Manager consumer specification and its
   eventual installed-package consumer live under `file_manager_demoboard/`.
 - Tests live under `tests/`.

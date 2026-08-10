@@ -1,31 +1,31 @@
 # FontFaceId
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FontFaceId`  
-Declaration: `include/gui_forms/text_shaping.hpp:15`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 font identity review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `FontFaceId`
+- Declaration: `include/gui_forms/text_shaping/types/text_shaping_types.hpp:13`
+- Definition: `inline/header-only`
 
-FontFaceId is a struct declared in include/gui_forms/text_shaping.hpp.
+FontFaceId is the ordered nonzero identity shared across shaping and raster registries.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `valid`
+### `valid` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool valid() const noexcept
 ```
 
-Reports the current valid value without mutation.
+Reports nonzero identity.
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
-friend constexpr auto operator<=>(const FontFaceId &, const FontFaceId &) = default
+friend constexpr auto operator<=>(const FontFaceId&, const FontFaceId&) = default
 ```
 
-Public FontFaceId operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Provides value ordering and equality.

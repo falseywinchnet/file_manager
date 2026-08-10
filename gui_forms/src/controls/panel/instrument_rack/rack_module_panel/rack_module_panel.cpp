@@ -1,0 +1,107 @@
+#include "rack_module_panel.hpp"
+
+#include <algorithm>
+#include <numeric>
+#include <utility>
+
+namespace gui_forms::detail {
+
+RackModulePanel::RackModulePanel(StableId stable_id)
+    : Panel(std::move(stable_id)) {
+    set_border_style(BorderStyle::line);
+    set_margin({});
+    set_accessible_description(
+        "Compact editing instrument; Alt+Left and Alt+Right request reordering");
+}
+
+void RackModulePanel::set_compact(bool compact) {
+    if (compact_ == compact) return;
+    compact_ = compact;
+    invalidate(invalidation::bounds);
+}
+
+void RackModulePanel::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    const double scale = effective_text_scale();
+    const double width = std::max(0.0, final_bounds.width);
+    const double height = std::max(0.0, final_bounds.height);
+    const double enable_width = 20.0 * scale;
+    const double remove_width = 22.0 * scale;
+    const double gap = 3.0 * scale;
+    if (enable) {
+        set_child_layout(enable, {0.0, 0.0, enable_width,
+                                  compact_ ? 26.0 * scale : height});
+    }
+    if (remove) {
+        set_child_layout(remove, {std::max(0.0, width - remove_width), 0.0,
+                                  remove_width,
+                                  compact_ ? 26.0 * scale : height});
+    }
+    const double field_left = enable_width + 5.0 * scale;
+    const double field_right = std::max(field_left,
+                                         width - remove_width - 5.0 * scale);
+    const double field_width = std::max(0.0, field_right - field_left);
+    if (compact_) {
+        double y = 4.0 * scale;
+        for (const Control::Ptr& field : fields) {
+            set_child_layout(field, {field_left, y, field_width, 25.0 * scale});
+            y += 28.0 * scale;
+        }
+        if (status) {
+            set_child_layout(status, {field_left, y, field_width,
+                                      std::max(16.0 * scale,
+                                               height - y - 3.0 * scale)});
+        }
+        return;
+    }
+    const double fields_y = 5.0 * scale;
+    const double fields_height = 27.0 * scale;
+    const double status_y = 37.0 * scale;
+    const double total_weight = std::accumulate(
+        field_weights.begin(), field_weights.end(), 0.0);
+    const double available = std::max(
+        0.0, field_width - gap * static_cast<double>(
+            fields.empty() ? 0U : fields.size() - 1U));
+    double x = field_left;
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        const double weight = total_weight > 0.0
+            ? field_weights[index] / total_weight
+            : 1.0 / static_cast<double>(fields.size());
+        const double next_width = index + 1U == fields.size()
+            ? std::max(0.0, field_right - x)
+            : available * weight;
+        set_child_layout(fields[index], {x, fields_y, next_width,
+                                         fields_height});
+        x += next_width + gap;
+    }
+    if (status) {
+        set_child_layout(status, {field_left, status_y, field_width,
+                                  std::max(16.0 * scale,
+                                           height - status_y - 3.0 * scale)});
+    }
+}
+
+SemanticDescriptor RackModulePanel::semantic_descriptor() const {
+    SemanticDescriptor descriptor = Panel::semantic_descriptor();
+    descriptor.role = SemanticRole::group;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    descriptor.states = SemanticState::enabled | SemanticState::visible;
+    descriptor.actions = {SemanticAction::decrement,
+                          SemanticAction::increment};
+    descriptor.exposed = true;
+    descriptor.include_descendants = true;
+    return descriptor;
+}
+
+bool RackModulePanel::on_semantic_action(SemanticAction action,
+                                         std::string_view value) {
+    if (action == SemanticAction::decrement ||
+        action == SemanticAction::increment) {
+        if (move_request) move_request(action == SemanticAction::increment);
+        return true;
+    }
+    return Panel::on_semantic_action(action, value);
+}
+
+} // namespace gui_forms::detail

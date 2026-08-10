@@ -1,23 +1,23 @@
 # BitmapDamageSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `BitmapDamageSnapshot`  
-Declaration: `include/gui_forms/drawing.hpp:649`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 bitmap damage review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `BitmapDamageSnapshot`
+- Declaration: `include/gui_forms/drawing/bitmap/bitmap.hpp:40`
+- Definition: `inline/header-only`
 
-BitmapDamageSnapshot is a struct declared in include/gui_forms/drawing.hpp.
+BitmapDamageSnapshot reports generation interval, history completeness, and bounded changed rectangles.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports whether no changed rectangles were retained.

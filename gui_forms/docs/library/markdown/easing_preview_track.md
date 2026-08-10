@@ -1,23 +1,23 @@
 # EasingPreviewTrack
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `EasingPreviewTrack`  
-Declaration: `include/gui_forms/diagnostic_controls.hpp:65`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 value-type split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `EasingPreviewTrack`
+- Declaration: `include/gui_forms/controls/easing_preview/easing_preview.hpp:11`
+- Definition: `inline/header-only`
 
-EasingPreviewTrack is a struct declared in include/gui_forms/diagnostic_controls.hpp.
+EasingPreviewTrack is one caller-authored easing comparison row: exact curve, label, and marker color.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![EasingPreviewTrack](../captures/easing_preview.png)
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const EasingPreviewTrack&, const EasingPreviewTrack&) = default
 ```
 
-Public EasingPreviewTrack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares curve, label, and color for exact retained configuration equality.

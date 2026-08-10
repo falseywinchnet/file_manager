@@ -20,11 +20,12 @@ generation, provider absence, and unsupported live traversal remain distinct.
 These fixtures open fake-provider and adapter work; they do not claim a
 production local transport or a connected Engine runtime.
 
-`fixtures/engine/live-query-v0-draft/` contains the negotiating ADR-008
-`ORC-ENG-004` projection. It exercises source-explicit progressive results,
-permission-partial traversal, and fallback routing without claiming that the
-Engine provider or contract version is frozen. Promotion waits for Engine reply
-006 and the native containment/resource evidence named there.
+`fixtures/engine/live-query-v0-draft/` contains the ADR-008 `ORC-ENG-004`
+fixture-draft projection. It exercises source-explicit progressive results,
+permission-partial traversal, and fallback routing. Engine reply 006 and the
+development provider/adapter are implemented; native NTFS/ext4,
+million-entry-resource, and installed-authenticated-transport evidence remain
+promotion gates rather than being inferred from this fixture set.
 
 `fixtures/local-wire-v1/` contains the current ADR-010 client/server hello and
 request payloads. Tests add and inspect the fixed `ORC1`/big-endian-length header
@@ -62,6 +63,11 @@ bounded reactivation, fresh identity, bootout, and removal.
 The measured environment, artifact hashes, negative results, and lifecycle
 observations are retained in
 [`evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md`](evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md).
+
+The service-host refactor, stable-Rust M4 build, complete 66-test gate,
+independent C++ client, real Go live-search route, optimized artifact hash, and
+browser-verified source atlas are recorded in
+[`evidence/M4_SERVICE_SYSTEM_REFACTOR_2026-08-10.md`](evidence/M4_SERVICE_SYSTEM_REFACTOR_2026-08-10.md).
 
 Endpoint fixtures additionally reject symlink publication files and
 noncanonical modes. Stdio fixtures send a record larger than one MiB and invalid

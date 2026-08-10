@@ -1,79 +1,79 @@
 # HarfBuzzFontEngine
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `HarfBuzzFontEngine`  
-Declaration: `src/render/text/harfbuzz_font_engine.hpp:45`  
-Definition: `src/render/text/harfbuzz_font_engine.cpp`
+- Status: **OBSERVED: bundle 009 text-engine split; focused M4 shaping tests pass**
+- Kind: **class**
+- Hierarchy: `HarfBuzzFontEngine`
+- Declaration: `src/render/text/harfbuzz/harfbuzz_font_engine.hpp:45`
+- Definition: `src/render/text/harfbuzz/harfbuzz_font_engine.cpp`
 
-HarfBuzzFontEngine is a class declared in src/render/text/harfbuzz_font_engine.hpp.
+HarfBuzzFontEngine owns bounded FreeType faces and HarfBuzz shaping state behind renderer-neutral font IDs, deterministic fallback ordering, absolute UTF-8 clusters, and immutable shaped runs.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `HarfBuzzFontEngine`
+### `HarfBuzzFontEngine` (public)
 
 ```cpp
 HarfBuzzFontEngine()
 ```
 
-Constructs or tears down the retained HarfBuzzFontEngine object according to its ownership contract.
+Constructs the private FreeType/HarfBuzz implementation; copying is prohibited and moves transfer complete engine ownership.
 
-### `~HarfBuzzFontEngine`
+### `~HarfBuzzFontEngine` (public)
 
 ```cpp
 ~HarfBuzzFontEngine()
 ```
 
-Constructs or tears down the retained HarfBuzzFontEngine object according to its ownership contract.
+Releases HarfBuzz fonts/faces and FreeType ownership in dependency-safe order.
 
-### `HarfBuzzFontEngine`
+### `HarfBuzzFontEngine` (public)
 
 ```cpp
 HarfBuzzFontEngine(const HarfBuzzFontEngine&) = delete
 ```
 
-Constructs or tears down the retained HarfBuzzFontEngine object according to its ownership contract.
+Constructs the private FreeType/HarfBuzz implementation; copying is prohibited and moves transfer complete engine ownership.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 HarfBuzzFontEngine& operator=(const HarfBuzzFontEngine&) = delete
 ```
 
-Public HarfBuzzFontEngine operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves complete engine ownership; copying is prohibited.
 
-### `register_typeface`
+### `register_typeface` (public)
 
 ```cpp
 [[nodiscard]] std::optional<FontFaceId> register_typeface( FontRole role, std::uint16_t weight, bool italic, std::span<const std::byte> encoded, std::uint32_t face_index = 0U)
 ```
 
-Public HarfBuzzFontEngine operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounded bytes and unique stable ID, owns the font bytes, creates FreeType/HarfBuzz faces, and commits only a usable face.
 
-### `register_fallback_typeface`
+### `register_fallback_typeface` (public)
 
 ```cpp
 [[nodiscard]] std::optional<FontFaceId> register_fallback_typeface( std::uint16_t weight, bool italic, std::span<const std::byte> encoded, std::uint32_t face_index = 0U)
 ```
 
-Public HarfBuzzFontEngine operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers a face and appends its ID once to deterministic fallback order.
 
-### `shape`
+### `shape` (public)
 
 ```cpp
 [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font)
 ```
 
-Public HarfBuzzFontEngine operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates request UTF-8/ranges, segments unsupported clusters across primary/fallback faces, shapes with HarfBuzz, and returns absolute cluster metadata and aggregate metrics.
 
-### `face_count`
+### `face_count` (public)
 
 ```cpp
 [[nodiscard]] std::size_t face_count() const noexcept
 ```
 
-Reports the current face count value without mutation.
+Returns the number of committed faces.

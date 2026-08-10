@@ -1,10 +1,10 @@
 # MasterDetailView
 
-Status: **OBSERVED: bundle 001 split; M4 build and focused tests pass**  
-Kind: **class / visual retained control**  
-Hierarchy: `ContainerControl → MasterDetailView`  
-Declaration: `include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp:42`  
-Definition: `src/controls/container/master_detail_view/master_detail_view.cpp`
+- Status: **OBSERVED: bundle 001 split; M4 build and focused tests pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ContainerControl → MasterDetailView`
+- Declaration: `include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp:42`
+- Definition: `src/controls/container/master_detail_view/master_detail_view.cpp`
 
 MasterDetailView is a content-agnostic retained shell over SplitContainer with explicit role ownership, theme-derived or explicit splitter policy, responsive compact presentation, focus-safe collapse, and inspectable presentation events.
 
@@ -12,9 +12,9 @@ MasterDetailView is a content-agnostic retained shell over SplitContainer with e
 
 ![MasterDetailView](../captures/master_detail_view.png)
 
-## Public methods
+## Declared methods
 
-### `MasterDetailView`
+### `MasterDetailView` (public)
 
 ```cpp
 explicit MasterDetailView(StableId stable_id)
@@ -22,7 +22,7 @@ explicit MasterDetailView(StableId stable_id)
 
 Constructs private SplitContainer infrastructure and configures it from the active structural layout policy; visual attachment remains lazy.
 
-### `initialize_control_tree`
+### `initialize_control_tree` (public)
 
 ```cpp
 void initialize_control_tree()
@@ -30,7 +30,7 @@ void initialize_control_tree()
 
 Attaches the owned SplitContainer exactly once.
 
-### `master`
+### `master` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr master() const noexcept
@@ -38,7 +38,7 @@ Attaches the owned SplitContainer exactly once.
 
 Returns the control occupying the master role.
 
-### `detail`
+### `detail` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr detail() const noexcept
@@ -46,7 +46,7 @@ Returns the control occupying the master role.
 
 Returns the control occupying the detail role.
 
-### `set_master`
+### `set_master` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr set_master(Control::Ptr control)
@@ -54,7 +54,7 @@ Returns the control occupying the detail role.
 
 Docks an unparented control into the first splitter panel and returns the detached predecessor; infrastructure and cross-role reuse are rejected.
 
-### `set_detail`
+### `set_detail` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr set_detail(Control::Ptr control)
@@ -62,7 +62,7 @@ Docks an unparented control into the first splitter panel and returns the detach
 
 Docks an unparented control into the second splitter panel and returns the detached predecessor; infrastructure and cross-role reuse are rejected.
 
-### `split_container`
+### `split_container` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<SplitContainer> split_container() const noexcept
@@ -70,7 +70,7 @@ Docks an unparented control into the second splitter panel and returns the detac
 
 Returns the genuine retained SplitContainer used for rendering, accessibility, pointer dragging, and keyboard splitter behavior.
 
-### `master_detail_layout`
+### `master_detail_layout` (public)
 
 ```cpp
 [[nodiscard]] const MasterDetailLayout& master_detail_layout() const noexcept
@@ -78,7 +78,7 @@ Returns the genuine retained SplitContainer used for rendering, accessibility, p
 
 Returns the stored explicit layout value; use effective_master_detail_layout for the active policy.
 
-### `uses_theme_layout`
+### `uses_theme_layout` (public)
 
 ```cpp
 [[nodiscard]] bool uses_theme_layout() const noexcept
@@ -86,7 +86,7 @@ Returns the stored explicit layout value; use effective_master_detail_layout for
 
 Reports whether current splitter dimensions and breakpoint derive from structural Theme tokens.
 
-### `effective_master_detail_layout`
+### `effective_master_detail_layout` (public)
 
 ```cpp
 [[nodiscard]] MasterDetailLayout effective_master_detail_layout() const noexcept
@@ -94,7 +94,7 @@ Reports whether current splitter dimensions and breakpoint derive from structura
 
 Resolves inherited structural Theme geometry or the explicit bounded layout.
 
-### `set_master_detail_layout`
+### `set_master_detail_layout` (public)
 
 ```cpp
 void set_master_detail_layout(MasterDetailLayout layout)
@@ -102,7 +102,7 @@ void set_master_detail_layout(MasterDetailLayout layout)
 
 Validates finite ordered extents, makes the explicit layout authoritative, reconfigures the splitter, and invalidates all affected retained phases.
 
-### `reset_master_detail_layout_to_theme`
+### `reset_master_detail_layout_to_theme` (public)
 
 ```cpp
 void reset_master_detail_layout_to_theme()
@@ -110,7 +110,7 @@ void reset_master_detail_layout_to_theme()
 
 Restores inherited structural Theme geometry and reconfigures the genuine splitter.
 
-### `display_mode`
+### `display_mode` (public)
 
 ```cpp
 [[nodiscard]] MasterDetailDisplayMode display_mode() const noexcept
@@ -118,7 +118,7 @@ Restores inherited structural Theme geometry and reconfigures the genuine splitt
 
 Returns the requested automatic or explicit presentation mode.
 
-### `set_display_mode`
+### `set_display_mode` (public)
 
 ```cpp
 void set_display_mode(MasterDetailDisplayMode mode)
@@ -126,7 +126,7 @@ void set_display_mode(MasterDetailDisplayMode mode)
 
 Selects automatic, side-by-side, master-only, or detail-only presentation; invalid values fail atomically.
 
-### `effective_display_mode`
+### `effective_display_mode` (public)
 
 ```cpp
 [[nodiscard]] MasterDetailDisplayMode effective_display_mode() const noexcept
@@ -134,7 +134,7 @@ Selects automatic, side-by-side, master-only, or detail-only presentation; inval
 
 Returns the presentation currently applied after responsive resolution.
 
-### `compact_detail_visible`
+### `compact_detail_visible` (public)
 
 ```cpp
 [[nodiscard]] bool compact_detail_visible() const noexcept
@@ -142,7 +142,7 @@ Returns the presentation currently applied after responsive resolution.
 
 Reports which role automatic compact presentation should expose.
 
-### `set_compact_detail_visible`
+### `set_compact_detail_visible` (public)
 
 ```cpp
 void set_compact_detail_visible(bool visible)
@@ -150,7 +150,7 @@ void set_compact_detail_visible(bool visible)
 
 Selects master or detail for the next automatic compact arrangement.
 
-### `show_master`
+### `show_master` (public)
 
 ```cpp
 void show_master()
@@ -158,7 +158,7 @@ void show_master()
 
 Convenience operation selecting the master role in compact automatic mode.
 
-### `show_detail`
+### `show_detail` (public)
 
 ```cpp
 void show_detail()
@@ -166,7 +166,7 @@ void show_detail()
 
 Convenience operation selecting the detail role in compact automatic mode.
 
-### `presentation_changed`
+### `presentation_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const MasterDetailPresentationChange&>& presentation_changed() noexcept
@@ -174,7 +174,7 @@ Convenience operation selecting the detail role in compact automatic mode.
 
 Returns events describing previous/current applied mode and whether accommodation caused the transition.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
@@ -182,7 +182,7 @@ Returns events describing previous/current applied mode and whether accommodatio
 
 Measures stable snapshots of both role controls, tolerates mutation during callbacks, and combines desired size according to resolved orientation/mode.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
@@ -190,10 +190,42 @@ void arrange(Rect final_bounds) override
 
 Configures and attaches the splitter, resolves responsive mode from final bounds, applies collapse with an explicit origin, and fills the view.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
 Projects an optional named group whose value reports side-by-side, master, or detail presentation.
+
+### `replace_role` (private)
+
+```cpp
+[[nodiscard]] Control::Ptr replace_role(Control::Ptr& slot, const std::shared_ptr<SplitterPanel>& panel, Control::Ptr replacement)
+```
+
+Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `resolve_display_mode` (private)
+
+```cpp
+[[nodiscard]] MasterDetailDisplayMode resolve_display_mode( Size available) const noexcept
+```
+
+Reports the current resolve display mode value without mutation.
+
+### `apply_display_mode` (private)
+
+```cpp
+void apply_display_mode(MasterDetailDisplayMode mode, bool automatic)
+```
+
+Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `configure_split` (private)
+
+```cpp
+void configure_split()
+```
+
+Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
