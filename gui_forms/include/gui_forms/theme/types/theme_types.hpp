@@ -67,7 +67,10 @@ struct ControlVisualRecipe final {
     Color focus_ring{Color::rgba(38, 114, 185)};
     Color default_ring{Color::rgba(25, 82, 139)};
     double focus_width{1.0};
+    double focus_offset{};
+    bool focus_external{};
     double default_width{2.0};
+    Point visual_offset{};
     Point pressed_content_offset{1.0, 1.0};
     friend bool operator==(const ControlVisualRecipe& left,
                            const ControlVisualRecipe& right) noexcept(noexcept(
@@ -76,7 +79,10 @@ struct ControlVisualRecipe final {
         left.focus_ring == right.focus_ring &&
         left.default_ring == right.default_ring &&
         left.focus_width == right.focus_width &&
+        left.focus_offset == right.focus_offset &&
+        left.focus_external == right.focus_external &&
         left.default_width == right.default_width &&
+        left.visual_offset == right.visual_offset &&
         left.pressed_content_offset == right.pressed_content_offset)) {
         return left.material == right.material && left.text == right.text &&
                left.muted_text == right.muted_text &&
@@ -84,7 +90,10 @@ struct ControlVisualRecipe final {
                left.focus_ring == right.focus_ring &&
                left.default_ring == right.default_ring &&
                left.focus_width == right.focus_width &&
+               left.focus_offset == right.focus_offset &&
+               left.focus_external == right.focus_external &&
                left.default_width == right.default_width &&
+               left.visual_offset == right.visual_offset &&
                left.pressed_content_offset == right.pressed_content_offset;
     }
 };
@@ -93,6 +102,26 @@ inline constexpr std::size_t control_visual_role_count =
     static_cast<std::size_t>(ControlVisualRole::count);
 inline constexpr std::size_t control_surface_state_count =
     static_cast<std::size_t>(ControlSurfaceState::count);
+
+struct ControlStateRecipes final {
+    std::array<ControlVisualRecipe, control_surface_state_count> values;
+    [[nodiscard]] static ControlStateRecipes from_parts(
+        const ControlVisualRecipe* values, std::size_t value_count);
+    [[nodiscard]] const ControlVisualRecipe& resolve(
+        ControlSurfaceState state) const noexcept {
+        return values[static_cast<std::size_t>(state)];
+    }
+    friend bool operator==(const ControlStateRecipes& left,
+                           const ControlStateRecipes& right) noexcept(noexcept(
+        left.values == right.values)) {
+        return left.values == right.values;
+    }
+};
+
+[[nodiscard]] bool valid_control_visual_recipe(
+    const ControlVisualRecipe& value) noexcept;
+[[nodiscard]] bool valid_control_state_recipes(
+    const ControlStateRecipes& value) noexcept;
 
 struct ControlRoleRecipes final {
     std::array<ControlVisualRecipe, control_surface_state_count> ordinary;

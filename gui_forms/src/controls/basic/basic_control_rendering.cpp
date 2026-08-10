@@ -252,6 +252,16 @@ void paint_theme_cues(Painter& painter, Rect bounds,
     }
     if (context.focused && recipe.focus_width > 0.0 &&
         bounds.width > 8.0 && bounds.height > 8.0) {
+        if (recipe.focus_external) {
+            const double outset = recipe.focus_offset + recipe.focus_width * 0.5;
+            painter.stroke_rounded_rect(
+                {bounds.x - outset, bounds.y - outset,
+                 bounds.width + outset * 2.0,
+                 bounds.height + outset * 2.0},
+                recipe.material.corner_radius + outset,
+                recipe.focus_ring, recipe.focus_width);
+            return;
+        }
         const double inset = std::max(3.0, recipe.default_width + 1.0);
         painter.stroke_rounded_rect(
             {bounds.x + inset, bounds.y + inset,

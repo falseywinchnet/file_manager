@@ -207,6 +207,89 @@ void test_flow_item_spacing_is_explicit_bounded_layout_state() {
             "FlowLayoutPanel item spacing must reject invalid geometry atomically");
 }
 
+void test_flow_alignment_projects_relational_flex_geometry() {
+    std::shared_ptr<gui_forms::FlowLayoutPanel> centered =
+        make_control<FlowLayoutPanel>(StableId("layout.flow.centered"));
+    std::shared_ptr<Button> centered_child =
+        sized_button("layout.flow.centered.child", 40.0, 20.0);
+    (*centered).add_child(centered_child);
+    (*centered).set_wrap_contents(false);
+    (*centered).set_main_alignment(FlowMainAlignment::center);
+    (*centered).set_cross_alignment(FlowCrossAlignment::center);
+    Window centered_window(centered, {200.0, 100.0});
+    centered_window.perform_layout();
+    require((*centered_child).arranged_bounds() == Rect{80.0, 40.0, 40.0, 20.0},
+            "single-line flow must center a child on both live container axes");
+
+    std::shared_ptr<gui_forms::FlowLayoutPanel> distributed =
+        make_control<FlowLayoutPanel>(StableId("layout.flow.distributed"));
+    std::shared_ptr<Button> first =
+        sized_button("layout.flow.distributed.first", 20.0, 10.0);
+    std::shared_ptr<Button> second =
+        sized_button("layout.flow.distributed.second", 20.0, 10.0);
+    std::shared_ptr<Button> third =
+        sized_button("layout.flow.distributed.third", 20.0, 10.0);
+    (*distributed).add_child(first);
+    (*distributed).add_child(second);
+    (*distributed).add_child(third);
+    (*distributed).set_wrap_contents(false);
+    (*distributed).set_main_alignment(FlowMainAlignment::space_between);
+    (*distributed).set_cross_alignment(FlowCrossAlignment::stretch);
+    Window distributed_window(distributed, {100.0, 30.0});
+    distributed_window.perform_layout();
+    require((*first).arranged_bounds() == Rect{0.0, 0.0, 20.0, 30.0} &&
+                (*second).arranged_bounds() == Rect{40.0, 0.0, 20.0, 30.0} &&
+                (*third).arranged_bounds() == Rect{80.0, 0.0, 20.0, 30.0},
+            "flow space-between and stretch must derive slots from live geometry");
+
+    bool invalid_main = false;
+    bool invalid_cross = false;
+    try {
+        (*distributed).set_main_alignment(static_cast<FlowMainAlignment>(0xffU));
+    } catch (const std::invalid_argument&) {
+        invalid_main = true;
+    }
+    try {
+        (*distributed).set_cross_alignment(static_cast<FlowCrossAlignment>(0xffU));
+    } catch (const std::invalid_argument&) {
+        invalid_cross = true;
+    }
+    require(invalid_main && invalid_cross &&
+                (*distributed).main_alignment() == FlowMainAlignment::space_between &&
+                (*distributed).cross_alignment() == FlowCrossAlignment::stretch,
+            "flow alignment must reject unknown values without mutation");
+
+    std::shared_ptr<gui_forms::FlowLayoutPanel> growing =
+        make_control<FlowLayoutPanel>(StableId("layout.flow.growing"));
+    std::shared_ptr<Button> fixed =
+        sized_button("layout.flow.growing.fixed", 20.0, 10.0);
+    std::shared_ptr<Button> first_grow =
+        sized_button("layout.flow.growing.first", 10.0, 10.0);
+    std::shared_ptr<Button> second_grow =
+        sized_button("layout.flow.growing.second", 10.0, 10.0);
+    (*growing).add_child(fixed);
+    (*growing).add_child(first_grow);
+    (*growing).add_child(second_grow);
+    (*growing).set_wrap_contents(false);
+    (*growing).set_flex_grow(*first_grow, 1.0);
+    (*growing).set_flex_grow(*second_grow, 2.0);
+    Window growing_window(growing, {100.0, 20.0});
+    growing_window.perform_layout();
+    require((*fixed).arranged_bounds().width == 20.0 &&
+                near((*first_grow).arranged_bounds().width, 30.0) &&
+                near((*second_grow).arranged_bounds().width, 50.0) &&
+                near((*second_grow).arranged_bounds().x, 50.0),
+            "retained flex grow must distribute remaining main-axis geometry by ratio");
+    bool invalid_grow = false;
+    try {
+        (*growing).set_flex_grow(*first_grow, -1.0);
+    } catch (const std::invalid_argument&) {
+        invalid_grow = true;
+    }
+    require(invalid_grow && (*growing).flex_grow(*first_grow) == 1.0,
+            "flex grow must reject invalid ratios without mutation");
+}
+
 void test_layout_panels_revalidate_snapshot_after_measure_callback() {
     {
         std::shared_ptr<gui_forms::FlowLayoutPanel> flow = make_control<FlowLayoutPanel>(
@@ -605,6 +688,7 @@ int main() {
         test_margin_padding_validation_and_retained_slots();
         test_flow_direction_break_visibility_and_resize();
         test_flow_item_spacing_is_explicit_bounded_layout_state();
+        test_flow_alignment_projects_relational_flex_geometry();
         test_layout_panels_revalidate_snapshot_after_measure_callback();
         test_table_mixed_tracks_spans_and_lookup();
         test_table_growth_hidden_children_and_fixed_overflow();

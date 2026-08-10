@@ -156,8 +156,7 @@ Insets Button::visual_outsets() const noexcept {
     const ControlVisualContext context = visual_context(
         hovered_visual(), pressed_visual(), false, focused_visual(),
         default_button_);
-    return surface_material_visual_outsets(
-        effective_theme().resolve(role, context).material);
+    return resolved_visual_outsets(role, context);
 }
 
 } // namespace gui_forms

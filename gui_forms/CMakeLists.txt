@@ -51,6 +51,7 @@ add_library(gui_forms_core STATIC
     src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
+    src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp

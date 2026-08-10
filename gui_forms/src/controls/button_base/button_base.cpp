@@ -128,6 +128,25 @@ void ButtonBase::clear_style() {
     invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
 }
 
+void ButtonBase::set_visual_recipes(ControlStateRecipes recipes) {
+    require_mutable();
+    if (!valid_control_state_recipes(recipes)) {
+        throw std::invalid_argument("Button visual recipes are invalid");
+    }
+    if (visual_recipes_override_ && *visual_recipes_override_ == recipes) {
+        return;
+    }
+    visual_recipes_override_ = std::move(recipes);
+    invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
+}
+
+void ButtonBase::clear_visual_recipes() {
+    require_mutable();
+    if (!visual_recipes_override_) return;
+    visual_recipes_override_.reset();
+    invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
+}
+
 void ButtonBase::set_image(ImageId image) {
     require_mutable();
     if (image.value != 0U && window() != nullptr &&
@@ -516,14 +535,47 @@ void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,
                                      bool command_alignment) const {
     const ControlVisualContext context = visual_context(
         hovered_, pressed_visual(), false, focused_, default_cue);
-    const ControlVisualRecipe& recipe = effective_theme().resolve(role, context);
-    paint_surface_material(painter, bounds, recipe.material);
-    paint_theme_cues(painter, bounds, recipe, context);
+    const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
+    const Rect visual_bounds{
+        bounds.x + recipe.visual_offset.x,
+        bounds.y + recipe.visual_offset.y,
+        bounds.width,
+        bounds.height,
+    };
+    paint_surface_material(painter, visual_bounds, recipe.material);
+    paint_theme_cues(painter, visual_bounds, recipe, context);
     const Point offset = context.surface == ControlSurfaceState::pressed
         ? recipe.pressed_content_offset : Point{};
     const std::string display = display_text();
-    paint_button_content(painter, bounds, display, recipe.text, offset, false,
+    paint_button_content(painter, visual_bounds, display, recipe.text, offset, false,
                          command_alignment);
+}
+
+const ControlVisualRecipe& ButtonBase::resolve_visual_recipe(
+    ControlVisualRole role, ControlVisualContext context) const noexcept {
+    if (visual_recipes_override_ && !context.high_contrast) {
+        return (*visual_recipes_override_).resolve(context.surface);
+    }
+    return effective_theme().resolve(role, context);
+}
+
+Insets ButtonBase::resolved_visual_outsets(
+    ControlVisualRole role, ControlVisualContext context) const noexcept {
+    const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
+    Insets result = surface_material_visual_outsets(recipe.material);
+    double cue_extent = 0.0;
+    if (context.focused && recipe.focus_external && recipe.focus_width > 0.0) {
+        cue_extent = recipe.focus_offset + recipe.focus_width;
+    }
+    result.left = std::max(
+        0.0, std::max(result.left, cue_extent) - recipe.visual_offset.x);
+    result.top = std::max(
+        0.0, std::max(result.top, cue_extent) - recipe.visual_offset.y);
+    result.right = std::max(
+        0.0, std::max(result.right, cue_extent) + recipe.visual_offset.x);
+    result.bottom = std::max(
+        0.0, std::max(result.bottom, cue_extent) + recipe.visual_offset.y);
+    return result;
 }
 
 void ButtonBase::on_paint(Painter& painter, Rect) {
@@ -541,8 +593,7 @@ Insets ButtonBase::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     const ControlVisualContext context = visual_context(
         hovered_, pressed_visual(), false, focused_, false);
-    return surface_material_visual_outsets(
-        effective_theme().resolve(ControlVisualRole::button, context).material);
+    return resolved_visual_outsets(ControlVisualRole::button, context);
 }
 
 void ButtonBase::on_pointer(PointerEvent& event) {

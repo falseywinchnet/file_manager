@@ -28,6 +28,11 @@ bool bounded_coordinate(Point point, MaterialCoordinateSpace space) noexcept {
     return std::abs(point.x) <= bound && std::abs(point.y) <= bound;
 }
 
+bool valid_material_border(const MaterialBorder& border) noexcept {
+    return std::isfinite(border.width) && border.width > 0.0 &&
+           border.width <= 64.0;
+}
+
 Point resolve_point(Point point, MaterialCoordinateSpace space,
                     Rect bounds) noexcept {
     if (space == MaterialCoordinateSpace::normalized) {
@@ -43,6 +48,39 @@ Size resolve_radii(Size radii, MaterialCoordinateSpace space,
         return {radii.width * bounds.width, radii.height * bounds.height};
     }
     return radii;
+}
+
+std::pair<Point, Point> resolve_css_linear_gradient(
+    double angle_degrees, Rect bounds) noexcept {
+    double angle = std::fmod(angle_degrees, 360.0);
+    if (angle < 0.0) angle += 360.0;
+    Point direction;
+    constexpr double epsilon = 1.0e-12;
+    if (std::abs(angle) < epsilon || std::abs(angle - 360.0) < epsilon) {
+        direction = {0.0, -1.0};
+    } else if (std::abs(angle - 90.0) < epsilon) {
+        direction = {1.0, 0.0};
+    } else if (std::abs(angle - 180.0) < epsilon) {
+        direction = {0.0, 1.0};
+    } else if (std::abs(angle - 270.0) < epsilon) {
+        direction = {-1.0, 0.0};
+    } else {
+        constexpr double degrees_to_radians =
+            3.14159265358979323846264338327950288 / 180.0;
+        const double radians = angle * degrees_to_radians;
+        direction = {std::sin(radians), -std::cos(radians)};
+    }
+    const Point center{bounds.x + bounds.width * 0.5,
+                       bounds.y + bounds.height * 0.5};
+    const double half_length =
+        (std::abs(direction.x) * bounds.width +
+         std::abs(direction.y) * bounds.height) * 0.5;
+    return {
+        {center.x - direction.x * half_length,
+         center.y - direction.y * half_length},
+        {center.x + direction.x * half_length,
+         center.y + direction.y * half_length},
+    };
 }
 
 void paint_stretched_image(Painter& painter, Rect bounds,
@@ -288,14 +326,46 @@ ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
 bool valid_recipe(const ControlVisualRecipe& value) noexcept {
     return valid_surface_material(value.material) &&
            std::isfinite(value.focus_width) && value.focus_width >= 0.0 &&
-           value.focus_width <= 16.0 && std::isfinite(value.default_width) &&
+           value.focus_width <= 16.0 && std::isfinite(value.focus_offset) &&
+           value.focus_offset >= 0.0 && value.focus_offset <= 64.0 &&
+           (value.focus_external || value.focus_offset == 0.0) &&
+           std::isfinite(value.default_width) &&
            value.default_width >= 0.0 && value.default_width <= 16.0 &&
+           finite(value.visual_offset) &&
+           std::abs(value.visual_offset.x) <= 32.0 &&
+           std::abs(value.visual_offset.y) <= 32.0 &&
            finite(value.pressed_content_offset) &&
            std::abs(value.pressed_content_offset.x) <= 32.0 &&
            std::abs(value.pressed_content_offset.y) <= 32.0;
 }
 
 } // namespace
+
+bool valid_control_visual_recipe(
+    const ControlVisualRecipe& value) noexcept {
+    return valid_recipe(value);
+}
+
+bool valid_control_state_recipes(
+    const ControlStateRecipes& value) noexcept {
+    return std::all_of(value.values.begin(), value.values.end(),
+                       &valid_recipe);
+}
+
+ControlStateRecipes ControlStateRecipes::from_parts(
+    const ControlVisualRecipe* recipe_values, std::size_t value_count) {
+    if (recipe_values == nullptr ||
+        value_count != control_surface_state_count) {
+        throw std::invalid_argument(
+            "control state recipes require one nonnull recipe per retained state");
+    }
+    ControlStateRecipes result;
+    std::copy_n(recipe_values, value_count, result.values.begin());
+    if (!valid_control_state_recipes(result)) {
+        throw std::invalid_argument("control state recipes contain an invalid recipe");
+    }
+    return result;
+}
 
 bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     if (material.fills.empty() ||
@@ -305,10 +375,21 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
         material.corner_radius < 0.0 || material.corner_radius > 4096.0) {
         return false;
     }
-    if (material.border &&
-        (!std::isfinite((*material.border).width) ||
-         (*material.border).width <= 0.0 || (*material.border).width > 64.0)) {
+    if (material.border && !valid_material_border(*material.border)) {
         return false;
+    }
+    if (material.border && !material.border_edges.empty()) return false;
+    if (!material.border_edges.empty() && material.corner_radius != 0.0) {
+        return false;
+    }
+    const std::optional<MaterialBorder>* edge_borders[]{
+        &material.border_edges.top,
+        &material.border_edges.right,
+        &material.border_edges.bottom,
+        &material.border_edges.left,
+    };
+    for (const std::optional<MaterialBorder>* edge : edge_borders) {
+        if (*edge && !valid_material_border(**edge)) return false;
     }
     for (const MaterialShadow& shadow : material.shadows) {
         if (!finite(shadow.offset) || !std::isfinite(shadow.blur_radius) ||
@@ -326,7 +407,8 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
         }
         switch (fill.kind) {
         case MaterialFillKind::solid:
-            if (fill.spread != GradientSpreadMode::pad) return false;
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                fill.spread != GradientSpreadMode::pad) return false;
             break;
         case MaterialFillKind::linear_gradient:
             if (fill.spread != GradientSpreadMode::pad &&
@@ -334,14 +416,25 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
                 fill.spread != GradientSpreadMode::reflect) {
                 return false;
             }
-            if (!bounded_coordinate(fill.start, fill.coordinate_space) ||
-                !bounded_coordinate(fill.end, fill.coordinate_space) ||
-                fill.start == fill.end || !valid_gradient_stops(fill.stops)) {
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints &&
+                fill.linear_geometry != MaterialLinearGeometry::css_angle) {
+                return false;
+            }
+            if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
+                if (fill.coordinate_space != MaterialCoordinateSpace::normalized ||
+                    !std::isfinite(fill.angle_degrees) ||
+                    std::abs(fill.angle_degrees) > 360'000.0 ||
+                    !valid_gradient_stops(fill.stops)) return false;
+            } else if (!bounded_coordinate(fill.start, fill.coordinate_space) ||
+                       !bounded_coordinate(fill.end, fill.coordinate_space) ||
+                       fill.start == fill.end ||
+                       !valid_gradient_stops(fill.stops)) {
                 return false;
             }
             break;
         case MaterialFillKind::radial_gradient: {
-            if (fill.spread != GradientSpreadMode::pad) return false;
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                fill.spread != GradientSpreadMode::pad) return false;
             if (!bounded_coordinate(fill.center, fill.coordinate_space) ||
                 !finite(fill.radii) || fill.radii.width <= 0.0 ||
                 fill.radii.height <= 0.0 ||
@@ -357,7 +450,8 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
             break;
         }
         case MaterialFillKind::image:
-            if (fill.image.value == 0U || !finite(fill.image_pixel_size) ||
+            if (fill.linear_geometry != MaterialLinearGeometry::endpoints ||
+                fill.image.value == 0U || !finite(fill.image_pixel_size) ||
                 fill.image_pixel_size.width <= 0.0 ||
                 fill.image_pixel_size.height <= 0.0 ||
                 std::floor(fill.image_pixel_size.width) !=
@@ -418,6 +512,14 @@ void paint_surface_material(Painter& painter, Rect bounds,
             }
             break;
         case MaterialFillKind::linear_gradient:
+            if (fill.linear_geometry == MaterialLinearGeometry::css_angle) {
+                const std::pair<Point, Point> endpoints =
+                    resolve_css_linear_gradient(fill.angle_degrees, bounds);
+                painter.fill_linear_gradient_spread(
+                    bounds, endpoints.first, endpoints.second, fill.stops,
+                    fill.spread);
+                break;
+            }
             painter.fill_linear_gradient_spread(
                 bounds, resolve_point(fill.start, fill.coordinate_space, bounds),
                 resolve_point(fill.end, fill.coordinate_space, bounds), fill.stops,
@@ -452,6 +554,30 @@ void paint_surface_material(Painter& painter, Rect bounds,
              std::max(0.0, bounds.height - inset * 2.0)},
             std::max(0.0, material.corner_radius - inset),
             (*material.border).color, (*material.border).width);
+    }
+    if (material.border_edges.top) {
+        const MaterialBorder& border = *material.border_edges.top;
+        const double y = bounds.y + border.width * 0.5;
+        painter.draw_line({bounds.x, y}, {bounds.x + bounds.width, y},
+                          border.color, border.width);
+    }
+    if (material.border_edges.right) {
+        const MaterialBorder& border = *material.border_edges.right;
+        const double x = bounds.x + bounds.width - border.width * 0.5;
+        painter.draw_line({x, bounds.y}, {x, bounds.y + bounds.height},
+                          border.color, border.width);
+    }
+    if (material.border_edges.bottom) {
+        const MaterialBorder& border = *material.border_edges.bottom;
+        const double y = bounds.y + bounds.height - border.width * 0.5;
+        painter.draw_line({bounds.x, y}, {bounds.x + bounds.width, y},
+                          border.color, border.width);
+    }
+    if (material.border_edges.left) {
+        const MaterialBorder& border = *material.border_edges.left;
+        const double x = bounds.x + border.width * 0.5;
+        painter.draw_line({x, bounds.y}, {x, bounds.y + bounds.height},
+                          border.color, border.width);
     }
 }
 

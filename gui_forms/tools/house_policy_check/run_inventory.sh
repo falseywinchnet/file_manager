@@ -14,6 +14,7 @@ pointer_rewrite_path=${3-}
 auto_rewrite_path=
 platform=native
 source_scope=${6-production}
+checker_mode=${GUI_FORMS_HOUSE_POLICY_MODE:-inventory}
 case ${4-} in
     native|mingw) platform=$4 ;;
     *)
@@ -41,6 +42,14 @@ case "$source_scope" in
     production|first-party) ;;
     *)
         echo "unsupported inventory source scope: $source_scope" >&2
+        exit 2
+        ;;
+esac
+
+case "$checker_mode" in
+    inventory|closure) ;;
+    *)
+        echo "unsupported house-policy mode: $checker_mode" >&2
         exit 2
         ;;
 esac
@@ -106,7 +115,7 @@ fi
 
 if [ "$platform" = mingw ]; then
     "$checker" \
-        --mode inventory \
+        --mode "$checker_mode" \
         --source-scope "$source_scope" \
         --quiet \
         --source-root "$gui_forms_root" \
@@ -118,7 +127,7 @@ if [ "$platform" = mingw ]; then
         "$@"
 else
     "$checker" \
-        --mode inventory \
+        --mode "$checker_mode" \
         --source-scope "$source_scope" \
         --quiet \
         --source-root "$gui_forms_root" \

@@ -53,6 +53,12 @@ public:
     }
     void set_style(BasicControlStyle style);
     void clear_style();
+    [[nodiscard]] const std::optional<ControlStateRecipes>&
+    visual_recipes_override() const noexcept {
+        return visual_recipes_override_;
+    }
+    void set_visual_recipes(ControlStateRecipes recipes);
+    void clear_visual_recipes();
     [[nodiscard]] ImageId image() const noexcept { return image_; }
     void set_image(ImageId image);
     void clear_image();
@@ -131,6 +137,10 @@ protected:
     void paint_themed_button(Painter& painter, Rect bounds,
                              ControlVisualRole role, bool default_cue,
                              bool command_alignment = false) const;
+    [[nodiscard]] const ControlVisualRecipe& resolve_visual_recipe(
+        ControlVisualRole role, ControlVisualContext context) const noexcept;
+    [[nodiscard]] Insets resolved_visual_outsets(
+        ControlVisualRole role, ControlVisualContext context) const noexcept;
     [[nodiscard]] ImageListResolution resolved_button_image(
         bool selected = false) const noexcept;
     void on_attached_to_window() override;
@@ -149,6 +159,7 @@ private:
     std::string text_;
     FontSpec font_{FontRole::control, 12.0, 400, false, 0.24};
     std::optional<BasicControlStyle> style_override_;
+    std::optional<ControlStateRecipes> visual_recipes_override_;
     ImageId image_{};
     std::shared_ptr<ImageList> image_list_;
     SubscriptionToken image_list_changed_;

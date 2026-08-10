@@ -2,6 +2,7 @@
 #include "support/named_callbacks.hpp"
 
 #include <cstdlib>
+#include <cmath>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -63,7 +64,9 @@ public:
     void draw_box_shadow(Rect, double, Point, double, double, Color) override {
         ++shadows;
     }
-    void draw_line(Point, Point, Color, double) override {}
+    void draw_line(Point start, Point end, Color color, double width) override {
+        lines.push_back({start, end, color, width});
+    }
     void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
     void draw_image(ImageId, Rect, double) override {}
     void draw_image_region(ImageId image, Rect source, Rect destination,
@@ -91,6 +94,12 @@ public:
         ImagePatternWrap wrap{ImagePatternWrap::tile};
         double opacity{};
     };
+    struct Line final {
+        Point start;
+        Point end;
+        Color color;
+        double width{};
+    };
 
     unsigned saves{};
     unsigned restores{};
@@ -114,6 +123,7 @@ public:
     GradientSpreadMode last_spread{GradientSpreadMode::pad};
     std::vector<ImageRegion> image_regions;
     std::vector<ImagePattern> image_patterns;
+    std::vector<Line> lines;
 };
 
 class FallbackPainter final : public Painter {
@@ -150,6 +160,108 @@ SurfaceMaterial specimen_material() {
     material.border = MaterialBorder{Color::rgba(25, 45, 75), 2.0};
     material.corner_radius = 9.0;
     return material;
+}
+
+void test_generated_pointer_count_construction_is_owned_and_bounded() {
+    GradientStop stops[]{
+        {0.0, Color::rgba(12, 31, 48)},
+        {0.55, Color::rgba(33, 89, 122)},
+        {1.0, Color::rgba(82, 155, 178)}};
+    MaterialFillLayer fills[]{
+        MaterialFillLayer::solid(Color::rgba(12, 31, 48)),
+        MaterialFillLayer::linear({0.0, 0.0}, {1.0, 1.0}, stops, 3U)};
+    MaterialShadow shadows[]{
+        {{0.0, 3.0}, 7.0, 1.0, Color::rgba(7, 15, 22, 96)}};
+    const MaterialBorder border{Color::rgba(55, 115, 145), 1.0};
+
+    const SurfaceMaterial material = SurfaceMaterial::from_parts(
+        fills, 2U, shadows, 1U, &border, 8.0);
+    stops[1].offset = 0.75;
+    fills[0].color = Color::rgba(255, 0, 0);
+    shadows[0].blur_radius = 19.0;
+
+    require(material.fills.size() == 2U &&
+                material.fills[0].color == Color::rgba(12, 31, 48) &&
+                material.fills[1].stops.size() == 3U &&
+                material.fills[1].stops[1].offset == 0.55 &&
+                material.shadows.size() == 1U &&
+                material.shadows[0].blur_radius == 7.0 &&
+                material.border == border && material.corner_radius == 8.0,
+            "pointer/count construction must copy generated static data into retained ownership");
+
+    bool rejected{};
+    try {
+        static_cast<void>(MaterialFillLayer::linear(
+            {0.0, 0.0}, {1.0, 0.0}, nullptr, 2U));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected,
+            "nonzero generated gradient count must reject a null pointer");
+
+    rejected = false;
+    try {
+        static_cast<void>(SurfaceMaterial::from_parts(
+            nullptr, 1U, nullptr, 0U, nullptr, 0.0));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected,
+            "nonzero generated fill count must reject a null pointer");
+}
+
+void test_css_angle_gradient_resolves_against_rectangular_bounds() {
+    const GradientStop stops[]{
+        {0.0, Color::rgba(10, 20, 30)},
+        {1.0, Color::rgba(80, 90, 100)}};
+    SurfaceMaterial material;
+    material.fills = {
+        MaterialFillLayer::linear_css_angle(145.0, stops, 2U)};
+    RichPainter painter;
+    paint_surface_material(painter, {20.0, 30.0, 200.0, 100.0}, material);
+
+    require(painter.spread_linear_fills == 1U &&
+                std::abs(painter.last_start.x - 63.6086916466358) < 0.000001 &&
+                std::abs(painter.last_start.y - -0.5351346224371) < 0.000001 &&
+                std::abs(painter.last_end.x - 176.391308353364) < 0.000001 &&
+                std::abs(painter.last_end.y - 160.535134622437) < 0.000001,
+            "CSS-angle gradients must resolve from the current rectangular bounds");
+
+    material.fills = {
+        MaterialFillLayer::linear_css_angle(180.0, stops, 2U)};
+    paint_surface_material(painter, {20.0, 30.0, 200.0, 100.0}, material);
+    require(painter.last_start == Point{120.0, 30.0} &&
+                painter.last_end == Point{120.0, 130.0},
+            "cardinal CSS angles must retain exact endpoints");
+}
+
+void test_independent_edge_borders_are_owned_and_inset() {
+    MaterialFillLayer fill =
+        MaterialFillLayer::solid(Color::rgba(240, 244, 248));
+    const MaterialBorder top{Color::rgba(10, 20, 30), 2.0};
+    const MaterialBorder right{Color::rgba(40, 50, 60), 4.0};
+    const MaterialBorderEdges edges = MaterialBorderEdges::from_parts(
+        &top, &right, nullptr, nullptr);
+    const SurfaceMaterial material = SurfaceMaterial::from_parts(
+        &fill, 1U, nullptr, 0U, nullptr, &edges, 0.0);
+    require(valid_surface_material(material),
+            "independent square edge borders must form a valid material");
+
+    RichPainter painter;
+    paint_surface_material(painter, {20.0, 30.0, 100.0, 60.0}, material);
+    require(painter.lines.size() == 2U &&
+                painter.lines[0].start == Point{20.0, 31.0} &&
+                painter.lines[0].end == Point{120.0, 31.0} &&
+                painter.lines[0].width == 2.0 &&
+                painter.lines[1].start == Point{118.0, 30.0} &&
+                painter.lines[1].end == Point{118.0, 90.0} &&
+                painter.lines[1].width == 4.0,
+            "edge borders must paint half-width inside their owned bounds");
+
+    SurfaceMaterial invalid = material;
+    invalid.corner_radius = 5.0;
+    require(!valid_surface_material(invalid),
+            "edge borders with rounded joins must wait for a proven corner primitive");
 }
 
 void test_material_validation_is_atomic() {
@@ -380,6 +492,9 @@ void test_shadow_outsets_participate_in_damage() {
 
 int main() {
     try {
+        test_generated_pointer_count_construction_is_owned_and_bounded();
+        test_css_angle_gradient_resolves_against_rectangular_bounds();
+        test_independent_edge_borders_are_owned_and_inset();
         test_material_validation_is_atomic();
         test_retained_replay_preserves_material_operations();
         test_repeating_material_survives_record_and_replay();

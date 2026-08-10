@@ -37,6 +37,11 @@ void require(bool condition, const char* message) {
     }
 }
 
+SurfaceMaterial solid_material(Color color) {
+    const MaterialFillLayer fill = MaterialFillLayer::solid(color);
+    return SurfaceMaterial::from_parts(&fill, 1U, nullptr, 0U, nullptr, 0.0);
+}
+
 class RecordingPainter final : public Painter {
 public:
     void save() override { ++saves; }
@@ -44,11 +49,22 @@ public:
     void translate(Point) override {}
     void clip_rect(Rect) override { ++clips; }
     void clip_rounded_rect(Rect, double) override { ++rounded_clips; }
-    void fill_rect(Rect, Color) override { ++fills; }
-    void fill_rounded_rect(Rect, double, Color) override { ++rounded_fills; }
+    void fill_rect(Rect bounds, Color color) override {
+        ++fills;
+        last_fill_bounds = bounds;
+        last_fill_color = color;
+    }
+    void fill_rounded_rect(Rect bounds, double, Color color) override {
+        ++rounded_fills;
+        last_fill_bounds = bounds;
+        last_fill_color = color;
+    }
     void stroke_rect(Rect, Color, double) override { ++strokes; }
-    void stroke_rounded_rect(Rect, double, Color, double) override {
+    void stroke_rounded_rect(Rect bounds, double, Color color, double width) override {
         ++rounded_strokes;
+        last_rounded_stroke_bounds = bounds;
+        last_rounded_stroke_color = color;
+        last_rounded_stroke_width = width;
     }
     void fill_linear_gradient(Rect, Point, Point,
                               std::span<const GradientStop>) override {
@@ -76,6 +92,11 @@ public:
     std::uint64_t rounded_strokes{};
     std::uint64_t gradients{};
     std::uint64_t lines{};
+    Rect last_fill_bounds{};
+    Color last_fill_color{};
+    Rect last_rounded_stroke_bounds{};
+    Color last_rounded_stroke_color{};
+    double last_rounded_stroke_width{};
     std::vector<std::string> texts;
     std::vector<FontRole> roles;
     std::vector<Point> text_origins;
@@ -259,6 +280,107 @@ void test_button_pointer_and_keyboard_activation() {
             "focused Button must activate once on normalized Space release");
     require(!(*button).pressed_visual(),
             "Button keyboard visual must clear after activation");
+}
+
+void test_button_authored_state_recipes_are_owned_and_retained() {
+    const Color normal_color = Color::rgba(21, 42, 63);
+    const Color hot_color = Color::rgba(31, 62, 93);
+    const Color pressed_color = Color::rgba(11, 32, 53);
+    const Color disabled_color = Color::rgba(91, 102, 113);
+    ControlVisualRecipe recipe_values[control_surface_state_count];
+    for (std::size_t index = 0; index < control_surface_state_count; ++index) {
+        recipe_values[index].material = solid_material(normal_color);
+        recipe_values[index].focus_ring = Color::rgba(40, 125, 155);
+        recipe_values[index].focus_width = 2.0;
+        recipe_values[index].focus_offset = 3.0;
+        recipe_values[index].focus_external = true;
+        recipe_values[index].default_width = 0.0;
+        recipe_values[index].visual_offset = {};
+        recipe_values[index].pressed_content_offset = {};
+    }
+    recipe_values[static_cast<std::size_t>(ControlSurfaceState::hot)].material =
+        solid_material(hot_color);
+    recipe_values[static_cast<std::size_t>(ControlSurfaceState::pressed)].material =
+        solid_material(pressed_color);
+    recipe_values[static_cast<std::size_t>(ControlSurfaceState::pressed)].visual_offset =
+        {0.0, 1.0};
+    recipe_values[static_cast<std::size_t>(ControlSurfaceState::disabled)].material =
+        solid_material(disabled_color);
+
+    const ControlStateRecipes recipes = ControlStateRecipes::from_parts(
+        recipe_values, control_surface_state_count);
+    recipe_values[static_cast<std::size_t>(ControlSurfaceState::normal)].material =
+        solid_material(Color::rgba(255, 0, 0));
+
+    std::shared_ptr<gui_forms::Button> button = make_control<Button>(
+        StableId("button.authored-state-recipes"), "Authored");
+    (*button).set_requested_bounds({0.0, 0.0, 120.0, 32.0});
+    (*button).set_visual_recipes(recipes);
+    Window window(button, {120.0, 32.0});
+    window.perform_layout();
+
+    RecordingPainter normal_painter;
+    (*button).on_paint(normal_painter, (*button).absolute_bounds());
+    require(normal_painter.last_fill_color == normal_color,
+            "Button must own its authored normal-state material");
+
+    (*button).on_focus_changed(true);
+    RecordingPainter focus_painter;
+    (*button).on_paint(focus_painter, (*button).absolute_bounds());
+    require(focus_painter.last_rounded_stroke_bounds ==
+                Rect{-4.0, -4.0, 128.0, 40.0} &&
+                focus_painter.last_rounded_stroke_width == 2.0 &&
+                (*button).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
+            "authored outline offset must paint and invalidate outside the button box");
+    (*button).on_focus_changed(false);
+
+    PointerEvent enter;
+    enter.action = PointerAction::enter;
+    (*button).on_pointer(enter);
+    RecordingPainter hot_painter;
+    (*button).on_paint(hot_painter, (*button).absolute_bounds());
+    require(hot_painter.last_fill_color == hot_color,
+            "Button hover must resolve the authored hot-state material");
+
+    PointerEvent down;
+    down.action = PointerAction::down;
+    down.button = PointerButton::primary;
+    down.position = center(button);
+    (*button).on_pointer(down);
+    RecordingPainter pressed_painter;
+    (*button).on_paint(pressed_painter, (*button).absolute_bounds());
+    require(pressed_painter.last_fill_color == pressed_color,
+            "Button press must resolve the authored pressed-state material");
+    require(pressed_painter.last_fill_bounds.y == 1.0 &&
+                (*button).visual_outsets().bottom == 1.0,
+            "authored pressed transform must move the whole visual without changing layout");
+
+    (*button).set_enabled(false);
+    RecordingPainter disabled_painter;
+    (*button).on_paint(disabled_painter, (*button).absolute_bounds());
+    require(disabled_painter.last_fill_color == disabled_color,
+            "Button disabled state must resolve the authored disabled material");
+
+    bool rejected_count = false;
+    try {
+        static_cast<void>(ControlStateRecipes::from_parts(
+            recipe_values, control_surface_state_count - 1U));
+    } catch (const std::invalid_argument&) {
+        rejected_count = true;
+    }
+    require(rejected_count,
+            "authored state recipes must reject a partial retained state set");
+
+    recipe_values[0].material.corner_radius = -1.0;
+    bool rejected_invalid = false;
+    try {
+        static_cast<void>(ControlStateRecipes::from_parts(
+            recipe_values, control_surface_state_count));
+    } catch (const std::invalid_argument&) {
+        rejected_invalid = true;
+    }
+    require(rejected_invalid,
+            "authored state recipes must reject an invalid surface atomically");
 }
 
 void test_mnemonics_and_dialog_buttons_are_retained_commands() {
@@ -937,6 +1059,7 @@ int main() {
     try {
         test_public_controls_render_with_role_policy();
         test_button_pointer_and_keyboard_activation();
+        test_button_authored_state_recipes_are_owned_and_retained();
         test_mnemonics_and_dialog_buttons_are_retained_commands();
         test_checkbox_state_and_click_order();
         test_radio_group_scope_and_order();
