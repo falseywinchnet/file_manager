@@ -1,92 +1,91 @@
 # Sorting and binary-search audit
 
-Status: **initial textual inventory from the dirty 2026-08-10 tree; workloads
-and measurements pending**.
+Status: **MEASURED on the M4 Release build; one bounded house-sort migration,
+all production binary-search-family calls migrated, negative results retained**.
 
-The implementation sibling must refresh this inventory from the exact starting
-snapshot. No call-site winner is selected here.
+The laboratory implements the architect-selected candidates in
+`include/gui_forms/detail/algorithm/sort.hpp`:
 
-The architect selected the laboratory candidate set: optimal house-style forms
-of stable insertion sort, a run-aware stable merge/adaptive sort, and an
-explicit-stack unstable partition/introspective sort. Standard-library sorts
-remain controls and remain selected wherever no house candidate wins a declared
-dimension without material regression.
+- stable insertion sort;
+- natural-run adaptive stable merge sort;
+- explicit-stack introsort with a private heap fallback at its depth limit.
 
-## Current sort sites
+`std::sort` and `std::stable_sort` are the controls. Candidate existence is not
+admission: a production call site changes only when its actual contract and the
+measured workload support the choice.
 
-### Ordinary sort
+## Production call-site decisions
 
-| Site | Data and semantic purpose | Initial workload hypothesis | Audit emphasis |
+| Site | Data/contract | Selection | Evidence and reason |
 |---|---|---|---|
-| `error_provider.cpp` snapshot | error icons ordered by stable UTF-8 ID | usually small; snapshot/report path | string comparison cost, determinism, maximum attached errors |
-| `list_box.cpp` stable-ID validation | copied item IDs sorted to detect duplicates | can scale with item count; mutation-time | string sizes, duplicate density, already-ordered inputs |
-| `list_box.cpp` selection normalization | integer indexes sorted then uniqued | often small and nearly ordered | insertion/adaptive sort versus standard sort |
-| `property_grid.cpp` visible descriptors | alphabetical or category/name ordering | moderate; rebuild/refresh path | stability need, canonicalization cost, precomputed keys |
-| `correspondence_view.cpp` expanded indexes | at most pinned, hover-expanded, and focused indexes | bounded to at most three current roles | direct ordered insertion or tiny fixed sorting logic |
-| `text_store.cpp` style-span normalization | spans ordered by start/end/style | bounded content; often authored in order | nearly-sorted behavior, duplicate/overlap patterns, stable requirement |
-| `damage_region.cpp` x edges | two numeric edges per nonempty rectangle, then unique | damage count dependent; potentially frame-sensitive | small-array behavior, duplicates, hotness |
-| `damage_region.cpp` y intervals | numeric pairs sorted for every x strip | repeated inside area computation; potentially expensive | comparator/move cost, repeated work, possible specialized sweep design |
+| `error_provider.cpp` | UTF-8 stable IDs for snapshot determinism | keep `std::sort` | The 32-element string corpus favored the standard control, 339.16 ns/sort versus 656.06 insertion and 398.90 house introsort. |
+| `list_box.cpp` duplicate-ID validation | growable string IDs | keep `std::sort` | String movement/comparison favored the standard control; no bounded small-size contract exists. |
+| `list_box.cpp` selected indexes | growable integer selection, often plausibly ordered | keep `std::sort` | Insertion won the synthetic nearly ordered 16/64 cases, but lost the random-64 case by 2.5x. No production distribution was measured, so a data-dependent cliff is not admitted. |
+| `property_grid.cpp` visible descriptors | growable descriptor list and named comparator | keep `std::sort` | Comparator/key costs and actual rebuild distributions are not measured; no house winner is established. |
+| `correspondence_view.cpp` expanded indexes | at most three roles: pinned, hover-expanded, focused | use house stable insertion | The maximum size is an exact code contract. At size three insertion measured 1.15 ns/sort versus 2.14 for `std::sort`, with equivalent output and no auxiliary allocation. |
+| `text_store.cpp` style spans | growable stateful spans, normalization path | keep `std::sort` | Actual order/overlap distribution is not measured; no specialized winner is established. |
+| `damage_region.cpp` x edges | duplicate-heavy numeric edges, frame-sensitive | keep `std::sort` | Insertion won the synthetic duplicate-128 corpus, but on random 512 edges it was 18.51 us versus 1.91 us for the standard control. Actual damage distributions are not yet sufficient to choose safely. |
+| `damage_region.cpp` y intervals | repeated growable numeric pairs | keep `std::sort` | Same data-dependent risk as x edges; algorithm replacement would precede evidence. |
+| `harfbuzz_font_engine.cpp` face tiers | stable registration order within preference tiers | keep `std::stable_sort` | Standard stable sort won: 16.52 ns versus 18.17 insertion and 28.57 adaptive. |
+| `control.cpp` two tab/mnemonic traversals | stable equal-tab insertion order | keep `std::stable_sort` | Standard control won the stable size-32 corpus, 63.28 ns versus 75.65 insertion and 139.89 adaptive. |
+| `window.cpp` two tab/mnemonic traversals | stable retained-child order | keep `std::stable_sort` | Standard control also won size 256, 856 ns versus 3.07 us insertion and 1.10 us adaptive. Caching/traversal consolidation would be a different lifecycle/invalidation change. |
+| File Manager demoboard product ordering | stable presentation ordering | keep `std::stable_sort` | First-party consumer behavior stays at its standard control; no consumer-specific winner was measured. |
 
-### Stable sort
+Support uses deliberately retain the standard operations: binary-search and
+sort tests need independent controls; `sort_lab.cpp` is the tournament;
+dispatcher tests canonicalize expected output; the renderer benchmark orders
+measurement samples; and the house-policy checker sorts its emitted ledger and
+rewrite plans deterministically. These are not production migrations waiting
+to happen.
 
-| Site | Data and required stability | Initial workload hypothesis | Audit emphasis |
-|---|---|---|---|
-| `harfbuzz_font_engine.cpp` face candidates | role/content/other tiers; registration order retained within tier | small fallback-face set | stable insertion/adaptive sort; tier precomputation |
-| `control.cpp` next-control traversal | children by `tab_index`, insertion order for equals | small/moderate retained child lists | frequency, existing order, stable semantics |
-| `control.cpp` mnemonic traversal | retained children by `tab_index` | small/moderate; input path | repeated sort versus maintained/cached order |
-| `window.cpp` traversal | eligible children by `tab_index` | navigation path | repeated tree sorting, allocation, stability |
-| `window.cpp` mnemonic traversal | children by `tab_index` | keyboard input path | repeated sorting/caching and exact invalidation |
-| `window.cpp` focus candidates | children by `tab_index` | navigation/focus path | stable order, tree size, already-sorted frequency |
+## Measured tournament
 
-The repeated stable tab-order sites may represent one semantic operation copied
-across implementations. Audit consolidation or a shared named traversal helper,
-but do not change public APIs, tree semantics, or invalidation rules.
+The complete result table is `SORT_LAB_M4_RESULTS.csv`. It records best total
+time, iterations, time per sort, and a checksum for every algorithm/corpus pair.
+Important outcomes are:
 
-## Current binary-search family
+- stable insertion has a real small/nearly-ordered numeric niche;
+- stable insertion has a severe random-medium regression and loses on the
+  measured string corpus;
+- house introsort did not beat `std::sort` in any measured corpus;
+- the adaptive stable candidate did not beat `std::stable_sort` in any stable
+  corpus;
+- the standard library remains selected everywhere evidence is absent or a
+  house candidate loses.
 
-House replacements use a contiguous range/index core with named lower-bound,
-upper-bound, and exact-search operations, explicit value/comparator types, and
-no lambdas at call sites.
+These are representative laboratory corpora, not claimed p50/p95 production
+telemetry. The bounded three-role correspondence site needs no distributional
+guess; other sites stay standard precisely because they do.
 
-| Operation | Current uses |
-|---|---|
-| exact binary search | selected ListBox indexes, CheckedListBox selection, grapheme boundaries |
-| lower bound | text layout offsets, text layout positions, ABI field-control positions, grapheme offsets |
-| upper bound | generated Unicode ranges, style-span lookup |
+`tests/sort_algorithm_tests.cpp` verifies ordering equivalence across empty,
+small, ordered, reverse, duplicate-heavy, deterministic generated, and larger
+inputs. It separately verifies stable equal-key order for both house stable
+algorithms.
 
-The house implementation must prove:
+## Binary search
 
-- empty and singleton ranges;
-- lower/upper edge insertion points;
-- duplicates;
-- custom named comparator behavior;
-- no overflow in midpoint computation;
-- iterator/range requirements stated explicitly;
-- equivalence to the current standard operation over representative and fuzzed
-  inputs.
+All production `std::lower_bound`, `std::upper_bound`, and
+`std::binary_search` calls were replaced by the contiguous index-returning
+house core in `include/gui_forms/detail/algorithm/binary_search.hpp`.
+First-party `std::*` occurrences remain only as independent test controls.
 
-## Measurement corpus required before sort selection
+The house operations cover:
 
-For each call site record:
+- lower-bound index;
+- upper-bound index;
+- exact membership;
+- explicit comparator types and heterogeneous values;
+- midpoint calculation as `first + count / 2`, avoiding `first + last`
+  overflow.
 
-- p50/p95/p99 and maximum element count;
-- initial-order classification: sorted, nearly sorted, reverse, random, runs;
-- duplicate/equal-key density;
-- element size and move/copy cost;
-- comparator calls and comparator cost;
-- scratch allocation and bytes;
-- invocation frequency and whether it occurs in input/frame paths;
-- required stability;
-- results under the actual libc++ and Windows toolchains.
+`tests/binary_search_tests.cpp` proves empty/singleton/boundary/duplicate,
+custom-comparator, constexpr, and deterministic generated equivalence against
+the standard controls.
 
-Call-site winners are chosen after this data. The selected laboratory candidates
-are stable insertion, adaptive/run-aware stable merge, and a nonrecursive
-explicit-stack partition/introspective sort. Specialized bounded numeric/pair
-ordering may still be measured for a concrete site. Each remains controlled by
-`std::sort`/`std::stable_sort` and exact output equivalence.
+## Negative rule retained
 
-## Negative rule
-
-Do not choose an algorithm because it is fashionable, theoretically optimal in
-the abstract, or already implemented elsewhere. Choose the smallest named set
-that wins or materially clarifies the actual GUI.Forms workloads.
+No algorithm is selected because it is theoretically fashionable or because a
+private implementation now exists. The losing candidates and their checksums
+remain in the laboratory as negative evidence. A later production migration
+needs a named workload and a win without material regression on the admitted
+input domain.

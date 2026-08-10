@@ -1,0 +1,12 @@
+operation,kind,allocations,object_bytes
+bind,delegate,0,16
+bind,std_function_small,0,32
+bind,std_function_large,1,32
+subscribe,delegate,2,0
+emit,delegate,1,0
+subscribe,std_function_large,3,0
+emit,std_function_large,2,0
+operation,kind,total_ns,iterations,ns_per_call,total
+invoke,delegate,33215208,10000000,3.32152,10000001
+invoke,std_function_small,25058791,10000000,2.50588,10000000
+invoke,std_function_large,18799792,10000000,1.87998,10000001

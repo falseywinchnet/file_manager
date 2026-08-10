@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Joshuah Rainstar
+// SPDX-License-Identifier: MIT
+
 #ifndef FILEMAN_THREADPOOL_ATOMIC_FAST_H
 #define FILEMAN_THREADPOOL_ATOMIC_FAST_H
 

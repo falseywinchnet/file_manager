@@ -1,6 +1,236 @@
 {
-  "findingCount": 566,
+  "findingCount": 642,
   "findings": [
+    {
+      "column": 42,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::make_gallery",
+      "exceptionIdentifier": "O-002-span",
+      "line": 19,
+      "path": "demo/gallery.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 30,
+      "constructKind": "consteval",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::dml",
+      "exceptionIdentifier": "O-002-consteval",
+      "line": 119,
+      "path": "demo/gallery_dml.hpp",
+      "replacementCategory": "retain_explicit_compile_time_execution"
+    },
+    {
+      "column": 30,
+      "constructKind": "consteval",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::dml",
+      "exceptionIdentifier": "O-002-consteval",
+      "line": 134,
+      "path": "demo/gallery_dml.hpp",
+      "replacementCategory": "retain_explicit_compile_time_execution"
+    },
+    {
+      "column": 12,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::write_pixel",
+      "exceptionIdentifier": "O-002-span",
+      "line": 174,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 29,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::write_pixel",
+      "exceptionIdentifier": "O-002-span",
+      "line": 174,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::render_candidate",
+      "exceptionIdentifier": "O-002-span",
+      "line": 223,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 27,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::render_candidate",
+      "exceptionIdentifier": "O-002-span",
+      "line": 223,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 23,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 313,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::project_objects",
+      "exceptionIdentifier": "O-002-span",
+      "line": 91,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::recent_paths",
+      "exceptionIdentifier": "O-002-span",
+      "line": 97,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::path_completions",
+      "exceptionIdentifier": "O-002-span",
+      "line": 100,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::search_results",
+      "exceptionIdentifier": "O-002-span",
+      "line": 105,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::criteria_modules",
+      "exceptionIdentifier": "O-002-span",
+      "line": 107,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::criterion_templates",
+      "exceptionIdentifier": "O-002-span",
+      "line": 109,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 19,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::FixtureCatalogue::criteria_objects",
+      "exceptionIdentifier": "O-002-span",
+      "line": 111,
+      "path": "file_manager_demoboard/include/file_manager_demoboard/fixture_model.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "file_manager_demoboard::(anonymous namespace)::make_object_field",
+      "exceptionIdentifier": "O-002-span",
+      "line": 357,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 514,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 1905,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 2114,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 2409,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 2438,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 2471,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 14,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "file_manager_demoboard::set_product_surface",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 3837,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
     {
       "column": 19,
       "constructKind": "std_span",
@@ -5660,9 +5890,540 @@
       "line": 64,
       "path": "src/render/text/harfbuzz/harfbuzz_font_engine.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 347,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 348,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 355,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 39,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 356,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 364,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 365,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 53,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 54,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_public_drawing_metrics_and_control_tag",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 768,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 843,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 23,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_image_list_state_density_ownership_and_button_layout",
+      "exceptionIdentifier": "O-002-span",
+      "line": 844,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 38,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 48,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 71,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 91,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 376,
+      "path": "tests/binding_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ImageRecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 34,
+      "path": "tests/collection_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ImageRecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 35,
+      "path": "tests/collection_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 22,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::curve_polygon_and_pie_paths_are_retained_and_bounded",
+      "exceptionIdentifier": "O-002-span",
+      "line": 371,
+      "path": "tests/drawing_core_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 38,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::curve_polygon_and_pie_paths_are_retained_and_bounded",
+      "exceptionIdentifier": "O-002-span",
+      "line": 390,
+      "path": "tests/drawing_core_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_error_semantics_geometry_rtl_and_lifetime",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 116,
+      "path": "tests/guidance_provider_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_help_routes_f1_locally_then_to_provider_without_external_policy",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 268,
+      "path": "tests/guidance_provider_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 36,
+      "path": "tests/input_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 34,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 37,
+      "path": "tests/input_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 300,
+      "path": "tests/layout_panel_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 301,
+      "path": "tests/layout_panel_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 39,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 40,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 46,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 9,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 48,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 56,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 32,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 33,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::crc32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::crc32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::write_u32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 69,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 16,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::write_u32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 69,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 37,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::repair_chunk_crc",
+      "exceptionIdentifier": "O-002-span",
+      "line": 82,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::repair_chunk_crc",
+      "exceptionIdentifier": "O-002-span",
+      "line": 84,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 87,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 30,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 88,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 90,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 128,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 134,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 135,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 7,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_request_and_result_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 72,
+      "path": "tests/text_shaping_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 52,
+      "constructKind": "designated_initializer",
+      "disposition": "review",
+      "enclosingSymbol": "(anonymous namespace)::test_atomic_mutation_and_limits",
+      "exceptionIdentifier": "O-007-classify-target",
+      "line": 142,
+      "path": "tests/text_store_tests.cpp",
+      "replacementCategory": "plain_configuration_record_review"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 45,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 46,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 51,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 52,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
     }
   ],
   "mode": "inventory",
   "schema": "gui.forms.house-policy-findings/v1",
-  "sourceRoot": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms"
+  "sourceRoot": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms",
+  "sourceScope": "first-party"
 }

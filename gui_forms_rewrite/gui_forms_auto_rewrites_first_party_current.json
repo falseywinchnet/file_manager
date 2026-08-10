@@ -1,0 +1,3576 @@
+{
+  "candidateCount": 446,
+  "rewrites": [
+    {
+      "fileSize": 1193,
+      "path": "demo/gallery.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 809
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/demo/showcase.cpp:25:28)",
+      "safe": false,
+      "tokenOffset": 638
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/demo/showcase.cpp:77:28)",
+      "safe": false,
+      "tokenOffset": 3024
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/demo/showcase.cpp:103:28)",
+      "safe": false,
+      "tokenOffset": 4139
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 6648
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 6781
+    },
+    {
+      "fileSize": 11351,
+      "path": "demo/showcase.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/demo/showcase.cpp:182:27)",
+      "safe": false,
+      "tokenOffset": 7922
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/demo/vsync_lab.cpp:208:35)",
+      "safe": false,
+      "tokenOffset": 7605
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 10788
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 11273
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 11979
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface>",
+      "safe": false,
+      "tokenOffset": 12750
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface>",
+      "safe": false,
+      "tokenOffset": 13913
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 16746
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 18272
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 27239
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 27720
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 28278
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 28805
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 29286
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 29728
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 30192
+    },
+    {
+      "fileSize": 31230,
+      "path": "demo/vsync_lab.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::vsync_lab::(anonymous namespace)::LabContext>",
+      "safe": false,
+      "tokenOffset": 31064
+    },
+    {
+      "fileSize": 9266,
+      "path": "file_manager_demoboard/src/controller_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::CapabilityEntry",
+      "safe": false,
+      "tokenOffset": 4234
+    },
+    {
+      "fileSize": 9266,
+      "path": "file_manager_demoboard/src/controller_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::ControllerLifetime>",
+      "safe": false,
+      "tokenOffset": 4737
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/fixture_model.cpp:180:33)",
+      "safe": false,
+      "tokenOffset": 11038
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/fixture_model.cpp:199:24)",
+      "safe": false,
+      "tokenOffset": 12049
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const file_manager_demoboard::FixturePath *>",
+      "safe": false,
+      "tokenOffset": 12324
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::FixturePathCompletion",
+      "safe": false,
+      "tokenOffset": 12698
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/fixture_model.cpp:231:36)",
+      "safe": false,
+      "tokenOffset": 13397
+    },
+    {
+      "fileSize": 17064,
+      "path": "file_manager_demoboard/src/fixture_model.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::FixturePathCompletion",
+      "safe": false,
+      "tokenOffset": 13984
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::FixtureObject",
+      "safe": false,
+      "tokenOffset": 15607
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::CriteriaSurfacePanel>",
+      "safe": false,
+      "tokenOffset": 23089
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::FixtureObject",
+      "safe": false,
+      "tokenOffset": 50340
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:1016:25)",
+      "safe": false,
+      "tokenOffset": 50666
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:1071:28)",
+      "safe": false,
+      "tokenOffset": 53641
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FixturePath",
+      "safe": false,
+      "tokenOffset": 67831
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "file_manager_demoboard::FixturePathCompletion",
+      "safe": false,
+      "tokenOffset": 77608
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const file_manager_demoboard::FixtureSearchResult *>",
+      "safe": false,
+      "tokenOffset": 88581
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "ModuleIterator",
+      "safe": false,
+      "tokenOffset": 97901
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::InstrumentFieldSpec *>",
+      "safe": false,
+      "tokenOffset": 98022
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 103105
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "ModuleIterator",
+      "safe": false,
+      "tokenOffset": 104440
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "ModuleIterator",
+      "safe": false,
+      "tokenOffset": 108733
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const file_manager_demoboard::FixtureObject *>",
+      "safe": false,
+      "tokenOffset": 111068
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::ProductLifetime>",
+      "safe": false,
+      "tokenOffset": 117881
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:2426:9)",
+      "safe": false,
+      "tokenOffset": 118102
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:2477:31)",
+      "safe": false,
+      "tokenOffset": 121115
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:2642:33)",
+      "safe": false,
+      "tokenOffset": 130479
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::shared_ptr<std::function<void (gui_forms::Rect)>>",
+      "safe": false,
+      "tokenOffset": 130713
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "type_spelling_too_long_for_mechanical_rewrite",
+      "replacement": "std::shared_ptr<std::unordered_map<std::string, std::string, std::hash<std::string>, std::equal_to<std::string>, std::allocator<std::pair<const std::string, std::string>>>>",
+      "safe": false,
+      "tokenOffset": 146168
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:2915:41)",
+      "safe": false,
+      "tokenOffset": 146694
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const file_manager_demoboard::FixtureObject *>",
+      "safe": false,
+      "tokenOffset": 149537
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::ObjectViewItem *>",
+      "safe": false,
+      "tokenOffset": 149872
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::ObjectViewItem *>",
+      "safe": false,
+      "tokenOffset": 151405
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 151794
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::ObjectViewItem *>",
+      "safe": false,
+      "tokenOffset": 159130
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 159885
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 167834
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 168057
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 168278
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::SearchController>",
+      "safe": false,
+      "tokenOffset": 168529
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 168756
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 169325
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<file_manager_demoboard::(anonymous namespace)::NavigationSession>",
+      "safe": false,
+      "tokenOffset": 169719
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/src/product_window.cpp:3299:39)",
+      "safe": false,
+      "tokenOffset": 169926
+    },
+    {
+      "fileSize": 176339,
+      "path": "file_manager_demoboard/src/product_window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "add_pointer_t<add_const_t<std::shared_ptr<file_manager_demoboard::(anonymous namespace)::ProductLifetime>>>",
+      "safe": false,
+      "tokenOffset": 175427
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 1230
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/tests/demoboard_tests.cpp:41:24)",
+      "safe": false,
+      "tokenOffset": 1432
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::SemanticNode *>",
+      "safe": false,
+      "tokenOffset": 3388
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FixtureCatalogue",
+      "safe": false,
+      "tokenOffset": 4328
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 5309
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 6868
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "DispatcherSnapshot",
+      "safe": false,
+      "tokenOffset": 9169
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 15068
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 15145
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 16008
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/tests/demoboard_tests.cpp:338:31)",
+      "safe": false,
+      "tokenOffset": 19058
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 19932
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 27051
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point<std::chrono::steady_clock, typename common_type<std::chrono::duration<long long, std::ratio<1, 1000000000>>, duration<long long, std::ratio<1, 1>>>::type>",
+      "safe": false,
+      "tokenOffset": 28383
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 31208
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 31278
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 34033
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 35637
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "MetricsSnapshot",
+      "safe": false,
+      "tokenOffset": 41024
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Rect",
+      "safe": false,
+      "tokenOffset": 41670
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 43681
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 50968
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 61413
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 61490
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 61559
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 61627
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/file_manager_demoboard/tests/demoboard_tests.cpp:998:31)",
+      "safe": false,
+      "tokenOffset": 61901
+    },
+    {
+      "fileSize": 72600,
+      "path": "file_manager_demoboard/tests/demoboard_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 71862
+    },
+    {
+      "fileSize": 27265,
+      "path": "tests/animation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "ProgressBarAnimationAppearance",
+      "safe": false,
+      "tokenOffset": 22083
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6428
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FocusSink>",
+      "safe": false,
+      "tokenOffset": 7822
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9147
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9251
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9383
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9499
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11288
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11493
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11618
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11750
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FocusSink>",
+      "safe": false,
+      "tokenOffset": 13532
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 14972
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 16229
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 16426
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 16573
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18558
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18703
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18852
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 19524
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 20151
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 20275
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 20390
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 29807
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 30531
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 36527
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "std::span<const byte, 70UL * sizeof(element_type)>",
+      "safe": false,
+      "tokenOffset": 37641
+    },
+    {
+      "fileSize": 43196,
+      "path": "tests/basic_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 38487
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/binding_tests.cpp:154:32)",
+      "safe": false,
+      "tokenOffset": 6349
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11062
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::PropertyProbe>",
+      "safe": false,
+      "tokenOffset": 16184
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 19636
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 23557
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 27852
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 28170
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 28282
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 32597
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 32742
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 33266
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 35569
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 39819
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 40176
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 40908
+    },
+    {
+      "fileSize": 44999,
+      "path": "tests/binding_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 43299
+    },
+    {
+      "fileSize": 7663,
+      "path": "tests/checked_list_box_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2266
+    },
+    {
+      "fileSize": 7663,
+      "path": "tests/checked_list_box_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2702
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2847
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3058
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8532
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::SemanticNode *>",
+      "safe": false,
+      "tokenOffset": 8962
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::SemanticNode *>",
+      "safe": false,
+      "tokenOffset": 10558
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 12599
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 14091
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::SemanticNode *>",
+      "safe": false,
+      "tokenOffset": 14761
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18745
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 26519
+    },
+    {
+      "fileSize": 29091,
+      "path": "tests/collection_controls_tests.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::SemanticNode *>",
+      "safe": false,
+      "tokenOffset": 26945
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2938
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3065
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5043
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5183
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 6429
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11409
+    },
+    {
+      "fileSize": 19384,
+      "path": "tests/composition_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 15915
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "UpdateScope",
+      "safe": false,
+      "tokenOffset": 7293
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "UpdateScope",
+      "safe": false,
+      "tokenOffset": 7435
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 8620
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LayoutTransactionState",
+      "safe": false,
+      "tokenOffset": 9432
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 11105
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FaultingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 11173
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 12235
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MutatingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 12317
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 12427
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 13498
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 13578
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 13662
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MutatingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 13769
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 13877
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 15117
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MutatingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 15200
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 16098
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 16201
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MutatingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 16308
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 17295
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MutatingLayoutControl>",
+      "safe": false,
+      "tokenOffset": 17374
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 17481
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 18578
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 18847
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 19134
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 20710
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 20791
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 20905
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 22122
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 22211
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 23076
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 23155
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 23238
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 24018
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 24102
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 24219
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CallbackArbitrationControl>",
+      "safe": false,
+      "tokenOffset": 24336
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 26492
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 26576
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 26662
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 27007
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 27216
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 29027
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 31324
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 33732
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 36252
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 41812
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 43586
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 43769
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "PopupToken",
+      "safe": false,
+      "tokenOffset": 45325
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "AcceleratorToken",
+      "safe": false,
+      "tokenOffset": 45972
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FontProbe>",
+      "safe": false,
+      "tokenOffset": 47285
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 47567
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 47698
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "PopupToken",
+      "safe": false,
+      "tokenOffset": 47834
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 49879
+    },
+    {
+      "fileSize": 54776,
+      "path": "tests/core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 51767
+    },
+    {
+      "fileSize": 16549,
+      "path": "tests/date_time_picker_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 4204
+    },
+    {
+      "fileSize": 16549,
+      "path": "tests/date_time_picker_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 4350
+    },
+    {
+      "fileSize": 16549,
+      "path": "tests/date_time_picker_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6155
+    },
+    {
+      "fileSize": 16549,
+      "path": "tests/date_time_picker_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6278
+    },
+    {
+      "fileSize": 22236,
+      "path": "tests/dispatcher_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "weak_ptr<gui_forms::Control>",
+      "safe": false,
+      "tokenOffset": 1616
+    },
+    {
+      "fileSize": 22236,
+      "path": "tests/dispatcher_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point<std::chrono::steady_clock, typename common_type<std::chrono::duration<long long, std::ratio<1, 1000000000>>, duration<long long, std::ratio<1, 1>>>::type>",
+      "safe": false,
+      "tokenOffset": 2243
+    },
+    {
+      "fileSize": 22236,
+      "path": "tests/dispatcher_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::DispatchPhaseProbe>",
+      "safe": false,
+      "tokenOffset": 17093
+    },
+    {
+      "fileSize": 23130,
+      "path": "tests/drawing_core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "GraphicsStateToken",
+      "safe": false,
+      "tokenOffset": 1731
+    },
+    {
+      "fileSize": 23130,
+      "path": "tests/drawing_core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/drawing_core_tests.cpp:134:36)",
+      "safe": false,
+      "tokenOffset": 5056
+    },
+    {
+      "fileSize": 23130,
+      "path": "tests/drawing_core_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "GraphicsStateToken",
+      "safe": false,
+      "tokenOffset": 7862
+    },
+    {
+      "fileSize": 23130,
+      "path": "tests/drawing_core_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/drawing_core_tests.cpp:480:29)",
+      "safe": false,
+      "tokenOffset": 20377
+    },
+    {
+      "fileSize": 5699,
+      "path": "tests/drawing_trace_equivalence_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "GraphicsStateToken",
+      "safe": false,
+      "tokenOffset": 1174
+    },
+    {
+      "fileSize": 12478,
+      "path": "tests/focus_scope_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 4711
+    },
+    {
+      "fileSize": 12478,
+      "path": "tests/focus_scope_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6384
+    },
+    {
+      "fileSize": 12478,
+      "path": "tests/focus_scope_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 8980
+    },
+    {
+      "fileSize": 12478,
+      "path": "tests/focus_scope_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9659
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 2341
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 3472
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 3542
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 4462
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ThrowingFrameControl>",
+      "safe": false,
+      "tokenOffset": 5971
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 6637
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 6698
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReentrantFrameControl>",
+      "safe": false,
+      "tokenOffset": 7876
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReentrantFrameControl>",
+      "safe": false,
+      "tokenOffset": 7986
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReentrantFrameControl>",
+      "safe": false,
+      "tokenOffset": 8094
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 8712
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 9740
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 10429
+    },
+    {
+      "fileSize": 17034,
+      "path": "tests/frame_scheduler_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 12954
+    },
+    {
+      "fileSize": 18532,
+      "path": "tests/gallery_interaction_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 12860
+    },
+    {
+      "fileSize": 18532,
+      "path": "tests/gallery_interaction_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::OverflowPaintProbe>",
+      "safe": false,
+      "tokenOffset": 17597
+    },
+    {
+      "fileSize": 18532,
+      "path": "tests/gallery_interaction_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::OverflowPaintProbe>",
+      "safe": false,
+      "tokenOffset": 17706
+    },
+    {
+      "fileSize": 15985,
+      "path": "tests/guidance_provider_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6419
+    },
+    {
+      "fileSize": 15985,
+      "path": "tests/guidance_provider_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 10914
+    },
+    {
+      "fileSize": 15985,
+      "path": "tests/guidance_provider_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11264
+    },
+    {
+      "fileSize": 15985,
+      "path": "tests/guidance_provider_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13167
+    },
+    {
+      "fileSize": 15985,
+      "path": "tests/guidance_provider_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13374
+    },
+    {
+      "fileSize": 12349,
+      "path": "tests/harfbuzz_font_engine_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/harfbuzz_font_engine_tests.cpp:177:27)",
+      "safe": false,
+      "tokenOffset": 8205
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 7375
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 8001
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8121
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 13758
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 16574
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::InputProbe>",
+      "safe": false,
+      "tokenOffset": 24291
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::InputProbe>",
+      "safe": false,
+      "tokenOffset": 24356
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 25979
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 26467
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 29832
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 31195
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 34638
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 40266
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 42099
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 44650
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 45287
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::HostLeaseInputProbe>",
+      "safe": false,
+      "tokenOffset": 46991
+    },
+    {
+      "fileSize": 53027,
+      "path": "tests/host_protocol_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::HostLeaseInputProbe>",
+      "safe": false,
+      "tokenOffset": 48740
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 1924
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2037
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 15595
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 15717
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18299
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 19977
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 20118
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 20507
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 24693
+    },
+    {
+      "fileSize": 28982,
+      "path": "tests/input_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 25828
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticNode",
+      "safe": false,
+      "tokenOffset": 623
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9582
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 13842
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 15730
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 15909
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18375
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 18549
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 26314
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 27402
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::PercentPropertyProbe>",
+      "safe": false,
+      "tokenOffset": 32383
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::NullablePropertyProbe>",
+      "safe": false,
+      "tokenOffset": 36137
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::AtomicPropertyProbe>",
+      "safe": false,
+      "tokenOffset": 38198
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::AtomicPropertyProbe>",
+      "safe": false,
+      "tokenOffset": 38301
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 38780
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 42497
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::NestedPropertyProbe>",
+      "safe": false,
+      "tokenOffset": 44303
+    },
+    {
+      "fileSize": 49569,
+      "path": "tests/inspection_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 45617
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6031
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6232
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8010
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9067
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 10720
+    },
+    {
+      "fileSize": 13067,
+      "path": "tests/instrument_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 10797
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CountingControl>",
+      "safe": false,
+      "tokenOffset": 14604
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CountingControl>",
+      "safe": false,
+      "tokenOffset": 14734
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CountingControl>",
+      "safe": false,
+      "tokenOffset": 14910
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::CountingControl>",
+      "safe": false,
+      "tokenOffset": 15081
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReentrantLayoutControl>",
+      "safe": false,
+      "tokenOffset": 16652
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::TransactionPaintControl>",
+      "safe": false,
+      "tokenOffset": 21924
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::TransactionPaintControl>",
+      "safe": false,
+      "tokenOffset": 23490
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::TransactionPaintControl>",
+      "safe": false,
+      "tokenOffset": 24393
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::DeferredInputPaintControl>",
+      "safe": false,
+      "tokenOffset": 25610
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::DeferredInputPaintControl>",
+      "safe": false,
+      "tokenOffset": 27887
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::DeferredInputPaintControl>",
+      "safe": false,
+      "tokenOffset": 29181
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::DeferredInputPaintControl>",
+      "safe": false,
+      "tokenOffset": 30285
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReplayPressureControl>",
+      "safe": false,
+      "tokenOffset": 31858
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReplayPressureControl>",
+      "safe": false,
+      "tokenOffset": 35664
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReplayPressureControl>",
+      "safe": false,
+      "tokenOffset": 37582
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReplayPressureControl>",
+      "safe": false,
+      "tokenOffset": 39528
+    },
+    {
+      "fileSize": 44674,
+      "path": "tests/invalidation_damage_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ReplayPressureControl>",
+      "safe": false,
+      "tokenOffset": 40654
+    },
+    {
+      "fileSize": 28718,
+      "path": "tests/layout_panel_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MeasureMutationControl>",
+      "safe": false,
+      "tokenOffset": 7786
+    },
+    {
+      "fileSize": 28718,
+      "path": "tests/layout_panel_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MeasureMutationControl>",
+      "safe": false,
+      "tokenOffset": 7902
+    },
+    {
+      "fileSize": 28718,
+      "path": "tests/layout_panel_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MeasureMutationControl>",
+      "safe": false,
+      "tokenOffset": 9243
+    },
+    {
+      "fileSize": 28718,
+      "path": "tests/layout_panel_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::MeasureMutationControl>",
+      "safe": false,
+      "tokenOffset": 9360
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::LifecycleProbe>",
+      "safe": false,
+      "tokenOffset": 2446
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::LifecycleProbe>",
+      "safe": false,
+      "tokenOffset": 2531
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 4185
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ThrowingAttachControl>",
+      "safe": false,
+      "tokenOffset": 5178
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ThrowingAttachControl>",
+      "safe": false,
+      "tokenOffset": 6061
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6244
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 7372
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8570
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8901
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::InitializationEventProbe>",
+      "safe": false,
+      "tokenOffset": 10260
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 10400
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11311
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13479
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13570
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13687
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13867
+    },
+    {
+      "fileSize": 16313,
+      "path": "tests/lifecycle_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 13966
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWakeConnection",
+      "safe": false,
+      "tokenOffset": 858
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 1186
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 1516
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 1731
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 1987
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 2266
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 2452
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 2827
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceSnapshot",
+      "safe": false,
+      "tokenOffset": 3084
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 3308
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 3532
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 3775
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 4173
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 4314
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceFrame",
+      "safe": false,
+      "tokenOffset": 4520
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 5495
+    },
+    {
+      "fileSize": 6787,
+      "path": "tests/live_surface_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "LiveSurfaceWriteLease",
+      "safe": false,
+      "tokenOffset": 6408
+    },
+    {
+      "fileSize": 15507,
+      "path": "tests/macos_host_close_tests.mm",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/macos_host_close_tests.mm:154:28)",
+      "safe": false,
+      "tokenOffset": 6305
+    },
+    {
+      "fileSize": 15507,
+      "path": "tests/macos_host_close_tests.mm",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FrameProbe>",
+      "safe": false,
+      "tokenOffset": 8564
+    },
+    {
+      "fileSize": 15507,
+      "path": "tests/macos_host_close_tests.mm",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::FrameProbe>",
+      "safe": false,
+      "tokenOffset": 8666
+    },
+    {
+      "fileSize": 15507,
+      "path": "tests/macos_host_close_tests.mm",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "FrameRequestToken",
+      "safe": false,
+      "tokenOffset": 9137
+    },
+    {
+      "fileSize": 3211,
+      "path": "tests/macos_multi_window_tests.mm",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::function<void ()>",
+      "safe": false,
+      "tokenOffset": 2269
+    },
+    {
+      "fileSize": 16471,
+      "path": "tests/material_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5377
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2979
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3220
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 3507
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SemanticSnapshot",
+      "safe": false,
+      "tokenOffset": 3999
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5835
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 8341
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 12061
+    },
+    {
+      "fileSize": 17377,
+      "path": "tests/menu_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 15887
+    },
+    {
+      "fileSize": 17117,
+      "path": "tests/png_registry_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "std::span<const byte, 70UL * sizeof(element_type)>",
+      "safe": false,
+      "tokenOffset": 901
+    },
+    {
+      "fileSize": 4655,
+      "path": "tests/popup_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "AnchoredPopupPlacementResult",
+      "safe": false,
+      "tokenOffset": 655
+    },
+    {
+      "fileSize": 4655,
+      "path": "tests/popup_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "AnchoredPopupPlacementResult",
+      "safe": false,
+      "tokenOffset": 1005
+    },
+    {
+      "fileSize": 4655,
+      "path": "tests/popup_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "AnchoredPopupPlacementResult",
+      "safe": false,
+      "tokenOffset": 1300
+    },
+    {
+      "fileSize": 4655,
+      "path": "tests/popup_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2887
+    },
+    {
+      "fileSize": 4655,
+      "path": "tests/popup_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "PopupToken",
+      "safe": false,
+      "tokenOffset": 3033
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3217
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3330
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3601
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9946
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 14333
+    },
+    {
+      "fileSize": 15973,
+      "path": "tests/range_controls_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 14461
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeComponent>",
+      "safe": false,
+      "tokenOffset": 3675
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 3751
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 3823
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 5161
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 5232
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Ptr",
+      "safe": false,
+      "tokenOffset": 5508
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 5889
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 7221
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 7295
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeComponent>",
+      "safe": false,
+      "tokenOffset": 8294
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8387
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeComponent>",
+      "safe": false,
+      "tokenOffset": 8745
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 8859
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9016
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 9574
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 10563
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11027
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 11099
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "MetricsSnapshot",
+      "safe": false,
+      "tokenOffset": 13286
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/retained_lifetime_tests.cpp:346:25)",
+      "safe": false,
+      "tokenOffset": 14718
+    },
+    {
+      "fileSize": 17362,
+      "path": "tests/retained_lifetime_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ProbeControl>",
+      "safe": false,
+      "tokenOffset": 15903
+    },
+    {
+      "fileSize": 9179,
+      "path": "tests/scrollable_control_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5317
+    },
+    {
+      "fileSize": 11727,
+      "path": "tests/semantic_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5606
+    },
+    {
+      "fileSize": 11727,
+      "path": "tests/semantic_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 10833
+    },
+    {
+      "fileSize": 59490,
+      "path": "tests/showcase_interaction_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point<std::chrono::steady_clock, typename common_type<std::chrono::duration<long long, std::ratio<1, 1000000000>>, duration<long long, std::ratio<1, 1>>>::type>",
+      "safe": false,
+      "tokenOffset": 527
+    },
+    {
+      "fileSize": 59490,
+      "path": "tests/showcase_interaction_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/showcase_interaction_tests.cpp:530:39)",
+      "safe": false,
+      "tokenOffset": 30062
+    },
+    {
+      "fileSize": 59490,
+      "path": "tests/showcase_interaction_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "Control::Ptr",
+      "safe": false,
+      "tokenOffset": 40304
+    },
+    {
+      "fileSize": 59490,
+      "path": "tests/showcase_interaction_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "host::HeadlessHostServices",
+      "safe": false,
+      "tokenOffset": 50820
+    },
+    {
+      "fileSize": 15017,
+      "path": "tests/split_container_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2714
+    },
+    {
+      "fileSize": 7277,
+      "path": "tests/support/headless_trace.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/support/headless_trace.cpp:116:17)",
+      "safe": false,
+      "tokenOffset": 4154
+    },
+    {
+      "fileSize": 7277,
+      "path": "tests/support/headless_trace.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::tests::(anonymous namespace)::TraceControl>",
+      "safe": false,
+      "tokenOffset": 4282
+    },
+    {
+      "fileSize": 7277,
+      "path": "tests/support/headless_trace.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::tests::(anonymous namespace)::TraceControl>",
+      "safe": false,
+      "tokenOffset": 4318
+    },
+    {
+      "fileSize": 7277,
+      "path": "tests/support/headless_trace.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::tests::(anonymous namespace)::TraceControl>",
+      "safe": false,
+      "tokenOffset": 4354
+    },
+    {
+      "fileSize": 7277,
+      "path": "tests/support/headless_trace.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::tests::(anonymous namespace)::TraceControl>",
+      "safe": false,
+      "tokenOffset": 4392
+    },
+    {
+      "fileSize": 10301,
+      "path": "tests/tab_control_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3656
+    },
+    {
+      "fileSize": 10301,
+      "path": "tests/tab_control_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 7414
+    },
+    {
+      "fileSize": 15192,
+      "path": "tests/text_store_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "TextStoreSnapshot",
+      "safe": false,
+      "tokenOffset": 10708
+    },
+    {
+      "fileSize": 15192,
+      "path": "tests/text_store_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/text_store_tests.cpp:279:21)",
+      "safe": false,
+      "tokenOffset": 11970
+    },
+    {
+      "fileSize": 14102,
+      "path": "tests/theme_tests.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 5793
+    },
+    {
+      "fileSize": 14102,
+      "path": "tests/theme_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6202
+    },
+    {
+      "fileSize": 14102,
+      "path": "tests/theme_tests.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/tests/theme_tests.cpp:240:28)",
+      "safe": false,
+      "tokenOffset": 10094
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 823
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 1969
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2052
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2838
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3039
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3873
+    },
+    {
+      "fileSize": 6266,
+      "path": "tests/timer_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 4815
+    },
+    {
+      "fileSize": 11358,
+      "path": "tests/tooltip_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2428
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 1342
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 1762
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 1872
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2013
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 2652
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 3067
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 5824
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6300
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 6444
+    },
+    {
+      "fileSize": 11416,
+      "path": "tests/validation_tests.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "SubscriptionToken",
+      "safe": false,
+      "tokenOffset": 7617
+    }
+  ],
+  "safeCount": 0,
+  "schema": "gui.forms.auto-type-rewrites/v1",
+  "sourceRoot": "gui_forms"
+}

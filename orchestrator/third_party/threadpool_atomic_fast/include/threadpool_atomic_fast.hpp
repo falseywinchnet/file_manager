@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Joshuah Rainstar
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "threadpool_atomic_fast.h"

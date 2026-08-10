@@ -1,6 +1,86 @@
 {
-  "findingCount": 566,
+  "findingCount": 580,
   "findings": [
+    {
+      "column": 42,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::make_gallery",
+      "exceptionIdentifier": "O-002-span",
+      "line": 19,
+      "path": "demo/gallery.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 30,
+      "constructKind": "consteval",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::dml",
+      "exceptionIdentifier": "O-002-consteval",
+      "line": 119,
+      "path": "demo/gallery_dml.hpp",
+      "replacementCategory": "retain_explicit_compile_time_execution"
+    },
+    {
+      "column": 30,
+      "constructKind": "consteval",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::gallery::dml",
+      "exceptionIdentifier": "O-002-consteval",
+      "line": 134,
+      "path": "demo/gallery_dml.hpp",
+      "replacementCategory": "retain_explicit_compile_time_execution"
+    },
+    {
+      "column": 12,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::write_pixel",
+      "exceptionIdentifier": "O-002-span",
+      "line": 174,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 29,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::write_pixel",
+      "exceptionIdentifier": "O-002-span",
+      "line": 174,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::render_candidate",
+      "exceptionIdentifier": "O-002-span",
+      "line": 223,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 27,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::vsync_lab::(anonymous namespace)::WaterfallSurface::render_candidate",
+      "exceptionIdentifier": "O-002-span",
+      "line": 223,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 23,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 313,
+      "path": "demo/vsync_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
     {
       "column": 19,
       "constructKind": "std_span",
@@ -852,6 +932,246 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::stable_insertion_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 16,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 28,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::stable_insertion_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 16,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::stable_insertion_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 37,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 28,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::stable_insertion_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 37,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::reverse_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 49,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 20,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::reverse_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 49,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::merge_runs",
+      "exceptionIdentifier": "O-002-span",
+      "line": 62,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 17,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::merge_runs",
+      "exceptionIdentifier": "O-002-span",
+      "line": 62,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::collect_run",
+      "exceptionIdentifier": "O-002-span",
+      "line": 93,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 25,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::collect_run",
+      "exceptionIdentifier": "O-002-span",
+      "line": 93,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::sift_down",
+      "exceptionIdentifier": "O-002-span",
+      "line": 116,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 16,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::sift_down",
+      "exceptionIdentifier": "O-002-span",
+      "line": 116,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::heap_sort_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 136,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 22,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::heap_sort_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 136,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::partition_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 152,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 29,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::sort_implementation::partition_range",
+      "exceptionIdentifier": "O-002-span",
+      "line": 152,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::adaptive_stable_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 203,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 27,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::adaptive_stable_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 203,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::adaptive_stable_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 246,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 27,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::adaptive_stable_sort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 246,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::explicit_stack_introsort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 254,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::explicit_stack_introsort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 254,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::explicit_stack_introsort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 305,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::detail::explicit_stack_introsort",
+      "exceptionIdentifier": "O-002-span",
+      "line": 305,
+      "path": "include/gui_forms/detail/algorithm/sort.hpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
       "column": 5,
       "constructKind": "std_span",
       "disposition": "admitted",
@@ -1297,7 +1617,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::validate_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 66,
+      "line": 76,
       "path": "include/gui_forms/resources/types/image_resource_types.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -1307,7 +1627,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::validate_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 67,
+      "line": 77,
       "path": "include/gui_forms/resources/types/image_resource_types.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -1317,7 +1637,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageResourceView::encoded",
       "exceptionIdentifier": "O-002-span",
-      "line": 82,
+      "line": 101,
       "path": "include/gui_forms/resources/types/image_resource_types.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -1807,7 +2127,7 @@
       "disposition": "approved_exception",
       "enclosingSymbol": "gui_forms::ErrorProvider::set_tag",
       "exceptionIdentifier": "O-011-tag",
-      "line": 505,
+      "line": 499,
       "path": "src/controls/guidance/error_provider/error_provider.cpp",
       "replacementCategory": "tag_only_or_explicit_type"
     },
@@ -1817,7 +2137,7 @@
       "disposition": "approved_exception",
       "enclosingSymbol": "gui_forms::ErrorProvider::set_tag",
       "exceptionIdentifier": "O-011-tag",
-      "line": 505,
+      "line": 499,
       "path": "src/controls/guidance/error_provider/error_provider.cpp",
       "replacementCategory": "tag_only_or_explicit_type"
     },
@@ -1827,7 +2147,7 @@
       "disposition": "review",
       "enclosingSymbol": "gui_forms::ErrorProvider::refresh_visual",
       "exceptionIdentifier": "O-007-classify-target",
-      "line": 589,
+      "line": 583,
       "path": "src/controls/guidance/error_provider/error_provider.cpp",
       "replacementCategory": "plain_configuration_record_review"
     },
@@ -1889,6 +2209,16 @@
       "exceptionIdentifier": "O-002-span",
       "line": 108,
       "path": "src/controls/panel/combo_box/combo_box.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 35,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "gui_forms::CorrespondenceView::expanded_indices",
+      "exceptionIdentifier": "O-002-span",
+      "line": 253,
+      "path": "src/controls/panel/correspondence_view/correspondence_view.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
@@ -2187,7 +2517,7 @@
       "disposition": "review",
       "enclosingSymbol": "gui_forms::ToolTip::show_now",
       "exceptionIdentifier": "O-007-classify-target",
-      "line": 343,
+      "line": 341,
       "path": "src/controls/tool_tip/tool_tip.cpp",
       "replacementCategory": "plain_configuration_record_review"
     },
@@ -3632,96 +3962,6 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 151,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 154,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 157,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 161,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 181,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 184,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 190,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 196,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 200,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
       "column": 15,
       "constructKind": "std_span",
       "disposition": "admitted",
@@ -3730,16 +3970,6 @@
       "line": 203,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 208,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 15,
@@ -3752,242 +3982,12 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 213,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 221,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 224,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 235,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 238,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 246,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 253,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 262,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 266,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 271,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 274,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 280,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 283,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 287,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 289,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 293,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 296,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 305,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 311,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 317,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 25,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 322,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 326,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 13,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::validate_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 331,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
       "column": 1,
       "constructKind": "std_span",
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 368,
+      "line": 369,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -3997,69 +3997,9 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 368,
+      "line": 369,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 371,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 374,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 379,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 387,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::store_new",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 403,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 13,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::store_new",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 421,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 1,
@@ -4067,7 +4007,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 424,
+      "line": 425,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -4077,72 +4017,12 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 426,
+      "line": 427,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 434,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 439,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 442,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 446,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::load_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 462,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 1,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-002-span",
-      "line": 466,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 44,
       "constructKind": "std_span",
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
@@ -4152,64 +4032,14 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
+      "column": 44,
+      "constructKind": "std_span",
+      "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 471,
+      "exceptionIdentifier": "O-002-span",
+      "line": 468,
       "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 475,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 479,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 485,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 492,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 13,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 505,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
+      "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
       "column": 1,
@@ -4217,7 +4047,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 508,
+      "line": 509,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -4227,79 +4057,9 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 510,
+      "line": 511,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 514,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 518,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 527,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 532,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 538,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 560,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::replace_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 562,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 1,
@@ -4307,7 +4067,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 566,
+      "line": 567,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -4317,59 +4077,9 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 568,
+      "line": 569,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 573,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 577,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 581,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 589,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 13,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::update_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 600,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 1,
@@ -4377,7 +4087,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 603,
+      "line": 604,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -4387,69 +4097,9 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
       "exceptionIdentifier": "O-002-span",
-      "line": 606,
+      "line": 607,
       "path": "src/core/resources/image_registry/image_registry.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 611,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 615,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 618,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 626,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 633,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 13,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_forms::ImageRegistry::patch_bgra32_premultiplied",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 653,
-      "path": "src/core/resources/image_registry/image_registry.cpp",
-      "replacementCategory": "plain_configuration_record_review"
     },
     {
       "column": 1,
@@ -5112,92 +4762,12 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 34,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 857,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 34,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 858,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 860,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 868,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 876,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 21,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 888,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 924,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
-      "column": 17,
-      "constructKind": "designated_initializer",
-      "disposition": "review",
-      "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
-      "exceptionIdentifier": "O-007-classify-target",
-      "line": 926,
-      "path": "src/render/skia/executor/skia_executor.cpp",
-      "replacementCategory": "plain_configuration_record_review"
-    },
-    {
       "column": 19,
       "constructKind": "std_span",
       "disposition": "admitted",
       "enclosingSymbol": "gui_drawing::render::SkiaExecutor::register_typeface",
       "exceptionIdentifier": "O-002-span",
-      "line": 60,
+      "line": 69,
       "path": "src/render/skia/executor/skia_executor.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -5207,7 +4777,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_drawing::render::SkiaExecutor::register_typeface",
       "exceptionIdentifier": "O-002-span",
-      "line": 61,
+      "line": 70,
       "path": "src/render/skia/executor/skia_executor.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -5217,7 +4787,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 70,
+      "line": 79,
       "path": "src/render/skia/executor/skia_executor.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -5227,7 +4797,7 @@
       "disposition": "admitted",
       "enclosingSymbol": "gui_drawing::render::SkiaExecutor::decode_png",
       "exceptionIdentifier": "O-002-span",
-      "line": 71,
+      "line": 80,
       "path": "src/render/skia/executor/skia_executor.hpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
@@ -5542,127 +5112,698 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 26,
+      "column": 5,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::Impl::covers",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient",
       "exceptionIdentifier": "O-002-span",
-      "line": 145,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "line": 347,
+      "path": "tests/animation_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 38,
+      "column": 31,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::Impl::covers",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient",
       "exceptionIdentifier": "O-002-span",
-      "line": 146,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 19,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::Impl::register_face",
-      "exceptionIdentifier": "O-002-span",
-      "line": 156,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 9,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::Impl::register_face",
-      "exceptionIdentifier": "O-002-span",
-      "line": 158,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 1,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_typeface",
-      "exceptionIdentifier": "O-002-span",
-      "line": 248,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "line": 348,
+      "path": "tests/animation_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
       "column": 5,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_typeface",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient_spread",
       "exceptionIdentifier": "O-002-span",
-      "line": 250,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "line": 355,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 39,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 356,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 364,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ProgressEffectsPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 365,
+      "path": "tests/animation_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 53,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 54,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_public_drawing_metrics_and_control_tag",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 768,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 843,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 23,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_image_list_state_density_ownership_and_button_layout",
+      "exceptionIdentifier": "O-002-span",
+      "line": 844,
+      "path": "tests/basic_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 38,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 48,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 71,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 91,
+      "path": "tests/binary_search_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 376,
+      "path": "tests/binding_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ImageRecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 34,
+      "path": "tests/collection_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ImageRecordingPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 35,
+      "path": "tests/collection_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 22,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::curve_polygon_and_pie_paths_are_retained_and_bounded",
+      "exceptionIdentifier": "O-002-span",
+      "line": 371,
+      "path": "tests/drawing_core_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 38,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::curve_polygon_and_pie_paths_are_retained_and_bounded",
+      "exceptionIdentifier": "O-002-span",
+      "line": 390,
+      "path": "tests/drawing_core_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_error_semantics_geometry_rtl_and_lifetime",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 116,
+      "path": "tests/guidance_provider_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 18,
+      "constructKind": "std_any",
+      "disposition": "approved_exception",
+      "enclosingSymbol": "(anonymous namespace)::test_help_routes_f1_locally_then_to_provider_without_external_policy",
+      "exceptionIdentifier": "O-011-tag",
+      "line": 268,
+      "path": "tests/guidance_provider_tests.cpp",
+      "replacementCategory": "tag_only_or_explicit_type"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 36,
+      "path": "tests/input_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 34,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RecordingPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 37,
+      "path": "tests/input_controls_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 300,
+      "path": "tests/layout_panel_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 301,
+      "path": "tests/layout_panel_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 39,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 40,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 46,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 9,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_linear_gradient_spread",
+      "exceptionIdentifier": "O-002-span",
+      "line": 48,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 56,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::RichPainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/material_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 32,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 11,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "",
+      "exceptionIdentifier": "O-002-span",
+      "line": 33,
+      "path": "tests/png_registry_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
       "column": 1,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_fallback_typeface",
-      "exceptionIdentifier": "O-002-span",
-      "line": 254,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 40,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_fallback_typeface",
-      "exceptionIdentifier": "O-002-span",
-      "line": 255,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
-      "replacementCategory": "retain_explicit_nonowning_range"
-    },
-    {
-      "column": 19,
-      "constructKind": "std_span",
-      "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_typeface",
+      "enclosingSymbol": "(anonymous namespace)::crc32",
       "exceptionIdentifier": "O-002-span",
       "line": 57,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.hpp",
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::crc32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 57,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::write_u32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 69,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 16,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::write_u32",
+      "exceptionIdentifier": "O-002-span",
+      "line": 69,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 37,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::repair_chunk_crc",
+      "exceptionIdentifier": "O-002-span",
+      "line": 82,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::repair_chunk_crc",
+      "exceptionIdentifier": "O-002-span",
+      "line": 84,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 1,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 87,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 30,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 88,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::chunk",
+      "exceptionIdentifier": "O-002-span",
+      "line": 90,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 128,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 134,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 15,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::parser_contract",
+      "exceptionIdentifier": "O-002-span",
+      "line": 135,
+      "path": "tests/png_registry_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 17,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_unstable_equivalence",
+      "exceptionIdentifier": "O-002-span",
+      "line": 84,
+      "path": "tests/sort_algorithm_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 17,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_unstable_equivalence",
+      "exceptionIdentifier": "O-002-span",
+      "line": 86,
+      "path": "tests/sort_algorithm_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 13,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_adaptive_stability",
+      "exceptionIdentifier": "O-002-span",
+      "line": 108,
+      "path": "tests/sort_algorithm_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 13,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::test_adaptive_stability",
+      "exceptionIdentifier": "O-002-span",
+      "line": 110,
+      "path": "tests/sort_algorithm_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
       "column": 9,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_typeface",
+      "enclosingSymbol": "(anonymous namespace)::test_descending_equal_key_boundary",
       "exceptionIdentifier": "O-002-span",
-      "line": 59,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.hpp",
+      "line": 124,
+      "path": "tests/sort_algorithm_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 19,
+      "column": 7,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_fallback_typeface",
+      "enclosingSymbol": "(anonymous namespace)::test_request_and_result_contract",
       "exceptionIdentifier": "O-002-span",
-      "line": 62,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.hpp",
+      "line": 72,
+      "path": "tests/text_shaping_tests.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     },
     {
-      "column": 9,
+      "column": 52,
+      "constructKind": "designated_initializer",
+      "disposition": "review",
+      "enclosingSymbol": "(anonymous namespace)::test_atomic_mutation_and_limits",
+      "exceptionIdentifier": "O-007-classify-target",
+      "line": 142,
+      "path": "tests/text_store_tests.cpp",
+      "replacementCategory": "plain_configuration_record_review"
+    },
+    {
+      "column": 5,
       "constructKind": "std_span",
       "disposition": "admitted",
-      "enclosingSymbol": "gui_forms::render::text::HarfBuzzFontEngine::register_fallback_typeface",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_linear_gradient",
       "exceptionIdentifier": "O-002-span",
-      "line": 64,
-      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.hpp",
+      "line": 45,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_linear_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 46,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 51,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 31,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::ThemePainter::fill_radial_gradient",
+      "exceptionIdentifier": "O-002-span",
+      "line": 52,
+      "path": "tests/theme_tests.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::StandardUnstableSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 42,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::StandardUnstableSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 42,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::StandardStableSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 50,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::StandardStableSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 50,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseInsertionSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 58,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseInsertionSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 58,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseAdaptiveSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 66,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseAdaptiveSort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 66,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 5,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseIntrosort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 74,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 21,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::HouseIntrosort::operator()",
+      "exceptionIdentifier": "O-002-span",
+      "line": 74,
+      "path": "tools/sort_lab.cpp",
+      "replacementCategory": "retain_explicit_nonowning_range"
+    },
+    {
+      "column": 20,
+      "constructKind": "std_span",
+      "disposition": "admitted",
+      "enclosingSymbol": "(anonymous namespace)::measure",
+      "exceptionIdentifier": "O-002-span",
+      "line": 153,
+      "path": "tools/sort_lab.cpp",
       "replacementCategory": "retain_explicit_nonowning_range"
     }
   ],
   "mode": "inventory",
   "schema": "gui.forms.house-policy-findings/v1",
-  "sourceRoot": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms"
+  "sourceRoot": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms",
+  "sourceScope": "first-party"
 }

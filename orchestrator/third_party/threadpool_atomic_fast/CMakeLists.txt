@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Joshuah Rainstar
+# SPDX-License-Identifier: MIT
+
 cmake_minimum_required(VERSION 3.20)
 project(threadpool_atomic_fast LANGUAGES C CXX)
 
