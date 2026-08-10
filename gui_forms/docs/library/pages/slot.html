@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Slot · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
+<body><article><header><p class="eyebrow">struct · library</p>
+<h1>Slot</h1><p class="summary">Slot is a struct declared in include/gui_forms/event.hpp.</p>
+<div class="badges"><span>generated inventory; detailed review pending</span><span>header-only or distributed</span></div></header>
+<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>Revocable → Slot</dd>
+<dt>Declaration</dt><dd>include/gui_forms/event.hpp:105</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
+<section><h2>Public methods</h2><section class="method"><h3>Slot</h3><code>Slot(std::weak_ptr&lt;State&gt; event_state, Callback event_callback) : state(std::move(event_state)), callback(std::move(event_callback))</code><p>Constructs or tears down the retained Slot object according to its ownership contract.</p></section><section class="method"><h3>disconnect</h3><code>void disconnect() noexcept override</code><p>Public Slot operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.</p></section><section class="method"><h3>connected</h3><code>[[nodiscard]] bool connected() const noexcept override</code><p>Reports the current connected value without mutation.</p></section></section>
+<footer><a href="../markdown/slot.md">AI-readable Markdown source</a></footer>
+</article></body></html>

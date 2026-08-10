@@ -1,0 +1,17 @@
+# LiveSurfaceSnapshot
+
+Status: **generated inventory; detailed review pending**  
+Kind: **struct**  
+Hierarchy: `LiveSurfaceSnapshot`  
+Declaration: `include/gui_forms/live_surface.hpp:24`  
+Definition: `inline/header-only`
+
+LiveSurfaceSnapshot is a struct declared in include/gui_forms/live_surface.hpp.
+
+## Visual evidence
+
+Capture pending; this page has not yet passed the Screen Sharing crop gate.
+
+## Public methods
+
+No public methods were discovered in this declaration.

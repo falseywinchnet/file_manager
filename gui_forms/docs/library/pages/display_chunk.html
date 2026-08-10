@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>DisplayChunk · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
+<body><article><header><p class="eyebrow">class · library</p>
+<h1>DisplayChunk</h1><p class="summary">DisplayChunk is a class declared in src/core/display_chunk.hpp.</p>
+<div class="badges"><span>generated inventory; detailed review pending</span><span>isolated per type</span></div></header>
+<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>DisplayChunk</dd>
+<dt>Declaration</dt><dd>src/core/display_chunk.hpp:55</dd><dt>Definition</dt><dd>src/core/display_chunk.cpp</dd></dl></section>
+<section><h2>Public methods</h2><section class="method"><h3>DisplayChunk</h3><code>DisplayChunk(std::uint64_t generation, PaintPlane plane, Rect logical_bounds, std::vector&lt;DisplayCommand&gt; commands)</code><p>Constructs or tears down the retained DisplayChunk object according to its ownership contract.</p></section><section class="method"><h3>info</h3><code>[[nodiscard]] DisplayChunkInfo info() const noexcept</code><p>Reports the current info value without mutation.</p></section><section class="method"><h3>generation</h3><code>[[nodiscard]] std::uint64_t generation() const noexcept</code><p>Reports the current generation value without mutation.</p></section><section class="method"><h3>plane</h3><code>[[nodiscard]] PaintPlane plane() const noexcept</code><p>Reports the current plane value without mutation.</p></section><section class="method"><h3>logical_bounds</h3><code>[[nodiscard]] Rect logical_bounds() const noexcept</code><p>Reports the current logical bounds value without mutation.</p></section><section class="method"><h3>commands</h3><code>[[nodiscard]] const std::vector&lt;DisplayCommand&gt;&amp; commands() const noexcept</code><p>Reports the current commands value without mutation.</p></section></section>
+<footer><a href="../markdown/display_chunk.md">AI-readable Markdown source</a></footer>
+</article></body></html>

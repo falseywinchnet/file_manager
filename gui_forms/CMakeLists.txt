@@ -171,10 +171,21 @@ target_include_directories(gui_forms_host_headless PUBLIC
 target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 
 add_library(gui_forms_controls STATIC
-    src/controls/basic_controls.cpp
+    src/controls/basic/basic_control_rendering.cpp
+    src/controls/panel/panel.cpp
+    src/controls/panel/group_box/group_box.cpp
+    src/controls/panel/picture_box/picture_box.cpp
+    src/controls/label/label.cpp
+    src/controls/button_base/button_base.cpp
+    src/controls/button_base/button/button.cpp
+    src/controls/button_base/check_box/check_box.cpp
+    src/controls/button_base/radio_button/radio_button.cpp
+    src/controls/button_base/link_label/link_label.cpp
     src/controls/canvas.cpp
     src/controls/collection_controls.cpp
-    src/controls/composition_controls.cpp
+    src/controls/panel/card/card.cpp
+    src/controls/panel/card/review_card/review_card.cpp
+    src/controls/container/master_detail_view/master_detail_view.cpp
     src/controls/commands.cpp
     src/controls/menu_controls.cpp
     src/controls/popup_controls.cpp

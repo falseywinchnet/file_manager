@@ -98,6 +98,42 @@ void test_interactive_card_state_input_and_semantics() {
             "semantic press must share card activation authority");
 }
 
+void test_card_selection_behavior_is_explicit_and_ordered() {
+    auto card = make_control<Card>(StableId("card.selection-behavior"));
+    card->set_requested_bounds({0.0, 0.0, 180.0, 80.0});
+    card->set_interactive(true);
+    card->set_selection_behavior(CardSelectionBehavior::toggle_on_activation);
+    Window window(card, {180.0, 80.0});
+    std::string trace;
+    auto selection = card->selected_changed().subscribe(
+        [&](bool selected) { trace += selected ? "selected\n" : "cleared\n"; });
+    auto activation = card->activated().subscribe(
+        [&](Card&) { trace += "activated\n"; });
+
+    require(window.perform_semantic_action(
+                "card.selection-behavior", SemanticAction::press) &&
+                card->selected() &&
+                trace == "selected\nactivated\n",
+            "toggle-on-activation must commit selection before activation");
+    trace.clear();
+    require(window.perform_semantic_action(
+                "card.selection-behavior", SemanticAction::press) &&
+                !card->selected() &&
+                trace == "cleared\nactivated\n",
+            "toggle-on-activation must remain symmetric and ordered");
+
+    bool rejected{};
+    try {
+        card->set_selection_behavior(
+            static_cast<CardSelectionBehavior>(255));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && card->selection_behavior() ==
+                            CardSelectionBehavior::toggle_on_activation,
+            "invalid card selection customization must fail atomically");
+}
+
 void test_card_theme_status_and_outsets_are_reusable() {
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "shadow-card";
@@ -337,6 +373,7 @@ int main() {
     try {
         test_card_section_ownership_and_layout();
         test_interactive_card_state_input_and_semantics();
+        test_card_selection_behavior_is_explicit_and_ordered();
         test_card_theme_status_and_outsets_are_reusable();
         test_compositions_follow_structural_theme_tokens_until_overridden();
         test_review_card_owns_typed_theme_aware_projection();

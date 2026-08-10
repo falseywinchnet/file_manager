@@ -499,6 +499,67 @@ void test_label_multiline_wrapping_and_alignment() {
             "Label must reject invalid line spacing without mutation");
 }
 
+void test_basic_control_layout_customization_is_bounded_and_atomic() {
+    auto label = make_control<Label>(StableId("label.maximum-lines"),
+                                     "one two three four five six seven eight");
+    label->set_text_wrapping(TextWrapping::word);
+    const Size unrestricted = label->measure({72.0, 200.0});
+    label->set_maximum_lines(2U);
+    const Size limited = label->measure({72.0, 200.0});
+    require(label->maximum_lines() == 2U && limited.height < unrestricted.height,
+            "Label MaximumLines must bound content-sized desired height");
+    label->set_requested_bounds({0.0, 0.0, 72.0, 80.0});
+    Window label_window(label, {72.0, 80.0});
+    RecordingPainter label_painter;
+    label_window.paint(label_painter, {0.0, 0.0, 72.0, 80.0});
+    require(label_painter.texts.size() == 2U,
+            "Label MaximumLines must bound actual retained painting");
+
+    bool rejected_lines{};
+    try {
+        label->set_maximum_lines(4097U);
+    } catch (const std::out_of_range&) {
+        rejected_lines = true;
+    }
+    bool rejected_alignment{};
+    try {
+        label->set_alignment(static_cast<HorizontalAlignment>(255));
+    } catch (const std::invalid_argument&) {
+        rejected_alignment = true;
+    }
+    require(rejected_lines && rejected_alignment &&
+                label->maximum_lines() == 2U &&
+                label->alignment() == HorizontalAlignment::near,
+            "Label bounded and enum properties must reject invalid values atomically");
+
+    auto button = make_control<Button>(StableId("button.content-padding"), "Run");
+    const Size default_size = button->measure({300.0, 200.0});
+    button->set_content_padding({20.0, 14.0, 20.0, 14.0});
+    const Size padded_size = button->measure({300.0, 200.0});
+    require(padded_size.width > default_size.width &&
+                padded_size.height > default_size.height,
+            "ButtonBase ContentPadding must participate in desired size");
+    bool rejected_padding{};
+    try {
+        button->set_content_padding({20.0, 14.0, 129.0, 14.0});
+    } catch (const std::invalid_argument&) {
+        rejected_padding = true;
+    }
+    require(rejected_padding &&
+                button->content_padding() == Insets{20.0, 14.0, 20.0, 14.0},
+            "ButtonBase ContentPadding must reject invalid insets atomically");
+
+    auto panel = make_control<Panel>(StableId("panel.border-validation"));
+    bool rejected_border{};
+    try {
+        panel->set_border_style(static_cast<BorderStyle>(255));
+    } catch (const std::invalid_argument&) {
+        rejected_border = true;
+    }
+    require(rejected_border && panel->border_style() == BorderStyle::none,
+            "Panel must reject invalid border-style states atomically");
+}
+
 void test_label_inherits_theme_typography_until_explicitly_overridden() {
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "label-type-roles";
@@ -799,6 +860,7 @@ int main() {
         test_wrong_thread_property_mutation_is_rejected();
         test_fixed_label_text_is_paint_only();
         test_label_multiline_wrapping_and_alignment();
+        test_basic_control_layout_customization_is_bounded_and_atomic();
         test_label_inherits_theme_typography_until_explicitly_overridden();
         test_picture_box_modes_registry_and_semantics();
         test_public_drawing_metrics_and_control_tag();
