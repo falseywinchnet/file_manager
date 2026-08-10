@@ -1,231 +1,255 @@
 # GraphicsRecorder
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → GraphicsRecorder`  
-Declaration: `include/gui_forms/drawing.hpp:804`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 command-recorder state-machine split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → GraphicsRecorder`
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:84`
+- Definition: `src/core/drawing/graphics_recorder/graphics_recorder.cpp`
 
-GraphicsRecorder is a class declared in include/gui_forms/drawing.hpp.
+GraphicsRecorder is a bounded thread-affine command transaction with explicit save-token stack discipline, retained transform/clip/quality state, validated resource snapshots, deterministic trace output, and a terminal close phase.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![GraphicsRecorder](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `GraphicsRecorder`
+### `GraphicsRecorder` (public)
 
 ```cpp
 GraphicsRecorder() = default
 ```
 
-Constructs or tears down the retained GraphicsRecorder object according to its ownership contract.
+Constructs an open recorder with identity transform and default quality state.
 
-### `save`
+### `save` (public)
 
 ```cpp
 [[nodiscard]] GraphicsStateToken save()
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enforces stack capacity, allocates a nonzero token, retains current state, and records the save command.
 
-### `restore`
+### `restore` (public)
 
 ```cpp
 void restore(GraphicsStateToken token)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requires LIFO exact-token ownership, restores state, and records the transition.
 
-### `translate`
+### `translate` (public)
 
 ```cpp
 void translate(double x, double y)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and composes translation before recording it.
 
-### `set_transform`
+### `set_transform` (public)
 
 ```cpp
 void set_transform(Matrix transform)
 ```
 
-Synchronously updates the retained transform property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a finite matrix, commits it, and records the state change.
 
-### `set_clip`
+### `set_clip` (public)
 
 ```cpp
 void set_clip(RectF clip)
 ```
 
-Synchronously updates the retained clip property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits a finite clip rectangle.
 
-### `reset_clip`
+### `reset_clip` (public)
 
 ```cpp
 void reset_clip()
 ```
 
-Returns clip to its inherited or default policy.
+Clears retained clipping and records the reset.
 
-### `set_quality`
+### `set_quality` (public)
 
 ```cpp
 void set_quality(SmoothingMode smoothing, InterpolationMode interpolation, PixelOffsetMode pixel_offset, CompositingMode compositing, CompositingQuality compositing_quality)
 ```
 
-Synchronously updates the retained quality property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates every closed quality/compositing vocabulary and records their atomic state update.
 
-### `current_state`
+### `current_state` (public)
 
 ```cpp
 [[nodiscard]] GraphicsState current_state() const
 ```
 
-Reports the current current state value without mutation.
+Requires an open live recorder and returns transform, clip, and quality state.
 
-### `is_visible`
+### `is_visible` (public)
 
 ```cpp
 [[nodiscard]] bool is_visible(PointF point) const
 ```
 
-Reports the current is visible value without mutation.
+Tests a point against current optional clip.
 
-### `measure_string`
+### `measure_string` (public)
 
 ```cpp
 [[nodiscard]] SizeF measure_string(std::string_view utf8, const Font& font, const StringFormat& format, const TextMetricsProvider& provider) const
 ```
 
-Reports the current measure string value without mutation.
+Validates UTF-8/resource liveness and delegates immutable snapshots to the supplied metrics provider.
 
-### `clear`
+### `clear` (public)
 
 ```cpp
 void clear(Color color)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Records a surface clear color.
 
-### `fill_rectangle`
+### `fill_rectangle` (public)
 
 ```cpp
 void fill_rectangle(const Brush& brush, RectF rect)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounds and snapshots a live brush into a fill command.
 
-### `draw_rectangle`
+### `draw_rectangle` (public)
 
 ```cpp
 void draw_rectangle(const Pen& pen, RectF rect)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounds and snapshots a live pen into a stroke command.
 
-### `draw_line`
+### `draw_line` (public)
 
 ```cpp
 void draw_line(const Pen& pen, PointF from, PointF to)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates endpoints and snapshots a live pen.
 
-### `draw_string`
+### `draw_string` (public)
 
 ```cpp
 void draw_string(std::string_view utf8, const Font& font, const SolidBrush& brush, PointF origin, const StringFormat& format)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounded UTF-8 and origin, then owns text plus font/brush/format snapshots.
 
-### `draw_ellipse`
+### `draw_ellipse` (public)
 
 ```cpp
 void draw_ellipse(const Pen& pen, RectF bounds)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounds and records a pen snapshot.
 
-### `fill_ellipse`
+### `fill_ellipse` (public)
 
 ```cpp
 void fill_ellipse(const Brush& brush, RectF bounds)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounds and records a brush snapshot.
 
-### `fill_polygon`
+### `fill_polygon` (public)
 
 ```cpp
 void fill_polygon(const Brush& brush, std::span<const PointF> points, FillMode fill_mode = FillMode::alternate)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounded finite points/fill rule and owns points plus brush snapshot.
 
-### `draw_path`
+### `draw_path` (public)
 
 ```cpp
 void draw_path(const Pen& pen, const GraphicsPath& path)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Owns live pen and path snapshots.
 
-### `fill_path`
+### `fill_path` (public)
 
 ```cpp
 void fill_path(const Brush& brush, const GraphicsPath& path)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Owns live brush and path snapshots.
 
-### `draw_image`
+### `draw_image` (public)
 
 ```cpp
 void draw_image(const ImageReference& image, RectF destination, RectF source, const ImageAttributes& attributes)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Owns ImageReference or Bitmap snapshot, validated source/destination geometry, and ImageAttributes snapshot.
 
-### `draw_image`
+### `draw_image` (public)
 
 ```cpp
 void draw_image(const Bitmap& image, RectF destination, RectF source, const ImageAttributes& attributes)
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Owns ImageReference or Bitmap snapshot, validated source/destination geometry, and ImageAttributes snapshot.
 
-### `close`
+### `close` (public)
 
 ```cpp
 void close()
 ```
 
-Public GraphicsRecorder operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requires balanced saved state and enters terminal closed state.
 
-### `closed`
+### `closed` (public)
 
 ```cpp
 [[nodiscard]] bool closed() const
 ```
 
-Reports the current closed value without mutation.
+Reports terminal recorder state.
 
-### `commands`
+### `commands` (public)
 
 ```cpp
 [[nodiscard]] std::span<const DrawingCommand> commands() const
 ```
 
-Reports the current commands value without mutation.
+Returns the immutable recorded command span.
 
-### `deterministic_trace`
+### `deterministic_trace` (public)
 
 ```cpp
 [[nodiscard]] std::string deterministic_trace() const
 ```
 
-Reports the current deterministic trace value without mutation.
+Serializes state and commands with stable numeric/resource vocabulary for equivalence tests.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Clears commands/state stack and terminally closes without throwing.
+
+### `require_recordable` (private)
+
+```cpp
+void require_recordable() const
+```
+
+Requires live, owner-thread, nonclosed state.
+
+### `append` (private)
+
+```cpp
+void append(DrawingCommand command)
+```
+
+Enforces command capacity before committing one complete command.

@@ -1,79 +1,87 @@
 # AcceleratorToken
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `AcceleratorToken`  
-Declaration: `include/gui_forms/window.hpp:177`  
-Definition: `src/core/window.cpp`
+- Status: **OBSERVED: bundle 007 token/attachment split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `AcceleratorToken`
+- Declaration: `include/gui_forms/window/window.hpp:105`
+- Definition: `src/core/window/accelerator/accelerator_token.cpp`
 
-AcceleratorToken is a class declared in include/gui_forms/window.hpp.
+AcceleratorToken is the move-only revocation handle for one Window accelerator registration whose lifetime is also bounded by its Component owner.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![AcceleratorToken](../captures/native_window_host.png)
 
-## Public methods
+## Declared methods
 
-### `AcceleratorToken`
+### `AcceleratorToken` (public)
 
 ```cpp
 AcceleratorToken() = default
 ```
 
-Constructs or tears down the retained AcceleratorToken object according to its ownership contract.
+Creates empty, transfers one attachment on move, prohibits copying, or is privately constructed by Window after registration.
 
-### `~AcceleratorToken`
+### `~AcceleratorToken` (public)
 
 ```cpp
 ~AcceleratorToken()
 ```
 
-Constructs or tears down the retained AcceleratorToken object according to its ownership contract.
+Disconnects any remaining registration.
 
-### `AcceleratorToken`
+### `AcceleratorToken` (public)
 
 ```cpp
 AcceleratorToken(AcceleratorToken&& other) noexcept : attachment_(std::move(other.attachment_))
 ```
 
-Constructs or tears down the retained AcceleratorToken object according to its ownership contract.
+Creates empty, transfers one attachment on move, prohibits copying, or is privately constructed by Window after registration.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 AcceleratorToken& operator=(AcceleratorToken&& other) noexcept
 ```
 
-Public AcceleratorToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes the current registration before accepting a moved attachment.
 
-### `AcceleratorToken`
+### `AcceleratorToken` (public)
 
 ```cpp
 AcceleratorToken(const AcceleratorToken&) = delete
 ```
 
-Constructs or tears down the retained AcceleratorToken object according to its ownership contract.
+Creates empty, transfers one attachment on move, prohibits copying, or is privately constructed by Window after registration.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 AcceleratorToken& operator=(const AcceleratorToken&) = delete
 ```
 
-Public AcceleratorToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes the current registration before accepting a moved attachment.
 
-### `disconnect`
+### `disconnect` (public)
 
 ```cpp
 void disconnect() noexcept
 ```
 
-Public AcceleratorToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Idempotently removes the exact accelerator from its Window.
 
-### `connected`
+### `connected` (public)
 
 ```cpp
 [[nodiscard]] bool connected() const noexcept
 ```
 
-Reports the current connected value without mutation.
+Reports whether the registration is still eligible for arbitration.
+
+### `AcceleratorToken` (private)
+
+```cpp
+explicit AcceleratorToken( std::shared_ptr<detail::AcceleratorAttachment> attachment) : attachment_(std::move(attachment))
+```
+
+Creates empty, transfers one attachment on move, prohibits copying, or is privately constructed by Window after registration.

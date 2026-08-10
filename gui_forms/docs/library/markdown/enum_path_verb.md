@@ -1,7 +1,7 @@
 # PathVerb
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/drawing.hpp:498`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/drawing/graphics_path/graphics_path.hpp:13`
 
 ## Declared values
 

@@ -1703,25 +1703,47 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
         painter.fill_rect({width * 0.68, 28.0, width * 0.29, 22.0}, green);
         painter.restore();
     });
-    primitives->add_at(board, {20.0, 38.0, 252.0, 158.0});
+    primitives->add_at(board, {20.0, 38.0, 194.0, 158.0});
+
+    auto raster_bitmap = std::make_shared<gui_drawing::Bitmap>(12U, 12U);
+    for (std::uint32_t index = 0U; index < 12U; ++index) {
+        raster_bitmap->set_pixel(
+            index, index,
+            gui_drawing::Color::from_rgb(39U, 116U, 184U));
+        raster_bitmap->set_pixel(
+            11U - index, index,
+            gui_drawing::Color::from_rgb(211U, 121U, 42U));
+    }
+    auto raster = make_control<RasterCanvas>(
+        StableId("showcase.images.raster.canvas"));
+    raster->set_accessible_name("Raster canvas transparency and sampling");
+    raster->set_bitmap(std::move(raster_bitmap));
+    raster->set_zoom(6.0);
+    raster->set_transparency_cell_size(8.0);
+    primitives->add_at(raster, {224.0, 54.0, 96.0, 132.0});
+    auto raster_caption = label("showcase.images.raster.caption",
+                                "RASTER", 9.0, 700, shell_blue_dark);
+    raster_caption->set_alignment(HorizontalAlignment::center);
+    primitives->add_at(raster_caption, {224.0, 34.0, 96.0, 16.0});
+
     auto nine_patch = make_control<MaterialPanel>(
         StableId("showcase.images.material.nine-patch"));
     nine_patch->set_accessible_name("Density-aware nine-patch material");
     nine_patch->set_accessible_description(
         "Corners remain fixed while edge and center source regions stretch");
-    primitives->add_at(nine_patch, {292.0, 52.0, 148.0, 54.0});
+    primitives->add_at(nine_patch, {334.0, 52.0, 106.0, 54.0});
     auto nine_caption = label("showcase.images.material.nine-patch.caption",
                               "NINE-PATCH", 9.0, 700, shell_blue_dark);
-    primitives->add_at(nine_caption, {292.0, 34.0, 148.0, 16.0});
+    primitives->add_at(nine_caption, {334.0, 34.0, 106.0, 16.0});
     auto tiled = make_control<MaterialPanel>(
         StableId("showcase.images.material.tile"));
     tiled->set_accessible_name("Tiled source-image material");
     tiled->set_accessible_description(
         "Exact logical period with cropped partial edge tiles");
-    primitives->add_at(tiled, {292.0, 132.0, 148.0, 54.0});
+    primitives->add_at(tiled, {334.0, 132.0, 106.0, 54.0});
     auto tile_caption = label("showcase.images.material.tile.caption",
                               "TEXTURE TILE", 9.0, 700, shell_blue_dark);
-    primitives->add_at(tile_caption, {292.0, 114.0, 148.0, 16.0});
+    primitives->add_at(tile_caption, {334.0, 114.0, 106.0, 16.0});
     static_cast<void>(context);
 }
 

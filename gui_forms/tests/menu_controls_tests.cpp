@@ -54,6 +54,9 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
     auto icons = std::make_shared<Command>("view.icons", "Icons");
 
     ContextMenu menu("object.context");
+    menu.set_preferred_width(180.0);
+    require(menu.preferred_width() == 180.0,
+            "ContextMenu must retain an explicit preferred popup width");
     menu.set_items({
         {"open", MenuItemKind::command, open},
         {"separator.primary", MenuItemKind::separator},
@@ -79,7 +82,8 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
     require(menu.is_open() && window.focus_scope_depth() == 1U,
             "opening a context menu must create one contained focus scope");
     const auto panel = window.find("object.context.popup.panel.0");
-    require(panel && panel->absolute_bounds().x >= 0.0 &&
+    require(panel && panel->absolute_bounds().width == 180.0 &&
+                panel->absolute_bounds().x >= 0.0 &&
                 panel->absolute_bounds().y >= 0.0 &&
                 panel->absolute_bounds().x + panel->absolute_bounds().width <= 400.0 &&
                 panel->absolute_bounds().y + panel->absolute_bounds().height <= 300.0,
@@ -196,6 +200,9 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
     root->set_row_style(0U, {TableSizeMode::absolute, 24.0});
     root->set_row_style(1U, {TableSizeMode::percent, 1.0});
     auto strip = make_control<MenuStrip>(StableId("menustrip"));
+    strip->set_item_padding(18.0);
+    require(strip->item_padding() == 18.0,
+            "MenuStrip must retain explicit top-level item padding");
     auto content = make_control<Panel>(StableId("menustrip.content"));
     root->add_child(strip);
     root->add_child(content);

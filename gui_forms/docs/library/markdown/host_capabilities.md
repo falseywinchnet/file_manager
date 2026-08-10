@@ -1,31 +1,31 @@
 # HostCapabilities
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HostCapabilities`  
-Declaration: `include/gui_forms/host.hpp:55`  
-Definition: `src/core/host.cpp`
+- Status: **OBSERVED: bundle 007 host capability value split; M4 macOS/MinGW builds and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `HostCapabilities`
+- Declaration: `include/gui_forms/host/types/host_types.hpp:52`
+- Definition: `src/core/host/types/host_types.cpp`
 
-HostCapabilities is a struct declared in include/gui_forms/host.hpp.
+HostCapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `supports`
+### `supports` (public)
 
 ```cpp
 [[nodiscard]] bool supports(HostCapability capability) const noexcept
 ```
 
-Reports the current supports value without mutation.
+Tests whether every requested capability bit is available.
 
-### `to_json`
+### `to_json` (public)
 
 ```cpp
 [[nodiscard]] std::string to_json() const
 ```
 
-Reports the current to json value without mutation.
+Serializes protocol, platform, raw bits, and stable capability names.

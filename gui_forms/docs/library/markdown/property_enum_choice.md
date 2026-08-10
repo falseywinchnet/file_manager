@@ -1,23 +1,23 @@
 # PropertyEnumChoice
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEnumChoice`  
-Declaration: `include/gui_forms/binding_types.hpp:176`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 010 enum choice review; focused M4 binding tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyEnumChoice`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:176`
+- Definition: `inline/header-only`
 
-PropertyEnumChoice is a struct declared in include/gui_forms/binding_types.hpp.
+PropertyEnumChoice maps one canonical display/name token to a signed enum value.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyEnumChoice&, const PropertyEnumChoice&) = default
 ```
 
-Public PropertyEnumChoice operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares name and numeric value.

@@ -1,17 +1,17 @@
 # ImageResourceView
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageResourceView`  
-Declaration: `include/gui_forms/resources.hpp:104`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 immutable image view review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ImageResourceView`
+- Declaration: `include/gui_forms/resources/types/image_resource_types.hpp:78`
+- Definition: `inline/header-only`
 
-ImageResourceView is a struct declared in include/gui_forms/resources.hpp.
+ImageResourceView exposes one registry-owned resource as identity, encoding, validated metadata, immutable bytes, stride, and content hash.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

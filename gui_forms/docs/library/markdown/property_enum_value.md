@@ -1,23 +1,23 @@
 # PropertyEnumValue
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEnumValue`  
-Declaration: `include/gui_forms/binding_types.hpp:40`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 010 binding value review; focused M4 binding tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyEnumValue`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:40`
+- Definition: `inline/header-only`
 
-PropertyEnumValue is a struct declared in include/gui_forms/binding_types.hpp.
+PropertyEnumValue preserves declared enum type, canonical symbolic name, and signed numeric representation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyEnumValue&, const PropertyEnumValue&) = default
 ```
 
-Public PropertyEnumValue operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares type, name, and value.

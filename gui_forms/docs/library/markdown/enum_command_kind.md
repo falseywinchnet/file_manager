@@ -1,7 +1,7 @@
 # CommandKind
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/drawing.hpp:756`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:36`
 
 ## Declared values
 

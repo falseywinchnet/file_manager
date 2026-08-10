@@ -1,17 +1,17 @@
 # FramePollResult
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FramePollResult`  
-Declaration: `include/gui_forms/scheduler.hpp:33`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 008 scheduler telemetry review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `FramePollResult`
+- Declaration: `include/gui_forms/scheduler/types/scheduler_types.hpp:31`
+- Definition: `inline/header-only`
 
-FramePollResult is a struct declared in include/gui_forms/scheduler.hpp.
+FramePollResult reports deadline, active-surface, UI-timer, coalescing, callback-fault, reentrancy, damage, occlusion, and next-wake outcomes for one host poll.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

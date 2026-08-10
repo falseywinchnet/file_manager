@@ -1,8 +1,8 @@
 # Engine service lifecycle and configuration
 
-Status: **OBSERVED development lifecycle/configuration projection; GIVEN
-systemwide service boundary; CANDIDATE native supervisors, authenticated IPC,
-and background ingestion**.
+Status: **OBSERVED development lifecycle/configuration projection and M4-only
+installed LaunchAgent/authenticated IPC; GIVEN eventual systemwide boundary;
+CANDIDATE other native supervisors and background ingestion**.
 
 ## Service boundary
 
@@ -128,19 +128,20 @@ feature:
 | fixed-width similarity candidate channel | **OBSERVED experimental and disabled from the public planner** |
 | native observation, watermarks, coalescing | **OBSERVED experimental portable core, macOS FSEvents, and Windows `ReadDirectoryChangesW`; coverage incomplete and watermark not durable** |
 | bounded status subscription | **negotiating** |
-| authenticated framed local transport | **deferred** |
+| authenticated framed local transport | **OBSERVED available in ADR-015's M4 deployment: same-uid peer check, rotated endpoint credentials, `ENG1` bounded frames, separated query/admin methods** |
 
 The exact catalogue stays authoritative across every row. A descriptor channel
 may be rebuilt, disabled, upgraded, or rejected independently.
 
 ## Native service adapters
 
-These supervisors remain **CANDIDATE** install boundaries. The macOS and
-Windows observation adapters are implemented experiments, not install promises:
+ADR-015 admits one narrow installed boundary: an M4-only per-user LaunchAgent.
+The eventual system service and all other supervisors remain **CANDIDATE**:
 
 | OS | Supervisor/start-stop candidate | Endpoint candidate |
 |---|---|---|
-| macOS | `launchd` system daemon; `launchctl` installs/starts/stops/restarts | launchd/root-owned Unix-domain query and admin sockets |
+| macOS M4 dogfood | **OBSERVED implementation:** per-user LaunchAgent; install/bootstrap/status/restart/bootout evidence required per deployment | same-uid, credential-separated `0600` Unix query/admin sockets in a private Application Support leaf |
+| macOS general/systemwide | `launchd` system daemon candidate | root-owned Unix-domain query and admin sockets candidate |
 | Windows | Service Control Manager service; SCM start/stop/restart with bounded stop deadline | ACL-separated named pipes and peer-token verification |
 | Linux | `systemd` system service/socket unit; `systemctl` lifecycle | owner/mode-separated `AF_UNIX` sockets plus peer credentials |
 
@@ -164,6 +165,9 @@ campaigns remain promotion gates.
 - fragment/similarity component loss does not alter exact recovery or identity.
 
 Implementation locators: `api/service.go`, `api/types.go`,
-`internal/service/lifecycle.go`, `internal/service/service.go`, and
-`internal/transport/jsonl.go`. Tests are in
+`internal/service/service.go`, `internal/service/lifecycle.go`,
+`internal/service/configuration.go`, `internal/service/capabilities.go`,
+`internal/service/status.go`, `internal/deployment/`,
+`internal/transport/jsonl.go`, and `internal/transport/local.go`. The complete
+responsibility and lock map is `SERVICE_IMPLEMENTATION_MAP.md`. Tests are in
 `internal/service/lifecycle_test.go` and `internal/transport/jsonl_test.go`.

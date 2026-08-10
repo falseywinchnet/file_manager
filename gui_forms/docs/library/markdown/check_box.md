@@ -1,10 +1,10 @@
 # CheckBox
 
-Status: **OBSERVED: bundle 002 split; M4 build, focused tests, and Screen Sharing pass**  
-Kind: **class / visual retained control**  
-Hierarchy: `ButtonBase → CheckBox`  
-Declaration: `include/gui_forms/controls/button_base/check_box/check_box.hpp:15`  
-Definition: `src/controls/button_base/check_box/check_box.cpp`
+- Status: **OBSERVED: bundle 002 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ButtonBase → CheckBox`
+- Declaration: `include/gui_forms/controls/button_base/check_box/check_box.hpp:15`
+- Definition: `src/controls/button_base/check_box/check_box.cpp`
 
 CheckBox specializes ButtonBase with validated two/three-state selection, optional automatic cycling, three indicator families, ordered state events, and checkable semantics.
 
@@ -12,9 +12,9 @@ CheckBox specializes ButtonBase with validated two/three-state selection, option
 
 ![CheckBox](../captures/check_box.png)
 
-## Public methods
+## Declared methods
 
-### `CheckBox`
+### `CheckBox` (public)
 
 ```cpp
 explicit CheckBox(StableId stable_id, std::string text =
@@ -22,7 +22,7 @@ explicit CheckBox(StableId stable_id, std::string text =
 
 Constructs an auto-checking unchecked command with classic indicator policy.
 
-### `check_state`
+### `check_state` (public)
 
 ```cpp
 [[nodiscard]] CheckState check_state() const noexcept
@@ -30,7 +30,7 @@ Constructs an auto-checking unchecked command with classic indicator policy.
 
 Returns unchecked, checked, or indeterminate retained state.
 
-### `set_check_state`
+### `set_check_state` (public)
 
 ```cpp
 void set_check_state(CheckState state)
@@ -38,7 +38,7 @@ void set_check_state(CheckState state)
 
 Validates state and three-state policy, commits it, then publishes state and boolean changes in order.
 
-### `checked`
+### `checked` (public)
 
 ```cpp
 [[nodiscard]] bool checked() const noexcept
@@ -46,7 +46,7 @@ Validates state and three-state policy, commits it, then publishes state and boo
 
 Maps retained state to true only for the checked value.
 
-### `set_checked`
+### `set_checked` (public)
 
 ```cpp
 void set_checked(bool checked)
@@ -54,7 +54,7 @@ void set_checked(bool checked)
 
 Selects checked or unchecked through the authoritative check-state setter.
 
-### `three_state`
+### `three_state` (public)
 
 ```cpp
 [[nodiscard]] bool three_state() const noexcept
@@ -62,7 +62,7 @@ Selects checked or unchecked through the authoritative check-state setter.
 
 Reports whether indeterminate is admitted and activation cycles three values.
 
-### `set_three_state`
+### `set_three_state` (public)
 
 ```cpp
 void set_three_state(bool enabled)
@@ -70,7 +70,7 @@ void set_three_state(bool enabled)
 
 Toggles three-state policy and normalizes an existing indeterminate value when disabling it.
 
-### `auto_check`
+### `auto_check` (public)
 
 ```cpp
 [[nodiscard]] bool auto_check() const noexcept
@@ -78,7 +78,7 @@ Toggles three-state policy and normalizes an existing indeterminate value when d
 
 Reports whether activation mutates check state before command publication.
 
-### `set_auto_check`
+### `set_auto_check` (public)
 
 ```cpp
 void set_auto_check(bool enabled)
@@ -86,7 +86,7 @@ void set_auto_check(bool enabled)
 
 Enables or disables automatic state cycling.
 
-### `indicator_style`
+### `indicator_style` (public)
 
 ```cpp
 [[nodiscard]] ChoiceIndicatorStyle indicator_style() const noexcept
@@ -94,7 +94,7 @@ Enables or disables automatic state cycling.
 
 Returns classic box, modern box, or toggle-switch presentation.
 
-### `set_indicator_style`
+### `set_indicator_style` (public)
 
 ```cpp
 void set_indicator_style(ChoiceIndicatorStyle style)
@@ -102,7 +102,7 @@ void set_indicator_style(ChoiceIndicatorStyle style)
 
 Validates indicator vocabulary and invalidates size, paint, and semantics.
 
-### `check_state_changed`
+### `check_state_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<CheckState>& check_state_changed() noexcept
@@ -110,7 +110,7 @@ Validates indicator vocabulary and invalidates size, paint, and semantics.
 
 Returns the event published after the complete CheckState commits.
 
-### `checked_changed`
+### `checked_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<bool>& checked_changed() noexcept
@@ -118,7 +118,7 @@ Returns the event published after the complete CheckState commits.
 
 Returns the boolean projection event published when checkedness changes.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
@@ -126,7 +126,7 @@ void on_paint(Painter& painter, Rect local_damage) override
 
 Records the selected indicator family, content, focus, and disabled states.
 
-### `visual_outsets`
+### `visual_outsets` (public)
 
 ```cpp
 [[nodiscard]] Insets visual_outsets() const noexcept override
@@ -134,7 +134,7 @@ Records the selected indicator family, content, focus, and disabled states.
 
 Reports theme material outsets for modern/toggle rendering where applicable.
 
-### `on_activate`
+### `on_activate` (public)
 
 ```cpp
 void on_activate() override
@@ -142,7 +142,7 @@ void on_activate() override
 
 Cycles state when auto-checking, stops safely after disposal, then publishes the inherited click.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override

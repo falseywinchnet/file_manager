@@ -1,7 +1,7 @@
 # ShapingRequestError
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/text_shaping.hpp:84`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/text_shaping/types/text_shaping_types.hpp:74`
 
 ## Declared values
 

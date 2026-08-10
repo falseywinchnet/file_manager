@@ -18,6 +18,7 @@ subproject's records and evidence gates.
 | Component | Path | Role | Current permission |
 |---|---|---|---|
 | GUI.Forms | `../gui_forms/` | Retained custom-rendered C++ UI framework and bindings | Active implementation toward a semicomplete, inspectable framework release |
+| Web.Forms | `../web_forms/` | Bounded browser-valid HTML/CSS authoring profile and build-time Rust generator of C++17-compatible code over public GUI.Forms | Authoring/nested-landscape/compiler boundaries accepted; detailed profile and implementation gated |
 | Engine | `../engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
 | Kolmogrov | `../kolmogrov/` | Formal and empirical fixed-width perceptual-similarity program | Active independent research and conformance work |
 | Orchestrator | `../orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |
@@ -68,6 +69,7 @@ membership remain separate explicit gates.
   handler registry, plugin grants and lifecycle, CLI/command grammar, and
   platform-integration policy.
 - GUI.Forms owns rendering and retained control behavior, not product policy.
+- Web.Forms owns its source profile, validation, lowering, and generated-source semantics; GUI.Forms remains authoritative for retained control/runtime behavior.
 - File Manager owns end-user composition and interaction. It is a client, not
   the hidden authority for Orchestrator or engine state.
 - Lexicon owns lexical source/package interpretation and lookup implementation;
@@ -78,7 +80,7 @@ membership remain separate explicit gates.
 
 ## Delivery order
 
-1. GUI.Forms, the Go engine, and Kolmogrov continue independently while
+1. GUI.Forms, Web.Forms planning, the Go engine, and Kolmogrov continue independently while
    publishing evidence and answering explicit interface proposals.
 2. Orchestrator builds its provider-independent contract/lifecycle/availability
    kernel and proposes required interfaces in each affected project's notes.

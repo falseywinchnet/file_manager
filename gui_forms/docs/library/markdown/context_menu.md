@@ -1,95 +1,135 @@
 # ContextMenu
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → ContextMenu`  
-Declaration: `include/gui_forms/menu_controls.hpp:62`  
-Definition: `src/controls/menu_controls.cpp`
+- Status: **OBSERVED: bundle 005 split and preferred-width enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class**
+- Hierarchy: `Component → ContextMenu`
+- Declaration: `include/gui_forms/components/context_menu/context_menu.hpp:62`
+- Definition: `src/controls/menu/context_menu/context_menu.cpp`
 
-ContextMenu is a class declared in include/gui_forms/menu_controls.hpp.
+ContextMenu is a nonvisual owner for a retained, focus-scoped popup menu tree. Its implementation controls transient lifetime, submenu chains, enabled/check state, root handoff, outside-pointer policy, invocation ordering, and caller-configurable preferred width without exposing implementation rows as reusable public controls.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ContextMenu](../captures/context_menu_menu_strip.png)
 
-## Public methods
+## Declared methods
 
-### `ContextMenu`
+### `ContextMenu` (public)
 
 ```cpp
 explicit ContextMenu(std::string stable_id)
 ```
 
-Constructs or tears down the retained ContextMenu object according to its ownership contract.
+Constructs a menu owner with stable identity and detached authored item state.
 
-### `~ContextMenu`
+### `~ContextMenu` (public)
 
 ```cpp
 ~ContextMenu() override
 ```
 
-Constructs or tears down the retained ContextMenu object according to its ownership contract.
+Revokes popup leases, focus scope, subscriptions, and implementation controls before destruction.
 
-### `stable_id`
+### `stable_id` (public)
 
 ```cpp
 [[nodiscard]] const std::string& stable_id() const noexcept
 ```
 
-Reports the current stable id value without mutation.
+Returns the stable identity prefix used for popup layers, panels, rows, and semantics.
 
-### `items`
+### `items` (public)
 
 ```cpp
 [[nodiscard]] const std::vector<MenuItemSpec>& items() const noexcept
 ```
 
-Reports the current items value without mutation.
+Returns the authored root menu-item tree.
 
-### `set_items`
+### `set_items` (public)
 
 ```cpp
 void set_items(std::vector<MenuItemSpec> items)
 ```
 
-Synchronously updates the retained items property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates item identities and submenu topology, replaces the model, and rebuilds an open presentation safely.
 
-### `show`
+### `preferred_width` (public)
+
+```cpp
+[[nodiscard]] double preferred_width() const noexcept
+```
+
+Returns the logical minimum width requested for each menu panel.
+
+### `set_preferred_width` (public)
+
+```cpp
+void set_preferred_width(double width)
+```
+
+Validates bounded panel width and rebuilds live menu geometry when open.
+
+### `show` (public)
 
 ```cpp
 void show(const Control::Ptr& owner, Point window_position)
 ```
 
-Public ContextMenu operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Opens the menu relative to an invoker and anchor point under a new popup and focus-scope lease.
 
-### `close`
+### `close` (public)
 
 ```cpp
 void close() noexcept
 ```
 
-Public ContextMenu operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes the complete submenu chain, revokes transient ownership, and publishes a real open-state transition.
 
-### `is_open`
+### `is_open` (public)
 
 ```cpp
 [[nodiscard]] bool is_open() const noexcept
 ```
 
-Reports the current is open value without mutation.
+Reports whether the root popup lease remains connected.
 
-### `item_invoked`
+### `item_invoked` (public)
 
 ```cpp
 [[nodiscard]] Event<const MenuItemInvocation&>& item_invoked() noexcept
 ```
 
-Public ContextMenu operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after an enabled leaf is committed and the transient chain closes.
 
-### `open_changed`
+### `open_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<bool>& open_changed() noexcept
 ```
 
+Returns the event published when root transient ownership opens or closes.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
 Public ContextMenu operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `set_root_navigation_handler` (private)
+
+```cpp
+void set_root_navigation_handler(std::function<bool(int)> handler)
+```
+
+Synchronously updates the retained root navigation handler property. Validation, typed invalidation, and notifications are defined by the implementation.
+
+### `set_outside_pointer_handler` (private)
+
+```cpp
+void set_outside_pointer_handler( std::function<bool(const PointerEvent&)> handler)
+```
+
+Synchronously updates the retained outside pointer handler property. Validation, typed invalidation, and notifications are defined by the implementation.

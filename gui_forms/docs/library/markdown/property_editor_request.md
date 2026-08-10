@@ -1,17 +1,17 @@
 # PropertyEditorRequest
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyEditorRequest`  
-Declaration: `include/gui_forms/inspection_controls.hpp:88`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 editor request value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyEditorRequest`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:22`
+- Definition: `inline/header-only`
 
-PropertyEditorRequest is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyEditorRequest is the complete immutable input to an editor factory: stable control identity, property path, inert descriptor, typed value, writeability, and top-level/compound position.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyEditorRequest](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

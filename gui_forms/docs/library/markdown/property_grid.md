@@ -1,295 +1,303 @@
 # PropertyGrid
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → PropertyGrid`  
-Declaration: `include/gui_forms/inspection_controls.hpp:421`  
-Definition: `src/controls/inspection_controls.cpp`
+- Status: **OBSERVED: bundle 006 control/Impl source split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → PropertyGrid`
+- Declaration: `include/gui_forms/controls/panel/property_grid/property_grid.hpp:14`
+- Definition: `src/controls/panel/property_grid/property_grid.cpp`
 
-PropertyGrid is a visual retained control declared in include/gui_forms/inspection_controls.hpp.
+PropertyGrid is a metadata-driven retained inspector/editor over one or multiple selected Controls. It projects inert descriptors into PropertyList, instance-owned converters and editor factories, expands bounded compound and immutable collection values through stable paths, commits multi-owner edits atomically with rollback, preserves value origins/reset policy, and exposes the same real editors to pointer, accessibility, binding, and automation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyGrid](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
-### `PropertyGrid`
+### `PropertyGrid` (public)
 
 ```cpp
 explicit PropertyGrid(StableId stable_id)
 ```
 
-Constructs or tears down the retained PropertyGrid object according to its ownership contract.
+Constructs source-private transactional state with default converter/editor registries.
 
-### `~PropertyGrid`
+### `~PropertyGrid` (public)
 
 ```cpp
 ~PropertyGrid() override
 ```
 
-Constructs or tears down the retained PropertyGrid object according to its ownership contract.
+Disconnects selected-object/list/editor state after ordinary disposal.
 
-### `initialize_control_tree`
+### `initialize_control_tree` (public)
 
 ```cpp
 void initialize_control_tree()
 ```
 
-Idempotently attaches lazily constructed internal controls before layout or use.
+Idempotently creates and owns the internal PropertyList after shared ownership exists.
 
-### `selected_object`
+### `selected_object` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr selected_object() const noexcept
 ```
 
-Reports the current selected object value without mutation.
+Returns the sole selected object, or no object for empty/multiple selection.
 
-### `set_selected_object`
+### `set_selected_object` (public)
 
 ```cpp
 void set_selected_object(Control::Ptr object)
 ```
 
-Synchronously updates the retained selected object property. Validation, typed invalidation, and notifications are defined by the implementation.
+Replaces selection with zero or one Control through the common multiple-selection path.
 
-### `selected_objects`
+### `selected_objects` (public)
 
 ```cpp
 [[nodiscard]] std::vector<Control::Ptr> selected_objects() const
 ```
 
-Reports the current selected objects value without mutation.
+Returns all selected Controls in transaction order.
 
-### `set_selected_objects`
+### `set_selected_objects` (public)
 
 ```cpp
 void set_selected_objects(std::vector<Control::Ptr> objects)
 ```
 
-Synchronously updates the retained selected objects property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates live Controls, derives their common editable schema, reconnects lifetime observation, and rebuilds rows/editors.
 
-### `property_sort`
+### `property_sort` (public)
 
 ```cpp
 [[nodiscard]] PropertySort property_sort() const noexcept
 ```
 
-Reports the current property sort value without mutation.
+Returns categorized or alphabetical projection policy.
 
-### `set_property_sort`
+### `set_property_sort` (public)
 
 ```cpp
 void set_property_sort(PropertySort sort)
 ```
 
-Synchronously updates the retained property sort property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates sort policy and rebuilds the visible descriptor projection without changing selected values.
 
-### `refresh_properties`
+### `refresh_properties` (public)
 
 ```cpp
 void refresh_properties()
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Re-reads descriptors, values, origins, and reset state from selected Controls and synchronizes existing editor projection.
 
-### `property_list`
+### `property_list` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<PropertyList> property_list() const noexcept
 ```
 
-Reports the current property list value without mutation.
+Returns the owned retained PropertyList surface.
 
-### `converter_registry`
+### `converter_registry` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<PropertyValueConverterRegistry> converter_registry() const noexcept
 ```
 
-Reports the current converter registry value without mutation.
+Returns the active instance-owned value converter registry.
 
-### `set_converter_registry`
+### `set_converter_registry` (public)
 
 ```cpp
 void set_converter_registry( std::shared_ptr<PropertyValueConverterRegistry> registry)
 ```
 
-Synchronously updates the retained converter registry property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a registry, replaces formatting/parsing policy, and rebuilds rows/editors.
 
-### `editor_registry`
+### `editor_registry` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<PropertyEditorRegistry> editor_registry() const noexcept
 ```
 
-Reports the current editor registry value without mutation.
+Returns the active instance-owned retained-editor registry.
 
-### `set_editor_registry`
+### `set_editor_registry` (public)
 
 ```cpp
 void set_editor_registry(std::shared_ptr<PropertyEditorRegistry> registry)
 ```
 
-Synchronously updates the retained editor registry property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a registry, replaces factory policy, and rebuilds real editors.
 
-### `editor`
+### `editor` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr editor(std::string_view property_name) const
 ```
 
-Reports the current editor value without mutation.
+Returns the real retained editor at a stable property/member/index path.
 
-### `reset_button`
+### `reset_button` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<Button> reset_button( std::string_view property_name) const
 ```
 
-Returns button to its inherited or default policy.
+Returns the real reset button for a property path.
 
-### `selected_descriptor`
+### `selected_descriptor` (public)
 
 ```cpp
 [[nodiscard]] std::optional<PropertyDescriptor> selected_descriptor( std::string_view property_name) const
 ```
 
-Reports the current selected descriptor value without mutation.
+Returns the common inert descriptor for a selected property path.
 
-### `selected_origin`
+### `selected_origin` (public)
 
 ```cpp
 [[nodiscard]] std::optional<PropertyValueOrigin> selected_origin( std::string_view property_name) const
 ```
 
-Reports the current selected origin value without mutation.
+Returns a common value origin when all selected owners agree.
 
-### `set_property_expanded`
+### `set_property_expanded` (public)
 
 ```cpp
 bool set_property_expanded(std::string_view property_name, bool expanded)
 ```
 
-Synchronously updates the retained property expanded property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits stable compound/collection path disclosure through PropertyList.
 
-### `property_expanded`
+### `property_expanded` (public)
 
 ```cpp
 [[nodiscard]] std::optional<bool> property_expanded( std::string_view property_name) const
 ```
 
-Reports the current property expanded value without mutation.
+Returns retained disclosure state for a projected property path.
 
-### `try_set_property_value`
+### `try_set_property_value` (public)
 
 ```cpp
 bool try_set_property_value(std::string_view property_name, BindingValue value)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and commits a typed value to every selected owner as one rollback-safe transaction.
 
-### `try_set_property_text`
+### `try_set_property_text` (public)
 
 ```cpp
 bool try_set_property_text(std::string_view property_name, std::string_view text)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Parses context-formatted text with the active converter and enters the same typed transaction.
 
-### `activate_property_editor`
+### `activate_property_editor` (public)
 
 ```cpp
 bool activate_property_editor(std::string_view property_name)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Invokes the installed real editor through its semantic Press action rather than bypassing control behavior.
 
-### `reset_property`
+### `reset_property` (public)
 
 ```cpp
 bool reset_property(std::string_view property_name)
 ```
 
-Returns property to its inherited or default policy.
+Requests registered reset on every owner as one rollback-safe transaction.
 
-### `insert_collection_item`
+### `insert_collection_item` (public)
 
 ```cpp
 bool insert_collection_item(std::string_view property_name, std::size_t index, BindingValue value)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Rebuilds an immutable collection with an inserted item and commits through the owning registered setter.
 
-### `remove_collection_item`
+### `remove_collection_item` (public)
 
 ```cpp
 bool remove_collection_item(std::string_view property_name, std::size_t index)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Rebuilds an immutable collection without the indexed item and commits transactionally.
 
-### `move_collection_item`
+### `move_collection_item` (public)
 
 ```cpp
 bool move_collection_item(std::string_view property_name, std::size_t from, std::size_t to)
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Reorders an immutable collection by stable index path and commits transactionally.
 
-### `last_error`
+### `last_error` (public)
 
 ```cpp
 [[nodiscard]] std::optional<PropertyGridEditError> last_error() const
 ```
 
-Reports the current last error value without mutation.
+Returns the last exact edit/parse/transaction failure.
 
-### `selected_object_changed`
+### `selected_object_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<Control::Ptr>& selected_object_changed() noexcept
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after selected-object projection commits.
 
-### `property_value_changed`
+### `property_value_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyGridValueChange&>& property_value_changed() noexcept
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the typed post-transaction event for edits and resets.
 
-### `edit_failed`
+### `edit_failed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PropertyGridEditError&>& edit_failed() noexcept
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after parse rejection, setter failure, or completed rollback.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Delegates desired extent to the owned PropertyList.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Commits own bounds and fills them with the PropertyList scroll surface.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a named property grid with selection count and included descendant editors.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

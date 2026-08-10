@@ -1,7 +1,7 @@
 # GlyphRunError
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/text_shaping.hpp:98`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/text_shaping/types/text_shaping_types.hpp:79`
 
 ## Declared values
 

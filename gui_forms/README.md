@@ -113,8 +113,10 @@ MSAA/UIA boundary.
   unchanged Wine specimen still uses the earlier managed paint path. M11g owns
   the visible zero-passthrough cutover; the prior retired compatibility specimen result is not native
   drawing closure.
-- The checked-in C++ header is the compiled form of the DML gallery schema; a
-  DML compiler/designer is not implemented yet.
+- The checked-in C++ header is the compiled form of the provisional Gallery DML
+  schema. The planning-stage sibling `../web_forms/` now owns the proposed
+  bounded HTML/CSS authoring/compiler direction; no Web.Forms compiler or
+  designer is implemented yet.
 - Text input proves committed UTF-8 and the AppKit IME bridge, not a finished
   shaping, selection, or editing engine.
 - The M3e host seam supplies monitor/work-area records and change events,

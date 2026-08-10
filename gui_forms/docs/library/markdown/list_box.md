@@ -1,255 +1,319 @@
 # ListBox
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → ListBox`  
-Declaration: `include/gui_forms/input_controls.hpp:162`  
-Definition: `src/controls/input_controls.cpp`
+- Status: **OBSERVED: bundle 004 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → ListBox`
+- Declaration: `include/gui_forms/controls/panel/list_box/list_box.hpp:26`
+- Definition: `src/controls/panel/list_box/list_box.cpp`
 
-ListBox is a visual retained control declared in include/gui_forms/input_controls.hpp.
+ListBox is a retained virtual-row selector with single, multi-simple, and multi-extended policies; stable item identities; scroll-window projection; keyboard/pointer range selection; activation; and virtual child semantics.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ListBox](../captures/list_box_combo_box.png)
 
-## Public methods
+## Declared methods
 
-### `ListBox`
+### `ListBox` (public)
 
 ```cpp
 explicit ListBox(StableId stable_id)
 ```
 
-Constructs or tears down the retained ListBox object according to its ownership contract.
+Constructs a focusable clipped row surface with vertical scrolling and collection semantics.
 
-### `items`
+### `items` (public)
 
 ```cpp
 [[nodiscard]] std::span<const std::string> items() const noexcept
 ```
 
-Reports the current items value without mutation.
+Returns the authoritative ordered display strings.
 
-### `set_items`
+### `set_items` (public)
 
 ```cpp
 virtual void set_items(std::vector<std::string> items)
 ```
 
-Synchronously updates the retained items property. Validation, typed invalidation, and notifications are defined by the implementation.
+Replaces the collection, repairs identity/selection/scroll state, and publishes only real selection changes.
 
-### `add_item`
+### `add_item` (public)
 
 ```cpp
 virtual void add_item(std::string item)
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Appends one display item with a deterministic identity and invalidates layout, paint, and semantics.
 
-### `remove_item`
+### `remove_item` (public)
 
 ```cpp
 virtual void remove_item(std::size_t index)
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes a valid row, shifts selection and identity state, and reports whether removal occurred.
 
-### `clear_items`
+### `clear_items` (public)
 
 ```cpp
 virtual void clear_items()
 ```
 
-Removes the explicit items value and restores fallback behavior.
+Clears rows, identities, selection, active anchor, and scroll position atomically.
 
-### `set_item_stable_ids`
+### `set_item_stable_ids` (public)
 
 ```cpp
 void set_item_stable_ids(std::vector<std::string> stable_ids)
 ```
 
-Synchronously updates the retained item stable ids property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs caller-provided unique nonzero row identities after exact cardinality validation.
 
-### `item_stable_id`
+### `item_stable_id` (public)
 
 ```cpp
 [[nodiscard]] std::string item_stable_id(std::size_t index) const
 ```
 
-Reports the current item stable id value without mutation.
+Returns the durable semantic identity for a valid row.
 
-### `selection_mode`
+### `selection_mode` (public)
 
 ```cpp
 [[nodiscard]] ListSelectionMode selection_mode() const noexcept
 ```
 
-Reports the current selection mode value without mutation.
+Returns the active none, single, multi-simple, or multi-extended policy.
 
-### `set_selection_mode`
+### `set_selection_mode` (public)
 
 ```cpp
 void set_selection_mode(ListSelectionMode mode)
 ```
 
-Synchronously updates the retained selection mode property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates policy and reconciles existing selection to its admitted cardinality.
 
-### `selected_indices`
+### `selected_indices` (public)
 
 ```cpp
 [[nodiscard]] std::span<const std::size_t> selected_indices() const noexcept
 ```
 
-Reports the current selected indices value without mutation.
+Returns selected row indexes in ascending order.
 
-### `selected_index`
+### `selected_index` (public)
 
 ```cpp
 [[nodiscard]] std::optional<std::size_t> selected_index() const noexcept
 ```
 
-Reports the current selected index value without mutation.
+Returns the active selected row or no value when selection is empty.
 
-### `select_index`
+### `select_index` (public)
 
 ```cpp
 void select_index(std::size_t index, bool extend = false, bool toggle = false)
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Applies programmatic selection using the current selection-mode law.
 
-### `clear_selection`
+### `clear_selection` (public)
 
 ```cpp
 void clear_selection()
 ```
 
-Removes the explicit selection value and restores fallback behavior.
+Clears selected rows and publishes a typed old/new selection transition.
 
-### `top_index`
+### `top_index` (public)
 
 ```cpp
 [[nodiscard]] std::size_t top_index() const noexcept
 ```
 
-Reports the current top index value without mutation.
+Returns the first row projected into the viewport.
 
-### `set_top_index`
+### `set_top_index` (public)
 
 ```cpp
 void set_top_index(std::size_t index)
 ```
 
-Synchronously updates the retained top index property. Validation, typed invalidation, and notifications are defined by the implementation.
+Constrains a requested first row to the available collection and viewport.
 
-### `item_height`
+### `item_height` (public)
 
 ```cpp
 [[nodiscard]] double item_height() const noexcept
 ```
 
-Reports the current item height value without mutation.
+Returns the logical fixed row height.
 
-### `set_item_height`
+### `set_item_height` (public)
 
 ```cpp
 void set_item_height(double height)
 ```
 
-Synchronously updates the retained item height property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite bounded positive height and invalidates scrolling, layout, and paint.
 
-### `font`
+### `font` (public)
 
 ```cpp
 [[nodiscard]] FontSpec font() const noexcept
 ```
 
-Reports the current font value without mutation.
+Returns the retained row FontSpec.
 
-### `set_font`
+### `set_font` (public)
 
 ```cpp
 void set_font(FontSpec font)
 ```
 
-Synchronously updates the retained font property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates row typography and invalidates measurement, paint, and semantics.
 
-### `selection_changed`
+### `selection_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const ListSelectionChange&>& selection_changed() noexcept
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns typed old/new index collections after selection commits.
 
-### `item_activated`
+### `item_activated` (public)
 
 ```cpp
 [[nodiscard]] Event<std::size_t>& item_activated() noexcept
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published for qualified double-click or keyboard activation.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records only visible rows with alternating, hover, selection, focus, text, and extension adornment states.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Updates viewport geometry and vertical scroll extent from row count and fixed height.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Maps pointer gestures to rows, focus, selection-mode modifiers, scrolling, and activation.
 
-### `on_key`
+### `on_key` (public)
 
 ```cpp
 void on_key(KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Implements navigation, home/end/page movement, range extension, toggling, activation, and type-independent selection.
 
-### `on_focus_changed`
+### `on_focus_changed` (public)
 
 ```cpp
 void on_focus_changed(bool focused) override
 ```
 
-Updates focus-dependent retained state and invalidates affected presentation/semantics.
+Commits the focus cue and invalidates active-row painting.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a list role with selection cardinality and active value.
 
-### `semantic_virtual_children`
+### `semantic_virtual_children` (public)
 
 ```cpp
 [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override
 ```
 
-Reports the current semantic virtual children value without mutation.
+Exposes every logical row as a stable selectable virtual option independent of viewport realization.
 
-### `on_semantic_child_action`
+### `on_semantic_child_action` (public)
 
 ```cpp
 bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 ```
 
+Maps row select/press actions to the same selection and activation state machine.
+
+### `row_text_left` (protected)
+
+```cpp
+[[nodiscard]] virtual double row_text_left() const noexcept
+```
+
+Reports the current row text left value without mutation.
+
+### `paint_row_adornment` (protected)
+
+```cpp
+virtual void paint_row_adornment(Painter& painter, std::size_t index, Rect row_bounds, bool selected, bool focused) const
+```
+
+Reports the current paint row adornment value without mutation.
+
+### `active_index_for_extension` (protected)
+
+```cpp
+[[nodiscard]] std::optional<std::size_t> active_index_for_extension() const noexcept
+```
+
+Reports the current active index for extension value without mutation.
+
+### `focused_for_extension` (protected)
+
+```cpp
+[[nodiscard]] bool focused_for_extension() const noexcept
+```
+
+Reports the current focused for extension value without mutation.
+
+### `index_at` (protected)
+
+```cpp
+[[nodiscard]] std::optional<std::size_t> index_at( Point absolute) const noexcept
+```
+
+Reports the current index at value without mutation.
+
+### `apply_selection` (private)
+
+```cpp
+void apply_selection(std::vector<std::size_t> selection, std::optional<std::size_t> active)
+```
+
 Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `ensure_visible` (private)
+
+```cpp
+void ensure_visible(std::size_t index)
+```
+
+Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `visible_row_count` (private)
+
+```cpp
+[[nodiscard]] std::size_t visible_row_count() const noexcept
+```
+
+Reports the current visible row count value without mutation.

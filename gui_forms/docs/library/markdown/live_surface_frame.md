@@ -1,135 +1,143 @@
 # LiveSurfaceFrame
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `LiveSurfaceFrame`  
-Declaration: `include/gui_forms/live_surface.hpp:73`  
-Definition: `src/core/live_surface.cpp`
+- Status: **OBSERVED: bundle 008 immutable read-lease review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `LiveSurfaceFrame`
+- Declaration: `include/gui_forms/live_surface/frame/live_surface_frame.hpp:20`
+- Definition: `src/core/live_surface/frame/live_surface_frame.cpp`
 
-LiveSurfaceFrame is a class declared in include/gui_forms/live_surface.hpp.
+LiveSurfaceFrame is a move-only immutable lease over one completely published buffer, retaining pixels while the producer searches other unleased slots.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `LiveSurfaceFrame`
+### `LiveSurfaceFrame` (public)
 
 ```cpp
 LiveSurfaceFrame() = default
 ```
 
-Constructs or tears down the retained LiveSurfaceFrame object according to its ownership contract.
+Constructs an empty lease, moves a lease, rejects copying, or privately binds one immutable buffer to exact epoch, generation, and damage metadata.
 
-### `~LiveSurfaceFrame`
+### `~LiveSurfaceFrame` (public)
 
 ```cpp
 ~LiveSurfaceFrame() = default
 ```
 
-Constructs or tears down the retained LiveSurfaceFrame object according to its ownership contract.
+Releases the shared buffer lease; no producer coordination or callback occurs.
 
-### `LiveSurfaceFrame`
+### `LiveSurfaceFrame` (public)
 
 ```cpp
 LiveSurfaceFrame(LiveSurfaceFrame&&) noexcept = default
 ```
 
-Constructs or tears down the retained LiveSurfaceFrame object according to its ownership contract.
+Constructs an empty lease, moves a lease, rejects copying, or privately binds one immutable buffer to exact epoch, generation, and damage metadata.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceFrame& operator=(LiveSurfaceFrame&&) noexcept = default
 ```
 
-Public LiveSurfaceFrame operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves or rejects copying according to exclusive lease-handle ownership.
 
-### `LiveSurfaceFrame`
+### `LiveSurfaceFrame` (public)
 
 ```cpp
 LiveSurfaceFrame(const LiveSurfaceFrame&) = delete
 ```
 
-Constructs or tears down the retained LiveSurfaceFrame object according to its ownership contract.
+Constructs an empty lease, moves a lease, rejects copying, or privately binds one immutable buffer to exact epoch, generation, and damage metadata.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceFrame& operator=(const LiveSurfaceFrame&) = delete
 ```
 
-Public LiveSurfaceFrame operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves or rejects copying according to exclusive lease-handle ownership.
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether an immutable buffer is currently retained.
 
-### `width`
+### `width` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t width() const noexcept
 ```
 
-Reports the current width value without mutation.
+Returns the retained buffer width or zero for an empty lease.
 
-### `height`
+### `height` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t height() const noexcept
 ```
 
-Reports the current height value without mutation.
+Returns the retained buffer height or zero for an empty lease.
 
-### `row_bytes`
+### `row_bytes` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t row_bytes() const noexcept
 ```
 
-Reports the current row bytes value without mutation.
+Returns the exact byte stride or zero for an empty lease.
 
-### `pixel_format`
+### `pixel_format` (public)
 
 ```cpp
 [[nodiscard]] LiveSurfacePixelFormat pixel_format() const noexcept
 ```
 
-Reports the current pixel format value without mutation.
+Returns the admitted BGRA premultiplied-sRGB format for retained and empty leases.
 
-### `epoch`
+### `epoch` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t epoch() const noexcept
 ```
 
-Reports the current epoch value without mutation.
+Returns the configuration epoch sampled with the publication.
 
-### `generation`
+### `generation` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t generation() const noexcept
 ```
 
-Reports the current generation value without mutation.
+Returns the monotonically published generation within the sampled epoch.
 
-### `damage`
+### `damage` (public)
 
 ```cpp
 [[nodiscard]] Rect damage() const noexcept
 ```
 
-Reports the current damage value without mutation.
+Returns producer-authored damage clipped to surface bounds.
 
-### `pixels`
+### `pixels` (public)
 
 ```cpp
 [[nodiscard]] std::span<const std::byte> pixels() const noexcept
 ```
 
-Reports the current pixels value without mutation.
+Returns a const byte span whose lifetime is protected by the retained shared buffer.
+
+### `LiveSurfaceFrame` (private)
+
+```cpp
+LiveSurfaceFrame(std::shared_ptr<const detail::LiveSurfaceBuffer> buffer, std::uint64_t epoch, std::uint64_t generation, Rect damage) noexcept
+```
+
+Constructs an empty lease, moves a lease, rejects copying, or privately binds one immutable buffer to exact epoch, generation, and damage metadata.

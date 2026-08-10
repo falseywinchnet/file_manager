@@ -1,7 +1,7 @@
 # Dirty
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/dirty.hpp:8`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/dirty.hpp:8`
 
 ## Declared values
 

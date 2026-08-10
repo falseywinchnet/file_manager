@@ -1,39 +1,39 @@
 # SolidBrush
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Brush → SolidBrush`  
-Declaration: `include/gui_forms/drawing.hpp:365`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 solid brush split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Brush → SolidBrush`
+- Declaration: `include/gui_forms/drawing/brush/brush.hpp:13`
+- Definition: `src/core/drawing/brush/solid_brush.cpp`
 
-SolidBrush is a class declared in include/gui_forms/drawing.hpp.
+SolidBrush retains one color under DrawingObject lifetime and thread-affinity rules.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `SolidBrush`
+### `SolidBrush` (public)
 
 ```cpp
 explicit SolidBrush(Color color)
 ```
 
-Constructs or tears down the retained SolidBrush object according to its ownership contract.
+Retains one authored color.
 
-### `color`
+### `color` (public)
 
 ```cpp
 [[nodiscard]] Color color() const
 ```
 
-Reports the current color value without mutation.
+Requires liveness and returns the retained color.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] BrushSnapshot snapshot() const override
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and projects a solid BrushSnapshot.

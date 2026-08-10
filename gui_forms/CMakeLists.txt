@@ -38,25 +38,50 @@ endif()
 
 add_library(gui_forms_core STATIC
     src/core/animation.cpp
-    src/core/binding.cpp
+    src/core/binding/value/binding_value.cpp
+    src/core/binding/currency_manager/currency_manager.cpp
+    src/core/binding/binding_source/binding_source.cpp
+    src/core/binding/binding/binding.cpp
+    src/core/binding/control_bindings_collection/control_bindings_collection.cpp
+    src/core/binding/binding_context/binding_context.cpp
     src/core/types.cpp
-    src/core/theme.cpp
-    src/core/text.cpp
-    src/core/text_shaping.cpp
-    src/core/unicode_grapheme.cpp
-    src/core/metrics.cpp
-    src/core/resources.cpp
-    src/core/live_surface.cpp
-    src/core/semantics.cpp
-    src/core/host.cpp
-    src/core/feedback.cpp
-    src/core/display_chunk.cpp
-    src/core/dispatcher.cpp
-    src/core/component.cpp
-    src/core/timer.cpp
+    src/core/theme/theme/theme.cpp
+    src/core/text/text_store/text_store.cpp
+    src/core/text_shaping/validation/text_shaping_validation.cpp
+    src/core/text/unicode/unicode_grapheme.cpp
+    src/core/metrics/metrics/metrics.cpp
+    src/core/metrics/snapshot/metrics_snapshot.cpp
+    src/core/resources/image_registry/image_registry.cpp
+    src/core/live_surface/buffer/live_surface_buffer.cpp
+    src/core/live_surface/frame/live_surface_frame.cpp
+    src/core/live_surface/surface/live_surface.cpp
+    src/core/live_surface/wake_connection/live_surface_wake_connection.cpp
+    src/core/live_surface/write_lease/live_surface_write_lease.cpp
+    src/core/semantics/snapshot/semantic_snapshot.cpp
+    src/core/host/types/host_types.cpp
+    src/core/host/services/host_services.cpp
+    src/core/host/session/host_session.cpp
+    src/core/feedback/semantic_feedback/semantic_feedback.cpp
+    src/core/display/chunk/display_chunk.cpp
+    src/core/display/recording_painter/recording_painter.cpp
+    src/core/display/replay/replay_display_chunk.cpp
+    src/core/dispatcher/operation/dispatch_operation.cpp
+    src/core/dispatcher/state/post_dispatch.cpp
+    src/core/scheduler/frame_request_token/frame_request_token.cpp
+    src/core/scheduler/request/scheduled_frame_request.cpp
+    src/core/window/dispatcher/window_dispatcher.cpp
+    src/core/window/lifecycle/window_lifecycle.cpp
+    src/core/window/presentation/window_presentation.cpp
+    src/core/window/scheduler/window_scheduler.cpp
+    src/core/window/popup/popup_token.cpp
+    src/core/window/accelerator/accelerator_token.cpp
+    src/core/control/dispatcher/control_dispatcher.cpp
+    src/core/component/component/component.cpp
+    src/core/component/component_container/component_container.cpp
+    src/core/timer/timer/timer.cpp
     src/core/control.cpp
     src/core/static_tree.cpp
-    src/core/window.cpp
+    src/core/window/window.cpp
 )
 target_include_directories(gui_forms_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -105,10 +130,10 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
                      EXCLUDE_FROM_ALL)
 
     add_library(gui_forms_text_engine STATIC
-        src/render/text/harfbuzz_font_engine.cpp
+        src/render/text/harfbuzz/harfbuzz_font_engine.cpp
     )
     target_include_directories(gui_forms_text_engine
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/text
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/text/harfbuzz
     )
     target_link_libraries(gui_forms_text_engine
         PUBLIC gui_forms_core
@@ -123,7 +148,24 @@ endif()
 # remains separate from the retained GUI.Forms core and from every host and
 # raster adapter so consumers can use its value/resource semantics alone.
 add_library(gui_drawing_core STATIC
-    src/core/drawing.cpp
+    src/core/drawing/bitmap/bitmap.cpp
+    src/core/drawing/brush/hatch_brush.cpp
+    src/core/drawing/brush/linear_gradient_brush.cpp
+    src/core/drawing/brush/path_gradient_brush.cpp
+    src/core/drawing/brush/solid_brush.cpp
+    src/core/drawing/color/color.cpp
+    src/core/drawing/font/font.cpp
+    src/core/drawing/geometry/drawing_geometry.cpp
+    src/core/drawing/graphics_path/graphics_path.cpp
+    src/core/drawing/graphics_recorder/graphics_recorder.cpp
+    src/core/drawing/image_attributes/image_attributes.cpp
+    src/core/drawing/image_reference/image_reference.cpp
+    src/core/drawing/matrix/matrix.cpp
+    src/core/drawing/object/drawing_object.cpp
+    src/core/drawing/pen/pen.cpp
+    src/core/drawing/region/region.cpp
+    src/core/drawing/string_format/string_format.cpp
+    src/core/drawing/texture_brush/texture_brush.cpp
 )
 target_include_directories(gui_drawing_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -163,7 +205,9 @@ if(APPLE)
 endif()
 
 add_library(gui_forms_host_headless STATIC
-    src/host/headless/headless_host.cpp
+    src/host/headless/capabilities/headless_capabilities.cpp
+    src/host/headless/services/headless_host_services.cpp
+    src/host/headless/session/headless_host.cpp
 )
 target_include_directories(gui_forms_host_headless PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/host/headless
@@ -181,26 +225,74 @@ add_library(gui_forms_controls STATIC
     src/controls/button_base/check_box/check_box.cpp
     src/controls/button_base/radio_button/radio_button.cpp
     src/controls/button_base/link_label/link_label.cpp
-    src/controls/canvas.cpp
-    src/controls/collection_controls.cpp
+    src/controls/raster_canvas/raster_canvas.cpp
+    src/controls/panel/tree_view/tree_view.cpp
+    src/controls/panel/object_view/object_view.cpp
+    src/controls/panel/correspondence_view/correspondence_view.cpp
     src/controls/panel/card/card.cpp
     src/controls/panel/card/review_card/review_card.cpp
     src/controls/container/master_detail_view/master_detail_view.cpp
-    src/controls/commands.cpp
-    src/controls/menu_controls.cpp
-    src/controls/popup_controls.cpp
-    src/controls/container_controls.cpp
-    src/controls/date_time_picker.cpp
-    src/controls/diagnostic_controls.cpp
-    src/controls/input_controls.cpp
-    src/controls/inspection_controls.cpp
-    src/controls/instrument_controls.cpp
+    src/controls/commands/command/command.cpp
+    src/controls/commands/command_binding/command_binding.cpp
+    src/controls/menu/context_menu/context_menu.cpp
+    src/controls/menu/menu_strip/menu_strip.cpp
+    src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
+    src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
+    src/controls/scrollable_control/container_control/container_control.cpp
+    src/controls/scrollable_control/container_control/user_control/user_control.cpp
+    src/controls/panel/scaled_panel/scaled_panel.cpp
+    src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp
+    src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp
+    src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp
+    src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp
+    src/controls/scrollable_control/container_control/tab_control/tab_control.cpp
+    src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
+    src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
+    src/controls/scrollable_control/container_control/split_container/split_container.cpp
+    src/controls/panel/date_time_picker/date_time_utilities.cpp
+    src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
+    src/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.cpp
+    src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.cpp
+    src/controls/panel/date_time_picker/calendar_popup/calendar_popup.cpp
+    src/controls/panel/date_time_picker/date_time_picker.cpp
+    src/controls/drawing_surface/drawing_surface.cpp
+    src/controls/metrics_view/metrics_view.cpp
+    src/controls/easing_preview/easing_preview.cpp
+    src/controls/panel/text_box/text_box.cpp
+    src/controls/panel/list_box/list_box.cpp
+    src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
+    src/controls/panel/combo_box/drop_down_layer.cpp
+    src/controls/panel/combo_box/combo_box.cpp
+    src/controls/panel/numeric_up_down/spin_buttons.cpp
+    src/controls/panel/numeric_up_down/numeric_up_down.cpp
+    src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
+    src/controls/panel/flags_value_editor/flags_value_editor.cpp
+    src/controls/panel/color_value_editor/color_value_editor.cpp
+    src/controls/inspection/inspection_types.cpp
+    src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp
+    src/controls/inspection/property_editor_registry/property_editor_registry.cpp
+    src/controls/panel/property_list/property_list.cpp
+    src/controls/panel/property_grid/property_grid.cpp
+    src/controls/panel/instrument_rack/rack_module_panel/rack_module_panel.cpp
+    src/controls/panel/instrument_rack/instrument_rack.cpp
     src/controls/image_list.cpp
-    src/controls/guidance.cpp
-    src/controls/material.cpp
-    src/controls/range_controls.cpp
-    src/controls/scrolling.cpp
-    src/controls/tooltip.cpp
+    src/controls/guidance/error_layer/error_layer.cpp
+    src/controls/guidance/error_glyph/error_glyph.cpp
+    src/controls/guidance/error_provider/error_provider.cpp
+    src/controls/guidance/help_provider/help_provider.cpp
+    src/controls/panel/material_panel/material_panel.cpp
+    src/controls/range_control/range_control_rendering.cpp
+    src/controls/range_control/range_control.cpp
+    src/controls/range_control/track_bar/track_bar.cpp
+    src/controls/range_control/progress_bar/progress_bar.cpp
+    src/controls/range_control/scroll_bar/scroll_bar.cpp
+    src/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.cpp
+    src/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.cpp
+    src/controls/scrollable_control/scroll_properties/scroll_properties.cpp
+    src/controls/scrollable_control/scrollable_control.cpp
+    src/controls/tool_tip/tool_tip_layer/tool_tip_layer.cpp
+    src/controls/tool_tip/tool_tip_bubble/tool_tip_bubble.cpp
+    src/controls/tool_tip/tool_tip.cpp
 )
 target_include_directories(gui_forms_controls PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -210,6 +302,8 @@ target_link_libraries(gui_forms_controls PUBLIC gui_forms_core gui_drawing_core)
 
 add_library(gui_forms_c_api SHARED
     src/abi/c_api.cpp
+    src/abi/error/abi_error.cpp
+    src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp
 )
 target_link_libraries(gui_forms_c_api PRIVATE
     gui_forms_controls
@@ -404,11 +498,11 @@ if(GUI_FORMS_ENABLE_SKIA)
     endforeach()
 
     add_library(gui_forms_skia STATIC
-        src/render/skia/skia_raster.cpp
+        src/render/skia/raster/skia_raster.cpp
     )
     add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/raster
     )
     target_include_directories(gui_forms_skia SYSTEM PRIVATE
         ${GUI_FORMS_SKIA_ROOT}
@@ -445,11 +539,11 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
 
     add_library(gui_drawing_skia STATIC
-        src/render/skia/drawing_skia.cpp
+        src/render/skia/executor/drawing_skia.cpp
     )
     add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
     target_include_directories(gui_drawing_skia
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/executor
     )
     target_include_directories(gui_drawing_skia SYSTEM PRIVATE
         ${GUI_FORMS_SKIA_ROOT}
@@ -482,7 +576,7 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
     target_include_directories(gui_drawing_raster_c_api PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/executor
     )
     target_link_libraries(gui_drawing_raster_c_api PRIVATE
         gui_drawing_skia
@@ -515,10 +609,10 @@ if(APPLE)
     find_library(GUI_FORMS_CORETEXT CoreText REQUIRED)
     find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     add_library(gui_forms_coregraphics STATIC
-        src/render/coregraphics/coregraphics_raster.cpp
+        src/render/coregraphics/raster/coregraphics_raster.cpp
     )
     target_include_directories(gui_forms_coregraphics PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/render/coregraphics
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/render/coregraphics/raster
     )
     target_link_libraries(gui_forms_coregraphics
         PUBLIC gui_forms_core
@@ -537,7 +631,8 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
-        src/host/macos/macos_host.mm
+        src/host/macos/application/macos_host.mm
+        src/host/macos/services/appkit_host_services.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -555,7 +650,7 @@ endif()
 
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     add_library(gui_forms_host_windows STATIC
-        src/host/windows/windows_host.cpp
+        src/host/windows/application/windows_host.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows
@@ -1370,7 +1465,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
     unset(CMAKE_REQUIRED_FLAGS)
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
-        src/core/resources.cpp
+        src/core/resources/image_registry/image_registry.cpp
     )
     target_include_directories(gui_forms_png_registry_fuzz PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

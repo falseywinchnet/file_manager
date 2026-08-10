@@ -2,7 +2,7 @@
 #include "gallery.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "skia_raster.hpp"
-#include "../src/core/device_damage.hpp"
+#include "../src/core/damage/device_damage/device_damage.hpp"
 
 #include <mach/mach.h>
 #include <sys/resource.h>

@@ -129,14 +129,23 @@ void test_paint_and_semantic_actions() {
     list->add_item("Checked", CheckState::checked);
     list->add_item("Mixed", CheckState::indeterminate);
     list->add_item("Empty", CheckState::unchecked);
+    list->set_indicator_size(20.0);
     list->set_requested_bounds({0.0, 0.0, 240.0, 120.0});
     Window window(list, {240.0, 120.0});
     window.perform_layout();
     RecordingPainter painter;
     window.paint(painter, {0.0, 0.0, 240.0, 120.0});
     require(painter.texts.size() == 3U && painter.strokes >= 3U &&
-                painter.lines >= 2U && painter.origins.front().x == 28.0,
+                painter.lines >= 2U && painter.origins.front().x == 34.0,
             "CheckedListBox must paint check adornments and shifted row text");
+    bool invalid_size{};
+    try {
+        list->set_indicator_size(40.0);
+    } catch (const std::out_of_range&) {
+        invalid_size = true;
+    }
+    require(invalid_size && list->indicator_size() == 20.0,
+            "CheckedListBox indicator size must reject invalid customization atomically");
 
     const std::string json = window.semantic_snapshot().to_json();
     require(json.find("\"role\":\"check_list_item\"") != std::string::npos &&

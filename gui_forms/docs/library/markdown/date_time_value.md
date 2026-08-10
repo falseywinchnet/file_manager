@@ -1,23 +1,23 @@
 # DateTimeValue
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `DateTimeValue`  
-Declaration: `include/gui_forms/date_time_picker.hpp:16`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 004 value-type split and calendar arithmetic review; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `DateTimeValue`
+- Declaration: `include/gui_forms/controls/panel/date_time_picker/date_time_value/date_time_value.hpp:8`
+- Definition: `inline/header-only`
 
-DateTimeValue is a struct declared in include/gui_forms/date_time_picker.hpp.
+DateTimeValue is DateTimePicker's timezone-free civil date/time value. Ordering is lexicographic across validated year-through-second fields so range constraint and calendar selection remain deterministic.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![DateTimeValue](../captures/date_time_picker.png)
 
-## Public methods
+## Declared methods
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
 friend constexpr auto operator<=>(const DateTimeValue&, const DateTimeValue&) = default
 ```
 
-Public DateTimeValue operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Orders values chronologically by year, month, day, hour, minute, then second.

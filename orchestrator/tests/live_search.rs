@@ -1,5 +1,7 @@
 #![cfg(unix)]
 
+mod support;
+
 use fileman_orchestrator::common::{ContractRef, Request, Response, TerminalStatus};
 use fileman_orchestrator::local_endpoint::connect_authenticated;
 use fileman_orchestrator::local_wire::{read_json_frame, write_json_frame};
@@ -37,7 +39,8 @@ fn daemon_routes_zero_catalogue_search_to_live_engine() {
     fs::write(source.join("nested/needle.txt"), b"fixture").expect("write source fixture");
 
     let engine_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../engine");
-    let build = Command::new("go")
+    let go = support::program("GO", &["/opt/homebrew/bin/go", "/usr/local/bin/go"], "go");
+    let build = Command::new(go)
         .args(["build", "-o"])
         .arg(&engine)
         .arg("./cmd/fileman-engine")
@@ -119,7 +122,12 @@ fn daemon_routes_zero_catalogue_search_to_live_engine() {
 
     let cpp_source = Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance/clients/cpp");
     let cpp_build = base.0.join("cpp");
-    let configure = Command::new("cmake")
+    let cmake = support::program(
+        "CMAKE",
+        &["/opt/homebrew/bin/cmake", "/usr/local/bin/cmake"],
+        "cmake",
+    );
+    let configure = Command::new(&cmake)
         .args(["-S", path(&cpp_source), "-B", path(&cpp_build)])
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .output()
@@ -129,7 +137,7 @@ fn daemon_routes_zero_catalogue_search_to_live_engine() {
         "C++ configure failed: {}",
         String::from_utf8_lossy(&configure.stderr)
     );
-    let compile = Command::new("cmake")
+    let compile = Command::new(&cmake)
         .args(["--build", path(&cpp_build), "--parallel"])
         .output()
         .expect("build independent C++ client");

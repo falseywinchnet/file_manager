@@ -258,24 +258,25 @@ impl Kernel {
 
     fn availability_result(&self) -> Value {
         let mut value = serde_json::to_value(CAPABILITIES).expect("static availability serializes");
-        if let Some(entries) = value.as_array_mut()
-            && let Some(live) = entries
+        if let Some(entries) = value.as_array_mut() {
+            if let Some(live) = entries
                 .iter_mut()
                 .find(|entry| entry["id"] == "engine.query.catalogue_free_fallback")
-        {
-            live["state"] = Value::String(
-                if self.live_search_available() {
-                    "available"
+            {
+                live["state"] = Value::String(
+                    if self.live_search_available() {
+                        "available"
+                    } else {
+                        "unavailable"
+                    }
+                    .to_owned(),
+                );
+                live["reason"] = Value::String(if self.live_search_available() {
+                    "connected Engine provider advertises ORC-ENG-004 through the bounded development adapter"
                 } else {
-                    "unavailable"
-                }
-                .to_owned(),
-            );
-            live["reason"] = Value::String(if self.live_search_available() {
-                "connected Engine provider advertises ORC-ENG-004 through the bounded development adapter"
-            } else {
-                "ORC-ENG-004 is implemented, but no Engine provider transport is connected to this process"
-            }.to_owned());
+                    "ORC-ENG-004 is implemented, but no Engine provider transport is connected to this process"
+                }.to_owned());
+            }
         }
         value
     }

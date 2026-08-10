@@ -1,31 +1,31 @@
 # FocusScopeId
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FocusScopeId`  
-Declaration: `include/gui_forms/window.hpp:225`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 focus-scope identity review; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `FocusScopeId`
+- Declaration: `include/gui_forms/window/window.hpp:153`
+- Definition: `inline/header-only`
 
-FocusScopeId is a struct declared in include/gui_forms/window.hpp.
+FocusScopeId is a nonzero monotonically assigned transient-containment identity.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit constexpr operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether the scope identity is nonzero.
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
 friend constexpr auto operator<=>(const FocusScopeId&, const FocusScopeId&) = default
 ```
 
-Public FocusScopeId operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Orders and compares exact scope identity.

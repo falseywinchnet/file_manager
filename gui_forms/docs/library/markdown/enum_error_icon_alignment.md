@@ -1,7 +1,7 @@
 # ErrorIconAlignment
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/guidance.hpp:37`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/components/error_provider/error_provider.hpp:37`
 
 ## Declared values
 

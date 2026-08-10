@@ -1,31 +1,31 @@
 # TextRange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `TextRange`  
-Declaration: `include/gui_forms/text.hpp:39`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 strongly typed text range review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `TextRange`
+- Declaration: `include/gui_forms/text/types/text_types.hpp:32`
+- Definition: `inline/header-only`
 
-TextRange is a struct declared in include/gui_forms/text.hpp.
+TextRange carries half-open start/end positions in one compile-time coordinate system.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
-friend constexpr bool operator==(const TextRange &, const TextRange &) = default
+friend constexpr bool operator==(const TextRange&, const TextRange&) = default
 ```
 
-Public TextRange operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares both typed endpoints.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports equal start and end positions.

@@ -1,47 +1,47 @@
 # TabPage
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → TabPage`  
-Declaration: `include/gui_forms/container_controls.hpp:291`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → TabPage`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp:9`
+- Definition: `src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp`
 
-TabPage is a visual retained control declared in include/gui_forms/container_controls.hpp.
+TabPage is an owned Panel surface with bounded caption text and page semantics; TabControl, not the page, owns selection and header interaction.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![TabPage](../captures/tab_control.png)
 
-## Public methods
+## Declared methods
 
-### `TabPage`
+### `TabPage` (public)
 
 ```cpp
 explicit TabPage(StableId stable_id, std::string text =
 ```
 
-Constructs or tears down the retained TabPage object according to its ownership contract.
+Constructs a Panel page with authored caption text.
 
-### `text`
+### `text` (public)
 
 ```cpp
 [[nodiscard]] const std::string& text() const noexcept
 ```
 
-Reports the current text value without mutation.
+Returns the tab header caption owned by this page.
 
-### `set_text`
+### `set_text` (public)
 
 ```cpp
 void set_text(std::string text)
 ```
 
-Synchronously updates the retained text property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded UTF-8 caption text and invalidates parent measurement, painting, and semantics.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects the selected content surface as a named page group while its TabControl owns the virtual tab action.

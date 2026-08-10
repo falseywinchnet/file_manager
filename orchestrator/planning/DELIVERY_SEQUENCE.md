@@ -47,17 +47,20 @@ watermarks, status subscriptions, lexical/fuzzy channels, or platform service
 packaging. Those features advance through capability state. Production
 deployment still requires its platform discovery/authentication adapter.
 
-The first slice may route checked cached exact results and may explicitly invoke
-manual reconciliation through an authorized admin port. Neither mode is a true
-zero-catalogue live filesystem query. ADR-008 requires that distinct Engine
-provision under `ORC-ENG-004`; Orchestrator may prepare its fake-provider and
-routing policy while the Engine implementation and evidence advance.
+The first catalogue slice may route checked cached exact results and may
+explicitly invoke manual reconciliation through an authorized admin port.
+Neither mode is a true zero-catalogue live filesystem query. ADR-008 requires
+that distinct Engine provision under `ORC-ENG-004`; Engine reply 006 and the
+development provider/adapter now implement it while installed and native
+promotion evidence advances independently.
 
-**OBSERVED development increment:** the bounded Rust JSONL peer and typed exact
-query adapter pass against a separately built Go Engine process for version,
-status, canonical root plan/apply, reconciliation, exact query, and shutdown.
-This admits development integration and does not satisfy installed discovery,
-peer authentication, or production framing.
+**OBSERVED development increment:** the bounded Rust JSONL peer and typed
+adapter pass against a separately built Go Engine process for version, status,
+canonical root plan/apply, reconciliation, exact query, catalogue-independent
+live query, and shutdown. The authenticated Rust and independent C++ clients
+exercise the unified live fallback without source-lane selection. This admits
+development integration and does not satisfy installed Engine discovery, peer
+authentication, production framing, native NTFS/ext4, or million-entry gates.
 
 Exit: normal broker and catalogue-independent fallback preserve the common
 result identity and terminal vocabulary on the same fixture while naming their

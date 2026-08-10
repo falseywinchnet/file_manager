@@ -1,7 +1,7 @@
 # FocusScopeCloseReason
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/window.hpp:247`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/window/window.hpp:175`
 
 ## Declared values
 

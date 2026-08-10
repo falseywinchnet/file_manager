@@ -1,7 +1,7 @@
 # ControlStyles
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/control.hpp:195`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/control.hpp:195`
 
 ## Declared values
 

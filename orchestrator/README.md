@@ -36,6 +36,12 @@ injection in Core 1.0.
 
 ## Current executable slice
 
+The executable source now separates the thin process entry, CLI/presentation,
+stdio laboratory, bounded Unix daemon host, launchd activation, endpoint/session
+framing, semantic kernel, and provider ports. The searchable local service
+atlas under [`docs/library/`](docs/library/) documents those boundaries and
+generates a Markdown mirror from the same reviewed manifest.
+
 The Rust bootstrap contains only provider-independent competence:
 
 - common status/error and request/reply vocabulary;
@@ -129,11 +135,31 @@ producer code into ABI.
 
 ## Build
 
+The crate's declared minimum Rust version is 1.87. The lockfile is
+authoritative for dependency reproduction. Build products stay under ignored
+component-local trees.
+
 ```sh
-cargo fmt --check --manifest-path orchestrator/Cargo.toml
-cargo test --manifest-path orchestrator/Cargo.toml
-cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-features -- -D warnings
-cargo run --manifest-path orchestrator/Cargo.toml -- status
+rustup run stable cargo fmt --manifest-path orchestrator/Cargo.toml -- --check
+rustup run stable cargo test --manifest-path orchestrator/Cargo.toml --locked
+rustup run stable cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-features --locked -- -D warnings
+rustup run stable cargo run --manifest-path orchestrator/Cargo.toml --locked -- status
+```
+
+The navigable, dependency-free source/service reference lives at
+[`docs/library/index.html`](docs/library/index.html), with checked-in Markdown
+mirrors for agents and text tools. Regenerate or check it with:
+
+```sh
+python3 orchestrator/tools/generate_service_docs.py
+python3 orchestrator/tools/generate_service_docs.py --check
+```
+
+From the authoritative checkout, the complete M4 gate is one command:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh orchestrator/tools/verify_m4.sh
 ```
 
 On macOS, the Rust CLI and independent C++ client derive the same stable private

@@ -1,23 +1,23 @@
 # ControlVisualContext
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ControlVisualContext`  
-Declaration: `include/gui_forms/theme.hpp:67`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 visual context review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ControlVisualContext`
+- Declaration: `include/gui_forms/theme/types/theme_types.hpp:38`
+- Definition: `inline/header-only`
 
-ControlVisualContext is a struct declared in include/gui_forms/theme.hpp.
+ControlVisualContext selects a role recipe from surface state plus selected, focused, defaulted, and high-contrast axes.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const ControlVisualContext&, const ControlVisualContext&) = default
 ```
 
-Public ControlVisualContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares every selection axis.

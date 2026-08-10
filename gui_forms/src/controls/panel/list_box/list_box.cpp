@@ -1,0 +1,478 @@
+#include "gui_forms/controls/panel/list_box/list_box.hpp"
+
+#include "../input_control_utilities.hpp"
+#include "gui_forms/text.hpp"
+#include "gui_forms/window.hpp"
+
+#include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <stdexcept>
+#include <utility>
+
+namespace gui_forms {
+using namespace input_control_detail;
+
+ListBox::ListBox(StableId stable_id) : Panel(std::move(stable_id)) {
+    set_paint_plane(PaintPlane::control);
+    set_border_style(BorderStyle::sunken);
+    set_focusable(true);
+}
+
+void ListBox::set_items(std::vector<std::string> items) {
+    require_mutable();
+    for (const std::string& item : items) {
+        if (!validate_utf8(item).valid()) {
+            throw std::invalid_argument("ListBox items must be valid UTF-8");
+        }
+    }
+    items_ = std::move(items);
+    item_stable_ids_.clear();
+    const std::vector<std::size_t> previous = selected_;
+    selected_.erase(std::remove_if(selected_.begin(), selected_.end(),
+        [this](std::size_t index) { return index >= items_.size(); }), selected_.end());
+    if (active_index_ && *active_index_ >= items_.size()) active_index_.reset();
+    if (anchor_index_ && *anchor_index_ >= items_.size()) anchor_index_.reset();
+    top_index_ = items_.empty() ? 0U : std::min(top_index_, items_.size() - 1U);
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    if (previous != selected_) {
+        publish_change(selection_changed_,
+                       ListSelectionChange{previous, selected_, active_index_});
+    }
+}
+
+void ListBox::add_item(std::string item) {
+    require_mutable();
+    if (!validate_utf8(item).valid()) {
+        throw std::invalid_argument("ListBox item must be valid UTF-8");
+    }
+    // Appending without an accompanying model identity returns the collection
+    // to the deterministic index-derived identity policy.
+    item_stable_ids_.clear();
+    items_.push_back(std::move(item));
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
+void ListBox::remove_item(std::size_t index) {
+    require_mutable();
+    if (index >= items_.size()) {
+        throw std::out_of_range("ListBox item index is outside the collection");
+    }
+    const std::vector<std::size_t> previous = selected_;
+    items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
+    if (!item_stable_ids_.empty()) {
+        item_stable_ids_.erase(item_stable_ids_.begin() +
+                               static_cast<std::ptrdiff_t>(index));
+    }
+    std::vector<std::size_t> adjusted;
+    for (const std::size_t selected : selected_) {
+        if (selected != index) adjusted.push_back(selected > index ? selected - 1U : selected);
+    }
+    selected_ = std::move(adjusted);
+    if (active_index_) {
+        if (*active_index_ == index) active_index_.reset();
+        else if (*active_index_ > index) --*active_index_;
+    }
+    if (anchor_index_) {
+        if (*anchor_index_ == index) anchor_index_.reset();
+        else if (*anchor_index_ > index) --*anchor_index_;
+    }
+    top_index_ = items_.empty() ? 0U : std::min(top_index_, items_.size() - 1U);
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    if (previous != selected_) {
+        publish_change(selection_changed_,
+                       ListSelectionChange{previous, selected_, active_index_});
+    }
+}
+
+void ListBox::clear_items() {
+    set_items({});
+}
+
+void ListBox::set_item_stable_ids(std::vector<std::string> stable_ids) {
+    require_mutable();
+    if (stable_ids.size() != items_.size()) {
+        throw std::invalid_argument(
+            "ListBox stable item IDs must match the item count");
+    }
+    std::vector<std::string> sorted = stable_ids;
+    for (const std::string& stable_id : sorted) {
+        if (stable_id.empty() || !validate_utf8(stable_id).valid()) {
+            throw std::invalid_argument(
+                "ListBox stable item IDs must be nonempty valid UTF-8");
+        }
+    }
+    std::sort(sorted.begin(), sorted.end());
+    if (std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end()) {
+        throw std::invalid_argument("ListBox stable item IDs must be unique");
+    }
+    item_stable_ids_ = std::move(stable_ids);
+    invalidate(Dirty::semantics);
+}
+
+std::string ListBox::item_stable_id(std::size_t index) const {
+    if (index >= items_.size()) {
+        throw std::out_of_range(
+            "ListBox item stable ID index is outside the collection");
+    }
+    if (!item_stable_ids_.empty()) return item_stable_ids_[index];
+    return std::string(stable_id().value()) + ".item." +
+           std::to_string(index);
+}
+
+void ListBox::set_selection_mode(ListSelectionMode mode) {
+    require_mutable();
+    if (selection_mode_ == mode) return;
+    selection_mode_ = mode;
+    if (mode == ListSelectionMode::one && selected_.size() > 1U) {
+        const std::size_t retained = active_index_.value_or(selected_.front());
+        apply_selection({retained}, retained);
+    }
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+std::optional<std::size_t> ListBox::selected_index() const noexcept {
+    return selected_.empty() ? std::optional<std::size_t>{}
+                             : std::optional<std::size_t>{selected_.front()};
+}
+
+void ListBox::apply_selection(std::vector<std::size_t> selection,
+                              std::optional<std::size_t> active) {
+    std::sort(selection.begin(), selection.end());
+    selection.erase(std::unique(selection.begin(), selection.end()), selection.end());
+    const std::vector<std::size_t> previous = selected_;
+    const auto previous_active = active_index_;
+    selected_ = std::move(selection);
+    active_index_ = active;
+    if (previous == selected_ && previous_active == active_index_) return;
+    invalidate(Dirty::paint | Dirty::semantics);
+    publish_change(selection_changed_,
+                   ListSelectionChange{previous, selected_, active_index_});
+}
+
+void ListBox::select_index(std::size_t index, bool extend, bool toggle) {
+    require_mutable();
+    if (index >= items_.size()) {
+        throw std::out_of_range("ListBox selection index is outside the collection");
+    }
+    if (selection_mode_ == ListSelectionMode::one) {
+        selected_ == std::vector<std::size_t>{index}
+            ? apply_selection(selected_, index)
+            : apply_selection({index}, index);
+        anchor_index_ = index;
+    } else if (extend && anchor_index_) {
+        std::vector<std::size_t> next;
+        const std::size_t first = std::min(*anchor_index_, index);
+        const std::size_t last = std::max(*anchor_index_, index);
+        next.reserve(last - first + 1U);
+        for (std::size_t item = first; item <= last; ++item) next.push_back(item);
+        apply_selection(std::move(next), index);
+    } else if (toggle) {
+        std::vector<std::size_t> next = selected_;
+        const auto found = std::find(next.begin(), next.end(), index);
+        if (found == next.end()) next.push_back(index);
+        else next.erase(found);
+        apply_selection(std::move(next), index);
+        anchor_index_ = index;
+    } else {
+        apply_selection({index}, index);
+        anchor_index_ = index;
+    }
+    ensure_visible(index);
+}
+
+void ListBox::clear_selection() {
+    require_mutable();
+    apply_selection({}, {});
+    anchor_index_.reset();
+}
+
+void ListBox::set_top_index(std::size_t index) {
+    require_mutable();
+    if (items_.empty()) {
+        if (index != 0U) throw std::out_of_range("empty ListBox top index must be zero");
+    } else if (index >= items_.size()) {
+        throw std::out_of_range("ListBox top index is outside the collection");
+    }
+    if (top_index_ == index) return;
+    top_index_ = index;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ListBox::set_item_height(double height) {
+    require_mutable();
+    if (!std::isfinite(height) || height < 12.0 || height > 256.0) {
+        throw std::invalid_argument("ListBox item height must be finite and between 12 and 256");
+    }
+    if (item_height_ == height) return;
+    item_height_ = height;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void ListBox::set_font(FontSpec font) {
+    require_mutable();
+    if (!valid_font_spec(font)) {
+        throw std::invalid_argument("ListBox font specification is invalid");
+    }
+    if (font_ == font) return;
+    font_ = font;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
+std::size_t ListBox::visible_row_count() const noexcept {
+    double height = local_bounds().height;
+    if (height <= 4.0) {
+        height = requested_bounds().height;
+    }
+    const double row_height = item_height_ * effective_text_scale();
+    return std::max<std::size_t>(1U, static_cast<std::size_t>(
+        std::floor(std::max(0.0, height - 4.0) / row_height)));
+}
+
+void ListBox::ensure_visible(std::size_t index) {
+    if (local_bounds().height <= 4.0 && requested_bounds().height <= 4.0) {
+        return;
+    }
+    const std::size_t visible = visible_row_count();
+    if (index < top_index_) top_index_ = index;
+    else if (index >= top_index_ + visible) top_index_ = index - visible + 1U;
+}
+
+void ListBox::arrange(Rect final_bounds) {
+    Panel::arrange(final_bounds);
+    if (active_index_) {
+        ensure_visible(*active_index_);
+    }
+}
+
+std::optional<std::size_t> ListBox::index_at(Point absolute) const noexcept {
+    const Rect bounds = absolute_bounds();
+    if (!bounds.contains(absolute)) return {};
+    const double local_y = absolute.y - bounds.y - 2.0;
+    if (local_y < 0.0) return {};
+    const double row_height = item_height_ * effective_text_scale();
+    const std::size_t index = top_index_ +
+        static_cast<std::size_t>(std::floor(local_y / row_height));
+    return index < items_.size() ? std::optional<std::size_t>{index}
+                                 : std::optional<std::size_t>{};
+}
+
+void ListBox::on_paint(Painter& painter, Rect damage) {
+    const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const ControlVisualRecipe& editor_recipe = effective_theme().resolve(
+        ControlVisualRole::editor,
+        visual_context(false, false, false, focused_));
+    if (themed) {
+        paint_surface_material(painter, bounds, editor_recipe.material);
+    } else {
+        Panel::on_paint(painter, damage);
+    }
+    const FontSpec font = effective_font(font_);
+    const double row_height = item_height_ * effective_text_scale();
+    painter.save();
+    painter.clip_rect({2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                       std::max(0.0, bounds.height - 4.0)});
+    const std::size_t visible = visible_row_count() + 1U;
+    const std::size_t end = std::min(items_.size(), top_index_ + visible);
+    for (std::size_t index = top_index_; index < end; ++index) {
+        const double y = 2.0 + static_cast<double>(index - top_index_) * row_height;
+        const bool selected = std::binary_search(selected_.begin(), selected_.end(), index);
+        const bool hovered = hovered_index_ == index;
+        const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
+        const ControlVisualRecipe& row_recipe = effective_theme().resolve(
+            ControlVisualRole::selection,
+            visual_context(hovered, false, selected, focused_));
+        if (themed && (selected || hovered)) {
+            paint_surface_material(painter, row, row_recipe.material);
+        } else if (selected) {
+            painter.fill_rect(row, focused_ ? style().accent
+                                            : style().accent_light);
+        } else if (hovered) {
+            painter.fill_rect(row, style().face_light);
+        }
+        paint_row_adornment(painter, index, row, selected, focused_);
+        painter.draw_text_utf8({row_text_left(),
+                                y + std::max(font.size,
+                                             row_height * 0.5 + 4.0)},
+                               items_[index], font,
+                               themed ? (selected || hovered
+                                             ? row_recipe.text
+                                             : editor_recipe.text)
+                                      : selected && focused_
+                                            ? style().highlight
+                                            : enabled() ? style().text
+                                                        : style().disabled_text);
+        if (focused_ && active_index_ == index) {
+            painter.stroke_rect({3.5, y + 1.5, std::max(0.0, bounds.width - 7.0),
+                                 std::max(0.0, row_height - 3.0)},
+                                themed ? row_recipe.focus_ring
+                                       : selected ? style().highlight
+                                                  : style().accent,
+                                themed ? row_recipe.focus_width : 1.0);
+        }
+    }
+    painter.restore();
+}
+
+double ListBox::row_text_left() const noexcept {
+    return 8.0;
+}
+
+void ListBox::paint_row_adornment(Painter&, std::size_t, Rect, bool,
+                                  bool) const {}
+
+void ListBox::on_pointer(PointerEvent& event) {
+    if (!eligible_for_input()) return;
+    if (event.action == PointerAction::move) {
+        const auto next = index_at(event.position);
+        if (next != hovered_index_) {
+            hovered_index_ = next;
+            invalidate(Dirty::paint);
+        }
+        return;
+    }
+    if (event.action == PointerAction::leave) {
+        hovered_index_.reset();
+        invalidate(Dirty::paint);
+        return;
+    }
+    if (event.action == PointerAction::wheel) {
+        if (!items_.empty() && event.wheel_delta.y != 0.0) {
+            const int direction = event.wheel_delta.y > 0.0 ? -1 : 1;
+            const std::ptrdiff_t next = std::clamp<std::ptrdiff_t>(
+                static_cast<std::ptrdiff_t>(top_index_) + direction * 3,
+                0, static_cast<std::ptrdiff_t>(items_.size() - 1U));
+            set_top_index(static_cast<std::size_t>(next));
+            event.handled = true;
+        }
+        return;
+    }
+    if (event.action == PointerAction::down && event.button == PointerButton::primary) {
+        if (window() != nullptr) static_cast<void>(window()->request_focus(shared_from_this()));
+        if (const auto index = index_at(event.position)) {
+            select_index(*index, includes(event.modifiers, Modifier::shift),
+                         command_modifier(event.modifiers));
+            event.handled = true;
+        }
+    } else if (event.action == PointerAction::up &&
+               event.button == PointerButton::primary) {
+        if (const auto index = index_at(event.position);
+            index && active_index_ == index) {
+            item_activated_.emit(*index);
+            event.handled = true;
+        }
+    }
+}
+
+void ListBox::on_key(KeyEvent& event) {
+    if (!focused_ || !enabled() || event.action != KeyAction::down || items_.empty()) return;
+    if (event.physical_key == PhysicalKey::enter && active_index_) {
+        item_activated_.emit(*active_index_);
+        event.handled = true;
+        return;
+    }
+    std::optional<std::size_t> next;
+    const std::size_t current = active_index_.value_or(0U);
+    if (event.physical_key == PhysicalKey::up) next = current == 0U ? 0U : current - 1U;
+    else if (event.physical_key == PhysicalKey::down) next = std::min(current + 1U, items_.size() - 1U);
+    else if (event.physical_key == PhysicalKey::home) next = 0U;
+    else if (event.physical_key == PhysicalKey::end) next = items_.size() - 1U;
+    else if (event.physical_key == PhysicalKey::page_up) next = current > visible_row_count() ? current - visible_row_count() : 0U;
+    else if (event.physical_key == PhysicalKey::page_down) next = std::min(current + visible_row_count(), items_.size() - 1U);
+    if (next) {
+        select_index(*next, includes(event.modifiers, Modifier::shift), false);
+        event.handled = true;
+    }
+}
+
+void ListBox::on_focus_changed(bool focused) {
+    focused_ = focused;
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+SemanticDescriptor ListBox::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::list;
+    descriptor.name = accessible_name();
+    descriptor.description = accessible_description();
+    if (const auto selected = selected_index()) {
+        descriptor.value = items_[*selected];
+    } else if (!selected_.empty()) {
+        descriptor.value = std::to_string(selected_.size()) + " items selected";
+    }
+    descriptor.actions = {SemanticAction::focus};
+    descriptor.exposed = true;
+    return descriptor;
+}
+
+std::vector<SemanticNode> ListBox::semantic_virtual_children() const {
+    std::vector<SemanticNode> nodes;
+    nodes.reserve(items_.size());
+    const Rect list_bounds = absolute_bounds();
+    const std::size_t visible_count = visible_row_count();
+    const std::size_t visible_end = std::min(items_.size(), top_index_ + visible_count);
+    const double row_height = item_height_ * effective_text_scale();
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        SemanticNode node;
+        node.stable_id = item_stable_id(index);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        node.role = SemanticRole::list_item;
+        node.name = items_[index];
+        node.value = items_[index];
+        const double row_y = list_bounds.y + 2.0 +
+            (static_cast<double>(index) - static_cast<double>(top_index_)) *
+                row_height;
+        node.bounds = Rect::intersection(
+            {list_bounds.x + 2.0, row_y, std::max(0.0, list_bounds.width - 4.0),
+             row_height},
+            list_bounds);
+        if (effectively_enabled()) node.states |= SemanticState::enabled;
+        node.states |= SemanticState::focusable;
+        if (index >= top_index_ && index < visible_end) {
+            node.states |= SemanticState::visible;
+        }
+        if (std::binary_search(selected_.begin(), selected_.end(), index)) {
+            node.states |= SemanticState::selected;
+        }
+        if (focused_ && active_index_ == index) node.states |= SemanticState::focused;
+        node.actions = {SemanticAction::focus, SemanticAction::select,
+                        SemanticAction::press};
+        nodes.push_back(std::move(node));
+    }
+    return nodes;
+}
+
+bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
+                                       SemanticAction action,
+                                       std::string_view) {
+    std::size_t index{};
+    if (!item_stable_ids_.empty()) {
+        const auto found = std::find(item_stable_ids_.begin(),
+                                     item_stable_ids_.end(), child_stable_id);
+        if (found == item_stable_ids_.end()) return false;
+        index = static_cast<std::size_t>(
+            std::distance(item_stable_ids_.begin(), found));
+    } else {
+        const std::string prefix = std::string(stable_id().value()) + ".item.";
+        if (!child_stable_id.starts_with(prefix)) return false;
+        const std::string_view suffix = child_stable_id.substr(prefix.size());
+        const auto parsed = std::from_chars(
+            suffix.data(), suffix.data() + suffix.size(), index);
+        if (parsed.ec != std::errc{} ||
+            parsed.ptr != suffix.data() + suffix.size() ||
+            index >= items_.size()) return false;
+    }
+    if (action != SemanticAction::focus && action != SemanticAction::select &&
+        action != SemanticAction::press) return false;
+    if (window() != nullptr) {
+        static_cast<void>(window()->request_focus(shared_from_this()));
+    }
+    select_index(index, false, false);
+    if (action == SemanticAction::press && is_alive()) {
+        item_activated_.emit(index);
+    }
+    return true;
+}
+
+} // namespace gui_forms

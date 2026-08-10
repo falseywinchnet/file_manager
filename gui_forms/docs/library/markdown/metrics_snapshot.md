@@ -1,23 +1,23 @@
 # MetricsSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MetricsSnapshot`  
-Declaration: `include/gui_forms/metrics.hpp:11`  
-Definition: `src/core/metrics.cpp`
+- Status: **OBSERVED: bundle 010 structured telemetry split; focused M4 core tests pass**
+- Kind: **struct**
+- Hierarchy: `MetricsSnapshot`
+- Declaration: `include/gui_forms/metrics/types/metrics_types.hpp:8`
+- Definition: `src/core/metrics/snapshot/metrics_snapshot.cpp`
 
-MetricsSnapshot is a struct declared in include/gui_forms/metrics.hpp.
+MetricsSnapshot is the renderer-neutral population, traversal, damage, input, lifetime, scheduler, presentation, and renderer telemetry record.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `to_json`
+### `to_json` (public)
 
 ```cpp
 [[nodiscard]] std::string to_json() const
 ```
 
-Reports the current to json value without mutation.
+Serializes every field with escaped renderer identity into one deterministic JSON object.

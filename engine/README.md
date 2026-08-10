@@ -45,10 +45,11 @@ the implementation.
   manifest or service. Digest-chained multi-run, checked disk-index sidecars,
   tiered exact query, and checkpoint-free cohort-compaction candidates are
   likewise measured but unadmitted.
-- `internal/service/` and `internal/transport/` — process-instance lifecycle,
-  effective configuration with stale-safe root apply, capability inventory,
-  reconciliation, status, query, inspect, integrity, JSONL projection, and an
-  opt-in one-root persistent mode.
+- `internal/service/` and `internal/transport/` — a responsibility-split service
+  façade for process lifecycle, effective configuration, capabilities, root
+  policy, reconciliation/publication, status, exact/live query, inspect,
+  integrity, and the bounded JSONL projection. The source map is
+  [`docs/SERVICE_IMPLEMENTATION_MAP.md`](docs/SERVICE_IMPLEMENTATION_MAP.md).
 - `internal/ownership/` — longest-approved-root ownership router.
 - `internal/observation/` — bounded chained-cursor coalescing plus opt-in native
   macOS FSEvents and Windows `ReadDirectoryChangesW` adapters. Events remain
@@ -64,7 +65,9 @@ the implementation.
   or admitted to the public query path yet.
 - `internal/workload/` — canonical generated logical corpora and digests shared
   by the reference engine and future immutable-segment/database controls.
-- `docs/` — charter, API, storage, ranking, validation, and delivery guidance.
+- `docs/` — charter, API, storage, ranking, validation, delivery guidance, and
+  a checked-in navigable service atlas at
+  [`docs/library/index.html`](docs/library/index.html).
 - `benchmarks/` — benchmark corpus and reporting contract.
 - `testdata/` — generated/non-sensitive fixture boundary.
 - `results/` — checked-in summaries and retained negative results; raw large
@@ -81,7 +84,24 @@ go test -race ./...
 go vet ./...
 make cross-build
 go test -run '^$' -bench . -benchmem ./...
+python3 tools/generate_library_docs.py --check
 ```
+
+Build and copy the explicitly development-scoped artifact without registering a
+native supervisor:
+
+```sh
+make build
+make install PREFIX=/explicit/prefix
+```
+
+The default invocation retains the mandatory `--sandbox-root` refusal. The
+only installed exception is ADR-015's host-bound `m4-dogfood` manifest and
+per-user LaunchAgent. It admits exact root id/path/object-identity tuples rather
+than a general bypass and serves distinct authenticated query/admin Unix
+sockets. See [`docs/M4_DOGFOOD_DEPLOYMENT.md`](docs/M4_DOGFOOD_DEPLOYMENT.md).
+Other hosts and release packages remain separate gates; copying the binary
+does not close them.
 
 Run the development service only against a disposable root:
 
@@ -140,9 +160,10 @@ streaming compactor: indexed writes, retained memory, exact state, and the warm
 relative-p99 query gate pass. An isolated `TIERED.*` manifest also passes
 logical/subprocess interruption and repair tests, but the live manifest,
 long-horizon, and overlap trials remain open. Recovery quarantine is internal and
-status-visible; it is not yet a public administrative API. Native launchd,
-SCM, and systemd installation plus authenticated query/admin endpoints remain
-explicit gates; see
+status-visible; it is not yet a public administrative API. The M4-only
+LaunchAgent and authenticated framed query/admin endpoints are an accepted
+controlled-dogfood projection. General launchd, SCM, and systemd installation
+and cross-platform client conformance remain explicit gates; see
 [`docs/SERVICE_LIFECYCLE_AND_CONFIGURATION.md`](docs/SERVICE_LIFECYCLE_AND_CONFIGURATION.md).
 The current integration-readiness rubric is
 [`docs/INTEGRATED_DOGFOOD_READINESS.md`](docs/INTEGRATED_DOGFOOD_READINESS.md).

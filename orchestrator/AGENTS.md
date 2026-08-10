@@ -92,3 +92,20 @@ quotas, and worker supervision. It may not:
   semantic authority.
 - Use `cargo fmt --check`, `cargo test`, and `cargo clippy --all-targets
   --all-features -- -D warnings` before handoff.
+
+## M4 verification
+
+The authoritative tree remains on the Neo. Run the complete Orchestrator gate
+on the M4 Mac with:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- \
+  /bin/sh orchestrator/tools/verify_m4.sh
+```
+
+The script selects the Mini's installed stable Rust toolchain, checks the
+in-place HTML/Markdown service atlas, runs the Rust/hostile/C++/Go integration
+suites, enforces warning-free Clippy, and emits a locked release build into the
+Mini's persistent ignored `orchestrator/target/` tree. The cross-language tests
+look for Homebrew CMake and Go at their absolute M4 paths when the relay shell
+does not include Homebrew in `PATH`.

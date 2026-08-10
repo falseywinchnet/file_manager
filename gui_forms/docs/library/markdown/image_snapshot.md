@@ -1,39 +1,39 @@
 # ImageSnapshot
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageSnapshot`  
-Declaration: `include/gui_forms/drawing.hpp:315`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 immutable image snapshot review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ImageSnapshot`
+- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:40`
+- Definition: `src/core/drawing/image_reference/image_reference.cpp`
 
-ImageSnapshot is a struct declared in include/gui_forms/drawing.hpp.
+ImageSnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `has_pixels`
+### `has_pixels` (public)
 
 ```cpp
 [[nodiscard]] bool has_pixels() const noexcept
 ```
 
-Reports the current has pixels value without mutation.
+Reports whether shared pixel storage is retained.
 
-### `row_bytes`
+### `row_bytes` (public)
 
 ```cpp
 [[nodiscard]] std::size_t row_bytes() const noexcept
 ```
 
-Reports the current row bytes value without mutation.
+Returns storage stride or zero.
 
-### `pixels`
+### `pixels` (public)
 
 ```cpp
 [[nodiscard]] std::span<const std::byte> pixels() const noexcept
 ```
 
-Reports the current pixels value without mutation.
+Returns const storage bytes or an empty span.

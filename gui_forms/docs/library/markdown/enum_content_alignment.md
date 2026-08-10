@@ -1,7 +1,7 @@
 # ContentAlignment
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/controls/button_base/button_base.hpp:16`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/button_base/button_base.hpp:16`
 
 ## Declared values
 

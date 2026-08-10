@@ -1,17 +1,17 @@
 # TreeSelectionChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `TreeSelectionChange`  
-Declaration: `include/gui_forms/collection_controls.hpp:27`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `TreeSelectionChange`
+- Declaration: `include/gui_forms/controls/panel/tree_view/tree_view.hpp:27`
+- Definition: `inline/header-only`
 
-TreeSelectionChange is a struct declared in include/gui_forms/collection_controls.hpp.
+TreeSelectionChange is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

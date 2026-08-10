@@ -1,20 +1,20 @@
 # MenuItemSpec
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MenuItemSpec`  
-Declaration: `include/gui_forms/menu_controls.hpp:31`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `MenuItemSpec`
+- Declaration: `include/gui_forms/components/context_menu/context_menu.hpp:31`
+- Definition: `inline/header-only`
 
-MenuItemSpec is a struct declared in include/gui_forms/menu_controls.hpp.
+MenuItemSpec is a struct declared in include/gui_forms/components/context_menu/context_menu.hpp.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `MenuItemSpec`
+### `MenuItemSpec` (public)
 
 ```cpp
 MenuItemSpec() = default
@@ -22,7 +22,7 @@ MenuItemSpec() = default
 
 Constructs or tears down the retained MenuItemSpec object according to its ownership contract.
 
-### `MenuItemSpec`
+### `MenuItemSpec` (public)
 
 ```cpp
 MenuItemSpec(std::string stable_identity, MenuItemKind item_kind, std::shared_ptr<Command> item_command =
@@ -30,7 +30,7 @@ MenuItemSpec(std::string stable_identity, MenuItemKind item_kind, std::shared_pt
 
 Constructs or tears down the retained MenuItemSpec object according to its ownership contract.
 
-### `stable_id`
+### `stable_id` (public)
 
 ```cpp
 : stable_id(std::move(stable_identity)), kind(item_kind), command(std::move(item_command)), text(std::move(item_text)), children(std::move(item_children))

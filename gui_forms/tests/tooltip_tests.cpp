@@ -221,6 +221,30 @@ void test_show_always_supports_a_disabled_visible_owner() {
             "ShowAlways must allow passive help owned by a disabled visible control");
 }
 
+void test_maximum_width_is_bounded_and_shapes_overlay() {
+    Fixture fixture;
+    ToolTip tips(fixture.window);
+    tips.set_maximum_width(120.0);
+    require(tips.maximum_width() == 120.0,
+            "ToolTip must retain an explicit bounded maximum width");
+    bool rejected = false;
+    try {
+        tips.set_maximum_width(40.0);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "ToolTip must reject unusably narrow maximum widths");
+    tips.set_tool_tip(
+        fixture.button,
+        "A deliberately long tooltip sentence that must wrap into multiple lines");
+    tips.show(fixture.button, 0ms);
+    fixture.window.perform_layout();
+    const SemanticNode* tip = find_role(
+        fixture.window.semantic_snapshot().roots, SemanticRole::tool_tip);
+    require(tip && tip->bounds.width <= 140.0,
+            "ToolTip bubble must honor maximum text width plus chrome");
+}
+
 } // namespace
 
 int main() {
@@ -231,6 +255,7 @@ int main() {
         test_explicit_show_multiple_providers_and_owner_disposal();
         test_mapping_removal_and_provider_disposal_are_quiescent();
         test_show_always_supports_a_disabled_visible_owner();
+        test_maximum_width_is_bounded_and_shapes_overlay();
         std::cout << "tooltip tests passed\n";
         return 0;
     } catch (const std::exception& error) {

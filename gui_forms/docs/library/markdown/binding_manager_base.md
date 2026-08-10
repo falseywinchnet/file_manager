@@ -1,159 +1,159 @@
 # BindingManagerBase
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `BindingManagerBase`  
-Declaration: `include/gui_forms/binding.hpp:131`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 010 currency interface split; focused M4 binding tests pass**
+- Kind: **class**
+- Hierarchy: `BindingManagerBase`
+- Declaration: `include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp:12`
+- Definition: `inline/header-only`
 
-BindingManagerBase is a class declared in include/gui_forms/binding.hpp.
+BindingManagerBase is the renderer-neutral currency/edit/transfer contract shared by list, grid, property, and settings surfaces.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `~BindingManagerBase`
+### `~BindingManagerBase` (public)
 
 ```cpp
 virtual ~BindingManagerBase() = default
 ```
 
-Constructs or tears down the retained BindingManagerBase object according to its ownership contract.
+Provides polymorphic destruction.
 
-### `count`
+### `count` (public)
 
 ```cpp
 [[nodiscard]] virtual std::size_t count() const noexcept = 0
 ```
 
-Reports the current count value without mutation.
+Returns source row cardinality.
 
-### `current`
+### `current` (public)
 
 ```cpp
 [[nodiscard]] virtual const BindingRecord* current() const noexcept = 0
 ```
 
-Reports the current current value without mutation.
+Returns the current row or null.
 
-### `position`
+### `position` (public)
 
 ```cpp
 [[nodiscard]] virtual std::ptrdiff_t position() const noexcept = 0
 ```
 
-Reports the current position value without mutation.
+Returns current zero-based currency or -1.
 
-### `binding_suspended`
+### `binding_suspended` (public)
 
 ```cpp
 [[nodiscard]] virtual bool binding_suspended() const noexcept = 0
 ```
 
-Reports the current binding suspended value without mutation.
+Reports whether automatic transfer publication is suspended.
 
-### `set_position`
+### `set_position` (public)
 
 ```cpp
 virtual bool set_position(std::ptrdiff_t position) = 0
 ```
 
-Synchronously updates the retained position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Moves currency if the requested position is admitted.
 
-### `cancel_current_edit`
+### `cancel_current_edit` (public)
 
 ```cpp
 virtual void cancel_current_edit() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Restores the current edit snapshot.
 
-### `end_current_edit`
+### `end_current_edit` (public)
 
 ```cpp
 virtual void end_current_edit() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Commits the current edit snapshot.
 
-### `remove_at`
+### `remove_at` (public)
 
 ```cpp
 virtual bool remove_at(std::size_t index) = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes an admitted row.
 
-### `suspend_binding`
+### `suspend_binding` (public)
 
 ```cpp
 virtual void suspend_binding() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers automatic transfer publication.
 
-### `resume_binding`
+### `resume_binding` (public)
 
 ```cpp
 virtual void resume_binding() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Resumes and coalesces pending source publication.
 
-### `pull_data`
+### `pull_data` (public)
 
 ```cpp
 virtual bool pull_data() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transfers every active binding from source to control.
 
-### `push_data`
+### `push_data` (public)
 
 ```cpp
 virtual bool push_data() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transfers every active binding from control to source.
 
-### `binding_complete`
+### `binding_complete` (public)
 
 ```cpp
 [[nodiscard]] virtual Event<BindingCompleteEvent&>& binding_complete() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns aggregate transfer completion observation.
 
-### `current_changed`
+### `current_changed` (public)
 
 ```cpp
 [[nodiscard]] virtual Event<>& current_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns currency-row change observation.
 
-### `current_item_changed`
+### `current_item_changed` (public)
 
 ```cpp
 [[nodiscard]] virtual Event<>& current_item_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns current-row content observation.
 
-### `position_changed`
+### `position_changed` (public)
 
 ```cpp
 [[nodiscard]] virtual Event<std::ptrdiff_t>& position_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns numeric currency change observation.
 
-### `data_error`
+### `data_error` (public)
 
 ```cpp
 [[nodiscard]] virtual Event<const std::string&>& data_error() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns portable source validation error observation.

@@ -1,7 +1,7 @@
 # DialogResult
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/control.hpp:116`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/control.hpp:116`
 
 ## Declared values
 

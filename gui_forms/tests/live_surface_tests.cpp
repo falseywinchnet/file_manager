@@ -17,8 +17,14 @@ int main() {
     using namespace gui_forms;
 
     assert(!LiveSurface::create({}));
+    assert(!LiveSurface::create(
+        {4U, 3U, LiveSurfacePixelFormat::bgra32_premultiplied_srgb, 1U}));
+    assert(!LiveSurface::create(
+        {4U, 3U, LiveSurfacePixelFormat::bgra32_premultiplied_srgb, 9U}));
     auto surface = LiveSurface::create({4U, 3U});
     assert(surface);
+    assert(surface->snapshot().description.buffer_count ==
+           default_live_surface_buffer_count);
     assert(!surface->acquire_latest());
 
     std::atomic<std::uint64_t> wakes{};
@@ -102,6 +108,18 @@ int main() {
     fill(disconnected_write, std::byte{0x55});
     assert(disconnected_write.publish() == 2U);
     assert(wakes == 5U);
+
+    auto low_latency_surface = LiveSurface::create(
+        {2U, 2U, LiveSurfacePixelFormat::bgra32_premultiplied_srgb, 2U});
+    assert(low_latency_surface);
+    auto low_latency_write = low_latency_surface->try_acquire_write();
+    assert(low_latency_write && low_latency_write.publish() == 1U);
+    auto low_latency_first = low_latency_surface->acquire_latest();
+    low_latency_write = low_latency_surface->try_acquire_write();
+    assert(low_latency_write && low_latency_write.publish() == 2U);
+    auto low_latency_second = low_latency_surface->acquire_latest();
+    assert(low_latency_first && low_latency_second);
+    assert(!low_latency_surface->try_acquire_write());
 
     auto root = make_control<Control>(StableId("live.root"));
     auto live_control = make_control<Control>(StableId("live.content"));

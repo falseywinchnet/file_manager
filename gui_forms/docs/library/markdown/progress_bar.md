@@ -1,231 +1,263 @@
 # ProgressBar
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `RangeControl → ProgressBar`  
-Declaration: `include/gui_forms/range_controls.hpp:159`  
-Definition: `src/controls/range_controls.cpp`
+- Status: **OBSERVED: bundle 004 split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `RangeControl → ProgressBar`
+- Declaration: `include/gui_forms/controls/range_control/progress_bar/progress_bar.hpp:39`
+- Definition: `src/controls/range_control/progress_bar/progress_bar.cpp`
 
-ProgressBar is a visual retained control declared in include/gui_forms/range_controls.hpp.
+ProgressBar is a noninteractive RangeControl visualization with continuous, segmented, and marquee modes; optional overlays and stripes; centralized motion-policy resolution; retained frame scheduling; deterministic phase; reduced-motion behavior; and progress semantics.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ProgressBar](../captures/range_controls.png)
 
-## Public methods
+## Declared methods
 
-### `ProgressBar`
+### `ProgressBar` (public)
 
 ```cpp
 explicit ProgressBar(StableId stable_id)
 ```
 
-Constructs or tears down the retained ProgressBar object according to its ownership contract.
+Constructs a non-focusable, non-hit-testable range visualization with progress semantics.
 
-### `visual_style`
+### `visual_style` (public)
 
 ```cpp
 [[nodiscard]] ProgressBarVisualStyle visual_style() const noexcept
 ```
 
-Reports the current visual style value without mutation.
+Returns continuous, segmented, or marquee presentation.
 
-### `set_visual_style`
+### `set_visual_style` (public)
 
 ```cpp
 void set_visual_style(ProgressBarVisualStyle style)
 ```
 
-Synchronously updates the retained visual style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates style, updates animation registration, and invalidates size, paint, and semantics.
 
-### `overlay_style`
+### `overlay_style` (public)
 
 ```cpp
 [[nodiscard]] ProgressBarOverlayStyle overlay_style() const noexcept
 ```
 
-Reports the current overlay style value without mutation.
+Returns none, solid, or striped overlay policy.
 
-### `set_overlay_style`
+### `set_overlay_style` (public)
 
 ```cpp
 void set_overlay_style(ProgressBarOverlayStyle style)
 ```
 
-Synchronously updates the retained overlay style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates overlay vocabulary and invalidates painting.
 
-### `stripe_width`
+### `stripe_width` (public)
 
 ```cpp
 [[nodiscard]] double stripe_width() const noexcept
 ```
 
-Reports the current stripe width value without mutation.
+Returns the positive logical stripe width used by compatibility overlay painting.
 
-### `set_stripe_width`
+### `set_stripe_width` (public)
 
 ```cpp
 void set_stripe_width(double width)
 ```
 
-Synchronously updates the retained stripe width property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite bounded positive width and synchronizes animation appearance.
 
-### `animation_appearance`
+### `animation_appearance` (public)
 
 ```cpp
 [[nodiscard]] const ProgressBarAnimationAppearance& animation_appearance() const noexcept
 ```
 
-Reports the current animation appearance value without mutation.
+Returns stripe width, gap, angle, and opacity as one value.
 
-### `set_animation_appearance`
+### `set_animation_appearance` (public)
 
 ```cpp
 void set_animation_appearance(ProgressBarAnimationAppearance appearance)
 ```
 
-Synchronously updates the retained animation appearance property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates all animation geometry/opacity fields and commits them atomically.
 
-### `animation_enabled`
+### `animation_enabled` (public)
 
 ```cpp
 [[nodiscard]] bool animation_enabled() const noexcept
 ```
 
-Reports the current animation enabled value without mutation.
+Reports caller intent to animate marquee or striped presentation.
 
-### `set_animation_enabled`
+### `set_animation_enabled` (public)
 
 ```cpp
 void set_animation_enabled(bool enabled)
 ```
 
-Synchronously updates the retained animation enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles animation intent and reconciles Window frame registration.
 
-### `animation_paused`
+### `animation_paused` (public)
 
 ```cpp
 [[nodiscard]] bool animation_paused() const noexcept
 ```
 
-Reports the current animation paused value without mutation.
+Reports whether application policy currently freezes phase.
 
-### `set_animation_paused`
+### `set_animation_paused` (public)
 
 ```cpp
 void set_animation_paused(bool paused)
 ```
 
-Synchronously updates the retained animation paused property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles pause state without discarding deterministic phase.
 
-### `reduced_motion`
+### `reduced_motion` (public)
 
 ```cpp
 [[nodiscard]] bool reduced_motion() const noexcept
 ```
 
-Reports the current reduced motion value without mutation.
+Reports the local compatibility override for reduced motion.
 
-### `set_reduced_motion`
+### `set_reduced_motion` (public)
 
 ```cpp
 void set_reduced_motion(bool reduced)
 ```
 
-Synchronously updates the retained reduced motion property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles the local override and reconciles effective animation registration.
 
-### `set_motion_policy`
+### `set_motion_policy` (public)
 
 ```cpp
 void set_motion_policy(bool paused, bool reduced_motion)
 ```
 
-Synchronously updates the retained motion policy property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs or clears an explicit policy override instead of inheriting the Window policy.
 
-### `set_motion_policy`
+### `set_motion_policy` (public)
 
 ```cpp
 void set_motion_policy(MotionPolicy policy)
 ```
 
-Synchronously updates the retained motion policy property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs or clears an explicit policy override instead of inheriting the Window policy.
 
-### `motion_policy`
+### `motion_policy` (public)
 
 ```cpp
 [[nodiscard]] MotionPolicy motion_policy() const noexcept
 ```
 
-Reports the current motion policy value without mutation.
+Returns the optional caller-authored motion-policy override.
 
-### `effective_motion_policy`
+### `effective_motion_policy` (public)
 
 ```cpp
 [[nodiscard]] MotionPolicy effective_motion_policy() const noexcept
 ```
 
-Reports the current effective motion policy value without mutation.
+Resolves local compatibility state, explicit override, and attached Window policy into one behavior.
 
-### `animation_period`
+### `animation_period` (public)
 
 ```cpp
 [[nodiscard]] FrameInterval animation_period() const noexcept
 ```
 
-Reports the current animation period value without mutation.
+Returns the positive duration of one animation cycle.
 
-### `set_animation_period`
+### `set_animation_period` (public)
 
 ```cpp
 void set_animation_period(FrameInterval period)
 ```
 
-Synchronously updates the retained animation period property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a positive duration and preserves phase continuity.
 
-### `animation_phase`
+### `animation_phase` (public)
 
 ```cpp
 [[nodiscard]] double animation_phase() const noexcept
 ```
 
-Reports the current animation phase value without mutation.
+Returns the normalized retained phase used for deterministic rendering and tests.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Provides stable progress-track desired thickness independent of phase.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records the selected track/fill/segment/marquee/overlay presentation from current range and phase.
 
-### `on_frame`
+### `on_frame` (public)
 
 ```cpp
 void on_frame(FrameTime now) override
 ```
 
-Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Advances phase from frame time under effective motion policy and invalidates only when pixels change.
 
-### `hit_test_local`
+### `hit_test_local` (public)
 
 ```cpp
 [[nodiscard]] bool hit_test_local(Point local_point) const override
 ```
 
-Reports the current hit test local value without mutation.
+Always declines input because progress is informational.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a progress role with numeric range/value and indeterminate state where applicable.
+
+### `on_attached_to_window` (protected)
+
+```cpp
+void on_attached_to_window() override
+```
+
+Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
+Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `update_animation_registration` (private)
+
+```cpp
+void update_animation_registration()
+```
+
+Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `animated_style` (private)
+
+```cpp
+[[nodiscard]] bool animated_style() const noexcept
+```
+
+Reports the current animated style value without mutation.

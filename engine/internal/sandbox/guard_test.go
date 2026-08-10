@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"filemanager/engine/api"
 )
 
 func TestGuardContainsOnlySandboxPaths(t *testing.T) {
@@ -99,5 +101,40 @@ func TestResolveDirectoryRejectsSymlinkEscape(t *testing.T) {
 	}
 	if _, err := guard.ResolveDirectory("escape"); !errors.Is(err, ErrOutsideRoot) {
 		t.Fatalf("ResolveDirectory symlink escape error = %v, want ErrOutsideRoot", err)
+	}
+}
+
+func TestApprovedGuardCannotWidenManifestPolicy(t *testing.T) {
+	container := t.TempDir()
+	root := filepath.Join(container, "approved")
+	outside := filepath.Join(container, "outside")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(outside, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	guard, err := NewApproved("m4-dogfood", []ApprovedRoot{{ID: "source", Path: root, Exclusions: []string{"private/cache"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if guard.Sandboxed() || guard.Deployment() != "m4-dogfood" {
+		t.Fatalf("approved guard mode = sandboxed %v deployment %q", guard.Sandboxed(), guard.Deployment())
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := guard.ResolveRoot(api.RootSpec{ID: "source", Path: root}); err != nil || resolved != canonicalRoot {
+		t.Fatalf("manifest root rejected: resolved=%q err=%v", resolved, err)
+	}
+	if _, err := guard.ResolveRoot(api.RootSpec{ID: "other", Path: outside}); !errors.Is(err, ErrOutsideRoot) {
+		t.Fatalf("unapproved root error = %v", err)
+	}
+	if guard.Allows("source", filepath.Join(canonicalRoot, "private", "cache", "entry")) {
+		t.Fatal("excluded subtree was admitted")
+	}
+	if !guard.Allows("source", filepath.Join(canonicalRoot, "public", "entry")) {
+		t.Fatal("non-excluded approved path was rejected")
 	}
 }

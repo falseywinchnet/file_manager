@@ -1,863 +1,1407 @@
 # Window
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Window`  
-Declaration: `include/gui_forms/window.hpp:285`  
-Definition: `src/core/dispatcher.cpp, src/core/window.cpp`
+- Status: **OBSERVED: bundle 007 retained-window hierarchy and lifecycle/dispatcher split; M4 macOS and MinGW builds, focused tests, and Screen Sharing pass**
+- Kind: **class**
+- Hierarchy: `Window`
+- Declaration: `include/gui_forms/window/window.hpp:213`
+- Definition: `src/core/window/dispatcher/window_dispatcher.cpp, src/core/window/lifecycle/window_lifecycle.cpp, src/core/window/presentation/window_presentation.cpp, src/core/window/scheduler/window_scheduler.cpp, src/core/window/window.cpp`
 
-Window is a class declared in include/gui_forms/window.hpp.
+Window is GUI.Forms' portable retained-root coordinator. It owns exact tree identity, update/layout/paint transactions, damage and presentation receipts, live layers, frame requests, UI-thread dispatch, resources, focus/validation/dialog keys, pointer/drag/deferred input, popups and accelerators, metrics, and semantic projection; native adapters reach it only through the host session and wake seams.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![Window](../captures/native_window_host.png)
 
-## Public methods
+## Declared methods
 
-### `Window`
+### `Window` (public)
 
 ```cpp
 explicit Window(Control::Ptr root, Size client_size =
 ```
 
-Constructs or tears down the retained Window object according to its ownership contract.
+Constructs one retained root on the creating UI thread, creates bounded dispatcher/frame lifetime state, attaches the tree, and seeds complete initial damage; copying is prohibited because identity and native attachment are singular.
 
-### `~Window`
+### `~Window` (public)
 
 ```cpp
 ~Window()
 ```
 
-Constructs or tears down the retained Window object according to its ownership contract.
+Revokes wakes, deferred input, dispatch work, accelerators, popups, focus scopes, frame requests, and retained attachment in dependency order before retiring the shared lifetime token.
 
-### `Window`
+### `Window` (public)
 
 ```cpp
 Window(const Window&) = delete
 ```
 
-Constructs or tears down the retained Window object according to its ownership contract.
+Constructs one retained root on the creating UI thread, creates bounded dispatcher/frame lifetime state, attaches the tree, and seeds complete initial damage; copying is prohibited because identity and native attachment are singular.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 Window& operator=(const Window&) = delete
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Is deleted so retained identity, UI-thread affinity, leases, and native-host association cannot be duplicated.
 
-### `root`
+### `root` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr root() const noexcept
 ```
 
-Reports the current root value without mutation.
+Returns the singular retained root owned for the Window lifetime.
 
-### `client_size`
+### `client_size` (public)
 
 ```cpp
 [[nodiscard]] Size client_size() const noexcept
 ```
 
-Reports the current client size value without mutation.
+Returns logical client extent independent of device scale.
 
-### `resize`
+### `resize` (public)
 
 ```cpp
 void resize(Size client_size)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates nonnegative logical extent, advances the surface epoch, damages the old extent, and invalidates root and overlay geometry.
 
-### `set_scale`
+### `set_scale` (public)
 
 ```cpp
 void set_scale(double scale)
 ```
 
-Synchronously updates the retained scale property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates a finite positive device scale, advances the surface epoch, and conservatively invalidates all retained roots.
 
-### `scale`
+### `scale` (public)
 
 ```cpp
 [[nodiscard]] double scale() const noexcept
 ```
 
-Reports the current scale value without mutation.
+Returns native device-pixel scale without conflating it with presentation text scale.
 
-### `presentation_settings`
+### `presentation_settings` (public)
 
 ```cpp
 [[nodiscard]] const PresentationSettings& presentation_settings() const noexcept
 ```
 
-Reports the current presentation settings value without mutation.
+Returns logical text-scale, contrast, motion, and sound preferences.
 
-### `set_presentation_settings`
+### `set_presentation_settings` (public)
 
 ```cpp
 void set_presentation_settings(PresentationSettings settings)
 ```
 
-Synchronously updates the retained presentation settings property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded text scale, dismisses geometry-sensitive transients when it changes, invalidates retained presentation, and publishes one committed event.
 
-### `set_text_scale`
+### `set_text_scale` (public)
 
 ```cpp
 void set_text_scale(double text_scale)
 ```
 
-Synchronously updates the retained text scale property. Validation, typed invalidation, and notifications are defined by the implementation.
+Changes only logical text scale through the complete presentation-settings transaction.
 
-### `presentation_changed`
+### `presentation_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after presentation settings commit.
 
-### `theme`
+### `theme` (public)
 
 ```cpp
 [[nodiscard]] const Theme& theme() const noexcept
 ```
 
-Reports the current theme value without mutation.
+Returns the active immutable theme by reference.
 
-### `theme_ptr`
+### `theme_ptr` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<const Theme> theme_ptr() const noexcept
 ```
 
-Reports the current theme ptr value without mutation.
+Returns shared ownership of the active immutable theme.
 
-### `set_theme`
+### `set_theme` (public)
 
 ```cpp
 void set_theme(std::shared_ptr<const Theme> theme)
 ```
 
-Synchronously updates the retained theme property. Validation, typed invalidation, and notifications are defined by the implementation.
+Rejects null, replaces immutable theme state, conservatively invalidates root and overlay style/layout/semantics, and publishes after commit.
 
-### `theme_changed`
+### `theme_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const Theme&>& theme_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the post-commit theme event.
 
-### `active`
+### `active` (public)
 
 ```cpp
 [[nodiscard]] bool active() const noexcept
 ```
 
-Reports the current active value without mutation.
+Reports portable top-level activation state.
 
-### `set_active`
+### `set_active` (public)
 
 ```cpp
 void set_active(bool active)
 ```
 
-Synchronously updates the retained active property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits a distinct activation value, refreshes activation-dependent style/paint/semantics across roots, and publishes after commit.
 
-### `active_changed`
+### `active_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<bool>& active_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the post-commit activation event.
 
-### `host_services`
+### `host_services` (public)
 
 ```cpp
 [[nodiscard]] HostServices* host_services() const noexcept
 ```
 
-Reports the current host services value without mutation.
+Returns the non-owning service seam installed only for an active HostSession.
 
-### `begin_update`
+### `begin_update` (public)
 
 ```cpp
 [[nodiscard]] UpdateScope begin_update()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enters a nestable update transaction, records depth metrics, and returns the sole close token for that level.
 
-### `perform_layout`
+### `perform_layout` (public)
 
 ```cpp
 void perform_layout()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs the bounded retained layout barrier even inside an update scope without publishing paint.
 
-### `flush`
+### `flush` (public)
 
 ```cpp
 void flush()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs the retained layout barrier; paint remains host-demand driven.
 
-### `paint`
+### `paint` (public)
 
 ```cpp
 std::optional<PaintReceipt> paint( Painter& painter, Rect requested_damage =
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Acquires the exclusive revision/epoch lease, applies bounded layout, replays damaged retained planes, produces an exact receipt only for a coherent current result, and defers reentrant input/paint.
 
-### `notify_presented`
+### `notify_presented` (public)
 
 ```cpp
 [[nodiscard]] bool notify_presented( PaintReceipt receipt, std::uint64_t duration_nanoseconds = 0U)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an exact receipt or uses the synchronous compatibility receipt, advances presentation metrics only in order, and rejects duplicates or retired epochs.
 
-### `notify_presented`
+### `notify_presented` (public)
 
 ```cpp
 void notify_presented(std::uint64_t duration_nanoseconds = 0U)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an exact receipt or uses the synchronous compatibility receipt, advances presentation metrics only in order, and rejects duplicates or retired epochs.
 
-### `paint_lease_snapshot`
+### `paint_lease_snapshot` (public)
 
 ```cpp
 [[nodiscard]] PaintLeaseSnapshot paint_lease_snapshot() const noexcept
 ```
 
-Reports the current paint lease snapshot value without mutation.
+Returns revision, epoch, lease, wake, deferral, and receipt counters plus current lease state.
 
-### `queue_live_surface_presentation`
+### `queue_live_surface_presentation` (public)
 
 ```cpp
 [[nodiscard]] bool queue_live_surface_presentation( const Control::Ptr& control, std::shared_ptr<LiveSurface> surface)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers or refreshes one attached control's durable producer surface without converting producer publication into retained repaint callbacks.
 
-### `take_live_surface_presentations`
+### `take_live_surface_presentations` (public)
 
 ```cpp
 [[nodiscard]] std::vector<LiveSurfacePresentation> take_live_surface_presentations()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Samples registered live surfaces into immutable geometry/clip placements for native composition and retires dead registrations.
 
-### `has_live_surface_presentations`
+### `has_live_surface_presentations` (public)
 
 ```cpp
 [[nodiscard]] bool has_live_surface_presentations() const noexcept
 ```
 
-Reports the current has live surface presentations value without mutation.
+Reports whether durable live-layer registrations keep a native display clock relevant.
 
-### `take_damage`
+### `take_damage` (public)
 
 ```cpp
 [[nodiscard]] DamageRegion take_damage()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves pending aggregate or named-plane damage to the host and acknowledges the paint wake when every plane drains.
 
-### `take_damage`
+### `take_damage` (public)
 
 ```cpp
 [[nodiscard]] DamageRegion take_damage(PaintPlane plane)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves pending aggregate or named-plane damage to the host and acknowledges the paint wake when every plane drains.
 
-### `needs_frame`
+### `needs_frame` (public)
 
 ```cpp
 [[nodiscard]] bool needs_frame() const noexcept
 ```
 
-Reports the current needs frame value without mutation.
+Reports retained damage or due scheduled work without polling controls.
 
-### `next_wake`
+### `next_wake` (public)
 
 ```cpp
 [[nodiscard]] std::optional<FrameTime> next_wake() const noexcept
 ```
 
-Reports the current next wake value without mutation.
+Returns the earliest eligible frame/timer deadline, respecting occlusion.
 
-### `schedule_paint`
+### `schedule_paint` (public)
 
 ```cpp
 [[nodiscard]] FrameRequestToken schedule_paint(const Control::Ptr& control, FrameTime deadline)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds one bounded, revocable deadline request for an attached control.
 
-### `activate_surface`
+### `activate_surface` (public)
 
 ```cpp
 [[nodiscard]] FrameRequestToken activate_surface(const Control::Ptr& control, FrameInterval interval, FrameTime first_deadline)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a bounded periodic surface request with an enforced minimum interval.
 
-### `schedule_ui_timer`
+### `schedule_ui_timer` (public)
 
 ```cpp
 [[nodiscard]] FrameRequestToken schedule_ui_timer( Component& owner, FrameInterval interval, FrameTime first_deadline, std::function<void(FrameTime)> callback)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a bounded periodic callback for a live Component owner with fault isolation and a minimum interval.
 
-### `poll_frame_schedule`
+### `poll_frame_schedule` (public)
 
 ```cpp
 [[nodiscard]] FramePollResult poll_frame_schedule(FrameTime now)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs one nonreentrant bounded schedule turn, coalesces due work, disconnects faulting callbacks, invalidates due surfaces, and returns the next wake.
 
-### `cancel_frame_requests`
+### `cancel_frame_requests` (public)
 
 ```cpp
 void cancel_frame_requests()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes every outstanding frame/surface/timer request and refreshes scheduling metrics.
 
-### `set_occluded`
+### `set_occluded` (public)
 
 ```cpp
 void set_occluded(bool occluded, FrameTime transition_time)
 ```
 
-Synchronously updates the retained occluded property. Validation, typed invalidation, and notifications are defined by the implementation.
+Transitions scheduling and paint leases between visible and occluded policy without discarding dirty state.
 
-### `occluded`
+### `occluded` (public)
 
 ```cpp
 [[nodiscard]] bool occluded() const noexcept
 ```
 
-Reports the current occluded value without mutation.
+Reports portable host occlusion state.
 
-### `check_access`
+### `check_access` (public)
 
 ```cpp
 [[nodiscard]] bool check_access() const noexcept
 ```
 
-Reports the current check access value without mutation.
+Compares the caller with immutable Window UI-thread affinity.
 
-### `verify_access`
+### `verify_access` (public)
 
 ```cpp
 void verify_access(std::string_view operation = "window access")
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Throws a named wrong-thread failure and records its metric when access is invalid.
 
-### `invoke_required`
+### `invoke_required` (public)
 
 ```cpp
 [[nodiscard]] bool invoke_required() const noexcept
 ```
 
-Reports the current invoke required value without mutation.
+Reports whether caller marshaling is required.
 
-### `begin_invoke`
+### `begin_invoke` (public)
 
 ```cpp
 [[nodiscard]] DispatchOperation begin_invoke(std::function<void()> callback)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Posts unowned or control-owned work into the bounded FIFO dispatcher and coalesces one host wake.
 
-### `begin_invoke`
+### `begin_invoke` (public)
 
 ```cpp
 [[nodiscard]] DispatchOperation begin_invoke( const Control::Ptr& owner, std::function<void()> callback)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Posts unowned or control-owned work into the bounded FIFO dispatcher and coalesces one host wake.
 
-### `invoke`
+### `invoke` (public)
 
 ```cpp
 void invoke(std::function<void()> callback)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs inline on the UI thread or posts and blocks without a nested message pump when a host wake seam exists.
 
-### `invoke`
+### `invoke` (public)
 
 ```cpp
 void invoke(const Control::Ptr& owner, std::function<void()> callback)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs inline on the UI thread or posts and blocks without a nested message pump when a host wake seam exists.
 
-### `drain_posted_work`
+### `drain_posted_work` (public)
 
 ```cpp
 [[nodiscard]] DispatchDrainResult drain_posted_work( std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Consumes one bounded queue snapshot in FIFO order, validates owners, isolates faults/cancellation, updates telemetry, and rearms one wake if work remains.
 
-### `dispatcher_snapshot`
+### `dispatcher_snapshot` (public)
 
 ```cpp
 [[nodiscard]] DispatcherSnapshot dispatcher_snapshot() const noexcept
 ```
 
-Reports the current dispatcher snapshot value without mutation.
+Returns thread-safe queue, outcome, invocation, wake, bound, and shutdown telemetry.
 
-### `set_dispatch_wake_handler`
+### `set_dispatch_wake_handler` (public)
 
 ```cpp
 void set_dispatch_wake_handler(std::function<void()> wake)
 ```
 
-Synchronously updates the retained dispatch wake handler property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs or removes the host wake primitive, immediately wakes queued work, and refuses removal while a synchronous waiter exists.
 
-### `set_paint_wake_handler`
+### `set_paint_wake_handler` (public)
 
 ```cpp
 void set_paint_wake_handler(std::function<void()> wake)
 ```
 
-Synchronously updates the retained paint wake handler property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs the host paint wake primitive used by cross-window or asynchronous retained invalidation.
 
-### `shutdown_dispatcher`
+### `shutdown_dispatcher` (public)
 
 ```cpp
 void shutdown_dispatcher() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Atomically stops acceptance, removes the wake seam, abandons deferred input on the UI thread, cancels pending work, and releases waiters.
 
-### `load_png`
+### `load_png` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Loads the sole admitted encoded image format into the generational resource registry on the UI thread.
 
-### `load_bgra32_premultiplied`
+### `load_bgra32_premultiplied` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult load_bgra32_premultiplied( std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Loads validated raw premultiplied pixels into the generational resource registry.
 
-### `replace_png`
+### `replace_png` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult replace_png(ImageId image, std::span<const std::byte> encoded)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces an existing PNG generation globally or for a named attached consumer and applies the appropriate conservative or scoped invalidation.
 
-### `replace_png`
+### `replace_png` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult replace_png(ImageId image, std::span<const std::byte> encoded, Control& consumer)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces an existing PNG generation globally or for a named attached consumer and applies the appropriate conservative or scoped invalidation.
 
-### `replace_bgra32_premultiplied`
+### `replace_bgra32_premultiplied` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult replace_bgra32_premultiplied( ImageId image, std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels, Control& consumer)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces raw pixels for an attached consumer and invalidates its paint/semantic projection.
 
-### `update_bgra32_premultiplied`
+### `update_bgra32_premultiplied` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult update_bgra32_premultiplied( ImageId image, std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels, Control& consumer)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes a live raw-pixel generation for an attached consumer without admitting renderer types.
 
-### `patch_bgra32_premultiplied`
+### `patch_bgra32_premultiplied` (public)
 
 ```cpp
 [[nodiscard]] ImageLoadResult patch_bgra32_premultiplied( ImageId image, std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height, std::uint64_t source_row_bytes, std::span<const std::byte> pixels, Control& consumer, Rect local_damage)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and patches a raw subregion, then applies exact consumer-local damage.
 
-### `remove_image`
+### `remove_image` (public)
 
 ```cpp
 [[nodiscard]] bool remove_image(ImageId image)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Retires a generational image and invalidates all display chunks because the unscoped API cannot name consumers.
 
-### `image_resources`
+### `image_resources` (public)
 
 ```cpp
 [[nodiscard]] const ImageRegistry& image_resources() const noexcept
 ```
 
-Reports the current image resources value without mutation.
+Returns the renderer-neutral image registry.
 
-### `image_resource_snapshot`
+### `image_resource_snapshot` (public)
 
 ```cpp
 [[nodiscard]] ImageRegistrySnapshot image_resource_snapshot() const noexcept
 ```
 
-Reports the current image resource snapshot value without mutation.
+Returns generational image counts and byte/accounting telemetry.
 
-### `find`
+### `find` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr find(std::string_view stable_id) const
 ```
 
-Reports the current find value without mutation.
+Resolves an attached control by authoritative unique stable ID.
 
-### `hit_test`
+### `hit_test` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr hit_test(Point position)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Applies the layout read barrier and finds the frontmost eligible retained target across overlays and root.
 
-### `request_focus`
+### `request_focus` (public)
 
 ```cpp
 bool request_focus(const Control::Ptr& control)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates attachment, eligibility, active focus-scope containment, and AutoValidate before committing focus events.
 
-### `focused_control`
+### `focused_control` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr focused_control() const noexcept
 ```
 
-Reports the current focused control value without mutation.
+Returns the currently focused live control if retained.
 
-### `validate_control`
+### `validate_control` (public)
 
 ```cpp
 bool validate_control(const Control::Ptr& control, Control* destination = nullptr, bool bulk = false)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs one nonreentrant cancelable validation transaction for an eligible control and records exact outcome metrics.
 
-### `validate_children`
+### `validate_children` (public)
 
 ```cpp
 bool validate_children( const Control::Ptr& container, ValidationConstraints constraints = ValidationConstraints::selectable)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Traverses a bounded retained subtree under declared validation constraints and stops on cancellation.
 
-### `validation_snapshot`
+### `validation_snapshot` (public)
 
 ```cpp
 [[nodiscard]] ValidationSnapshot validation_snapshot() const noexcept
 ```
 
-Reports the current validation snapshot value without mutation.
+Returns validation attempts, outcomes, blocked focus moves, reentrancy, visits, and active state.
 
-### `begin_focus_scope`
+### `begin_focus_scope` (public)
 
 ```cpp
 [[nodiscard]] FocusScopeId begin_focus_scope( const Control::Ptr& root, const Control::Ptr& preferred_focus =
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates nested ownership and depth, captures previous focus, optionally focuses a preferred/first descendant, and publishes the opened scope.
 
-### `end_focus_scope`
+### `end_focus_scope` (public)
 
 ```cpp
 bool end_focus_scope( FocusScopeId scope, FocusScopeCloseReason reason = FocusScopeCloseReason::explicit_close)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes the active matching scope, applies the named reason, optionally restores eligible prior focus, and publishes after state commit.
 
-### `focus_scope_depth`
+### `focus_scope_depth` (public)
 
 ```cpp
 [[nodiscard]] std::size_t focus_scope_depth() const noexcept
 ```
 
-Reports the current focus scope depth value without mutation.
+Returns active transient/modal focus containment depth.
 
-### `active_focus_scope_root`
+### `active_focus_scope_root` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr active_focus_scope_root() const noexcept
 ```
 
-Reports the current active focus scope root value without mutation.
+Returns the live root of the innermost active focus scope.
 
-### `move_focus`
+### `move_focus` (public)
 
 ```cpp
 bool move_focus(bool forward = true)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds stable eligible tab-order candidates within the active scope and commits the next validated destination.
 
-### `set_accept_button`
+### `set_accept_button` (public)
 
 ```cpp
 void set_accept_button(const Control::Ptr& control)
 ```
 
-Synchronously updates the retained accept button property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and retains the attached command target used for Return dialog routing.
 
-### `set_cancel_button`
+### `set_cancel_button` (public)
 
 ```cpp
 void set_cancel_button(const Control::Ptr& control)
 ```
 
-Synchronously updates the retained cancel button property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and retains the attached command target used for Escape dialog routing.
 
-### `accept_button`
+### `accept_button` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr accept_button() const noexcept
 ```
 
-Reports the current accept button value without mutation.
+Returns the current live default command target.
 
-### `cancel_button`
+### `cancel_button` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr cancel_button() const noexcept
 ```
 
-Reports the current cancel button value without mutation.
+Returns the current live cancellation command target.
 
-### `dialog_key_snapshot`
+### `dialog_key_snapshot` (public)
 
 ```cpp
 [[nodiscard]] DialogKeySnapshot dialog_key_snapshot() const noexcept
 ```
 
-Reports the current dialog key snapshot value without mutation.
+Returns mnemonic/default/cancel attempts, outcomes, candidates, collisions, cycles, and rejections.
 
-### `dialog_result`
+### `dialog_result` (public)
 
 ```cpp
 [[nodiscard]] DialogResult dialog_result() const noexcept
 ```
 
-Reports the current dialog result value without mutation.
+Returns the committed portable dialog result.
 
-### `set_dialog_result`
+### `set_dialog_result` (public)
 
 ```cpp
 void set_dialog_result(DialogResult result)
 ```
 
-Synchronously updates the retained dialog result property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates a defined result, commits a distinct value, and publishes it.
 
-### `dialog_result_changed`
+### `dialog_result_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<DialogResult>& dialog_result_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the post-commit dialog-result event.
 
-### `focus_scope_changed`
+### `focus_scope_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const FocusScopeChange&>& focus_scope_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns opened/closed focus-scope publications.
 
-### `capture_pointer`
+### `capture_pointer` (public)
 
 ```cpp
 void capture_pointer(const Control::Ptr& control, std::uint64_t pointer_id = 1)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates an attached eligible control and commits portable pointer capture for a nonzero pointer identity.
 
-### `release_pointer`
+### `release_pointer` (public)
 
 ```cpp
 void release_pointer()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes current portable pointer capture and publishes the transition.
 
-### `captured_control`
+### `captured_control` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr captured_control() const noexcept
 ```
 
-Reports the current captured control value without mutation.
+Returns the current live retained capture owner.
 
-### `captured_pointer_id`
+### `captured_pointer_id` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t captured_pointer_id() const noexcept
 ```
 
-Reports the current captured pointer id value without mutation.
+Returns the captured pointer identity or zero.
 
-### `pointer_capture_changed`
+### `pointer_capture_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const PointerCaptureChange&>& pointer_capture_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns capture transitions consumed by HostSession services.
 
-### `control_availability_changed`
+### `control_availability_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const ControlAvailabilityChange&>& control_availability_changed() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns effective visibility/enabled transitions for providers and native projection.
 
-### `open_popup`
+### `open_popup` (public)
 
 ```cpp
 [[nodiscard]] PopupToken open_popup(const Control::Ptr& owner, const Control::Ptr& popup, PopupOptions options =
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates owner policy and a live detached popup root, attaches it as a retained overlay, binds revocable owner lifetime, and returns the close token.
 
-### `register_accelerator`
+### `register_accelerator` (public)
 
 ```cpp
 [[nodiscard]] AcceleratorToken register_accelerator( Component& owner, KeyGesture gesture, std::function<bool()> callback, AcceleratorOptions options =
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates owner/gesture/callback, records priority policy, binds owner lifetime, and returns the revocation token.
 
-### `pressed_control`
+### `pressed_control` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr pressed_control() const noexcept
 ```
 
-Reports the current pressed control value without mutation.
+Returns the control retaining qualified pointer press state.
 
-### `dispatch_pointer`
+### `dispatch_pointer` (public)
 
 ```cpp
 bool dispatch_pointer(PointerEvent event)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers safely under a paint lease or routes preview/target/bubble pointer input with hover, press, capture, focus, and mutation revalidation.
 
-### `dispatch_key`
+### `dispatch_key` (public)
 
 ```cpp
 bool dispatch_key(KeyEvent event)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers safely under paint, arbitrates preemptive accelerators, focus route, dialog keys/mnemonics, ordinary accelerators, and traversal in deterministic order.
 
-### `dispatch_text`
+### `dispatch_text` (public)
 
 ```cpp
 bool dispatch_text(TextInputEvent event)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers safely under paint or routes committed/composition text through the focused retained route.
 
-### `deferred_input_snapshot`
+### `deferred_input_snapshot` (public)
 
 ```cpp
 [[nodiscard]] DeferredInputSnapshot deferred_input_snapshot() const noexcept
 ```
 
-Reports the current deferred input snapshot value without mutation.
+Returns fixed-capacity queue, delivery, compaction, rejection, abandonment, fault, and drain telemetry.
 
-### `dispatch_drag`
+### `dispatch_drag` (public)
 
 ```cpp
 [[nodiscard]] DragDispatchResult dispatch_drag(DragEvent event)
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates session ordering and typed payload, defers under paint, routes enter/over/leave/drop, and enforces one admitted effect.
 
-### `cancel_drag`
+### `cancel_drag` (public)
 
 ```cpp
 void cancel_drag() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Terminates retained drag ownership and abandons deferred drag work.
 
-### `metrics_snapshot`
+### `metrics_snapshot` (public)
 
 ```cpp
 [[nodiscard]] MetricsSnapshot metrics_snapshot() const
 ```
 
-Reports the current metrics snapshot value without mutation.
+Returns structured retained layout/paint/input/semantic/resource activity metrics.
 
-### `metrics`
+### `metrics` (public)
 
 ```cpp
 Metrics& metrics() noexcept
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns mutable structured instrumentation for internal coordinated emitters.
 
-### `reset_activity_metrics`
+### `reset_activity_metrics` (public)
 
 ```cpp
 void reset_activity_metrics() noexcept
 ```
 
-Returns activity metrics to its inherited or default policy.
+Resets interval activity counters without erasing lifetime/identity state.
 
-### `semantic_snapshot`
+### `semantic_snapshot` (public)
 
 ```cpp
 [[nodiscard]] SemanticSnapshot semantic_snapshot()
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds a mutation-safe bounded semantic tree across root and overlays, retrying when callbacks mutate identity.
 
-### `semantic_generation`
+### `semantic_generation` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t semantic_generation() const noexcept
 ```
 
-Reports the current semantic generation value without mutation.
+Returns the generation native accessibility adapters use to avoid redundant publication.
 
-### `perform_semantic_action`
+### `perform_semantic_action` (public)
 
 ```cpp
 bool perform_semantic_action(std::string_view stable_id, SemanticAction action, std::string_view value =
 ```
 
-Public Window operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers during paint or resolves stable real/virtual identity and enters the same focus, press, value, disclosure, and scroll paths as ordinary input.
+
+### `attach_subtree` (private)
+
+```cpp
+void attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent)
+```
+
+Recursively validates ownership and stable identity, installs Window/dispatcher affinity, and publishes lifecycle attachment.
+
+### `detach_subtree` (private)
+
+```cpp
+void detach_subtree(const Control::Ptr& control)
+```
+
+Revokes interaction/transients, unregisters identity/dispatcher affinity, and publishes lifecycle detachment without implicit disposal.
+
+### `dispose_subtree` (private)
+
+```cpp
+void dispose_subtree(const Control::Ptr& control) noexcept
+```
+
+Performs noexcept retained teardown, revoking dependents before irreversible disposed state.
+
+### `revoke_interaction_for_subtree` (private)
+
+```cpp
+void revoke_interaction_for_subtree(const Control::Ptr& control, bool notify_focus)
+```
+
+Clears focus, capture, pressed, hover, drag, dialogs, scopes, popups, accelerators, and scheduled work owned by a departing subtree.
+
+### `close_focus_scopes_for_subtree` (private)
+
+```cpp
+void close_focus_scopes_for_subtree(const Control::Ptr& control)
+```
+
+Closes active scopes rooted within a subtree through ordinary notifications.
+
+### `end_focus_scope` (private)
+
+```cpp
+bool end_focus_scope( FocusScopeId scope, FocusScopeCloseReason reason, const Control::Ptr& notification_owner)
+```
+
+Closes the active matching scope, applies the named reason, optionally restores eligible prior focus, and publishes after state commit.
+
+### `revoke_focus_scopes_for_subtree` (private)
+
+```cpp
+void revoke_focus_scopes_for_subtree(const Control::Ptr& control) noexcept
+```
+
+Noexcept-removes departing scope state during teardown.
+
+### `close_popups_for_subtree` (private)
+
+```cpp
+void close_popups_for_subtree(const Control::Ptr& control) noexcept
+```
+
+Disconnects every popup whose owner belongs to the named subtree.
+
+### `close_popup` (private)
+
+```cpp
+void close_popup(detail::PopupAttachment& popup) noexcept
+```
+
+Revokes overlay ownership, detaches its retained root, and publishes close through the owner's ordered change channel when possible.
+
+### `close_accelerator` (private)
+
+```cpp
+void close_accelerator(detail::AcceleratorAttachment& accelerator) noexcept
+```
+
+Revokes and removes one exact accelerator attachment.
+
+### `dispatch_accelerator` (private)
+
+```cpp
+[[nodiscard]] bool dispatch_accelerator(const KeyEvent& event, bool preemptive)
+```
+
+Tests a stable reverse-registration snapshot at the requested preemptive phase and invokes only live owners.
+
+### `focus_allowed_by_active_scope` (private)
+
+```cpp
+[[nodiscard]] bool focus_allowed_by_active_scope( const Control::Ptr& control) const noexcept
+```
+
+Checks containment against the innermost active focus scope.
+
+### `focus_candidates` (private)
+
+```cpp
+[[nodiscard]] std::vector<Control::Ptr> focus_candidates( const Control::Ptr& scope_root) const
+```
+
+Builds stable tab-index/tree-order eligible candidates inside a scope root.
+
+### `validate_focus_transition` (private)
+
+```cpp
+[[nodiscard]] bool validate_focus_transition( const Control::Ptr& previous, const Control::Ptr& destination, AutoValidate mode)
+```
+
+Applies the source container's AutoValidate policy before a focus commit.
+
+### `change_pointer_capture` (private)
+
+```cpp
+void change_pointer_capture(const Control::Ptr& control, std::uint64_t pointer_id, bool revoked)
+```
+
+Commits exact capture identity, publishes revoked/ordinary transitions, and synchronizes semantic state.
+
+### `on_eligibility_changed` (private)
+
+```cpp
+void on_eligibility_changed(const Control::Ptr& control)
+```
+
+Revokes interaction invalidated by effective enabled/visible changes and publishes availability.
+
+### `on_hit_test_transparency_changed` (private)
+
+```cpp
+void on_hit_test_transparency_changed(const Control::Ptr& control)
+```
+
+Revokes now-invalid hover/press/capture targets and refreshes hit-test state.
+
+### `publish_control_availability` (private)
+
+```cpp
+void publish_control_availability(Control& control)
+```
+
+Publishes stable/runtime identity with current effective visibility and enabled state.
+
+### `register_subtree` (private)
+
+```cpp
+void register_subtree(const Control::Ptr& control)
+```
+
+Enforces unique stable IDs recursively before a subtree becomes addressable.
+
+### `unregister_subtree` (private)
+
+```cpp
+void unregister_subtree(const Control::Ptr& control)
+```
+
+Removes authoritative stable-ID mappings recursively.
+
+### `mark_dirty` (private)
+
+```cpp
+void mark_dirty(Control& control, Dirty dirty)
+```
+
+Promotes typed invalidation through layout/style/paint/hit-test/semantic dependencies, cache retirement, damage, metrics, and wake coalescing.
+
+### `mark_paint_dirty` (private)
+
+```cpp
+void mark_paint_dirty(Control& control, Rect local_damage)
+```
+
+Transforms exact local damage through visual outsets into the control's paint plane.
+
+### `mark_subtree_dirty` (private)
+
+```cpp
+void mark_subtree_dirty(Control& control, Dirty dirty)
+```
+
+Recursively applies typed invalidation while respecting lifecycle and layout suspension.
+
+### `mark_child_layout_slot` (private)
+
+```cpp
+void mark_child_layout_slot(Control& control)
+```
+
+Invalidates the exact parent layout responsibility for a changed child.
+
+### `change_paint_plane` (private)
+
+```cpp
+void change_paint_plane(Control& control, PaintPlane plane)
+```
+
+Damages old/new projections and migrates retained paint-plane ownership.
+
+### `add_damage` (private)
+
+```cpp
+void add_damage(Rect damage, PaintPlane plane)
+```
+
+Clips and records exact damage in one retained paint plane.
+
+### `add_damage_all_planes` (private)
+
+```cpp
+void add_damage_all_planes(Rect damage)
+```
+
+Records the same clipped damage across every plane.
+
+### `request_paint_wake` (private)
+
+```cpp
+void request_paint_wake() noexcept
+```
+
+Coalesces one thread-safe host paint wake unless occluded or already pending.
+
+### `acknowledge_paint_wake_if_damage_drained` (private)
+
+```cpp
+void acknowledge_paint_wake_if_damage_drained() noexcept
+```
+
+Clears the pending wake only after all retained damage drains.
+
+### `touch_paint` (private)
+
+```cpp
+void touch_paint() noexcept
+```
+
+Advances nonzero content revision and transitions the lease state for a new mutation.
+
+### `update_paint_lease_state` (private)
+
+```cpp
+void update_paint_lease_state() noexcept
+```
+
+Derives the legal lease state from occlusion, active render, dirty revision, and ready/presented progress.
+
+### `defer_input` (private)
+
+```cpp
+[[nodiscard]] bool defer_input(DeferredInput input)
+```
+
+Queues bounded critical input during paint while compacting only replaceable moves/drag-overs.
+
+### `schedule_deferred_input_drain` (private)
+
+```cpp
+void schedule_deferred_input_drain() noexcept
+```
+
+Posts one coalesced dispatcher drain after the paint lease releases.
+
+### `drain_deferred_input` (private)
+
+```cpp
+void drain_deferred_input()
+```
+
+Delivers one ordered deferred batch outside paint with per-event fault accounting.
+
+### `abandon_deferred_input` (private)
+
+```cpp
+void abandon_deferred_input() noexcept
+```
+
+Cancels queued deferred input and its posted drain during shutdown.
+
+### `abandon_deferred_drag` (private)
+
+```cpp
+void abandon_deferred_drag() noexcept
+```
+
+Removes only deferred drag events when a drag session terminates.
+
+### `add_subtree_damage` (private)
+
+```cpp
+void add_subtree_damage(const Control::Ptr& control)
+```
+
+Adds current and last-painted visual extents for a subtree.
+
+### `ensure_layout` (private)
+
+```cpp
+void ensure_layout(bool read_barrier)
+```
+
+Runs bounded measure/arrange passes across root and overlays, respects update scopes/suspension, and records second-pass requests.
+
+### `leave_update_scope` (private)
+
+```cpp
+void leave_update_scope()
+```
+
+Validates balanced nesting, updates metrics, and flushes layout only at the outer boundary.
+
+### `flush_if_outermost` (private)
+
+```cpp
+void flush_if_outermost()
+```
+
+Applies the retained layout barrier when no update transaction remains.
+
+### `route_to` (private)
+
+```cpp
+[[nodiscard]] std::vector<Control::Ptr> route_to(const Control::Ptr& target) const
+```
+
+Builds root-to-target retained ancestry for preview/target/bubble dispatch.
+
+### `drop_target_at` (private)
+
+```cpp
+[[nodiscard]] Control::Ptr drop_target_at(Point position)
+```
+
+Finds the frontmost eligible typed-drop target across overlays and root.
+
+### `route_drag` (private)
+
+```cpp
+[[nodiscard]] DragDispatchResult route_drag(const Control::Ptr& target, DragEvent event)
+```
+
+Routes one typed drag event with mutation revalidation and accepted-effect enforcement.
+
+### `hit_test_recursive` (private)
+
+```cpp
+[[nodiscard]] Control::Ptr hit_test_recursive(const Control::Ptr& control, Point window_position) const
+```
+
+Searches visible enabled retained children front-to-back with inverse coordinate mapping.
+
+### `paint_recursive` (private)
+
+```cpp
+void paint_recursive(const Control::Ptr& control, Painter& painter, Rect window_damage, PaintPlane plane, std::uint64_t& visited_nodes, std::uint64_t& painted_controls, std::uint64_t& consumed_invalidations, std::uint64_t& chunks_rebuilt, std::uint64_t& chunks_reused, std::uint64_t& commands_replayed)
+```
+
+Rebuilds or replays display chunks within damage, clip, plane, and lifecycle bounds while recording cache metrics.
+
+### `measure_dirty_recursive` (private)
+
+```cpp
+void measure_dirty_recursive(const Control::Ptr& control, Size available, std::uint64_t& visited_nodes, std::uint64_t& callbacks)
+```
+
+Measures only runnable dirty nodes and propagates bounded desired-size changes.
+
+### `arrange_dirty_recursive` (private)
+
+```cpp
+void arrange_dirty_recursive(const Control::Ptr& control, Rect final_bounds, std::uint64_t& visited_nodes, std::uint64_t& callbacks)
+```
+
+Arranges only runnable dirty nodes, commits geometry, and propagates resulting damage.
+
+### `has_runnable_layout_dirty` (private)
+
+```cpp
+[[nodiscard]] bool has_runnable_layout_dirty( const Control::Ptr& control) const noexcept
+```
+
+Detects layout work not blocked by suspension.
+
+### `note_suspended_layout_request` (private)
+
+```cpp
+void note_suspended_layout_request(Control& control) noexcept
+```
+
+Records a coalesced request owned by a suspended subtree.
+
+### `commit_layout_requests_recursive` (private)
+
+```cpp
+void commit_layout_requests_recursive(const Control::Ptr& control) noexcept
+```
+
+Promotes deferred suspended requests after layout resumes.
+
+### `recompute_subtree_dirty` (private)
+
+```cpp
+[[nodiscard]] Dirty recompute_subtree_dirty(const Control::Ptr& control) noexcept
+```
+
+Re-derives aggregate dirtiness from exact node and child state.
+
+### `clear_layout_dirty_subtree` (private)
+
+```cpp
+void clear_layout_dirty_subtree(const Control::Ptr& control) noexcept
+```
+
+Clears completed measure/arrange dirtiness recursively.
+
+### `clear_paint_dirty_subtree` (private)
+
+```cpp
+void clear_paint_dirty_subtree(const Control::Ptr& control) noexcept
+```
+
+Clears completed paint dirtiness recursively after coherent replay.
+
+### `display_cache_entries` (private)
+
+```cpp
+[[nodiscard]] std::uint64_t display_cache_entries( const Control::Ptr& control) const noexcept
+```
+
+Counts retained display chunks recursively for structured metrics.
+
+### `update_display_cache_metrics` (private)
+
+```cpp
+void update_display_cache_metrics() noexcept
+```
+
+Publishes current display-chunk population and generation.
+
+### `compact_frame_requests` (private)
+
+```cpp
+void compact_frame_requests() noexcept
+```
+
+Erases disconnected/dead scheduled requests without disturbing order.
+
+### `active_surface_count` (private)
+
+```cpp
+[[nodiscard]] std::size_t active_surface_count() const noexcept
+```
+
+Counts connected periodic surface requests.
+
+### `update_frame_schedule_metrics` (private)
+
+```cpp
+void update_frame_schedule_metrics() noexcept
+```
+
+Publishes bounded request/surface counts.
+
+### `absolute_bounds_of` (private)
+
+```cpp
+[[nodiscard]] Rect absolute_bounds_of(const Control& control) const
+```
+
+Accumulates retained parent transforms into root-client logical bounds.
+
+### `visual_bounds_of` (private)
+
+```cpp
+[[nodiscard]] Rect visual_bounds_of(const Control& control, Insets outsets) const
+```
+
+Expands absolute bounds by validated bounded visual outsets.
+
+### `paint_damage_bounds_of` (private)
+
+```cpp
+[[nodiscard]] Rect paint_damage_bounds_of(const Control& control) const
+```
+
+Unites current and last-painted visual bounds so shrinking effects erase cleanly.
+
+### `eligible` (private)
+
+```cpp
+[[nodiscard]] bool eligible(const Control::Ptr& control) const noexcept
+```
+
+Tests live attachment plus the control's effective input eligibility.
+
+### `move_focus_after` (private)
+
+```cpp
+[[nodiscard]] bool move_focus_after(const Control::Ptr& origin)
+```
+
+Finds the next stable focus candidate after an origin inside the active scope.
+
+### `validate_command_activation` (private)
+
+```cpp
+[[nodiscard]] bool validate_command_activation( const Control::Ptr& destination)
+```
+
+Applies focus validation before mnemonic/default/cancel command activation.
+
+### `dispatch_mnemonic` (private)
+
+```cpp
+[[nodiscard]] bool dispatch_mnemonic(char32_t character)
+```
+
+Builds and cycles stable mnemonic candidates while accounting collisions and scope containment.
+
+### `dispatch_dialog_button` (private)
+
+```cpp
+[[nodiscard]] bool dispatch_dialog_button(bool accept)
+```
+
+Validates and performs the configured accept or cancel button through normal semantic press behavior.
+
+### `clear_dialog_targets_for_subtree` (private)
+
+```cpp
+void clear_dialog_targets_for_subtree(const Control::Ptr& control) noexcept
+```
+
+Clears accept/cancel references owned by a departing subtree.
+
+### `require_ui_thread` (private)
+
+```cpp
+void require_ui_thread(std::string_view operation)
+```
+
+Rejects named wrong-thread mutations and records the structured rejection metric.

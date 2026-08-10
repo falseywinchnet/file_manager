@@ -502,8 +502,10 @@ void test_public_easing_preview_owns_scheduler_policy_and_semantics() {
         StableId("animation.public.preview"));
     preview->set_requested_bounds({0.0, 0.0, 500.0, 340.0});
     preview->set_title("Public easing proof");
+    preview->set_marker_size(18.0);
     Window window(preview, {500.0, 340.0});
-    require(preview->tracks().size() == 8U && window.next_wake().has_value() &&
+    require(preview->tracks().size() == 8U && preview->marker_size() == 18.0 &&
+                window.next_wake().has_value() &&
                 has_semantic_state(preview->semantic_descriptor().states,
                                    SemanticState::busy),
             "EasingPreview must own all public curves, one frame lease, and busy semantics");

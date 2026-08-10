@@ -1,7 +1,7 @@
 # ValidationConstraints
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/control.hpp:129`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/control.hpp:129`
 
 ## Declared values
 

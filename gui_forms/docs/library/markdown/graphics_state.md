@@ -1,17 +1,17 @@
 # GraphicsState
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `GraphicsState`  
-Declaration: `include/gui_forms/drawing.hpp:740`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 graphics state review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `GraphicsState`
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:20`
+- Definition: `inline/header-only`
 
-GraphicsState is a struct declared in include/gui_forms/drawing.hpp.
+GraphicsState is the complete transform, optional clip, smoothing, interpolation, pixel-offset, compositing, and compositing-quality state.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

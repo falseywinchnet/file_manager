@@ -1,87 +1,111 @@
 # Component
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component`  
-Declaration: `include/gui_forms/component.hpp:26`  
-Definition: `src/core/component.cpp`
+- Status: **OBSERVED: bundle 010 component state-machine split; focused M4 lifecycle tests pass**
+- Kind: **class**
+- Hierarchy: `Component`
+- Declaration: `include/gui_forms/component/component/component.hpp:11`
+- Definition: `src/core/component/component/component.cpp`
 
-Component is a class declared in include/gui_forms/component.hpp.
+Component owns the alive-to-disposing-to-disposed transition and revokes acquired work in strict reverse order before subclass teardown.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `Component`
+### `Component` (public)
 
 ```cpp
 Component() = default
 ```
 
-Constructs or tears down the retained Component object according to its ownership contract.
+Constructs an alive component; copying is prohibited.
 
-### `~Component`
+### `~Component` (public)
 
 ```cpp
 virtual ~Component()
 ```
 
-Constructs or tears down the retained Component object according to its ownership contract.
+Provides polymorphic destruction without implicitly re-entering virtual teardown.
 
-### `Component`
+### `Component` (public)
 
 ```cpp
 Component(const Component&) = delete
 ```
 
-Constructs or tears down the retained Component object according to its ownership contract.
+Constructs an alive component; copying is prohibited.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 Component& operator=(const Component&) = delete
 ```
 
-Public Component operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copy assignment is prohibited.
 
-### `dispose`
+### `dispose` (public)
 
 ```cpp
 void dispose()
 ```
 
-Public Component operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies thread policy, enters disposing once, revokes owned work, runs subclass teardown, and commits disposed.
 
-### `component_state`
+### `component_state` (public)
 
 ```cpp
 [[nodiscard]] ComponentState component_state() const noexcept
 ```
 
-Reports the current component state value without mutation.
+Returns the exact lifecycle state.
 
-### `is_alive`
+### `is_alive` (public)
 
 ```cpp
 [[nodiscard]] bool is_alive() const noexcept
 ```
 
-Reports the current is alive value without mutation.
+Reports whether mutation remains admissible.
 
-### `is_disposed`
+### `is_disposed` (public)
 
 ```cpp
 [[nodiscard]] bool is_disposed() const noexcept
 ```
 
-Reports the current is disposed value without mutation.
+Reports completed teardown.
 
-### `own_revocable`
+### `own_revocable` (public)
 
 ```cpp
 void own_revocable(const std::weak_ptr<detail::Revocable>& revocable)
 ```
 
-Public Component operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds weak revocation authority while alive or immediately disconnects work acquired after teardown begins.
+
+### `verify_dispose_thread` (protected)
+
+```cpp
+virtual void verify_dispose_thread()
+```
+
+Allows an owner to enforce disposal affinity before state changes.
+
+### `on_dispose` (protected)
+
+```cpp
+virtual void on_dispose() noexcept
+```
+
+Provides noexcept subclass teardown after revocation.
+
+### `revoke_owned_work` (protected)
+
+```cpp
+void revoke_owned_work() noexcept
+```
+
+Exchanges and disconnects the revocation stack in reverse acquisition order.

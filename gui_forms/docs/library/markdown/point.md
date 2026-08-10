@@ -1,10 +1,10 @@
 # Point
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `Point`  
-Declaration: `include/gui_forms/types.hpp:17`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `Point`
+- Declaration: `include/gui_forms/types.hpp:17`
+- Definition: `inline/header-only`
 
 Point is a struct declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ Point is a struct declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const Point&, const Point&) = default

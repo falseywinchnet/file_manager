@@ -1,23 +1,23 @@
 # SizeI
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `SizeI`  
-Declaration: `include/gui_forms/drawing.hpp:31`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `SizeI`
+- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:22`
+- Definition: `inline/header-only`
 
-SizeI is a struct declared in include/gui_forms/drawing.hpp.
+SizeI carries signed integer width and height.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const SizeI&, const SizeI&) = default
 ```
 
-Public SizeI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares width and height.

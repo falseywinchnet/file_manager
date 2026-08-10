@@ -1,17 +1,17 @@
 # InstrumentModuleMoveRequest
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `InstrumentModuleMoveRequest`  
-Declaration: `include/gui_forms/instrument_controls.hpp:66`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 event value split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **struct**
+- Hierarchy: `InstrumentModuleMoveRequest`
+- Declaration: `include/gui_forms/instrument/instrument_types.hpp:56`
+- Definition: `inline/header-only`
 
-InstrumentModuleMoveRequest is a struct declared in include/gui_forms/instrument_controls.hpp.
+InstrumentModuleMoveRequest carries stable module identity, previous index, and bounded requested index; the consumer remains ordering authority.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![InstrumentModuleMoveRequest](../captures/instrument_rack.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

@@ -1,7 +1,7 @@
 # HostDialogChoice
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/host.hpp:148`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/host/types/host_types.hpp:145`
 
 ## Declared values
 

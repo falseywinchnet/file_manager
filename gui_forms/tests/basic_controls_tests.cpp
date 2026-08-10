@@ -695,6 +695,7 @@ void test_public_drawing_metrics_and_control_tag() {
         StableId("controls.diagnostics.drawing"));
     drawing->set_requested_bounds({0.0, 0.0, 120.0, 60.0});
     drawing->set_accessible_name("Public owner drawing");
+    drawing->set_background(Color::rgba(8, 9, 10));
     std::uint64_t callback_count = 0U;
     Rect callback_bounds;
     Rect callback_damage;
@@ -707,6 +708,7 @@ void test_public_drawing_metrics_and_control_tag() {
         });
     auto metrics = make_control<MetricsView>(
         StableId("controls.diagnostics.metrics"), "Runtime proof");
+    metrics->set_accent_width(9.0);
     metrics->set_requested_bounds({0.0, 60.0, 240.0, 90.0});
     root->add_child(drawing);
     root->add_child(metrics);
@@ -721,13 +723,15 @@ void test_public_drawing_metrics_and_control_tag() {
             "DrawingSurface must invoke public owner paint with retained bounds and damage");
     require(!drawing->hit_test_visible() &&
                 !drawing->hit_test_local({10.0, 10.0}) &&
+                drawing->background() == Color::rgba(8, 9, 10) &&
                 drawing->semantic_descriptor().role == SemanticRole::image &&
                 drawing->semantic_descriptor().exposed,
             "DrawingSurface must default to input-transparent image semantics");
     const SemanticDescriptor metrics_semantics = metrics->semantic_descriptor();
     require(metrics_semantics.role == SemanticRole::group &&
                 metrics_semantics.name == "Runtime proof" &&
-                metrics_semantics.value.find("controls") != std::string::npos,
+                metrics_semantics.value.find("controls") != std::string::npos &&
+                metrics->accent_width() == 9.0,
             "MetricsView must expose the structured runtime snapshot semantically");
 }
 

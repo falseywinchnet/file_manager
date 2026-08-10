@@ -1,10 +1,10 @@
 # GradientStop
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `GradientStop`  
-Declaration: `include/gui_forms/types.hpp:89`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `GradientStop`
+- Declaration: `include/gui_forms/types.hpp:89`
+- Definition: `inline/header-only`
 
 GradientStop is a struct declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ GradientStop is a struct declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const GradientStop&, const GradientStop&) = default

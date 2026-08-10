@@ -1,7 +1,7 @@
 # DateTimePickerFormat
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/date_time_picker.hpp:50`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/panel/date_time_picker/date_time_picker.hpp:14`
 
 ## Declared values
 

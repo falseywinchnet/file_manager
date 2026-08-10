@@ -1,7 +1,7 @@
 # DragEffect
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/events.hpp:148`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/events.hpp:148`
 
 ## Declared values
 

@@ -58,6 +58,10 @@ Before planning or implementation, read:
   local gates and explicit architect start directions pass.
 - `plugin_runtime/` is frozen legacy research input. New runtime implementation
   belongs to Orchestrator's plugin-supervisor subsystem after its gate opens.
+- `web_forms/` is the planning-stage Web.Forms authoring/compiler project. It
+  may define a bounded browser-valid HTML/CSS source profile and generated C++
+  contract over public GUI.Forms; it may not introduce JavaScript, a runtime
+  browser/DOM/CSS engine, or implementation before its local gates pass.
 - Kolmogrov similarity is a gated core engine candidate channel. It is distinct
   from AI interpretation and personal semantic memory, which belong in
   Orchestrator-managed hives beyond the engine's critical boundary.

@@ -1,151 +1,199 @@
 # EasingPreview
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Control → EasingPreview`  
-Declaration: `include/gui_forms/diagnostic_controls.hpp:77`  
-Definition: `src/controls/diagnostic_controls.cpp`
+- Status: **OBSERVED: bundle 006 split and marker-size enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Control → EasingPreview`
+- Declaration: `include/gui_forms/controls/easing_preview/easing_preview.hpp:21`
+- Definition: `src/controls/easing_preview/easing_preview.cpp`
 
-EasingPreview is a visual retained control declared in include/gui_forms/diagnostic_controls.hpp.
+EasingPreview is a retained animation conformance surface that owns an AnimationTimeline, one revocable frame lease, configurable tracks/style/title/marker size, authored and effective motion policy, deterministic phase, painter recording, and image semantics. Hidden, detached, paused, or reduced states never create a perpetual redraw loop.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![EasingPreview](../captures/easing_preview.png)
 
-## Public methods
+## Declared methods
 
-### `EasingPreview`
+### `EasingPreview` (public)
 
 ```cpp
 explicit EasingPreview(StableId stable_id)
 ```
 
-Constructs or tears down the retained EasingPreview object according to its ownership contract.
+Constructs the canonical eight-curve infinite timeline and accessible conformance description.
 
-### `title`
+### `title` (public)
 
 ```cpp
 [[nodiscard]] const std::string& title() const noexcept
 ```
 
-Reports the current title value without mutation.
+Returns the retained heading.
 
-### `set_title`
+### `set_title` (public)
 
 ```cpp
 void set_title(std::string title)
 ```
 
-Synchronously updates the retained title property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits heading and refreshes paint and semantics.
 
-### `style`
+### `style` (public)
 
 ```cpp
 [[nodiscard]] const BasicControlStyle& style() const noexcept
 ```
 
-Reports the current style value without mutation.
+Returns the retained visual palette.
 
-### `set_style`
+### `set_style` (public)
 
 ```cpp
 void set_style(BasicControlStyle style)
 ```
 
-Synchronously updates the retained style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits palette without changing timeline authority.
 
-### `specification`
+### `specification` (public)
 
 ```cpp
 [[nodiscard]] const AnimationSpec& specification() const noexcept
 ```
 
-Reports the current specification value without mutation.
+Returns the authoritative AnimationTimeline specification.
 
-### `set_specification`
+### `set_specification` (public)
 
 ```cpp
 void set_specification(AnimationSpec specification)
 ```
 
-Synchronously updates the retained specification property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates through AnimationTimeline, restarts/preserves policy coherently, and reconciles the frame lease.
 
-### `tracks`
+### `tracks` (public)
 
 ```cpp
 [[nodiscard]] const std::vector<EasingPreviewTrack>& tracks() const noexcept
 ```
 
-Reports the current tracks value without mutation.
+Returns ordered curve/label/color track configuration.
 
-### `set_tracks`
+### `set_tracks` (public)
 
 ```cpp
 void set_tracks(std::vector<EasingPreviewTrack> tracks)
 ```
 
-Synchronously updates the retained tracks property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires one through 32 named tracks and refreshes paint and semantics.
 
-### `motion_policy`
+### `motion_policy` (public)
 
 ```cpp
 [[nodiscard]] MotionPolicy motion_policy() const noexcept
 ```
 
-Reports the current motion policy value without mutation.
+Returns the caller-authored enabled/paused/reduced policy.
 
-### `effective_motion_policy`
+### `effective_motion_policy` (public)
 
 ```cpp
 [[nodiscard]] MotionPolicy effective_motion_policy() const noexcept
 ```
 
-Reports the current effective motion policy value without mutation.
+Combines authored policy with Window reduced-motion presentation settings.
 
-### `set_motion_policy`
+### `set_motion_policy` (public)
 
 ```cpp
 void set_motion_policy(MotionPolicy policy)
 ```
 
-Synchronously updates the retained motion policy property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits policy, pauses/resumes without catch-up, and acquires or revokes the single frame lease.
 
-### `phase`
+### `marker_size` (public)
+
+```cpp
+[[nodiscard]] double marker_size() const noexcept
+```
+
+Returns the logical square marker size.
+
+### `set_marker_size` (public)
+
+```cpp
+void set_marker_size(double size)
+```
+
+Validates a size within [4, 48] and refreshes track paint.
+
+### `phase` (public)
 
 ```cpp
 [[nodiscard]] double phase() const noexcept
 ```
 
-Reports the current phase value without mutation.
+Returns the last retained normalized timeline phase.
 
-### `on_frame`
+### `on_frame` (public)
 
 ```cpp
 void on_frame(FrameTime now) override
 ```
 
-Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Samples active timeline state, updates phase, and disconnects when a finite animation finishes.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records frame, title/readout, each track, and curve-sampled markers from effective motion policy.
 
-### `hit_test_local`
+### `hit_test_local` (public)
 
 ```cpp
 [[nodiscard]] bool hit_test_local(Point local_point) const override
 ```
 
-Reports the current hit test local value without mutation.
+Always rejects input because surrounding controls own policy interaction.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects image role, normalized phase/range, motion readout, and busy state only while active.
+
+### `on_attached_to_window` (protected)
+
+```cpp
+void on_attached_to_window() override
+```
+
+Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
+Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `register_frames` (private)
+
+```cpp
+void register_frames()
+```
+
+Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `motion_readout` (private)
+
+```cpp
+[[nodiscard]] std::string motion_readout(double presented_phase) const
+```
+
+Reports the current motion readout value without mutation.

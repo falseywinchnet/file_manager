@@ -1,31 +1,31 @@
 # TextMetricsProvider
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `TextMetricsProvider`  
-Declaration: `include/gui_forms/drawing.hpp:796`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 text-measurement interface review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `TextMetricsProvider`
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:76`
+- Definition: `inline/header-only`
 
-TextMetricsProvider is a class declared in include/gui_forms/drawing.hpp.
+TextMetricsProvider isolates renderer-specific measurement behind renderer-neutral UTF-8, font, and format snapshots.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `~TextMetricsProvider`
+### `~TextMetricsProvider` (public)
 
 ```cpp
 virtual ~TextMetricsProvider() = default
 ```
 
-Constructs or tears down the retained TextMetricsProvider object according to its ownership contract.
+Provides polymorphic cleanup.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] virtual SizeF measure(std::string_view utf8, const FontSnapshot& font, const StringFormatSnapshot& format) const = 0
 ```
 
-Computes desired size from the available constraint without arranging children.
+Measures one UTF-8 string under immutable font and format recipes.

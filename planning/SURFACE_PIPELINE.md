@@ -3,6 +3,15 @@
 Status: HYPOTHESIS. This is the main UI architecture direction to interrogate,
 not an accepted implementation design.
 
+**GIVEN refinement, 2026-08-10:** the proposed authoritative visual source is
+now the bounded browser-valid HTML/CSS profile owned by `../web_forms/`, not a
+new Athene-derived XML/DML syntax. The DML lineage still supplies the durable
+principles—round-trip source, stable IDs, compiled metadata, deterministic
+order, and retained native output—and the provisional Gallery DML remains
+implementation evidence. The no-JavaScript and nested-landscape boundary is
+accepted, and Rust is selected for the build-time compiler; exact profile
+grammar and lowering details remain CANDIDATE.
+
 ## 1. Deciding properties are independent axes
 
 Framework labels obscure the decisions that matter:
@@ -33,10 +42,10 @@ where real consumers rely on them, while rejecting accidental backend behavior,
 historic bugs, and implementation details.
 
 ```text
-imperative C++ API / generated C# binding / future visual designer
+bounded Web.Forms HTML/CSS / imperative C++ / generated C# / future designer
         |
         v
-versioned DML schema / GUI specification
+versioned build-time GUI construction IR
         |
         v
 generated forms code + native retained presentation graph
@@ -80,10 +89,11 @@ UI construction, calculations, arguments, and variable storage. Pandora was
 described as a portable C object engine with shared objects and process
 isolation.
 
-The architect confirms **DML** as the intended lineage. The public sources found
-so far substantiate DML/Pandora and runtime object linkage, but do not name “PTP
-schemas.” No PTP terminology is required for this project unless an original
-artifact later establishes it.
+The architect confirms **DML** as the historical lineage but has selected a new
+bounded HTML/CSS source profile, Web.Forms, rather than recreating Athene syntax.
+The public sources found so far substantiate DML/Pandora and runtime object
+linkage, but do not name “PTP schemas.” No PTP terminology is required for this
+project unless an original artifact later establishes it.
 
 The principle worth reviving is not XML syntax. It is a portable, versioned,
 inspectable boundary between application construction and the rendering core.
@@ -128,10 +138,16 @@ the remembered list. None of this mandates Avalonia, XAML, MVVM, or .NET.
   versioned function tables, plain data, explicit ownership/allocator rules,
   explicit error objects, and callback/event contracts. C++ and generated C#
   bindings sit above it.
-- DML is the durable GUI specification and pleasant SOL-authoring surface.
-- A future Visual-Studio-like designer edits DML and generates forms code.
-- Rust initially hosts untrusted plugin adapters behind capability-limited IPC;
-  it is not the primary widget engine.
+- Web.Forms HTML/CSS is the proposed durable GUI specification and visual
+  authoring surface; its build-time Rust compiler produces the retained
+  construction IR and contributes no product runtime.
+- Web.Forms generated product source is a C++17-compatible orthodox subset even
+  when GUI.Forms itself is built as C++20.
+- A future Visual-Studio-like designer edits round-trippable Web.Forms source
+  and generates disposable forms code.
+- Rust hosts the isolated Web.Forms build tool and untrusted plugin adapters
+  behind capability-limited IPC; it is not the primary widget engine or a GUI
+  product runtime.
 - No native text-control overlay. IME, tooltip, keyboard navigation, and
   accessibility semantics are deliberate engine features, even where a host OS
   cannot guarantee equal capability.

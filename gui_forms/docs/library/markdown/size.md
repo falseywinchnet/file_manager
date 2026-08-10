@@ -1,10 +1,10 @@
 # Size
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `Size`  
-Declaration: `include/gui_forms/types.hpp:23`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `Size`
+- Declaration: `include/gui_forms/types.hpp:23`
+- Definition: `inline/header-only`
 
 Size is a struct declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ Size is a struct declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const Size&, const Size&) = default

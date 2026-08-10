@@ -1,17 +1,17 @@
 # PngCodecLimits
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PngCodecLimits`  
-Declaration: `src/render/skia/drawing_skia.hpp:46`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 renderer codec limits review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `PngCodecLimits`
+- Declaration: `src/render/skia/executor/drawing_skia.hpp:46`
+- Definition: `inline/header-only`
 
-PngCodecLimits is a struct declared in src/render/skia/drawing_skia.hpp.
+PngCodecLimits bounds encoded size, dimensions, and total pixels before Skia decode or encode.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

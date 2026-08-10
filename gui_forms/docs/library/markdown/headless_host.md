@@ -1,127 +1,127 @@
 # HeadlessHost
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `HeadlessHost`  
-Declaration: `src/host/headless/headless_host.hpp:58`  
-Definition: `src/host/headless/headless_host.cpp`
+- Status: **OBSERVED: bundle 007 deterministic host/session split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `HeadlessHost`
+- Declaration: `src/host/headless/session/headless_host.hpp:14`
+- Definition: `src/host/headless/session/headless_host.cpp`
 
-HeadlessHost is a class declared in src/host/headless/headless_host.hpp.
+HeadlessHost owns the reference HostServices and HostSession, installs atomic dispatcher/paint wake flags, supplies caller-controlled timestamps, and records a machine-stable lifecycle trace.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `HeadlessHost`
+### `HeadlessHost` (public)
 
 ```cpp
 explicit HeadlessHost(Window& window)
 ```
 
-Constructs or tears down the retained HeadlessHost object according to its ownership contract.
+Binds one Window, installs reference services/session and coalesced wake handlers, and subscribes exact event/result trace publication.
 
-### `~HeadlessHost`
+### `~HeadlessHost` (public)
 
 ```cpp
 ~HeadlessHost()
 ```
 
-Constructs or tears down the retained HeadlessHost object according to its ownership contract.
+Removes paint and dispatcher wake seams before member shutdown.
 
-### `HeadlessHost`
+### `HeadlessHost` (public)
 
 ```cpp
 HeadlessHost(const HeadlessHost&) = delete
 ```
 
-Constructs or tears down the retained HeadlessHost object according to its ownership contract.
+Binds one Window, installs reference services/session and coalesced wake handlers, and subscribes exact event/result trace publication.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 HeadlessHost& operator=(const HeadlessHost&) = delete
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Is deleted because reference service/session attachment is singular.
 
-### `dispatch`
+### `dispatch` (public)
 
 ```cpp
-[[nodiscard]] HostDispatchResult dispatch(HostEventPayload payload, std::uint64_t timestamp_nanoseconds)
+[[nodiscard]] HostDispatchResult dispatch( HostEventPayload payload, std::uint64_t timestamp_nanoseconds)
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Assigns the next monotonic sequence to a caller-timestamped payload and enters HostSession.
 
-### `pump_dispatcher`
+### `pump_dispatcher` (public)
 
 ```cpp
 [[nodiscard]] DispatchDrainResult pump_dispatcher( std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn)
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Consumes the atomic wake flag and drains one bounded Window dispatcher turn.
 
-### `dispatcher_wake_pending`
+### `dispatcher_wake_pending` (public)
 
 ```cpp
 [[nodiscard]] bool dispatcher_wake_pending() const noexcept
 ```
 
-Reports the current dispatcher wake pending value without mutation.
+Atomically reports a coalesced dispatcher wake.
 
-### `paint_wake_pending`
+### `paint_wake_pending` (public)
 
 ```cpp
 [[nodiscard]] bool paint_wake_pending() const noexcept
 ```
 
-Reports the current paint wake pending value without mutation.
+Atomically reports a coalesced retained-paint wake.
 
-### `consume_paint_wake`
+### `consume_paint_wake` (public)
 
 ```cpp
 [[nodiscard]] bool consume_paint_wake() noexcept
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Atomically acknowledges and returns retained-paint wake state.
 
-### `session`
+### `session` (public)
 
 ```cpp
 [[nodiscard]] HostSession& session() noexcept
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns mutable or const access to the owned reference HostSession.
 
-### `session`
+### `session` (public)
 
 ```cpp
 [[nodiscard]] const HostSession& session() const noexcept
 ```
 
-Reports the current session value without mutation.
+Returns mutable or const access to the owned reference HostSession.
 
-### `services`
+### `services` (public)
 
 ```cpp
 [[nodiscard]] HostServices& services() noexcept
 ```
 
-Public HeadlessHost operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns mutable or const access to the owned reference HostServices.
 
-### `services`
+### `services` (public)
 
 ```cpp
 [[nodiscard]] const HostServices& services() const noexcept
 ```
 
-Reports the current services value without mutation.
+Returns mutable or const access to the owned reference HostServices.
 
-### `trace`
+### `trace` (public)
 
 ```cpp
 [[nodiscard]] const std::string& trace() const noexcept
 ```
 
-Reports the current trace value without mutation.
+Returns the stable event/result/lifecycle/service trace.

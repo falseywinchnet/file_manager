@@ -1,17 +1,17 @@
 # FontFallbackMatch
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `FontFallbackMatch`  
-Declaration: `include/gui_forms/text_shaping.hpp:131`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 fallback result review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `FontFallbackMatch`
+- Declaration: `include/gui_forms/text_shaping/types/text_shaping_types.hpp:100`
+- Definition: `inline/header-only`
 
-FontFallbackMatch is a struct declared in include/gui_forms/text_shaping.hpp.
+FontFallbackMatch identifies an admitted face and the exact scalar prefix it covers.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

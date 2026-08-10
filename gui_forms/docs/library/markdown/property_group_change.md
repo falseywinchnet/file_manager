@@ -1,17 +1,17 @@
 # PropertyGroupChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyGroupChange`  
-Declaration: `include/gui_forms/inspection_controls.hpp:300`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 event value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyGroupChange`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:86`
+- Definition: `inline/header-only`
 
-PropertyGroupChange is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyGroupChange carries stable group identity and committed disclosure state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyGroupChange](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

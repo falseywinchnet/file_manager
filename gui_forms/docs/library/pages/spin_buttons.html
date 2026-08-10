@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>SpinButtons · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
+<body><article><header><p class="eyebrow">class · visual</p>
+<h1>SpinButtons</h1><p class="summary">SpinButtons is NumericUpDown&#x27;s source-private two-part command surface. It qualifies pointer capture independently for increment and decrement and publishes only directional intent.</p>
+<div class="badges"><span>OBSERVED: bundle 004 source-private state-machine split; M4 build, focused tests, and Screen Sharing pass</span><span>isolated per type</span></div></header>
+<section><h2>Visual evidence</h2><figure><img src="../captures/numeric_up_down.png" alt="SpinButtons control capture"><figcaption>M4 Complete Showcase crop showing the NumericUpDown trailing up/down button column painted and hit-tested by SpinButtons.</figcaption></figure></section>
+<section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>Control → SpinButtons</dd>
+<dt>Declaration</dt><dd>src/controls/panel/numeric_up_down/spin_buttons.hpp:7</dd><dt>Definition</dt><dd>src/controls/panel/numeric_up_down/spin_buttons.cpp</dd></dl></section>
+<section><h2>Declared methods</h2><section class="method"><h3>SpinButtons <span class="access">public</span></h3><code>explicit SpinButtons(StableId stable_id)</code><p>Constructs a non-tab-stop vertical two-command surface.</p></section><section class="method"><h3>stepped <span class="access">public</span></h3><code>[[nodiscard]] Event&lt;int&gt;&amp; stepped() noexcept</code><p>Returns the event carrying +1 or -1 after a qualified release.</p></section><section class="method"><h3>on_paint <span class="access">public</span></h3><code>void on_paint(Painter&amp; painter, Rect local_damage) override</code><p>Records framed upper/lower button states and directional chevrons.</p></section><section class="method"><h3>on_pointer <span class="access">public</span></h3><code>void on_pointer(PointerEvent&amp; event) override</code><p>Tracks hover, press, capture, cancellation, and same-part release before publishing a step.</p></section></section>
+<footer><a href="../markdown/spin_buttons.md">AI-readable Markdown source</a></footer>
+</article></body></html>

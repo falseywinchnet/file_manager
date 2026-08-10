@@ -1,39 +1,39 @@
 # TextUnitIndex
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `TextUnitIndex`  
-Declaration: `include/gui_forms/text.hpp:14`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 strongly typed text index review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `TextUnitIndex`
+- Declaration: `include/gui_forms/text/types/text_types.hpp:10`
+- Definition: `inline/header-only`
 
-TextUnitIndex is a class declared in include/gui_forms/text.hpp.
+TextUnitIndex prevents accidental mixing of byte, UTF-16, scalar, grapheme, and line coordinate systems.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `TextUnitIndex`
+### `TextUnitIndex` (public)
 
 ```cpp
 explicit constexpr TextUnitIndex(std::size_t value = 0) noexcept : value_(value)
 ```
 
-Constructs or tears down the retained TextUnitIndex object according to its ownership contract.
+Constructs an explicit index from a unit count.
 
-### `value`
+### `value` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::size_t value() const noexcept
 ```
 
-Reports the current value value without mutation.
+Returns the stored unit count.
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
-friend constexpr auto operator<=>(const TextUnitIndex &, const TextUnitIndex &) = default
+friend constexpr auto operator<=>(const TextUnitIndex&, const TextUnitIndex&) = default
 ```
 
-Public TextUnitIndex operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Orders indices only within the same tagged coordinate system.

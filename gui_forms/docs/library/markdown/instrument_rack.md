@@ -1,279 +1,287 @@
 # InstrumentRack
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → InstrumentRack`  
-Declaration: `include/gui_forms/instrument_controls.hpp:78`  
-Definition: `src/controls/instrument_controls.cpp`
+- Status: **OBSERVED: bundle 006 split with source-private module control; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → InstrumentRack`
+- Declaration: `include/gui_forms/controls/panel/instrument_rack/instrument_rack.hpp:14`
+- Definition: `src/controls/panel/instrument_rack/instrument_rack.cpp`
 
-InstrumentRack is a visual retained control declared in include/gui_forms/instrument_controls.hpp.
+InstrumentRack is a bounded retained editor rack that reconciles stable module/field identities across model replacements, owns real choice/text/check/button/status controls, preserves surviving focus and popup state, responsively wraps or compacts modules, scrolls one plane, emits typed commit/toggle/remove/reorder events, and hosts an optional caller-owned action subtree.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![InstrumentRack](../captures/instrument_rack.png)
 
-## Public methods
+## Declared methods
 
-### `InstrumentRack`
+### `InstrumentRack` (public)
 
 ```cpp
 explicit InstrumentRack(StableId stable_id)
 ```
 
-Constructs or tears down the retained InstrumentRack object according to its ownership contract.
+Constructs the rack coordinator, source-private module shells, and default layout policy.
 
-### `~InstrumentRack`
+### `~InstrumentRack` (public)
 
 ```cpp
 ~InstrumentRack() override
 ```
 
-Constructs or tears down the retained InstrumentRack object according to its ownership contract.
+Releases reconciled module state and owned subscriptions after normal Control disposal.
 
-### `modules`
+### `modules` (public)
 
 ```cpp
 [[nodiscard]] const std::vector<InstrumentModuleSpec>& modules() const noexcept
 ```
 
-Reports the current modules value without mutation.
+Returns the normalized caller-facing module model in current order.
 
-### `set_modules`
+### `set_modules` (public)
 
 ```cpp
 void set_modules(std::vector<InstrumentModuleSpec> modules)
 ```
 
-Synchronously updates the retained modules property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded UTF-8 identities/fields, reconciles surviving controls by stable ID, disposes removed shells, preserves useful focus, and refreshes layout.
 
-### `field_editor`
+### `field_editor` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr field_editor(std::string_view module_id, std::string_view field_id) const
 ```
 
-Reports the current field editor value without mutation.
+Returns the real retained editor for a stable module/field pair.
 
-### `module_bounds`
+### `module_bounds` (public)
 
 ```cpp
 [[nodiscard]] std::optional<Rect> module_bounds( std::string_view module_id) const noexcept
 ```
 
-Reports the current module bounds value without mutation.
+Returns the last logical rack bounds for a stable module.
 
-### `set_module_enabled`
+### `set_module_enabled` (public)
 
 ```cpp
 bool set_module_enabled(std::string_view module_id, bool enabled)
 ```
 
-Synchronously updates the retained module enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits module enabled state and synchronizes descendants and public model.
 
-### `set_module_state`
+### `set_module_state` (public)
 
 ```cpp
 bool set_module_state(std::string_view module_id, InstrumentModuleState state, std::string status_text)
 ```
 
-Synchronously updates the retained module state property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits live/staged/pending/invalid state and status text, then refreshes presentation.
 
-### `set_field_value`
+### `set_field_value` (public)
 
 ```cpp
 bool set_field_value(std::string_view module_id, std::string_view field_id, std::string value)
 ```
 
-Synchronously updates the retained field value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Synchronizes one real editor and public model without emitting a user commit.
 
-### `set_field_validation`
+### `set_field_validation` (public)
 
 ```cpp
 bool set_field_validation(std::string_view module_id, std::string_view field_id, std::string message)
 ```
 
-Synchronously updates the retained field validation property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits validation text and refreshes module/accessibility presentation.
 
-### `set_action_content`
+### `set_action_content` (public)
 
 ```cpp
 void set_action_content(Control::Ptr content, double minimum_width = 170.0)
 ```
 
-Synchronously updates the retained action content property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and assumes ownership of an unparented action subtree plus its minimum slot width.
 
-### `action_content`
+### `action_content` (public)
 
 ```cpp
 [[nodiscard]] Control::Ptr action_content() const noexcept
 ```
 
-Reports the current action content value without mutation.
+Returns the optional caller-owned retained action subtree.
 
-### `module_width`
+### `module_width` (public)
 
 ```cpp
 [[nodiscard]] double module_width() const noexcept
 ```
 
-Reports the current module width value without mutation.
+Returns preferred logical module slot width.
 
-### `set_module_width`
+### `set_module_width` (public)
 
 ```cpp
 void set_module_width(double width)
 ```
 
-Synchronously updates the retained module width property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates positive width and invalidates responsive layout.
 
-### `module_height`
+### `module_height` (public)
 
 ```cpp
 [[nodiscard]] double module_height() const noexcept
 ```
 
-Reports the current module height value without mutation.
+Returns preferred noncompact module height.
 
-### `set_module_height`
+### `set_module_height` (public)
 
 ```cpp
 void set_module_height(double height)
 ```
 
-Synchronously updates the retained module height property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates positive height and invalidates responsive layout.
 
-### `rack_gap`
+### `rack_gap` (public)
 
 ```cpp
 [[nodiscard]] double rack_gap() const noexcept
 ```
 
-Reports the current rack gap value without mutation.
+Returns logical inter-slot and inter-line spacing.
 
-### `set_rack_gap`
+### `set_rack_gap` (public)
 
 ```cpp
 void set_rack_gap(double gap)
 ```
 
-Synchronously updates the retained rack gap property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finite nonnegative spacing and refreshes layout.
 
-### `content_height`
+### `content_height` (public)
 
 ```cpp
 [[nodiscard]] double content_height() const noexcept
 ```
 
-Reports the current content height value without mutation.
+Returns the last computed wrapped content height.
 
-### `preferred_height`
+### `preferred_height` (public)
 
 ```cpp
 [[nodiscard]] double preferred_height(double available_width) const
 ```
 
-Reports the current preferred height value without mutation.
+Computes bounded wrapped height for a positive available width without arranging.
 
-### `scroll_offset`
+### `scroll_offset` (public)
 
 ```cpp
 [[nodiscard]] double scroll_offset() const noexcept
 ```
 
-Reports the current scroll offset value without mutation.
+Returns the single retained vertical scroll origin.
 
-### `set_scroll_offset`
+### `set_scroll_offset` (public)
 
 ```cpp
 void set_scroll_offset(double offset)
 ```
 
-Synchronously updates the retained scroll offset property. Validation, typed invalidation, and notifications are defined by the implementation.
+Clamps offset to content/viewport bounds, re-arranges children, and refreshes paint/hit testing/semantics.
 
-### `field_changed`
+### `field_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const InstrumentFieldChange&>& field_changed() noexcept
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for live text/choice transitions.
 
-### `field_committed`
+### `field_committed` (public)
 
 ```cpp
 [[nodiscard]] Event<const InstrumentFieldChange&>& field_committed() noexcept
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for qualified field commits.
 
-### `module_toggled`
+### `module_toggled` (public)
 
 ```cpp
 [[nodiscard]] Event<const InstrumentModuleToggle&>& module_toggled() noexcept
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event for committed enable-state changes.
 
-### `remove_requested`
+### `remove_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<const InstrumentModuleRequest&>& remove_requested() noexcept
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event requesting consumer-authorized module removal.
 
-### `move_requested`
+### `move_requested` (public)
 
 ```cpp
 [[nodiscard]] Event<const InstrumentModuleMoveRequest&>& move_requested() noexcept
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event requesting a stable module reorder.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Computes desired height from the responsive slot algorithm and available viewport.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Commits bounds and arranges reconciled module/action slots against current scroll origin.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Consumes wheel input to scroll the rack through its clamped state machine.
 
-### `on_pointer_bubble`
+### `on_pointer_bubble` (public)
 
 ```cpp
 void on_pointer_bubble(PointerEvent& event) override
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Accepts unhandled descendant wheel input into the same rack scroll path.
 
-### `on_key_preview`
+### `on_key_preview` (public)
 
 ```cpp
 void on_key_preview(KeyEvent& event) override
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps Alt+Left/Right from a focused module descendant to typed reorder requests.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a named group, module count, and included real descendants.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

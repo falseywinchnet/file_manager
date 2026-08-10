@@ -1,287 +1,287 @@
 # CoreGraphicsRaster
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Painter → CoreGraphicsRaster`  
-Declaration: `src/render/coregraphics/coregraphics_raster.hpp:14`  
-Definition: `src/render/coregraphics/coregraphics_raster.cpp`
+- Status: **OBSERVED: bundle 009 CoreGraphics control raster split; focused M4 smoke tests pass**
+- Kind: **class**
+- Hierarchy: `Painter → CoreGraphicsRaster`
+- Declaration: `src/render/coregraphics/raster/coregraphics_raster.hpp:14`
+- Definition: `src/render/coregraphics/raster/coregraphics_raster.cpp`
 
-CoreGraphicsRaster is a class declared in src/render/coregraphics/coregraphics_raster.hpp.
+CoreGraphicsRaster is the macOS comparison Painter terminal with the same CPU frame, image, text, clipping, material, and pixel-inspection contract as SkiaRaster, without entering the portable core.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `CoreGraphicsRaster`
+### `CoreGraphicsRaster` (public)
 
 ```cpp
 CoreGraphicsRaster()
 ```
 
-Constructs or tears down the retained CoreGraphicsRaster object according to its ownership contract.
+Allocates bounded CPU BGRA backing and CoreGraphics state; moves transfer ownership and copying is prohibited.
 
-### `~CoreGraphicsRaster`
+### `~CoreGraphicsRaster` (public)
 
 ```cpp
 ~CoreGraphicsRaster() override
 ```
 
-Constructs or tears down the retained CoreGraphicsRaster object according to its ownership contract.
+Releases CoreGraphics contexts, paths, images, and typefaces.
 
-### `CoreGraphicsRaster`
+### `CoreGraphicsRaster` (public)
 
 ```cpp
 CoreGraphicsRaster(const CoreGraphicsRaster&) = delete
 ```
 
-Constructs or tears down the retained CoreGraphicsRaster object according to its ownership contract.
+Allocates bounded CPU BGRA backing and CoreGraphics state; moves transfer ownership and copying is prohibited.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 CoreGraphicsRaster& operator=(const CoreGraphicsRaster&) = delete
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves complete raster ownership; copying is prohibited.
 
-### `resize`
+### `resize` (public)
 
 ```cpp
 bool resize(Size logical_size, double scale)
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and replaces backing dimensions and scale.
 
-### `begin_frame`
+### `begin_frame` (public)
 
 ```cpp
 void begin_frame(const DamageRegion& damage)
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Begins one damage-clipped frame transaction.
 
-### `end_frame`
+### `end_frame` (public)
 
 ```cpp
 void end_frame()
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requires balanced saved state and completes the transaction.
 
-### `register_typeface`
+### `register_typeface` (public)
 
 ```cpp
 [[nodiscard]] bool register_typeface(FontRole role, std::uint16_t weight, bool italic, std::span<const std::byte> encoded)
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and owns a bounded CoreText typeface by stable ID.
 
-### `synchronize_images`
+### `synchronize_images` (public)
 
 ```cpp
 [[nodiscard]] bool synchronize_images(const ImageRegistry& registry)
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Synchronizes generational PNG/BGRA registry resources and retires stale decodes.
 
-### `pixels`
+### `pixels` (public)
 
 ```cpp
 [[nodiscard]] const void* pixels() const noexcept
 ```
 
-Reports the current pixels value without mutation.
+Returns const CPU backing bytes.
 
-### `row_bytes`
+### `row_bytes` (public)
 
 ```cpp
 [[nodiscard]] std::size_t row_bytes() const noexcept
 ```
 
-Reports the current row bytes value without mutation.
+Returns backing stride.
 
-### `pixel_width`
+### `pixel_width` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t pixel_width() const noexcept
 ```
 
-Reports the current pixel width value without mutation.
+Returns backing width.
 
-### `pixel_height`
+### `pixel_height` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t pixel_height() const noexcept
 ```
 
-Reports the current pixel height value without mutation.
+Returns backing height.
 
-### `byte_size`
+### `byte_size` (public)
 
 ```cpp
 [[nodiscard]] std::size_t byte_size() const noexcept
 ```
 
-Reports the current byte size value without mutation.
+Returns total backing byte extent.
 
-### `save`
+### `save` (public)
 
 ```cpp
 void save() override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Pushes CoreGraphics state during an active frame.
 
-### `restore`
+### `restore` (public)
 
 ```cpp
 void restore() override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Pops a matched CoreGraphics state.
 
-### `translate`
+### `translate` (public)
 
 ```cpp
 void translate(Point offset) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Applies logical translation.
 
-### `clip_rect`
+### `clip_rect` (public)
 
 ```cpp
 void clip_rect(Rect rect) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Intersects current clip with a rectangle.
 
-### `clip_rounded_rect`
+### `clip_rounded_rect` (public)
 
 ```cpp
 void clip_rounded_rect(Rect rect, double radius) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Intersects current clip with a rounded path.
 
-### `fill_rect`
+### `fill_rect` (public)
 
 ```cpp
 void fill_rect(Rect rect, Color color) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Fills a logical rectangle.
 
-### `fill_rounded_rect`
+### `fill_rounded_rect` (public)
 
 ```cpp
 void fill_rounded_rect(Rect rect, double radius, Color color) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Fills rounded geometry.
 
-### `stroke_rect`
+### `stroke_rect` (public)
 
 ```cpp
 void stroke_rect(Rect rect, Color color, double width) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes rectangle geometry.
 
-### `stroke_rounded_rect`
+### `stroke_rounded_rect` (public)
 
 ```cpp
 void stroke_rounded_rect(Rect rect, double radius, Color color, double width) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes rounded geometry.
 
-### `fill_linear_gradient`
+### `fill_linear_gradient` (public)
 
 ```cpp
 void fill_linear_gradient( Rect rect, Point start, Point end, std::span<const GradientStop> stops) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes validated linear stops.
 
-### `fill_linear_gradient_spread`
+### `fill_linear_gradient_spread` (public)
 
 ```cpp
 void fill_linear_gradient_spread( Rect rect, Point start, Point end, std::span<const GradientStop> stops, GradientSpreadMode spread) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes explicit linear spread policy.
 
-### `fill_radial_gradient`
+### `fill_radial_gradient` (public)
 
 ```cpp
 void fill_radial_gradient( Rect rect, Point center, Size radii, std::span<const GradientStop> stops) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes validated radial stops.
 
-### `draw_box_shadow`
+### `draw_box_shadow` (public)
 
 ```cpp
 void draw_box_shadow(Rect rect, double corner_radius, Point offset, double blur_radius, double spread, Color color) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes bounded shadow geometry.
 
-### `draw_line`
+### `draw_line` (public)
 
 ```cpp
 void draw_line(Point from, Point to, Color color, double width) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes a logical line.
 
-### `draw_text_utf8`
+### `draw_text_utf8` (public)
 
 ```cpp
 void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color color) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws UTF-8 through registered CoreText faces.
 
-### `measure_text_utf8`
+### `measure_text_utf8` (public)
 
 ```cpp
 [[nodiscard]] Size measure_text_utf8(std::string_view text, FontSpec font) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns logical UTF-8 extents.
 
-### `draw_image`
+### `draw_image` (public)
 
 ```cpp
 void draw_image(ImageId image, Rect destination, double opacity) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a synchronized resource.
 
-### `draw_image_region`
+### `draw_image_region` (public)
 
 ```cpp
 void draw_image_region(ImageId image, Rect source, Rect destination, double opacity) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a source region with default sampling.
 
-### `draw_image_region_sampled`
+### `draw_image_region_sampled` (public)
 
 ```cpp
 void draw_image_region_sampled(ImageId image, Rect source, Rect destination, ImageSampling sampling, double opacity) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a source region with explicit sampling.
 
-### `fill_image_pattern`
+### `fill_image_pattern` (public)
 
 ```cpp
 void fill_image_pattern(ImageId image, Size source_pixel_size, Rect destination, Size logical_tile_size, ImagePatternWrap wrap, double opacity) override
 ```
 
-Public CoreGraphicsRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes image pattern wrap policy.

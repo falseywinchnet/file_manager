@@ -1,2 +1,15 @@
+# Rust and native build trees
 /target/
-/conformance/clients/cpp/build/
+/build/
+/.build/
+/conformance/clients/cpp/build*/
+
+# Generated interpreter/tool caches
+__pycache__/
+*.py[cod]
+
+# Local documentation preview state
+/docs/library/.preview/
+
+# Host metadata
+.DS_Store

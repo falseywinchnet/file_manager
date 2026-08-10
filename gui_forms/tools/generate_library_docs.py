@@ -26,6 +26,7 @@ MANUAL_PATH = OUTPUT / "manual.json"
 class Method:
     name: str
     signature: str
+    access: str = "public"
     explanation: str = ""
 
 
@@ -59,6 +60,10 @@ def sanitized(text: str) -> str:
                 if result[offset] != "\n":
                     result[offset] = " "
             index = end + 2
+        elif (text[index] == "'" and index > 0 and index + 1 < len(text) and
+              text[index - 1].isalnum() and text[index + 1].isalnum()):
+            # C++ digit separators are not character-literal delimiters.
+            index += 1
         elif text[index] in {'"', "'"}:
             quote = text[index]
             result[index] = " "
@@ -115,7 +120,7 @@ def method_name(signature: str, owner: str) -> str | None:
     return name
 
 
-def public_methods(body: str, kind: str, owner: str) -> list[Method]:
+def declared_methods(body: str, kind: str, owner: str) -> list[Method]:
     clean = sanitized(body)
     access = "public" if kind == "struct" else "private"
     depth = 0
@@ -127,7 +132,7 @@ def public_methods(body: str, kind: str, owner: str) -> list[Method]:
             access = stripped.split(":", 1)[0]
             buffer.clear()
             continue
-        if depth == 0 and access == "public" and stripped:
+        if depth == 0 and stripped:
             buffer.append(original_line.strip())
             candidate = normalize_signature(" ".join(buffer))
             first_brace = clean_line.find("{")
@@ -135,10 +140,12 @@ def public_methods(body: str, kind: str, owner: str) -> list[Method]:
             if terminal:
                 candidate = candidate.split("{", 1)[0].strip()
                 if ("(" in candidate and
+                        not candidate.startswith("std::function<") and
                         not re.match(r"^(class|struct|enum|using|typedef)\b", candidate)):
                     name = method_name(candidate, owner)
                     if name:
-                        methods.append(Method(name, candidate.rstrip("; ")))
+                        methods.append(Method(
+                            name, candidate.rstrip("; "), access))
                 buffer.clear()
         depth += clean_line.count("{") - clean_line.count("}")
         if depth < 0:
@@ -192,7 +199,7 @@ def declarations() -> tuple[list[TypeRecord], list[dict]]:
                 header=relative,
                 line=text.count("\n", 0, match.start()) + 1,
                 bases=base_names(match.group(3) or ""),
-                methods=public_methods(body, match.group(1), name),
+                methods=declared_methods(body, match.group(1), name),
             ))
         for match in enum_pattern.finditer(clean):
             end = matching_brace(clean, match.end() - 1)
@@ -310,6 +317,9 @@ def source_status(record: TypeRecord) -> str:
 
 def write_page(record: TypeRecord, manual: dict) -> dict:
     override = manual.get("types", {}).get(record.name, {})
+    declaration_header = override.get("declaration_header")
+    if declaration_header and declaration_header != record.header:
+        override = {}
     summary = override.get(
         "summary",
         f"{record.name} is a {'visual retained control' if record.visual else record.kind} declared in {record.header}.")
@@ -321,7 +331,8 @@ def write_page(record: TypeRecord, manual: dict) -> dict:
             method.name, default_explanation(record.name, method))
 
     methods_html = "".join(
-        f'<section class="method"><h3>{esc(method.name)}</h3>'
+        f'<section class="method"><h3>{esc(method.name)} '
+        f'<span class="access">{esc(method.access)}</span></h3>'
         f'<code>{esc(method.signature)}</code><p>{esc(method.explanation)}</p></section>'
         for method in record.methods
     ) or '<p class="empty">No public methods were discovered in this declaration.</p>'
@@ -342,22 +353,22 @@ def write_page(record: TypeRecord, manual: dict) -> dict:
 <section><h2>Visual evidence</h2>{capture_html}</section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>{esc(bases)}</dd>
 <dt>Declaration</dt><dd>{esc(record.header)}:{record.line}</dd><dt>Definition</dt><dd>{esc(definitions)}</dd></dl></section>
-<section><h2>Public methods</h2>{methods_html}</section>
+<section><h2>Declared methods</h2>{methods_html}</section>
 <footer><a href="../markdown/{esc(record.slug)}.md">AI-readable Markdown source</a></footer>
 </article></body></html>'''
     (OUTPUT / "pages" / f"{record.slug}.html").write_text(page, encoding="utf-8")
 
     method_md = "\n\n".join(
-        f"### `{method.name}`\n\n```cpp\n{method.signature}\n```\n\n{method.explanation}"
+        f"### `{method.name}` ({method.access})\n\n```cpp\n{method.signature}\n```\n\n{method.explanation}"
         for method in record.methods
     ) or "No public methods were discovered in this declaration."
     markdown = f"""# {record.name}
 
-Status: **{status}**  
-Kind: **{record.kind}{' / visual retained control' if record.visual else ''}**  
-Hierarchy: `{bases}`  
-Declaration: `{record.header}:{record.line}`  
-Definition: `{definitions}`
+- Status: **{status}**
+- Kind: **{record.kind}{' / visual retained control' if record.visual else ''}**
+- Hierarchy: `{bases}`
+- Declaration: `{record.header}:{record.line}`
+- Definition: `{definitions}`
 
 {summary}
 
@@ -365,7 +376,7 @@ Definition: `{definitions}`
 
 {f'![{record.name}](../{capture})' if capture else 'Capture pending; this page has not yet passed the Screen Sharing crop gate.'}
 
-## Public methods
+## Declared methods
 
 {method_md}
 """
@@ -388,8 +399,8 @@ def write_enum_page(enum: dict) -> dict:
     values = "\n".join(f"- `{value}`" for value in enum["values"])
     markdown = f"""# {enum['name']}
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `{enum['header']}:{enum['line']}`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `{enum['header']}:{enum['line']}`
 
 ## Declared values
 
@@ -416,7 +427,7 @@ def write_assets() -> None:
 :root{color-scheme:light dark;font:14px/1.45 system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;display:grid;grid-template-columns:minmax(250px,23vw) 1fr;height:100vh;background:#10151d;color:#e8edf4}aside{border-right:1px solid #344052;overflow:auto;padding:14px;background:#151c26}h1{font-size:18px;margin:0 0 12px}input{width:100%;padding:9px;border:1px solid #47566b;border-radius:6px;background:#0e141c;color:inherit}nav h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#93a5bb;margin:18px 0 6px}nav a{display:block;color:#dce7f4;text-decoration:none;padding:5px 7px;border-radius:4px}nav a:hover,nav a.active{background:#2b3d55}nav .pending{color:#aab6c4}iframe{width:100%;height:100%;border:0;background:#f8fafc}.count{color:#91a3b8;font-size:12px;margin-top:8px}
 '''.strip() + "\n", encoding="utf-8")
     (OUTPUT / "assets" / "page.css").write_text('''
-:root{font:15px/1.55 system-ui,sans-serif;color:#172033;background:#f8fafc}body{margin:0}article{max-width:980px;margin:auto;padding:38px 44px 70px}h1{font-size:38px;line-height:1.1;margin:.15em 0}h2{margin-top:2em;border-bottom:1px solid #d8e0ea;padding-bottom:.3em}.eyebrow{color:#5d7088;text-transform:uppercase;letter-spacing:.1em;font-size:12px}.summary{font-size:18px;color:#35455b}.badges{display:flex;gap:8px;flex-wrap:wrap}.badges span{background:#e5edf7;border:1px solid #c8d5e5;border-radius:999px;padding:3px 9px;font-size:12px}.method{border-left:3px solid #90a9c7;padding:2px 0 8px 16px;margin:20px 0}.method h3{margin-bottom:5px}.method code{display:block;white-space:pre-wrap;background:#edf2f7;border-radius:5px;padding:9px}dl{display:grid;grid-template-columns:120px 1fr;gap:8px}dt{font-weight:700}dd{margin:0}figure{margin:0}img{max-width:100%;border:1px solid #c7d1dd;border-radius:7px;box-shadow:0 8px 24px #23364b24}.pending{padding:14px;border:1px dashed #c08a32;background:#fff8e7;border-radius:6px}footer{margin-top:45px}a{color:#245f9e}@media(max-width:650px){article{padding:25px 20px}dl{grid-template-columns:1fr}h1{font-size:31px}}
+:root{font:15px/1.55 system-ui,sans-serif;color:#172033;background:#f8fafc}body{margin:0}article{max-width:980px;margin:auto;padding:38px 44px 70px}h1{font-size:38px;line-height:1.1;margin:.15em 0}h2{margin-top:2em;border-bottom:1px solid #d8e0ea;padding-bottom:.3em}.eyebrow{color:#5d7088;text-transform:uppercase;letter-spacing:.1em;font-size:12px}.summary{font-size:18px;color:#35455b}.badges{display:flex;gap:8px;flex-wrap:wrap}.badges span,.access{background:#e5edf7;border:1px solid #c8d5e5;border-radius:999px;padding:3px 9px;font-size:12px}.access{font-weight:500;margin-left:6px;color:#4c6078}.method{border-left:3px solid #90a9c7;padding:2px 0 8px 16px;margin:20px 0}.method h3{margin-bottom:5px}.method code{display:block;white-space:pre-wrap;background:#edf2f7;border-radius:5px;padding:9px}dl{display:grid;grid-template-columns:120px 1fr;gap:8px}dt{font-weight:700}dd{margin:0}figure{margin:0}img{max-width:100%;border:1px solid #c7d1dd;border-radius:7px;box-shadow:0 8px 24px #23364b24}.pending{padding:14px;border:1px dashed #c08a32;background:#fff8e7;border-radius:6px}footer{margin-top:45px}a{color:#245f9e}@media(max-width:650px){article{padding:25px 20px}dl{grid-template-columns:1fr}h1{font-size:31px}}
 '''.strip() + "\n", encoding="utf-8")
     (OUTPUT / "assets" / "library.js").write_text('''
 const manifest=window.GUI_FORMS_LIBRARY;const nav=document.querySelector("nav");const frame=document.querySelector("iframe");const input=document.querySelector("input");const count=document.querySelector(".count");
@@ -455,10 +466,21 @@ def validate_output(payload: dict, manual: dict,
         if capture and not (OUTPUT / capture).is_file():
             raise RuntimeError(f"{name} references missing capture: {capture}")
         candidates = [record for record in types if record.name == name]
+        declaration_header = review.get("declaration_header")
+        if declaration_header:
+            candidates = [record for record in candidates
+                          if record.header == declaration_header]
         if len(candidates) != 1:
             raise RuntimeError(
                 f"manual review {name} resolves to {len(candidates)} declarations")
-        discovered = {method.name for method in candidates[0].methods}
+        method_scope = review.get("method_scope", "public")
+        if method_scope not in {"public", "all"}:
+            raise RuntimeError(
+                f"{name} review has invalid method_scope: {method_scope}")
+        discovered = {
+            method.name for method in candidates[0].methods
+            if method_scope == "all" or method.access == "public"
+        }
         explained = set(review.get("methods", {}))
         missing = sorted(discovered - explained)
         stale = sorted(explained - discovered)

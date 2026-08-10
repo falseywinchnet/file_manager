@@ -1,10 +1,10 @@
 # gd_error_view
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `gd_error_view`  
-Declaration: `include/gui_forms/drawing_c_api.h:202`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `gd_error_view`
+- Declaration: `include/gui_forms/drawing_c_api.h:202`
+- Definition: `inline/header-only`
 
 gd_error_view is a struct declared in include/gui_forms/drawing_c_api.h.
 
@@ -12,6 +12,6 @@ gd_error_view is a struct declared in include/gui_forms/drawing_c_api.h.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

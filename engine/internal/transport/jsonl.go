@@ -21,6 +21,14 @@ type Request struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+type Authority string
+
+const (
+	AuthorityDevelopment Authority = "development"
+	AuthorityQuery       Authority = "query"
+	AuthorityAdmin       Authority = "admin"
+)
+
 const MaxJSONLFrameBytes = 1_048_576
 
 type Response struct {
@@ -75,9 +83,17 @@ func Serve(ctx context.Context, input io.Reader, output io.Writer, engine *servi
 }
 
 func dispatch(ctx context.Context, engine *service.Service, incoming Request) (Response, bool) {
+	return dispatchAuthorized(ctx, engine, incoming, AuthorityDevelopment)
+}
+
+func dispatchAuthorized(ctx context.Context, engine *service.Service, incoming Request, authority Authority) (Response, bool) {
 	response := Response{ID: incoming.ID}
 	if incoming.ID == "" || incoming.Method == "" {
 		response.Error = &Fault{Code: api.ErrorInvalidRequest, Message: "request id and method are required"}
+		return response, false
+	}
+	if !methodAllowed(authority, incoming.Method) {
+		response.Error = &Fault{Code: api.ErrorMethodUnavailable, Message: "method is not available on this authority endpoint"}
 		return response, false
 	}
 	var result any
@@ -160,6 +176,35 @@ func dispatch(ctx context.Context, engine *service.Service, incoming Request) (R
 	}
 	response.Result = result
 	return response, shutdown
+}
+
+func methodAllowed(authority Authority, method string) bool {
+	if authority == AuthorityDevelopment {
+		return true
+	}
+	common := map[string]bool{
+		"version": true, "engine.version": true, "status": true, "engine.status": true,
+		"configuration.get": true, "engine.configuration_get": true,
+	}
+	if common[method] {
+		return true
+	}
+	if authority == AuthorityQuery {
+		return map[string]bool{
+			"query": true, "engine.query": true, "engine.query_live": true,
+			"inspect": true, "engine.inspect": true,
+		}[method]
+	}
+	if authority == AuthorityAdmin {
+		return map[string]bool{
+			"root.plan": true, "engine.root_plan": true, "root.apply": true, "engine.root_apply": true,
+			"scan.reconcile": true, "engine.scan_reconcile": true,
+			"projection.rebuild": true, "engine.projection_rebuild": true,
+			"integrity.check": true, "engine.integrity_check": true,
+			"shutdown": true, "engine.shutdown": true,
+		}[method]
+	}
+	return false
 }
 
 func decodeParams(raw json.RawMessage, target any) error {

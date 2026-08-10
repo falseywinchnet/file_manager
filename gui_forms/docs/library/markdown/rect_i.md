@@ -1,127 +1,127 @@
 # RectI
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `RectI`  
-Declaration: `include/gui_forms/drawing.hpp:43`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 integer rectangle review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `RectI`
+- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:34`
+- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
 
-RectI is a struct declared in include/gui_forms/drawing.hpp.
+RectI provides overflow-aware integer pixel containment, intersection, union, translation, and inflation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `left`
+### `left` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::int64_t left() const noexcept
 ```
 
-Reports the current left value without mutation.
+Returns signed left edge.
 
-### `top`
+### `top` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::int64_t top() const noexcept
 ```
 
-Reports the current top value without mutation.
+Returns signed top edge.
 
-### `right`
+### `right` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::int64_t right() const noexcept
 ```
 
-Reports the current right value without mutation.
+Returns 64-bit x-plus-width edge.
 
-### `bottom`
+### `bottom` (public)
 
 ```cpp
 [[nodiscard]] constexpr std::int64_t bottom() const noexcept
 ```
 
-Reports the current bottom value without mutation.
+Returns 64-bit y-plus-height edge.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports nonpositive width or height.
 
-### `contains`
+### `contains` (public)
 
 ```cpp
 [[nodiscard]] bool contains(PointI point) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests point or rectangle containment with wide edge arithmetic.
 
-### `contains`
+### `contains` (public)
 
 ```cpp
 [[nodiscard]] bool contains(RectI rect) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests point or rectangle containment with wide edge arithmetic.
 
-### `intersects`
+### `intersects` (public)
 
 ```cpp
 [[nodiscard]] bool intersects(RectI rect) const noexcept
 ```
 
-Reports the current intersects value without mutation.
+Tests positive-area overlap.
 
-### `offset`
+### `offset` (public)
 
 ```cpp
 void offset(std::int32_t dx, std::int32_t dy) noexcept
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Translates with 32-bit saturation.
 
-### `inflate`
+### `inflate` (public)
 
 ```cpp
 void inflate(std::int32_t dx, std::int32_t dy) noexcept
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Expands symmetrically with saturation.
 
-### `intersect`
+### `intersect` (public)
 
 ```cpp
 void intersect(RectI rect) noexcept
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces this rectangle with exact intersection.
 
-### `intersection`
+### `intersection` (public)
 
 ```cpp
 [[nodiscard]] static RectI intersection(RectI left, RectI right) noexcept
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns exact overlap or empty.
 
-### `united`
+### `united` (public)
 
 ```cpp
 [[nodiscard]] static RectI united(RectI left, RectI right) noexcept
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns conservative union with saturation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const RectI&, const RectI&) = default
 ```
 
-Public RectI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all four fields.

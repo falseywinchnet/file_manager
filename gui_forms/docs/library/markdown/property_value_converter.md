@@ -1,17 +1,17 @@
 # PropertyValueConverter
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PropertyValueConverter`  
-Declaration: `include/gui_forms/inspection_controls.hpp:42`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 006 converter callback value split; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PropertyValueConverter`
+- Declaration: `include/gui_forms/inspection/property_value_converter_registry/property_value_converter_registry.hpp:23`
+- Definition: `inline/header-only`
 
-PropertyValueConverter is a struct declared in include/gui_forms/inspection_controls.hpp.
+PropertyValueConverter is a renderer-neutral pair of formatting/parsing callbacks with optional context-aware variants. Formatting does not imply editability, and parsing still passes through descriptor conversion and value-tree validation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![PropertyValueConverter](../captures/property_grid.png)
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

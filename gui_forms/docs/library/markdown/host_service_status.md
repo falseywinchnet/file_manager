@@ -1,23 +1,23 @@
 # HostServiceStatus
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HostServiceStatus`  
-Declaration: `include/gui_forms/host.hpp:90`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 service result value split; M4 builds and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `HostServiceStatus`
+- Declaration: `include/gui_forms/host/types/host_types.hpp:87`
+- Definition: `inline/header-only`
 
-HostServiceStatus is a struct declared in include/gui_forms/host.hpp.
+HostServiceStatus carries the portable service rejection/failure category without native error types.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `accepted`
+### `accepted` (public)
 
 ```cpp
 [[nodiscard]] bool accepted() const noexcept
 ```
 
-Reports the current accepted value without mutation.
+Reports the error-free result.

@@ -791,6 +791,9 @@ void test_default_flags_and_color_property_editors() {
     require(flags && flags->value().name == "Top, Left" &&
                 flags->semantic_descriptor().role == SemanticRole::combo_box,
             "the default enum editor service must project flags through a retained multi-choice editor");
+    flags->set_popup_width(286.0);
+    require(flags->popup_width() == 286.0,
+            "flags editor popup width must retain caller customization");
     flags->set_dropped_down(true);
     auto choices = std::dynamic_pointer_cast<CheckedListBox>(window.find(
         std::string(flags->stable_id().value()) + ".popup.list"));
@@ -808,7 +811,11 @@ void test_default_flags_and_color_property_editors() {
 
     auto color = std::dynamic_pointer_cast<ColorValueEditor>(
         grid->editor("ForeColor"));
-    require(color && color->editor() &&
+    require(color != nullptr,
+            "the default color service must create a retained color editor");
+    color->set_swatch_width(42.0);
+    require(color->editor() &&
+                color->swatch_width() == 42.0 &&
                 color->editor()->text() ==
                     ColorValueEditor::format_value(target->foreground()),
             "the default color service must provide canonical text and a retained swatch editor");

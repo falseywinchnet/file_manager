@@ -134,6 +134,7 @@ void test_range_events_checkbox_and_spinner() {
 
 void test_popup_keyboard_commit_cancel_and_outside_dismissal() {
     Fixture fixture;
+    fixture.picker->set_drop_down_alignment(DateTimeDropDownAlignment::right);
     std::vector<std::string> events;
     auto values = fixture.picker->value_changed().subscribe(
         [&](DateTimeValue) { events.push_back("value"); });
@@ -152,10 +153,22 @@ void test_popup_keyboard_commit_cancel_and_outside_dismissal() {
         find_node(open.roots, "date.picker.popup.calendar");
     const SemanticNode* selected =
         find_node(open.roots, "date.picker.popup.calendar.day.2026-08-05");
-    require(calendar && calendar->role == SemanticRole::calendar && selected &&
+    require(calendar && calendar->role == SemanticRole::calendar &&
+                calendar->bounds.x == 8.0 && selected &&
                 selected->role == SemanticRole::date_cell &&
                 has_semantic_state(selected->states, SemanticState::selected),
-            "calendar popup must expose stable virtual date cells and selection state");
+            "calendar popup must honor right alignment and expose stable virtual date cells and selection state");
+    bool invalid_alignment{};
+    try {
+        fixture.picker->set_drop_down_alignment(
+            static_cast<DateTimeDropDownAlignment>(99));
+    } catch (const std::invalid_argument&) {
+        invalid_alignment = true;
+    }
+    require(invalid_alignment &&
+                fixture.picker->drop_down_alignment() ==
+                    DateTimeDropDownAlignment::right,
+            "DateTimePicker popup alignment must reject invalid vocabulary transactionally");
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
                 fixture.window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 fixture.picker->value().day == 6U && !fixture.picker->dropped_down() &&

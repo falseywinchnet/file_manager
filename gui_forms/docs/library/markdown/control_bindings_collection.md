@@ -1,135 +1,135 @@
 # ControlBindingsCollection
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `ControlBindingsCollection`  
-Declaration: `include/gui_forms/binding.hpp:407`  
-Definition: `src/core/binding.cpp`
+- Status: **OBSERVED: bundle 010 per-control binding collection split; focused M4 binding tests pass**
+- Kind: **class**
+- Hierarchy: `ControlBindingsCollection`
+- Declaration: `include/gui_forms/binding/control_bindings_collection/control_bindings_collection.hpp:17`
+- Definition: `src/core/binding/control_bindings_collection/control_bindings_collection.cpp`
 
-ControlBindingsCollection is a class declared in include/gui_forms/binding.hpp.
+ControlBindingsCollection owns the unique active binding for each canonical target property and disposes the set deterministically.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `ControlBindingsCollection`
+### `ControlBindingsCollection` (public)
 
 ```cpp
 explicit ControlBindingsCollection(Control& target) : target_(&target)
 ```
 
-Constructs or tears down the retained ControlBindingsCollection object according to its ownership contract.
+Binds a target; copying is prohibited.
 
-### `~ControlBindingsCollection`
+### `~ControlBindingsCollection` (public)
 
 ```cpp
 ~ControlBindingsCollection()
 ```
 
-Constructs or tears down the retained ControlBindingsCollection object according to its ownership contract.
+Clears and disposes all bindings.
 
-### `ControlBindingsCollection`
+### `ControlBindingsCollection` (public)
 
 ```cpp
 ControlBindingsCollection(const ControlBindingsCollection&) = delete
 ```
 
-Constructs or tears down the retained ControlBindingsCollection object according to its ownership contract.
+Binds a target; copying is prohibited.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 ControlBindingsCollection& operator=(const ControlBindingsCollection&) = delete
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copy assignment is prohibited.
 
-### `add`
+### `add` (public)
 
 ```cpp
 std::shared_ptr<Binding> add( std::string property_name, std::shared_ptr<BindingSource> source, std::string data_member)
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates with default or explicit policy, or validates and starts an existing binding after enforcing target/property uniqueness.
 
-### `add`
+### `add` (public)
 
 ```cpp
 std::shared_ptr<Binding> add( std::string property_name, std::shared_ptr<BindingSource> source, std::string data_member, BindingOptions options)
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates with default or explicit policy, or validates and starts an existing binding after enforcing target/property uniqueness.
 
-### `add`
+### `add` (public)
 
 ```cpp
 void add(std::shared_ptr<Binding> binding)
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Creates with default or explicit policy, or validates and starts an existing binding after enforcing target/property uniqueness.
 
-### `remove`
+### `remove` (public)
 
 ```cpp
 bool remove(const Binding& binding)
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Detaches and disposes one binding identity.
 
-### `clear`
+### `clear` (public)
 
 ```cpp
 void clear() noexcept
 ```
 
-Public ControlBindingsCollection operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Exchanges the owned set and safely disposes every live binding.
 
-### `find`
+### `find` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<Binding> find( std::string_view property_name) const
 ```
 
-Reports the current find value without mutation.
+Canonicalizes a property name and returns its binding.
 
-### `items`
+### `items` (public)
 
 ```cpp
 [[nodiscard]] std::span<const std::shared_ptr<Binding>> items() const noexcept
 ```
 
-Reports the current items value without mutation.
+Returns the ordered shared-owner view.
 
-### `size`
+### `size` (public)
 
 ```cpp
 [[nodiscard]] std::size_t size() const noexcept
 ```
 
-Reports the current size value without mutation.
+Returns binding count.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports whether no bindings are owned.
 
-### `default_data_source_update_mode`
+### `default_data_source_update_mode` (public)
 
 ```cpp
 [[nodiscard]] DataSourceUpdateMode default_data_source_update_mode() const noexcept
 ```
 
-Reports the current default data source update mode value without mutation.
+Returns the policy used by the short add overload.
 
-### `set_default_data_source_update_mode`
+### `set_default_data_source_update_mode` (public)
 
 ```cpp
-void set_default_data_source_update_mode(DataSourceUpdateMode mode) noexcept
+void set_default_data_source_update_mode( DataSourceUpdateMode mode) noexcept
 ```
 
-Synchronously updates the retained default data source update mode property. Validation, typed invalidation, and notifications are defined by the implementation.
+Changes the future short-add default without mutating existing bindings.

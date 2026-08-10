@@ -128,9 +128,13 @@ provided the immutable availability snapshot states that condition exactly.
 
 The executable `orchestrator release --json` is the authoritative projection.
 Every Core-profile requirement is satisfied and the first macOS artifact
-reports `state: ready` and `ready: true`. GUI.Forms FM0, Engine live search,
-settings, plugins, and semantic facts retain their independent capability gates
-and are not implied by this release.
+reports `state: ready` and `ready: true`. GUI.Forms FM0, installed Engine
+live-search transport, settings, plugins, and semantic facts retain their
+independent capability gates and are not implied by this release.
 
 The final promoted-artifact measurement is recorded in
 [`../conformance/evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md`](../conformance/evidence/MACOS_LAUNCHD_CORE_1_0_2026-08-07.md).
+
+The refactored service-host layout, Rust 1.87 M4 gate, complete Rust/C++/Go
+suite, documentation atlas, and current optimized artifact are recorded in
+[`../conformance/evidence/M4_SERVICE_SYSTEM_REFACTOR_2026-08-10.md`](../conformance/evidence/M4_SERVICE_SYSTEM_REFACTOR_2026-08-10.md).

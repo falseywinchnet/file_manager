@@ -1,303 +1,303 @@
 # SkiaRaster
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Painter → SkiaRaster`  
-Declaration: `src/render/skia/skia_raster.hpp:12`  
-Definition: `src/render/skia/skia_raster.cpp`
+- Status: **OBSERVED: bundle 009 retained Skia raster split; focused M4 smoke and core tests pass**
+- Kind: **class**
+- Hierarchy: `Painter → SkiaRaster`
+- Declaration: `src/render/skia/raster/skia_raster.hpp:12`
+- Definition: `src/render/skia/raster/skia_raster.cpp`
 
-SkiaRaster is a class declared in src/render/skia/skia_raster.hpp.
+SkiaRaster is GUI.Forms' private CPU-only Painter terminal with explicit frame bounds, state stack, rounded clips/materials, PNG registry synchronization, live-surface sampling, HarfBuzz fallback text, and caller-readable BGRA output.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![SkiaRaster](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `SkiaRaster`
+### `SkiaRaster` (public)
 
 ```cpp
 SkiaRaster()
 ```
 
-Constructs or tears down the retained SkiaRaster object according to its ownership contract.
+Allocates a bounded CPU raster surface; moves transfer ownership and copying is prohibited.
 
-### `~SkiaRaster`
+### `~SkiaRaster` (public)
 
 ```cpp
 ~SkiaRaster() override
 ```
 
-Constructs or tears down the retained SkiaRaster object according to its ownership contract.
+Releases private CPU surface, font, image, and shaping state.
 
-### `SkiaRaster`
+### `SkiaRaster` (public)
 
 ```cpp
 SkiaRaster(const SkiaRaster&) = delete
 ```
 
-Constructs or tears down the retained SkiaRaster object according to its ownership contract.
+Allocates a bounded CPU raster surface; moves transfer ownership and copying is prohibited.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 SkiaRaster& operator=(const SkiaRaster&) = delete
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves complete raster ownership; copying is prohibited.
 
-### `resize`
+### `resize` (public)
 
 ```cpp
 bool resize(Size logical_size, double scale)
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and replaces CPU backing dimensions/scale while resetting frame state.
 
-### `begin_frame`
+### `begin_frame` (public)
 
 ```cpp
 void begin_frame(const DamageRegion& damage)
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Begins one nonnested damage-clipped paint transaction.
 
-### `end_frame`
+### `end_frame` (public)
 
 ```cpp
 void end_frame()
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requires balanced Painter save state and completes the active transaction.
 
-### `register_typeface`
+### `register_typeface` (public)
 
 ```cpp
 [[nodiscard]] bool register_typeface(FontRole role, std::uint16_t weight, bool italic, std::span<const std::byte> encoded)
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and registers primary font bytes for Skia/HarfBuzz use.
 
-### `register_fallback_typeface`
+### `register_fallback_typeface` (public)
 
 ```cpp
 [[nodiscard]] bool register_fallback_typeface( std::uint16_t weight, bool italic, std::span<const std::byte> encoded)
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers a deterministic fallback face without exposing native objects.
 
-### `synchronize_images`
+### `synchronize_images` (public)
 
 ```cpp
 [[nodiscard]] bool synchronize_images(const ImageRegistry& registry)
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Synchronizes generational registry resources and retires stale decoded images.
 
-### `pixels`
+### `pixels` (public)
 
 ```cpp
 [[nodiscard]] const void* pixels() const noexcept
 ```
 
-Reports the current pixels value without mutation.
+Returns const CPU backing bytes.
 
-### `row_bytes`
+### `row_bytes` (public)
 
 ```cpp
 [[nodiscard]] std::size_t row_bytes() const noexcept
 ```
 
-Reports the current row bytes value without mutation.
+Returns backing stride.
 
-### `pixel_width`
+### `pixel_width` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t pixel_width() const noexcept
 ```
 
-Reports the current pixel width value without mutation.
+Returns backing pixel width.
 
-### `pixel_height`
+### `pixel_height` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t pixel_height() const noexcept
 ```
 
-Reports the current pixel height value without mutation.
+Returns backing pixel height.
 
-### `byte_size`
+### `byte_size` (public)
 
 ```cpp
 [[nodiscard]] std::size_t byte_size() const noexcept
 ```
 
-Reports the current byte size value without mutation.
+Returns total backing byte extent.
 
-### `save`
+### `save` (public)
 
 ```cpp
 void save() override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Pushes Painter state during an active frame.
 
-### `restore`
+### `restore` (public)
 
 ```cpp
 void restore() override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Pops a matched Painter state.
 
-### `translate`
+### `translate` (public)
 
 ```cpp
 void translate(Point offset) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Applies logical translation to current canvas state.
 
-### `clip_rect`
+### `clip_rect` (public)
 
 ```cpp
 void clip_rect(Rect rect) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Intersects current clip with an axis-aligned rectangle.
 
-### `clip_rounded_rect`
+### `clip_rounded_rect` (public)
 
 ```cpp
 void clip_rounded_rect(Rect rect, double radius) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Intersects current clip with a rounded rectangle.
 
-### `fill_rect`
+### `fill_rect` (public)
 
 ```cpp
 void fill_rect(Rect rect, Color color) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Fills a logical rectangle with straight-alpha Color.
 
-### `fill_rounded_rect`
+### `fill_rounded_rect` (public)
 
 ```cpp
 void fill_rounded_rect(Rect rect, double radius, Color color) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Fills validated rounded geometry.
 
-### `stroke_rect`
+### `stroke_rect` (public)
 
 ```cpp
 void stroke_rect(Rect rect, Color color, double width) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes validated rectangle geometry and width.
 
-### `stroke_rounded_rect`
+### `stroke_rounded_rect` (public)
 
 ```cpp
 void stroke_rounded_rect(Rect rect, double radius, Color color, double width) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes rounded geometry.
 
-### `fill_linear_gradient`
+### `fill_linear_gradient` (public)
 
 ```cpp
 void fill_linear_gradient( Rect rect, Point start, Point end, std::span<const GradientStop> stops) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes validated linear gradient stops.
 
-### `fill_linear_gradient_spread`
+### `fill_linear_gradient_spread` (public)
 
 ```cpp
 void fill_linear_gradient_spread( Rect rect, Point start, Point end, std::span<const GradientStop> stops, GradientSpreadMode spread) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes pad, repeat, or reflect linear spread.
 
-### `fill_radial_gradient`
+### `fill_radial_gradient` (public)
 
 ```cpp
 void fill_radial_gradient( Rect rect, Point center, Size radii, std::span<const GradientStop> stops) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes validated radial gradient geometry/stops.
 
-### `draw_box_shadow`
+### `draw_box_shadow` (public)
 
 ```cpp
 void draw_box_shadow(Rect rect, double corner_radius, Point offset, double blur_radius, double spread, Color color) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes bounded CPU blur/spread shadow geometry.
 
-### `draw_line`
+### `draw_line` (public)
 
 ```cpp
 void draw_line(Point from, Point to, Color color, double width) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Strokes a validated logical line.
 
-### `draw_text_utf8`
+### `draw_text_utf8` (public)
 
 ```cpp
 void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color color) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Shapes and draws UTF-8 through registered primary/fallback faces.
 
-### `measure_text_utf8`
+### `measure_text_utf8` (public)
 
 ```cpp
 [[nodiscard]] Size measure_text_utf8(std::string_view text, FontSpec font) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Shapes and returns logical text extents without drawing.
 
-### `draw_image`
+### `draw_image` (public)
 
 ```cpp
 void draw_image(ImageId image, Rect destination, double opacity) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a synchronized generational image resource.
 
-### `draw_live_surface`
+### `draw_live_surface` (public)
 
 ```cpp
 void draw_live_surface(std::shared_ptr<LiveSurface> surface, Rect destination, double opacity) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Samples the newest immutable LiveSurface frame without blocking its producer.
 
-### `draw_image_region`
+### `draw_image_region` (public)
 
 ```cpp
 void draw_image_region(ImageId image, Rect source, Rect destination, double opacity) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a source region with default linear sampling.
 
-### `draw_image_region_sampled`
+### `draw_image_region_sampled` (public)
 
 ```cpp
 void draw_image_region_sampled(ImageId image, Rect source, Rect destination, ImageSampling sampling, double opacity) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Draws a source region with explicit nearest/linear policy.
 
-### `fill_image_pattern`
+### `fill_image_pattern` (public)
 
 ```cpp
 void fill_image_pattern(ImageId image, Size source_pixel_size, Rect destination, Size logical_tile_size, ImagePatternWrap wrap, double opacity) override
 ```
 
-Public SkiaRaster operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Realizes tiled/flipped/clamped image patterns.

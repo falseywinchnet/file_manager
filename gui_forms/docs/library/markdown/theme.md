@@ -1,63 +1,71 @@
 # Theme
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Theme`  
-Declaration: `include/gui_forms/theme.hpp:182`  
-Definition: `src/core/theme.cpp`
+- Status: **OBSERVED: bundle 009 theme split; focused M4 tests and native showcase pass**
+- Kind: **class**
+- Hierarchy: `Theme`
+- Declaration: `include/gui_forms/theme/theme/theme.hpp:11`
+- Definition: `src/core/theme/theme/theme.cpp`
 
-Theme is a class declared in include/gui_forms/theme.hpp.
+Theme is an immutable validated role/state recipe table plus structural spacing, geometry, typography, and motion tokens; it resolves logical visual context without exposing renderer or platform objects.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![Theme](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `create`
+### `create` (public)
 
 ```cpp
 [[nodiscard]] static std::shared_ptr<const Theme> create( ThemeDefinition definition)
 ```
 
-Public Theme operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates bounded identity, every ordinary/selected/high-contrast recipe, and ordered finite structural tokens before publishing shared immutable ownership.
 
-### `id`
+### `id` (public)
 
 ```cpp
 [[nodiscard]] std::string_view id() const noexcept
 ```
 
-Reports the current id value without mutation.
+Returns the immutable theme identity.
 
-### `basic_style`
+### `basic_style` (public)
 
 ```cpp
 [[nodiscard]] const BasicControlStyle& basic_style() const noexcept
 ```
 
-Reports the current basic style value without mutation.
+Returns the compatibility color projection used by explicitly legacy-styled controls.
 
-### `structure`
+### `structure` (public)
 
 ```cpp
 [[nodiscard]] const ThemeStructureTokens& structure() const noexcept
 ```
 
-Reports the current structure value without mutation.
+Returns immutable spacing, geometry, typography, and motion token scales.
 
-### `resolve`
+### `resolve` (public)
 
 ```cpp
 [[nodiscard]] const ControlVisualRecipe& resolve( ControlVisualRole role, ControlVisualContext context) const noexcept
 ```
 
-Reports the current resolve value without mutation.
+Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
 
-### `definition`
+### `definition` (public)
 
 ```cpp
 [[nodiscard]] const ThemeDefinition& definition() const noexcept
 ```
 
-Reports the current definition value without mutation.
+Returns the complete immutable definition for inspection or derivation.
+
+### `Theme` (private)
+
+```cpp
+explicit Theme(ThemeDefinition definition) : definition_(std::move(definition))
+```
+
+Privately takes an already validated ThemeDefinition so published themes remain immutable.

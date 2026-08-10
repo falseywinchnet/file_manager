@@ -1,31 +1,31 @@
 # PointI
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PointI`  
-Declaration: `include/gui_forms/drawing.hpp:17`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `PointI`
+- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:8`
+- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
 
-PointI is a struct declared in include/gui_forms/drawing.hpp.
+PointI is a signed integer pixel-coordinate pair.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `offset`
+### `offset` (public)
 
 ```cpp
 void offset(std::int32_t dx, std::int32_t dy) noexcept
 ```
 
-Public PointI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds signed deltas with deterministic 32-bit saturation.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const PointI&, const PointI&) = default
 ```
 
-Public PointI operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares both coordinates.

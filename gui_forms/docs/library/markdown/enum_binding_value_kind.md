@@ -1,7 +1,7 @@
 # BindingValueKind
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/binding_types.hpp:21`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:21`
 
 ## Declared values
 

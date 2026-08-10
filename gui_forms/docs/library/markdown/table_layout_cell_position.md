@@ -1,20 +1,20 @@
 # TableLayoutCellPosition
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `TableLayoutCellPosition`  
-Declaration: `include/gui_forms/container_controls.hpp:165`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `TableLayoutCellPosition`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp:27`
+- Definition: `inline/header-only`
 
-TableLayoutCellPosition is a struct declared in include/gui_forms/container_controls.hpp.
+TableLayoutCellPosition is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const TableLayoutCellPosition&, const TableLayoutCellPosition&) = default

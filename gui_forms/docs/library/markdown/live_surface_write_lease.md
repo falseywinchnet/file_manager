@@ -1,119 +1,127 @@
 # LiveSurfaceWriteLease
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `LiveSurfaceWriteLease`  
-Declaration: `include/gui_forms/live_surface.hpp:111`  
-Definition: `src/core/live_surface.cpp`
+- Status: **OBSERVED: bundle 008 producer lease review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `LiveSurfaceWriteLease`
+- Declaration: `include/gui_forms/live_surface/write_lease/live_surface_write_lease.hpp:22`
+- Definition: `src/core/live_surface/write_lease/live_surface_write_lease.cpp`
 
-LiveSurfaceWriteLease is a class declared in include/gui_forms/live_surface.hpp.
+LiveSurfaceWriteLease is a move-only exclusive producer candidate; publish commits complete pixels atomically, while destruction or abandon returns the slot without publishing.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `LiveSurfaceWriteLease`
+### `LiveSurfaceWriteLease` (public)
 
 ```cpp
 LiveSurfaceWriteLease() = default
 ```
 
-Constructs or tears down the retained LiveSurfaceWriteLease object according to its ownership contract.
+Constructs an empty token, moves exclusive ownership, rejects copying, or privately binds the state, buffer slot, and configuration epoch selected by LiveSurface.
 
-### `~LiveSurfaceWriteLease`
+### `~LiveSurfaceWriteLease` (public)
 
 ```cpp
 ~LiveSurfaceWriteLease()
 ```
 
-Constructs or tears down the retained LiveSurfaceWriteLease object according to its ownership contract.
+Abandons an unpublished candidate so producer failure cannot strand the writing slot.
 
-### `LiveSurfaceWriteLease`
+### `LiveSurfaceWriteLease` (public)
 
 ```cpp
 LiveSurfaceWriteLease(LiveSurfaceWriteLease&& other) noexcept
 ```
 
-Constructs or tears down the retained LiveSurfaceWriteLease object according to its ownership contract.
+Constructs an empty token, moves exclusive ownership, rejects copying, or privately binds the state, buffer slot, and configuration epoch selected by LiveSurface.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceWriteLease& operator=(LiveSurfaceWriteLease&& other) noexcept
 ```
 
-Public LiveSurfaceWriteLease operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Abandons any current candidate before taking move ownership; copying is prohibited.
 
-### `LiveSurfaceWriteLease`
+### `LiveSurfaceWriteLease` (public)
 
 ```cpp
 LiveSurfaceWriteLease(const LiveSurfaceWriteLease&) = delete
 ```
 
-Constructs or tears down the retained LiveSurfaceWriteLease object according to its ownership contract.
+Constructs an empty token, moves exclusive ownership, rejects copying, or privately binds the state, buffer slot, and configuration epoch selected by LiveSurface.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 LiveSurfaceWriteLease& operator=(const LiveSurfaceWriteLease&) = delete
 ```
 
-Public LiveSurfaceWriteLease operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Abandons any current candidate before taking move ownership; copying is prohibited.
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether state and candidate buffer ownership are both current.
 
-### `width`
+### `width` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t width() const noexcept
 ```
 
-Reports the current width value without mutation.
+Returns candidate width or zero for an empty lease.
 
-### `height`
+### `height` (public)
 
 ```cpp
 [[nodiscard]] std::uint32_t height() const noexcept
 ```
 
-Reports the current height value without mutation.
+Returns candidate height or zero for an empty lease.
 
-### `row_bytes`
+### `row_bytes` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t row_bytes() const noexcept
 ```
 
-Reports the current row bytes value without mutation.
+Returns candidate stride or zero for an empty lease.
 
-### `pixels`
+### `pixels` (public)
 
 ```cpp
 [[nodiscard]] std::span<std::byte> pixels() noexcept
 ```
 
-Public LiveSurfaceWriteLease operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the mutable candidate byte span; these bytes remain invisible until publish succeeds.
 
-### `publish`
+### `publish` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t publish(Rect damage =
 ```
 
-Public LiveSurfaceWriteLease operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates epoch, slot, and buffer identity under the mutex, clips/defaults damage, advances generation, releases producer ownership, then invokes copied best-effort wakes outside the mutex.
 
-### `abandon`
+### `abandon` (public)
 
 ```cpp
 void abandon() noexcept
 ```
 
-Public LiveSurfaceWriteLease operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears the writing slot only when this lease still owns the current epoch and releases candidate state without changing publication identity.
+
+### `LiveSurfaceWriteLease` (private)
+
+```cpp
+LiveSurfaceWriteLease(std::shared_ptr<detail::LiveSurfaceState> state, std::shared_ptr<detail::LiveSurfaceBuffer> buffer, std::size_t slot, std::uint64_t epoch) noexcept
+```
+
+Constructs an empty token, moves exclusive ownership, rejects copying, or privately binds the state, buffer slot, and configuration epoch selected by LiveSurface.

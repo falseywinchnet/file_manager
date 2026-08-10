@@ -1,7 +1,7 @@
 # ScrollBarPart
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/range_controls.hpp:241`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp:10`
 
 ## Declared values
 

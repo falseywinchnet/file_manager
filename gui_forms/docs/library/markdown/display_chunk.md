@@ -1,63 +1,63 @@
 # DisplayChunk
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DisplayChunk`  
-Declaration: `src/core/display_chunk.hpp:55`  
-Definition: `src/core/display_chunk.cpp`
+- Status: **OBSERVED: bundle 008 immutable display chunk review; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DisplayChunk`
+- Declaration: `src/core/display/chunk/display_chunk.hpp:10`
+- Definition: `src/core/display/chunk/display_chunk.cpp`
 
-DisplayChunk is a class declared in src/core/display_chunk.hpp.
+DisplayChunk is an immutable generation- and plane-bound command sequence that can be cached per control and replayed only after a complete recording transaction succeeds.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `DisplayChunk`
+### `DisplayChunk` (public)
 
 ```cpp
 DisplayChunk(std::uint64_t generation, PaintPlane plane, Rect logical_bounds, std::vector<DisplayCommand> commands)
 ```
 
-Constructs or tears down the retained DisplayChunk object according to its ownership contract.
+Takes ownership of a complete command vector and binds it to exact generation, paint plane, and logical bounds.
 
-### `info`
+### `info` (public)
 
 ```cpp
 [[nodiscard]] DisplayChunkInfo info() const noexcept
 ```
 
-Reports the current info value without mutation.
+Returns public immutable chunk telemetry without exposing command storage.
 
-### `generation`
+### `generation` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t generation() const noexcept
 ```
 
-Reports the current generation value without mutation.
+Returns the retained display generation.
 
-### `plane`
+### `plane` (public)
 
 ```cpp
 [[nodiscard]] PaintPlane plane() const noexcept
 ```
 
-Reports the current plane value without mutation.
+Returns the chunk's backplane, control, or overlay plane.
 
-### `logical_bounds`
+### `logical_bounds` (public)
 
 ```cpp
 [[nodiscard]] Rect logical_bounds() const noexcept
 ```
 
-Reports the current logical bounds value without mutation.
+Returns the coordinate bounds in which commands were authored.
 
-### `commands`
+### `commands` (public)
 
 ```cpp
 [[nodiscard]] const std::vector<DisplayCommand>& commands() const noexcept
 ```
 
-Reports the current commands value without mutation.
+Returns const internal command storage to trusted replay code.

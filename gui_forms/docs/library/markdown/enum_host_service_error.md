@@ -1,7 +1,7 @@
 # HostServiceError
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/host.hpp:78`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/host/types/host_types.hpp:75`
 
 ## Declared values
 

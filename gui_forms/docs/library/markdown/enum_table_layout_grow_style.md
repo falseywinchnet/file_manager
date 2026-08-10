@@ -1,7 +1,7 @@
 # TableLayoutGrowStyle
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/container_controls.hpp:172`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp:34`
 
 ## Declared values
 

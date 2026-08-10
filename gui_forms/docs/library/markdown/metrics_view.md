@@ -1,79 +1,103 @@
 # MetricsView
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Control → MetricsView`  
-Declaration: `include/gui_forms/diagnostic_controls.hpp:46`  
-Definition: `src/controls/diagnostic_controls.cpp`
+- Status: **OBSERVED: bundle 006 split and accent-width enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Control → MetricsView`
+- Declaration: `include/gui_forms/controls/metrics_view/metrics_view.hpp:10`
+- Definition: `src/controls/metrics_view/metrics_view.cpp`
 
-MetricsView is a visual retained control declared in include/gui_forms/diagnostic_controls.hpp.
+MetricsView is an input-transparent diagnostic control over Window's structured metrics snapshot. It formats bounded live counters into a retained card with caller-owned title/style/accent width and group semantics; it does not replace the snapshot as instrumentation authority.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![MetricsView](../captures/metrics_view.png)
 
-## Public methods
+## Declared methods
 
-### `MetricsView`
+### `MetricsView` (public)
 
 ```cpp
 explicit MetricsView(StableId stable_id, std::string title = "Runtime metrics")
 ```
 
-Constructs or tears down the retained MetricsView object according to its ownership contract.
+Constructs a titled noninteractive diagnostic projection.
 
-### `title`
+### `title` (public)
 
 ```cpp
 [[nodiscard]] const std::string& title() const noexcept
 ```
 
-Reports the current title value without mutation.
+Returns the retained diagnostic heading.
 
-### `set_title`
+### `set_title` (public)
 
 ```cpp
 void set_title(std::string title)
 ```
 
-Synchronously updates the retained title property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits title, synchronizes accessible name, and invalidates paint and semantics.
 
-### `style`
+### `style` (public)
 
 ```cpp
 [[nodiscard]] const BasicControlStyle& style() const noexcept
 ```
 
-Reports the current style value without mutation.
+Returns the compatibility color/style palette used by the card.
 
-### `set_style`
+### `set_style` (public)
 
 ```cpp
 void set_style(BasicControlStyle style)
 ```
 
-Synchronously updates the retained style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits palette and invalidates paint.
 
-### `on_paint`
+### `accent_width` (public)
+
+```cpp
+[[nodiscard]] double accent_width() const noexcept
+```
+
+Returns the logical width of the leading diagnostic rail.
+
+### `set_accent_width` (public)
+
+```cpp
+void set_accent_width(double width)
+```
+
+Validates a width within [1, 32] and refreshes paint.
+
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records backplane, accent rail, title, and a bounded two-line Window metrics readout.
 
-### `hit_test_local`
+### `hit_test_local` (public)
 
 ```cpp
 [[nodiscard]] bool hit_test_local(Point local_point) const override
 ```
 
-Reports the current hit test local value without mutation.
+Always rejects input because metrics are observational.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects group role, title, and the current structured metrics readout.
+
+### `metrics_text` (private)
+
+```cpp
+[[nodiscard]] std::string metrics_text() const
+```
+
+Reports the current metrics text value without mutation.

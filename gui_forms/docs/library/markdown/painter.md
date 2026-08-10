@@ -1,10 +1,10 @@
 # Painter
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Painter`  
-Declaration: `include/gui_forms/types.hpp:161`  
-Definition: `src/core/types.cpp`
+- Status: **generated inventory; detailed review pending**
+- Kind: **class**
+- Hierarchy: `Painter`
+- Declaration: `include/gui_forms/types.hpp:161`
+- Definition: `src/core/types.cpp`
 
 Painter is a class declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ Painter is a class declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `~Painter`
+### `~Painter` (public)
 
 ```cpp
 virtual ~Painter() = default
@@ -22,7 +22,7 @@ virtual ~Painter() = default
 
 Constructs or tears down the retained Painter object according to its ownership contract.
 
-### `save`
+### `save` (public)
 
 ```cpp
 virtual void save() = 0
@@ -30,7 +30,7 @@ virtual void save() = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `restore`
+### `restore` (public)
 
 ```cpp
 virtual void restore() = 0
@@ -38,7 +38,7 @@ virtual void restore() = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `translate`
+### `translate` (public)
 
 ```cpp
 virtual void translate(Point offset) = 0
@@ -46,7 +46,7 @@ virtual void translate(Point offset) = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `clip_rect`
+### `clip_rect` (public)
 
 ```cpp
 virtual void clip_rect(Rect rect) = 0
@@ -54,7 +54,7 @@ virtual void clip_rect(Rect rect) = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `clip_rounded_rect`
+### `clip_rounded_rect` (public)
 
 ```cpp
 virtual void clip_rounded_rect(Rect rect, double radius)
@@ -62,7 +62,7 @@ virtual void clip_rounded_rect(Rect rect, double radius)
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_rect`
+### `fill_rect` (public)
 
 ```cpp
 virtual void fill_rect(Rect rect, Color color) = 0
@@ -70,7 +70,7 @@ virtual void fill_rect(Rect rect, Color color) = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_rounded_rect`
+### `fill_rounded_rect` (public)
 
 ```cpp
 virtual void fill_rounded_rect(Rect rect, double radius, Color color)
@@ -78,7 +78,7 @@ virtual void fill_rounded_rect(Rect rect, double radius, Color color)
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `stroke_rect`
+### `stroke_rect` (public)
 
 ```cpp
 virtual void stroke_rect(Rect rect, Color color, double width) = 0
@@ -86,7 +86,7 @@ virtual void stroke_rect(Rect rect, Color color, double width) = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `stroke_rounded_rect`
+### `stroke_rounded_rect` (public)
 
 ```cpp
 virtual void stroke_rounded_rect(Rect rect, double radius, Color color, double width)
@@ -94,7 +94,7 @@ virtual void stroke_rounded_rect(Rect rect, double radius, Color color, double w
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_linear_gradient`
+### `fill_linear_gradient` (public)
 
 ```cpp
 virtual void fill_linear_gradient( Rect rect, Point start, Point end, std::span<const GradientStop> stops)
@@ -102,7 +102,7 @@ virtual void fill_linear_gradient( Rect rect, Point start, Point end, std::span<
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_linear_gradient_spread`
+### `fill_linear_gradient_spread` (public)
 
 ```cpp
 virtual void fill_linear_gradient_spread( Rect rect, Point start, Point end, std::span<const GradientStop> stops, GradientSpreadMode spread)
@@ -110,7 +110,7 @@ virtual void fill_linear_gradient_spread( Rect rect, Point start, Point end, std
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_radial_gradient`
+### `fill_radial_gradient` (public)
 
 ```cpp
 virtual void fill_radial_gradient( Rect rect, Point center, Size radii, std::span<const GradientStop> stops)
@@ -118,7 +118,7 @@ virtual void fill_radial_gradient( Rect rect, Point center, Size radii, std::spa
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_box_shadow`
+### `draw_box_shadow` (public)
 
 ```cpp
 virtual void draw_box_shadow(Rect rect, double corner_radius, Point offset, double blur_radius, double spread, Color color)
@@ -126,7 +126,7 @@ virtual void draw_box_shadow(Rect rect, double corner_radius, Point offset, doub
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_line`
+### `draw_line` (public)
 
 ```cpp
 virtual void draw_line(Point from, Point to, Color color, double width) = 0
@@ -134,7 +134,7 @@ virtual void draw_line(Point from, Point to, Color color, double width) = 0
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_text_utf8`
+### `draw_text_utf8` (public)
 
 ```cpp
 virtual void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color color) = 0
@@ -142,7 +142,7 @@ virtual void draw_text_utf8(Point origin, std::string_view text, FontSpec font, 
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `measure_text_utf8`
+### `measure_text_utf8` (public)
 
 ```cpp
 [[nodiscard]] virtual Size measure_text_utf8(std::string_view text, FontSpec font)
@@ -150,7 +150,7 @@ Public Painter operation. Its exact signature is inventoried here; follow the li
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_image`
+### `draw_image` (public)
 
 ```cpp
 virtual void draw_image(ImageId image, Rect destination, double opacity = 1.0) = 0
@@ -158,7 +158,7 @@ virtual void draw_image(ImageId image, Rect destination, double opacity = 1.0) =
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_live_surface`
+### `draw_live_surface` (public)
 
 ```cpp
 virtual void draw_live_surface(std::shared_ptr<LiveSurface> surface, Rect destination, double opacity = 1.0)
@@ -166,7 +166,7 @@ virtual void draw_live_surface(std::shared_ptr<LiveSurface> surface, Rect destin
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_image_region`
+### `draw_image_region` (public)
 
 ```cpp
 virtual void draw_image_region(ImageId image, Rect source, Rect destination, double opacity = 1.0)
@@ -174,7 +174,7 @@ virtual void draw_image_region(ImageId image, Rect source, Rect destination, dou
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `draw_image_region_sampled`
+### `draw_image_region_sampled` (public)
 
 ```cpp
 virtual void draw_image_region_sampled( ImageId image, Rect source, Rect destination, ImageSampling sampling, double opacity = 1.0)
@@ -182,7 +182,7 @@ virtual void draw_image_region_sampled( ImageId image, Rect source, Rect destina
 
 Public Painter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `fill_image_pattern`
+### `fill_image_pattern` (public)
 
 ```cpp
 virtual void fill_image_pattern(ImageId image, Size source_pixel_size, Rect destination, Size logical_tile_size, ImagePatternWrap wrap = ImagePatternWrap::tile, double opacity = 1.0)

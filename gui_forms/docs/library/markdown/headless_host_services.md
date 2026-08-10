@@ -1,63 +1,127 @@
 # HeadlessHostServices
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `HostServices → HeadlessHostServices`  
-Declaration: `src/host/headless/headless_host.hpp:14`  
-Definition: `src/host/headless/headless_host.cpp`
+- Status: **OBSERVED: bundle 007 deterministic service adapter split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `HostServices → HeadlessHostServices`
+- Declaration: `src/host/headless/services/headless_host_services.hpp:12`
+- Definition: `src/host/headless/services/headless_host_services.cpp`
 
-HeadlessHostServices is a class declared in src/host/headless/headless_host.hpp.
+HeadlessHostServices is the deterministic reference adapter for portable monitor, cursor/capture, clipboard, typed dialogs, and semantic sounds; it records textual traces instead of owning native state.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `HeadlessHostServices`
+### `HeadlessHostServices` (public)
 
 ```cpp
 HeadlessHostServices()
 ```
 
-Constructs or tears down the retained HeadlessHostServices object according to its ownership contract.
+Constructs the reference capability set and one deterministic primary monitor.
 
-### `~HeadlessHostServices`
+### `~HeadlessHostServices` (public)
 
 ```cpp
 ~HeadlessHostServices() override
 ```
 
-Constructs or tears down the retained HeadlessHostServices object according to its ownership contract.
+Runs portable shutdown before releasing fixtures.
 
-### `queue_dialog_result`
+### `queue_dialog_result` (public)
 
 ```cpp
 void queue_dialog_result(HostDialogResult result)
 ```
 
-Public HeadlessHostServices operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Queues one deterministic typed result for the next dialog request.
 
-### `set_dialog_handler`
+### `set_dialog_handler` (public)
 
 ```cpp
 void set_dialog_handler(DialogHandler handler)
 ```
 
-Synchronously updates the retained dialog handler property. Validation, typed invalidation, and notifications are defined by the implementation.
+Installs a programmable nested-dialog test handler.
 
-### `dialog_trace`
+### `dialog_trace` (public)
 
 ```cpp
 [[nodiscard]] const std::string& dialog_trace() const noexcept
 ```
 
-Reports the current dialog trace value without mutation.
+Returns stable request/outcome trace text.
 
-### `sound_trace`
+### `sound_trace` (public)
 
 ```cpp
 [[nodiscard]] const std::string& sound_trace() const noexcept
 ```
 
-Reports the current sound trace value without mutation.
+Returns stable semantic cue/time/gain trace text.
+
+### `query_monitors_impl` (protected)
+
+```cpp
+[[nodiscard]] HostMonitorResult query_monitors_impl() override
+```
+
+Returns the deterministic monitor set.
+
+### `set_cursor_impl` (protected)
+
+```cpp
+[[nodiscard]] HostServiceStatus set_cursor_impl(CursorKind cursor) override
+```
+
+Acknowledges portable cursor mapping without native state.
+
+### `set_pointer_capture_impl` (protected)
+
+```cpp
+[[nodiscard]] HostServiceStatus set_pointer_capture_impl( bool captured, std::uint64_t pointer_id) override
+```
+
+Acknowledges portable capture mapping without native state.
+
+### `read_clipboard_text_impl` (protected)
+
+```cpp
+[[nodiscard]] HostClipboardTextResult read_clipboard_text_impl() override
+```
+
+Returns deterministic clipboard text, presence, and generation.
+
+### `write_clipboard_text_impl` (protected)
+
+```cpp
+[[nodiscard]] HostServiceStatus write_clipboard_text_impl( std::string_view text_utf8) override
+```
+
+Commits deterministic clipboard text and advances generation.
+
+### `show_dialog_impl` (protected)
+
+```cpp
+[[nodiscard]] HostDialogResult show_dialog_impl( const HostDialogRequest& request) override
+```
+
+Uses the installed handler or queued result and records a stable typed trace.
+
+### `play_sound_cue_impl` (protected)
+
+```cpp
+[[nodiscard]] HostServiceStatus play_sound_cue_impl( const HostSoundCueRequest& request) override
+```
+
+Records the already-qualified semantic cue request.
+
+### `shutdown_impl` (protected)
+
+```cpp
+void shutdown_impl() noexcept override
+```
+
+Clears deterministic clipboard, dialog queue, and sound trace.

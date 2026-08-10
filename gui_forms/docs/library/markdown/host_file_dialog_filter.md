@@ -1,23 +1,23 @@
 # HostFileDialogFilter
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HostFileDialogFilter`  
-Declaration: `include/gui_forms/host.hpp:157`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 typed-dialog value review; M4 builds and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `HostFileDialogFilter`
+- Declaration: `include/gui_forms/host/types/host_types.hpp:154`
+- Definition: `inline/header-only`
 
-HostFileDialogFilter is a struct declared in include/gui_forms/host.hpp.
+HostFileDialogFilter carries a user-facing label and bounded extension vocabulary without native filter syntax.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const HostFileDialogFilter&, const HostFileDialogFilter&) = default
 ```
 
-Public HostFileDialogFilter operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares label and ordered extension vocabulary.

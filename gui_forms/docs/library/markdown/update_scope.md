@@ -1,79 +1,79 @@
 # UpdateScope
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `UpdateScope`  
-Declaration: `include/gui_forms/window.hpp:750`  
-Definition: `src/core/window.cpp`
+- Status: **OBSERVED: bundle 007 lifecycle transaction split; M4 build and focused tests pass**
+- Kind: **class**
+- Hierarchy: `UpdateScope`
+- Declaration: `include/gui_forms/window/window.hpp:678`
+- Definition: `src/core/window/lifecycle/window_lifecycle.cpp`
 
-UpdateScope is a class declared in include/gui_forms/window.hpp.
+UpdateScope is the move-only RAII token for one Window update-depth level; it guarantees balanced close and makes an explicit layout barrier available without opening a nested native loop.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![UpdateScope](../captures/native_window_host.png)
 
-## Public methods
+## Declared methods
 
-### `UpdateScope`
+### `UpdateScope` (public)
 
 ```cpp
 explicit UpdateScope(Window& window) noexcept : window_(&window)
 ```
 
-Constructs or tears down the retained UpdateScope object according to its ownership contract.
+Enters with one Window reference, transfers the sole close responsibility on move, and prohibits copying.
 
-### `~UpdateScope`
+### `~UpdateScope` (public)
 
 ```cpp
 ~UpdateScope()
 ```
 
-Constructs or tears down the retained UpdateScope object according to its ownership contract.
+Closes an outstanding level exactly once.
 
-### `UpdateScope`
+### `UpdateScope` (public)
 
 ```cpp
 UpdateScope(UpdateScope&& other) noexcept
 ```
 
-Constructs or tears down the retained UpdateScope object according to its ownership contract.
+Enters with one Window reference, transfers the sole close responsibility on move, and prohibits copying.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 UpdateScope& operator=(UpdateScope&& other) noexcept
 ```
 
-Public UpdateScope operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes any currently owned level before accepting another move-only responsibility.
 
-### `UpdateScope`
+### `UpdateScope` (public)
 
 ```cpp
 UpdateScope(const UpdateScope&) = delete
 ```
 
-Constructs or tears down the retained UpdateScope object according to its ownership contract.
+Enters with one Window reference, transfers the sole close responsibility on move, and prohibits copying.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 UpdateScope& operator=(const UpdateScope&) = delete
 ```
 
-Public UpdateScope operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Closes any currently owned level before accepting another move-only responsibility.
 
-### `perform_layout`
+### `perform_layout` (public)
 
 ```cpp
 void perform_layout()
 ```
 
-Public UpdateScope operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests the Window layout barrier while retaining the surrounding update level.
 
-### `close`
+### `close` (public)
 
 ```cpp
 void close()
 ```
 
-Public UpdateScope operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Atomically clears its Window pointer and leaves exactly one update level.

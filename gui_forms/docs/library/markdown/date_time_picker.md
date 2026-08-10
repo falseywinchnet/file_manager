@@ -1,295 +1,367 @@
 # DateTimePicker
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Panel → DateTimePicker`  
-Declaration: `include/gui_forms/date_time_picker.hpp:57`  
-Definition: `src/controls/date_time_picker.cpp`
+- Status: **OBSERVED: bundle 004 split and drop-down-alignment enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Panel → DateTimePicker`
+- Declaration: `include/gui_forms/controls/panel/date_time_picker/date_time_picker.hpp:26`
+- Definition: `src/controls/panel/date_time_picker/date_time_picker.cpp`
 
-DateTimePicker is a visual retained control declared in include/gui_forms/date_time_picker.hpp.
+DateTimePicker is a retained civil date/time field with validated bounds, four formatting policies, caller-supplied format vocabulary, optional check state, calendar or spin presentation, configurable popup alignment, source-private transient ownership, keyboard/pointer/semantic control, and ordered typed events.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![DateTimePicker](../captures/date_time_picker.png)
 
-## Public methods
+## Declared methods
 
-### `DateTimePicker`
+### `DateTimePicker` (public)
 
 ```cpp
 explicit DateTimePicker(StableId stable_id)
 ```
 
-Constructs or tears down the retained DateTimePicker object according to its ownership contract.
+Constructs a focusable picker with validated civil value/range defaults and disclosure cursor policy.
 
-### `value`
+### `value` (public)
 
 ```cpp
 [[nodiscard]] DateTimeValue value() const noexcept
 ```
 
-Reports the current value value without mutation.
+Returns the authoritative constrained civil date/time value.
 
-### `set_value`
+### `set_value` (public)
 
 ```cpp
 void set_value(DateTimeValue value)
 ```
 
-Synchronously updates the retained value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the civil value, clamps to the admitted range, and publishes a real change.
 
-### `minimum`
+### `minimum` (public)
 
 ```cpp
 [[nodiscard]] DateTimeValue minimum() const noexcept
 ```
 
-Reports the current minimum value without mutation.
+Returns the inclusive earliest admitted civil value.
 
-### `maximum`
+### `maximum` (public)
 
 ```cpp
 [[nodiscard]] DateTimeValue maximum() const noexcept
 ```
 
-Reports the current maximum value without mutation.
+Returns the inclusive latest admitted civil value.
 
-### `set_range`
+### `set_range` (public)
 
 ```cpp
 void set_range(DateTimeValue minimum, DateTimeValue maximum)
 ```
 
-Synchronously updates the retained range property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates both civil values and chronological order, constrains current value, and refreshes popup/semantics coherently.
 
-### `format`
+### `format` (public)
 
 ```cpp
 [[nodiscard]] DateTimePickerFormat format() const noexcept
 ```
 
-Reports the current format value without mutation.
+Returns long-date, short-date, time, or custom presentation policy.
 
-### `set_format`
+### `set_format` (public)
 
 ```cpp
 void set_format(DateTimePickerFormat format)
 ```
 
-Synchronously updates the retained format property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the format vocabulary and invalidates measure, paint, and semantics.
 
-### `custom_format`
+### `custom_format` (public)
 
 ```cpp
 [[nodiscard]] const std::string& custom_format() const noexcept
 ```
 
-Reports the current custom format value without mutation.
+Returns the token pattern used when custom formatting is selected.
 
-### `set_custom_format`
+### `set_custom_format` (public)
 
 ```cpp
 void set_custom_format(std::string format)
 ```
 
-Synchronously updates the retained custom format property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits the caller pattern, then refreshes formatted projection.
 
-### `format_provider`
+### `format_provider` (public)
 
 ```cpp
 [[nodiscard]] const DateTimeFormatProvider& format_provider() const noexcept
 ```
 
-Reports the current format provider value without mutation.
+Returns the shared immutable vocabulary/pattern provider.
 
-### `set_format_provider`
+### `set_format_provider` (public)
 
 ```cpp
 void set_format_provider(DateTimeFormatProvider provider)
 ```
 
-Synchronously updates the retained format provider property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a provider, commits shared ownership, and refreshes field and open popup presentation.
 
-### `formatted_value`
+### `formatted_value` (public)
 
 ```cpp
 [[nodiscard]] std::string formatted_value() const
 ```
 
-Reports the current formatted value value without mutation.
+Formats the current civil value through active format and provider without changing authority.
 
-### `show_check_box`
+### `show_check_box` (public)
 
 ```cpp
 [[nodiscard]] bool show_check_box() const noexcept
 ```
 
-Reports the current show check box value without mutation.
+Reports whether an enable/disable checkbox is painted and interactive.
 
-### `set_show_check_box`
+### `set_show_check_box` (public)
 
 ```cpp
 void set_show_check_box(bool show)
 ```
 
-Synchronously updates the retained show check box property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles checkbox composition and invalidates measure, paint, and semantics.
 
-### `checked`
+### `checked` (public)
 
 ```cpp
 [[nodiscard]] bool checked() const noexcept
 ```
 
-Reports the current checked value without mutation.
+Returns the retained enabled state when check-box presentation is used.
 
-### `set_checked`
+### `set_checked` (public)
 
 ```cpp
 void set_checked(bool checked)
 ```
 
-Synchronously updates the retained checked property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits enabled state, closes disallowed popups, and publishes a real checked transition.
 
-### `show_up_down`
+### `show_up_down` (public)
 
 ```cpp
 [[nodiscard]] bool show_up_down() const noexcept
 ```
 
-Reports the current show up down value without mutation.
+Reports whether compact day stepping replaces calendar disclosure.
 
-### `set_show_up_down`
+### `set_show_up_down` (public)
 
 ```cpp
 void set_show_up_down(bool show)
 ```
 
-Synchronously updates the retained show up down property. Validation, typed invalidation, and notifications are defined by the implementation.
+Switches between spin and popup affordances, closing transient state when required.
 
-### `dropped_down`
+### `dropped_down` (public)
 
 ```cpp
 [[nodiscard]] bool dropped_down() const noexcept
 ```
 
-Reports the current dropped down value without mutation.
+Reports whether this picker currently owns its calendar transient lease.
 
-### `set_dropped_down`
+### `set_dropped_down` (public)
 
 ```cpp
 void set_dropped_down(bool dropped_down)
 ```
 
-Synchronously updates the retained dropped down property. Validation, typed invalidation, and notifications are defined by the implementation.
+Opens or closes through the common calendar ownership state machine.
 
-### `font`
+### `drop_down_alignment` (public)
+
+```cpp
+[[nodiscard]] DateTimeDropDownAlignment drop_down_alignment() const noexcept
+```
+
+Returns left-edge or right-edge popup anchoring policy.
+
+### `set_drop_down_alignment` (public)
+
+```cpp
+void set_drop_down_alignment(DateTimeDropDownAlignment alignment)
+```
+
+Validates alignment, commits it, and repositions an open popup within client bounds.
+
+### `font` (public)
 
 ```cpp
 [[nodiscard]] FontSpec font() const noexcept
 ```
 
-Reports the current font value without mutation.
+Returns the retained field and calendar FontSpec.
 
-### `set_font`
+### `set_font` (public)
 
 ```cpp
 void set_font(FontSpec font)
 ```
 
-Synchronously updates the retained font property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates typography, refreshes open popup presentation, and invalidates geometry and paint.
 
-### `style`
+### `style` (public)
 
 ```cpp
 [[nodiscard]] const BasicControlStyle& style() const noexcept
 ```
 
-Reports the current style value without mutation.
+Returns the compatibility field/calendar BasicControlStyle.
 
-### `set_style`
+### `set_style` (public)
 
 ```cpp
 void set_style(BasicControlStyle style)
 ```
 
-Synchronously updates the retained style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits compatibility colors and refreshes field and open popup appearance.
 
-### `value_changed`
+### `value_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<DateTimeValue>& value_changed() noexcept
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after authoritative value commits.
 
-### `checked_changed`
+### `checked_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<bool>& checked_changed() noexcept
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after optional checked state commits.
 
-### `drop_down_changed`
+### `drop_down_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<bool>& drop_down_changed() noexcept
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the event published after transient calendar ownership opens or closes.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records checkbox, formatted value, focus, and either spin or disclosure affordance from retained state.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Qualifies checkbox toggling, day stepping, field focus, and popup disclosure by local part.
 
-### `on_key`
+### `on_key` (public)
 
 ```cpp
 void on_key(KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Handles open/close, day stepping, commit, cancellation, and checked-state toggling.
 
-### `on_focus_changed`
+### `on_focus_changed` (public)
 
 ```cpp
 void on_focus_changed(bool focused) override
 ```
 
-Updates focus-dependent retained state and invalidates affected presentation/semantics.
+Commits focus appearance while transient lifetime remains governed by owner/revocation policy.
 
-### `on_activate`
+### `on_activate` (public)
 
 ```cpp
 void on_activate() override
 ```
 
-Runs the control's single authoritative activation path.
+Invokes the primary check, spin, or calendar action through normal state transitions.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a date-time picker or spin role with formatted/civil value, checked/expanded state, range, and actions.
 
-### `on_semantic_action`
+### `on_semantic_action` (public)
 
 ```cpp
 bool on_semantic_action(SemanticAction action, std::string_view value) override
+```
+
+Routes press, expand/collapse, check, increment/decrement, and set-value through ordinary validation and events.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
+Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `part_at` (private)
+
+```cpp
+[[nodiscard]] HitPart part_at(Point absolute) const noexcept
+```
+
+Reports the current part at value without mutation.
+
+### `step_days` (private)
+
+```cpp
+void step_days(int days)
+```
+
+Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `open_drop_down` (private)
+
+```cpp
+void open_drop_down()
+```
+
+Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `close_drop_down` (private)
+
+```cpp
+void close_drop_down()
+```
+
+Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `commit_popup_value` (private)
+
+```cpp
+void commit_popup_value(DateTimeValue value)
+```
+
+Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_popup_revoked` (private)
+
+```cpp
+void on_popup_revoked()
 ```
 
 Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

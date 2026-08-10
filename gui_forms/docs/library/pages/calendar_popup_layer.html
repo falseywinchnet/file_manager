@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>CalendarPopupLayer · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
+<body><article><header><p class="eyebrow">class · visual</p>
+<h1>CalendarPopupLayer</h1><p class="summary">CalendarPopupLayer is DateTimePicker&#x27;s source-private transient boundary. It owns outside-click dismissal around the anchored CalendarPopup while leaving date navigation and commit with the popup and picker.</p>
+<div class="badges"><span>OBSERVED: bundle 004 source-private state-machine split; M4 build, focused tests, and Screen Sharing pass</span><span>isolated per type</span></div></header>
+<section><h2>Visual evidence</h2><figure><img src="../captures/date_time_picker.png" alt="CalendarPopupLayer control capture"><figcaption>M4 Complete Showcase crop with DateTimePicker&#x27;s calendar open; CalendarPopupLayer supplies the full-window outside-click dismissal boundary.</figcaption></figure></section>
+<section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>Panel → CalendarPopupLayer</dd>
+<dt>Declaration</dt><dd>src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.hpp:7</dd><dt>Definition</dt><dd>src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.cpp</dd></dl></section>
+<section><h2>Declared methods</h2><section class="method"><h3>CalendarPopupLayer <span class="access">public</span></h3><code>explicit CalendarPopupLayer(StableId stable_id)</code><p>Constructs a full-window transient panel around the owned calendar bounds.</p></section><section class="method"><h3>dismissed <span class="access">public</span></h3><code>[[nodiscard]] Event&lt;&gt;&amp; dismissed() noexcept</code><p>Returns the event raised when an outside primary press requests closure.</p></section><section class="method"><h3>on_pointer <span class="access">public</span></h3><code>void on_pointer(PointerEvent&amp; event) override</code><p>Dismisses and consumes a primary press outside the popup, while inside gestures continue to the child.</p></section></section>
+<footer><a href="../markdown/calendar_popup_layer.md">AI-readable Markdown source</a></footer>
+</article></body></html>

@@ -1,87 +1,119 @@
 # BindingContext
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Component → BindingContext`  
-Declaration: `include/gui_forms/binding.hpp:448`  
-Definition: `src/core/binding.cpp`
+- Status: **OBSERVED: bundle 010 Window currency-context split; focused M4 binding tests pass**
+- Kind: **class**
+- Hierarchy: `Component → BindingContext`
+- Declaration: `include/gui_forms/binding/binding_context/binding_context.hpp:18`
+- Definition: `src/core/binding/binding_context/binding_context.cpp`
 
-BindingContext is a class declared in include/gui_forms/binding.hpp.
+BindingContext owns weak Window-scoped membership and disposal subscriptions for BindingSources while each source retains its own currency manager.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `BindingContext`
+### `BindingContext` (public)
 
 ```cpp
 explicit BindingContext(Window& window)
 ```
 
-Constructs or tears down the retained BindingContext object according to its ownership contract.
+Binds Window lifetime and verifies construction affinity.
 
-### `~BindingContext`
+### `~BindingContext` (public)
 
 ```cpp
 ~BindingContext() override
 ```
 
-Constructs or tears down the retained BindingContext object according to its ownership contract.
+Disposes and contains destructor exceptions.
 
-### `add`
+### `add` (public)
 
 ```cpp
 void add(const std::shared_ptr<BindingSource>& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Ensures a source has a context entry by resolving its manager.
 
-### `manager`
+### `manager` (public)
 
 ```cpp
 CurrencyManager& manager(const std::shared_ptr<BindingSource>& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates shared owner, liveness, same Window, and uniqueness; installs disposal removal and returns the source manager.
 
-### `contains`
+### `contains` (public)
 
 ```cpp
 [[nodiscard]] bool contains(const BindingSource& source) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests source pointer membership.
 
-### `remove`
+### `remove` (public)
 
 ```cpp
 bool remove(const BindingSource& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies affinity and removes one source with publication.
 
-### `clear`
+### `clear` (public)
 
 ```cpp
 void clear()
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies affinity, retires all entries, and publishes removal for each still-live source.
 
-### `size`
+### `size` (public)
 
 ```cpp
 [[nodiscard]] std::size_t size() const noexcept
 ```
 
-Reports the current size value without mutation.
+Returns membership count.
 
-### `collection_changed`
+### `collection_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const BindingContextChange&>& collection_changed() noexcept
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns ordered add/remove observation.
+
+### `verify_dispose_thread` (protected)
+
+```cpp
+void verify_dispose_thread() override
+```
+
+Enforces Window affinity while available.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Drops entries, observations, and Window lifetime without publishing into teardown.
+
+### `bound_window` (private)
+
+```cpp
+[[nodiscard]] Window* bound_window() const noexcept
+```
+
+Resolves weak Window lifetime without extending ownership.
+
+### `remove_entry` (private)
+
+```cpp
+bool remove_entry(BindingSource* source, bool publish)
+```
+
+Disconnects and erases one exact source entry and optionally publishes removal.

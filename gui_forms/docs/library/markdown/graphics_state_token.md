@@ -1,23 +1,23 @@
 # GraphicsStateToken
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `GraphicsStateToken`  
-Declaration: `include/gui_forms/drawing.hpp:750`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 graphics save-token review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `GraphicsStateToken`
+- Declaration: `include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp:30`
+- Definition: `inline/header-only`
 
-GraphicsStateToken is a struct declared in include/gui_forms/drawing.hpp.
+GraphicsStateToken is the nonzero exact LIFO identity of one saved recorder state.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const GraphicsStateToken&, const GraphicsStateToken&) = default
 ```
 
-Public GraphicsStateToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares token identity.

@@ -1,31 +1,31 @@
 # ImageReference
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `DrawingObject → ImageReference`  
-Declaration: `include/gui_forms/drawing.hpp:585`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 image-reference split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `DrawingObject → ImageReference`
+- Declaration: `include/gui_forms/drawing/image_reference/image_reference.hpp:13`
+- Definition: `src/core/drawing/image_reference/image_reference.cpp`
 
-ImageReference is a class declared in include/gui_forms/drawing.hpp.
+ImageReference is renderer-neutral stable image identity and dimensions without pixel storage or backend handles.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `ImageReference`
+### `ImageReference` (public)
 
 ```cpp
 ImageReference(std::uint64_t stable_id, std::uint32_t width, std::uint32_t height, PixelFormat pixel_format, std::uint64_t generation = 1)
 ```
 
-Constructs or tears down the retained ImageReference object according to its ownership contract.
+Validates nonzero identity, bounded dimensions, pixel format, and generation.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] ImageSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and copies identity/dimension/format/generation metadata.

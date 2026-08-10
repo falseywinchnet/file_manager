@@ -3,10 +3,13 @@ if(NOT DEFINED DRAWING_CORE OR NOT DEFINED DRAWING_C_API OR
     message(FATAL_ERROR "drawing boundary audit arguments are incomplete")
 endif()
 
-set(drawing_files
+file(GLOB_RECURSE drawing_files
+    "${SOURCE_DIRECTORY}/include/gui_forms/drawing/*.hpp"
+    "${SOURCE_DIRECTORY}/src/core/drawing/*.cpp"
+)
+list(APPEND drawing_files
     "${SOURCE_DIRECTORY}/include/gui_forms/drawing.hpp"
     "${SOURCE_DIRECTORY}/include/gui_forms/drawing_c_api.h"
-    "${SOURCE_DIRECTORY}/src/core/drawing.cpp"
     "${SOURCE_DIRECTORY}/src/abi/drawing_c_api.cpp"
 )
 foreach(path IN LISTS drawing_files)

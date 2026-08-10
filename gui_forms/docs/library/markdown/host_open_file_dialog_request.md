@@ -1,17 +1,17 @@
 # HostOpenFileDialogRequest
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `HostOpenFileDialogRequest`  
-Declaration: `include/gui_forms/host.hpp:173`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 typed-dialog request review; M4 builds and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `HostOpenFileDialogRequest`
+- Declaration: `include/gui_forms/host/types/host_types.hpp:170`
+- Definition: `inline/header-only`
 
-HostOpenFileDialogRequest is a struct declared in include/gui_forms/host.hpp.
+HostOpenFileDialogRequest declares bounded portable title/location/name/filter state and multiple-selection policy.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

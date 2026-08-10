@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gui_forms/scrolling.hpp"
+#include "gui_forms/controls/scrollable_control/scrollable_control.hpp"
 #include "gui_forms/theme.hpp"
 
 #include <cstdint>

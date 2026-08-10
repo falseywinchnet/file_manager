@@ -1,95 +1,111 @@
 # DrawingSurface
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Control → DrawingSurface`  
-Declaration: `include/gui_forms/diagnostic_controls.hpp:14`  
-Definition: `src/controls/diagnostic_controls.cpp`
+- Status: **OBSERVED: bundle 006 split and background enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Control → DrawingSurface`
+- Declaration: `include/gui_forms/controls/drawing_surface/drawing_surface.hpp:11`
+- Definition: `src/controls/drawing_surface/drawing_surface.cpp`
 
-DrawingSurface is a visual retained control declared in include/gui_forms/diagnostic_controls.hpp.
+DrawingSurface is the public owner-draw primitive for renderer-neutral application visuals. It retains one paint callback, explicit hit-test and semantic policy, and a caller-owned background while normal Control damage, display-list retention, and lifetime rules remain authoritative.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![DrawingSurface](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `DrawingSurface`
+### `DrawingSurface` (public)
 
 ```cpp
 explicit DrawingSurface(StableId stable_id)
 ```
 
-Constructs or tears down the retained DrawingSurface object according to its ownership contract.
+Constructs an owner-draw control with transparent background, image semantics, and input transparency by default.
 
-### `set_paint_callback`
+### `set_paint_callback` (public)
 
 ```cpp
 void set_paint_callback(PaintCallback callback)
 ```
 
-Synchronously updates the retained paint callback property. Validation, typed invalidation, and notifications are defined by the implementation.
+Replaces the renderer-neutral callback and invalidates paint and semantics without creating a subclass.
 
-### `has_paint_callback`
+### `has_paint_callback` (public)
 
 ```cpp
 [[nodiscard]] bool has_paint_callback() const noexcept
 ```
 
-Reports the current has paint callback value without mutation.
+Reports whether an owner paint callback is currently retained.
 
-### `hit_test_visible`
+### `hit_test_visible` (public)
 
 ```cpp
 [[nodiscard]] bool hit_test_visible() const noexcept
 ```
 
-Reports the current hit test visible value without mutation.
+Reports whether local bounds participate in pointer hit testing.
 
-### `set_hit_test_visible`
+### `set_hit_test_visible` (public)
 
 ```cpp
 void set_hit_test_visible(bool visible)
 ```
 
-Synchronously updates the retained hit test visible property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits input participation and invalidates hit-test and semantic projections.
 
-### `semantic_role`
+### `semantic_role` (public)
 
 ```cpp
 [[nodiscard]] SemanticRole semantic_role() const noexcept
 ```
 
-Reports the current semantic role value without mutation.
+Returns the caller-selected semantic role for the owner-drawn surface.
 
-### `set_semantic_role`
+### `set_semantic_role` (public)
 
 ```cpp
 void set_semantic_role(SemanticRole role)
 ```
 
-Synchronously updates the retained semantic role property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits semantic role and invalidates accessibility projection.
 
-### `on_paint`
+### `background` (public)
+
+```cpp
+[[nodiscard]] Color background() const noexcept
+```
+
+Returns the retained background color painted before the callback.
+
+### `set_background` (public)
+
+```cpp
+void set_background(Color color)
+```
+
+Commits owner-selectable backplane color and invalidates paint.
+
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Paints the backplane and invokes the callback with exact local bounds and local damage.
 
-### `hit_test_local`
+### `hit_test_local` (public)
 
 ```cpp
 [[nodiscard]] bool hit_test_local(Point local_point) const override
 ```
 
-Reports the current hit test local value without mutation.
+Combines explicit hit-test visibility with ordinary Control bounds testing.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects caller role, accessible name, and description without inventing domain meaning.

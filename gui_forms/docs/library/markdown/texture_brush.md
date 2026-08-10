@@ -1,95 +1,103 @@
 # TextureBrush
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Brush → TextureBrush`  
-Declaration: `include/gui_forms/drawing.hpp:719`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 texture brush split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Brush → TextureBrush`
+- Declaration: `include/gui_forms/drawing/texture_brush/texture_brush.hpp:11`
+- Definition: `src/core/drawing/texture_brush/texture_brush.cpp`
 
-TextureBrush is a class declared in include/gui_forms/drawing.hpp.
+TextureBrush retains an immutable bitmap/image snapshot plus wrap policy and affine texture transform, so later source mutation cannot alter an authored brush unexpectedly.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `TextureBrush`
+### `TextureBrush` (public)
 
 ```cpp
 explicit TextureBrush(const Bitmap& image, WrapMode wrap_mode = WrapMode::tile)
 ```
 
-Constructs or tears down the retained TextureBrush object according to its ownership contract.
+Snapshots a live Bitmap/ImageReference or privately clones an existing validated brush recipe.
 
-### `TextureBrush`
+### `TextureBrush` (public)
 
 ```cpp
 explicit TextureBrush(const ImageReference& image, WrapMode wrap_mode = WrapMode::tile)
 ```
 
-Constructs or tears down the retained TextureBrush object according to its ownership contract.
+Snapshots a live Bitmap/ImageReference or privately clones an existing validated brush recipe.
 
-### `set_wrap_mode`
+### `set_wrap_mode` (public)
 
 ```cpp
 void set_wrap_mode(WrapMode mode)
 ```
 
-Synchronously updates the retained wrap mode property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits the closed wrap vocabulary.
 
-### `set_transform`
+### `set_transform` (public)
 
 ```cpp
 void set_transform(Matrix transform)
 ```
 
-Synchronously updates the retained transform property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a finite affine transform and commits it.
 
-### `reset_transform`
+### `reset_transform` (public)
 
 ```cpp
 void reset_transform()
 ```
 
-Returns transform to its inherited or default policy.
+Restores identity texture mapping.
 
-### `translate_transform`
+### `translate_transform` (public)
 
 ```cpp
 void translate_transform(double x, double y)
 ```
 
-Public TextureBrush operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Composes a validated translation after current mapping.
 
-### `scale_transform`
+### `scale_transform` (public)
 
 ```cpp
 void scale_transform(double x, double y)
 ```
 
-Public TextureBrush operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates finite nonzero scale and composes it.
 
-### `rotate_transform`
+### `rotate_transform` (public)
 
 ```cpp
 void rotate_transform(double degrees)
 ```
 
-Public TextureBrush operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Composes a validated origin rotation.
 
-### `clone`
+### `clone` (public)
 
 ```cpp
 [[nodiscard]] std::unique_ptr<TextureBrush> clone() const
 ```
 
-Reports the current clone value without mutation.
+Returns independent brush state retaining the same immutable image snapshot.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] BrushSnapshot snapshot() const override
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and returns the full texture recipe.
+
+### `TextureBrush` (private)
+
+```cpp
+explicit TextureBrush(BrushSnapshot value)
+```
+
+Snapshots a live Bitmap/ImageReference or privately clones an existing validated brush recipe.

@@ -1,17 +1,17 @@
 # ImageRegistryLimits
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageRegistryLimits`  
-Declaration: `include/gui_forms/resources.hpp:27`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 image-registry limits review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ImageRegistryLimits`
+- Declaration: `include/gui_forms/resources/types/image_resource_types.hpp:22`
+- Definition: `inline/header-only`
 
-ImageRegistryLimits is a struct declared in include/gui_forms/resources.hpp.
+ImageRegistryLimits bounds individual encoded and decoded images, PNG structure, resource count, and aggregate registry memory.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

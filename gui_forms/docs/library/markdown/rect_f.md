@@ -1,135 +1,135 @@
 # RectF
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `RectF`  
-Declaration: `include/gui_forms/drawing.hpp:71`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 logical rectangle review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `RectF`
+- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:62`
+- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
 
-RectF is a struct declared in include/gui_forms/drawing.hpp.
+RectF provides validated finite logical containment, intersection, union, translation, and inflation.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `left`
+### `left` (public)
 
 ```cpp
 [[nodiscard]] constexpr double left() const noexcept
 ```
 
-Reports the current left value without mutation.
+Returns left edge.
 
-### `top`
+### `top` (public)
 
 ```cpp
 [[nodiscard]] constexpr double top() const noexcept
 ```
 
-Reports the current top value without mutation.
+Returns top edge.
 
-### `right`
+### `right` (public)
 
 ```cpp
 [[nodiscard]] constexpr double right() const noexcept
 ```
 
-Reports the current right value without mutation.
+Returns x-plus-width.
 
-### `bottom`
+### `bottom` (public)
 
 ```cpp
 [[nodiscard]] constexpr double bottom() const noexcept
 ```
 
-Reports the current bottom value without mutation.
+Returns y-plus-height.
 
-### `empty`
+### `empty` (public)
 
 ```cpp
 [[nodiscard]] constexpr bool empty() const noexcept
 ```
 
-Reports the current empty value without mutation.
+Reports nonpositive width or height.
 
-### `finite`
+### `finite` (public)
 
 ```cpp
 [[nodiscard]] bool finite() const noexcept
 ```
 
-Reports the current finite value without mutation.
+Checks all four fields.
 
-### `contains`
+### `contains` (public)
 
 ```cpp
 [[nodiscard]] bool contains(PointF point) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests point or rectangle containment.
 
-### `contains`
+### `contains` (public)
 
 ```cpp
 [[nodiscard]] bool contains(RectF rect) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests point or rectangle containment.
 
-### `intersects`
+### `intersects` (public)
 
 ```cpp
 [[nodiscard]] bool intersects(RectF rect) const noexcept
 ```
 
-Reports the current intersects value without mutation.
+Tests positive-area overlap.
 
-### `offset`
+### `offset` (public)
 
 ```cpp
 void offset(double dx, double dy)
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and commits finite translation.
 
-### `inflate`
+### `inflate` (public)
 
 ```cpp
 void inflate(double dx, double dy)
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and commits symmetric expansion.
 
-### `intersect`
+### `intersect` (public)
 
 ```cpp
 void intersect(RectF rect) noexcept
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Replaces this rectangle with exact intersection.
 
-### `intersection`
+### `intersection` (public)
 
 ```cpp
 [[nodiscard]] static RectF intersection(RectF left, RectF right) noexcept
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns finite overlap or empty.
 
-### `united`
+### `united` (public)
 
 ```cpp
 [[nodiscard]] static RectF united(RectF left, RectF right) noexcept
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns finite conservative union.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const RectF&, const RectF&) = default
 ```
 
-Public RectF operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all four fields.

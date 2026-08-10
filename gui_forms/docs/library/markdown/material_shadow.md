@@ -1,23 +1,23 @@
 # MaterialShadow
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `MaterialShadow`  
-Declaration: `include/gui_forms/surface_material.hpp:78`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 material shadow review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `MaterialShadow`
+- Declaration: `include/gui_forms/surface_material/types/surface_material_types.hpp:69`
+- Definition: `inline/header-only`
 
-MaterialShadow is a struct declared in include/gui_forms/surface_material.hpp.
+MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const MaterialShadow&, const MaterialShadow&) = default
 ```
 
-Public MaterialShadow operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares all authored shadow fields.

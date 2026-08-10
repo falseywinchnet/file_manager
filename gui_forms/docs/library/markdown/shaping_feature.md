@@ -1,23 +1,23 @@
 # ShapingFeature
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ShapingFeature`  
-Declaration: `include/gui_forms/text_shaping.hpp:45`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 shaping feature review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `ShapingFeature`
+- Declaration: `include/gui_forms/text_shaping/types/text_shaping_types.hpp:40`
+- Definition: `inline/header-only`
 
-ShapingFeature is a struct declared in include/gui_forms/text_shaping.hpp.
+ShapingFeature applies one OpenType tag/value to a validated UTF-8 subrange.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
-friend constexpr bool operator==(const ShapingFeature &, const ShapingFeature &) = default
+friend constexpr bool operator==(const ShapingFeature&, const ShapingFeature&) = default
 ```
 
-Public ShapingFeature operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares tag, value, and range.

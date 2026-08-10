@@ -1,191 +1,239 @@
 # ScrollBar
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `RangeControl → ScrollBar`  
-Declaration: `include/gui_forms/range_controls.hpp:253`  
-Definition: `src/controls/range_controls.cpp`
+- Status: **OBSERVED: bundle 004 hierarchical state-machine split; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `RangeControl → ScrollBar`
+- Declaration: `include/gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp:19`
+- Definition: `src/controls/range_control/scroll_bar/scroll_bar.cpp`
 
-ScrollBar is a visual retained control declared in include/gui_forms/range_controls.hpp.
+ScrollBar specializes RangeControl with independently bounded button/thumb/repeat timing, inspectable part geometry, proportional thumb allocation, drag and track/button interaction, deterministic key behavior, retained auto-repeat, focus cues, and scrollbar semantics.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![ScrollBar](../captures/range_controls.png)
 
-## Public methods
+## Declared methods
 
-### `ScrollBar`
+### `ScrollBar` (public)
 
 ```cpp
 explicit ScrollBar(StableId stable_id, Orientation orientation = Orientation::vertical)
 ```
 
-Constructs or tears down the retained ScrollBar object according to its ownership contract.
+Constructs an orientation-specific range control with scrollbar cursor and repeat state.
 
-### `button_extent`
+### `button_extent` (public)
 
 ```cpp
 [[nodiscard]] double button_extent() const noexcept
 ```
 
-Reports the current button extent value without mutation.
+Returns the logical decrement/increment button axis extent.
 
-### `set_button_extent`
+### `set_button_extent` (public)
 
 ```cpp
 void set_button_extent(double extent)
 ```
 
-Synchronously updates the retained button extent property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite bounded extent and invalidates geometry and paint.
 
-### `minimum_thumb_extent`
+### `minimum_thumb_extent` (public)
 
 ```cpp
 [[nodiscard]] double minimum_thumb_extent() const noexcept
 ```
 
-Reports the current minimum thumb extent value without mutation.
+Returns the minimum logical draggable thumb extent.
 
-### `set_minimum_thumb_extent`
+### `set_minimum_thumb_extent` (public)
 
 ```cpp
 void set_minimum_thumb_extent(double extent)
 ```
 
-Synchronously updates the retained minimum thumb extent property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a finite bounded positive extent and invalidates geometry.
 
-### `initial_repeat_delay`
+### `initial_repeat_delay` (public)
 
 ```cpp
 [[nodiscard]] FrameInterval initial_repeat_delay() const noexcept
 ```
 
-Reports the current initial repeat delay value without mutation.
+Returns the delay before a held part first repeats.
 
-### `set_initial_repeat_delay`
+### `set_initial_repeat_delay` (public)
 
 ```cpp
 void set_initial_repeat_delay(FrameInterval delay)
 ```
 
-Synchronously updates the retained initial repeat delay property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a positive duration for repeat qualification.
 
-### `repeat_interval`
+### `repeat_interval` (public)
 
 ```cpp
 [[nodiscard]] FrameInterval repeat_interval() const noexcept
 ```
 
-Reports the current repeat interval value without mutation.
+Returns the positive interval between qualified repeats.
 
-### `set_repeat_interval`
+### `set_repeat_interval` (public)
 
 ```cpp
 void set_repeat_interval(FrameInterval interval)
 ```
 
-Synchronously updates the retained repeat interval property. Validation, typed invalidation, and notifications are defined by the implementation.
+Accepts a positive repeat cadence.
 
-### `decrement_button_bounds`
+### `decrement_button_bounds` (public)
 
 ```cpp
 [[nodiscard]] Rect decrement_button_bounds() const noexcept
 ```
 
-Reports the current decrement button bounds value without mutation.
+Returns the current local geometry of the leading decrement part.
 
-### `increment_button_bounds`
+### `increment_button_bounds` (public)
 
 ```cpp
 [[nodiscard]] Rect increment_button_bounds() const noexcept
 ```
 
-Reports the current increment button bounds value without mutation.
+Returns the current local geometry of the trailing increment part.
 
-### `track_bounds`
+### `track_bounds` (public)
 
 ```cpp
 [[nodiscard]] Rect track_bounds() const noexcept
 ```
 
-Reports the current track bounds value without mutation.
+Returns the local axis track between command buttons.
 
-### `thumb_bounds`
+### `thumb_bounds` (public)
 
 ```cpp
 [[nodiscard]] Rect thumb_bounds() const noexcept
 ```
 
-Reports the current thumb bounds value without mutation.
+Returns the constrained proportional thumb geometry within the track.
 
-### `part_at`
+### `part_at` (public)
 
 ```cpp
 [[nodiscard]] ScrollBarPart part_at(Point local_point) const noexcept
 ```
 
-Reports the current part at value without mutation.
+Classifies a local point as none, decrement button/page, thumb, increment page/button.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Provides orientation-aware desired thickness and two-button axis length.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records buttons, chevrons, track, pages, thumb, interaction, focus, and disabled states.
 
-### `on_pointer`
+### `on_pointer` (public)
 
 ```cpp
 void on_pointer(PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Owns part qualification, capture, thumb dragging, page/line changes, cancellation, and repeat scheduling.
 
-### `on_key`
+### `on_key` (public)
 
 ```cpp
 void on_key(KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Handles arrows, page movement, home, and end through reasoned RangeControl transitions.
 
-### `on_focus_changed`
+### `on_focus_changed` (public)
 
 ```cpp
 void on_focus_changed(bool focused) override
 ```
 
-Updates focus-dependent retained state and invalidates affected presentation/semantics.
+Commits keyboard focus cues and stops interaction when focus policy requires.
 
-### `on_frame`
+### `on_frame` (public)
 
 ```cpp
 void on_frame(FrameTime now) override
 ```
 
-Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes deadline-based held-part repeats while preserving current pointer qualification.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a scrollbar role with range, value, orientation, and line/page actions.
 
-### `on_semantic_action`
+### `on_semantic_action` (public)
 
 ```cpp
 bool on_semantic_action(SemanticAction action, std::string_view value) override
+```
+
+Routes increment, decrement, page, and set-value commands through ordinary constrained state.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
+Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `axis_coordinate` (private)
+
+```cpp
+[[nodiscard]] double axis_coordinate(Point local_point) const noexcept
+```
+
+Reports the current axis coordinate value without mutation.
+
+### `value_from_thumb_coordinate` (private)
+
+```cpp
+[[nodiscard]] double value_from_thumb_coordinate(double coordinate) const noexcept
+```
+
+Reports the current value from thumb coordinate value without mutation.
+
+### `apply_part` (private)
+
+```cpp
+bool apply_part(ScrollBarPart part)
+```
+
+Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `begin_repeat` (private)
+
+```cpp
+void begin_repeat(ScrollBarPart part, Point pointer)
+```
+
+Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `stop_interaction` (private)
+
+```cpp
+void stop_interaction() noexcept
 ```
 
 Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

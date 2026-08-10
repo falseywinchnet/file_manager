@@ -1,17 +1,17 @@
 # PointerCaptureChange
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PointerCaptureChange`  
-Declaration: `include/gui_forms/window.hpp:204`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 007 window interaction value review; M4 build and focused tests pass**
+- Kind: **struct**
+- Hierarchy: `PointerCaptureChange`
+- Declaration: `include/gui_forms/window/window.hpp:132`
+- Definition: `inline/header-only`
 
-PointerCaptureChange is a struct declared in include/gui_forms/window.hpp.
+PointerCaptureChange carries capture state, runtime/stable control identity, and pointer identity to host services.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

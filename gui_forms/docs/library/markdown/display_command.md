@@ -1,17 +1,17 @@
 # DisplayCommand
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `DisplayCommand`  
-Declaration: `src/core/display_chunk.hpp:36`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 008 private display command review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `DisplayCommand`
+- Declaration: `src/core/display/command/display_command.hpp:36`
+- Definition: `inline/header-only`
 
-DisplayCommand is a struct declared in src/core/display_chunk.hpp.
+DisplayCommand is the closed renderer-neutral storage record for one Painter operation, using typed geometry/color/font/resource fields and owned variable data.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

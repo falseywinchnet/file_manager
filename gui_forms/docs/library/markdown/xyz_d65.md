@@ -1,23 +1,23 @@
 # XyzD65
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `XyzD65`  
-Declaration: `include/gui_forms/drawing.hpp:171`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 color-space value review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `XyzD65`
+- Declaration: `include/gui_forms/drawing/color/color.hpp:85`
+- Definition: `inline/header-only`
 
-XyzD65 is a struct declared in include/gui_forms/drawing.hpp.
+XyzD65 carries normalized CIE XYZ D65 coordinates plus straight alpha.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend constexpr bool operator==(const XyzD65&, const XyzD65&) = default
 ```
 
-Public XyzD65 operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares XYZ and alpha.

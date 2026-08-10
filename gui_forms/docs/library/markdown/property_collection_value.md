@@ -1,63 +1,71 @@
 # PropertyCollectionValue
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `PropertyCollectionValue`  
-Declaration: `include/gui_forms/binding_types.hpp:73`  
-Definition: `src/core/binding.cpp`
+- Status: **OBSERVED: bundle 010 property collection handle review; focused M4 binding tests pass**
+- Kind: **class**
+- Hierarchy: `PropertyCollectionValue`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:73`
+- Definition: `src/core/binding/value/binding_value.cpp`
 
-PropertyCollectionValue is a class declared in include/gui_forms/binding_types.hpp.
+PropertyCollectionValue is a cheap immutable shared handle over a validated bounded homogeneous property sequence.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `PropertyCollectionValue`
+### `PropertyCollectionValue` (public)
 
 ```cpp
 PropertyCollectionValue() = default
 ```
 
-Constructs or tears down the retained PropertyCollectionValue object according to its ownership contract.
+Default construction is empty; private factory construction admits validated shared data.
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether immutable data is present.
 
-### `item_type_name`
+### `item_type_name` (public)
 
 ```cpp
 [[nodiscard]] std::string_view item_type_name() const noexcept
 ```
 
-Reports the current item type name value without mutation.
+Returns retained item type identity or an empty view.
 
-### `item_kind`
+### `item_kind` (public)
 
 ```cpp
 [[nodiscard]] BindingValueKind item_kind() const noexcept
 ```
 
-Reports the current item kind value without mutation.
+Returns the declared non-null item kind.
 
-### `data`
+### `data` (public)
 
 ```cpp
 [[nodiscard]] const PropertyCollectionData* data() const noexcept
 ```
 
-Reports the current data value without mutation.
+Returns the immutable backing record pointer.
 
-### `operator==`
+### `operator==` (public)
 
 ```cpp
 friend bool operator==(const PropertyCollectionValue& left, const PropertyCollectionValue& right) noexcept
 ```
 
-Public PropertyCollectionValue operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares structural collection data rather than shared-pointer identity.
+
+### `PropertyCollectionValue` (private)
+
+```cpp
+explicit PropertyCollectionValue( std::shared_ptr<const PropertyCollectionData> authored_data) : data_(std::move(authored_data))
+```
+
+Default construction is empty; private factory construction admits validated shared data.

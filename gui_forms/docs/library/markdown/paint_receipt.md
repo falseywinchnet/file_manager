@@ -1,31 +1,31 @@
 # PaintReceipt
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `PaintReceipt`  
-Declaration: `include/gui_forms/window.hpp:146`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 008 presentation acknowledgement review; focused M4 tests pass**
+- Kind: **struct**
+- Hierarchy: `PaintReceipt`
+- Declaration: `include/gui_forms/window/presentation/presentation_types.hpp:63`
+- Definition: `inline/header-only`
 
-PaintReceipt is a struct declared in include/gui_forms/window.hpp.
+PaintReceipt proves that one complete retained transaction replayed into a host backing surface at a specific content revision and surface epoch.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operatorbool`
+### `operatorbool` (public)
 
 ```cpp
 [[nodiscard]] explicit constexpr operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Accepts a receipt as structurally present only when both its rendered revision and surface epoch are nonzero.
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
 friend constexpr auto operator<=>(const PaintReceipt&, const PaintReceipt&) = default
 ```
 
-Public PaintReceipt operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Orders and compares receipts by their exact revision-and-epoch identity.

@@ -1,55 +1,55 @@
 # LinearGradientBrush
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Brush → LinearGradientBrush`  
-Declaration: `include/gui_forms/drawing.hpp:387`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 linear-gradient brush split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Brush → LinearGradientBrush`
+- Declaration: `include/gui_forms/drawing/brush/linear_gradient_brush.hpp:7`
+- Definition: `src/core/drawing/brush/linear_gradient_brush.cpp`
 
-LinearGradientBrush is a class declared in include/gui_forms/drawing.hpp.
+LinearGradientBrush retains bounded geometry, angle, wrap, and either factor-derived or explicit interpolation stops.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `LinearGradientBrush`
+### `LinearGradientBrush` (public)
 
 ```cpp
 LinearGradientBrush(RectF bounds, Color first, Color second, double angle = 0.0, WrapMode wrap_mode = WrapMode::tile)
 ```
 
-Constructs or tears down the retained LinearGradientBrush object according to its ownership contract.
+Validates bounds, angle, and wrap before retaining endpoint colors.
 
-### `set_blend`
+### `set_blend` (public)
 
 ```cpp
 void set_blend(std::span<const double> factors, std::span<const double> positions)
 ```
 
-Synchronously updates the retained blend property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates equal bounded monotonic factor/position spans and derives interpolation colors.
 
-### `set_interpolation_colors`
+### `set_interpolation_colors` (public)
 
 ```cpp
 void set_interpolation_colors(const ColorBlend& blend)
 ```
 
-Synchronously updates the retained interpolation colors property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and owns explicit colors and positions.
 
-### `set_wrap_mode`
+### `set_wrap_mode` (public)
 
 ```cpp
 void set_wrap_mode(WrapMode mode)
 ```
 
-Synchronously updates the retained wrap mode property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits the closed wrap vocabulary.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] BrushSnapshot snapshot() const override
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and copies the complete linear-gradient recipe.

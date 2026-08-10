@@ -1,7 +1,7 @@
 # KeyAction
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/events.hpp:34`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/events.hpp:34`
 
 ## Declared values
 

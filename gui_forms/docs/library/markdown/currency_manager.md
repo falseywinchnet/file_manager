@@ -1,183 +1,191 @@
 # CurrencyManager
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `BindingManagerBase → CurrencyManager`  
-Declaration: `include/gui_forms/binding.hpp:154`  
-Definition: `src/core/binding.cpp`
+- Status: **OBSERVED: bundle 010 currency manager split; focused M4 binding tests pass**
+- Kind: **class**
+- Hierarchy: `BindingManagerBase → CurrencyManager`
+- Declaration: `include/gui_forms/binding/currency_manager/currency_manager.hpp:11`
+- Definition: `src/core/binding/currency_manager/currency_manager.cpp`
 
-CurrencyManager is a class declared in include/gui_forms/binding.hpp.
+CurrencyManager is the non-owning facade over exactly one BindingSource, keeping navigation, edit, and bulk transfer vocabulary uniform.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `count`
+### `count` (public)
 
 ```cpp
 [[nodiscard]] std::size_t count() const noexcept override
 ```
 
-Reports the current count value without mutation.
+Delegates row count or returns zero after detachment.
 
-### `current`
+### `current` (public)
 
 ```cpp
 [[nodiscard]] const BindingRecord* current() const noexcept override
 ```
 
-Reports the current current value without mutation.
+Delegates current row or returns null after detachment.
 
-### `position`
+### `position` (public)
 
 ```cpp
 [[nodiscard]] std::ptrdiff_t position() const noexcept override
 ```
 
-Reports the current position value without mutation.
+Delegates currency or returns -1 after detachment.
 
-### `binding_suspended`
+### `binding_suspended` (public)
 
 ```cpp
 [[nodiscard]] bool binding_suspended() const noexcept override
 ```
 
-Reports the current binding suspended value without mutation.
+Delegates suspension state.
 
-### `set_position`
+### `set_position` (public)
 
 ```cpp
 bool set_position(std::ptrdiff_t position) override
 ```
 
-Synchronously updates the retained position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Delegates an admitted currency transition.
 
-### `cancel_current_edit`
+### `cancel_current_edit` (public)
 
 ```cpp
 void cancel_current_edit() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates edit rollback.
 
-### `end_current_edit`
+### `end_current_edit` (public)
 
 ```cpp
 void end_current_edit() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates edit commit.
 
-### `remove_at`
+### `remove_at` (public)
 
 ```cpp
 bool remove_at(std::size_t index) override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates row removal.
 
-### `suspend_binding`
+### `suspend_binding` (public)
 
 ```cpp
 void suspend_binding() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates transfer suspension.
 
-### `resume_binding`
+### `resume_binding` (public)
 
 ```cpp
 void resume_binding() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates transfer resumption.
 
-### `pull_data`
+### `pull_data` (public)
 
 ```cpp
 bool pull_data() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests every active binding to read the source.
 
-### `push_data`
+### `push_data` (public)
 
 ```cpp
 bool push_data() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests every active binding to write the source.
 
-### `binding_complete`
+### `binding_complete` (public)
 
 ```cpp
 [[nodiscard]] Event<BindingCompleteEvent&>& binding_complete() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source completion event.
 
-### `current_changed`
+### `current_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<>& current_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source currency event.
 
-### `current_item_changed`
+### `current_item_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<>& current_item_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source current-item event.
 
-### `position_changed`
+### `position_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<std::ptrdiff_t>& position_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source position event.
 
-### `data_error`
+### `data_error` (public)
 
 ```cpp
 [[nodiscard]] Event<const std::string&>& data_error() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source error event.
 
-### `list`
+### `list` (public)
 
 ```cpp
 [[nodiscard]] std::span<const BindingRecord> list() const noexcept
 ```
 
-Reports the current list value without mutation.
+Returns the complete source row view.
 
-### `list_changed`
+### `list_changed` (public)
 
 ```cpp
 [[nodiscard]] Event<const BindingListChange&>& list_changed() noexcept
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source list event.
 
-### `refresh`
+### `refresh` (public)
 
 ```cpp
 void refresh()
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes one non-metadata reset.
 
-### `source`
+### `source` (public)
 
 ```cpp
 [[nodiscard]] BindingSource& source() const noexcept
 ```
 
-Reports the current source value without mutation.
+Returns the bound source reference.
+
+### `CurrencyManager` (private)
+
+```cpp
+explicit CurrencyManager(BindingSource& source) : source_(&source)
+```
+
+Privately binds one source for the source's complete lifetime.

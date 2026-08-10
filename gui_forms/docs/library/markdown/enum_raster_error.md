@@ -1,7 +1,7 @@
 # RasterError
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `src/render/skia/drawing_skia.hpp:15`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `src/render/skia/executor/drawing_skia.hpp:15`
 
 ## Declared values
 

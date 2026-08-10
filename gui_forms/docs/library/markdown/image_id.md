@@ -1,10 +1,10 @@
 # ImageId
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `ImageId`  
-Declaration: `include/gui_forms/types.hpp:147`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `ImageId`
+- Declaration: `include/gui_forms/types.hpp:147`
+- Definition: `inline/header-only`
 
 ImageId is a struct declared in include/gui_forms/types.hpp.
 
@@ -12,9 +12,9 @@ ImageId is a struct declared in include/gui_forms/types.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `operator<=>`
+### `operator<=>` (public)
 
 ```cpp
 friend constexpr auto operator<=>(const ImageId&, const ImageId&) = default

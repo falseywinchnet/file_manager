@@ -1,31 +1,31 @@
 # TextShaper
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `TextShaper`  
-Declaration: `include/gui_forms/text_shaping.hpp:117`  
-Definition: `inline/header-only`
+- Status: **OBSERVED: bundle 009 shaping interface split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `TextShaper`
+- Declaration: `include/gui_forms/text_shaping/text_shaper/text_shaper.hpp:7`
+- Definition: `inline/header-only`
 
-TextShaper is a class declared in include/gui_forms/text_shaping.hpp.
+TextShaper is the renderer-neutral boundary from a validated shaping request to clustered glyph placement.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `~TextShaper`
+### `~TextShaper` (public)
 
 ```cpp
 virtual ~TextShaper() = default
 ```
 
-Constructs or tears down the retained TextShaper object according to its ownership contract.
+Provides polymorphic destruction.
 
-### `shape`
+### `shape` (public)
 
 ```cpp
-[[nodiscard]] virtual GlyphRun shape(const ShapingRequest &request) = 0
+[[nodiscard]] virtual GlyphRun shape(const ShapingRequest& request) = 0
 ```
 
-Public TextShaper operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Shapes one request into a source-correlated glyph run.

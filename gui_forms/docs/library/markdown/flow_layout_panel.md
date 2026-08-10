@@ -1,111 +1,143 @@
 # FlowLayoutPanel
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `ContainerControl → FlowLayoutPanel`  
-Declaration: `include/gui_forms/container_controls.hpp:122`  
-Definition: `src/controls/container_controls.cpp`
+- Status: **OBSERVED: bundle 003 split and item-spacing enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `ContainerControl → FlowLayoutPanel`
+- Declaration: `include/gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp:17`
+- Definition: `src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp`
 
-FlowLayoutPanel is a visual retained control declared in include/gui_forms/container_controls.hpp.
+FlowLayoutPanel is a retained directional packing algorithm with four flow directions, optional wrapping, explicit bounded inter-item/inter-line spacing, per-child margins, stable flow breaks, and optional content-driven size.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![FlowLayoutPanel](../captures/layout_panels.png)
 
-## Public methods
+## Declared methods
 
-### `FlowLayoutPanel`
+### `FlowLayoutPanel` (public)
 
 ```cpp
 explicit FlowLayoutPanel(StableId stable_id)
 ```
 
-Constructs or tears down the retained FlowLayoutPanel object according to its ownership contract.
+Constructs a left-to-right wrapping ContainerControl with zero explicit inter-item spacing.
 
-### `flow_direction`
+### `flow_direction` (public)
 
 ```cpp
 [[nodiscard]] FlowDirection flow_direction() const noexcept
 ```
 
-Reports the current flow direction value without mutation.
+Returns left-to-right, right-to-left, top-down, or bottom-up packing order.
 
-### `set_flow_direction`
+### `set_flow_direction` (public)
 
 ```cpp
 void set_flow_direction(FlowDirection direction)
 ```
 
-Synchronously updates the retained flow direction property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates the closed direction vocabulary and invalidates measurement, arrangement, and semantics.
 
-### `wrap_contents`
+### `wrap_contents` (public)
 
 ```cpp
 [[nodiscard]] bool wrap_contents() const noexcept
 ```
 
-Reports the current wrap contents value without mutation.
+Reports whether overflowing items start a new line or column.
 
-### `set_wrap_contents`
+### `set_wrap_contents` (public)
 
 ```cpp
 void set_wrap_contents(bool wrap)
 ```
 
-Synchronously updates the retained wrap contents property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles wrapping and invalidates the retained layout result.
 
-### `auto_size`
+### `item_spacing` (public)
+
+```cpp
+[[nodiscard]] Size item_spacing() const noexcept
+```
+
+Returns explicit main-axis item and cross-axis line separation as logical dimensions.
+
+### `set_item_spacing` (public)
+
+```cpp
+void set_item_spacing(Size spacing)
+```
+
+Accepts finite zero-to-256 spacing, applies it between items and lines without trailing gaps, and invalidates layout.
+
+### `auto_size` (public)
 
 ```cpp
 [[nodiscard]] bool auto_size() const noexcept override
 ```
 
-Reports the current auto size value without mutation.
+Returns whether desired size follows the packed child extent.
 
-### `set_auto_size`
+### `set_auto_size` (public)
 
 ```cpp
 void set_auto_size(bool auto_size) override
 ```
 
-Synchronously updates the retained auto size property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits content-driven sizing through the base Control property while preserving flow-specific invalidation.
 
-### `set_flow_break`
+### `set_flow_break` (public)
 
 ```cpp
 void set_flow_break(const Control& child, bool flow_break)
 ```
 
-Synchronously updates the retained flow break property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requires a direct child and records whether it terminates the current line/column after itself.
 
-### `flow_break`
+### `flow_break` (public)
 
 ```cpp
 [[nodiscard]] bool flow_break(const Control& child) const
 ```
 
-Reports the current flow break value without mutation.
+Returns the retained break bit for a current direct child.
 
-### `measure`
+### `measure` (public)
 
 ```cpp
 [[nodiscard]] Size measure(Size available) override
 ```
 
-Computes desired size from the available constraint without arranging children.
+Packs stable child snapshots without assignment and returns the bounded flow extent when auto-sized.
 
-### `arrange`
+### `arrange` (public)
 
 ```cpp
 void arrange(Rect final_bounds) override
 ```
 
-Commits final geometry and arranges retained child roles within it.
+Reconciles removed metadata and assigns each live child a margin-aware directional slot in final bounds.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects a named flow surface as a group while leaving unnamed structural layout unexposed.
+
+### `layout_children` (private)
+
+```cpp
+[[nodiscard]] Size layout_children(Size available, bool assign)
+```
+
+Public FlowLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `reconcile_flow_breaks` (private)
+
+```cpp
+void reconcile_flow_breaks()
+```
+
+Public FlowLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.

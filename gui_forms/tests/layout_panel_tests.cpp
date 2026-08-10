@@ -148,6 +148,32 @@ void test_flow_direction_break_visibility_and_resize() {
             "attached flow policy mutation must retain UI-thread enforcement");
 }
 
+void test_flow_item_spacing_is_explicit_bounded_layout_state() {
+    auto flow = make_control<FlowLayoutPanel>(StableId("layout.flow.spacing"));
+    auto first = sized_button("layout.flow.spacing.first", 30.0, 20.0);
+    auto second = sized_button("layout.flow.spacing.second", 30.0, 20.0);
+    auto third = sized_button("layout.flow.spacing.third", 30.0, 20.0);
+    flow->add_child(first);
+    flow->add_child(second);
+    flow->add_child(third);
+    flow->set_item_spacing({7.0, 9.0});
+    Window window(flow, {75.0, 80.0});
+    window.perform_layout();
+    require(first->arranged_bounds() == Rect{0.0, 0.0, 30.0, 20.0} &&
+                second->arranged_bounds() == Rect{37.0, 0.0, 30.0, 20.0} &&
+                third->arranged_bounds() == Rect{0.0, 29.0, 30.0, 20.0},
+            "FlowLayoutPanel item spacing must separate items and wrapped lines");
+
+    bool rejected{};
+    try {
+        flow->set_item_spacing({257.0, 9.0});
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && flow->item_spacing() == Size{7.0, 9.0},
+            "FlowLayoutPanel item spacing must reject invalid geometry atomically");
+}
+
 void test_layout_panels_revalidate_snapshot_after_measure_callback() {
     {
         auto flow = make_control<FlowLayoutPanel>(
@@ -547,6 +573,7 @@ int main() {
     try {
         test_margin_padding_validation_and_retained_slots();
         test_flow_direction_break_visibility_and_resize();
+        test_flow_item_spacing_is_explicit_bounded_layout_state();
         test_layout_panels_revalidate_snapshot_after_measure_callback();
         test_table_mixed_tracks_spans_and_lookup();
         test_table_growth_hidden_children_and_fixed_overflow();

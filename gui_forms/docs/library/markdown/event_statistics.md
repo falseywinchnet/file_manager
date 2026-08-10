@@ -1,10 +1,10 @@
 # EventStatistics
 
-Status: **generated inventory; detailed review pending**  
-Kind: **struct**  
-Hierarchy: `EventStatistics`  
-Declaration: `include/gui_forms/event.hpp:49`  
-Definition: `inline/header-only`
+- Status: **generated inventory; detailed review pending**
+- Kind: **struct**
+- Hierarchy: `EventStatistics`
+- Declaration: `include/gui_forms/event.hpp:49`
+- Definition: `inline/header-only`
 
 EventStatistics is a struct declared in include/gui_forms/event.hpp.
 
@@ -12,6 +12,6 @@ EventStatistics is a struct declared in include/gui_forms/event.hpp.
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
 No public methods were discovered in this declaration.

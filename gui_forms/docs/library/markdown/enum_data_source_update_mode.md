@@ -1,7 +1,7 @@
 # DataSourceUpdateMode
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/binding.hpp:28`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:16`
 
 ## Declared values
 

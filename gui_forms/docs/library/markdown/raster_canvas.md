@@ -1,207 +1,279 @@
 # RasterCanvas
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class / visual retained control**  
-Hierarchy: `Control → RasterCanvas`  
-Declaration: `include/gui_forms/canvas.hpp:15`  
-Definition: `src/controls/canvas.cpp`
+- Status: **OBSERVED: bundle 006 hierarchical move and transparency-cell enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Kind: **class / visual retained control**
+- Hierarchy: `Control → RasterCanvas`
+- Declaration: `include/gui_forms/controls/raster_canvas/raster_canvas.hpp:15`
+- Definition: `src/controls/raster_canvas/raster_canvas.cpp`
 
-RasterCanvas is a visual retained control declared in include/gui_forms/canvas.hpp.
+RasterCanvas is a retained viewport over an application-owned GUI.Drawing Bitmap. It owns resource publication/patch recovery, exact generation tracking, zoom/origin transforms, nearest or linear sampling, bounded background/checker customization, local damage projection, and image semantics; document tools, history, and selection remain outside the control.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![RasterCanvas](../captures/drawing_raster_material.png)
 
-## Public methods
+## Declared methods
 
-### `RasterCanvas`
+### `RasterCanvas` (public)
 
 ```cpp
 explicit RasterCanvas(StableId stable_id)
 ```
 
-Constructs or tears down the retained RasterCanvas object according to its ownership contract.
+Constructs a focusable crosshair viewport with nearest sampling and adaptive checker presentation.
 
-### `bitmap`
+### `bitmap` (public)
 
 ```cpp
 [[nodiscard]] const std::shared_ptr<gui_drawing::Bitmap>& bitmap() const noexcept
 ```
 
-Reports the current bitmap value without mutation.
+Returns the shared application-owned bitmap currently presented.
 
-### `set_bitmap`
+### `set_bitmap` (public)
 
 ```cpp
 void set_bitmap(std::shared_ptr<gui_drawing::Bitmap> bitmap)
 ```
 
-Synchronously updates the retained bitmap property. Validation, typed invalidation, and notifications are defined by the implementation.
+Revokes stale Window imagery, replaces the document reference, publishes when attached, and resets generation/error state.
 
-### `clear_bitmap`
+### `clear_bitmap` (public)
 
 ```cpp
 void clear_bitmap()
 ```
 
-Removes the explicit bitmap value and restores fallback behavior.
+Removes bitmap presentation through the same resource-revocation path.
 
-### `zoom`
+### `zoom` (public)
 
 ```cpp
 [[nodiscard]] double zoom() const noexcept
 ```
 
-Reports the current zoom value without mutation.
+Returns retained bitmap-pixel to client-unit scale.
 
-### `set_zoom`
+### `set_zoom` (public)
 
 ```cpp
 void set_zoom(double zoom)
 ```
 
-Synchronously updates the retained zoom property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates [1/64, 256] and commits zoom with current origin.
 
-### `view_origin`
+### `view_origin` (public)
 
 ```cpp
 [[nodiscard]] gui_drawing::PointF view_origin() const noexcept
 ```
 
-Reports the current view origin value without mutation.
+Returns the bitmap-space point mapped to client origin.
 
-### `set_view_origin`
+### `set_view_origin` (public)
 
 ```cpp
 void set_view_origin(gui_drawing::PointF origin)
 ```
 
-Synchronously updates the retained view origin property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates bounded finite coordinates and commits origin with current zoom.
 
-### `set_view`
+### `set_view` (public)
 
 ```cpp
 void set_view(double zoom, gui_drawing::PointF origin)
 ```
 
-Synchronously updates the retained view property. Validation, typed invalidation, and notifications are defined by the implementation.
+Atomically validates and commits zoom and origin, then refreshes paint and semantics.
 
-### `sampling`
+### `sampling` (public)
 
 ```cpp
 [[nodiscard]] ImageSampling sampling() const noexcept
 ```
 
-Reports the current sampling value without mutation.
+Returns nearest or linear image sampling policy.
 
-### `set_sampling`
+### `set_sampling` (public)
 
 ```cpp
 void set_sampling(ImageSampling sampling)
 ```
 
-Synchronously updates the retained sampling property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates admitted sampling and refreshes paint/damage expansion policy.
 
-### `transparency_grid`
+### `transparency_grid` (public)
 
 ```cpp
 [[nodiscard]] bool transparency_grid() const noexcept
 ```
 
-Reports the current transparency grid value without mutation.
+Reports whether transparent bitmap bounds receive a checker backplane.
 
-### `set_transparency_grid`
+### `set_transparency_grid` (public)
 
 ```cpp
 void set_transparency_grid(bool visible)
 ```
 
-Synchronously updates the retained transparency grid property. Validation, typed invalidation, and notifications are defined by the implementation.
+Toggles checker presentation without changing bitmap data.
 
-### `canvas_background`
+### `canvas_background` (public)
 
 ```cpp
 [[nodiscard]] Color canvas_background() const noexcept
 ```
 
-Reports the current canvas background value without mutation.
+Returns the viewport color outside visible bitmap bounds.
 
-### `set_canvas_background`
+### `set_canvas_background` (public)
 
 ```cpp
 void set_canvas_background(Color color)
 ```
 
-Synchronously updates the retained canvas background property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits canvas backplane color and invalidates paint.
 
-### `set_transparency_colors`
+### `set_transparency_colors` (public)
 
 ```cpp
 void set_transparency_colors(Color first, Color second)
 ```
 
-Synchronously updates the retained transparency colors property. Validation, typed invalidation, and notifications are defined by the implementation.
+Atomically replaces both checker colors and refreshes paint.
 
-### `presented_generation`
+### `transparency_cell_size` (public)
+
+```cpp
+[[nodiscard]] double transparency_cell_size() const noexcept
+```
+
+Returns explicit checker cell size, or zero for adaptive sizing.
+
+### `set_transparency_cell_size` (public)
+
+```cpp
+void set_transparency_cell_size(double size)
+```
+
+Accepts zero or a bounded [2, 128] cell size and refreshes paint.
+
+### `presented_generation` (public)
 
 ```cpp
 [[nodiscard]] std::uint64_t presented_generation() const noexcept
 ```
 
-Reports the current presented generation value without mutation.
+Returns the exact Bitmap generation uploaded to the Window resource registry.
 
-### `last_resource_error`
+### `last_resource_error` (public)
 
 ```cpp
 [[nodiscard]] ImageResourceError last_resource_error() const noexcept
 ```
 
-Reports the current last resource error value without mutation.
+Returns the last image publication or patch error.
 
-### `synchronize_bitmap`
+### `synchronize_bitmap` (public)
 
 ```cpp
 [[nodiscard]] bool synchronize_bitmap()
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes accumulated Bitmap damage as bounded image patches, recovering stale resource IDs by full republish.
 
-### `bitmap_to_client`
+### `bitmap_to_client` (public)
 
 ```cpp
 [[nodiscard]] Rect bitmap_to_client(gui_drawing::RectI pixels) const noexcept
 ```
 
-Reports the current bitmap to client value without mutation.
+Transforms an integer bitmap rectangle through retained origin and zoom.
 
-### `client_to_bitmap`
+### `client_to_bitmap` (public)
 
 ```cpp
 [[nodiscard]] gui_drawing::PointF client_to_bitmap(Point client) const noexcept
 ```
 
-Reports the current client to bitmap value without mutation.
+Transforms a client point back into bitmap-space coordinates.
 
-### `visible_bitmap_bounds`
+### `visible_bitmap_bounds` (public)
 
 ```cpp
 [[nodiscard]] gui_drawing::RectF visible_bitmap_bounds() const
 ```
 
-Reports the current visible bitmap bounds value without mutation.
+Clips the current client viewport to exact bitmap-space bounds.
 
-### `on_paint`
+### `on_paint` (public)
 
 ```cpp
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Records canvas, optional checker, and the visible sampled bitmap region.
 
-### `semantic_descriptor`
+### `semantic_descriptor` (public)
 
 ```cpp
 [[nodiscard]] SemanticDescriptor semantic_descriptor() const override
 ```
 
-Projects the current retained state into the framework semantic/accessibility graph.
+Projects image role plus bitmap dimensions and zoom without claiming document editing semantics.
+
+### `on_attached_to_window` (protected)
+
+```cpp
+void on_attached_to_window() override
+```
+
+Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_detaching_from_window` (protected)
+
+```cpp
+void on_detaching_from_window(Window& former_window) noexcept override
+```
+
+Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_detached_from_window` (protected)
+
+```cpp
+void on_detached_from_window() noexcept override
+```
+
+Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `on_dispose` (protected)
+
+```cpp
+void on_dispose() noexcept override
+```
+
+Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `publish_full_bitmap` (private)
+
+```cpp
+[[nodiscard]] bool publish_full_bitmap()
+```
+
+Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `damage_to_client` (private)
+
+```cpp
+[[nodiscard]] Rect damage_to_client(gui_drawing::RectI pixels) const noexcept
+```
+
+Reports the current damage to client value without mutation.
+
+### `paint_transparency_grid` (private)
+
+```cpp
+void paint_transparency_grid(Painter& painter, Rect bounds) const
+```
+
+Reports the current paint transparency grid value without mutation.

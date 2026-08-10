@@ -1,7 +1,7 @@
 # LiveSurfacePixelFormat
 
-Status: **generated state/value inventory; narrative review pending**  
-Declaration: `include/gui_forms/live_surface.hpp:13`
+- Status: **generated state/value inventory; narrative review pending**
+- Declaration: `include/gui_forms/live_surface/types/live_surface_types.hpp:10`
 
 ## Declared values
 

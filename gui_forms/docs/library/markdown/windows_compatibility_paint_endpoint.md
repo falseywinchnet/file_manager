@@ -1,10 +1,10 @@
 # WindowsCompatibilityPaintEndpoint
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `WindowsCompatibilityPaintEndpoint`  
-Declaration: `include/gui_forms/platform/windows_host.hpp:56`  
-Definition: `src/host/windows/windows_host.cpp`
+- Status: **generated inventory; detailed review pending**
+- Kind: **class**
+- Hierarchy: `WindowsCompatibilityPaintEndpoint`
+- Declaration: `include/gui_forms/platform/windows_host.hpp:56`
+- Definition: `src/host/windows/application/windows_host.cpp`
 
 WindowsCompatibilityPaintEndpoint is a class declared in include/gui_forms/platform/windows_host.hpp.
 
@@ -12,9 +12,9 @@ WindowsCompatibilityPaintEndpoint is a class declared in include/gui_forms/platf
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `acquire`
+### `acquire` (public)
 
 ```cpp
 static std::shared_ptr<WindowsCompatibilityPaintEndpoint> acquire( std::uint32_t width, std::uint32_t height)
@@ -22,7 +22,7 @@ static std::shared_ptr<WindowsCompatibilityPaintEndpoint> acquire( std::uint32_t
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `~WindowsCompatibilityPaintEndpoint`
+### `~WindowsCompatibilityPaintEndpoint` (public)
 
 ```cpp
 ~WindowsCompatibilityPaintEndpoint()
@@ -30,7 +30,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Constructs or tears down the retained WindowsCompatibilityPaintEndpoint object according to its ownership contract.
 
-### `WindowsCompatibilityPaintEndpoint`
+### `WindowsCompatibilityPaintEndpoint` (public)
 
 ```cpp
 WindowsCompatibilityPaintEndpoint( const WindowsCompatibilityPaintEndpoint&) = delete
@@ -38,7 +38,7 @@ WindowsCompatibilityPaintEndpoint( const WindowsCompatibilityPaintEndpoint&) = d
 
 Constructs or tears down the retained WindowsCompatibilityPaintEndpoint object according to its ownership contract.
 
-### `operator=`
+### `operator=` (public)
 
 ```cpp
 WindowsCompatibilityPaintEndpoint& operator=( const WindowsCompatibilityPaintEndpoint&) = delete
@@ -46,7 +46,7 @@ WindowsCompatibilityPaintEndpoint& operator=( const WindowsCompatibilityPaintEnd
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `compatibility_handle`
+### `compatibility_handle` (public)
 
 ```cpp
 [[nodiscard]] std::uintptr_t compatibility_handle() const noexcept
@@ -54,7 +54,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Reports the current compatibility handle value without mutation.
 
-### `device_context`
+### `device_context` (public)
 
 ```cpp
 [[nodiscard]] std::uintptr_t device_context() const noexcept
@@ -62,7 +62,7 @@ Reports the current compatibility handle value without mutation.
 
 Reports the current device context value without mutation.
 
-### `live_surface`
+### `live_surface` (public)
 
 ```cpp
 [[nodiscard]] std::shared_ptr<LiveSurface> live_surface() const noexcept
@@ -70,7 +70,7 @@ Reports the current device context value without mutation.
 
 Reports the current live surface value without mutation.
 
-### `publish_device_context`
+### `publish_device_context` (public)
 
 ```cpp
 [[nodiscard]] bool publish_device_context( std::uintptr_t device_context) noexcept
@@ -78,7 +78,7 @@ Reports the current live surface value without mutation.
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `begin_device_context_write`
+### `begin_device_context_write` (public)
 
 ```cpp
 [[nodiscard]] bool begin_device_context_write( std::uintptr_t device_context) noexcept
@@ -86,7 +86,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `end_device_context_write`
+### `end_device_context_write` (public)
 
 ```cpp
 [[nodiscard]] bool end_device_context_write( std::uintptr_t device_context, bool publish) noexcept
@@ -94,7 +94,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `configure`
+### `configure` (public)
 
 ```cpp
 [[nodiscard]] bool configure(std::uint32_t width, std::uint32_t height) noexcept
@@ -102,7 +102,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `submit_bgra32_premultiplied`
+### `submit_bgra32_premultiplied` (public)
 
 ```cpp
 [[nodiscard]] bool submit_bgra32_premultiplied( std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels) noexcept
@@ -110,7 +110,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `touch`
+### `touch` (public)
 
 ```cpp
 void touch(bool explicit_boundary = false) noexcept
@@ -118,7 +118,7 @@ void touch(bool explicit_boundary = false) noexcept
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `drain_now`
+### `drain_now` (public)
 
 ```cpp
 [[nodiscard]] bool drain_now() noexcept
@@ -126,7 +126,7 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] std::string snapshot() const
@@ -134,10 +134,18 @@ Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inven
 
 Reports the current snapshot value without mutation.
 
-### `release`
+### `release` (public)
 
 ```cpp
 void release() noexcept
 ```
 
 Public WindowsCompatibilityPaintEndpoint operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+
+### `WindowsCompatibilityPaintEndpoint` (private)
+
+```cpp
+explicit WindowsCompatibilityPaintEndpoint( std::unique_ptr<Implementation> implementation) noexcept
+```
+
+Constructs or tears down the retained WindowsCompatibilityPaintEndpoint object according to its ownership contract.

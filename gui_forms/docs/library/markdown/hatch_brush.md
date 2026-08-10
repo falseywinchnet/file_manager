@@ -1,31 +1,31 @@
 # HatchBrush
 
-Status: **generated inventory; detailed review pending**  
-Kind: **class**  
-Hierarchy: `Brush → HatchBrush`  
-Declaration: `include/gui_forms/drawing.hpp:375`  
-Definition: `src/core/drawing.cpp`
+- Status: **OBSERVED: bundle 009 hatch brush split; focused M4 tests pass**
+- Kind: **class**
+- Hierarchy: `Brush → HatchBrush`
+- Declaration: `include/gui_forms/drawing/brush/hatch_brush.hpp:7`
+- Definition: `src/core/drawing/brush/hatch_brush.cpp`
 
-HatchBrush is a class declared in include/gui_forms/drawing.hpp.
+HatchBrush retains one validated hatch vocabulary value plus foreground/background colors.
 
 ## Visual evidence
 
 Capture pending; this page has not yet passed the Screen Sharing crop gate.
 
-## Public methods
+## Declared methods
 
-### `HatchBrush`
+### `HatchBrush` (public)
 
 ```cpp
 HatchBrush(HatchStyle style, Color foreground, Color background = Color::from_argb(0U, 0U, 0U, 0U))
 ```
 
-Constructs or tears down the retained HatchBrush object according to its ownership contract.
+Validates the closed hatch vocabulary and retains its two colors.
 
-### `snapshot`
+### `snapshot` (public)
 
 ```cpp
 [[nodiscard]] BrushSnapshot snapshot() const override
 ```
 
-Reports the current snapshot value without mutation.
+Requires liveness and projects a hatch BrushSnapshot.
