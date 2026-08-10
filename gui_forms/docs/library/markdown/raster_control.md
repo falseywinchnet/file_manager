@@ -1,12 +1,12 @@
 # RasterControl
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI raster-control split; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `ScrollableControl → RasterControl`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:576`
 - Definition: `inline/header-only`
 
-RasterControl is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp.
+RasterControl is the compatibility owner-painted and scroll-capable retained surface for bounded PNG/BGRA frames or a generational LiveSurface, with input projection and revocable wake scheduling.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 explicit RasterControl(StableId stable_id, bool input_transparent = false) : ScrollableControl(std::move(stable_id)), input_transparent_(input_transparent)
 ```
 
-Constructs or tears down the retained RasterControl object according to its ownership contract.
+Constructs a scrollable compatibility surface.
 
 ### `hit_test_local` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained RasterControl object according to its owne
 [[nodiscard]] bool hit_test_local(gui_forms::Point point) const override
 ```
 
-Reports the current hit test local value without mutation.
+Uses retained geometry for ordinary input admission.
 
 ### `pointer_input` (public)
 
@@ -36,7 +36,7 @@ Reports the current hit test local value without mutation.
 [[nodiscard]] gui_forms::Event<const RasterPointerSample&>& pointer_input() noexcept
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns projected pointer observation.
 
 ### `key_input` (public)
 
@@ -44,7 +44,7 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] gui_forms::Event<const RasterKeySample&>& key_input() noexcept
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns projected key observation.
 
 ### `set_png` (public)
 
@@ -52,7 +52,7 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 bool set_png(std::span<const std::byte> encoded)
 ```
 
-Synchronously updates the retained png property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates/stores bounded PNG through the Window image registry and switches from pixel/live sources.
 
 ### `set_bgra32_premultiplied` (public)
 
@@ -60,7 +60,7 @@ Synchronously updates the retained png property. Validation, typed invalidation,
 bool set_bgra32_premultiplied(std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels)
 ```
 
-Synchronously updates the retained bgra32 premultiplied property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates dimensions/stride/extent, copies immutable pixels, and switches from PNG/live sources.
 
 ### `set_live_surface` (public)
 
@@ -68,7 +68,7 @@ Synchronously updates the retained bgra32 premultiplied property. Validation, ty
 void set_live_surface(std::shared_ptr<gui_forms::LiveSurface> surface)
 ```
 
-Synchronously updates the retained live surface property. Validation, typed invalidation, and notifications are defined by the implementation.
+Binds a generational frame source and refreshes wake integration.
 
 ### `clear_live_surface` (public)
 
@@ -76,7 +76,7 @@ Synchronously updates the retained live surface property. Validation, typed inva
 void clear_live_surface(const std::shared_ptr<gui_forms::LiveSurface>& surface)
 ```
 
-Removes the explicit live surface value and restores fallback behavior.
+Clears only the matching source and revokes its wake path.
 
 ### `on_paint` (public)
 
@@ -84,7 +84,7 @@ Removes the explicit live surface value and restores fallback behavior.
 void on_paint(gui_forms::Painter& painter, Rect) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Selects the newest live frame, retained image, or copied pixels and paints within clipped bounds.
 
 ### `on_pointer` (public)
 
@@ -92,7 +92,7 @@ Records renderer-neutral paint operations for the damaged local region.
 void on_pointer(gui_forms::PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Projects a core pointer event to compatibility callbacks.
 
 ### `on_key` (public)
 
@@ -100,7 +100,7 @@ Consumes normalized routed pointer input and updates retained interaction state.
 void on_key(gui_forms::KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Projects a core key event and copies handled state back.
 
 ### `on_attached_to_window` (protected)
 
@@ -108,7 +108,7 @@ Consumes normalized keyboard input for this control's interaction contract.
 void on_attached_to_window() override
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects the revocable live wake once Window ownership is available.
 
 ### `on_detached_from_window` (protected)
 
@@ -116,7 +116,7 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 void on_detached_from_window() noexcept override
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes wake integration before base detachment.
 
 ### `queue_live_surface_paint` (private)
 
@@ -124,7 +124,7 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 static void queue_live_surface_paint( const std::weak_ptr<RasterControl>& weak_target, const std::weak_ptr<LiveWakeState>& weak_state) noexcept
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Marshals a producer wake to owner-thread invalidation through Window dispatch.
 
 ### `connect_live_surface_wake` (private)
 
@@ -132,7 +132,7 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 void connect_live_surface_wake()
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Installs one weak source/owner wake callback.
 
 ### `disconnect_live_surface_wake` (private)
 
@@ -140,4 +140,4 @@ Public RasterControl operation. Its exact signature is inventoried here; follow 
 void disconnect_live_surface_wake() noexcept
 ```
 
-Public RasterControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes and clears wake state.

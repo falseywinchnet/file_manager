@@ -1,12 +1,12 @@
 # PropertyState
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI foreign-property state review; native and MinGW ABI builds pass**
 - Kind: **struct**
 - Hierarchy: `PropertyState`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:1393`
 - Definition: `inline/header-only`
 
-PropertyState is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp.
+PropertyState owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 [[nodiscard]] gui_forms::BindingValue get() const
 ```
 
-Reports the current get value without mutation.
+Calls the foreign getter and converts its ABI value/text into declared native schema.
 
 ### `set` (public)
 
@@ -28,7 +28,7 @@ Reports the current get value without mutation.
 void set(const gui_forms::BindingValue& value) const
 ```
 
-Reports the current set value without mutation.
+Converts native value to ABI form and invokes the foreign setter.
 
 ### `reset` (public)
 
@@ -36,7 +36,7 @@ Reports the current set value without mutation.
 void reset() const
 ```
 
-Reports the current reset value without mutation.
+Invokes the optional foreign reset callback.
 
 ### `should_serialize` (public)
 
@@ -44,7 +44,7 @@ Reports the current reset value without mutation.
 [[nodiscard]] bool should_serialize() const
 ```
 
-Reports the current should serialize value without mutation.
+Invokes optional authored serialization policy or derives it from descriptor defaults.
 
 ### `format` (public)
 
@@ -52,7 +52,7 @@ Reports the current should serialize value without mutation.
 [[nodiscard]] std::string format( const gui_forms::BindingValue& value) const
 ```
 
-Reports the current format value without mutation.
+Invokes optional foreign formatter and validates returned schema.
 
 ### `parse` (public)
 
@@ -60,7 +60,7 @@ Reports the current format value without mutation.
 [[nodiscard]] std::optional<gui_forms::BindingValue> parse( std::string_view text) const
 ```
 
-Reports the current parse value without mutation.
+Invokes optional foreign parser and treats declared callback rejection as no conversion.
 
 ### `edit` (public)
 
@@ -68,4 +68,4 @@ Reports the current parse value without mutation.
 [[nodiscard]] gui_forms::BindingValue edit( const gui_forms::BindingValue& current) const
 ```
 
-Reports the current edit value without mutation.
+Invokes optional foreign editor and validates the returned value.

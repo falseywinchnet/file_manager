@@ -1,12 +1,12 @@
 # AbiPropertyObjectControl
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI property-proxy split; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `Control → AbiPropertyObjectControl`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:895`
 - Definition: `inline/header-only`
 
-AbiPropertyObjectControl is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp.
+AbiPropertyObjectControl is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 explicit AbiPropertyObjectControl(StableId stable_id) : Control(std::move(stable_id))
 ```
 
-Constructs or tears down the retained AbiPropertyObjectControl object according to its ownership contract.
+Constructs a stable nonvisual proxy.
 
 ### `define` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained AbiPropertyObjectControl object according 
 void define(const gf_property_descriptor_v1& authored, const gf_property_callbacks_v1& callbacks)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies/validates descriptor and callback table, installs a PropertyRegistration, and retains bounded callback state.
 
 ### `notify_changed` (public)
 
@@ -36,7 +36,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 void notify_changed(std::string_view name)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes an explicitly named foreign property change.
 
 ### `install_converters` (public)
 
@@ -44,7 +44,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 void install_converters(gui_forms::PropertyValueConverterRegistry& target)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers named formatter/parser services backed by the retained callback state.
 
 ### `install_editors` (public)
 
@@ -52,7 +52,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 void install_editors(gui_forms::PropertyEditorRegistry& target, std::set<std::string>& installed)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers named editor services backed by the retained callback state.
 
 ### `copy_text` (private)
 
@@ -60,7 +60,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static std::string copy_text(gf_string_view view, std::size_t maximum, std::string_view field)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates ABI string views and copies UTF-8 with a field-specific diagnostic.
 
 ### `native_kind` (private)
 
@@ -68,7 +68,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static gui_forms::BindingValueKind native_kind(std::uint32_t kind)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps closed ABI value kind to native BindingValueKind.
 
 ### `abi_kind` (private)
 
@@ -76,7 +76,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static std::uint32_t abi_kind(gui_forms::BindingValueKind kind)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps native BindingValueKind to closed ABI kind.
 
 ### `to_abi` (private)
 
@@ -84,7 +84,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static gf_property_value to_abi(const gui_forms::BindingValue& value)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects a native scalar value into an ABI record without leaking ownership.
 
 ### `from_abi` (private)
 
@@ -92,7 +92,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static gui_forms::BindingValue from_abi( const gf_property_value& value, std::string text, const gui_forms::PropertyDescriptor& descriptor)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and converts an ABI value/text pair through declared descriptor schema.
 
 ### `callback_text` (private)
 
@@ -100,7 +100,7 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static std::string callback_text( const std::function<std::uint32_t(char*, std::uint64_t, std::uint64_t*)>& invoke, std::string_view operation)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Performs size-query then bounded fill for callback-owned UTF-8 output.
 
 ### `copy_descriptor` (private)
 
@@ -108,4 +108,4 @@ Public AbiPropertyObjectControl operation. Its exact signature is inventoried he
 static gui_forms::PropertyDescriptor copy_descriptor( const gf_property_descriptor_v1& authored)
 ```
 
-Public AbiPropertyObjectControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies and validates the complete inert ABI descriptor and standard values.

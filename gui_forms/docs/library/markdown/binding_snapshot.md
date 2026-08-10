@@ -1,12 +1,12 @@
 # BindingSnapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 transfer telemetry review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingSnapshot`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:111`
 - Definition: `inline/header-only`
 
-BindingSnapshot is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingSnapshot reports endpoints, directional operations, successes, failures, reentrancy suppression, and active state.
 
 ## Visual evidence
 

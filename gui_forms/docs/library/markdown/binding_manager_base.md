@@ -1,12 +1,12 @@
 # BindingManagerBase
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 currency interface split; focused M4 binding tests pass**
 - Kind: **class**
 - Hierarchy: `BindingManagerBase`
 - Declaration: `include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp:12`
 - Definition: `inline/header-only`
 
-BindingManagerBase is a class declared in include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp.
+BindingManagerBase is the renderer-neutral currency/edit/transfer contract shared by list, grid, property, and settings surfaces.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 virtual ~BindingManagerBase() = default
 ```
 
-Constructs or tears down the retained BindingManagerBase object according to its ownership contract.
+Provides polymorphic destruction.
 
 ### `count` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained BindingManagerBase object according to its
 [[nodiscard]] virtual std::size_t count() const noexcept = 0
 ```
 
-Reports the current count value without mutation.
+Returns source row cardinality.
 
 ### `current` (public)
 
@@ -36,7 +36,7 @@ Reports the current count value without mutation.
 [[nodiscard]] virtual const BindingRecord* current() const noexcept = 0
 ```
 
-Reports the current current value without mutation.
+Returns the current row or null.
 
 ### `position` (public)
 
@@ -44,7 +44,7 @@ Reports the current current value without mutation.
 [[nodiscard]] virtual std::ptrdiff_t position() const noexcept = 0
 ```
 
-Reports the current position value without mutation.
+Returns current zero-based currency or -1.
 
 ### `binding_suspended` (public)
 
@@ -52,7 +52,7 @@ Reports the current position value without mutation.
 [[nodiscard]] virtual bool binding_suspended() const noexcept = 0
 ```
 
-Reports the current binding suspended value without mutation.
+Reports whether automatic transfer publication is suspended.
 
 ### `set_position` (public)
 
@@ -60,7 +60,7 @@ Reports the current binding suspended value without mutation.
 virtual bool set_position(std::ptrdiff_t position) = 0
 ```
 
-Synchronously updates the retained position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Moves currency if the requested position is admitted.
 
 ### `cancel_current_edit` (public)
 
@@ -68,7 +68,7 @@ Synchronously updates the retained position property. Validation, typed invalida
 virtual void cancel_current_edit() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Restores the current edit snapshot.
 
 ### `end_current_edit` (public)
 
@@ -76,7 +76,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual void end_current_edit() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Commits the current edit snapshot.
 
 ### `remove_at` (public)
 
@@ -84,7 +84,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual bool remove_at(std::size_t index) = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes an admitted row.
 
 ### `suspend_binding` (public)
 
@@ -92,7 +92,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual void suspend_binding() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Defers automatic transfer publication.
 
 ### `resume_binding` (public)
 
@@ -100,7 +100,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual void resume_binding() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Resumes and coalesces pending source publication.
 
 ### `pull_data` (public)
 
@@ -108,7 +108,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual bool pull_data() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transfers every active binding from source to control.
 
 ### `push_data` (public)
 
@@ -116,7 +116,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 virtual bool push_data() = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transfers every active binding from control to source.
 
 ### `binding_complete` (public)
 
@@ -124,7 +124,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 [[nodiscard]] virtual Event<BindingCompleteEvent&>& binding_complete() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns aggregate transfer completion observation.
 
 ### `current_changed` (public)
 
@@ -132,7 +132,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 [[nodiscard]] virtual Event<>& current_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns currency-row change observation.
 
 ### `current_item_changed` (public)
 
@@ -140,7 +140,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 [[nodiscard]] virtual Event<>& current_item_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns current-row content observation.
 
 ### `position_changed` (public)
 
@@ -148,7 +148,7 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 [[nodiscard]] virtual Event<std::ptrdiff_t>& position_changed() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns numeric currency change observation.
 
 ### `data_error` (public)
 
@@ -156,4 +156,4 @@ Public BindingManagerBase operation. Its exact signature is inventoried here; fo
 [[nodiscard]] virtual Event<const std::string&>& data_error() noexcept = 0
 ```
 
-Public BindingManagerBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns portable source validation error observation.

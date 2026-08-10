@@ -1,12 +1,12 @@
 # BindingContext
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 Window currency-context split; focused M4 binding tests pass**
 - Kind: **class**
 - Hierarchy: `Component → BindingContext`
 - Declaration: `include/gui_forms/binding/binding_context/binding_context.hpp:18`
 - Definition: `src/core/binding/binding_context/binding_context.cpp`
 
-BindingContext is a class declared in include/gui_forms/binding/binding_context/binding_context.hpp.
+BindingContext owns weak Window-scoped membership and disposal subscriptions for BindingSources while each source retains its own currency manager.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 explicit BindingContext(Window& window)
 ```
 
-Constructs or tears down the retained BindingContext object according to its ownership contract.
+Binds Window lifetime and verifies construction affinity.
 
 ### `~BindingContext` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained BindingContext object according to its own
 ~BindingContext() override
 ```
 
-Constructs or tears down the retained BindingContext object according to its ownership contract.
+Disposes and contains destructor exceptions.
 
 ### `add` (public)
 
@@ -36,7 +36,7 @@ Constructs or tears down the retained BindingContext object according to its own
 void add(const std::shared_ptr<BindingSource>& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Ensures a source has a context entry by resolving its manager.
 
 ### `manager` (public)
 
@@ -44,7 +44,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 CurrencyManager& manager(const std::shared_ptr<BindingSource>& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates shared owner, liveness, same Window, and uniqueness; installs disposal removal and returns the source manager.
 
 ### `contains` (public)
 
@@ -52,7 +52,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 [[nodiscard]] bool contains(const BindingSource& source) const noexcept
 ```
 
-Reports the current contains value without mutation.
+Tests source pointer membership.
 
 ### `remove` (public)
 
@@ -60,7 +60,7 @@ Reports the current contains value without mutation.
 bool remove(const BindingSource& source)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies affinity and removes one source with publication.
 
 ### `clear` (public)
 
@@ -68,7 +68,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 void clear()
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Verifies affinity, retires all entries, and publishes removal for each still-live source.
 
 ### `size` (public)
 
@@ -76,7 +76,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 [[nodiscard]] std::size_t size() const noexcept
 ```
 
-Reports the current size value without mutation.
+Returns membership count.
 
 ### `collection_changed` (public)
 
@@ -84,7 +84,7 @@ Reports the current size value without mutation.
 [[nodiscard]] Event<const BindingContextChange&>& collection_changed() noexcept
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns ordered add/remove observation.
 
 ### `verify_dispose_thread` (protected)
 
@@ -92,7 +92,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 void verify_dispose_thread() override
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enforces Window affinity while available.
 
 ### `on_dispose` (protected)
 
@@ -100,7 +100,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 void on_dispose() noexcept override
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Drops entries, observations, and Window lifetime without publishing into teardown.
 
 ### `bound_window` (private)
 
@@ -108,7 +108,7 @@ Public BindingContext operation. Its exact signature is inventoried here; follow
 [[nodiscard]] Window* bound_window() const noexcept
 ```
 
-Reports the current bound window value without mutation.
+Resolves weak Window lifetime without extending ownership.
 
 ### `remove_entry` (private)
 
@@ -116,4 +116,4 @@ Reports the current bound window value without mutation.
 bool remove_entry(BindingSource* source, bool publish)
 ```
 
-Public BindingContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects and erases one exact source entry and optionally publishes removal.

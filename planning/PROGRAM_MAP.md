@@ -18,7 +18,7 @@ subproject's records and evidence gates.
 | Component | Path | Role | Current permission |
 |---|---|---|---|
 | GUI.Forms | `../gui_forms/` | Retained custom-rendered C++ UI framework and bindings | Active implementation toward a semicomplete, inspectable framework release |
-| Web.Forms | `../web_forms/` | Bounded browser-valid HTML/CSS authoring profile and build-time generator over public GUI.Forms | Architect intake and language planning open; parser/compiler/runtime implementation gated |
+| Web.Forms | `../web_forms/` | Bounded browser-valid HTML/CSS authoring profile and build-time Rust generator of C++17-compatible code over public GUI.Forms | Authoring/nested-landscape/compiler boundaries accepted; detailed profile and implementation gated |
 | Engine | `../engine/` | Go catalogue-independent live search, exact catalogue, index, retrieval, and core Kolmogrov candidate integration | Active implementation toward a mostly running standalone service; required live-query lane open under ADR-008 |
 | Kolmogrov | `../kolmogrov/` | Formal and empirical fixed-width perceptual-similarity program | Active independent research and conformance work |
 | Orchestrator | `../orchestrator/` | Headless Rust integration authority, capability/availability map, control plane, hives, settings, handlers, command/CLI authority, plugin supervision, and platform policy | Active implementation toward Orchestrator Core 1.0; independent of GUI.Forms |

@@ -8,8 +8,9 @@ now the bounded browser-valid HTML/CSS profile owned by `../web_forms/`, not a
 new Athene-derived XML/DML syntax. The DML lineage still supplies the durable
 principles—round-trip source, stable IDs, compiled metadata, deterministic
 order, and retained native output—and the provisional Gallery DML remains
-implementation evidence. Exact Web.Forms grammar and compiler architecture are
-still CANDIDATE.
+implementation evidence. The no-JavaScript and nested-landscape boundary is
+accepted, and Rust is selected for the build-time compiler; exact profile
+grammar and lowering details remain CANDIDATE.
 
 ## 1. Deciding properties are independent axes
 
@@ -138,11 +139,15 @@ the remembered list. None of this mandates Avalonia, XAML, MVVM, or .NET.
   explicit error objects, and callback/event contracts. C++ and generated C#
   bindings sit above it.
 - Web.Forms HTML/CSS is the proposed durable GUI specification and visual
-  authoring surface; its compiler produces the retained construction IR.
+  authoring surface; its build-time Rust compiler produces the retained
+  construction IR and contributes no product runtime.
+- Web.Forms generated product source is a C++17-compatible orthodox subset even
+  when GUI.Forms itself is built as C++20.
 - A future Visual-Studio-like designer edits round-trippable Web.Forms source
   and generates disposable forms code.
-- Rust initially hosts untrusted plugin adapters behind capability-limited IPC;
-  it is not the primary widget engine.
+- Rust hosts the isolated Web.Forms build tool and untrusted plugin adapters
+  behind capability-limited IPC; it is not the primary widget engine or a GUI
+  product runtime.
 - No native text-control overlay. IME, tooltip, keyboard navigation, and
   accessibility semantics are deliberate engine features, even where a host OS
   cannot guarantee equal capability.

@@ -1,12 +1,12 @@
 # PropertyObjectValue
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 property object handle review; focused M4 binding tests pass**
 - Kind: **class**
 - Hierarchy: `PropertyObjectValue`
 - Declaration: `include/gui_forms/binding/value/binding_value.hpp:53`
 - Definition: `src/core/binding/value/binding_value.cpp`
 
-PropertyObjectValue is a class declared in include/gui_forms/binding/value/binding_value.hpp.
+PropertyObjectValue is a cheap immutable shared handle over a validated recursive property object tree.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 PropertyObjectValue() = default
 ```
 
-Constructs or tears down the retained PropertyObjectValue object according to its ownership contract.
+Default construction is empty; private factory construction admits validated shared data.
 
 ### `operatorbool` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained PropertyObjectValue object according to it
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether immutable data is present.
 
 ### `type_name` (public)
 
@@ -36,7 +36,7 @@ Reports the current operatorbool value without mutation.
 [[nodiscard]] std::string_view type_name() const noexcept
 ```
 
-Reports the current type name value without mutation.
+Returns the retained type name or an empty view.
 
 ### `members` (public)
 
@@ -44,7 +44,7 @@ Reports the current type name value without mutation.
 [[nodiscard]] std::span<const PropertyObjectMember> members() const noexcept
 ```
 
-Reports the current members value without mutation.
+Returns retained members or an empty span.
 
 ### `data` (public)
 
@@ -52,7 +52,7 @@ Reports the current members value without mutation.
 [[nodiscard]] const PropertyObjectData* data() const noexcept
 ```
 
-Reports the current data value without mutation.
+Returns the immutable backing record pointer.
 
 ### `operator==` (public)
 
@@ -60,7 +60,7 @@ Reports the current data value without mutation.
 friend bool operator==(const PropertyObjectValue& left, const PropertyObjectValue& right) noexcept
 ```
 
-Public PropertyObjectValue operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares structural property data rather than shared-pointer identity.
 
 ### `PropertyObjectValue` (private)
 
@@ -68,4 +68,4 @@ Public PropertyObjectValue operation. Its exact signature is inventoried here; f
 explicit PropertyObjectValue( std::shared_ptr<const PropertyObjectData> authored_data) : data_(std::move(authored_data))
 ```
 
-Constructs or tears down the retained PropertyObjectValue object according to its ownership contract.
+Default construction is empty; private factory construction admits validated shared data.

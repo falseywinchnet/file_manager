@@ -1,12 +1,12 @@
 # BindingSource
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 source/edit state-machine split; focused M4 binding and inspection tests pass**
 - Kind: **class**
 - Hierarchy: `Component → enable_shared_from_this → BindingSource`
 - Declaration: `include/gui_forms/binding/binding_source/binding_source.hpp:26`
 - Definition: `src/core/binding/binding_source/binding_source.cpp`
 
-BindingSource is a class declared in include/gui_forms/binding/binding_source/binding_source.hpp.
+BindingSource owns stable rows, currency, edit snapshots, list/error events, suspension coalescing, active bindings, and exact owner-Window affinity.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 explicit BindingSource(Window& window)
 ```
 
-Constructs or tears down the retained BindingSource object according to its ownership contract.
+Binds Window lifetime, verifies affinity, and creates its sole CurrencyManager.
 
 ### `~BindingSource` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained BindingSource object according to its owne
 ~BindingSource() override
 ```
 
-Constructs or tears down the retained BindingSource object according to its ownership contract.
+Disposes while its owner remains valid and contains destructor exceptions.
 
 ### `set_records` (public)
 
@@ -36,7 +36,7 @@ Constructs or tears down the retained BindingSource object according to its owne
 void set_records(std::vector<BindingRecord> records, bool metadata_changed = false)
 ```
 
-Synchronously updates the retained records property. Validation, typed invalidation, and notifications are defined by the implementation.
+Normalizes and validates a complete candidate list before atomically replacing rows, currency, edit state, and publication.
 
 ### `records` (public)
 
@@ -44,7 +44,7 @@ Synchronously updates the retained records property. Validation, typed invalidat
 [[nodiscard]] std::span<const BindingRecord> records() const noexcept
 ```
 
-Reports the current records value without mutation.
+Returns the retained ordered row view.
 
 ### `count` (public)
 
@@ -52,7 +52,7 @@ Reports the current records value without mutation.
 [[nodiscard]] std::size_t count() const noexcept
 ```
 
-Reports the current count value without mutation.
+Returns row cardinality.
 
 ### `position` (public)
 
@@ -60,7 +60,7 @@ Reports the current count value without mutation.
 [[nodiscard]] std::ptrdiff_t position() const noexcept
 ```
 
-Reports the current position value without mutation.
+Returns currency or -1.
 
 ### `set_position` (public)
 
@@ -68,7 +68,7 @@ Reports the current position value without mutation.
 bool set_position(std::ptrdiff_t position)
 ```
 
-Synchronously updates the retained position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates owner access and admitted range, commits currency, and publishes ordered transitions.
 
 ### `move_first` (public)
 
@@ -76,7 +76,7 @@ Synchronously updates the retained position property. Validation, typed invalida
 bool move_first()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves currency to the first row when present.
 
 ### `move_last` (public)
 
@@ -84,7 +84,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool move_last()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves currency to the last row when present.
 
 ### `move_next` (public)
 
@@ -92,7 +92,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool move_next()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves currency forward without passing the last row.
 
 ### `move_previous` (public)
 
@@ -100,7 +100,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool move_previous()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves currency backward without passing the first row.
 
 ### `current` (public)
 
@@ -108,7 +108,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] const BindingRecord* current() const noexcept
 ```
 
-Reports the current current value without mutation.
+Returns the current row or null for empty/invalid currency.
 
 ### `current_field` (public)
 
@@ -116,7 +116,7 @@ Reports the current current value without mutation.
 [[nodiscard]] std::optional<BindingValue> current_field( std::string_view field) const
 ```
 
-Reports the current current field value without mutation.
+Canonicalizes a field name and returns the current value when present.
 
 ### `current_error` (public)
 
@@ -124,7 +124,7 @@ Reports the current current field value without mutation.
 [[nodiscard]] std::string current_error(std::string_view field) const
 ```
 
-Reports the current current error value without mutation.
+Returns field-specific error, falling back to record-wide error.
 
 ### `bindings` (public)
 
@@ -132,7 +132,7 @@ Reports the current current error value without mutation.
 [[nodiscard]] std::vector<std::shared_ptr<Binding>> bindings() const
 ```
 
-Reports the current bindings value without mutation.
+Locks and returns the currently live registered bindings.
 
 ### `set_current_field` (public)
 
@@ -140,7 +140,7 @@ Reports the current bindings value without mutation.
 bool set_current_field(std::string_view field, BindingValue value)
 ```
 
-Synchronously updates the retained current field property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates edit policy and recursive value shape, commits one changed field, and publishes row/error transfer state.
 
 ### `add` (public)
 
@@ -148,7 +148,7 @@ Synchronously updates the retained current field property. Validation, typed inv
 std::size_t add(BindingRecord record)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Appends one normalized admitted row.
 
 ### `insert` (public)
 
@@ -156,7 +156,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 std::size_t insert(std::size_t index, BindingRecord record)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Normalizes and validates one row, preserves stable identity uniqueness, adjusts currency, and publishes addition.
 
 ### `remove_at` (public)
 
@@ -164,7 +164,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool remove_at(std::size_t index)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enforces remove policy, updates currency/edit state, and publishes removal plus current transition.
 
 ### `remove_current` (public)
 
@@ -172,7 +172,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool remove_current()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes current currency when present.
 
 ### `clear` (public)
 
@@ -180,7 +180,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void clear()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears rows, currency, and edit state and publishes one reset/current transition.
 
 ### `find` (public)
 
@@ -188,7 +188,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] std::optional<std::size_t> find( std::string_view field, const BindingValue& value) const
 ```
 
-Reports the current find value without mutation.
+Returns the first row whose canonical field equals the requested value.
 
 ### `allow_edit` (public)
 
@@ -196,7 +196,7 @@ Reports the current find value without mutation.
 [[nodiscard]] bool allow_edit() const noexcept
 ```
 
-Reports the current allow edit value without mutation.
+Returns the source-wide edit gate.
 
 ### `set_allow_edit` (public)
 
@@ -204,7 +204,7 @@ Reports the current allow edit value without mutation.
 void set_allow_edit(bool allow)
 ```
 
-Synchronously updates the retained allow edit property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits edit policy and cancels an active edit when disabled.
 
 ### `allow_new` (public)
 
@@ -212,7 +212,7 @@ Synchronously updates the retained allow edit property. Validation, typed invali
 [[nodiscard]] bool allow_new() const noexcept
 ```
 
-Reports the current allow new value without mutation.
+Returns the source-wide insertion gate.
 
 ### `set_allow_new` (public)
 
@@ -220,7 +220,7 @@ Reports the current allow new value without mutation.
 void set_allow_new(bool allow)
 ```
 
-Synchronously updates the retained allow new property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits insertion policy.
 
 ### `allow_remove` (public)
 
@@ -228,7 +228,7 @@ Synchronously updates the retained allow new property. Validation, typed invalid
 [[nodiscard]] bool allow_remove() const noexcept
 ```
 
-Reports the current allow remove value without mutation.
+Returns the source-wide removal gate.
 
 ### `set_allow_remove` (public)
 
@@ -236,7 +236,7 @@ Reports the current allow remove value without mutation.
 void set_allow_remove(bool allow)
 ```
 
-Synchronously updates the retained allow remove property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits removal policy.
 
 ### `begin_edit` (public)
 
@@ -244,7 +244,7 @@ Synchronously updates the retained allow remove property. Validation, typed inva
 bool begin_edit()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Captures the current stable row once when row and policy permit.
 
 ### `cancel_edit` (public)
 
@@ -252,7 +252,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void cancel_edit()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Restores the captured stable row even if currency moved, then publishes the rollback.
 
 ### `end_edit` (public)
 
@@ -260,7 +260,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void end_edit()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Discards the edit snapshot as committed.
 
 ### `binding_suspended` (public)
 
@@ -268,7 +268,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] bool binding_suspended() const noexcept
 ```
 
-Reports the current binding suspended value without mutation.
+Reports automatic source publication suspension.
 
 ### `suspend_binding` (public)
 
@@ -276,7 +276,7 @@ Reports the current binding suspended value without mutation.
 void suspend_binding()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Begins suspension without nesting side effects.
 
 ### `resume_binding` (public)
 
@@ -284,7 +284,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void resume_binding()
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Ends suspension and emits one coalesced pending reset.
 
 ### `raise_list_changed_events` (public)
 
@@ -292,7 +292,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] bool raise_list_changed_events() const noexcept
 ```
 
-Reports the current raise list changed events value without mutation.
+Returns whether public list events are enabled.
 
 ### `set_raise_list_changed_events` (public)
 
@@ -300,7 +300,7 @@ Reports the current raise list changed events value without mutation.
 void set_raise_list_changed_events(bool raise) noexcept
 ```
 
-Synchronously updates the retained raise list changed events property. Validation, typed invalidation, and notifications are defined by the implementation.
+Changes list-event publication policy without mutating data.
 
 ### `reset_bindings` (public)
 
@@ -308,7 +308,7 @@ Synchronously updates the retained raise list changed events property. Validatio
 void reset_bindings(bool metadata_changed = false)
 ```
 
-Returns bindings to its inherited or default policy.
+Publishes a reset with explicit metadata-change classification.
 
 ### `reset_current_item` (public)
 
@@ -316,7 +316,7 @@ Returns bindings to its inherited or default policy.
 void reset_current_item()
 ```
 
-Returns current item to its inherited or default policy.
+Publishes a changed event for current currency.
 
 ### `reset_item` (public)
 
@@ -324,7 +324,7 @@ Returns current item to its inherited or default policy.
 bool reset_item(std::size_t index)
 ```
 
-Returns item to its inherited or default policy.
+Publishes a changed event for one admitted row index.
 
 ### `data_member` (public)
 
@@ -332,7 +332,7 @@ Returns item to its inherited or default policy.
 [[nodiscard]] const std::string& data_member() const noexcept
 ```
 
-Reports the current data member value without mutation.
+Returns the canonical source member name.
 
 ### `set_data_member` (public)
 
@@ -340,7 +340,7 @@ Reports the current data member value without mutation.
 void set_data_member(std::string member)
 ```
 
-Synchronously updates the retained data member property. Validation, typed invalidation, and notifications are defined by the implementation.
+Canonicalizes changed member identity and publishes source/member/reset events.
 
 ### `currency_manager` (public)
 
@@ -348,7 +348,7 @@ Synchronously updates the retained data member property. Validation, typed inval
 [[nodiscard]] CurrencyManager& currency_manager() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source-owned currency facade.
 
 ### `currency_manager` (public)
 
@@ -356,7 +356,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] const CurrencyManager& currency_manager() const noexcept
 ```
 
-Reports the current currency manager value without mutation.
+Returns the source-owned currency facade.
 
 ### `snapshot` (public)
 
@@ -364,7 +364,7 @@ Reports the current currency manager value without mutation.
 [[nodiscard]] BindingSourceSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Copies currency, revision, activity, suspension, edit, and publication telemetry.
 
 ### `list_changed` (public)
 
@@ -372,7 +372,7 @@ Reports the current snapshot value without mutation.
 [[nodiscard]] Event<const BindingListChange&>& list_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns public list-change observation.
 
 ### `current_changed` (public)
 
@@ -380,7 +380,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<>& current_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns current-record observation.
 
 ### `current_item_changed` (public)
 
@@ -388,7 +388,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<>& current_item_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns current-record content observation.
 
 ### `position_changed` (public)
 
@@ -396,7 +396,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<std::ptrdiff_t>& position_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns numeric currency observation.
 
 ### `data_error` (public)
 
@@ -404,7 +404,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<const std::string&>& data_error() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns source error observation.
 
 ### `data_source_changed` (public)
 
@@ -412,7 +412,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<>& data_source_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns full-source identity observation.
 
 ### `data_member_changed` (public)
 
@@ -420,7 +420,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<const std::string&>& data_member_changed() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns member-name observation.
 
 ### `binding_complete` (public)
 
@@ -428,7 +428,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<BindingCompleteEvent&>& binding_complete() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns aggregate binding completion observation.
 
 ### `disposed_event` (public)
 
@@ -436,7 +436,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Event<>& disposed_event() noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the retirement observation used by BindingContext and bindings.
 
 ### `verify_dispose_thread` (protected)
 
@@ -444,7 +444,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void verify_dispose_thread() override
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enforces Window affinity when available.
 
 ### `on_dispose` (protected)
 
@@ -452,7 +452,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void on_dispose() noexcept override
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Retires bindings, events, records, manager, edit state, and Window lifetime without callbacks into a disposed owner.
 
 ### `require_access` (private)
 
@@ -460,7 +460,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void require_access(std::string_view operation) const
 ```
 
-Reports the current require access value without mutation.
+Rejects disposed, retired-Window, or wrong-thread operations.
 
 ### `normalize_record` (private)
 
@@ -468,7 +468,7 @@ Reports the current require access value without mutation.
 static void normalize_record(BindingRecord& record)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Canonicalizes field/error names and validates identity, recursive values, and error UTF-8.
 
 ### `validate_records` (private)
 
@@ -476,7 +476,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 static void validate_records(std::vector<BindingRecord>& records)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Normalizes a complete candidate list and rejects duplicate stable identities.
 
 ### `publish_model_change` (private)
 
@@ -484,7 +484,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void publish_model_change(const BindingListChange& change)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Advances revision and either defers/coalesces or emits model/list changes according to suspension and publication policy.
 
 ### `publish_current_transition` (private)
 
@@ -492,7 +492,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void publish_current_transition(std::ptrdiff_t old_position)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Emits position/current events only after a real currency transition.
 
 ### `register_binding` (private)
 
@@ -500,7 +500,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void register_binding(const std::shared_ptr<Binding>& binding)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds one live binding weakly without duplicate identity.
 
 ### `unregister_binding` (private)
 
@@ -508,7 +508,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 void unregister_binding(const Binding* binding) noexcept
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes one binding identity and expired registrations.
 
 ### `transfer_bindings` (private)
 
@@ -516,7 +516,7 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 bool transfer_bindings(bool source_to_control)
 ```
 
-Public BindingSource operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Snapshots registrations, performs every live directional transfer, aggregates acceptance, and prunes expiration.
 
 ### `bound_window` (private)
 
@@ -524,4 +524,4 @@ Public BindingSource operation. Its exact signature is inventoried here; follow 
 [[nodiscard]] Window* bound_window() const noexcept
 ```
 
-Reports the current bound window value without mutation.
+Resolves weak Window lifetime without extending ownership.

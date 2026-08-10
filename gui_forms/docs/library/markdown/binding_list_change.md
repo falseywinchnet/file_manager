@@ -1,12 +1,12 @@
 # BindingListChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 list change review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingListChange`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:64`
 - Definition: `inline/header-only`
 
-BindingListChange is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingListChange identifies one reset, row mutation, or currency transition with stable identity, field, index, and metadata flag.
 
 ## Visual evidence
 

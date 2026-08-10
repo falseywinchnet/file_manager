@@ -60,7 +60,7 @@ refactors unnecessarily breaking.
 **GIVEN:** preserve `class` for style/component recipes. A reserved `wf-*` class
 prefix can carry Boolean traits; typed values and relationships use
 `data-wf-*`. `id` alone owns addressable identity. Style manipulation is not a
-`nonthemable` flag: `data-wf-style-exposure="baked|exposed"` controls whether
+theming opt-out: `data-wf-style-exposure="baked|exposed"` controls whether
 typed presentation properties are generated, and defaults to `baked`.
 
 This keeps CSS useful in a normal browser, makes compiler settings visibly
@@ -78,9 +78,9 @@ ancestor surface; `background` is not falsely redefined as inherited.
 Use one behavioral control base plus visual recipe composition. Do not admit
 arbitrary multiple behavioral inheritance.
 
-## Recommendation R5 — precompose static material, not the whole GUI
+## Resolution R5 — precompose static material, not the whole GUI
 
-**CANDIDATE recommendation:** flatten shared backgrounds, frescoes, textures,
+**GIVEN:** flatten shared backgrounds, frescoes, textures,
 and decorative layers where exact, while retaining controls/text/focus/semantic
 objects separately. This preserves precise damage and accessibility while still
 removing repetitive browser-style paint structure.

@@ -1,12 +1,12 @@
 # PropertyObjectData
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 object value storage review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyObjectData`
 - Declaration: `include/gui_forms/binding/value/binding_value.hpp:117`
 - Definition: `inline/header-only`
 
-PropertyObjectData is a struct declared in include/gui_forms/binding/value/binding_value.hpp.
+PropertyObjectData is shared immutable type identity plus bounded ordered members.
 
 ## Visual evidence
 

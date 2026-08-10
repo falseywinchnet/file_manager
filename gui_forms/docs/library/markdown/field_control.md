@@ -1,12 +1,12 @@
 # FieldControl
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI Unicode field state-machine split; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `Panel → FieldControl`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:129`
 - Definition: `inline/header-only`
 
-FieldControl is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp.
+FieldControl owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated Unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 FieldControl(StableId stable_id, FieldControlKind kind) : Panel(std::move(stable_id)), kind_(kind)
 ```
 
-Constructs or tears down the retained FieldControl object according to its ownership contract.
+Constructs one closed field kind and stable retained panel identity.
 
 ### `set_colors` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained FieldControl object according to its owner
 void set_colors(gui_forms::Color foreground, gui_forms::Color background)
 ```
 
-Synchronously updates the retained colors property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits explicit foreground/background compatibility colors.
 
 ### `set_text` (public)
 
@@ -36,7 +36,7 @@ Synchronously updates the retained colors property. Validation, typed invalidati
 void set_text(std::string text)
 ```
 
-Synchronously updates the retained text property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates UTF-8, snapshots history, replaces content, clamps selection, and invalidates retained presentation.
 
 ### `replace` (public)
 
@@ -44,7 +44,7 @@ Synchronously updates the retained text property. Validation, typed invalidation
 [[nodiscard]] bool replace(std::uint64_t start, std::uint64_t length, std::string_view replacement, gf_field_edit_result& result)
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates a byte range and replacement, applies edit policy/history, and returns exact edit telemetry.
 
 ### `history` (public)
 
@@ -52,7 +52,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 [[nodiscard]] bool history(std::int32_t direction, gf_field_edit_result& result)
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves backward or forward through bounded snapshots.
 
 ### `clear_history` (public)
 
@@ -60,7 +60,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 void clear_history() noexcept
 ```
 
-Removes the explicit history value and restores fallback behavior.
+Drops undo and redo stacks.
 
 ### `text` (public)
 
@@ -68,7 +68,7 @@ Removes the explicit history value and restores fallback behavior.
 [[nodiscard]] std::string_view text() const noexcept
 ```
 
-Reports the current text value without mutation.
+Returns current UTF-8 content.
 
 ### `set_selection` (public)
 
@@ -76,7 +76,7 @@ Reports the current text value without mutation.
 bool set_selection(std::uint64_t start, std::uint64_t length, bool caret_visible)
 ```
 
-Synchronously updates the retained selection property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates scalar boundaries and commits anchor/caret direction.
 
 ### `set_edit_state` (public)
 
@@ -84,7 +84,7 @@ Synchronously updates the retained selection property. Validation, typed invalid
 bool set_edit_state(std::uint64_t anchor, std::uint64_t caret, bool caret_visible)
 ```
 
-Synchronously updates the retained edit state property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits read-only, password, multiline, and viewport state after validation.
 
 ### `position_at` (public)
 
@@ -92,7 +92,7 @@ Synchronously updates the retained edit state property. Validation, typed invali
 [[nodiscard]] std::uint64_t position_at(double local_x) const noexcept
 ```
 
-Reports the current position at value without mutation.
+Maps local x through shaped glyph geometry and viewport to a scalar boundary.
 
 ### `navigate` (public)
 
@@ -100,7 +100,7 @@ Reports the current position at value without mutation.
 [[nodiscard]] bool navigate(std::uint64_t position, std::int32_t direction, std::uint64_t& result) const noexcept
 ```
 
-Reports the current navigate value without mutation.
+Moves or extends the selection through the requested Unicode navigation operation.
 
 ### `on_paint` (public)
 
@@ -108,7 +108,7 @@ Reports the current navigate value without mutation.
 void on_paint(gui_forms::Painter& painter, Rect damage) override
 ```
 
-Records renderer-neutral paint operations for the damaged local region.
+Paints the compatibility field, selection, caret, masked text, border, and clipping through retained Painter vocabulary.
 
 ### `on_focus_changed` (public)
 
@@ -116,7 +116,7 @@ Records renderer-neutral paint operations for the damaged local region.
 void on_focus_changed(bool focused) override
 ```
 
-Updates focus-dependent retained state and invalidates affected presentation/semantics.
+Invalidates caret/focus presentation.
 
 ### `pointer_input` (public)
 
@@ -124,7 +124,7 @@ Updates focus-dependent retained state and invalidates affected presentation/sem
 [[nodiscard]] gui_forms::Event<const RasterPointerSample&>& pointer_input() noexcept
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns compatibility pointer observation.
 
 ### `key_input` (public)
 
@@ -132,7 +132,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 [[nodiscard]] gui_forms::Event<const RasterKeySample&>& key_input() noexcept
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns compatibility key observation.
 
 ### `text_input` (public)
 
@@ -140,7 +140,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 [[nodiscard]] gui_forms::Event<const RasterTextSample&>& text_input() noexcept
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns compatibility text observation.
 
 ### `on_pointer` (public)
 
@@ -148,7 +148,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 void on_pointer(gui_forms::PointerEvent& event) override
 ```
 
-Consumes normalized routed pointer input and updates retained interaction state.
+Projects pointer events, performs hit-test caret placement, and publishes the sample.
 
 ### `on_key` (public)
 
@@ -156,7 +156,7 @@ Consumes normalized routed pointer input and updates retained interaction state.
 void on_key(gui_forms::KeyEvent& event) override
 ```
 
-Consumes normalized keyboard input for this control's interaction contract.
+Projects keys, applies navigation/editing when unhandled, and copies handled state.
 
 ### `on_text_input` (public)
 
@@ -164,7 +164,7 @@ Consumes normalized keyboard input for this control's interaction contract.
 void on_text_input(gui_forms::TextInputEvent& event) override
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects composition/replacement input and commits admitted edits.
 
 ### `snapshot` (private)
 
@@ -172,7 +172,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 [[nodiscard]] FieldSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Captures exact edit/history state.
 
 ### `apply_snapshot` (private)
 
@@ -180,7 +180,7 @@ Reports the current snapshot value without mutation.
 void apply_snapshot(FieldSnapshot snapshot)
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Restores a snapshot with validation and retained invalidation.
 
 ### `push_history` (private)
 
@@ -188,7 +188,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 void push_history(std::deque<FieldSnapshot>& history, FieldSnapshot snapshot)
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds a bounded snapshot while suppressing duplicate adjacent states.
 
 ### `push_undo` (private)
 
@@ -196,7 +196,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 void push_undo(FieldSnapshot snapshot)
 ```
 
-Public FieldControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Captures pre-edit state and clears forward history.
 
 ### `clear_redo` (private)
 
@@ -204,7 +204,7 @@ Public FieldControl operation. Its exact signature is inventoried here; follow t
 void clear_redo() noexcept
 ```
 
-Removes the explicit redo value and restores fallback behavior.
+Drops redo state after divergent edits.
 
 ### `edit_result` (private)
 
@@ -212,4 +212,4 @@ Removes the explicit redo value and restores fallback behavior.
 [[nodiscard]] gf_field_edit_result edit_result(bool changed) const noexcept
 ```
 
-Reports the current edit result value without mutation.
+Builds exact ABI edit telemetry from old/new state.

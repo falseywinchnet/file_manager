@@ -1,12 +1,12 @@
 # BindingRecord
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 source record review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingRecord`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:46`
 - Definition: `inline/header-only`
 
-BindingRecord is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingRecord is one stable editable row with canonical field values and field/record error projections.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 BindingRecord() = default
 ```
 
-Constructs or tears down the retained BindingRecord object according to its ownership contract.
+Default construction is empty; authored construction moves identity, fields, edit policy, and errors.
 
 ### `BindingRecord` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained BindingRecord object according to its owne
 BindingRecord(std::string identity, std::map<std::string, BindingValue> values, bool can_edit = true, std::map<std::string, std::string> error_values =
 ```
 
-Constructs or tears down the retained BindingRecord object according to its ownership contract.
+Default construction is empty; authored construction moves identity, fields, edit policy, and errors.
 
 ### `stable_id` (public)
 
@@ -36,7 +36,7 @@ Constructs or tears down the retained BindingRecord object according to its owne
 : stable_id(std::move(identity)), fields(std::move(values)), editable(can_edit), errors(std::move(error_values))
 ```
 
-Public BindingRecord operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Parser-visible start of the retained stable identity field.
 
 ### `operator==` (public)
 
@@ -44,4 +44,4 @@ Public BindingRecord operation. Its exact signature is inventoried here; follow 
 friend bool operator==(const BindingRecord&, const BindingRecord&) = default
 ```
 
-Public BindingRecord operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete source record.

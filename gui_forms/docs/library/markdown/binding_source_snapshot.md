@@ -1,12 +1,12 @@
 # BindingSourceSnapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 source telemetry review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingSourceSnapshot`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:97`
 - Definition: `inline/header-only`
 
-BindingSourceSnapshot is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingSourceSnapshot reports currency, revision, reset/field/position/suspension counters, edit state, and event publication policy.
 
 ## Visual evidence
 

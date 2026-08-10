@@ -10,9 +10,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": true,
       "page": "pages/abi_property_object_control.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI property-proxy split; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "abipropertyobjectcontrol src/abi/control_adapters/abi_control_adapters.hpp abipropertyobjectcontrol is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp. control"
+      "search": "abipropertyobjectcontrol src/abi/control_adapters/abi_control_adapters.hpp abipropertyobjectcontrol is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors. control"
     },
     {
       "name": "AnchoredPopupLayer",
@@ -282,9 +282,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": true,
       "page": "pages/field_control.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI Unicode field state-machine split; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "fieldcontrol src/abi/control_adapters/abi_control_adapters.hpp fieldcontrol is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp. panel"
+      "search": "fieldcontrol src/abi/control_adapters/abi_control_adapters.hpp fieldcontrol owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native. panel"
     },
     {
       "name": "FlagsValueEditor",
@@ -321,9 +321,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": true,
       "page": "pages/form_control.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI form-adapter split; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "formcontrol src/abi/control_adapters/abi_control_adapters.hpp formcontrol is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp. panel"
+      "search": "formcontrol src/abi/control_adapters/abi_control_adapters.hpp formcontrol is a retained panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter. panel"
     },
     {
       "name": "GalleryControl",
@@ -373,9 +373,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": true,
       "page": "pages/input_transparent_control.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI control-adapter split; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "inputtransparentcontrol src/abi/control_adapters/abi_control_adapters.hpp inputtransparentcontrol is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp. control"
+      "search": "inputtransparentcontrol src/abi/control_adapters/abi_control_adapters.hpp inputtransparentcontrol participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces. control"
     },
     {
       "name": "InstrumentRack",
@@ -646,9 +646,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": true,
       "page": "pages/raster_control.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI raster-control split; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rastercontrol src/abi/control_adapters/abi_control_adapters.hpp rastercontrol is a visual retained control declared in src/abi/control_adapters/abi_control_adapters.hpp. scrollablecontrol"
+      "search": "rastercontrol src/abi/control_adapters/abi_control_adapters.hpp rastercontrol is the compatibility owner-painted and scroll-capable retained surface for bounded png/bgra frames or a generational livesurface, with input projection and revocable wake scheduling. scrollablecontrol"
     },
     {
       "name": "ReviewCard",
@@ -1041,9 +1041,9 @@
       "header": "include/gui_forms/binding/binding/binding.hpp",
       "visual": false,
       "page": "pages/binding.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 directional transfer state-machine split; focused M4 binding tests pass",
       "sourceStatus": "isolated per type",
-      "search": "binding include/gui_forms/binding/binding/binding.hpp binding is a class declared in include/gui_forms/binding/binding/binding.hpp. component enable_shared_from_this"
+      "search": "binding include/gui_forms/binding/binding/binding.hpp binding connects one explicit control property to one bindingsource field with validated conversion, update timing, null projection, completion policy, error routing, reentrancy suppression, and teardown. component enable_shared_from_this"
     },
     {
       "name": "BindingCompleteEvent",
@@ -1052,9 +1052,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_complete_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 completion event review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingcompleteevent include/gui_forms/binding/types/binding_contract_types.hpp bindingcompleteevent is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingcompleteevent include/gui_forms/binding/types/binding_contract_types.hpp bindingcompleteevent reports binding identity, transfer direction, closed outcome, diagnostic text, and cancellable acceptance."
     },
     {
       "name": "BindingContext",
@@ -1065,9 +1065,9 @@
       "header": "include/gui_forms/binding/binding_context/binding_context.hpp",
       "visual": false,
       "page": "pages/binding_context.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 Window currency-context split; focused M4 binding tests pass",
       "sourceStatus": "isolated per type",
-      "search": "bindingcontext include/gui_forms/binding/binding_context/binding_context.hpp bindingcontext is a class declared in include/gui_forms/binding/binding_context/binding_context.hpp. component"
+      "search": "bindingcontext include/gui_forms/binding/binding_context/binding_context.hpp bindingcontext owns weak window-scoped membership and disposal subscriptions for bindingsources while each source retains its own currency manager. component"
     },
     {
       "name": "BindingContextChange",
@@ -1076,9 +1076,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_context_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 context change review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingcontextchange include/gui_forms/binding/types/binding_contract_types.hpp bindingcontextchange is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingcontextchange include/gui_forms/binding/types/binding_contract_types.hpp bindingcontextchange identifies one bindingsource entering or leaving a window currency context."
     },
     {
       "name": "BindingConvertEvent",
@@ -1087,9 +1087,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_convert_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 conversion event review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingconvertevent include/gui_forms/binding/types/binding_contract_types.hpp bindingconvertevent is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingconvertevent include/gui_forms/binding/types/binding_contract_types.hpp bindingconvertevent lets formatting/parsing observers replace a proposed value for a declared destination kind and explicitly mark it handled."
     },
     {
       "name": "BindingListChange",
@@ -1098,9 +1098,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_list_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 list change review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindinglistchange include/gui_forms/binding/types/binding_contract_types.hpp bindinglistchange is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindinglistchange include/gui_forms/binding/types/binding_contract_types.hpp bindinglistchange identifies one reset, row mutation, or currency transition with stable identity, field, index, and metadata flag."
     },
     {
       "name": "BindingManagerBase",
@@ -1109,9 +1109,9 @@
       "header": "include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp",
       "visual": false,
       "page": "pages/binding_manager_base.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 currency interface split; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingmanagerbase include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp bindingmanagerbase is a class declared in include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp."
+      "search": "bindingmanagerbase include/gui_forms/binding/binding_manager_base/binding_manager_base.hpp bindingmanagerbase is the renderer-neutral currency/edit/transfer contract shared by list, grid, property, and settings surfaces."
     },
     {
       "name": "BindingOptions",
@@ -1120,9 +1120,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_options.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 binding policy review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingoptions include/gui_forms/binding/types/binding_contract_types.hpp bindingoptions is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingoptions include/gui_forms/binding/types/binding_contract_types.hpp bindingoptions defines source/control update timing, optional invariant formatting, and asymmetric null projections."
     },
     {
       "name": "BindingRecord",
@@ -1131,9 +1131,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_record.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 source record review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingrecord include/gui_forms/binding/types/binding_contract_types.hpp bindingrecord is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingrecord include/gui_forms/binding/types/binding_contract_types.hpp bindingrecord is one stable editable row with canonical field values and field/record error projections."
     },
     {
       "name": "BindingSnapshot",
@@ -1142,9 +1142,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 transfer telemetry review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingsnapshot include/gui_forms/binding/types/binding_contract_types.hpp bindingsnapshot is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingsnapshot include/gui_forms/binding/types/binding_contract_types.hpp bindingsnapshot reports endpoints, directional operations, successes, failures, reentrancy suppression, and active state."
     },
     {
       "name": "BindingSource",
@@ -1156,9 +1156,9 @@
       "header": "include/gui_forms/binding/binding_source/binding_source.hpp",
       "visual": false,
       "page": "pages/binding_source.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 source/edit state-machine split; focused M4 binding and inspection tests pass",
       "sourceStatus": "isolated per type",
-      "search": "bindingsource include/gui_forms/binding/binding_source/binding_source.hpp bindingsource is a class declared in include/gui_forms/binding/binding_source/binding_source.hpp. component enable_shared_from_this"
+      "search": "bindingsource include/gui_forms/binding/binding_source/binding_source.hpp bindingsource owns stable rows, currency, edit snapshots, list/error events, suspension coalescing, active bindings, and exact owner-window affinity. component enable_shared_from_this"
     },
     {
       "name": "BindingSourceSnapshot",
@@ -1167,9 +1167,9 @@
       "header": "include/gui_forms/binding/types/binding_contract_types.hpp",
       "visual": false,
       "page": "pages/binding_source_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 source telemetry review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "bindingsourcesnapshot include/gui_forms/binding/types/binding_contract_types.hpp bindingsourcesnapshot is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp."
+      "search": "bindingsourcesnapshot include/gui_forms/binding/types/binding_contract_types.hpp bindingsourcesnapshot reports currency, revision, reset/field/position/suspension counters, edit state, and event publication policy."
     },
     {
       "name": "Bitmap",
@@ -1393,9 +1393,9 @@
       "header": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp",
       "visual": false,
       "page": "pages/compatibility_paint_binding.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 Windows paint binding review; complete M4 MinGW build passes",
       "sourceStatus": "header-only or distributed",
-      "search": "compatibilitypaintbinding src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp compatibilitypaintbinding is a struct declared in src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp."
+      "search": "compatibilitypaintbinding src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp compatibilitypaintbinding weakly correlates one rastercontrol, its owner thread, and the livesurface supplied by a windows compatibility endpoint."
     },
     {
       "name": "CompatibilityPaintWrite",
@@ -1404,9 +1404,9 @@
       "header": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp",
       "visual": false,
       "page": "pages/compatibility_paint_write.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 Windows paint write-lease review; complete M4 MinGW build passes",
       "sourceStatus": "header-only or distributed",
-      "search": "compatibilitypaintwrite src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp compatibilitypaintwrite is a struct declared in src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp."
+      "search": "compatibilitypaintwrite src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp compatibilitypaintwrite owns one endpoint during an active device-context write and records the exact dc and acquiring thread required to end it."
     },
     {
       "name": "Component",
@@ -1472,9 +1472,9 @@
       "header": "include/gui_forms/binding/control_bindings_collection/control_bindings_collection.hpp",
       "visual": false,
       "page": "pages/control_bindings_collection.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 per-control binding collection split; focused M4 binding tests pass",
       "sourceStatus": "isolated per type",
-      "search": "controlbindingscollection include/gui_forms/binding/control_bindings_collection/control_bindings_collection.hpp controlbindingscollection is a class declared in include/gui_forms/binding/control_bindings_collection/control_bindings_collection.hpp."
+      "search": "controlbindingscollection include/gui_forms/binding/control_bindings_collection/control_bindings_collection.hpp controlbindingscollection owns the unique active binding for each canonical target property and disposes the set deterministically."
     },
     {
       "name": "ControlFactory",
@@ -1608,9 +1608,9 @@
       "header": "include/gui_forms/binding/currency_manager/currency_manager.hpp",
       "visual": false,
       "page": "pages/currency_manager.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 currency manager split; focused M4 binding tests pass",
       "sourceStatus": "isolated per type",
-      "search": "currencymanager include/gui_forms/binding/currency_manager/currency_manager.hpp currencymanager is a class declared in include/gui_forms/binding/currency_manager/currency_manager.hpp. bindingmanagerbase"
+      "search": "currencymanager include/gui_forms/binding/currency_manager/currency_manager.hpp currencymanager is the non-owning facade over exactly one bindingsource, keeping navigation, edit, and bulk transfer vocabulary uniform. bindingmanagerbase"
     },
     {
       "name": "DamageRecord",
@@ -2010,9 +2010,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/field_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI field-history review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "fieldsnapshot src/abi/control_adapters/abi_control_adapters.hpp fieldsnapshot is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "fieldsnapshot src/abi/control_adapters/abi_control_adapters.hpp fieldsnapshot captures utf-8 text, selection anchor/caret, read-only and password state, and horizontal viewport for exact undo/redo."
     },
     {
       "name": "FocusScopeChange",
@@ -3165,9 +3165,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/live_wake_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI live-surface wake review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "livewakestate src/abi/control_adapters/abi_control_adapters.hpp livewakestate is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "livewakestate src/abi/control_adapters/abi_control_adapters.hpp livewakestate weakly correlates a rastercontrol and window so producer wakes can queue paint without prolonging either owner."
     },
     {
       "name": "MacApplicationWindow",
@@ -3710,9 +3710,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_collection_data.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 collection value storage review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertycollectiondata include/gui_forms/binding/value/binding_value.hpp propertycollectiondata is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertycollectiondata include/gui_forms/binding/value/binding_value.hpp propertycollectiondata is shared immutable item type/kind plus a bounded homogeneous value sequence."
     },
     {
       "name": "PropertyCollectionValue",
@@ -3721,9 +3721,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_collection_value.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 property collection handle review; focused M4 binding tests pass",
       "sourceStatus": "grouped migration pending",
-      "search": "propertycollectionvalue include/gui_forms/binding/value/binding_value.hpp propertycollectionvalue is a class declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertycollectionvalue include/gui_forms/binding/value/binding_value.hpp propertycollectionvalue is a cheap immutable shared handle over a validated bounded homogeneous property sequence."
     },
     {
       "name": "PropertyConversionContext",
@@ -3743,9 +3743,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_descriptor.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 inert property descriptor review; focused M4 inspection tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertydescriptor include/gui_forms/binding/value/binding_value.hpp propertydescriptor is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertydescriptor include/gui_forms/binding/value/binding_value.hpp propertydescriptor exposes renderer/language-neutral schema, serialization, mutability, invalidation, enum, standard-value, converter, and editor metadata without executable callbacks."
     },
     {
       "name": "PropertyEditorBinding",
@@ -3798,9 +3798,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_enum_choice.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 enum choice review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyenumchoice include/gui_forms/binding/value/binding_value.hpp propertyenumchoice is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyenumchoice include/gui_forms/binding/value/binding_value.hpp propertyenumchoice maps one canonical display/name token to a signed enum value."
     },
     {
       "name": "PropertyEnumDescriptor",
@@ -3809,9 +3809,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_enum_descriptor.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 enum schema review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyenumdescriptor include/gui_forms/binding/value/binding_value.hpp propertyenumdescriptor is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyenumdescriptor include/gui_forms/binding/value/binding_value.hpp propertyenumdescriptor supplies bounded named choices and explicit flags semantics for descriptor-aware conversion."
     },
     {
       "name": "PropertyEnumValue",
@@ -3820,9 +3820,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_enum_value.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 binding value review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyenumvalue include/gui_forms/binding/value/binding_value.hpp propertyenumvalue is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyenumvalue include/gui_forms/binding/value/binding_value.hpp propertyenumvalue preserves declared enum type, canonical symbolic name, and signed numeric representation."
     },
     {
       "name": "PropertyGridEditError",
@@ -3875,9 +3875,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_object_data.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 object value storage review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyobjectdata include/gui_forms/binding/value/binding_value.hpp propertyobjectdata is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyobjectdata include/gui_forms/binding/value/binding_value.hpp propertyobjectdata is shared immutable type identity plus bounded ordered members."
     },
     {
       "name": "PropertyObjectMember",
@@ -3886,9 +3886,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_object_member.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 property member review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyobjectmember include/gui_forms/binding/value/binding_value.hpp propertyobjectmember is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyobjectmember include/gui_forms/binding/value/binding_value.hpp propertyobjectmember is one inert inspectable object member with optional schema, nullability, enum, standard-value, converter, and editor metadata."
     },
     {
       "name": "PropertyObjectValue",
@@ -3897,9 +3897,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_object_value.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 property object handle review; focused M4 binding tests pass",
       "sourceStatus": "grouped migration pending",
-      "search": "propertyobjectvalue include/gui_forms/binding/value/binding_value.hpp propertyobjectvalue is a class declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyobjectvalue include/gui_forms/binding/value/binding_value.hpp propertyobjectvalue is a cheap immutable shared handle over a validated recursive property object tree."
     },
     {
       "name": "PropertyRegistration",
@@ -3908,9 +3908,9 @@
       "header": "include/gui_forms/binding/value/binding_value.hpp",
       "visual": false,
       "page": "pages/property_registration.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 executable property registration review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertyregistration include/gui_forms/binding/value/binding_value.hpp propertyregistration is a struct declared in include/gui_forms/binding/value/binding_value.hpp."
+      "search": "propertyregistration include/gui_forms/binding/value/binding_value.hpp propertyregistration privately couples an inert descriptor to explicit getter, setter, change, reset, serialization, and origin callbacks registered by a retained control."
     },
     {
       "name": "PropertyResetRequest",
@@ -3952,9 +3952,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/property_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI foreign-property state review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertystate src/abi/control_adapters/abi_control_adapters.hpp propertystate is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "propertystate src/abi/control_adapters/abi_control_adapters.hpp propertystate owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing."
     },
     {
       "name": "PropertyValueChange",
@@ -4007,9 +4007,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/raster_key_sample.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI key record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rasterkeysample src/abi/control_adapters/abi_control_adapters.hpp rasterkeysample is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "rasterkeysample src/abi/control_adapters/abi_control_adapters.hpp rasterkeysample is the c-callback projection of physical key, modifiers, repeat, and mutable handled state."
     },
     {
       "name": "RasterPointerSample",
@@ -4018,9 +4018,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/raster_pointer_sample.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI pointer record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rasterpointersample src/abi/control_adapters/abi_control_adapters.hpp rasterpointersample is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "rasterpointersample src/abi/control_adapters/abi_control_adapters.hpp rasterpointersample is the bounded c-callback projection of one retained pointer event."
     },
     {
       "name": "RasterResult",
@@ -4040,9 +4040,9 @@
       "header": "src/abi/control_adapters/abi_control_adapters.hpp",
       "visual": false,
       "page": "pages/raster_text_sample.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI text record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rastertextsample src/abi/control_adapters/abi_control_adapters.hpp rastertextsample is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp."
+      "search": "rastertextsample src/abi/control_adapters/abi_control_adapters.hpp rastertextsample owns utf-8 text plus composition and replacement-range metadata for a c callback."
     },
     {
       "name": "RecordingPainter",
@@ -4472,9 +4472,9 @@
       "header": "include/gui_forms/binding/binding_context/binding_context.hpp",
       "visual": false,
       "page": "pages/source_entry.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private context entry review; focused M4 binding tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "sourceentry include/gui_forms/binding/binding_context/binding_context.hpp sourceentry is a struct declared in include/gui_forms/binding/binding_context/binding_context.hpp."
+      "search": "sourceentry include/gui_forms/binding/binding_context/binding_context.hpp sourceentry weakly tracks a source and owns the subscription that removes it when disposed."
     },
     {
       "name": "SplitChangeEvent",

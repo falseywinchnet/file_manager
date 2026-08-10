@@ -1,12 +1,12 @@
 # RasterTextSample
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI text record review; native and MinGW ABI builds pass**
 - Kind: **struct**
 - Hierarchy: `RasterTextSample`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:74`
 - Definition: `inline/header-only`
 
-RasterTextSample is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp.
+RasterTextSample owns UTF-8 text plus composition and replacement-range metadata for a C callback.
 
 ## Visual evidence
 

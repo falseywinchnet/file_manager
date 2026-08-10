@@ -1,12 +1,12 @@
 # PropertyDescriptor
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 inert property descriptor review; focused M4 inspection tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyDescriptor`
 - Declaration: `include/gui_forms/binding/value/binding_value.hpp:201`
 - Definition: `inline/header-only`
 
-PropertyDescriptor is a struct declared in include/gui_forms/binding/value/binding_value.hpp.
+PropertyDescriptor exposes renderer/language-neutral schema, serialization, mutability, invalidation, enum, standard-value, converter, and editor metadata without executable callbacks.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 PropertyDescriptor() = default
 ```
 
-Constructs or tears down the retained PropertyDescriptor object according to its ownership contract.
+Default construction supplies a writable text behavior descriptor; authored construction commits the core schema and invalidation contract.
 
 ### `PropertyDescriptor` (public)
 
@@ -28,4 +28,4 @@ Constructs or tears down the retained PropertyDescriptor object according to its
 PropertyDescriptor(std::string authored_name, BindingValueKind value_kind, std::string authored_category, std::string authored_description, std::optional<BindingValue> authored_default, Dirty authored_effects, bool authored_subtree_effect = false) : name(std::move(authored_name)), kind(value_kind), category(std::move(authored_category)), description(std::move(authored_description)), default_value(std::move(authored_default)), invalidation_effects(authored_effects), invalidates_subtree(authored_subtree_effect)
 ```
 
-Constructs or tears down the retained PropertyDescriptor object according to its ownership contract.
+Default construction supplies a writable text behavior descriptor; authored construction commits the core schema and invalidation contract.

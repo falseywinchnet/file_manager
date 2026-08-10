@@ -1,12 +1,12 @@
 # RasterPointerSample
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI pointer record review; native and MinGW ABI builds pass**
 - Kind: **struct**
 - Hierarchy: `RasterPointerSample`
 - Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:58`
 - Definition: `inline/header-only`
 
-RasterPointerSample is a struct declared in src/abi/control_adapters/abi_control_adapters.hpp.
+RasterPointerSample is the bounded C-callback projection of one retained pointer event.
 
 ## Visual evidence
 

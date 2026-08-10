@@ -1,12 +1,12 @@
 # SourceEntry
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private context entry review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `SourceEntry`
 - Declaration: `include/gui_forms/binding/binding_context/binding_context.hpp:37`
 - Definition: `inline/header-only`
 
-SourceEntry is a struct declared in include/gui_forms/binding/binding_context/binding_context.hpp.
+SourceEntry weakly tracks a source and owns the subscription that removes it when disposed.
 
 ## Visual evidence
 

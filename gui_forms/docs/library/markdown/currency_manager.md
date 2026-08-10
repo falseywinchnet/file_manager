@@ -1,12 +1,12 @@
 # CurrencyManager
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 currency manager split; focused M4 binding tests pass**
 - Kind: **class**
 - Hierarchy: `BindingManagerBase → CurrencyManager`
 - Declaration: `include/gui_forms/binding/currency_manager/currency_manager.hpp:11`
 - Definition: `src/core/binding/currency_manager/currency_manager.cpp`
 
-CurrencyManager is a class declared in include/gui_forms/binding/currency_manager/currency_manager.hpp.
+CurrencyManager is the non-owning facade over exactly one BindingSource, keeping navigation, edit, and bulk transfer vocabulary uniform.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 [[nodiscard]] std::size_t count() const noexcept override
 ```
 
-Reports the current count value without mutation.
+Delegates row count or returns zero after detachment.
 
 ### `current` (public)
 
@@ -28,7 +28,7 @@ Reports the current count value without mutation.
 [[nodiscard]] const BindingRecord* current() const noexcept override
 ```
 
-Reports the current current value without mutation.
+Delegates current row or returns null after detachment.
 
 ### `position` (public)
 
@@ -36,7 +36,7 @@ Reports the current current value without mutation.
 [[nodiscard]] std::ptrdiff_t position() const noexcept override
 ```
 
-Reports the current position value without mutation.
+Delegates currency or returns -1 after detachment.
 
 ### `binding_suspended` (public)
 
@@ -44,7 +44,7 @@ Reports the current position value without mutation.
 [[nodiscard]] bool binding_suspended() const noexcept override
 ```
 
-Reports the current binding suspended value without mutation.
+Delegates suspension state.
 
 ### `set_position` (public)
 
@@ -52,7 +52,7 @@ Reports the current binding suspended value without mutation.
 bool set_position(std::ptrdiff_t position) override
 ```
 
-Synchronously updates the retained position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Delegates an admitted currency transition.
 
 ### `cancel_current_edit` (public)
 
@@ -60,7 +60,7 @@ Synchronously updates the retained position property. Validation, typed invalida
 void cancel_current_edit() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates edit rollback.
 
 ### `end_current_edit` (public)
 
@@ -68,7 +68,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 void end_current_edit() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates edit commit.
 
 ### `remove_at` (public)
 
@@ -76,7 +76,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 bool remove_at(std::size_t index) override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates row removal.
 
 ### `suspend_binding` (public)
 
@@ -84,7 +84,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 void suspend_binding() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates transfer suspension.
 
 ### `resume_binding` (public)
 
@@ -92,7 +92,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 void resume_binding() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Delegates transfer resumption.
 
 ### `pull_data` (public)
 
@@ -100,7 +100,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 bool pull_data() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests every active binding to read the source.
 
 ### `push_data` (public)
 
@@ -108,7 +108,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 bool push_data() override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests every active binding to write the source.
 
 ### `binding_complete` (public)
 
@@ -116,7 +116,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] Event<BindingCompleteEvent&>& binding_complete() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source completion event.
 
 ### `current_changed` (public)
 
@@ -124,7 +124,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] Event<>& current_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source currency event.
 
 ### `current_item_changed` (public)
 
@@ -132,7 +132,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] Event<>& current_item_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source current-item event.
 
 ### `position_changed` (public)
 
@@ -140,7 +140,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] Event<std::ptrdiff_t>& position_changed() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source position event.
 
 ### `data_error` (public)
 
@@ -148,7 +148,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] Event<const std::string&>& data_error() noexcept override
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source error event.
 
 ### `list` (public)
 
@@ -156,7 +156,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] std::span<const BindingRecord> list() const noexcept
 ```
 
-Reports the current list value without mutation.
+Returns the complete source row view.
 
 ### `list_changed` (public)
 
@@ -164,7 +164,7 @@ Reports the current list value without mutation.
 [[nodiscard]] Event<const BindingListChange&>& list_changed() noexcept
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns the source list event.
 
 ### `refresh` (public)
 
@@ -172,7 +172,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 void refresh()
 ```
 
-Public CurrencyManager operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes one non-metadata reset.
 
 ### `source` (public)
 
@@ -180,7 +180,7 @@ Public CurrencyManager operation. Its exact signature is inventoried here; follo
 [[nodiscard]] BindingSource& source() const noexcept
 ```
 
-Reports the current source value without mutation.
+Returns the bound source reference.
 
 ### `CurrencyManager` (private)
 
@@ -188,4 +188,4 @@ Reports the current source value without mutation.
 explicit CurrencyManager(BindingSource& source) : source_(&source)
 ```
 
-Constructs or tears down the retained CurrencyManager object according to its ownership contract.
+Privately binds one source for the source's complete lifetime.

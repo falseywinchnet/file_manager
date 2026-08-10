@@ -1,12 +1,12 @@
 # Binding
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 directional transfer state-machine split; focused M4 binding tests pass**
 - Kind: **class**
 - Hierarchy: `Component → enable_shared_from_this → Binding`
 - Declaration: `include/gui_forms/binding/binding/binding.hpp:16`
 - Definition: `src/core/binding/binding/binding.cpp`
 
-Binding is a class declared in include/gui_forms/binding/binding/binding.hpp.
+Binding connects one explicit Control property to one BindingSource field with validated conversion, update timing, null projection, completion policy, error routing, reentrancy suppression, and teardown.
 
 ## Visual evidence
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 Binding(Control& target, std::string property_name, std::shared_ptr<BindingSource> source, std::string data_member, BindingOptions options =
 ```
 
-Constructs or tears down the retained Binding object according to its ownership contract.
+Canonicalizes endpoint names, validates update/format options, and requires live source, target, and declared bindable property.
 
 ### `~Binding` (public)
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained Binding object according to its ownership 
 ~Binding() override
 ```
 
-Constructs or tears down the retained Binding object according to its ownership contract.
+Disposes and contains destructor exceptions.
 
 ### `target` (public)
 
@@ -36,7 +36,7 @@ Constructs or tears down the retained Binding object according to its ownership 
 [[nodiscard]] Control* target() const noexcept
 ```
 
-Reports the current target value without mutation.
+Returns the non-owning target pointer while active.
 
 ### `source` (public)
 
@@ -44,7 +44,7 @@ Reports the current target value without mutation.
 [[nodiscard]] std::shared_ptr<BindingSource> source() const noexcept
 ```
 
-Reports the current source value without mutation.
+Locks and returns the source owner while available.
 
 ### `property_name` (public)
 
@@ -52,7 +52,7 @@ Reports the current source value without mutation.
 [[nodiscard]] const std::string& property_name() const noexcept
 ```
 
-Reports the current property name value without mutation.
+Returns canonical target property identity.
 
 ### `data_member` (public)
 
@@ -60,7 +60,7 @@ Reports the current property name value without mutation.
 [[nodiscard]] const std::string& data_member() const noexcept
 ```
 
-Reports the current data member value without mutation.
+Returns canonical source field identity.
 
 ### `options` (public)
 
@@ -68,7 +68,7 @@ Reports the current data member value without mutation.
 [[nodiscard]] const BindingOptions& options() const noexcept
 ```
 
-Reports the current options value without mutation.
+Returns current transfer policy.
 
 ### `set_options` (public)
 
@@ -76,7 +76,7 @@ Reports the current options value without mutation.
 void set_options(BindingOptions options)
 ```
 
-Synchronously updates the retained options property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits changed policy, then refreshes the control when active.
 
 ### `active` (public)
 
@@ -84,7 +84,7 @@ Synchronously updates the retained options property. Validation, typed invalidat
 [[nodiscard]] bool active() const noexcept
 ```
 
-Reports the current active value without mutation.
+Reports whether subscriptions and endpoints are connected.
 
 ### `read_value` (public)
 
@@ -92,7 +92,7 @@ Reports the current active value without mutation.
 bool read_value()
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Explicitly transfers source to control.
 
 ### `write_value` (public)
 
@@ -100,7 +100,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 bool write_value()
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Explicitly transfers control to source.
 
 ### `validate` (public)
 
@@ -108,7 +108,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 bool validate()
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs the configured validation-time source write or accepts when policy does not require it.
 
 ### `snapshot` (public)
 
@@ -116,7 +116,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 [[nodiscard]] BindingSnapshot snapshot() const
 ```
 
-Reports the current snapshot value without mutation.
+Copies endpoint and directional transfer/reentrancy telemetry.
 
 ### `format` (public)
 
@@ -124,7 +124,7 @@ Reports the current snapshot value without mutation.
 [[nodiscard]] Event<BindingConvertEvent&>& format() noexcept
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns source-to-control conversion interception.
 
 ### `parse` (public)
 
@@ -132,7 +132,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 [[nodiscard]] Event<BindingConvertEvent&>& parse() noexcept
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns control-to-source conversion interception.
 
 ### `binding_complete` (public)
 
@@ -140,7 +140,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 [[nodiscard]] Event<BindingCompleteEvent&>& binding_complete() noexcept
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns per-binding completion observation.
 
 ### `verify_dispose_thread` (protected)
 
@@ -148,7 +148,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 void verify_dispose_thread() override
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enforces target Window affinity before teardown.
 
 ### `on_dispose` (protected)
 
@@ -156,7 +156,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 void on_dispose() noexcept override
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Unregisters, disconnects every subscription/event, and retires endpoint references.
 
 ### `start` (private)
 
@@ -164,7 +164,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 void start()
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers with source and connects source, target-change, validation, and disposal observations before the initial read.
 
 ### `update_control` (private)
 
@@ -172,7 +172,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 bool update_control(bool automatic)
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Guards reentrancy, fetches current source/null/error state, applies formatting or typed conversion, writes the declared property, and completes atomically.
 
 ### `update_source` (private)
 
@@ -180,7 +180,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 bool update_source(bool automatic)
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Guards reentrancy, reads target, applies parsing/null projection or typed conversion, writes the current field, and completes atomically.
 
 ### `complete` (private)
 
@@ -188,7 +188,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 bool complete(BindingCompleteContext context, BindingCompleteState state, std::string error =
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Emits per-binding then source completion, routes error text, and returns cancellation-aware success.
 
 ### `source_changed` (private)
 
@@ -196,7 +196,7 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 void source_changed(const BindingListChange& change)
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Automatically reads on source change when policy admits.
 
 ### `target_changed` (private)
 
@@ -204,4 +204,4 @@ Public Binding operation. Its exact signature is inventoried here; follow the li
 void target_changed()
 ```
 
-Public Binding operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Automatically writes on property change when policy admits.

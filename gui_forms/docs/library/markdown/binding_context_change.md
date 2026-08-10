@@ -1,12 +1,12 @@
 # BindingContextChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 context change review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingContextChange`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:122`
 - Definition: `inline/header-only`
 
-BindingContextChange is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingContextChange identifies one BindingSource entering or leaving a Window currency context.
 
 ## Visual evidence
 

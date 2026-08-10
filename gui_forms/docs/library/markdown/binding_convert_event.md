@@ -1,12 +1,12 @@
 # BindingConvertEvent
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 conversion event review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `BindingConvertEvent`
 - Declaration: `include/gui_forms/binding/types/binding_contract_types.hpp:72`
 - Definition: `inline/header-only`
 
-BindingConvertEvent is a struct declared in include/gui_forms/binding/types/binding_contract_types.hpp.
+BindingConvertEvent lets formatting/parsing observers replace a proposed value for a declared destination kind and explicitly mark it handled.
 
 ## Visual evidence
 
