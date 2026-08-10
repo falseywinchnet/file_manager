@@ -92,7 +92,7 @@ SemanticDescriptor ErrorGlyph::semantic_descriptor() const {
 
 void ErrorGlyph::on_frame(FrameTime) {
     Window* owner = attached_window();
-    if (!owner || owner->presentation_settings().reduced_motion ||
+    if (!owner || (*owner).presentation_settings().reduced_motion ||
         style_ == ErrorBlinkStyle::never_blink) {
         phase_visible_ = true;
         frame_request_.disconnect();
@@ -127,16 +127,16 @@ void ErrorGlyph::on_detached_from_window() noexcept {
 void ErrorGlyph::refresh_schedule() {
     frame_request_.disconnect();
     Window* owner = attached_window();
-    if (!owner || owner->presentation_settings().reduced_motion ||
+    if (!owner || (*owner).presentation_settings().reduced_motion ||
         style_ == ErrorBlinkStyle::never_blink ||
         (style_ == ErrorBlinkStyle::blink_if_different_error &&
          transitions_remaining_ == 0U)) {
         phase_visible_ = true;
         return;
     }
-    auto self = std::dynamic_pointer_cast<ErrorGlyph>(shared_from_this());
+    std::shared_ptr<gui_forms::ErrorGlyph> self = std::dynamic_pointer_cast<ErrorGlyph>(shared_from_this());
     if (!self) return;
-    frame_request_ = owner->activate_surface(
+    frame_request_ = (*owner).activate_surface(
         self, rate_, FrameClock::now() + rate_);
 }
 

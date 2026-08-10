@@ -131,7 +131,7 @@ BITMAPINFO bitmap_info(std::uint32_t width, std::uint32_t height) {
 
 void copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {
     const std::span<const std::byte> source = snapshot.pixels();
-    auto* output = static_cast<std::byte*>(destination);
+    std::byte* output = static_cast<std::byte*>(destination);
     std::copy(source.begin(), source.end(), output);
     if (snapshot.pixel_format == PixelFormat::rgba32_premultiplied) {
         for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
@@ -156,7 +156,7 @@ gd_result export_hbitmap(Bitmap& bitmap, Color background, std::uintptr_t& outpu
     const std::uint8_t bg = background.is_empty() ? 0U : background.green();
     const std::uint8_t bb = background.is_empty() ? 0U : background.blue();
     const std::span<const std::byte> source = snapshot.pixels();
-    auto* destination = static_cast<std::uint8_t*>(pixels);
+    std::uint8_t* destination = static_cast<std::uint8_t*>(pixels);
     for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
         const auto channel = [&](std::size_t index) {
             return std::to_integer<std::uint8_t>(source[offset + index]);
@@ -187,13 +187,13 @@ gd_result import_hbitmap(std::uintptr_t source, std::unique_ptr<Bitmap>& output)
         details.bmWidth <= 0 || details.bmHeight == 0) {
         throw std::invalid_argument("native HBITMAP is invalid");
     }
-    const auto width = static_cast<std::uint32_t>(details.bmWidth);
-    const auto height = static_cast<std::uint32_t>(
+    const std::uint32_t width = static_cast<std::uint32_t>(details.bmWidth);
+    const std::uint32_t height = static_cast<std::uint32_t>(
         details.bmHeight < 0 ? -static_cast<std::int64_t>(details.bmHeight) :
                                details.bmHeight);
     auto bitmap = std::make_unique<Bitmap>(width, height,
                                            PixelFormat::bgra32_premultiplied);
-    BitmapLockView lock = bitmap->lock(BitmapLockMode::write);
+    BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
     BITMAPINFO info = bitmap_info(width, height);
     HDC device = GetDC(nullptr);
     if (device == nullptr) throw std::runtime_error("GetDC failed");
@@ -201,15 +201,15 @@ gd_result import_hbitmap(std::uintptr_t source, std::unique_ptr<Bitmap>& output)
                                lock.writable_data, &info, DIB_RGB_COLORS);
     ReleaseDC(nullptr, device);
     if (rows != static_cast<int>(height)) {
-        bitmap->unlock(lock.token);
+        (*bitmap).unlock(lock.token);
         throw std::runtime_error("GetDIBits failed");
     }
     for (std::uint32_t y = 0; y < height; ++y) {
-        auto* row = reinterpret_cast<std::uint8_t*>(lock.writable_data) +
+        std::uint8_t* row = reinterpret_cast<std::uint8_t*>(lock.writable_data) +
                     static_cast<std::size_t>(y) * lock.row_bytes;
         for (std::uint32_t x = 0; x < width; ++x) row[x * 4U + 3U] = 255U;
     }
-    bitmap->unlock(lock.token);
+    (*bitmap).unlock(lock.token);
     output = std::move(bitmap);
     return GD_OK;
 }
@@ -239,8 +239,8 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
         if (window_surface) compatibility.release_dc(window, device);
         throw std::length_error("native surface exceeds bitmap limits");
     }
-    const auto width = static_cast<std::uint32_t>(width64);
-    const auto height = static_cast<std::uint32_t>(height64);
+    const std::uint32_t width = static_cast<std::uint32_t>(width64);
+    const std::uint32_t height = static_cast<std::uint32_t>(height64);
     std::vector<std::byte> captured(static_cast<std::size_t>(width) * height * 4U);
     BITMAPINFO info = bitmap_info(width, height);
     void* pixels = nullptr;
@@ -273,14 +273,14 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
     DeleteObject(dib);
     auto bitmap = std::make_unique<Bitmap>(width, height,
                                            PixelFormat::bgra32_premultiplied);
-    BitmapLockView lock = bitmap->lock(BitmapLockMode::write);
+    BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
     std::memcpy(lock.writable_data, captured.data(), captured.size());
     for (std::uint32_t y = 0; y < height; ++y) {
-        auto* row = reinterpret_cast<std::uint8_t*>(lock.writable_data) +
+        std::uint8_t* row = reinterpret_cast<std::uint8_t*>(lock.writable_data) +
                     static_cast<std::size_t>(y) * lock.row_bytes;
         for (std::uint32_t x = 0; x < width; ++x) row[x * 4U + 3U] = 255U;
     }
-    bitmap->unlock(lock.token);
+    (*bitmap).unlock(lock.token);
     output.bitmap = std::move(bitmap);
     output.bounds = {static_cast<double>(bounds.left), static_cast<double>(bounds.top),
                      static_cast<double>(width), static_cast<double>(height)};
@@ -305,8 +305,8 @@ gd_result refresh_surface(std::uintptr_t source, std::uint32_t kind,
         bounds = {0, 0, GetDeviceCaps(source_device, HORZRES),
                         GetDeviceCaps(source_device, VERTRES)};
     }
-    const auto width = static_cast<std::uint32_t>(bounds.right - bounds.left);
-    const auto height = static_cast<std::uint32_t>(bounds.bottom - bounds.top);
+    const std::uint32_t width = static_cast<std::uint32_t>(bounds.right - bounds.left);
+    const std::uint32_t height = static_cast<std::uint32_t>(bounds.bottom - bounds.top);
     if (width == 0U || height == 0U ||
         width != bitmap.width() || height != bitmap.height()) {
         if (window_surface) compatibility.release_dc(window, source_device);
@@ -323,15 +323,15 @@ gd_result refresh_surface(std::uintptr_t source, std::uint32_t kind,
         }
         BitmapLockView lock = bitmap.lock(BitmapLockMode::write);
         try {
-            const auto packed_row_bytes = static_cast<std::size_t>(width) * 4U;
-            const auto* source_bytes = static_cast<const std::byte*>(capture_staging.pixels);
+            const std::size_t packed_row_bytes = static_cast<std::size_t>(width) * 4U;
+            const std::byte* source_bytes = static_cast<const std::byte*>(capture_staging.pixels);
             for (std::uint32_t y = 0; y < height; ++y) {
-                auto* destination = lock.writable_data +
+                std::byte* destination = lock.writable_data +
                     static_cast<std::size_t>(y) * lock.row_bytes;
                 std::memcpy(destination,
                             source_bytes + static_cast<std::size_t>(y) * packed_row_bytes,
                             packed_row_bytes);
-                auto* row = reinterpret_cast<std::uint8_t*>(destination);
+                std::uint8_t* row = reinterpret_cast<std::uint8_t*>(destination);
                 for (std::uint32_t x = 0; x < width; ++x) {
                     row[x * 4U + 3U] = 255U;
                 }
@@ -456,13 +456,13 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
         std::scoped_lock lock(lease_mutex);
         const auto found = leases.find(lease_token);
         if (found == leases.end()) throw std::invalid_argument("HDC lease token is stale");
-        if (found->second.bitmap != &bitmap) {
+        if ((*found).second.bitmap != &bitmap) {
             throw std::invalid_argument("HDC lease belongs to a different bitmap");
         }
-        if (found->second.owner != std::this_thread::get_id()) {
+        if ((*found).second.owner != std::this_thread::get_id()) {
             return GD_ERROR_WRONG_THREAD;
         }
-        lease = found->second;
+        lease = (*found).second;
         leases.erase(found);
     }
     struct LeaseCleanup final {
@@ -473,7 +473,7 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
             DeleteObject(lease.dib);
         }
     } cleanup{lease};
-    auto* pixels = static_cast<std::uint8_t*>(lease.pixels);
+    std::uint8_t* pixels = static_cast<std::uint8_t*>(lease.pixels);
     for (std::size_t offset = 0; offset < lease.byte_count; offset += 4U) {
         if (pixels[offset + 3U] == 0U &&
             (pixels[offset] != 0U || pixels[offset + 1U] != 0U ||

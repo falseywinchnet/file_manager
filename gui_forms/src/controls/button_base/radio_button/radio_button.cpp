@@ -1,4 +1,5 @@
 #include "gui_forms/controls/button_base/radio_button/radio_button.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
@@ -20,16 +21,12 @@ RadioButton::RadioButton(StableId stable_id, std::string text)
         {"Checked", BindingValueKind::boolean, "Behavior",
          "Whether the radio button is selected within its group.",
          BindingValue{false}, Dirty::paint | Dirty::semantics},
-        [this] { return BindingValue{checked_}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::boolean);
-            if (!converted) throw std::invalid_argument("RadioButton.Checked binding requires Boolean");
-            set_checked(std::get<bool>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return checked_changed_.subscribe(owner,
-                [changed = std::move(changed)](bool) { changed(); });
-        }, {}, {}});
+        detail::BindingMemberGetter<RadioButton, bool>(
+            *this, &RadioButton::checked_),
+        detail::ConvertedPropertySetter<RadioButton, bool>(
+            *this, &RadioButton::set_checked, BindingValueKind::boolean,
+            "RadioButton.Checked binding requires Boolean"),
+        detail::EventChangeConnector<bool>(checked_changed_), {}, {}});
 }
 
 void RadioButton::set_checked_without_exclusion(bool checked_value) {
@@ -49,11 +46,11 @@ void RadioButton::set_checked(bool checked_value) {
     }
     if (checked_value) {
         if (const Control::Ptr owner = parent()) {
-            for (const Control::Ptr& sibling : owner->children()) {
-                auto peer = std::dynamic_pointer_cast<RadioButton>(sibling);
-                if (peer && peer.get() != this && peer->group_name_ == group_name_ &&
-                    peer->checked_) {
-                    peer->set_checked_without_exclusion(false);
+            for (const Control::Ptr& sibling : (*owner).children()) {
+                std::shared_ptr<gui_forms::RadioButton> peer = std::dynamic_pointer_cast<RadioButton>(sibling);
+                if (peer && peer.get() != this && (*peer).group_name_ == group_name_ &&
+                    (*peer).checked_) {
+                    (*peer).set_checked_without_exclusion(false);
                     if (!is_alive()) {
                         return;
                     }
@@ -73,11 +70,11 @@ void RadioButton::set_group_name(std::string name) {
     invalidate(Dirty::semantics);
     if (checked_) {
         if (const Control::Ptr owner = parent()) {
-            for (const Control::Ptr& sibling : owner->children()) {
-                auto peer = std::dynamic_pointer_cast<RadioButton>(sibling);
-                if (peer && peer.get() != this && peer->group_name_ == group_name_ &&
-                    peer->checked_) {
-                    peer->set_checked_without_exclusion(false);
+            for (const Control::Ptr& sibling : (*owner).children()) {
+                std::shared_ptr<gui_forms::RadioButton> peer = std::dynamic_pointer_cast<RadioButton>(sibling);
+                if (peer && peer.get() != this && (*peer).group_name_ == group_name_ &&
+                    (*peer).checked_) {
+                    (*peer).set_checked_without_exclusion(false);
                     if (!is_alive()) {
                         return;
                     }

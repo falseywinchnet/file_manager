@@ -77,6 +77,8 @@ protected:
 
 private:
     struct Entry;
+    using EntryMap =
+        std::unordered_map<std::uint64_t, std::unique_ptr<Entry>>;
     enum class PendingAction : std::uint8_t { none, show, auto_hide };
 
     [[nodiscard]] Window* bound_window() const noexcept;
@@ -100,7 +102,7 @@ private:
 
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
     std::unique_ptr<Timer> timer_;
-    std::unordered_map<std::uint64_t, std::unique_ptr<Entry>> entries_;
+    EntryMap entries_;
     std::weak_ptr<Control> pending_target_;
     std::weak_ptr<Control> visible_target_;
     std::shared_ptr<Control> overlay_layer_;

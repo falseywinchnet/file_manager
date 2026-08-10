@@ -25,7 +25,7 @@ No package documentation comment is present.
 
 ### callLocal
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:205`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:271`.
 
 ```go
 func callLocal(args []string, output io.Writer) error
@@ -35,10 +35,20 @@ No declaration documentation comment is present.
 
 ### createManifest
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:135`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:189`.
 
 ```go
 func createManifest(args []string, output io.Writer) error
+```
+
+No declaration documentation comment is present.
+
+### ensureManifestAdmission
+
+Kind: `function`. Source: `cmd/fileman-engine/main.go:143`.
+
+```go
+func ensureManifestAdmission(ctx context.Context, engine *service.Service, manifest deployment.Manifest) error
 ```
 
 No declaration documentation comment is present.
@@ -49,6 +59,16 @@ Kind: `function`. Source: `cmd/fileman-engine/main.go:27`.
 
 ```go
 func main()
+```
+
+No declaration documentation comment is present.
+
+### manifestAdmissionCommitter
+
+Kind: `function`. Source: `cmd/fileman-engine/main.go:172`.
+
+```go
+func manifestAdmissionCommitter(manifest deployment.Manifest) func(transport.Request, transport.Response) error
 ```
 
 No declaration documentation comment is present.
@@ -75,7 +95,7 @@ No declaration documentation comment is present.
 
 ### serve
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:238`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:311`.
 
 ```go
 func serve(input io.Reader, output io.Writer, guard *sandbox.Guard) error
@@ -85,7 +105,7 @@ No declaration documentation comment is present.
 
 ### serveConfigured
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:253`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:326`.
 
 ```go
 func serveConfigured(input io.Reader, output io.Writer, guard *sandbox.Guard, options serveOptions) error
@@ -95,7 +115,7 @@ No declaration documentation comment is present.
 
 ### serveWithStore
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:242`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:315`.
 
 ```go
 func serveWithStore(input io.Reader, output io.Writer, guard *sandbox.Guard, storeRoot string) error
@@ -105,7 +125,7 @@ No declaration documentation comment is present.
 
 ### splitNonempty
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:228`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:301`.
 
 ```go
 func splitNonempty(value string) []string
@@ -125,7 +145,7 @@ No declaration documentation comment is present.
 
 ### writeManifestAtomically
 
-Kind: `function`. Source: `cmd/fileman-engine/main.go:179`.
+Kind: `function`. Source: `cmd/fileman-engine/main.go:233`.
 
 ```go
 func writeManifestAtomically(path string, payload []byte) error
@@ -135,7 +155,7 @@ No declaration documentation comment is present.
 
 ### serveOptions
 
-Kind: `struct`. Source: `cmd/fileman-engine/main.go:246`.
+Kind: `struct`. Source: `cmd/fileman-engine/main.go:319`.
 
 ```go
 type serveOptions struct

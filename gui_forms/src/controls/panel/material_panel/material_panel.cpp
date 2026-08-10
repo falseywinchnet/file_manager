@@ -32,11 +32,11 @@ void MaterialPanel::validate_window_images(
     if (window() == nullptr) return;
     for (const MaterialFillLayer& fill : material.fills) {
         if (fill.kind != MaterialFillKind::image) continue;
-        const auto resource = window()->image_resources().find(fill.image);
+        const std::optional<ImageResourceView> resource = (*window()).image_resources().find(fill.image);
         if (!resource ||
-            static_cast<double>(resource->metadata.width) !=
+            static_cast<double>((*resource).metadata.width) !=
                 fill.image_pixel_size.width ||
-            static_cast<double>(resource->metadata.height) !=
+            static_cast<double>((*resource).metadata.height) !=
                 fill.image_pixel_size.height) {
             throw std::invalid_argument(
                 "material image is missing from the attached Window or its declared pixel size is stale");

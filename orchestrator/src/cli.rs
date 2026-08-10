@@ -99,7 +99,7 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     }
     let method =
         method_for_command(command).ok_or_else(|| format!("unknown command: {command}"))?;
-    let mut kernel = Kernel::new();
+    let kernel = Kernel::new();
     let response = kernel.handle(Request::local("cli-1", method));
     render_response(command, &response, json_output)
 }

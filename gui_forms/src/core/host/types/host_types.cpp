@@ -6,10 +6,47 @@
 #include <cmath>
 #include <array>
 #include <sstream>
-#include <type_traits>
 #include <unordered_set>
 
 namespace gui_forms {
+namespace {
+
+struct HostEventNameVisitor final {
+    const char* operator()(const HostAttachEvent&) const noexcept { return "attach"; }
+    const char* operator()(const HostResizeEvent&) const noexcept { return "resize"; }
+    const char* operator()(const HostScaleEvent&) const noexcept { return "scale"; }
+    const char* operator()(const HostActivationEvent&) const noexcept { return "activation"; }
+    const char* operator()(const HostOcclusionEvent&) const noexcept { return "occlusion"; }
+    const char* operator()(const HostDisplayEvent&) const noexcept { return "display"; }
+    const char* operator()(const DragEvent&) const noexcept { return "drag"; }
+    const char* operator()(const PointerEvent&) const noexcept { return "pointer"; }
+    const char* operator()(const KeyEvent&) const noexcept { return "key"; }
+    const char* operator()(const TextInputEvent&) const noexcept { return "text"; }
+    const char* operator()(const HostCloseRequest&) const noexcept { return "close_request"; }
+    const char* operator()(const HostClosedEvent&) const noexcept { return "closed"; }
+    const char* operator()(const HostShutdownEvent&) const noexcept { return "shutdown"; }
+};
+
+struct HostDialogKindVisitor final {
+    const char* operator()(const HostMessageDialogRequest&) const noexcept {
+        return "message";
+    }
+    const char* operator()(const HostOpenFileDialogRequest&) const noexcept {
+        return "open_file";
+    }
+    const char* operator()(const HostSaveFileDialogRequest&) const noexcept {
+        return "save_file";
+    }
+    const char* operator()(const HostFolderDialogRequest&) const noexcept {
+        return "select_folder";
+    }
+    const char* operator()(const HostColorDialogRequest&) const noexcept {
+        return "color";
+    }
+};
+
+} // namespace
+
 const char* host_dispatch_error_name(HostDispatchError error) noexcept {
     switch (error) {
     case HostDispatchError::none: return "none";
@@ -37,23 +74,7 @@ const char* host_lifecycle_phase_name(HostLifecyclePhase phase) noexcept {
 }
 
 const char* host_event_name(const HostEventPayload& payload) noexcept {
-    return std::visit([](const auto& value) -> const char* {
-        using Payload = std::decay_t<decltype(value)>;
-        if constexpr (std::is_same_v<Payload, HostAttachEvent>) return "attach";
-        if constexpr (std::is_same_v<Payload, HostResizeEvent>) return "resize";
-        if constexpr (std::is_same_v<Payload, HostScaleEvent>) return "scale";
-        if constexpr (std::is_same_v<Payload, HostActivationEvent>) return "activation";
-        if constexpr (std::is_same_v<Payload, HostOcclusionEvent>) return "occlusion";
-        if constexpr (std::is_same_v<Payload, HostDisplayEvent>) return "display";
-        if constexpr (std::is_same_v<Payload, DragEvent>) return "drag";
-        if constexpr (std::is_same_v<Payload, PointerEvent>) return "pointer";
-        if constexpr (std::is_same_v<Payload, KeyEvent>) return "key";
-        if constexpr (std::is_same_v<Payload, TextInputEvent>) return "text";
-        if constexpr (std::is_same_v<Payload, HostCloseRequest>) return "close_request";
-        if constexpr (std::is_same_v<Payload, HostClosedEvent>) return "closed";
-        if constexpr (std::is_same_v<Payload, HostShutdownEvent>) return "shutdown";
-        return "unknown";
-    }, payload);
+    return std::visit(HostEventNameVisitor{}, payload);
 }
 
 const char* host_service_error_name(HostServiceError error) noexcept {
@@ -107,21 +128,7 @@ const char* drag_effect_name(DragEffect effect) noexcept {
 }
 
 const char* host_dialog_kind_name(const HostDialogRequestPayload& payload) noexcept {
-    return std::visit([](const auto& value) -> const char* {
-        using Payload = std::decay_t<decltype(value)>;
-        if constexpr (std::is_same_v<Payload, HostMessageDialogRequest>) {
-            return "message";
-        } else if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
-            return "open_file";
-        } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
-            return "save_file";
-        } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
-            return "select_folder";
-        } else if constexpr (std::is_same_v<Payload, HostColorDialogRequest>) {
-            return "color";
-        }
-        return "unknown";
-    }, payload);
+    return std::visit(HostDialogKindVisitor{}, payload);
 }
 
 const char* host_dialog_outcome_name(HostDialogOutcome outcome) noexcept {

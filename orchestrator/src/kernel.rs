@@ -12,14 +12,16 @@ use crate::local_session::{LOCAL_WIRE_FAMILY, LOCAL_WIRE_MAJOR, LOCAL_WIRE_MINOR
 use crate::release::core_release_manifest;
 use crate::runtime_health::RuntimeHealth;
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Kernel {
-    lifecycle: Lifecycle,
+    lifecycle: Mutex<Lifecycle>,
     runtime_health: Arc<RuntimeHealth>,
     supervisor_restart: bool,
-    engine_search: Option<Box<dyn UnifiedEngineSearch>>,
+    engine_search: Option<Mutex<Box<dyn UnifiedEngineSearch>>>,
+    engine_live_available: AtomicBool,
 }
 
 impl Default for Kernel {
@@ -30,44 +32,47 @@ impl Default for Kernel {
 
 impl Kernel {
     fn live_search_available(&self) -> bool {
-        self.engine_search
-            .as_ref()
-            .is_some_and(|search| search.live_available())
+        self.engine_live_available.load(Ordering::Acquire)
     }
 
     #[must_use]
     pub fn new() -> Self {
         Self {
-            lifecycle: Lifecycle::started(),
+            lifecycle: Mutex::new(Lifecycle::started()),
             runtime_health: Arc::new(RuntimeHealth::in_process()),
             supervisor_restart: false,
             engine_search: None,
+            engine_live_available: AtomicBool::new(false),
         }
     }
 
     #[must_use]
     pub fn for_local_daemon() -> Self {
         Self {
-            lifecycle: Lifecycle::started(),
+            lifecycle: Mutex::new(Lifecycle::started()),
             runtime_health: Arc::new(RuntimeHealth::local_daemon()),
             supervisor_restart: false,
             engine_search: None,
+            engine_live_available: AtomicBool::new(false),
         }
     }
 
     #[must_use]
     pub fn for_supervised_daemon() -> Self {
         Self {
-            lifecycle: Lifecycle::started(),
+            lifecycle: Mutex::new(Lifecycle::started()),
             runtime_health: Arc::new(RuntimeHealth::local_daemon()),
             supervisor_restart: true,
             engine_search: None,
+            engine_live_available: AtomicBool::new(false),
         }
     }
 
     #[must_use]
     pub fn with_engine_search(mut self, search: impl UnifiedEngineSearch + 'static) -> Self {
-        self.engine_search = Some(Box::new(search));
+        self.engine_live_available
+            .store(search.live_available(), Ordering::Release);
+        self.engine_search = Some(Mutex::new(Box::new(search)));
         self
     }
 
@@ -77,7 +82,7 @@ impl Kernel {
     }
 
     #[must_use]
-    pub fn handle(&mut self, request: Request) -> Response {
+    pub fn handle(&self, request: Request) -> Response {
         if let Err(error) = validate_request_id(&request.id) {
             return Response::failure("", error);
         }
@@ -106,7 +111,7 @@ impl Kernel {
             return Response::failure(request.id, error);
         }
 
-        if self.lifecycle.snapshot().state != LifecycleState::Ready
+        if self.lifecycle_snapshot().state != LifecycleState::Ready
             && request.method != "orchestrator.version"
         {
             return Response::failure(
@@ -164,12 +169,12 @@ impl Kernel {
 
     #[must_use]
     pub fn is_stopped(&self) -> bool {
-        self.lifecycle.snapshot().state == LifecycleState::Stopped
+        self.lifecycle_snapshot().state == LifecycleState::Stopped
     }
 
     #[must_use]
     pub fn lifecycle_generation(&self) -> u64 {
-        self.lifecycle.snapshot().generation
+        self.lifecycle_snapshot().generation
     }
 
     fn status_result(&self) -> Value {
@@ -178,7 +183,7 @@ impl Kernel {
     }
 
     fn status_result_with(&self, release: &crate::release::CoreReleaseManifest) -> Value {
-        let lifecycle = self.lifecycle.snapshot();
+        let lifecycle = self.lifecycle_snapshot();
         json!({
             "component": "orchestrator",
             "core_release": {
@@ -212,7 +217,7 @@ impl Kernel {
     }
 
     fn frontend_bootstrap_result(&self) -> Value {
-        let lifecycle = self.lifecycle.snapshot();
+        let lifecycle = self.lifecycle_snapshot();
         let release = core_release_manifest();
         let restart_eligible = release.ready && self.supervisor_restart;
         let opening = frontend_opening_result(release, CAPABILITIES, restart_eligible);
@@ -299,7 +304,7 @@ impl Kernel {
             .count()
     }
 
-    fn search_response(&mut self, id: String, params: Value) -> Response {
+    fn search_response(&self, id: String, params: Value) -> Response {
         let request: EngineSearchRequest =
             match serde_json::from_value::<EngineSearchRequest>(params) {
                 Ok(request) if request.is_well_formed() => request,
@@ -324,7 +329,7 @@ impl Kernel {
                     );
                 }
             };
-        let Some(search) = self.engine_search.as_mut() else {
+        let Some(search) = self.engine_search.as_ref() else {
             return Response::failure(
                 id,
                 ApiError::new(
@@ -334,7 +339,19 @@ impl Kernel {
                 ),
             );
         };
+        let Ok(mut search) = search.lock() else {
+            return Response::failure(
+                id,
+                ApiError::new(
+                    ApiErrorCode::Internal,
+                    TerminalStatus::InternalFault,
+                    "Engine search worker state is poisoned",
+                ),
+            );
+        };
         let outcome = search.search(&request);
+        self.engine_live_available
+            .store(search.live_available(), Ordering::Release);
         let terminal = outcome.terminal();
         if !matches!(terminal, TerminalStatus::Success | TerminalStatus::Partial) {
             return Response::failure(
@@ -371,10 +388,17 @@ impl Kernel {
         Response::result(id, terminal, result)
     }
 
-    fn shutdown_result(&mut self) -> Result<Value, ApiError> {
-        self.lifecycle
+    fn shutdown_result(&self) -> Result<Value, ApiError> {
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| {
+            ApiError::new(
+                ApiErrorCode::Internal,
+                TerminalStatus::InternalFault,
+                "Orchestrator lifecycle state is poisoned",
+            )
+        })?;
+        lifecycle
             .begin_shutdown()
-            .and_then(|()| self.lifecycle.finish_shutdown())
+            .and_then(|()| lifecycle.finish_shutdown())
             .map_err(|error| {
                 ApiError::new(
                     ApiErrorCode::Internal,
@@ -383,6 +407,13 @@ impl Kernel {
                 )
             })?;
         Ok(json!({"state": "stopped"}))
+    }
+
+    fn lifecycle_snapshot(&self) -> crate::lifecycle::LifecycleSnapshot {
+        self.lifecycle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .snapshot()
     }
 }
 
@@ -701,10 +732,61 @@ mod tests {
         ApiErrorCode, ContractRef, MAX_CRITICAL_EXTENSIONS, MAX_REQUEST_ID_BYTES, Request,
         TerminalStatus,
     };
+    use crate::engine_contract::{EngineLiveQueryResultFixture, EngineSearchBudget};
+    use crate::engine_port::{EngineSearchOutcome, UnifiedEngineSearch};
+    use std::sync::{Arc, mpsc};
+    use std::thread;
+    use std::time::Duration;
+
+    struct BlockingSearch {
+        entered: mpsc::SyncSender<()>,
+        release: mpsc::Receiver<()>,
+    }
+
+    impl UnifiedEngineSearch for BlockingSearch {
+        fn search(
+            &mut self,
+            _request: &crate::engine_contract::EngineSearchRequest,
+        ) -> EngineSearchOutcome {
+            self.entered.send(()).expect("publish blocked search");
+            self.release.recv().expect("release blocked search");
+            let page: EngineLiveQueryResultFixture = serde_json::from_str(include_str!(
+                "../conformance/fixtures/engine/live-query-v0-draft/query_live_no_catalogue_page.json"
+            ))
+            .expect("live fixture");
+            EngineSearchOutcome::Live(page)
+        }
+
+        fn live_available(&self) -> bool {
+            true
+        }
+    }
+
+    struct BecomesUnavailable {
+        live: bool,
+    }
+
+    impl UnifiedEngineSearch for BecomesUnavailable {
+        fn search(
+            &mut self,
+            _request: &crate::engine_contract::EngineSearchRequest,
+        ) -> EngineSearchOutcome {
+            self.live = false;
+            let page: EngineLiveQueryResultFixture = serde_json::from_str(include_str!(
+                "../conformance/fixtures/engine/live-query-v0-draft/query_live_no_catalogue_page.json"
+            ))
+            .expect("live fixture");
+            EngineSearchOutcome::Live(page)
+        }
+
+        fn live_available(&self) -> bool {
+            self.live
+        }
+    }
 
     #[test]
     fn kernel_reports_stubs_without_fact_or_plugin_operations() {
-        let mut kernel = Kernel::new();
+        let kernel = Kernel::new();
         let status = kernel.handle(Request::local("one", "orchestrator.semantic_facts.status"));
         assert_eq!(status.status, TerminalStatus::Success);
 
@@ -718,7 +800,7 @@ mod tests {
 
     #[test]
     fn shutdown_is_terminal() {
-        let mut kernel = Kernel::new();
+        let kernel = Kernel::new();
         let response = kernel.handle(Request::local("one", "orchestrator.shutdown"));
         assert_eq!(response.status, TerminalStatus::Success);
         assert!(kernel.is_stopped());
@@ -729,7 +811,7 @@ mod tests {
 
     #[test]
     fn frontend_bootstrap_is_one_bounded_immutable_snapshot() {
-        let mut kernel = Kernel::new();
+        let kernel = Kernel::new();
         let response = kernel.handle(Request::local(
             "frontend",
             "orchestrator.frontend.bootstrap",
@@ -792,7 +874,7 @@ mod tests {
             ApiErrorCode::ResourceBudgetExceeded
         );
 
-        let mut supervised = Kernel::for_supervised_daemon();
+        let supervised = Kernel::for_supervised_daemon();
         let response = supervised.handle(Request::local(
             "supervised",
             "orchestrator.frontend.bootstrap",
@@ -855,7 +937,7 @@ mod tests {
 
     #[test]
     fn attacker_controlled_envelope_fields_are_bounded_before_error_reflection() {
-        let mut kernel = Kernel::new();
+        let kernel = Kernel::new();
         let oversized_id = kernel.handle(Request::local(
             "x".repeat(MAX_REQUEST_ID_BYTES + 1),
             "orchestrator.status",
@@ -878,5 +960,71 @@ mod tests {
             minor: 0,
         });
         assert_eq!(kernel.handle(contract).status, TerminalStatus::Invalid);
+    }
+
+    #[test]
+    fn blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state() {
+        let (entered_sender, entered_receiver) = mpsc::sync_channel(1);
+        let (release_sender, release_receiver) = mpsc::sync_channel(1);
+        let kernel = Arc::new(Kernel::new().with_engine_search(BlockingSearch {
+            entered: entered_sender,
+            release: release_receiver,
+        }));
+        let search_kernel = Arc::clone(&kernel);
+        let search = thread::spawn(move || {
+            let mut request = Request::local("search", "orchestrator.search");
+            request.params = serde_json::json!({
+                "query_id": "blocking-provider",
+                "root_id": "docs",
+                "descendants": true,
+                "text": "ledger",
+                "budget": EngineSearchBudget::default()
+            });
+            search_kernel.handle(request)
+        });
+        entered_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("provider entered");
+
+        let status_kernel = Arc::clone(&kernel);
+        let (status_sender, status_receiver) = mpsc::sync_channel(1);
+        let status = thread::spawn(move || {
+            let response = status_kernel.handle(Request::local("status", "orchestrator.status"));
+            let _ = status_sender.send(response);
+        });
+        let prompt_status = status_receiver.recv_timeout(Duration::from_millis(200));
+        release_sender.send(()).expect("release provider");
+
+        assert_eq!(
+            prompt_status
+                .expect("status must not wait for provider I/O")
+                .status,
+            TerminalStatus::Success
+        );
+        assert_eq!(
+            search.join().expect("search thread").status,
+            TerminalStatus::Success
+        );
+        status.join().expect("status thread");
+    }
+
+    #[test]
+    fn provider_health_cache_updates_after_terminal_worker_call() {
+        let kernel = Kernel::new().with_engine_search(BecomesUnavailable { live: true });
+        let mut request = Request::local("search", "orchestrator.search");
+        request.params = serde_json::json!({
+            "query_id": "health-transition",
+            "root_id": "docs",
+            "descendants": true,
+            "text": "ledger",
+            "budget": EngineSearchBudget::default()
+        });
+        assert_eq!(kernel.handle(request).status, TerminalStatus::Success);
+
+        let status = kernel.handle(Request::local("status", "orchestrator.status"));
+        assert_eq!(
+            status.result.expect("status result")["search"]["live_search_available"],
+            false
+        );
     }
 }

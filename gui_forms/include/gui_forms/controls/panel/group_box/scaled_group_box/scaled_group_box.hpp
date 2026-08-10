@@ -21,9 +21,10 @@ public:
     void arrange(Rect final_bounds) override;
 
 private:
+    using SlotMap = std::unordered_map<std::uint64_t, Rect>;
     void reconcile_slots();
     Size design_size_;
-    std::unordered_map<std::uint64_t, Rect> slots_;
+    SlotMap slots_;
 };
 
 } // namespace gui_forms

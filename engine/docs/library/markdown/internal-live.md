@@ -9,6 +9,7 @@ Package live performs bounded, metadata-only filesystem search without construct
 ## Invariants
 
 - No catalogue is created or consulted.
+- An excluded starting scope and a replaced installed root fail closed.
 - Directory links are returned but not traversed.
 - State is bounded by depth, sessions, work, results, time, and bytes.
 
@@ -251,7 +252,7 @@ No declaration documentation comment is present.
 
 ### displayPath
 
-Kind: `function`. Source: `internal/live/manager.go:461`.
+Kind: `function`. Source: `internal/live/manager.go:475`.
 
 ```go
 func displayPath(path string) string
@@ -264,14 +265,14 @@ No declaration documentation comment is present.
 Kind: `function`. Source: `internal/live/manager.go:207`.
 
 ```go
-func newSession(root api.RootSpec, query api.LiveQuery, now time.Time) (*session, error)
+func newSession(root api.RootSpec, expectedObjectID string, query api.LiveQuery, now time.Time) (*session, error)
 ```
 
 No declaration documentation comment is present.
 
 ### randomID
 
-Kind: `function`. Source: `internal/live/manager.go:250`.
+Kind: `function`. Source: `internal/live/manager.go:264`.
 
 ```go
 func randomID() (string, error)
@@ -281,7 +282,7 @@ No declaration documentation comment is present.
 
 ### resultFor
 
-Kind: `function`. Source: `internal/live/manager.go:367`.
+Kind: `function`. Source: `internal/live/manager.go:381`.
 
 ```go
 func resultFor(root api.RootSpec, relative, name string, info os.FileInfo, observed identity.Observation, rank int) api.Result
@@ -314,7 +315,7 @@ No declaration documentation comment is present.
 Kind: `method`. Source: `internal/live/manager.go:102`.
 
 ```go
-func (m *Manager) Query(ctx context.Context, root api.RootSpec, query api.LiveQuery, owns OwnsFunc) (api.LiveQueryResponse, error)
+func (m *Manager) Query(ctx context.Context, root api.RootSpec, expectedObjectID string, query api.LiveQuery, owns OwnsFunc) (api.LiveQueryResponse, error)
 ```
 
 No declaration documentation comment is present.
@@ -331,7 +332,7 @@ No declaration documentation comment is present.
 
 ### Manager.expire
 
-Kind: `method`. Source: `internal/live/manager.go:449`.
+Kind: `method`. Source: `internal/live/manager.go:463`.
 
 ```go
 func (m *Manager) expire(now time.Time)
@@ -341,7 +342,7 @@ No declaration documentation comment is present.
 
 ### Manager.expireToken
 
-Kind: `method`. Source: `internal/live/manager.go:430`.
+Kind: `method`. Source: `internal/live/manager.go:444`.
 
 ```go
 func (m *Manager) expireToken(token string)
@@ -351,7 +352,7 @@ No declaration documentation comment is present.
 
 ### session.close
 
-Kind: `method`. Source: `internal/live/manager.go:415`.
+Kind: `method`. Source: `internal/live/manager.go:429`.
 
 ```go
 func (s *session) close()
@@ -361,7 +362,7 @@ No declaration documentation comment is present.
 
 ### session.matches
 
-Kind: `method`. Source: `internal/live/manager.go:258`.
+Kind: `method`. Source: `internal/live/manager.go:272`.
 
 ```go
 func (s *session) matches(query api.LiveQuery) bool
@@ -371,7 +372,7 @@ No declaration documentation comment is present.
 
 ### session.page
 
-Kind: `method`. Source: `internal/live/manager.go:264`.
+Kind: `method`. Source: `internal/live/manager.go:278`.
 
 ```go
 func (s *session) page(ctx context.Context, budget api.LiveQueryBudget, owns OwnsFunc, started time.Time) (api.LiveQueryResponse, bool, error)
@@ -381,7 +382,7 @@ No declaration documentation comment is present.
 
 ### session.response
 
-Kind: `method`. Source: `internal/live/manager.go:386`.
+Kind: `method`. Source: `internal/live/manager.go:400`.
 
 ```go
 func (s *session) response(results []api.Result, visited, stats uint64, started time.Time, complete bool) api.LiveQueryResponse
@@ -391,7 +392,7 @@ No declaration documentation comment is present.
 
 ### session.unavailablePath
 
-Kind: `method`. Source: `internal/live/manager.go:407`.
+Kind: `method`. Source: `internal/live/manager.go:421`.
 
 ```go
 func (s *session) unavailablePath(path string)
@@ -401,7 +402,7 @@ No declaration documentation comment is present.
 
 ### session.warn
 
-Kind: `method`. Source: `internal/live/manager.go:399`.
+Kind: `method`. Source: `internal/live/manager.go:413`.
 
 ```go
 func (s *session) warn(message string)

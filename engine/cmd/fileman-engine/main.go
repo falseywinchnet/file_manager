@@ -129,7 +129,61 @@ func runLaunchd(args []string) error {
 	if _, err := engine.ApplyRoots(context.Background(), manifest.RootSpecs()); err != nil {
 		return fmt.Errorf("apply manifest root policy: %w", err)
 	}
-	return transport.ServeLocal(context.Background(), manifest.RuntimeDir, engine)
+	reconcileContext, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := ensureManifestAdmission(reconcileContext, engine, manifest); err != nil {
+		return err
+	}
+	return transport.ServeLocalWithOptions(
+		context.Background(), manifest.RuntimeDir, engine,
+		transport.LocalOptions{AfterSuccessfulDispatch: manifestAdmissionCommitter(manifest)},
+	)
+}
+
+func ensureManifestAdmission(ctx context.Context, engine *service.Service, manifest deployment.Manifest) error {
+	status, err := engine.Status(ctx)
+	if err != nil {
+		return fmt.Errorf("inspect recovered generation: %w", err)
+	}
+	admissionDigest := manifest.AdmissionDigest()
+	admissionCurrent := false
+	if status.Generation != 0 {
+		admissionCurrent, err = deployment.AdmissionMatches(manifest.StoreRoot, admissionDigest, status.Generation)
+		if err != nil {
+			return err
+		}
+	}
+	if !admissionCurrent {
+		var generation api.Generation
+		for _, root := range manifest.RootSpecs() {
+			report, err := engine.Reconcile(ctx, root.ID)
+			if err != nil {
+				return fmt.Errorf("reconcile changed admission policy for root %q: %w", root.ID, err)
+			}
+			generation = report.Generation
+		}
+		if err := deployment.CommitAdmission(manifest.StoreRoot, admissionDigest, generation); err != nil {
+			return fmt.Errorf("commit admission generation: %w", err)
+		}
+	}
+	return nil
+}
+
+func manifestAdmissionCommitter(manifest deployment.Manifest) func(transport.Request, transport.Response) error {
+	digest := manifest.AdmissionDigest()
+	return func(request transport.Request, response transport.Response) error {
+		switch request.Method {
+		case "scan.reconcile", "engine.scan_reconcile", "projection.rebuild", "engine.projection_rebuild":
+			report, ok := response.Result.(api.ReconcileReport)
+			if !ok || report.Generation == 0 {
+				return errors.New("successful reconciliation returned no generation")
+			}
+			if err := deployment.CommitAdmission(manifest.StoreRoot, digest, report.Generation); err != nil {
+				return fmt.Errorf("commit admission generation: %w", err)
+			}
+		}
+		return nil
+	}
 }
 
 func createManifest(args []string, output io.Writer) error {
@@ -199,7 +253,19 @@ func writeManifestAtomically(path string, payload []byte) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temporaryPath, path)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	directoryHandle, err := os.Open(directory)
+	if err != nil {
+		return err
+	}
+	syncErr := directoryHandle.Sync()
+	closeErr := directoryHandle.Close()
+	if syncErr != nil {
+		return syncErr
+	}
+	return closeErr
 }
 
 func callLocal(args []string, output io.Writer) error {
@@ -215,6 +281,13 @@ func callLocal(args []string, output io.Writer) error {
 	decoder := json.NewDecoder(strings.NewReader(*requestJSON))
 	if err := decoder.Decode(&request); err != nil {
 		return fmt.Errorf("decode request: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			err = errors.New("multiple JSON values")
+		}
+		return fmt.Errorf("request contains trailing data: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()

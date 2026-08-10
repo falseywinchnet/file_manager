@@ -1,0 +1,2640 @@
+{
+  "candidateCount": 329,
+  "rewrites": [
+    {
+      "fileSize": 34053,
+      "path": "include/gui_forms/control/control/control.hpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 27090
+    },
+    {
+      "fileSize": 29172,
+      "path": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 4336
+    },
+    {
+      "fileSize": 29172,
+      "path": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
+      "reason": "type_spelling_too_long_for_mechanical_rewrite",
+      "replacement": "std::shared_ptr<std::variant<std::monostate, bool, long long, unsigned long long, double, std::string, gui_forms::Point, gui_forms::Size, gui_forms::Rect, gui_forms::Insets, gui_forms::Color, gui_forms::FontSpec, gui_forms::ImageId, gui_forms::PropertyEnumValue, gui_forms::PropertyObjectValue, gui_forms::PropertyCollectionValue>>",
+      "safe": false,
+      "tokenOffset": 7972
+    },
+    {
+      "fileSize": 29172,
+      "path": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/../control_adapters/abi_property_object_control/abi_property_object_control.hpp:174:46)",
+      "safe": false,
+      "tokenOffset": 8313
+    },
+    {
+      "fileSize": 29172,
+      "path": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::PropertyEnumChoice *>",
+      "safe": false,
+      "tokenOffset": 18061
+    },
+    {
+      "fileSize": 20545,
+      "path": "src/abi/control_adapters/field_control/field_control.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/../control_adapters/field_control/field_control.hpp:43:39)",
+      "safe": false,
+      "tokenOffset": 1942
+    },
+    {
+      "fileSize": 20545,
+      "path": "src/abi/control_adapters/field_control/field_control.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/../control_adapters/field_control/field_control.hpp:224:33)",
+      "safe": false,
+      "tokenOffset": 10336
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ObjectRecord>",
+      "safe": false,
+      "tokenOffset": 3736
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<(anonymous namespace)::ObjectRecord>",
+      "safe": false,
+      "tokenOffset": 4500
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 8695
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 10530
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 10717
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "__thread_id",
+      "safe": false,
+      "tokenOffset": 12638
+    },
+    {
+      "fileSize": 81158,
+      "path": "src/abi/drawing_c_api.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 45784
+    },
+    {
+      "fileSize": 15688,
+      "path": "src/abi/drawing_skia_c_api.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "path",
+      "safe": false,
+      "tokenOffset": 2768
+    },
+    {
+      "fileSize": 15688,
+      "path": "src/abi/drawing_skia_c_api.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "path",
+      "safe": false,
+      "tokenOffset": 2845
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/registry.hpp:446:27)",
+      "safe": false,
+      "tokenOffset": 19207
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/registry.hpp:990:39)",
+      "safe": false,
+      "tokenOffset": 44571
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::unique_ptr<ControlRecord, std::function<void (ControlRecord *)>>",
+      "safe": false,
+      "tokenOffset": 77988
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::abi::detail::RegistrySlot *>",
+      "safe": false,
+      "tokenOffset": 91779
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/registry.hpp:2177:43)",
+      "safe": false,
+      "tokenOffset": 100257
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/abi/registry/registry.hpp:2377:30)",
+      "safe": false,
+      "tokenOffset": 110432
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::unique_ptr<ControlRecord, std::function<void (ControlRecord *)>>",
+      "safe": false,
+      "tokenOffset": 124332
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::unique_ptr<ControlRecord, std::function<void (ControlRecord *)>>",
+      "safe": false,
+      "tokenOffset": 126232
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 134992
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 135646
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "type_spelling_too_long_for_mechanical_rewrite",
+      "replacement": "std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<gui_forms::Control>, std::hash<std::string>, std::equal_to<std::string>, std::allocator<std::pair<const std::string, std::shared_ptr<gui_forms::Control>>>>>",
+      "safe": false,
+      "tokenOffset": 136008
+    },
+    {
+      "fileSize": 142648,
+      "path": "src/abi/registry/registry.hpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::abi::detail::RegistrySlot *>",
+      "safe": false,
+      "tokenOffset": 139652
+    },
+    {
+      "fileSize": 42034,
+      "path": "src/controls/gallery_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/gallery_controls.cpp:392:29)",
+      "safe": false,
+      "tokenOffset": 15234
+    },
+    {
+      "fileSize": 42034,
+      "path": "src/controls/gallery_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/gallery_controls.cpp:397:33)",
+      "safe": false,
+      "tokenOffset": 15440
+    },
+    {
+      "fileSize": 42034,
+      "path": "src/controls/gallery_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/gallery_controls.cpp:478:31)",
+      "safe": false,
+      "tokenOffset": 19760
+    },
+    {
+      "fileSize": 42034,
+      "path": "src/controls/gallery_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 41609
+    },
+    {
+      "fileSize": 42034,
+      "path": "src/controls/gallery_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 41668
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 3641
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 3864
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/guidance/error_provider/error_provider.cpp:392:25)",
+      "safe": false,
+      "tokenOffset": 15039
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 16369
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 17595
+    },
+    {
+      "fileSize": 25581,
+      "path": "src/controls/guidance/error_provider/error_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 22529
+    },
+    {
+      "fileSize": 11485,
+      "path": "src/controls/guidance/help_provider/help_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 2405
+    },
+    {
+      "fileSize": 11485,
+      "path": "src/controls/guidance/help_provider/help_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2626
+    },
+    {
+      "fileSize": 11485,
+      "path": "src/controls/guidance/help_provider/help_provider.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 9713
+    },
+    {
+      "fileSize": 11485,
+      "path": "src/controls/guidance/help_provider/help_provider.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 10593
+    },
+    {
+      "fileSize": 12204,
+      "path": "src/controls/inspection/property_editor_registry/property_editor_registry.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 1803
+    },
+    {
+      "fileSize": 12204,
+      "path": "src/controls/inspection/property_editor_registry/property_editor_registry.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2559
+    },
+    {
+      "fileSize": 8572,
+      "path": "src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2021
+    },
+    {
+      "fileSize": 8572,
+      "path": "src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2391
+    },
+    {
+      "fileSize": 8572,
+      "path": "src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp",
+      "reason": "type_spelling_too_long_for_mechanical_rewrite",
+      "replacement": "std::optional<std::variant<std::monostate, bool, long long, unsigned long long, double, std::string, gui_forms::Point, gui_forms::Size, gui_forms::Rect, gui_forms::Insets, gui_forms::Color, gui_forms::FontSpec, gui_forms::ImageId, gui_forms::PropertyEnumValue, gui_forms::PropertyObjectValue, gui_forms::PropertyCollectionValue>>",
+      "safe": false,
+      "tokenOffset": 4405
+    },
+    {
+      "fileSize": 17502,
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::MenuStripItemSpec *>",
+      "safe": false,
+      "tokenOffset": 15117
+    },
+    {
+      "fileSize": 17502,
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 16841
+    },
+    {
+      "fileSize": 17502,
+      "path": "src/controls/menu/menu_strip/menu_strip.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 16963
+    },
+    {
+      "fileSize": 7787,
+      "path": "src/controls/panel/color_value_editor/color_value_editor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 1766
+    },
+    {
+      "fileSize": 7787,
+      "path": "src/controls/panel/color_value_editor/color_value_editor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 1876
+    },
+    {
+      "fileSize": 7787,
+      "path": "src/controls/panel/color_value_editor/color_value_editor.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/color_value_editor/color_value_editor.cpp:54:25)",
+      "safe": false,
+      "tokenOffset": 2082
+    },
+    {
+      "fileSize": 20038,
+      "path": "src/controls/panel/combo_box/combo_box.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 4734
+    },
+    {
+      "fileSize": 41094,
+      "path": "src/controls/panel/correspondence_view/correspondence_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::CorrespondenceItem *>",
+      "safe": false,
+      "tokenOffset": 715
+    },
+    {
+      "fileSize": 41094,
+      "path": "src/controls/panel/correspondence_view/correspondence_view.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/correspondence_view/correspondence_view.cpp:65:25)",
+      "safe": false,
+      "tokenOffset": 2733
+    },
+    {
+      "fileSize": 41094,
+      "path": "src/controls/panel/correspondence_view/correspondence_view.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/correspondence_view/correspondence_view.cpp:225:25)",
+      "safe": false,
+      "tokenOffset": 8951
+    },
+    {
+      "fileSize": 41094,
+      "path": "src/controls/panel/correspondence_view/correspondence_view.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/correspondence_view/correspondence_view.cpp:844:37)",
+      "safe": false,
+      "tokenOffset": 37059
+    },
+    {
+      "fileSize": 8075,
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/date_time_picker/date_time_utilities.cpp:151:29)",
+      "safe": false,
+      "tokenOffset": 5822
+    },
+    {
+      "fileSize": 8075,
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 5956
+    },
+    {
+      "fileSize": 8075,
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 6099
+    },
+    {
+      "fileSize": 8075,
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 6266
+    },
+    {
+      "fileSize": 8075,
+      "path": "src/controls/panel/date_time_picker/date_time_utilities.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 6405
+    },
+    {
+      "fileSize": 2480,
+      "path": "src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 1718
+    },
+    {
+      "fileSize": 2480,
+      "path": "src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 2165
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::InstrumentRack::Impl::ModuleState *>",
+      "safe": false,
+      "tokenOffset": 4208
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::InstrumentRack::Impl::ModuleState *>",
+      "safe": false,
+      "tokenOffset": 4499
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::InstrumentRack::Impl::ModuleState *>",
+      "safe": false,
+      "tokenOffset": 4799
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::InstrumentFieldSpec *>",
+      "safe": false,
+      "tokenOffset": 5210
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 7520
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 22572
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/instrument_rack/instrument_rack.cpp:515:31)",
+      "safe": false,
+      "tokenOffset": 24466
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::InstrumentRack::Impl::ModuleState *>",
+      "safe": false,
+      "tokenOffset": 30854
+    },
+    {
+      "fileSize": 43177,
+      "path": "src/controls/panel/instrument_rack/instrument_rack.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 35860
+    },
+    {
+      "fileSize": 20102,
+      "path": "src/controls/panel/list_box/list_box.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 6882
+    },
+    {
+      "fileSize": 20102,
+      "path": "src/controls/panel/list_box/list_box.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 18863
+    },
+    {
+      "fileSize": 34338,
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::ObjectViewItem *>",
+      "safe": false,
+      "tokenOffset": 2900
+    },
+    {
+      "fileSize": 34338,
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 16012
+    },
+    {
+      "fileSize": 34338,
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/panel/object_view/object_view.cpp:464:39)",
+      "safe": false,
+      "tokenOffset": 20383
+    },
+    {
+      "fileSize": 34338,
+      "path": "src/controls/panel/object_view/object_view.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 30060
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::PropertyObjectMember *>",
+      "safe": false,
+      "tokenOffset": 3275
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::PropertyObjectMember *>",
+      "safe": false,
+      "tokenOffset": 5245
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 29524
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 29579
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 32887
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 32948
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 34148
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 34663
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 34986
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 36188
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 36864
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 37310
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 45406
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 50134
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 50338
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 50401
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 53246
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 53936
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 57533
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 57889
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 58325
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 58753
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 59358
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 59423
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 59895
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 60625
+    },
+    {
+      "fileSize": 63683,
+      "path": "src/controls/panel/property_grid/property_grid.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 60688
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::PropertyList::Impl::RowState *>",
+      "safe": false,
+      "tokenOffset": 1789
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::PropertyList::Impl::RowState *>",
+      "safe": false,
+      "tokenOffset": 2068
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 4944
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 22997
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::string *>",
+      "safe": false,
+      "tokenOffset": 25957
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::PropertyGroupSpec *>",
+      "safe": false,
+      "tokenOffset": 29186
+    },
+    {
+      "fileSize": 48202,
+      "path": "src/controls/panel/property_list/property_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::PropertyGroupSpec *>",
+      "safe": false,
+      "tokenOffset": 46983
+    },
+    {
+      "fileSize": 2360,
+      "path": "src/controls/panel/scaled_panel/scaled_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 1604
+    },
+    {
+      "fileSize": 2360,
+      "path": "src/controls/panel/scaled_panel/scaled_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 2045
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::TreeViewItem *>",
+      "safe": false,
+      "tokenOffset": 1940
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 8944
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 15757
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 17535
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 17862
+    },
+    {
+      "fileSize": 21995,
+      "path": "src/controls/panel/tree_view/tree_view.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<unsigned long *>",
+      "safe": false,
+      "tokenOffset": 21309
+    },
+    {
+      "fileSize": 15633,
+      "path": "src/controls/range_control/scroll_bar/scroll_bar.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/range_control/scroll_bar/scroll_bar.cpp:203:31)",
+      "safe": false,
+      "tokenOffset": 8243
+    },
+    {
+      "fileSize": 8757,
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2190
+    },
+    {
+      "fileSize": 8757,
+      "path": "src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp:110:29)",
+      "safe": false,
+      "tokenOffset": 3806
+    },
+    {
+      "fileSize": 20847,
+      "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const std::shared_ptr<gui_forms::TabPage> *>",
+      "safe": false,
+      "tokenOffset": 1726
+    },
+    {
+      "fileSize": 20847,
+      "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const std::shared_ptr<gui_forms::TabPage> *>",
+      "safe": false,
+      "tokenOffset": 2796
+    },
+    {
+      "fileSize": 20847,
+      "path": "src/controls/scrollable_control/container_control/tab_control/tab_control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 5079
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 6314
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 7449
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:272:30)",
+      "safe": false,
+      "tokenOffset": 9949
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:283:30)",
+      "safe": false,
+      "tokenOffset": 10433
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:294:25)",
+      "safe": false,
+      "tokenOffset": 10914
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:318:30)",
+      "safe": false,
+      "tokenOffset": 11710
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 21792
+    },
+    {
+      "fileSize": 25336,
+      "path": "src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp:584:28)",
+      "safe": false,
+      "tokenOffset": 23805
+    },
+    {
+      "fileSize": 33952,
+      "path": "src/controls/scrollable_control/scrollable_control.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/scrollable_control.cpp:584:23)",
+      "safe": false,
+      "tokenOffset": 25849
+    },
+    {
+      "fileSize": 33952,
+      "path": "src/controls/scrollable_control/scrollable_control.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/scrollable_control/scrollable_control.cpp:704:19)",
+      "safe": false,
+      "tokenOffset": 31066
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "duration",
+      "safe": false,
+      "tokenOffset": 16280
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "rep",
+      "safe": false,
+      "tokenOffset": 16395
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 43424
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 45162
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 49418
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 51735
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 52699
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 58540
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:1087:33)",
+      "safe": false,
+      "tokenOffset": 58951
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 59020
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 59458
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 59790
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 60922
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 61401
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 61630
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 62366
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 62896
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 63102
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:1227:31)",
+      "safe": false,
+      "tokenOffset": 67071
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:1288:9)",
+      "safe": false,
+      "tokenOffset": 70645
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:2228:32)",
+      "safe": false,
+      "tokenOffset": 127812
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:2306:40)",
+      "safe": false,
+      "tokenOffset": 131767
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:2355:32)",
+      "safe": false,
+      "tokenOffset": 134382
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::HostMonitor *>",
+      "safe": false,
+      "tokenOffset": 142206
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "duration",
+      "safe": false,
+      "tokenOffset": 142910
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "rep",
+      "safe": false,
+      "tokenOffset": 143000
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 144181
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 151835
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 152170
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 152728
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 152987
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/controls/showcase_controls.cpp:2756:40)",
+      "safe": false,
+      "tokenOffset": 157533
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 157585
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 158620
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 158942
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 159307
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 159688
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 160555
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 161588
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 161937
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 162314
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 162657
+    },
+    {
+      "fileSize": 163175,
+      "path": "src/controls/showcase_controls.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "std::shared_ptr<gui_forms::showcase::(anonymous namespace)::ShowcaseContext>",
+      "safe": false,
+      "tokenOffset": 162940
+    },
+    {
+      "fileSize": 15996,
+      "path": "src/controls/tool_tip/tool_tip.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 1942
+    },
+    {
+      "fileSize": 15996,
+      "path": "src/controls/tool_tip/tool_tip.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2153
+    },
+    {
+      "fileSize": 15996,
+      "path": "src/controls/tool_tip/tool_tip.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 4510
+    },
+    {
+      "fileSize": 15996,
+      "path": "src/controls/tool_tip/tool_tip.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "__libcpp_remove_reference_t<std::unique_ptr<gui_forms::ToolTip::PopupHolder, std::default_delete<gui_forms::ToolTip::PopupHolder>> &>",
+      "safe": false,
+      "tokenOffset": 14011
+    },
+    {
+      "fileSize": 3869,
+      "path": "src/core/binding/binding_context/binding_context.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 2131
+    },
+    {
+      "fileSize": 3869,
+      "path": "src/core/binding/binding_context/binding_context.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 2575
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::BindingRecord *>",
+      "safe": false,
+      "tokenOffset": 3829
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 5070
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 5532
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 7948
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 12267
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::BindingRecord *>",
+      "safe": false,
+      "tokenOffset": 13240
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::weak_ptr<gui_forms::Binding> *>",
+      "safe": false,
+      "tokenOffset": 18051
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 18170
+    },
+    {
+      "fileSize": 19292,
+      "path": "src/core/binding/binding_source/binding_source.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 18489
+    },
+    {
+      "fileSize": 3099,
+      "path": "src/core/binding/control_bindings_collection/control_bindings_collection.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Binding> *>",
+      "safe": false,
+      "tokenOffset": 1929
+    },
+    {
+      "fileSize": 3099,
+      "path": "src/core/binding/control_bindings_collection/control_bindings_collection.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "__libcpp_remove_reference_t<std::shared_ptr<gui_forms::Binding> &>",
+      "safe": false,
+      "tokenOffset": 2133
+    },
+    {
+      "fileSize": 3099,
+      "path": "src/core/binding/control_bindings_collection/control_bindings_collection.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const std::shared_ptr<gui_forms::Binding> *>",
+      "safe": false,
+      "tokenOffset": 2807
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 2354
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 5105
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 5216
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/binding/value/binding_value.cpp:161:21)",
+      "safe": false,
+      "tokenOffset": 5574
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::PropertyEnumChoice *>",
+      "safe": false,
+      "tokenOffset": 6048
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::PropertyEnumChoice *>",
+      "safe": false,
+      "tokenOffset": 6460
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/binding/value/binding_value.cpp:795:28)",
+      "safe": false,
+      "tokenOffset": 34654
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 36158
+    },
+    {
+      "fileSize": 36721,
+      "path": "src/core/binding/value/binding_value.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 36345
+    },
+    {
+      "fileSize": 1571,
+      "path": "src/core/component/component/component.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 1340
+    },
+    {
+      "fileSize": 1619,
+      "path": "src/core/component/component_container/component_container.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Component> *>",
+      "safe": false,
+      "tokenOffset": 704
+    },
+    {
+      "fileSize": 1619,
+      "path": "src/core/component/component_container/component_container.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "__libcpp_remove_reference_t<std::shared_ptr<gui_forms::Component> &>",
+      "safe": false,
+      "tokenOffset": 915
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/control/control/control.cpp:276:32)",
+      "safe": false,
+      "tokenOffset": 11361
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 25069
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "size_type",
+      "safe": false,
+      "tokenOffset": 25138
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 29565
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 30477
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 31355
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 32232
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 33298
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 33822
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 34680
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 35815
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 43962
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 44387
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 45189
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 46057
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 59417
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 61037
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 61178
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::Control::DeferredInitializationChange *>",
+      "safe": false,
+      "tokenOffset": 72294
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/control/control/control.cpp:2206:37)",
+      "safe": false,
+      "tokenOffset": 85200
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 87343
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 87993
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 90252
+    },
+    {
+      "fileSize": 91006,
+      "path": "src/core/control/control/control.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "__libcpp_remove_reference_t<std::vector<std::shared_ptr<gui_forms::Control>, std::allocator<std::shared_ptr<gui_forms::Control>>> &>",
+      "safe": false,
+      "tokenOffset": 90735
+    },
+    {
+      "fileSize": 1600,
+      "path": "src/core/control/static_tree/control_factory/control_factory.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 818
+    },
+    {
+      "fileSize": 18929,
+      "path": "src/core/drawing/bitmap/bitmap.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_drawing::ImageAttributesSnapshot::ColorRemap *>",
+      "safe": false,
+      "tokenOffset": 7639
+    },
+    {
+      "fileSize": 10261,
+      "path": "src/core/drawing/color/color.cpp",
+      "reason": "unqualified_type_requires_owner_review",
+      "replacement": "const Entry *",
+      "safe": false,
+      "tokenOffset": 1224
+    },
+    {
+      "fileSize": 17846,
+      "path": "src/core/drawing/graphics_path/graphics_path.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/graphics_path/graphics_path.cpp:182:21)",
+      "safe": false,
+      "tokenOffset": 6342
+    },
+    {
+      "fileSize": 17846,
+      "path": "src/core/drawing/graphics_path/graphics_path.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/graphics_path/graphics_path.cpp:343:42)",
+      "safe": false,
+      "tokenOffset": 13319
+    },
+    {
+      "fileSize": 17846,
+      "path": "src/core/drawing/graphics_path/graphics_path.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/graphics_path/graphics_path.cpp:360:35)",
+      "safe": false,
+      "tokenOffset": 14292
+    },
+    {
+      "fileSize": 17846,
+      "path": "src/core/drawing/graphics_path/graphics_path.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/graphics_path/graphics_path.cpp:405:32)",
+      "safe": false,
+      "tokenOffset": 16008
+    },
+    {
+      "fileSize": 17846,
+      "path": "src/core/drawing/graphics_path/graphics_path.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/graphics_path/graphics_path.cpp:417:31)",
+      "safe": false,
+      "tokenOffset": 16376
+    },
+    {
+      "fileSize": 16010,
+      "path": "src/core/drawing/graphics_recorder/graphics_recorder.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::reverse_iterator<std::__wrap_iter<gui_drawing::GraphicsRecorder::SavedState *>>",
+      "safe": false,
+      "tokenOffset": 603
+    },
+    {
+      "fileSize": 1946,
+      "path": "src/core/drawing/image_attributes/image_attributes.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_drawing::ImageAttributesSnapshot::ColorRemap *>",
+      "safe": false,
+      "tokenOffset": 1068
+    },
+    {
+      "fileSize": 3553,
+      "path": "src/core/drawing/region/region.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/region/region.cpp:50:32)",
+      "safe": false,
+      "tokenOffset": 1672
+    },
+    {
+      "fileSize": 3553,
+      "path": "src/core/drawing/region/region.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/region/region.cpp:62:26)",
+      "safe": false,
+      "tokenOffset": 2040
+    },
+    {
+      "fileSize": 22662,
+      "path": "src/core/drawing/support/drawing_support.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/bitmap/../support/drawing_support.hpp:236:26)",
+      "safe": false,
+      "tokenOffset": 8132
+    },
+    {
+      "fileSize": 22662,
+      "path": "src/core/drawing/support/drawing_support.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/bitmap/../support/drawing_support.hpp:446:34)",
+      "safe": false,
+      "tokenOffset": 17525
+    },
+    {
+      "fileSize": 22662,
+      "path": "src/core/drawing/support/drawing_support.hpp",
+      "reason": "translation_unit_type_conflict",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/drawing/bitmap/../support/drawing_support.hpp:535:35)",
+      "safe": false,
+      "tokenOffset": 21660
+    },
+    {
+      "fileSize": 20390,
+      "path": "src/core/host/services/host_services.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/host/services/host_services.cpp:68:29)",
+      "safe": false,
+      "tokenOffset": 2010
+    },
+    {
+      "fileSize": 20390,
+      "path": "src/core/host/services/host_services.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/host/services/host_services.cpp:108:27)",
+      "safe": false,
+      "tokenOffset": 3619
+    },
+    {
+      "fileSize": 17487,
+      "path": "src/core/host/session/host_session.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/host/session/host_session.cpp:68:29)",
+      "safe": false,
+      "tokenOffset": 2010
+    },
+    {
+      "fileSize": 17487,
+      "path": "src/core/host/session/host_session.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/host/session/host_session.cpp:108:27)",
+      "safe": false,
+      "tokenOffset": 3619
+    },
+    {
+      "fileSize": 18013,
+      "path": "src/core/resources/image_list/image_list/image_list.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_forms::ImageList::Entry *>",
+      "safe": false,
+      "tokenOffset": 3817
+    },
+    {
+      "fileSize": 22289,
+      "path": "src/core/text/text_store/text_store.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/text/text_store/text_store.cpp:542:27)",
+      "safe": false,
+      "tokenOffset": 18528
+    },
+    {
+      "fileSize": 22289,
+      "path": "src/core/text/text_store/text_store.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/text/text_store/text_store.cpp:574:24)",
+      "safe": false,
+      "tokenOffset": 19924
+    },
+    {
+      "fileSize": 25883,
+      "path": "src/core/theme/theme/theme.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/theme/theme/theme.cpp:165:33)",
+      "safe": false,
+      "tokenOffset": 6729
+    },
+    {
+      "fileSize": 25883,
+      "path": "src/core/theme/theme/theme.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/theme/theme/theme.cpp:477:31)",
+      "safe": false,
+      "tokenOffset": 21264
+    },
+    {
+      "fileSize": 25883,
+      "path": "src/core/theme/theme/theme.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "value_type",
+      "safe": false,
+      "tokenOffset": 25320
+    },
+    {
+      "fileSize": 3162,
+      "path": "src/core/types/damage_region/damage_region.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 296
+    },
+    {
+      "fileSize": 10136,
+      "path": "src/core/types/painter/painter.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/types/painter/painter.cpp:11:26)",
+      "safe": false,
+      "tokenOffset": 230
+    },
+    {
+      "fileSize": 9679,
+      "path": "src/core/window/dispatcher/window_dispatcher.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 5376
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:61:34)",
+      "safe": false,
+      "tokenOffset": 2003
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:62:28)",
+      "safe": false,
+      "tokenOffset": 2083
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:86:26)",
+      "safe": false,
+      "tokenOffset": 3162
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:136:41)",
+      "safe": false,
+      "tokenOffset": 5574
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:311:9)",
+      "safe": false,
+      "tokenOffset": 13862
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/presentation/window_presentation.cpp:334:37)",
+      "safe": false,
+      "tokenOffset": 14958
+    },
+    {
+      "fileSize": 21395,
+      "path": "src/core/window/presentation/window_presentation.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 16054
+    },
+    {
+      "fileSize": 10249,
+      "path": "src/core/window/scheduler/window_scheduler.cpp",
+      "reason": "non_prefix_declarator",
+      "replacement": "std::function<void (FrameTime)>",
+      "safe": false,
+      "tokenOffset": 6176
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::detail::AcceleratorAttachment> *>",
+      "safe": false,
+      "tokenOffset": 11178
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 11703
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::detail::PopupAttachment> *>",
+      "safe": false,
+      "tokenOffset": 13972
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:350:33)",
+      "safe": false,
+      "tokenOffset": 14675
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 15728
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 16400
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 23817
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 23936
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 26938
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 34509
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::Window::FocusScopeState *>",
+      "safe": false,
+      "tokenOffset": 37026
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 40321
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 40628
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 42389
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 48575
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:1243:38)",
+      "safe": false,
+      "tokenOffset": 49796
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 51672
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 59032
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:1522:34)",
+      "safe": false,
+      "tokenOffset": 60330
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:1530:32)",
+      "safe": false,
+      "tokenOffset": 60772
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 64348
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 64648
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 66639
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 68272
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<std::shared_ptr<gui_forms::Control> *>",
+      "safe": false,
+      "tokenOffset": 68600
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "reverse_iterator",
+      "safe": false,
+      "tokenOffset": 82021
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:2254:38)",
+      "safe": false,
+      "tokenOffset": 88743
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_reverse_iterator",
+      "safe": false,
+      "tokenOffset": 94019
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 108350
+    },
+    {
+      "fileSize": 110212,
+      "path": "src/core/window/window.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/core/window/window.cpp:2722:26)",
+      "safe": false,
+      "tokenOffset": 109041
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 50248
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "unqualified_nested_alias",
+      "replacement": "rep",
+      "safe": false,
+      "tokenOffset": 50552
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "unqualified_nested_alias",
+      "replacement": "time_point",
+      "safe": false,
+      "tokenOffset": 55227
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "implementation_private_type",
+      "replacement": "__libcpp_remove_reference_t<std::function<void ()> &>",
+      "safe": false,
+      "tokenOffset": 67524
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::host::MacApplicationWindow *>",
+      "safe": false,
+      "tokenOffset": 75901
+    },
+    {
+      "fileSize": 84238,
+      "path": "src/host/macos/application/macos_host.mm",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<gui_forms::host::MacApplicationWindow *>",
+      "safe": false,
+      "tokenOffset": 79156
+    },
+    {
+      "fileSize": 21464,
+      "path": "src/host/macos/services/appkit_host_services.mm",
+      "reason": "dependent_or_undeduced",
+      "replacement": "",
+      "safe": false,
+      "tokenOffset": 19440
+    },
+    {
+      "fileSize": 7386,
+      "path": "src/render/coregraphics/coregraphics_raster_smoke.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "pos_type",
+      "safe": false,
+      "tokenOffset": 2119
+    },
+    {
+      "fileSize": 7386,
+      "path": "src/render/coregraphics/coregraphics_raster_smoke.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/render/coregraphics/coregraphics_raster_smoke.cpp:118:35)",
+      "safe": false,
+      "tokenOffset": 5222
+    },
+    {
+      "fileSize": 37170,
+      "path": "src/render/coregraphics/raster/coregraphics_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 12464
+    },
+    {
+      "fileSize": 37170,
+      "path": "src/render/coregraphics/raster/coregraphics_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 17370
+    },
+    {
+      "fileSize": 37170,
+      "path": "src/render/coregraphics/raster/coregraphics_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 32846
+    },
+    {
+      "fileSize": 37170,
+      "path": "src/render/coregraphics/raster/coregraphics_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 33941
+    },
+    {
+      "fileSize": 37170,
+      "path": "src/render/coregraphics/raster/coregraphics_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 35597
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "implementation_private_type",
+      "replacement": "std::__wrap_iter<const gui_drawing::ImageAttributesSnapshot::ColorRemap *>",
+      "safe": false,
+      "tokenOffset": 4674
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/render/skia/executor/skia_executor.cpp:354:27)",
+      "safe": false,
+      "tokenOffset": 15027
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 20492
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 20626
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 21314
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "const_iterator",
+      "safe": false,
+      "tokenOffset": 21470
+    },
+    {
+      "fileSize": 43585,
+      "path": "src/render/skia/executor/skia_executor.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/render/skia/executor/skia_executor.cpp:902:28)",
+      "safe": false,
+      "tokenOffset": 41743
+    },
+    {
+      "fileSize": 33760,
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 14611
+    },
+    {
+      "fileSize": 33760,
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 18131
+    },
+    {
+      "fileSize": 33760,
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 28646
+    },
+    {
+      "fileSize": 33760,
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 31035
+    },
+    {
+      "fileSize": 33760,
+      "path": "src/render/skia/raster/skia_raster.cpp",
+      "reason": "unqualified_nested_alias",
+      "replacement": "iterator",
+      "safe": false,
+      "tokenOffset": 32267
+    },
+    {
+      "fileSize": 12361,
+      "path": "src/render/text/harfbuzz/harfbuzz_font_engine.cpp",
+      "reason": "unnamed_closure_or_local_type",
+      "replacement": "(lambda at /Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/src/render/text/harfbuzz/harfbuzz_font_engine.cpp:118:31)",
+      "safe": false,
+      "tokenOffset": 3999
+    }
+  ],
+  "safeCount": 0,
+  "schema": "gui.forms.auto-type-rewrites/v1",
+  "sourceRoot": "gui_forms"
+}

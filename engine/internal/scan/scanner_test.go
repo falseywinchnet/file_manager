@@ -88,3 +88,11 @@ func TestScanPrunesMoreSpecificChildRoot(t *testing.T) {
 		t.Fatal("parent shard retained child-owned record")
 	}
 }
+
+func TestApprovedScannerRejectsWrongOpenedRootIdentity(t *testing.T) {
+	rootPath := t.TempDir()
+	root := api.RootSpec{ID: "root", Path: rootPath}
+	if _, err := (Scanner{}).ScanApproved(context.Background(), root, "fixture:0000000000000000:0000000000000000", ownerFor(root)); err == nil {
+		t.Fatal("scanner accepted an opened root with the wrong object identity")
+	}
+}

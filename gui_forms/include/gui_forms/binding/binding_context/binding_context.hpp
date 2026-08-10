@@ -38,11 +38,18 @@ private:
         std::weak_ptr<BindingSource> source;
         SubscriptionToken disposed;
     };
+    struct SourceDisposedCallback final {
+        BindingContext* context{};
+        BindingSource* source{};
+
+        void operator()() const;
+    };
+    using SourceMap = std::unordered_map<BindingSource*, SourceEntry>;
 
     [[nodiscard]] Window* bound_window() const noexcept;
     bool remove_entry(BindingSource* source, bool publish);
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
-    std::unordered_map<BindingSource*, SourceEntry> sources_;
+    SourceMap sources_;
     Event<const BindingContextChange&> collection_changed_;
 };
 

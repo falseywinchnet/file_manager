@@ -23,7 +23,7 @@ void TabPage::set_text(std::string text) {
     text_ = std::move(text);
     invalidate(Dirty::paint | Dirty::semantics | Dirty::measure);
     if (const Control::Ptr owner = parent()) {
-        owner->invalidate(Dirty::paint | Dirty::semantics | Dirty::measure);
+        (*owner).invalidate(Dirty::paint | Dirty::semantics | Dirty::measure);
     }
 }
 

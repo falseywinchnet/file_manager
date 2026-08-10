@@ -173,7 +173,9 @@ func TestBackgroundEventStormBatchesOneDurablePublicationAndThenStaysQuiet(t *te
 		Events:  events,
 	}
 	updated := waitForBackgroundState(t, engine, func(status api.Status) bool {
-		return status.Work.Currentness == api.CurrentnessCurrentVolatile && status.Work.ReconciledWatermark == 9000
+		return status.Work.Currentness == api.CurrentnessCurrentVolatile &&
+			status.Work.ReconciledWatermark == 9000 &&
+			status.Generation == baseline.Generation+1
 	})
 	if updated.Generation != baseline.Generation+1 {
 		t.Fatalf("storm generation=%d, baseline=%d", updated.Generation, baseline.Generation)

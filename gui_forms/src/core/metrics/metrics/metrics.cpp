@@ -12,17 +12,17 @@ MetricsSnapshot Metrics::snapshot() const {
 }
 
 void Metrics::reset_activity() noexcept {
-    const auto controls = values_.control_count;
-    const auto stable_ids = values_.stable_id_count;
-    const auto depth = values_.update_scope_depth;
-    const auto maximum_depth = values_.maximum_update_scope_depth;
-    const auto focus_scope_depth = values_.focus_scope_depth;
-    const auto maximum_focus_scope_depth = values_.maximum_focus_scope_depth;
-    const auto renderer = values_.renderer_name;
-    const auto cpu_only = values_.cpu_only;
-    const auto display_cache_entries = values_.display_cache_entries;
-    const auto display_generation = values_.display_generation;
-    const auto active_surfaces = values_.active_surface_count;
+    const std::uint64_t controls = values_.control_count;
+    const std::uint64_t stable_ids = values_.stable_id_count;
+    const std::uint64_t depth = values_.update_scope_depth;
+    const std::uint64_t maximum_depth = values_.maximum_update_scope_depth;
+    const std::uint64_t focus_scope_depth = values_.focus_scope_depth;
+    const std::uint64_t maximum_focus_scope_depth = values_.maximum_focus_scope_depth;
+    const std::string renderer = values_.renderer_name;
+    const bool cpu_only = values_.cpu_only;
+    const std::uint64_t display_cache_entries = values_.display_cache_entries;
+    const std::uint64_t display_generation = values_.display_generation;
+    const std::uint64_t active_surfaces = values_.active_surface_count;
     values_ = {};
     values_.control_count = controls;
     values_.stable_id_count = stable_ids;

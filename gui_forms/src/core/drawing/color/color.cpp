@@ -21,12 +21,12 @@ Color Color::from_name(std::string_view name) {
         {"yellow", 0xffffff00U}, {"yellowgreen", 0xff9acd32U},
     };
     const std::string key = ascii_lower(name);
-    const auto found = std::find_if(std::begin(entries), std::end(entries),
-                                    [&key](const Entry& entry) {
-                                        return entry.name == key;
-                                    });
+    const Entry* found = std::begin(entries);
+    while (found != std::end(entries) && (*found).name != key) {
+        ++found;
+    }
     return found == std::end(entries) ? Color::empty() :
-        Color(found->argb, false, true);
+        Color((*found).argb, false, true);
 }
 
 Color Color::from_html(std::string_view value) {
@@ -35,9 +35,9 @@ Color Color::from_html(std::string_view value) {
     const std::string_view digits = value.substr(1);
     if (digits.size() == 3) {
         const std::uint32_t compact = parse_hex(digits);
-        const auto red = static_cast<std::uint8_t>(((compact >> 8U) & 0xfU) * 17U);
-        const auto green = static_cast<std::uint8_t>(((compact >> 4U) & 0xfU) * 17U);
-        const auto blue = static_cast<std::uint8_t>((compact & 0xfU) * 17U);
+        const std::uint8_t red = static_cast<std::uint8_t>(((compact >> 8U) & 0xfU) * 17U);
+        const std::uint8_t green = static_cast<std::uint8_t>(((compact >> 4U) & 0xfU) * 17U);
+        const std::uint8_t blue = static_cast<std::uint8_t>((compact & 0xfU) * 17U);
         return from_rgb(red, green, blue);
     }
     if (digits.size() == 6) return from_argb(UINT32_C(0xff000000) | parse_hex(digits));
@@ -47,8 +47,8 @@ Color Color::from_html(std::string_view value) {
 
 double Color::brightness() const noexcept {
     if (empty_) return 0.0;
-    const auto minimum = std::min({red(), green(), blue()});
-    const auto maximum = std::max({red(), green(), blue()});
+    const unsigned char minimum = std::min({red(), green(), blue()});
+    const unsigned char maximum = std::max({red(), green(), blue()});
     return (static_cast<double>(minimum) + maximum) / 510.0;
 }
 
@@ -266,4 +266,3 @@ const SystemPalette& default_system_palette() noexcept {
 
 
 } // namespace gui_drawing
-

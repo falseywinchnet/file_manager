@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp"
 
 #include "property_editor_drop_down_layer/property_editor_drop_down_layer.hpp"
+#include "gui_forms/detail/weak_member_callback.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -31,12 +32,14 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
         throw std::invalid_argument(
             "FlagsValueEditor requires a valid finite flags descriptor");
     }
-    const bool has_bit = std::any_of(
-        descriptor.choices.begin(), descriptor.choices.end(),
-        [](const PropertyEnumChoice& choice) {
-            return choice.value > 0 &&
-                std::has_single_bit(static_cast<std::uint64_t>(choice.value));
-        });
+    bool has_bit = false;
+    for (const PropertyEnumChoice& choice : descriptor.choices) {
+        if (choice.value > 0 &&
+            std::has_single_bit(static_cast<std::uint64_t>(choice.value))) {
+            has_bit = true;
+            break;
+        }
+    }
     if (!has_bit) {
         throw std::invalid_argument(
             "FlagsValueEditor requires at least one positive single-bit choice");
@@ -49,7 +52,7 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
         property.kind = BindingValueKind::enumeration;
         property.enumeration =
             std::make_shared<const PropertyEnumDescriptor>(descriptor);
-        const auto normalized = convert_property_value(BindingValue{value_},
+        const std::optional<BindingValue> normalized = convert_property_value(BindingValue{value_},
                                                         property);
         if (!normalized) {
             throw std::invalid_argument(
@@ -73,7 +76,7 @@ void FlagsValueEditor::set_value(PropertyEnumValue value) {
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);
-    const auto normalized = convert_property_value(BindingValue{std::move(value)},
+    const std::optional<BindingValue> normalized = convert_property_value(BindingValue{std::move(value)},
                                                     property);
     if (!normalized) {
         throw std::invalid_argument(
@@ -110,10 +113,10 @@ void FlagsValueEditor::set_popup_width(double width) {
 
 void FlagsValueEditor::open_drop_down() {
     if (dropped_down_ || !attached() || window() == nullptr) return;
-    const Control::Ptr root = window()->root();
+    const Control::Ptr root = (*window()).root();
     if (!root) return;
     const Rect editor = absolute_bounds();
-    const Size client = window()->client_size();
+    const Size client = (*window()).client_size();
     popup_choice_indices_.clear();
     std::vector<std::string> items;
     for (std::size_t index = 0U; index < descriptor_.choices.size(); ++index) {
@@ -131,41 +134,42 @@ void FlagsValueEditor::open_drop_down() {
     const double y = editor.y + editor.height + height <= client.height
         ? editor.y + editor.height : std::max(0.0, editor.y - height);
     const std::string prefix(stable_id().value());
-    auto layer = make_control<PropertyEditorDropDownLayer>(
+    std::shared_ptr<gui_forms::detail::PropertyEditorDropDownLayer> layer = make_control<PropertyEditorDropDownLayer>(
         StableId(prefix + ".popup.layer"));
-    layer->set_requested_bounds({0.0, 0.0, client.width, client.height});
-    auto list = make_control<CheckedListBox>(
+    (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
+    std::shared_ptr<gui_forms::CheckedListBox> list = make_control<CheckedListBox>(
         StableId(prefix + ".popup.list"));
-    list->set_paint_plane(PaintPlane::overlay);
-    list->set_items(std::move(items));
-    list->set_check_on_click(true);
+    (*list).set_paint_plane(PaintPlane::overlay);
+    (*list).set_items(std::move(items));
+    (*list).set_check_on_click(true);
     const double popup_width = std::min(popup_width_, client.width);
     const double popup_x = std::clamp(
         editor.x, 0.0, std::max(0.0, client.width - popup_width));
-    list->set_requested_bounds({popup_x, y, popup_width, height});
-    layer->add_child(list);
-    PopupToken token = window()->open_popup(shared_from_this(), layer);
+    (*list).set_requested_bounds({popup_x, y, popup_width, height});
+    (*layer).add_child(list);
+    PopupToken token = (*window()).open_popup(shared_from_this(), layer);
 
     popup_layer_ = layer;
     popup_list_ = list;
     popup_token_ = std::move(token);
     const std::weak_ptr<FlagsValueEditor> weak =
         std::static_pointer_cast<FlagsValueEditor>(shared_from_this());
-    popup_check_ = list->item_check_state_changed().subscribe(
-        *this, [weak](std::size_t index, CheckState state) {
-            if (const auto retained = weak.lock()) {
-                retained->apply_popup_choice(index, state);
-            }
-        });
-    popup_dismissal_ = layer->dismissed().subscribe(*this, [weak] {
-        if (const auto retained = weak.lock()) retained->close_drop_down();
-    });
+    popup_check_ = (*list).item_check_state_changed().subscribe(
+        *this,
+        detail::WeakMemberCallback<
+            void (FlagsValueEditor::*)(std::size_t, CheckState)>(
+                weak, &FlagsValueEditor::apply_popup_choice));
+    popup_dismissal_ = (*layer).dismissed().subscribe(
+        *this,
+        detail::WeakMemberCallback<void (FlagsValueEditor::*)()>(
+            weak, &FlagsValueEditor::close_drop_down));
     if (Event<>* closed = popup_token_.closed_event()) {
-        popup_revocation_ = closed->subscribe(*this, [weak] {
-            if (const auto retained = weak.lock()) retained->on_popup_revoked();
-        });
+        popup_revocation_ = (*closed).subscribe(
+            *this,
+            detail::WeakMemberCallback<void (FlagsValueEditor::*)()>(
+                weak, &FlagsValueEditor::on_popup_revoked));
     }
-    popup_scope_ = window()->begin_focus_scope(layer, list).value;
+    popup_scope_ = (*window()).begin_focus_scope(layer, list).value;
     dropped_down_ = true;
     synchronize_popup();
     invalidate(Dirty::paint | Dirty::semantics);
@@ -178,7 +182,7 @@ void FlagsValueEditor::close_drop_down() {
     popup_check_.disconnect();
     popup_dismissal_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(FocusScopeId{popup_scope_}));
+        static_cast<void>((*window()).end_focus_scope(FocusScopeId{popup_scope_}));
     }
     popup_scope_ = 0U;
     popup_token_.disconnect();
@@ -199,7 +203,7 @@ void FlagsValueEditor::on_popup_revoked() {
     popup_dismissal_.disconnect();
     popup_revocation_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(
+        static_cast<void>((*window()).end_focus_scope(
             FocusScopeId{popup_scope_},
             FocusScopeCloseReason::owner_unavailable));
     }
@@ -216,7 +220,7 @@ void FlagsValueEditor::on_popup_revoked() {
 void FlagsValueEditor::synchronize_popup() {
     if (!popup_list_) return;
     synchronizing_popup_ = true;
-    const auto bits = static_cast<std::uint64_t>(value_.value);
+    const std::uint64_t bits = static_cast<std::uint64_t>(value_.value);
     for (std::size_t popup_index = 0U;
          popup_index < popup_choice_indices_.size(); ++popup_index) {
         const std::int64_t choice =
@@ -225,7 +229,7 @@ void FlagsValueEditor::synchronize_popup() {
             ? value_.value == 0
             : (bits & static_cast<std::uint64_t>(choice)) ==
                   static_cast<std::uint64_t>(choice);
-        popup_list_->set_item_checked(popup_index, checked);
+        (*popup_list_).set_item_checked(popup_index, checked);
     }
     synchronizing_popup_ = false;
 }
@@ -249,7 +253,7 @@ void FlagsValueEditor::apply_popup_choice(std::size_t popup_index,
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);
-    const auto normalized = convert_property_value(
+    const std::optional<BindingValue> normalized = convert_property_value(
         BindingValue{static_cast<std::int64_t>(bits)}, property);
     if (!normalized) {
         synchronize_popup();

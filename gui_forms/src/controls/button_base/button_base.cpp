@@ -1,5 +1,7 @@
 #include "gui_forms/controls/button_base/button_base.hpp"
 #include "../basic/basic_control_rendering.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
@@ -20,16 +22,12 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
         {"Text", BindingValueKind::text, "Appearance",
          "Text displayed by the button.", BindingValue{std::string{}},
          invalidation::text_content},
-        [this] { return BindingValue{text_}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::text);
-            if (!converted) throw std::invalid_argument("ButtonBase.Text binding requires text");
-            set_text(std::get<std::string>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return text_changed_.subscribe(owner,
-                [changed = std::move(changed)](const std::string&) { changed(); });
-        }, {}, {}});
+        detail::BindingMemberGetter<ButtonBase, std::string>(
+            *this, &ButtonBase::text_),
+        detail::ConvertedPropertySetter<ButtonBase, std::string>(
+            *this, &ButtonBase::set_text, BindingValueKind::text,
+            "ButtonBase.Text binding requires text"),
+        detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 
     PropertyDescriptor font;
     font.name = "Font";
@@ -42,10 +40,10 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     font.bindable = false;
     define_bindable_property({
         std::move(font),
-        [this] { return BindingValue{font_}; },
-        [this](const BindingValue& value) {
-            set_font(std::get<FontSpec>(value));
-        }, {}, {}, {}});
+        detail::BindingMemberGetter<ButtonBase, FontSpec>(
+            *this, &ButtonBase::font_),
+        detail::DirectPropertySetter<ButtonBase, FontSpec>(
+            *this, &ButtonBase::set_font), {}, {}, {}});
 
     PropertyDescriptor image;
     image.name = "Image";
@@ -57,14 +55,14 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     image.bindable = false;
     define_bindable_property({
         std::move(image),
-        [this] { return BindingValue{image_}; },
-        [this](const BindingValue& value) {
-            set_image(std::get<ImageId>(value));
-        }, {},
-        [this] { clear_image(); },
-        [this] {
-            return image_.value != 0U || image_index_ >= 0 || !image_key_.empty();
-        }});
+        detail::BindingMemberGetter<ButtonBase, ImageId>(
+            *this, &ButtonBase::image_),
+        detail::DirectPropertySetter<ButtonBase, ImageId>(
+            *this, &ButtonBase::set_image), {},
+        detail::BoundMemberFunction<void (ButtonBase::*)()>(
+            *this, &ButtonBase::clear_image),
+        detail::BoundMemberFunction<bool (ButtonBase::*)() const noexcept>(
+            *this, &ButtonBase::should_serialize_image)});
 
     PropertyDescriptor content_padding;
     content_padding.name = "ContentPadding";
@@ -78,10 +76,14 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     content_padding.bindable = false;
     define_bindable_property({
         std::move(content_padding),
-        [this] { return BindingValue{content_padding_}; },
-        [this](const BindingValue& value) {
-            set_content_padding(std::get<Insets>(value));
-        }, {}, {}, {}});
+        detail::BindingMemberGetter<ButtonBase, Insets>(
+            *this, &ButtonBase::content_padding_),
+        detail::DirectPropertySetter<ButtonBase, Insets>(
+            *this, &ButtonBase::set_content_padding), {}, {}, {}});
+}
+
+bool ButtonBase::should_serialize_image() const noexcept {
+    return image_.value != 0U || image_index_ >= 0 || !image_key_.empty();
 }
 
 void ButtonBase::set_text(std::string text) {
@@ -129,7 +131,7 @@ void ButtonBase::clear_style() {
 void ButtonBase::set_image(ImageId image) {
     require_mutable();
     if (image.value != 0U && window() != nullptr &&
-        !window()->image_resources().find(image)) {
+        !(*window()).image_resources().find(image)) {
         throw std::invalid_argument("Button image ID is not live in its Window");
     }
     if (image_ == image && image_index_ == -1 && image_key_.empty()) return;
@@ -145,16 +147,16 @@ void ButtonBase::clear_image() {
 
 void ButtonBase::set_image_list(std::shared_ptr<ImageList> image_list) {
     require_mutable();
-    if (image_list && !image_list->is_alive()) {
+    if (image_list && !(*image_list).is_alive()) {
         throw std::invalid_argument("Button requires a live ImageList");
     }
     if (image_list && window() != nullptr &&
-        !image_list->belongs_to(*window())) {
+        !(*image_list).belongs_to(*window())) {
         throw std::invalid_argument(
             "Button and ImageList must belong to the same Window");
     }
     if (image_list && image_index_ >= 0 &&
-        static_cast<std::size_t>(image_index_) >= image_list->count()) {
+        static_cast<std::size_t>(image_index_) >= (*image_list).count()) {
         throw std::out_of_range(
             "Button image index is outside the assigned ImageList");
     }
@@ -162,14 +164,18 @@ void ButtonBase::set_image_list(std::shared_ptr<ImageList> image_list) {
     image_list_changed_.disconnect();
     image_list_ = std::move(image_list);
     if (image_list_) {
-        image_list_changed_ = image_list_->changed().subscribe(
-            *this, [this](const ImageListChange&) {
-                if (is_alive()) {
-                    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
-                }
-            });
+        image_list_changed_ = (*image_list_).changed().subscribe(
+            *this,
+            Delegate<const ImageListChange&>::bind<
+                ButtonBase, &ButtonBase::on_image_list_changed>(*this));
     }
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
+void ButtonBase::on_image_list_changed(const ImageListChange&) {
+    if (is_alive()) {
+        invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    }
 }
 
 void ButtonBase::set_image_index(int image_index) {
@@ -178,7 +184,7 @@ void ButtonBase::set_image_index(int image_index) {
         throw std::out_of_range("Button image index must be -1 or nonnegative");
     }
     if (image_index >= 0 && image_list_ &&
-        static_cast<std::size_t>(image_index) >= image_list_->count()) {
+        static_cast<std::size_t>(image_index) >= (*image_list_).count()) {
         throw std::out_of_range("Button image index is outside its ImageList");
     }
     if (image_index_ == image_index && image_.value == 0U && image_key_.empty()) {
@@ -284,10 +290,10 @@ bool ButtonBase::perform_dialog_command() { return perform_click(); }
 
 void ButtonBase::on_attached_to_window() {
     Control::on_attached_to_window();
-    if (image_list_ && !image_list_->belongs_to(*window())) {
+    if (image_list_ && !(*image_list_).belongs_to(*window())) {
         throw std::logic_error("Button cannot attach to a different ImageList Window");
     }
-    if (image_.value != 0U && !window()->image_resources().find(image_)) {
+    if (image_.value != 0U && !(*window()).image_resources().find(image_)) {
         throw std::logic_error("Button cannot attach with a foreign or stale image ID");
     }
 }
@@ -309,14 +315,14 @@ Size ButtonBase::measure(Size available) {
     Size image_size{};
     if (image_.value != 0U) {
         if (window() != nullptr) {
-            if (const auto resource = window()->image_resources().find(image_)) {
-                image_size = {static_cast<double>(resource->metadata.width),
-                              static_cast<double>(resource->metadata.height)};
+            if (const std::optional<ImageResourceView> resource = (*window()).image_resources().find(image_)) {
+                image_size = {static_cast<double>((*resource).metadata.width),
+                              static_cast<double>((*resource).metadata.height)};
             }
         }
-    } else if (image_list_ && image_list_->is_alive() &&
+    } else if (image_list_ && (*image_list_).is_alive() &&
                (!image_key_.empty() || image_index_ >= 0)) {
-        image_size = image_list_->image_size();
+        image_size = (*image_list_).image_size();
     }
     const bool has_text = text_width > 0.0;
     const bool has_image = image_size.width > 0.0 && image_size.height > 0.0;
@@ -389,25 +395,25 @@ ImageListResolution ButtonBase::resolved_button_image(bool selected) const noexc
         : selected ? ImageVisualState::selected
                    : ImageVisualState::normal;
     result.requested_state = state;
-    result.requested_scale = window() ? window()->scale() : 1.0;
+    result.requested_scale = window() ? (*window()).scale() : 1.0;
     if (image_.value != 0U && window() != nullptr) {
-        const auto resource = window()->image_resources().find(image_);
+        const std::optional<ImageResourceView> resource = (*window()).image_resources().find(image_);
         if (!resource) return result;
         result.image = image_;
-        result.source_size = {static_cast<double>(resource->metadata.width),
-                              static_cast<double>(resource->metadata.height)};
+        result.source_size = {static_cast<double>((*resource).metadata.width),
+                              static_cast<double>((*resource).metadata.height)};
         result.resolved_state = ImageVisualState::normal;
         result.resolved_scale = 1.0;
         return result;
     }
-    if (!image_list_ || !image_list_->is_alive() || window() == nullptr ||
-        !image_list_->belongs_to(*window())) return result;
+    if (!image_list_ || !(*image_list_).is_alive() || window() == nullptr ||
+        !(*image_list_).belongs_to(*window())) return result;
     if (!image_key_.empty()) {
-        return image_list_->resolve(image_key_, state, window()->scale());
+        return (*image_list_).resolve(image_key_, state, (*window()).scale());
     }
     if (image_index_ >= 0) {
-        return image_list_->resolve(static_cast<std::size_t>(image_index_), state,
-                                    window()->scale());
+        return (*image_list_).resolve(static_cast<std::size_t>(image_index_), state,
+                                    (*window()).scale());
     }
     return result;
 }
@@ -436,7 +442,7 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
     Size image_size{};
     if (image) {
         image_size = image_list_ && image_.value == 0U
-            ? image_list_->image_size() : image.source_size;
+            ? (*image_list_).image_size() : image.source_size;
     }
     const bool has_text = text_size.width > 0.0 && text_size.height > 0.0;
     const bool has_image = image && image_size.width > 0.0 &&

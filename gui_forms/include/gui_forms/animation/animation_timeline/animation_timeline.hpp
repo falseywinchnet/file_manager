@@ -77,8 +77,11 @@ struct MotionPolicy final {
         return reduced ? 0.5 + (phase - 0.5) * 0.5 : phase;
     }
 
-    friend constexpr bool operator==(const MotionPolicy&,
-                                     const MotionPolicy&) noexcept = default;
+    friend constexpr bool operator==(const MotionPolicy& left,
+                                     const MotionPolicy& right) noexcept {
+        return left.enabled == right.enabled && left.paused == right.paused &&
+               left.reduced == right.reduced;
+    }
 };
 
 [[nodiscard]] double apply_easing(EasingCurve easing, double progress) noexcept;

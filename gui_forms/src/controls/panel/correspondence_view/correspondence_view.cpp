@@ -24,7 +24,8 @@ CorrespondenceView::CorrespondenceView(StableId stable_id)
 
 std::optional<std::size_t> CorrespondenceView::item_index(
     std::string_view id) const noexcept {
-    const auto found = std::find_if(items_.begin(), items_.end(),
+    const std::vector<CorrespondenceItem>::const_iterator found =
+        std::find_if(items_.begin(), items_.end(),
         [id](const CorrespondenceItem& item) { return item.stable_id == id; });
     return found == items_.end() ? std::optional<std::size_t>{}
                                 : std::optional<std::size_t>{
@@ -101,7 +102,7 @@ void CorrespondenceView::set_selected_id(std::string_view stable_id) {
 }
 
 bool CorrespondenceView::expanded(std::string_view stable_id) const {
-    const auto index = item_index(stable_id);
+    const std::optional<std::size_t> index = item_index(stable_id);
     if (!index) {
         throw std::out_of_range(
             "CorrespondenceView expansion ID is not in the model");
@@ -119,7 +120,7 @@ void CorrespondenceView::emit_expansion_delta(
 
 void CorrespondenceView::set_pinned_id(std::string_view stable_id) {
     require_mutable();
-    const auto next_index = stable_id.empty() ? std::optional<std::size_t>{}
+    const std::optional<std::size_t> next_index = stable_id.empty() ? std::optional<std::size_t>{}
                                                : item_index(stable_id);
     if (!stable_id.empty() && !next_index) {
         throw std::out_of_range(
@@ -206,7 +207,7 @@ void CorrespondenceView::set_hover_intent_delay(
     }
     if (hover_intent_delay_ == delay) return;
     hover_intent_delay_ = delay;
-    if (const auto index = item_index(hovered_id_)) schedule_hover_intent(*index);
+    if (const std::optional<std::size_t> index = item_index(hovered_id_)) schedule_hover_intent(*index);
 }
 
 void CorrespondenceView::set_font(FontSpec font) {
@@ -223,7 +224,7 @@ std::vector<std::size_t> CorrespondenceView::expanded_indices() const {
     std::vector<std::size_t> indices;
     indices.reserve(3U);
     const auto insert = [this, &indices](std::string_view id) {
-        if (const auto index = item_index(id);
+        if (const std::optional<std::size_t> index = item_index(id);
             index && std::find(indices.begin(), indices.end(), *index) ==
                          indices.end()) {
             indices.push_back(*index);
@@ -259,7 +260,7 @@ double CorrespondenceView::row_height(std::size_t index) const noexcept {
 double CorrespondenceView::row_top(std::size_t index) const noexcept {
     const double compact = scaled_compact_height();
     const double delta = scaled_expanded_height() - compact;
-    const auto expanded = expanded_indices();
+    const std::vector<std::size_t> expanded = expanded_indices();
     const std::size_t before = static_cast<std::size_t>(std::count_if(
         expanded.begin(), expanded.end(),
         [index](std::size_t value) { return value < index; }));
@@ -326,7 +327,9 @@ CorrespondenceView::realized_range() const noexcept {
 }
 
 std::size_t CorrespondenceView::realized_count() const noexcept {
-    const auto [first, end] = realized_range();
+    const std::pair<std::size_t, std::size_t> range = realized_range();
+    const std::size_t first = range.first;
+    const std::size_t end = range.second;
     return end - first;
 }
 
@@ -339,7 +342,7 @@ Rect CorrespondenceView::item_bounds(std::size_t index) const noexcept {
 
 std::optional<Rect> CorrespondenceView::item_bounds(
     std::string_view stable_id) const noexcept {
-    const auto index = item_index(stable_id);
+    const std::optional<std::size_t> index = item_index(stable_id);
     return index ? std::optional<Rect>{item_bounds(*index)}
                  : std::optional<Rect>{};
 }
@@ -417,16 +420,16 @@ void CorrespondenceView::schedule_hover_intent(std::size_t index) {
     if (index >= items_.size() || !items_[index].enabled || !window()) return;
     pending_hover_id_ = items_[index].stable_id;
     const std::string intended = pending_hover_id_;
-    const auto self = std::static_pointer_cast<CorrespondenceView>(
+    const std::shared_ptr<gui_forms::CorrespondenceView> self = std::static_pointer_cast<CorrespondenceView>(
         shared_from_this());
     std::weak_ptr<CorrespondenceView> weak = self;
-    hover_timer_ = window()->schedule_ui_timer(
+    hover_timer_ = (*window()).schedule_ui_timer(
         *this, std::chrono::hours(24),
         FrameClock::now() + hover_intent_delay_,
         [weak, intended](FrameTime) {
-            if (const auto view = weak.lock()) {
-                view->hover_timer_.disconnect();
-                view->apply_hover_expansion(intended);
+            if (const std::shared_ptr<gui_forms::CorrespondenceView> view = weak.lock()) {
+                (*view).hover_timer_.disconnect();
+                (*view).apply_hover_expansion(intended);
             }
         });
 }
@@ -481,7 +484,7 @@ void CorrespondenceView::set_hovered_index(
 void CorrespondenceView::arrange(Rect final_bounds) {
     Panel::arrange(final_bounds);
     clamp_scroll_offset();
-    if (const auto focused = item_index(focused_id_)) ensure_visible(*focused);
+    if (const std::optional<std::size_t> focused = item_index(focused_id_)) ensure_visible(*focused);
 }
 
 void CorrespondenceView::paint_glyph(Painter& painter, Rect b,
@@ -536,7 +539,9 @@ void CorrespondenceView::on_paint(Painter& painter, Rect damage) {
     painter.save();
     painter.clip_rect({2.0, 2.0, std::max(0.0, bounds.width - 4.0),
                        std::max(0.0, bounds.height - 4.0)});
-    const auto [first, end] = realized_range();
+    const std::pair<std::size_t, std::size_t> range = realized_range();
+    const std::size_t first = range.first;
+    const std::size_t end = range.second;
     for (std::size_t index = first; index < end; ++index) {
         const CorrespondenceItem& item = items_[index];
         const Rect row = item_bounds(index);
@@ -678,7 +683,7 @@ void CorrespondenceView::on_pointer(PointerEvent& event) {
         pressed_click_count_ = event.click_count;
         if (pressed_index_) {
             if (window()) {
-                static_cast<void>(window()->request_focus(shared_from_this()));
+                static_cast<void>((*window()).request_focus(shared_from_this()));
             }
             set_selected_id(items_[*pressed_index_].stable_id);
             focus_index(*pressed_index_,
@@ -689,7 +694,7 @@ void CorrespondenceView::on_pointer(PointerEvent& event) {
     }
     if (event.action == PointerAction::up &&
         event.button == pressed_button_ && pressed_button_ != PointerButton::none) {
-        const auto released = index_at(event.position);
+        const std::optional<std::size_t> released = index_at(event.position);
         if (released && pressed_index_ == released) {
             const CorrespondenceItem& item = items_[*released];
             if (pressed_button_ == PointerButton::secondary) {
@@ -760,7 +765,7 @@ void CorrespondenceView::on_focus_changed(bool focused) {
     if (focused_ && focused_id_.empty()) focused_id_ = active;
     restore_anchor(anchor);
     if (focused_) {
-        if (const auto index = item_index(focused_id_)) ensure_visible(*index);
+        if (const std::optional<std::size_t> index = item_index(focused_id_)) ensure_visible(*index);
     }
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
@@ -788,7 +793,9 @@ SemanticDescriptor CorrespondenceView::semantic_descriptor() const {
 std::vector<SemanticNode>
 CorrespondenceView::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
-    const auto [first, end] = realized_range();
+    const std::pair<std::size_t, std::size_t> range = realized_range();
+    const std::size_t first = range.first;
+    const std::size_t end = range.second;
     nodes.reserve(end - first);
     const Rect absolute = absolute_bounds();
     for (std::size_t index = first; index < end; ++index) {
@@ -873,10 +880,10 @@ bool CorrespondenceView::on_semantic_child_action(
         action == SemanticAction::press) {
         const std::string_view item_id = stable_id.substr(
             0U, stable_id.size() - activate_suffix.size());
-        const auto activate_index = item_index(item_id);
+        const std::optional<std::size_t> activate_index = item_index(item_id);
         if (!activate_index) return false;
         if (window()) {
-            static_cast<void>(window()->request_focus(shared_from_this()));
+            static_cast<void>((*window()).request_focus(shared_from_this()));
         }
         focus_index(*activate_index,
                     CorrespondenceExpansionReason::keyboard_focus);
@@ -886,14 +893,14 @@ bool CorrespondenceView::on_semantic_child_action(
         }
         return true;
     }
-    const auto index = item_index(stable_id);
+    const std::optional<std::size_t> index = item_index(stable_id);
     if (!index || (action != SemanticAction::focus &&
                    action != SemanticAction::select &&
                    action != SemanticAction::press &&
                    action != SemanticAction::show_menu &&
                    action != SemanticAction::expand &&
                    action != SemanticAction::collapse)) return false;
-    if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+    if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     focus_index(*index, CorrespondenceExpansionReason::keyboard_focus);
     if (action == SemanticAction::select) {
         set_selected_id(stable_id);

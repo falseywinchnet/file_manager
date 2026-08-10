@@ -1,4 +1,5 @@
 #include "gui_forms/controls/button_base/check_box/check_box.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
@@ -20,16 +21,12 @@ CheckBox::CheckBox(StableId stable_id, std::string text)
         {"Checked", BindingValueKind::boolean, "Behavior",
          "Whether the check box is in a checked state.", BindingValue{false},
          Dirty::paint | Dirty::semantics},
-        [this] { return BindingValue{checked()}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::boolean);
-            if (!converted) throw std::invalid_argument("CheckBox.Checked binding requires Boolean");
-            set_checked(std::get<bool>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return checked_changed_.subscribe(owner,
-                [changed = std::move(changed)](bool) { changed(); });
-        }, {}, {}});
+        detail::BindingNoexceptMethodGetter<CheckBox, bool>(
+            *this, &CheckBox::checked),
+        detail::ConvertedPropertySetter<CheckBox, bool>(
+            *this, &CheckBox::set_checked, BindingValueKind::boolean,
+            "CheckBox.Checked binding requires Boolean"),
+        detail::EventChangeConnector<bool>(checked_changed_), {}, {}});
 }
 
 void CheckBox::set_check_state(CheckState state) {

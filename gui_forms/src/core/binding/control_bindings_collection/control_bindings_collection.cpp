@@ -32,7 +32,7 @@ std::shared_ptr<Binding> ControlBindingsCollection::add(
 std::shared_ptr<Binding> ControlBindingsCollection::add(
     std::string property_name, std::shared_ptr<BindingSource> source,
     std::string data_member, BindingOptions options) {
-    auto binding = std::make_shared<Binding>(
+    std::shared_ptr<gui_forms::Binding> binding = std::make_shared<Binding>(
         *target_, std::move(property_name), std::move(source),
         std::move(data_member), std::move(options));
     add(binding);
@@ -40,37 +40,39 @@ std::shared_ptr<Binding> ControlBindingsCollection::add(
 }
 
 void ControlBindingsCollection::add(std::shared_ptr<Binding> binding) {
-    if (!target_ || !target_->is_alive()) {
+    if (!target_ || !(*target_).is_alive()) {
         throw std::logic_error("GUI.Forms cannot bind a disposed Control");
     }
-    if (!binding || binding->target() != target_) {
+    if (!binding || (*binding).target() != target_) {
         throw std::invalid_argument(
             "GUI.Forms ControlBindingsCollection requires its own target");
     }
-    if (find(binding->property_name())) {
+    if (find((*binding).property_name())) {
         throw std::invalid_argument(
             "GUI.Forms Control already has a binding for property " +
-            binding->property_name());
+            (*binding).property_name());
     }
-    binding->start();
+    (*binding).start();
     bindings_.push_back(std::move(binding));
 }
 
 bool ControlBindingsCollection::remove(const Binding& binding) {
-    const auto found = std::find_if(bindings_.begin(), bindings_.end(),
-        [&binding](const auto& candidate) { return candidate.get() == &binding; });
+    BindingList::iterator found = bindings_.begin();
+    while (found != bindings_.end() && (*found).get() != &binding) {
+        ++found;
+    }
     if (found == bindings_.end()) return false;
-    const auto removed = std::move(*found);
+    const std::shared_ptr<Binding> removed = std::move(*found);
     bindings_.erase(found);
-    if (removed && removed->is_alive()) removed->dispose();
+    if (removed && (*removed).is_alive()) (*removed).dispose();
     return true;
 }
 
 void ControlBindingsCollection::clear() noexcept {
-    auto bindings = std::exchange(bindings_, {});
-    for (const auto& binding : bindings) {
-        if (binding && binding->is_alive()) {
-            try { binding->dispose(); } catch (...) {}
+    BindingList bindings = std::exchange(bindings_, {});
+    for (const std::shared_ptr<gui_forms::Binding>& binding : bindings) {
+        if (binding && (*binding).is_alive()) {
+            try { (*binding).dispose(); } catch (...) {}
         }
     }
 }
@@ -78,10 +80,11 @@ void ControlBindingsCollection::clear() noexcept {
 std::shared_ptr<Binding> ControlBindingsCollection::find(
     std::string_view property_name) const {
     const std::string canonical = canonical_binding_name(property_name);
-    const auto found = std::find_if(bindings_.begin(), bindings_.end(),
-        [&canonical](const auto& binding) {
-            return binding && binding->property_name() == canonical;
-        });
+    BindingList::const_iterator found = bindings_.begin();
+    while (found != bindings_.end() &&
+           (!*found || (*(*found)).property_name() != canonical)) {
+        ++found;
+    }
     return found == bindings_.end() ? std::shared_ptr<Binding>{} : *found;
 }
 

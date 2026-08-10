@@ -124,6 +124,8 @@ private:
     friend class BindingContext;
     friend class CurrencyManager;
     friend class ErrorProvider;
+    using RecordList = std::vector<BindingRecord>;
+    using WeakBindingList = std::vector<std::weak_ptr<Binding>>;
     void require_access(std::string_view operation) const;
     static void normalize_record(BindingRecord& record);
     static void validate_records(std::vector<BindingRecord>& records);
@@ -131,11 +133,12 @@ private:
     void publish_current_transition(std::ptrdiff_t old_position);
     void register_binding(const std::shared_ptr<Binding>& binding);
     void unregister_binding(const Binding* binding) noexcept;
+    void compact_expired_bindings() noexcept;
     bool transfer_bindings(bool source_to_control);
     [[nodiscard]] Window* bound_window() const noexcept;
 
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
-    std::vector<BindingRecord> records_;
+    RecordList records_;
     std::unique_ptr<CurrencyManager> currency_manager_;
     std::optional<BindingRecord> edit_snapshot_;
     std::string edit_stable_id_;
@@ -162,7 +165,7 @@ private:
     Event<const std::string&> data_member_changed_;
     Event<BindingCompleteEvent&> binding_complete_;
     Event<> disposed_event_;
-    std::vector<std::weak_ptr<Binding>> bindings_;
+    WeakBindingList bindings_;
 };
 
 } // namespace gui_forms

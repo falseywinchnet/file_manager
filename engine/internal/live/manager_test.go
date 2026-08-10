@@ -25,13 +25,13 @@ func TestCursorExpiresWithoutDurableState(t *testing.T) {
 		QueryID: "expiry", Scope: api.LiveQueryScope{RootID: "docs", Descendants: true}, Text: "needle",
 		Budget: api.LiveQueryBudget{MaxResults: 1, MaxVisitedEntries: 100, MaxStatCalls: 100, MaxWallTimeMS: 1_000, MaxOpenDirectories: 8, MaxResponseBytes: 64 * 1024},
 	}
-	page, err := manager.Query(context.Background(), api.RootSpec{ID: "docs", Path: rootPath}, query, nil)
+	page, err := manager.Query(context.Background(), api.RootSpec{ID: "docs", Path: rootPath}, "", query, nil)
 	if err != nil || page.NextCursor == "" {
 		t.Fatalf("first page=%+v err=%v", page, err)
 	}
 	query.Cursor = page.NextCursor
 	current = current.Add(sessionTTL + time.Second)
-	_, err = manager.Query(context.Background(), api.RootSpec{ID: "docs", Path: rootPath}, query, nil)
+	_, err = manager.Query(context.Background(), api.RootSpec{ID: "docs", Path: rootPath}, "", query, nil)
 	var fault *api.Fault
 	if !errors.As(err, &fault) || fault.Code != api.ErrorGenerationExpired {
 		t.Fatalf("expired cursor error=%v", err)

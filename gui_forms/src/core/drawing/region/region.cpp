@@ -29,64 +29,54 @@ void Region::exclude(RectF rectangle) {
 bool Region::is_visible(PointF point) const {
     require_alive();
     require_finite(point, "region visibility point");
-    const bool included = std::any_of(
-        value_.rectangles.begin(), value_.rectangles.end(),
-        [point](RectF rectangle) { return rectangle.contains(point); }) ||
-        std::any_of(value_.paths.begin(), value_.paths.end(),
-                    [point](const PathSnapshot& path) {
-                        return path_snapshot_visible(path, point);
-                    });
+    bool included = false;
+    for (const RectF rectangle : value_.rectangles) {
+        if (rectangle.contains(point)) {
+            included = true;
+            break;
+        }
+    }
+    for (const PathSnapshot& path : value_.paths) {
+        if (path_snapshot_visible(path, point)) {
+            included = true;
+            break;
+        }
+    }
     if (!included) return false;
-    return std::none_of(value_.exclusions.begin(), value_.exclusions.end(),
-                        [point](RectF rectangle) {
-                            return rectangle.contains(point);
-                        });
+    for (const RectF rectangle : value_.exclusions) {
+        if (rectangle.contains(point)) return false;
+    }
+    return true;
 }
 
 RectF Region::bounds() const {
     require_alive();
-    bool any = false;
-    double left{}, top{}, right{}, bottom{};
-    const auto include_point = [&](PointF point) {
-        if (!any) {
-            left = right = point.x;
-            top = bottom = point.y;
-            any = true;
-            return;
-        }
-        left = std::min(left, point.x);
-        top = std::min(top, point.y);
-        right = std::max(right, point.x);
-        bottom = std::max(bottom, point.y);
-    };
-    const auto include = [&](RectF rectangle) {
-        if (rectangle.empty()) return;
-        include_point({rectangle.left(), rectangle.top()});
-        include_point({rectangle.right(), rectangle.bottom()});
-    };
-    for (const RectF rectangle : value_.rectangles) include(rectangle);
+    RectBoundsAccumulator accumulator;
+    for (const RectF rectangle : value_.rectangles) {
+        accumulator.include(rectangle);
+    }
     for (const PathSnapshot& path : value_.paths) {
         for (const PathElement& element : path.elements) {
             switch (element.verb) {
             case PathVerb::line:
-                include_point(element.first);
-                include_point(element.second);
+                accumulator.include(element.first);
+                accumulator.include(element.second);
                 break;
             case PathVerb::quadratic:
-                include_point(element.first);
-                include_point(element.second);
-                include_point(element.third);
+                accumulator.include(element.first);
+                accumulator.include(element.second);
+                accumulator.include(element.third);
                 break;
             case PathVerb::bezier:
-                include_point(element.first);
-                include_point(element.second);
-                include_point(element.third);
-                include_point(element.fourth);
+                accumulator.include(element.first);
+                accumulator.include(element.second);
+                accumulator.include(element.third);
+                accumulator.include(element.fourth);
                 break;
             case PathVerb::rectangle:
             case PathVerb::ellipse:
             case PathVerb::arc:
-                include(element.rect);
+                accumulator.include(element.rect);
                 break;
             case PathVerb::start_figure:
             case PathVerb::close_figure:
@@ -94,7 +84,7 @@ RectF Region::bounds() const {
             }
         }
     }
-    return any ? RectF{left, top, right - left, bottom - top} : RectF{};
+    return accumulator.bounds();
 }
 
 RegionSnapshot Region::snapshot() const {
@@ -104,4 +94,3 @@ RegionSnapshot Region::snapshot() const {
 
 
 } // namespace gui_drawing
-

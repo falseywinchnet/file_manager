@@ -60,9 +60,9 @@ public:
 
     Control(const Control& other) : api_(other.api_), handle_(other.handle_) {
         if (api_ != nullptr && handle_.slot != 0U) {
-            const gf_result result = api_->table().retain(handle_);
+            const gf_result result = (*api_).table().retain(handle_);
             if (result != GF_OK) {
-                api_->throw_last(result);
+                (*api_).throw_last(result);
             }
         }
     }
@@ -98,7 +98,7 @@ public:
 
     void reset() noexcept {
         if (api_ != nullptr && handle_.slot != 0U) {
-            static_cast<void>(api_->table().release(handle_));
+            static_cast<void>((*api_).table().release(handle_));
         }
         api_ = nullptr;
         handle_ = {};
@@ -107,66 +107,66 @@ public:
     [[nodiscard]] gf_handle get() const noexcept { return handle_; }
 
     void set_visible(bool visible) const {
-        check(api_->table().set_visible(handle_, visible ? 1U : 0U));
+        check((*api_).table().set_visible(handle_, visible ? 1U : 0U));
     }
 
     [[nodiscard]] bool visible() const {
         uint32_t value{};
-        check(api_->table().get_visible(handle_, &value));
+        check((*api_).table().get_visible(handle_, &value));
         return value != 0U;
     }
 
     void set_enabled(bool enabled) const {
-        check(api_->table().set_enabled(handle_, enabled ? 1U : 0U));
+        check((*api_).table().set_enabled(handle_, enabled ? 1U : 0U));
     }
 
     [[nodiscard]] bool enabled() const {
         uint32_t value{};
-        check(api_->table().get_enabled(handle_, &value));
+        check((*api_).table().get_enabled(handle_, &value));
         return value != 0U;
     }
 
-    void set_name(std::string_view name) const { set_string(api_->table().set_name, name); }
-    void set_text(std::string_view text) const { set_string(api_->table().set_text, text); }
-    [[nodiscard]] std::string name() const { return get_string(api_->table().get_name); }
-    [[nodiscard]] std::string text() const { return get_string(api_->table().get_text); }
+    void set_name(std::string_view name) const { set_string((*api_).table().set_name, name); }
+    void set_text(std::string_view text) const { set_string((*api_).table().set_text, text); }
+    [[nodiscard]] std::string name() const { return get_string((*api_).table().get_name); }
+    [[nodiscard]] std::string text() const { return get_string((*api_).table().get_text); }
 
     void run_window(std::uint32_t flags = GF_WINDOW_RUN_DEFAULT) const {
-        check(api_->table().run_window(handle_, flags));
+        check((*api_).table().run_window(handle_, flags));
     }
 
     [[nodiscard]] std::string last_host_trace() const {
-        return get_string(api_->table().last_host_trace);
+        return get_string((*api_).table().last_host_trace);
     }
 
     void add_child(const Control& child) const {
-        check(api_->table().add_child(handle_, child.handle_));
+        check((*api_).table().add_child(handle_, child.handle_));
     }
 
     void request_close() const {
-        check(api_->table().request_close(handle_));
+        check((*api_).table().request_close(handle_));
     }
 
     [[nodiscard]] std::uint64_t callback_fault_count() const {
         std::uint64_t value{};
-        check(api_->table().callback_fault_count(handle_, &value));
+        check((*api_).table().callback_fault_count(handle_, &value));
         return value;
     }
 
     [[nodiscard]] std::string stable_id() const {
         uint64_t required{};
-        gf_result result = api_->table().stable_id(handle_, nullptr, 0U, &required);
+        gf_result result = (*api_).table().stable_id(handle_, nullptr, 0U, &required);
         if (result != GF_ERROR_BUFFER_TOO_SMALL && result != GF_OK) {
-            api_->throw_last(result);
+            (*api_).throw_last(result);
         }
         std::string value(required, '\0');
-        result = api_->table().stable_id(handle_, value.data(), value.size(), &required);
+        result = (*api_).table().stable_id(handle_, value.data(), value.size(), &required);
         check(result);
         return value;
     }
 
     void dispose() {
-        check(api_->table().dispose(handle_));
+        check((*api_).table().dispose(handle_));
         handle_ = {};
     }
 
@@ -182,7 +182,7 @@ private:
         uint64_t required{};
         gf_result result = operation(handle_, nullptr, 0U, &required);
         if (result != GF_ERROR_BUFFER_TOO_SMALL && result != GF_OK) {
-            api_->throw_last(result);
+            (*api_).throw_last(result);
         }
         std::string value(required, '\0');
         check(operation(handle_, value.data(), value.size(), &required));
@@ -191,7 +191,7 @@ private:
 
     void check(gf_result result) const {
         if (result != GF_OK) {
-            api_->throw_last(result);
+            (*api_).throw_last(result);
         }
     }
 

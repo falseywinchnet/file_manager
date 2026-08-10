@@ -3,6 +3,17 @@
 #include <sstream>
 
 namespace gui_forms::host {
+namespace {
+
+struct DialogOutcomeVisitor final {
+    template <typename Result>
+    [[nodiscard]] HostDialogOutcome operator()(const Result& value) const {
+        return value.outcome;
+    }
+};
+
+} // namespace
+
 HeadlessHostServices::HeadlessHostServices()
     : HostServices(headless_capabilities()),
       monitors_{{"headless.primary",
@@ -62,14 +73,14 @@ HostDialogResult HeadlessHostServices::show_dialog_impl(
          << " depth=" << snapshot().modal_depth
          << " error=" << host_service_error_name(result.status.error);
     if (result.status.accepted()) {
-        line << " outcome=" << host_dialog_outcome_name(std::visit(
-            [](const auto& value) { return value.outcome; }, result.payload));
-        if (const auto* message =
+        line << " outcome=" << host_dialog_outcome_name(
+            std::visit(DialogOutcomeVisitor{}, result.payload));
+        if (const gui_forms::HostMessageDialogResult* message =
                 std::get_if<HostMessageDialogResult>(&result.payload)) {
-            line << " choice=" << host_dialog_choice_name(message->choice);
-        } else if (const auto* paths =
+            line << " choice=" << host_dialog_choice_name((*message).choice);
+        } else if (const gui_forms::HostPathDialogResult* paths =
                        std::get_if<HostPathDialogResult>(&result.payload)) {
-            line << " paths=" << paths->paths.size();
+            line << " paths=" << (*paths).paths.size();
         }
     }
     dialog_trace_ += line.str() + '\n';

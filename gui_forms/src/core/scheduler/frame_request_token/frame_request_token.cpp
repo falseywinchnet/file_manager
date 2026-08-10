@@ -24,13 +24,13 @@ FrameRequestToken::FrameRequestToken(
 
 void FrameRequestToken::disconnect() noexcept {
     if (revocable_) {
-        revocable_->disconnect();
+        (*revocable_).disconnect();
         revocable_.reset();
     }
 }
 
 bool FrameRequestToken::connected() const noexcept {
-    return revocable_ != nullptr && revocable_->connected();
+    return revocable_ != nullptr && (*revocable_).connected();
 }
 
 } // namespace gui_forms

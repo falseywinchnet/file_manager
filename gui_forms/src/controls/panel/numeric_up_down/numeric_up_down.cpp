@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp"
 
 #include "spin_buttons.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -20,41 +21,41 @@ NumericUpDown::NumericUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
         {"Value", BindingValueKind::number, "Behavior",
          "Current numeric value.", BindingValue{0.0},
          Dirty::paint | Dirty::semantics},
-        [this] { return BindingValue{value_}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(
-                value, BindingValueKind::number);
-            if (!converted) {
-                throw std::invalid_argument(
-                    "NumericUpDown.Value binding requires a number");
-            }
-            set_value(std::get<double>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return value_changed_.subscribe(owner,
-                [changed = std::move(changed)](double) { changed(); });
-        }, {}, {}});
+        detail::BindingMemberGetter<NumericUpDown, double>(
+            *this, &NumericUpDown::value_),
+        detail::ConvertedPropertySetter<NumericUpDown, double>(
+            *this, &NumericUpDown::set_value, BindingValueKind::number,
+            "NumericUpDown.Value binding requires a number"),
+        detail::EventChangeConnector<double>(value_changed_), {}, {}});
+}
+
+void NumericUpDown::EditorChangeCallback::operator()(
+    const std::string&) const {
+    const std::shared_ptr<NumericUpDown> numeric = target.lock();
+    if (numeric && !(*numeric).synchronizing_) {
+        (*numeric).commit_editor_text();
+    }
+}
+
+void NumericUpDown::SpinnerStepCallback::operator()(int direction) const {
+    const std::shared_ptr<NumericUpDown> numeric = target.lock();
+    if (numeric) (*numeric).step(direction);
 }
 
 void NumericUpDown::initialize_control_tree() {
     const std::string prefix(stable_id().value());
     editor_ = make_control<TextBox>(StableId(prefix + ".editor"));
-    editor_->set_border_style(BorderStyle::none);
+    (*editor_).set_border_style(BorderStyle::none);
     spinner_ = make_control<SpinButtons>(StableId(prefix + ".spinner"));
     add_child(editor_);
     add_child(spinner_);
     const std::weak_ptr<NumericUpDown> weak =
         std::static_pointer_cast<NumericUpDown>(shared_from_this());
-    editor_change_ = editor_->text_changed().subscribe(
-        *this, [weak](const std::string&) {
-            if (const auto numeric = weak.lock(); numeric && !numeric->synchronizing_) {
-                numeric->commit_editor_text();
-            }
-        });
-    auto spin = std::dynamic_pointer_cast<SpinButtons>(spinner_);
-    spinner_step_ = spin->stepped().subscribe(*this, [weak](int direction) {
-        if (const auto numeric = weak.lock()) numeric->step(direction);
-    });
+    editor_change_ = (*editor_).text_changed().subscribe(
+        *this, EditorChangeCallback{weak});
+    std::shared_ptr<gui_forms::SpinButtons> spin = std::dynamic_pointer_cast<SpinButtons>(spinner_);
+    spinner_step_ = (*spin).stepped().subscribe(
+        *this, SpinnerStepCallback{weak});
     synchronize_editor();
 }
 
@@ -141,22 +142,22 @@ std::string NumericUpDown::formatted_value() const {
 void NumericUpDown::synchronize_editor() {
     if (!editor_) return;
     synchronizing_ = true;
-    editor_->set_text(formatted_value());
+    (*editor_).set_text(formatted_value());
     synchronizing_ = false;
 }
 
 void NumericUpDown::commit_editor_text() {
-    if (!editor_ || editor_->text().empty()) return;
+    if (!editor_ || (*editor_).text().empty()) return;
     try {
         std::size_t consumed{};
         double parsed{};
         if (hexadecimal_) {
-            parsed = static_cast<double>(std::stoll(std::string(editor_->text()),
+            parsed = static_cast<double>(std::stoll(std::string((*editor_).text()),
                                                     &consumed, 16));
         } else {
-            parsed = std::stod(std::string(editor_->text()), &consumed);
+            parsed = std::stod(std::string((*editor_).text()), &consumed);
         }
-        if (consumed == editor_->text().size() && std::isfinite(parsed) &&
+        if (consumed == (*editor_).text().size() && std::isfinite(parsed) &&
             parsed >= minimum_ && parsed <= maximum_ && parsed != value_) {
             value_ = parsed;
             invalidate(Dirty::paint | Dirty::semantics);
@@ -171,8 +172,8 @@ void NumericUpDown::step(int direction) {
                                    minimum_, maximum_);
     if (next != value_) set_value(next);
     if (editor_ && window() != nullptr) {
-        static_cast<void>(window()->request_focus(editor_));
-        editor_->select_all();
+        static_cast<void>((*window()).request_focus(editor_));
+        (*editor_).select_all();
     }
 }
 
@@ -240,7 +241,7 @@ bool NumericUpDown::on_semantic_action(SemanticAction action,
         }
     }
     if (action == SemanticAction::focus && editor_ && window() != nullptr) {
-        return window()->request_focus(editor_);
+        return (*window()).request_focus(editor_);
     }
     return Panel::on_semantic_action(action, value_text);
 }

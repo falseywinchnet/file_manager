@@ -171,7 +171,7 @@ void ScrollBar::begin_repeat(ScrollBarPart part, Point pointer) {
     if (window() == nullptr || part == ScrollBarPart::none ||
         part == ScrollBarPart::thumb) return;
     const FrameTime now = FrameClock::now();
-    repeat_frames_ = window()->activate_surface(
+    repeat_frames_ = (*window()).activate_surface(
         shared_from_this(), repeat_interval_, now + initial_repeat_delay_);
 }
 
@@ -193,6 +193,28 @@ Size ScrollBar::measure(Size available) {
             std::min(available.height, preferred.height)};
 }
 
+void ScrollBar::paint_button(Painter& painter, Rect button,
+                             ScrollBarPart part, bool incrementing,
+                             const BasicControlStyle& colors) {
+    paint_thumb(painter, button, colors, pressed_part_ == part);
+    const double cx = button.x + button.width * 0.5;
+    const double cy = button.y + button.height * 0.5;
+    const Color arrow = enabled() ? colors.dark_border : colors.disabled_text;
+    if (orientation() == Orientation::horizontal) {
+        const double direction = incrementing ? 1.0 : -1.0;
+        painter.draw_line({cx - 2.0 * direction, cy - 4.0},
+                          {cx + 2.0 * direction, cy}, arrow, 1.5);
+        painter.draw_line({cx + 2.0 * direction, cy},
+                          {cx - 2.0 * direction, cy + 4.0}, arrow, 1.5);
+    } else {
+        const double direction = incrementing ? 1.0 : -1.0;
+        painter.draw_line({cx - 4.0, cy - 2.0 * direction},
+                          {cx, cy + 2.0 * direction}, arrow, 1.5);
+        painter.draw_line({cx, cy + 2.0 * direction},
+                          {cx + 4.0, cy - 2.0 * direction}, arrow, 1.5);
+    }
+}
+
 void ScrollBar::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
     const BasicControlStyle& colors = style();
@@ -200,27 +222,10 @@ void ScrollBar::on_paint(Painter& painter, Rect) {
     painter.fill_rect(bounds, colors.face);
     paint_sunken(painter, track, colors, colors.face_light);
 
-    const auto paint_button = [&](Rect button, ScrollBarPart part, bool incrementing) {
-        paint_thumb(painter, button, colors, pressed_part_ == part);
-        const double cx = button.x + button.width * 0.5;
-        const double cy = button.y + button.height * 0.5;
-        const Color arrow = enabled() ? colors.dark_border : colors.disabled_text;
-        if (orientation() == Orientation::horizontal) {
-            const double direction = incrementing ? 1.0 : -1.0;
-            painter.draw_line({cx - 2.0 * direction, cy - 4.0},
-                              {cx + 2.0 * direction, cy}, arrow, 1.5);
-            painter.draw_line({cx + 2.0 * direction, cy},
-                              {cx - 2.0 * direction, cy + 4.0}, arrow, 1.5);
-        } else {
-            const double direction = incrementing ? 1.0 : -1.0;
-            painter.draw_line({cx - 4.0, cy - 2.0 * direction},
-                              {cx, cy + 2.0 * direction}, arrow, 1.5);
-            painter.draw_line({cx, cy + 2.0 * direction},
-                              {cx + 4.0, cy - 2.0 * direction}, arrow, 1.5);
-        }
-    };
-    paint_button(decrement_button_bounds(), ScrollBarPart::decrement_button, false);
-    paint_button(increment_button_bounds(), ScrollBarPart::increment_button, true);
+    paint_button(painter, decrement_button_bounds(),
+                 ScrollBarPart::decrement_button, false, colors);
+    paint_button(painter, increment_button_bounds(),
+                 ScrollBarPart::increment_button, true, colors);
     paint_thumb(painter, thumb_bounds(), colors, focused_ || tracking_thumb_);
 }
 
@@ -238,7 +243,7 @@ void ScrollBar::on_pointer(PointerEvent& event) {
     }
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary) {
-        if (window() != nullptr) static_cast<void>(window()->request_focus(shared_from_this()));
+        if (window() != nullptr) static_cast<void>((*window()).request_focus(shared_from_this()));
         pressed_part_ = part_at(local);
         if (pressed_part_ == ScrollBarPart::none) return;
         set_pointer_capture(true);

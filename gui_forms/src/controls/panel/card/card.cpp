@@ -8,14 +8,17 @@
 namespace gui_forms {
 namespace {
 
+bool valid_card_extent(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0 && value <= 4096.0;
+}
+
 bool valid_layout(const CardLayout& layout) noexcept {
     const double values[] = {layout.padding.left, layout.padding.top,
                              layout.padding.right, layout.padding.bottom,
                              layout.section_gap, layout.header_extent,
                              layout.footer_extent};
-    return std::all_of(std::begin(values), std::end(values), [](double value) {
-        return std::isfinite(value) && value >= 0.0 && value <= 4096.0;
-    });
+    return std::all_of(std::begin(values), std::end(values),
+                       valid_card_extent);
 }
 
 CardLayout themed_card_layout(const Theme& theme) noexcept {
@@ -41,12 +44,12 @@ Control::Ptr Card::replace_section(Control::Ptr& slot,
         if (replacement == slot) return {};
         throw std::logic_error("one control cannot occupy two card sections");
     }
-    if (replacement && replacement->parent()) {
+    if (replacement && (*replacement).parent()) {
         throw std::logic_error("card section control already has a parent");
     }
     Control::Ptr previous = slot;
     if (replacement) add_child(replacement);
-    if (slot) previous = remove_child(slot->runtime_id());
+    if (slot) previous = remove_child((*slot).runtime_id());
     slot = std::move(replacement);
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
@@ -138,7 +141,7 @@ Size Card::measure(Size available) {
     const Control::Ptr retained_body = body_;
     const Control::Ptr retained_footer = footer_;
     if (retained_header && is_current_layout_child(retained_header)) {
-        const Size desired = retained_header->measure(
+        const Size desired = (*retained_header).measure(
             {inner_width, layout.header_extent});
         if (!is_alive()) return {};
         if (header_ != retained_header ||
@@ -151,7 +154,7 @@ Size Card::measure(Size available) {
         }
     }
     if (retained_body && is_current_layout_child(retained_body)) {
-        const Size desired = retained_body->measure(
+        const Size desired = (*retained_body).measure(
             {inner_width, available.height});
         if (!is_alive()) return {};
         if (body_ != retained_body || !is_current_layout_child(retained_body)) {
@@ -163,7 +166,7 @@ Size Card::measure(Size available) {
         }
     }
     if (retained_footer && is_current_layout_child(retained_footer)) {
-        const Size desired = retained_footer->measure(
+        const Size desired = (*retained_footer).measure(
             {inner_width, layout.footer_extent});
         if (!is_alive()) return {};
         if (footer_ != retained_footer ||

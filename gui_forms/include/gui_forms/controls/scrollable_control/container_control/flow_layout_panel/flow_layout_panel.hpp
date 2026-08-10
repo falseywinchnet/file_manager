@@ -38,10 +38,11 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
+    using FlowBreakMap = std::unordered_map<std::uint64_t, bool>;
     [[nodiscard]] Size layout_children(Size available, bool assign);
     void reconcile_flow_breaks();
 
-    std::unordered_map<std::uint64_t, bool> flow_breaks_;
+    FlowBreakMap flow_breaks_;
     FlowDirection flow_direction_{FlowDirection::left_to_right};
     Size item_spacing_{};
     bool wrap_contents_{true};

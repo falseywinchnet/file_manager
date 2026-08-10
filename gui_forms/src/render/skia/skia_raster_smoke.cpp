@@ -181,7 +181,7 @@ int main() {
         repeating_gradient, gui_forms::GradientSpreadMode::repeat);
     raster.end_frame();
 
-    const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());
+    const std::uint8_t* pixels = static_cast<const std::uint8_t*>(raster.pixels());
     if (pixels == nullptr || raster.byte_size() == 0) {
         std::fputs("Skia raster surface exposed no pixels\n", stderr);
         return 7;

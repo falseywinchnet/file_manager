@@ -75,6 +75,14 @@ planned against older state receives `STALE_CONFIGURATION` and must re-plan.
 The unqualified `root.apply` alias remains a development fixture and does not
 define the cross-project safety contract.
 
+The M4 installed projection also maintains a private policy-generation
+`ADMISSION` record. Recovery is admitted for serving only when the record names
+the recovered generation and the digest of the exact host, uid, deployment,
+root identity, path, and exclusions. A changed or missing admission record
+causes an authoritative reconcile before endpoints become ready. Root identity
+is compared from the already-opened `os.Root` used for traversal, closing the
+check/open replacement window.
+
 **OBSERVED limitation:** root policy is process memory until persistent
 reconciliation commits it with a generation. A crash before that commit loses
 the uncommitted projection, so production root apply acknowledgement and the
@@ -128,7 +136,7 @@ feature:
 | fixed-width similarity candidate channel | **OBSERVED experimental and disabled from the public planner** |
 | native observation, watermarks, coalescing | **OBSERVED experimental portable core, macOS FSEvents, and Windows `ReadDirectoryChangesW`; coverage incomplete and watermark not durable** |
 | bounded status subscription | **negotiating** |
-| authenticated framed local transport | **OBSERVED available in ADR-015's M4 deployment: same-uid peer check, rotated endpoint credentials, `ENG1` bounded frames, separated query/admin methods** |
+| authenticated framed local transport | **OBSERVED available in ADR-015's M4 deployment: same-uid peer check, rotated endpoint credentials, `ENG1` bounded frames, separated query/admin methods, 32/4 connection ceilings, and bounded handshake/idle/request/write time** |
 
 The exact catalogue stays authoritative across every row. A descriptor channel
 may be rebuilt, disabled, upgraded, or rejected independently.
@@ -162,6 +170,9 @@ campaigns remain promotion gates.
 - idle, no-change reconciliation, and status subscription produce zero durable
   catalogue writes;
 - query and admin endpoints cannot exchange authority;
+- duplicate service startup cannot replace a live listener or rotate its credentials;
+- shutdown closes idle accepted sockets and drains their bounded handlers;
+- a root/exclusion authority change cannot serve a generation produced under the older authority;
 - fragment/similarity component loss does not alter exact recovery or identity.
 
 Implementation locators: `api/service.go`, `api/types.go`,

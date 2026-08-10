@@ -19,8 +19,8 @@ const (
 )
 
 type serviceLifecycle struct {
-	mu             *sync.Mutex
-	shutdown       *sync.Mutex
+	mu             sync.Mutex
+	shutdown       sync.Mutex
 	state          api.LifecycleState
 	generation     uint64
 	instanceID     string
@@ -35,14 +35,14 @@ type serviceLifecycle struct {
 	cancelLifetime context.CancelFunc
 }
 
-func newServiceLifecycle() (serviceLifecycle, error) {
+func newServiceLifecycle() (*serviceLifecycle, error) {
 	var identity [16]byte
 	if _, err := rand.Read(identity[:]); err != nil {
-		return serviceLifecycle{}, errors.New("create service instance identity: " + err.Error())
+		return nil, errors.New("create service instance identity: " + err.Error())
 	}
 	lifetime, cancel := context.WithCancel(context.Background())
-	return serviceLifecycle{
-		mu: &sync.Mutex{}, shutdown: &sync.Mutex{}, state: api.LifecycleReady, generation: 1,
+	return &serviceLifecycle{
+		state: api.LifecycleReady, generation: 1,
 		instanceID: hex.EncodeToString(identity[:]), startedAt: time.Now().UTC(), phase: api.WorkIdle,
 		drained: make(chan struct{}), lifetime: lifetime, cancelLifetime: cancel,
 	}, nil

@@ -43,6 +43,9 @@ public:
 
 private:
     [[nodiscard]] Rect content_bounds() const noexcept;
+    [[nodiscard]] bool should_serialize_image() const noexcept;
+    [[nodiscard]] BindingValue size_mode_property_value() const;
+    void set_size_mode_property_value(const BindingValue& value);
 
     ImageId image_{};
     PictureBoxSizeMode size_mode_{PictureBoxSizeMode::normal};

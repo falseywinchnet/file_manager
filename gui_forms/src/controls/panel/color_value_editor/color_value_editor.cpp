@@ -19,16 +19,16 @@ void ColorValueEditor::initialize_control_tree() {
     editor_ = make_control<TextBox>(
         StableId(std::string(stable_id().value()) + ".text"),
         format_value(value_));
-    editor_->set_font({FontRole::monospace, 9.5, 400, false});
+    (*editor_).set_font({FontRole::monospace, 9.5, 400, false});
     add_child(editor_);
     const std::weak_ptr<ColorValueEditor> weak =
         std::static_pointer_cast<ColorValueEditor>(shared_from_this());
-    committed_ = editor_->committed().subscribe(
+    committed_ = (*editor_).committed().subscribe(
         *this, [weak](const std::string& text) {
-            if (const auto retained = weak.lock()) retained->commit(text);
+            if (const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock()) (*retained).commit(text);
         });
-    cancelled_ = editor_->cancelled().subscribe(*this, [weak] {
-        if (const auto retained = weak.lock()) retained->cancel();
+    cancelled_ = (*editor_).cancelled().subscribe(*this, [weak] {
+        if (const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock()) (*retained).cancel();
     });
 }
 
@@ -44,9 +44,11 @@ std::string ColorValueEditor::format_value(Color value) {
 }
 
 std::optional<Color> ColorValueEditor::parse_value(std::string_view text) {
-    const auto first = text.find_first_not_of(" \t\r\n");
+    const std::string_view::size_type first =
+        text.find_first_not_of(" \t\r\n");
     if (first == std::string_view::npos) return {};
-    const auto last = text.find_last_not_of(" \t\r\n");
+    const std::string_view::size_type last =
+        text.find_last_not_of(" \t\r\n");
     text = text.substr(first, last - first + 1U);
     if ((text.size() != 7U && text.size() != 9U) || text.front() != '#') {
         return {};
@@ -66,8 +68,8 @@ std::optional<Color> ColorValueEditor::parse_value(std::string_view text) {
     std::uint8_t channels[4]{0U, 0U, 0U, 255U};
     const std::size_t count = text.size() == 9U ? 4U : 3U;
     for (std::size_t index = 0U; index < count; ++index) {
-        const auto high = nibble(text[1U + index * 2U]);
-        const auto low = nibble(text[2U + index * 2U]);
+        const std::optional<std::uint8_t> high = nibble(text[1U + index * 2U]);
+        const std::optional<std::uint8_t> low = nibble(text[2U + index * 2U]);
         if (!high || !low) return {};
         channels[index] = static_cast<std::uint8_t>((*high << 4U) | *low);
     }
@@ -77,12 +79,12 @@ std::optional<Color> ColorValueEditor::parse_value(std::string_view text) {
 void ColorValueEditor::set_value(Color value) {
     require_mutable();
     if (value_ == value) {
-        if (editor_ && editor_->text() != format_value(value)) {
+        if (editor_ && (*editor_).text() != format_value(value)) {
             synchronizing_ = true;
-            editor_->set_text(format_value(value));
+            (*editor_).set_text(format_value(value));
             synchronizing_ = false;
         }
-        if (editor_) editor_->set_visual_status(ControlVisualStatus::normal);
+        if (editor_) (*editor_).set_visual_status(ControlVisualStatus::normal);
         set_visual_status(ControlVisualStatus::normal);
         invalidate(Dirty::paint | Dirty::semantics);
         return;
@@ -90,8 +92,8 @@ void ColorValueEditor::set_value(Color value) {
     value_ = value;
     if (editor_) {
         synchronizing_ = true;
-        editor_->set_text(format_value(value_));
-        editor_->set_visual_status(ControlVisualStatus::normal);
+        (*editor_).set_text(format_value(value_));
+        (*editor_).set_visual_status(ControlVisualStatus::normal);
         synchronizing_ = false;
     }
     set_visual_status(ControlVisualStatus::normal);
@@ -111,10 +113,10 @@ void ColorValueEditor::set_swatch_width(double width) {
 
 void ColorValueEditor::commit(std::string_view text) {
     if (synchronizing_) return;
-    const auto parsed = parse_value(text);
+    const std::optional<Color> parsed = parse_value(text);
     if (!parsed) {
         set_visual_status(ControlVisualStatus::invalid);
-        if (editor_) editor_->set_visual_status(ControlVisualStatus::invalid);
+        if (editor_) (*editor_).set_visual_status(ControlVisualStatus::invalid);
         const PropertyEditorInputError failure{
             std::string(text), "Color must be #RRGGBB or #RRGGBBAA"};
         edit_failed_.emit(failure);
@@ -125,8 +127,8 @@ void ColorValueEditor::commit(std::string_view text) {
     set_visual_status(ControlVisualStatus::normal);
     if (editor_) {
         synchronizing_ = true;
-        editor_->set_text(format_value(value_));
-        editor_->set_visual_status(ControlVisualStatus::normal);
+        (*editor_).set_text(format_value(value_));
+        (*editor_).set_visual_status(ControlVisualStatus::normal);
         synchronizing_ = false;
     }
     invalidate(Dirty::paint | Dirty::semantics);
@@ -136,8 +138,8 @@ void ColorValueEditor::commit(std::string_view text) {
 void ColorValueEditor::cancel() {
     if (!editor_) return;
     synchronizing_ = true;
-    editor_->set_text(format_value(value_));
-    editor_->set_visual_status(ControlVisualStatus::normal);
+    (*editor_).set_text(format_value(value_));
+    (*editor_).set_visual_status(ControlVisualStatus::normal);
     synchronizing_ = false;
     set_visual_status(ControlVisualStatus::normal);
     invalidate(Dirty::paint | Dirty::semantics);

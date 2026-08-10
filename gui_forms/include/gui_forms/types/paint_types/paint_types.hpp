@@ -13,7 +13,11 @@ struct Color {
     std::uint8_t green{};
     std::uint8_t blue{};
     std::uint8_t alpha{255};
-    friend constexpr bool operator==(const Color&, const Color&) = default;
+    friend constexpr bool operator==(const Color& left,
+                                     const Color& right) noexcept {
+        return left.red == right.red && left.green == right.green &&
+               left.blue == right.blue && left.alpha == right.alpha;
+    }
 
     [[nodiscard]] static constexpr Color rgba(std::uint8_t red_value,
                                                std::uint8_t green_value,
@@ -29,8 +33,10 @@ struct Color {
 struct GradientStop final {
     double offset{};
     Color color{};
-    friend constexpr bool operator==(const GradientStop&,
-                                     const GradientStop&) = default;
+    friend constexpr bool operator==(const GradientStop& left,
+                                     const GradientStop& right) noexcept {
+        return left.offset == right.offset && left.color == right.color;
+    }
 };
 
 // Controls how a linear gradient behaves outside its authored start/end
@@ -74,7 +80,12 @@ struct FontSpec {
     // This is a layout input: painters and measurement must apply the same
     // value. Zero preserves the typeface's native spacing.
     double letter_spacing{};
-    friend constexpr bool operator==(const FontSpec&, const FontSpec&) = default;
+    friend constexpr bool operator==(const FontSpec& left,
+                                     const FontSpec& right) noexcept {
+        return left.role == right.role && left.size == right.size &&
+               left.weight == right.weight && left.italic == right.italic &&
+               left.letter_spacing == right.letter_spacing;
+    }
 };
 
 [[nodiscard]] inline bool valid_font_spec(FontSpec font) noexcept {
@@ -86,7 +97,14 @@ struct FontSpec {
 
 struct ImageId {
     std::uint64_t value{};
-    friend constexpr auto operator<=>(const ImageId&, const ImageId&) = default;
+    friend constexpr bool operator==(const ImageId& left,
+                                     const ImageId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const ImageId& left, const ImageId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 
 enum class ImagePatternWrap : std::uint8_t {

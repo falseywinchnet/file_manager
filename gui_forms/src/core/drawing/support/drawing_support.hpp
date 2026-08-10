@@ -54,6 +54,67 @@ void require_finite(RectF rect, std::string_view field) {
     }
 }
 
+[[nodiscard]] PointF point_on_ellipse(RectF bounds,
+                                      double angle_degrees) noexcept {
+    constexpr double degrees_to_radians =
+        0.01745329251994329576923690768489;
+    const double radians = angle_degrees * degrees_to_radians;
+    return {bounds.x + bounds.width * 0.5 +
+                bounds.width * 0.5 * std::cos(radians),
+            bounds.y + bounds.height * 0.5 +
+                bounds.height * 0.5 * std::sin(radians)};
+}
+
+[[nodiscard]] double ellipse_parameter_angle(
+    double radius_x, double radius_y, double geometric_degrees) noexcept {
+    constexpr double degrees_to_radians =
+        0.01745329251994329576923690768489;
+    const double geometric = geometric_degrees * degrees_to_radians;
+    return std::atan2(radius_x * std::sin(geometric),
+                      radius_y * std::cos(geometric));
+}
+
+[[nodiscard]] PointF ellipse_point(double center_x, double center_y,
+                                   double radius_x, double radius_y,
+                                   double parameter) noexcept {
+    return {center_x + radius_x * std::cos(parameter),
+            center_y + radius_y * std::sin(parameter)};
+}
+
+class RectBoundsAccumulator final {
+public:
+    void include(PointF point) noexcept {
+        if (!any_) {
+            left_ = right_ = point.x;
+            top_ = bottom_ = point.y;
+            any_ = true;
+            return;
+        }
+        left_ = std::min(left_, point.x);
+        top_ = std::min(top_, point.y);
+        right_ = std::max(right_, point.x);
+        bottom_ = std::max(bottom_, point.y);
+    }
+
+    void include(RectF rectangle) noexcept {
+        if (rectangle.empty()) return;
+        include(PointF{rectangle.left(), rectangle.top()});
+        include(PointF{rectangle.right(), rectangle.bottom()});
+    }
+
+    [[nodiscard]] RectF bounds() const noexcept {
+        return any_ ? RectF{left_, top_, right_ - left_, bottom_ - top_} :
+                      RectF{};
+    }
+
+private:
+    bool any_{};
+    double left_{};
+    double top_{};
+    double right_{};
+    double bottom_{};
+};
+
 [[nodiscard]] std::string ascii_lower(std::string_view input) {
     std::string result;
     result.reserve(input.size());
@@ -87,7 +148,7 @@ void require_finite(RectF rect, std::string_view field) {
 [[nodiscard]] bool valid_utf8(std::string_view input) noexcept {
     std::size_t index{};
     while (index < input.size()) {
-        const auto lead = static_cast<unsigned char>(input[index]);
+        const unsigned char lead = static_cast<unsigned char>(input[index]);
         if (lead <= 0x7fU) {
             ++index;
             continue;
@@ -112,7 +173,7 @@ void require_finite(RectF rect, std::string_view field) {
         }
         if (index + count > input.size()) return false;
         for (std::size_t offset = 1; offset < count; ++offset) {
-            const auto continuation = static_cast<unsigned char>(input[index + offset]);
+            const unsigned char continuation = static_cast<unsigned char>(input[index + offset]);
             if ((continuation & 0xc0U) != 0x80U) return false;
             scalar = (scalar << 6U) | (continuation & 0x3fU);
         }
@@ -128,7 +189,7 @@ void require_finite(RectF rect, std::string_view field) {
 [[nodiscard]] std::string number(double value) {
     if (value == 0.0) value = 0.0;
     std::array<char, 64> buffer{};
-    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
+    const std::to_chars_result result = std::to_chars(buffer.data(), buffer.data() + buffer.size(),
                                       value, std::chars_format::general,
                                       std::numeric_limits<double>::max_digits10);
     if (result.ec != std::errc{}) {
@@ -231,17 +292,20 @@ void require_blend_positions(std::span<const double> positions,
     }
 }
 
+[[nodiscard]] std::uint8_t interpolate_channel(
+    std::uint8_t left, std::uint8_t right, double amount) noexcept {
+    return static_cast<std::uint8_t>(std::lround(
+        static_cast<double>(left) +
+        (static_cast<double>(right) - left) * amount));
+}
+
 [[nodiscard]] Color interpolate_color(Color first, Color second,
                                       double amount) noexcept {
-    const auto channel = [amount](std::uint8_t left, std::uint8_t right) {
-        return static_cast<std::uint8_t>(std::lround(
-            static_cast<double>(left) +
-            (static_cast<double>(right) - left) * amount));
-    };
-    return Color::from_argb(channel(first.alpha(), second.alpha()),
-                            channel(first.red(), second.red()),
-                            channel(first.green(), second.green()),
-                            channel(first.blue(), second.blue()));
+    return Color::from_argb(
+        interpolate_channel(first.alpha(), second.alpha(), amount),
+        interpolate_channel(first.red(), second.red(), amount),
+        interpolate_channel(first.green(), second.green(), amount),
+        interpolate_channel(first.blue(), second.blue(), amount));
 }
 
 [[nodiscard]] std::uint8_t premultiply(std::uint8_t channel,
@@ -440,31 +504,35 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
     return result;
 }
 
+void include_polygon_visibility(std::vector<PointF>& figure, PointF point,
+                                FillMode fill_mode, bool& inside) {
+    if (figure.size() < 3U) {
+        figure.clear();
+        return;
+    }
+    bool hit = false;
+    for (std::size_t first = 0U, previous = figure.size() - 1U;
+         first < figure.size(); previous = first++) {
+        const PointF a = figure[first];
+        const PointF b = figure[previous];
+        const bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
+            (point.x < (b.x - a.x) * (point.y - a.y) /
+                           (b.y - a.y) + a.x);
+        if (crosses) hit = !hit;
+    }
+    inside = fill_mode == FillMode::alternate ? inside != hit : inside || hit;
+    figure.clear();
+}
+
 [[nodiscard]] bool path_snapshot_visible(const PathSnapshot& path, PointF point) {
     bool inside = false;
     std::vector<PointF> figure;
-    const auto include_polygon = [&] {
-        if (figure.size() < 3U) {
-            figure.clear();
-            return;
-        }
-        bool hit = false;
-        for (std::size_t i = 0, j = figure.size() - 1U; i < figure.size(); j = i++) {
-            const PointF a = figure[i];
-            const PointF b = figure[j];
-            const bool crosses = ((a.y > point.y) != (b.y > point.y)) &&
-                (point.x < (b.x - a.x) * (point.y - a.y) /
-                               (b.y - a.y) + a.x);
-            if (crosses) hit = !hit;
-        }
-        inside = path.fill_mode == FillMode::alternate ? inside != hit : inside || hit;
-        figure.clear();
-    };
     for (const PathElement& element : path.elements) {
         bool primitive_hit = false;
         switch (element.verb) {
         case PathVerb::start_figure:
-            include_polygon();
+            include_polygon_visibility(
+                figure, point, path.fill_mode, inside);
             break;
         case PathVerb::line:
             if (figure.empty()) figure.push_back(element.first);
@@ -507,13 +575,15 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
             break;
         }
         case PathVerb::rectangle:
-            include_polygon();
+            include_polygon_visibility(
+                figure, point, path.fill_mode, inside);
             primitive_hit = element.rect.contains(point);
             inside = path.fill_mode == FillMode::alternate ?
                 inside != primitive_hit : inside || primitive_hit;
             break;
         case PathVerb::ellipse: {
-            include_polygon();
+            include_polygon_visibility(
+                figure, point, path.fill_mode, inside);
             const double rx = element.rect.width / 2.0;
             const double ry = element.rect.height / 2.0;
             if (rx > 0.0 && ry > 0.0) {
@@ -526,34 +596,25 @@ void require_enum(Enum value, unsigned maximum, std::string_view field) {
             break;
         }
         case PathVerb::arc: {
-            constexpr double degrees_to_radians =
-                0.01745329251994329576923690768489;
-            const double center_x = element.rect.x + element.rect.width * 0.5;
-            const double center_y = element.rect.y + element.rect.height * 0.5;
-            const double radius_x = element.rect.width * 0.5;
-            const double radius_y = element.rect.height * 0.5;
-            const auto point_at = [&](double degrees) {
-                const double radians = degrees * degrees_to_radians;
-                return PointF{center_x + radius_x * std::cos(radians),
-                              center_y + radius_y * std::sin(radians)};
-            };
-            const PointF start = point_at(element.start_angle);
+            const PointF start =
+                point_on_ellipse(element.rect, element.start_angle);
             if (figure.empty() || figure.back() != start) figure.push_back(start);
             const int segments = std::max(
                 1, static_cast<int>(std::ceil(std::abs(element.sweep_angle) / 12.0)));
             for (int index = 1; index <= segments; ++index) {
                 const double ratio = static_cast<double>(index) / segments;
-                figure.push_back(point_at(
+                figure.push_back(point_on_ellipse(element.rect,
                     element.start_angle + element.sweep_angle * ratio));
             }
             break;
         }
         case PathVerb::close_figure:
-            include_polygon();
+            include_polygon_visibility(
+                figure, point, path.fill_mode, inside);
             break;
         }
     }
-    include_polygon();
+    include_polygon_visibility(figure, point, path.fill_mode, inside);
     return inside;
 }
 

@@ -40,15 +40,15 @@ ImageList::~ImageList() {
     // destructor never races the Window registry and the Window still owns the
     // bounded resources until its own teardown.
     if (is_alive()) {
-        if (Window* owner = bound_window(); owner && owner->check_access()) {
+        if (Window* owner = bound_window(); owner && (*owner).check_access()) {
             release_all();
         }
     }
 }
 
 Window* ImageList::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 bool ImageList::belongs_to(const Window& window) const noexcept {
@@ -63,7 +63,7 @@ void ImageList::require_access(std::string_view operation) const {
     if (!owner) {
         throw std::logic_error("GUI.Forms cannot use an ImageList after Window shutdown");
     }
-    owner->verify_access(operation);
+    (*owner).verify_access(operation);
 }
 
 bool ImageList::valid_state(ImageVisualState state) noexcept {
@@ -112,14 +112,16 @@ void ImageList::set_image_size(Size image_size) {
 
 std::optional<std::size_t> ImageList::index_of_key(
     std::string_view key) const noexcept {
-    const auto found = std::find_if(entries_.begin(), entries_.end(),
-        [key](const Entry& entry) { return same_key(entry.key, key); });
+    std::vector<Entry>::const_iterator found = entries_.begin();
+    while (found != entries_.end() && !same_key((*found).key, key)) {
+        ++found;
+    }
     if (found == entries_.end()) return {};
     return static_cast<std::size_t>(std::distance(entries_.begin(), found));
 }
 
 std::size_t ImageList::require_index(std::string_view key) const {
-    const auto index = index_of_key(key);
+    const std::optional<std::size_t> index = index_of_key(key);
     if (!index) throw std::out_of_range("ImageList key is not present");
     return *index;
 }
@@ -138,11 +140,11 @@ std::optional<std::size_t> ImageList::variant_index(
 
 Size ImageList::source_size(ImageId image) const {
     Window* owner = bound_window();
-    const auto resource = owner ? owner->image_resources().find(image)
+    const std::optional<ImageResourceView> resource = owner ? (*owner).image_resources().find(image)
                                 : std::optional<ImageResourceView>{};
     if (!resource) throw std::invalid_argument("ImageList requires a live Window image ID");
-    return {static_cast<double>(resource->metadata.width),
-            static_cast<double>(resource->metadata.height)};
+    return {static_cast<double>((*resource).metadata.width),
+            static_cast<double>((*resource).metadata.height)};
 }
 
 ImageLoadResult ImageList::add_png(std::string key,
@@ -151,7 +153,7 @@ ImageLoadResult ImageList::add_png(std::string key,
     require_access("ImageList PNG add");
     validate_key(key);
     validate_density(density_scale);
-    const auto existing = index_of_key(key);
+    const std::optional<std::size_t> existing = index_of_key(key);
     if (!existing && entries_.size() >= maximum_image_list_entries) {
         throw std::length_error("ImageList entry limit exceeded");
     }
@@ -160,7 +162,7 @@ ImageLoadResult ImageList::add_png(std::string key,
         throw std::invalid_argument("ImageList already contains this key/density variant");
     }
     Window* owner = bound_window();
-    ImageLoadResult loaded = owner->load_png(encoded);
+    ImageLoadResult loaded = (*owner).load_png(encoded);
     if (!loaded) return loaded;
     std::size_t changed_index{};
     try {
@@ -169,7 +171,7 @@ ImageLoadResult ImageList::add_png(std::string key,
         if (existing) {
             Entry& entry = entries_[*existing];
             if (entry.variants.size() >= maximum_image_list_variants_per_entry) {
-                static_cast<void>(owner->remove_image(loaded.image));
+                static_cast<void>((*owner).remove_image(loaded.image));
                 throw std::length_error("ImageList variant limit exceeded");
             }
             entry.variants.push_back(variant);
@@ -179,8 +181,8 @@ ImageLoadResult ImageList::add_png(std::string key,
             changed_index = entries_.size() - 1U;
         }
     } catch (...) {
-        if (owner->image_resources().find(loaded.image)) {
-            static_cast<void>(owner->remove_image(loaded.image));
+        if ((*owner).image_resources().find(loaded.image)) {
+            static_cast<void>((*owner).remove_image(loaded.image));
         }
         throw;
     }
@@ -197,11 +199,11 @@ ImageLoadResult ImageList::set_variant_png(
     validate_density(density_scale);
     const std::size_t entry_index = require_index(key);
     Entry& entry = entries_[entry_index];
-    const auto existing = variant_index(entry, state, density_scale);
+    const std::optional<std::size_t> existing = variant_index(entry, state, density_scale);
     Window* owner = bound_window();
     if (existing && entry.variants[*existing].owned) {
         Variant& variant = entry.variants[*existing];
-        ImageLoadResult replaced = owner->replace_png(variant.image, encoded);
+        ImageLoadResult replaced = (*owner).replace_png(variant.image, encoded);
         if (!replaced) return replaced;
         variant.image = replaced.image;
         variant.source_size = source_size(replaced.image);
@@ -209,7 +211,7 @@ ImageLoadResult ImageList::set_variant_png(
         return replaced;
     }
 
-    ImageLoadResult loaded = owner->load_png(encoded);
+    ImageLoadResult loaded = (*owner).load_png(encoded);
     if (!loaded) return loaded;
     ImageListChangeKind change_kind = ImageListChangeKind::added;
     try {
@@ -220,14 +222,14 @@ ImageLoadResult ImageList::set_variant_png(
             change_kind = ImageListChangeKind::replaced;
         } else {
             if (entry.variants.size() >= maximum_image_list_variants_per_entry) {
-                static_cast<void>(owner->remove_image(loaded.image));
+                static_cast<void>((*owner).remove_image(loaded.image));
                 throw std::length_error("ImageList variant limit exceeded");
             }
             entry.variants.push_back(next);
         }
     } catch (...) {
-        if (owner->image_resources().find(loaded.image)) {
-            static_cast<void>(owner->remove_image(loaded.image));
+        if ((*owner).image_resources().find(loaded.image)) {
+            static_cast<void>((*owner).remove_image(loaded.image));
         }
         throw;
     }
@@ -241,7 +243,7 @@ std::size_t ImageList::add_image(std::string key, ImageId image,
     validate_key(key);
     validate_density(density_scale);
     const Size source = source_size(image);
-    const auto existing = index_of_key(key);
+    const std::optional<std::size_t> existing = index_of_key(key);
     if (!existing && entries_.size() >= maximum_image_list_entries) {
         throw std::length_error("ImageList entry limit exceeded");
     }
@@ -275,13 +277,13 @@ void ImageList::set_variant_image(std::string_view key, ImageVisualState state,
     const Size source = source_size(image);
     const std::size_t entry_index = require_index(key);
     Entry& entry = entries_[entry_index];
-    const auto existing = variant_index(entry, state, density_scale);
+    const std::optional<std::size_t> existing = variant_index(entry, state, density_scale);
     if (existing) {
         Variant& previous = entry.variants[*existing];
         if (previous.image == image) return;
         if (previous.owned) {
             if (Window* owner = bound_window()) {
-                static_cast<void>(owner->remove_image(previous.image));
+                static_cast<void>((*owner).remove_image(previous.image));
             }
         }
         previous = {state, density_scale, image, source, false};
@@ -304,7 +306,7 @@ void ImageList::set_key_name(std::size_t index, std::string key) {
     require_access("ImageList key mutation");
     if (index >= entries_.size()) throw std::out_of_range("ImageList index is outside the collection");
     validate_key(key);
-    if (const auto duplicate = index_of_key(key); duplicate && *duplicate != index) {
+    if (const std::optional<std::size_t> duplicate = index_of_key(key); duplicate && *duplicate != index) {
         throw std::invalid_argument("ImageList keys are unique ignoring ASCII case");
     }
     Entry& entry = entries_[index];
@@ -319,7 +321,7 @@ void ImageList::release_entry(Entry& entry) noexcept {
     for (Variant& variant : entry.variants) {
         if (!variant.owned || variant.image.value == 0U) continue;
         try {
-            static_cast<void>(owner->remove_image(variant.image));
+            static_cast<void>((*owner).remove_image(variant.image));
         } catch (...) {
             // Component disposal cannot throw. Window teardown remains the
             // final owner of any resource whose release could not complete.
@@ -345,7 +347,7 @@ bool ImageList::remove_at(std::size_t index) {
 
 bool ImageList::remove_by_key(std::string_view key) {
     require_access("ImageList key removal");
-    const auto index = index_of_key(key);
+    const std::optional<std::size_t> index = index_of_key(key);
     return index ? remove_at(*index) : false;
 }
 
@@ -359,7 +361,7 @@ void ImageList::clear() {
 ImageListResolution ImageList::resolve(std::string_view key,
                                        ImageVisualState state,
                                        double density_scale) const noexcept {
-    const auto index = index_of_key(key);
+    const std::optional<std::size_t> index = index_of_key(key);
     if (index) return resolve(*index, state, density_scale);
     ImageListResolution result;
     result.requested_state = state;
@@ -402,22 +404,22 @@ ImageListResolution ImageList::resolve(std::size_t index,
         const Variant* smaller{};
         for (const Variant& variant : entry.variants) {
             if (variant.state != candidate_state ||
-                !owner->image_resources().find(variant.image)) continue;
+                !(*owner).image_resources().find(variant.image)) continue;
             if (variant.density_scale == density_scale) exact = &variant;
             else if (variant.density_scale > density_scale &&
-                     (!larger || variant.density_scale < larger->density_scale)) {
+                     (!larger || variant.density_scale < (*larger).density_scale)) {
                 larger = &variant;
             } else if (variant.density_scale < density_scale &&
-                       (!smaller || variant.density_scale > smaller->density_scale)) {
+                       (!smaller || variant.density_scale > (*smaller).density_scale)) {
                 smaller = &variant;
             }
         }
         const Variant* chosen = exact ? exact : (larger ? larger : smaller);
         if (!chosen) continue;
-        result.image = chosen->image;
-        result.source_size = chosen->source_size;
+        result.image = (*chosen).image;
+        result.source_size = (*chosen).source_size;
         result.resolved_state = candidate_state;
-        result.resolved_scale = chosen->density_scale;
+        result.resolved_scale = (*chosen).density_scale;
         return result;
     }
     return result;
@@ -440,7 +442,7 @@ void ImageList::emit_change(ImageListChangeKind kind, std::size_t index,
 }
 
 void ImageList::verify_dispose_thread() {
-    if (Window* owner = bound_window()) owner->verify_access("ImageList disposal");
+    if (Window* owner = bound_window()) (*owner).verify_access("ImageList disposal");
 }
 
 void ImageList::on_dispose() noexcept {

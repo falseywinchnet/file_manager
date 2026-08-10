@@ -60,7 +60,7 @@ fi
 
 attempt=0
 STATUS_OUTPUT=
-while [ "$attempt" -lt 100 ]; do
+while [ "$attempt" -lt 600 ]; do
   if STATUS_OUTPUT=$("$BINARY" call-local --runtime-dir "$RUNTIME_DIR" --authority query \
     --timeout 2s --request '{"id":"install-status","method":"engine.status"}' 2>/dev/null); then
     break

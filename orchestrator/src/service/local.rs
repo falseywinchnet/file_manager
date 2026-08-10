@@ -55,17 +55,24 @@ pub(super) fn serve_endpoint(endpoint: &UnixEndpoint, kernel: Kernel) -> Result<
         .set_nonblocking(true)
         .map_err(|error| error.to_string())?;
     let health = kernel.runtime_health();
-    let kernel = Arc::new(Mutex::new(kernel));
+    let kernel = Arc::new(kernel);
     let shutdown = Arc::new(AtomicBool::new(false));
     let rejected = Arc::new(AtomicU64::new(0));
     let active = Arc::new(Mutex::new(HashMap::<usize, UnixStream>::new()));
-    let (sender, receiver) = mpsc::sync_channel(LOCAL_PENDING_SESSIONS);
-    let receiver = Arc::new(Mutex::new(receiver));
+    let mut senders = Vec::with_capacity(LOCAL_SESSION_WORKERS);
+    let mut receivers = Vec::with_capacity(LOCAL_SESSION_WORKERS);
+    let base_depth = LOCAL_PENDING_SESSIONS / LOCAL_SESSION_WORKERS;
+    let extra_depth = LOCAL_PENDING_SESSIONS % LOCAL_SESSION_WORKERS;
+    for worker_id in 0..LOCAL_SESSION_WORKERS {
+        let depth = base_depth + usize::from(worker_id < extra_depth);
+        let (sender, receiver) = mpsc::sync_channel(depth);
+        senders.push(sender);
+        receivers.push(receiver);
+    }
 
     thread::scope(|scope| {
         let mut workers = Vec::with_capacity(LOCAL_SESSION_WORKERS);
-        for worker_id in 0..LOCAL_SESSION_WORKERS {
-            let receiver = Arc::clone(&receiver);
+        for (worker_id, receiver) in receivers.into_iter().enumerate() {
             let kernel = Arc::clone(&kernel);
             let shutdown = Arc::clone(&shutdown);
             let active = Arc::clone(&active);
@@ -79,8 +86,8 @@ pub(super) fn serve_endpoint(endpoint: &UnixEndpoint, kernel: Kernel) -> Result<
             }));
         }
 
-        let accept_result = accept_sessions(endpoint, &sender, &shutdown, &rejected, &health);
-        drop(sender);
+        let accept_result = accept_sessions(endpoint, &senders, &shutdown, &rejected, &health);
+        drop(senders);
         close_active_sessions(&active);
         let mut worker_faulted = false;
         for worker in workers {
@@ -119,7 +126,7 @@ where
 
 fn serve_connection(
     stream: &mut UnixStream,
-    kernel: &Arc<Mutex<Kernel>>,
+    kernel: &Arc<Kernel>,
     shutdown: &AtomicBool,
     health: &RuntimeHealth,
 ) -> Result<(), String> {
@@ -129,13 +136,8 @@ fn serve_connection(
             Err(LocalWireError::EndOfStream) => return Ok(()),
             Err(error) => return Err(error.to_string()),
         };
-        let (response, stopped) = {
-            let mut kernel = kernel
-                .lock()
-                .map_err(|_| "kernel lock poisoned".to_owned())?;
-            let response = kernel.handle(request);
-            (response, kernel.is_stopped())
-        };
+        let response = kernel.handle(request);
+        let stopped = kernel.is_stopped();
         write_json_frame(stream, &response).map_err(|error| error.to_string())?;
         health.record_completed_request();
         if stopped {
@@ -147,11 +149,12 @@ fn serve_connection(
 
 fn accept_sessions(
     endpoint: &UnixEndpoint,
-    sender: &SyncSender<UnixStream>,
+    senders: &[SyncSender<UnixStream>],
     shutdown: &AtomicBool,
     rejected: &AtomicU64,
     health: &RuntimeHealth,
 ) -> Result<(), String> {
+    let mut next_worker = 0_usize;
     while !shutdown.load(Ordering::Acquire) {
         let Some(stream) = endpoint.try_accept().map_err(|error| error.to_string())? else {
             thread::sleep(ACCEPT_POLL);
@@ -161,15 +164,29 @@ fn accept_sessions(
         if shutdown.load(Ordering::Acquire) {
             break;
         }
-        match sender.try_send(stream) {
-            Ok(()) => {}
-            Err(TrySendError::Full(_)) => {
-                rejected.fetch_add(1, Ordering::Relaxed);
-                health.record_rejected_session();
+        let mut stream = Some(stream);
+        let mut disconnected = 0_usize;
+        for offset in 0..senders.len() {
+            let worker = (next_worker + offset) % senders.len();
+            let candidate = stream.take().expect("undispatched stream remains owned");
+            match senders[worker].try_send(candidate) {
+                Ok(()) => {
+                    next_worker = (worker + 1) % senders.len();
+                    break;
+                }
+                Err(TrySendError::Full(candidate)) => stream = Some(candidate),
+                Err(TrySendError::Disconnected(candidate)) => {
+                    disconnected += 1;
+                    stream = Some(candidate);
+                }
             }
-            Err(TrySendError::Disconnected(_)) => {
+        }
+        if stream.is_some() {
+            if disconnected == senders.len() {
                 return Err("all local session workers stopped".to_owned());
             }
+            rejected.fetch_add(1, Ordering::Relaxed);
+            health.record_rejected_session();
         }
     }
     Ok(())
@@ -178,23 +195,17 @@ fn accept_sessions(
 fn session_worker(
     worker_id: usize,
     endpoint: &UnixEndpoint,
-    receiver: &Arc<Mutex<Receiver<UnixStream>>>,
-    kernel: &Arc<Mutex<Kernel>>,
+    receiver: &Receiver<UnixStream>,
+    kernel: &Arc<Kernel>,
     shutdown: &Arc<AtomicBool>,
     active: &Arc<Mutex<HashMap<usize, UnixStream>>>,
     health: &Arc<RuntimeHealth>,
 ) {
     while !shutdown.load(Ordering::Acquire) {
-        let stream = {
-            let Ok(receiver) = receiver.lock() else {
-                shutdown.store(true, Ordering::Release);
-                return;
-            };
-            match receiver.recv_timeout(ACCEPT_POLL) {
-                Ok(stream) => stream,
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
-            }
+        let stream = match receiver.recv_timeout(ACCEPT_POLL) {
+            Ok(stream) => stream,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(mpsc::RecvTimeoutError::Disconnected) => return,
         };
         let monitor = match stream.try_clone() {
             Ok(monitor) => monitor,
@@ -211,13 +222,7 @@ fn session_worker(
         }
         let _session_health = ActiveSessionHealth::new(Arc::clone(health));
 
-        let Ok(kernel_guard) = kernel.lock() else {
-            shutdown.store(true, Ordering::Release);
-            remove_active_session(active, worker_id);
-            return;
-        };
-        let generation = kernel_guard.lifecycle_generation();
-        drop(kernel_guard);
+        let generation = kernel.lifecycle_generation();
         match endpoint.authenticate(stream, generation) {
             Ok(mut stream) => {
                 health.record_authenticated_session();

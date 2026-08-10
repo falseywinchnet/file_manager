@@ -13,6 +13,65 @@
 
 namespace gui_forms {
 
+void Window::collect_paint_checkpoints(
+    const Control::Ptr& control, PaintControlCheckpointList& checkpoints) {
+    if (!control) return;
+    checkpoints.push_back({control, (*control).display_chunk_});
+    for (const Control::Ptr& child : (*control).children_) {
+        collect_paint_checkpoints(child, checkpoints);
+    }
+}
+
+void Window::abandon_paint(
+    const PaintControlCheckpointList& checkpoints,
+    std::uint64_t generation_before, Rect paint_bounds) {
+    for (const PaintControlCheckpoint& checkpoint : checkpoints) {
+        if (!checkpoint.control || !(*checkpoint.control).is_alive()) continue;
+        (*checkpoint.control).display_chunk_ = checkpoint.chunk;
+        (*checkpoint.control).dirty_ |= Dirty::paint;
+    }
+    if (root_ && (*root_).is_alive()) {
+        static_cast<void>(recompute_subtree_dirty(root_));
+    }
+    display_generation_ = generation_before;
+    add_damage_all_planes(paint_bounds);
+    paint_dirty_ = true;
+    dirty_after_render_ = true;
+    in_paint_ = false;
+    ++paint_leases_abandoned_;
+    update_paint_lease_state();
+    update_display_cache_metrics();
+    if (!root_ || !(*root_).is_alive()) {
+        abandon_deferred_input();
+    } else {
+        schedule_deferred_input_drain();
+    }
+}
+
+Rect Window::paint_plane_bounds(std::size_t index, Rect requested_damage,
+                                Rect paint_bounds,
+                                Rect window_bounds) const {
+    if (!requested_damage.empty()) return paint_bounds;
+    return Rect::intersection(plane_damage_[index].bounds(), window_bounds);
+}
+
+bool Window::has_popup_paint_dirty() const noexcept {
+    for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
+        const Control::Ptr overlay = (*popup).popup();
+        if (overlay && has_dirty((*overlay).subtree_dirty_, Dirty::paint)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Window::has_plane_damage() const noexcept {
+    for (const DamageRegion& damage : plane_damage_) {
+        if (!damage.empty()) return true;
+    }
+    return false;
+}
+
 std::optional<PaintReceipt> Window::paint(Painter& painter,
                                           Rect requested_damage) {
     require_ui_thread("paint");
@@ -33,7 +92,7 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
     }
     ensure_layout(true);
 
-    if (!root_->is_alive()) {
+    if (!(*root_).is_alive()) {
         return std::nullopt;
     }
 
@@ -53,22 +112,11 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         return std::nullopt;
     }
 
-    struct ControlCheckpoint final {
-        Control::Ptr control;
-        std::shared_ptr<const detail::DisplayChunk> chunk;
-    };
-    std::vector<ControlCheckpoint> checkpoints;
-    const auto checkpoint_tree = [&checkpoints](const Control::Ptr& root) {
-        const auto visit = [&checkpoints](const auto& self,
-                                         const Control::Ptr& control) -> void {
-            if (!control) return;
-            checkpoints.push_back({control, control->display_chunk_});
-            for (const Control::Ptr& child : control->children_) self(self, child);
-        };
-        visit(visit, root);
-    };
-    checkpoint_tree(root_);
-    for (const auto& popup : popups_) checkpoint_tree(popup->popup());
+    PaintControlCheckpointList checkpoints;
+    collect_paint_checkpoints(root_, checkpoints);
+    for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
+        collect_paint_checkpoints((*popup).popup(), checkpoints);
+    }
 
     const std::uint64_t lease_revision = content_revision_;
     const std::uint64_t lease_epoch = surface_epoch_;
@@ -83,30 +131,6 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
     std::uint64_t chunks_rebuilt = 0;
     std::uint64_t chunks_reused = 0;
     std::uint64_t commands_replayed = 0;
-    const auto abandon = [&]() {
-        for (const ControlCheckpoint& checkpoint : checkpoints) {
-            if (!checkpoint.control || !checkpoint.control->is_alive()) continue;
-            checkpoint.control->display_chunk_ = checkpoint.chunk;
-            checkpoint.control->dirty_ |= Dirty::paint;
-        }
-        if (root_ && root_->is_alive()) {
-            static_cast<void>(recompute_subtree_dirty(root_));
-        }
-        display_generation_ = generation_before;
-        add_damage_all_planes(paint_bounds);
-        paint_dirty_ = true;
-        dirty_after_render_ = true;
-        in_paint_ = false;
-        ++paint_leases_abandoned_;
-        update_paint_lease_state();
-        update_display_cache_metrics();
-        if (!root_ || !root_->is_alive()) {
-            abandon_deferred_input();
-        } else {
-            schedule_deferred_input_drain();
-        }
-    };
-
     try {
         // Application callbacks and retained chunk rebuilding record into a
         // complete candidate command list. No candidate command reaches the
@@ -127,27 +151,19 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         candidate.clip_rect(paint_bounds);
         paint_surface_material(
             candidate, window_bounds,
-            theme_->resolve(ControlVisualRole::window,
+            (*theme_).resolve(ControlVisualRole::window,
                             backplane_context).material);
         candidate.restore();
         std::vector<Control::Ptr> popup_roots;
         popup_roots.reserve(popups_.size());
-        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
-        const auto paint_plane_bounds = [this, &requested_damage, &paint_bounds,
-                                         &window_bounds](std::size_t index) {
-            Rect plane_bounds = paint_bounds;
-            if (requested_damage.empty()) {
-                plane_bounds = Rect::intersection(plane_damage_[index].bounds(),
-                                                  window_bounds);
-            }
-            return plane_bounds;
-        };
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) popup_roots.push_back((*popup).popup());
         // Complete the application root across every paint plane before any
         // popup root. A popup is one composited retained surface; interleaving
         // its backplane with later application planes lets ordinary content
         // paint over the popup and leaves only overlay-plane pixels visible.
         for (std::size_t index = 0; index < paint_plane_count; ++index) {
-            const Rect plane_bounds = paint_plane_bounds(index);
+            const Rect plane_bounds = Window::paint_plane_bounds(
+                index, requested_damage, paint_bounds, window_bounds);
             if (plane_bounds.empty()) continue;
             const PaintPlane plane = static_cast<PaintPlane>(index);
             paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes,
@@ -157,11 +173,12 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // Window-owned popup roots are composited after all application
         // content, in opening order and independently of consumer layout.
         for (const Control::Ptr& overlay : popup_roots) {
-            if (!overlay || !overlay->is_alive() || overlay->window_ != this) {
+            if (!overlay || !(*overlay).is_alive() || (*overlay).window_ != this) {
                 continue;
             }
             for (std::size_t index = 0; index < paint_plane_count; ++index) {
-                const Rect plane_bounds = paint_plane_bounds(index);
+                const Rect plane_bounds = Window::paint_plane_bounds(
+                    index, requested_damage, paint_bounds, window_bounds);
                 if (!plane_bounds.empty()) {
                     const PaintPlane plane = static_cast<PaintPlane>(index);
                     paint_recursive(overlay, candidate, plane_bounds, plane,
@@ -171,10 +188,11 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
                 }
             }
         }
-        const auto transaction = candidate.finish(
+        const std::shared_ptr<const detail::DisplayChunk> transaction =
+            candidate.finish(
             display_generation_, PaintPlane::control, window_bounds);
-        if (lease_epoch != surface_epoch_ || !root_->is_alive()) {
-            abandon();
+        if (lease_epoch != surface_epoch_ || !(*root_).is_alive()) {
+            abandon_paint(checkpoints, generation_before, paint_bounds);
             return std::nullopt;
         }
         static_cast<void>(detail::replay_display_chunk(*transaction, painter));
@@ -182,12 +200,12 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // resize, scale transition, or owner retirement at that boundary
         // invalidates the candidate even though every draw command returned.
         // The host receives no receipt and therefore cannot publish it.
-        if (lease_epoch != surface_epoch_ || !root_->is_alive()) {
-            abandon();
+        if (lease_epoch != surface_epoch_ || !(*root_).is_alive()) {
+            abandon_paint(checkpoints, generation_before, paint_bounds);
             return std::nullopt;
         }
     } catch (...) {
-        abandon();
+        abandon_paint(checkpoints, generation_before, paint_bounds);
         throw;
     }
 
@@ -220,16 +238,11 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
                           paint_bounds.area(), full_window);
     update_display_cache_metrics();
 
-    const bool popup_paint_dirty = std::any_of(
-        popups_.begin(), popups_.end(), [](const auto& popup) {
-            const Control::Ptr overlay = popup->popup();
-            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::paint);
-        });
+    const bool popup_paint_dirty = has_popup_paint_dirty();
     paint_dirty_ = dirty_after_render_ ||
-                   has_dirty(root_->subtree_dirty_, Dirty::paint) ||
+                   has_dirty((*root_).subtree_dirty_, Dirty::paint) ||
                    popup_paint_dirty ||
-                   std::any_of(plane_damage_.begin(), plane_damage_.end(),
-                               [](const DamageRegion& damage) { return !damage.empty(); });
+                   has_plane_damage();
     update_paint_lease_state();
     schedule_deferred_input_drain();
     return PaintReceipt{lease_revision, lease_epoch};
@@ -272,21 +285,68 @@ PaintLeaseSnapshot Window::paint_lease_snapshot() const noexcept {
 bool Window::queue_live_surface_presentation(
     const Control::Ptr& control, std::shared_ptr<LiveSurface> surface) {
     require_ui_thread("live-surface presentation");
-    if (!control || !surface || !control->is_alive() ||
-        control->window_ != this) {
+    if (!control || !surface || !(*control).is_alive() ||
+        (*control).window_ != this) {
         return false;
     }
-    auto [entry, inserted] = live_surface_registrations_.try_emplace(
-        control->runtime_id().value,
-        LiveSurfaceRegistration{control, surface, 0U, 0U, false});
-    if (!inserted && entry->second.surface != surface) {
-        entry->second =
+    std::pair<
+        std::unordered_map<std::uint64_t, LiveSurfaceRegistration>::iterator,
+        bool> insertion = live_surface_registrations_.try_emplace(
+            (*control).runtime_id().value,
+            LiveSurfaceRegistration{control, surface, 0U, 0U, false});
+    std::unordered_map<std::uint64_t, LiveSurfaceRegistration>::iterator entry =
+        insertion.first;
+    const bool inserted = insertion.second;
+    if (!inserted && (*entry).second.surface != surface) {
+        (*entry).second =
             LiveSurfaceRegistration{control, std::move(surface), 0U, 0U, false};
     } else {
-        entry->second.control = control;
-        entry->second.surface = std::move(surface);
+        (*entry).second.control = control;
+        (*entry).second.surface = std::move(surface);
     }
     return true;
+}
+
+void Window::collect_visible_overlay_rectangles(
+    const Control::Ptr& control, std::vector<Rect>& rectangles) const {
+    if (!control || !(*control).is_alive() || (*control).window_ != this ||
+        !(*control).effectively_visible()) {
+        return;
+    }
+    if ((*control).paint_plane_ == PaintPlane::overlay) {
+        const Rect bounds = Rect::intersection(
+            absolute_bounds_of(*control),
+            {0.0, 0.0, client_size_.width, client_size_.height});
+        if (!bounds.empty()) rectangles.push_back(bounds);
+    }
+    for (const Control::Ptr& child : (*control).children_) {
+        collect_visible_overlay_rectangles(child, rectangles);
+    }
+}
+
+std::vector<Rect> Window::subtract_rectangle(Rect source, Rect cover) {
+    std::vector<Rect> fragments;
+    const Rect overlap = Rect::intersection(source, cover);
+    if (overlap.empty()) {
+        fragments.push_back(source);
+        return fragments;
+    }
+    const double source_right = source.x + source.width;
+    const double source_bottom = source.y + source.height;
+    const double overlap_right = overlap.x + overlap.width;
+    const double overlap_bottom = overlap.y + overlap.height;
+    const Rect candidates[] = {
+        {source.x, source.y, source.width, overlap.y - source.y},
+        {source.x, overlap_bottom, source.width,
+         source_bottom - overlap_bottom},
+        {source.x, overlap.y, overlap.x - source.x, overlap.height},
+        {overlap_right, overlap.y, source_right - overlap_right,
+         overlap.height},
+    };
+    for (const Rect& candidate : candidates) {
+        if (!candidate.empty()) fragments.push_back(candidate);
+    }
+    return fragments;
 }
 
 std::vector<LiveSurfacePresentation>
@@ -301,69 +361,29 @@ Window::take_live_surface_presentations() {
     // therefore keep advancing while a menu is open without allowing the live
     // lane to paint over the menu.
     std::vector<Rect> overlay_rectangles;
-    const auto collect_visible_overlays =
-        [this, &overlay_rectangles](const auto& self,
-                                    const Control::Ptr& candidate) -> void {
-            if (!candidate || !candidate->is_alive() ||
-                candidate->window_ != this || !candidate->effectively_visible()) {
-                return;
-            }
-            if (candidate->paint_plane_ == PaintPlane::overlay) {
-                const Rect bounds = Rect::intersection(
-                    absolute_bounds_of(*candidate),
-                    {0.0, 0.0, client_size_.width, client_size_.height});
-                if (!bounds.empty()) overlay_rectangles.push_back(bounds);
-            }
-            for (const Control::Ptr& child : candidate->children_) {
-                self(self, child);
-            }
-        };
-    collect_visible_overlays(collect_visible_overlays, root_);
-    for (const auto& popup : popups_) {
+    collect_visible_overlay_rectangles(root_, overlay_rectangles);
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
         if (popup) {
-            collect_visible_overlays(collect_visible_overlays, popup->popup());
+            collect_visible_overlay_rectangles(
+                (*popup).popup(), overlay_rectangles);
         }
     }
-
-    const auto subtract_rectangle = [](const Rect& source, const Rect& cover) {
-        std::vector<Rect> fragments;
-        const Rect overlap = Rect::intersection(source, cover);
-        if (overlap.empty()) {
-            fragments.push_back(source);
-            return fragments;
-        }
-        const double source_right = source.x + source.width;
-        const double source_bottom = source.y + source.height;
-        const double overlap_right = overlap.x + overlap.width;
-        const double overlap_bottom = overlap.y + overlap.height;
-        const Rect candidates[] = {
-            {source.x, source.y, source.width, overlap.y - source.y},
-            {source.x, overlap_bottom, source.width,
-             source_bottom - overlap_bottom},
-            {source.x, overlap.y, overlap.x - source.x, overlap.height},
-            {overlap_right, overlap.y, source_right - overlap_right,
-             overlap.height},
-        };
-        for (const Rect& candidate : candidates) {
-            if (!candidate.empty()) fragments.push_back(candidate);
-        }
-        return fragments;
-    };
-    for (auto iterator = live_surface_registrations_.begin();
+    for (LiveSurfaceRegistrationMap::iterator iterator =
+             live_surface_registrations_.begin();
          iterator != live_surface_registrations_.end();) {
-        const Control::Ptr control = iterator->second.control.lock();
-        if (!control || !control->is_alive() || control->window_ != this ||
-            !iterator->second.surface) {
+        const Control::Ptr control = (*iterator).second.control.lock();
+        if (!control || !(*control).is_alive() || (*control).window_ != this ||
+            !(*iterator).second.surface) {
             iterator = live_surface_registrations_.erase(iterator);
             continue;
         }
-        if (occluded_ || !popups_.empty() || !control->visible_ ||
-            !control->effectively_visible()) {
+        if (occluded_ || !popups_.empty() || !(*control).visible_ ||
+            !(*control).effectively_visible()) {
             ++iterator;
             continue;
         }
 
-        const LiveSurfaceSnapshot snapshot = iterator->second.surface->snapshot();
+        const LiveSurfaceSnapshot snapshot = (*(*iterator).second.surface).snapshot();
         if (!snapshot.has_frame) {
             ++iterator;
             continue;
@@ -373,15 +393,16 @@ Window::take_live_surface_presentations() {
         Rect clip = Rect::intersection(
             destination, {0.0, 0.0, client_size_.width, client_size_.height});
         bool valid = !destination.empty() && !clip.empty();
-        for (auto ancestor = control->parent(); ancestor && valid && !clip.empty();
-             ancestor = ancestor->parent()) {
-            if (!ancestor->is_alive() || ancestor->window_ != this ||
-                !ancestor->visible_) {
+        for (Control::Ptr ancestor = (*control).parent();
+             ancestor && valid && !clip.empty();
+             ancestor = (*ancestor).parent()) {
+            if (!(*ancestor).is_alive() || (*ancestor).window_ != this ||
+                !(*ancestor).visible_) {
                 valid = false;
                 break;
             }
             const Rect ancestor_bounds = absolute_bounds_of(*ancestor);
-            const Rect viewport = ancestor->child_viewport_rectangle();
+            const Rect viewport = (*ancestor).child_viewport_rectangle();
             clip = Rect::intersection(
                 clip, {ancestor_bounds.x + viewport.x,
                        ancestor_bounds.y + viewport.y,
@@ -396,7 +417,8 @@ Window::take_live_surface_presentations() {
                     if (!Rect::intersection(candidate, overlay).empty()) {
                         clipped_by_overlay = true;
                     }
-                    auto fragments = subtract_rectangle(candidate, overlay);
+                    std::vector<Rect> fragments = Window::subtract_rectangle(
+                        candidate, overlay);
                     remaining.insert(remaining.end(), fragments.begin(),
                                      fragments.end());
                 }
@@ -404,20 +426,20 @@ Window::take_live_surface_presentations() {
                 if (clips.empty()) break;
             }
             const bool same_generation =
-                iterator->second.sampled_epoch == snapshot.epoch &&
-                iterator->second.sampled_generation ==
+                (*iterator).second.sampled_epoch == snapshot.epoch &&
+                (*iterator).second.sampled_generation ==
                     snapshot.published_generation;
             if (!same_generation || clipped_by_overlay ||
-                iterator->second.sampled_with_overlay_clip) {
+                (*iterator).second.sampled_with_overlay_clip) {
                 for (const Rect& visible_clip : clips) {
                     result.push_back(LiveSurfacePresentation{
-                        control->runtime_id(), iterator->second.surface,
+                        (*control).runtime_id(), (*iterator).second.surface,
                         destination, visible_clip});
                 }
             }
-            iterator->second.sampled_epoch = snapshot.epoch;
-            iterator->second.sampled_generation = snapshot.published_generation;
-            iterator->second.sampled_with_overlay_clip = clipped_by_overlay;
+            (*iterator).second.sampled_epoch = snapshot.epoch;
+            (*iterator).second.sampled_generation = snapshot.published_generation;
+            (*iterator).second.sampled_with_overlay_clip = clipped_by_overlay;
         }
         ++iterator;
     }
@@ -460,15 +482,10 @@ DamageRegion Window::take_damage(PaintPlane plane) {
     const std::size_t index = paint_plane_index(plane);
     DamageRegion result = std::move(plane_damage_[index]);
     plane_damage_[index] = {};
-    const bool popup_paint_dirty = std::any_of(
-        popups_.begin(), popups_.end(), [](const auto& popup) {
-            const Control::Ptr overlay = popup->popup();
-            return overlay && has_dirty(overlay->subtree_dirty_, Dirty::paint);
-        });
-    paint_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::paint) ||
+    const bool popup_paint_dirty = has_popup_paint_dirty();
+    paint_dirty_ = has_dirty((*root_).subtree_dirty_, Dirty::paint) ||
                    popup_paint_dirty ||
-                   std::any_of(plane_damage_.begin(), plane_damage_.end(),
-                               [](const DamageRegion& damage) { return !damage.empty(); });
+                   has_plane_damage();
     acknowledge_paint_wake_if_damage_drained();
     return result;
 }

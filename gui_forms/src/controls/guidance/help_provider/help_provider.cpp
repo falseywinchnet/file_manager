@@ -30,13 +30,17 @@ public:
     AcceleratorToken token;
 };
 
+bool HelpProvider::FocusedHelpAccelerator::operator()() const {
+    return provider != nullptr && (*provider).request_focused_help();
+}
+
 HelpProvider::HelpProvider(Window& window)
     : window_lifetime_(window.lifetime_),
       provider_id_(next_help_provider_id.fetch_add(1U)) {
     window.verify_access("HelpProvider construction");
     accelerator_ = std::make_unique<AcceleratorHolder>(window.register_accelerator(
         *this, KeyGesture{PhysicalKey::f1, Modifier::none},
-        [this] { return request_focused_help(); }));
+        FocusedHelpAccelerator{this}));
 }
 
 HelpProvider::~HelpProvider() {
@@ -51,8 +55,8 @@ HelpProvider::~HelpProvider() {
 }
 
 Window* HelpProvider::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 void HelpProvider::require_access(std::string_view operation) const {
@@ -63,25 +67,26 @@ void HelpProvider::require_access(std::string_view operation) const {
     if (!owner) {
         throw std::logic_error("GUI.Forms cannot use a HelpProvider after Window shutdown");
     }
-    owner->verify_access(operation);
+    (*owner).verify_access(operation);
 }
 
 bool HelpProvider::can_extend(const std::shared_ptr<Control>& target) const {
     Window* owner = bound_window();
-    if (!owner || !target || !target->is_alive()) return false;
-    owner->verify_access("HelpProvider target query");
-    return target->attached_window() == owner &&
-           owner->find(target->stable_id().value()).get() == target.get();
+    if (!owner || !target || !(*target).is_alive()) return false;
+    (*owner).verify_access("HelpProvider target query");
+    return (*target).attached_window() == owner &&
+           (*owner).find((*target).stable_id().value()).get() == target.get();
 }
 
 HelpProvider::Entry* HelpProvider::find_entry(const Control& target) {
-    const auto found = entries_.find(target.runtime_id().value);
-    return found == entries_.end() ? nullptr : found->second.get();
+    const EntryMap::iterator found = entries_.find(target.runtime_id().value);
+    return found == entries_.end() ? nullptr : (*found).second.get();
 }
 
 const HelpProvider::Entry* HelpProvider::find_entry(const Control& target) const {
-    const auto found = entries_.find(target.runtime_id().value);
-    return found == entries_.end() ? nullptr : found->second.get();
+    const EntryMap::const_iterator found =
+        entries_.find(target.runtime_id().value);
+    return found == entries_.end() ? nullptr : (*found).second.get();
 }
 
 HelpProvider::Entry& HelpProvider::require_entry(
@@ -91,10 +96,10 @@ HelpProvider::Entry& HelpProvider::require_entry(
             "GUI.Forms HelpProvider target must be live and attached to its Window");
     }
     if (Entry* existing = find_entry(*target)) return *existing;
-    auto entry = std::make_unique<Entry>();
-    entry->target = target;
+    std::unique_ptr<gui_forms::HelpProvider::Entry> entry = std::make_unique<Entry>();
+    (*entry).target = target;
     Entry& result = *entry;
-    entries_.emplace(target->runtime_id().value, std::move(entry));
+    entries_.emplace((*target).runtime_id().value, std::move(entry));
     return result;
 }
 
@@ -104,8 +109,8 @@ bool HelpProvider::entry_effective(const Entry& entry) const noexcept {
 }
 
 void HelpProvider::publish_semantics(Entry& entry) {
-    const auto target = entry.target.lock();
-    if (!target || !target->is_alive() || target->attached_window() != bound_window()) {
+    const std::shared_ptr<gui_forms::Control> target = entry.target.lock();
+    if (!target || !(*target).is_alive() || (*target).attached_window() != bound_window()) {
         return;
     }
     std::string description;
@@ -113,9 +118,9 @@ void HelpProvider::publish_semantics(Entry& entry) {
         description = entry.help_string.empty() ? entry.keyword : entry.help_string;
     }
     if (description.empty()) {
-        target->clear_provider_help(provider_id_);
+        (*target).clear_provider_help(provider_id_);
     } else {
-        target->set_provider_help(provider_id_, std::move(description));
+        (*target).set_provider_help(provider_id_, std::move(description));
     }
 }
 
@@ -129,13 +134,13 @@ void HelpProvider::set_help_string(const std::shared_ptr<Control>& target,
     if (entry.help_string == text) return;
     entry.help_string = std::move(text);
     publish_semantics(entry);
-    erase_if_empty(target->runtime_id().value);
+    erase_if_empty((*target).runtime_id().value);
 }
 
 std::string HelpProvider::help_string(const Control& target) const {
-    if (Window* owner = bound_window()) owner->verify_access("HelpProvider string query");
+    if (Window* owner = bound_window()) (*owner).verify_access("HelpProvider string query");
     const Entry* entry = find_entry(target);
-    return entry ? entry->help_string : std::string{};
+    return entry ? (*entry).help_string : std::string{};
 }
 
 void HelpProvider::set_help_keyword(const std::shared_ptr<Control>& target,
@@ -148,13 +153,13 @@ void HelpProvider::set_help_keyword(const std::shared_ptr<Control>& target,
     if (entry.keyword == keyword) return;
     entry.keyword = std::move(keyword);
     publish_semantics(entry);
-    erase_if_empty(target->runtime_id().value);
+    erase_if_empty((*target).runtime_id().value);
 }
 
 std::string HelpProvider::help_keyword(const Control& target) const {
-    if (Window* owner = bound_window()) owner->verify_access("HelpProvider keyword query");
+    if (Window* owner = bound_window()) (*owner).verify_access("HelpProvider keyword query");
     const Entry* entry = find_entry(target);
-    return entry ? entry->keyword : std::string{};
+    return entry ? (*entry).keyword : std::string{};
 }
 
 void HelpProvider::set_help_navigator(const std::shared_ptr<Control>& target,
@@ -165,13 +170,13 @@ void HelpProvider::set_help_navigator(const std::shared_ptr<Control>& target,
     }
     Entry& entry = require_entry(target);
     entry.navigator = navigator;
-    erase_if_empty(target->runtime_id().value);
+    erase_if_empty((*target).runtime_id().value);
 }
 
 HelpNavigator HelpProvider::help_navigator(const Control& target) const {
-    if (Window* owner = bound_window()) owner->verify_access("HelpProvider navigator query");
+    if (Window* owner = bound_window()) (*owner).verify_access("HelpProvider navigator query");
     const Entry* entry = find_entry(target);
-    return entry ? entry->navigator : HelpNavigator::topic;
+    return entry ? (*entry).navigator : HelpNavigator::topic;
 }
 
 void HelpProvider::set_show_help(const std::shared_ptr<Control>& target, bool show) {
@@ -183,7 +188,7 @@ void HelpProvider::set_show_help(const std::shared_ptr<Control>& target, bool sh
 }
 
 bool HelpProvider::show_help(const Control& target) const {
-    if (Window* owner = bound_window()) owner->verify_access("HelpProvider show-help query");
+    if (Window* owner = bound_window()) (*owner).verify_access("HelpProvider show-help query");
     const Entry* entry = find_entry(target);
     return entry && entry_effective(*entry);
 }
@@ -191,18 +196,19 @@ bool HelpProvider::show_help(const Control& target) const {
 void HelpProvider::reset_show_help(const Control& target) {
     require_access("HelpProvider show-help reset");
     Entry* entry = find_entry(target);
-    if (!entry || !entry->show_help.has_value()) return;
-    entry->show_help.reset();
+    if (!entry || !(*entry).show_help.has_value()) return;
+    (*entry).show_help.reset();
     publish_semantics(*entry);
     erase_if_empty(target.runtime_id().value);
 }
 
 void HelpProvider::clear() {
     require_access("HelpProvider clear");
-    for (auto& [id, entry] : entries_) {
-        static_cast<void>(id);
-        if (const auto target = entry->target.lock(); target && target->is_alive()) {
-            target->clear_provider_help(provider_id_);
+    for (std::pair<const std::uint64_t, std::unique_ptr<Entry>>& mapped_entry :
+         entries_) {
+        std::unique_ptr<Entry>& entry = mapped_entry.second;
+        if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {
+            (*target).clear_provider_help(provider_id_);
         }
     }
     entries_.clear();
@@ -229,16 +235,16 @@ bool HelpProvider::request_help(const std::shared_ptr<Control>& target,
     const Entry* entry = find_entry(*target);
     if (!entry || !entry_effective(*entry)) return false;
     if (keyboard_initiated) {
-        const Rect bounds = target->absolute_bounds();
+        const Rect bounds = (*target).absolute_bounds();
         position = {bounds.x + bounds.width * 0.5,
                     bounds.y + bounds.height * 0.5};
     }
     HelpRequestEvent request{
-        std::string(target->stable_id().value()), position, help_namespace_,
-        entry->help_string, entry->keyword, entry->navigator,
+        std::string((*target).stable_id().value()), position, help_namespace_,
+        (*entry).help_string, (*entry).keyword, (*entry).navigator,
         keyboard_initiated, false};
     ++request_count_;
-    target->help_requested_.emit(request);
+    (*target).help_requested_.emit(request);
     if (!request.handled) help_requested_.emit(request);
     if (request.handled) ++handled_request_count_;
     return request.handled;
@@ -247,9 +253,9 @@ bool HelpProvider::request_help(const std::shared_ptr<Control>& target,
 bool HelpProvider::request_focused_help() {
     Window* owner = bound_window();
     if (!owner) return false;
-    std::shared_ptr<Control> target = owner->focused_control();
-    if (!target) target = owner->root();
-    for (auto current = target; current; current = current->parent()) {
+    std::shared_ptr<Control> target = (*owner).focused_control();
+    if (!target) target = (*owner).root();
+    for (std::shared_ptr<Control> current = target; current; current = (*current).parent()) {
         const Entry* entry = find_entry(*current);
         if (entry && entry_effective(*entry)) {
             return request_help(current, {}, true);
@@ -259,13 +265,13 @@ bool HelpProvider::request_focused_help() {
 }
 
 void HelpProvider::erase_if_empty(std::uint64_t runtime_id) {
-    const auto found = entries_.find(runtime_id);
+    const EntryMap::iterator found = entries_.find(runtime_id);
     if (found == entries_.end()) return;
-    const Entry& entry = *found->second;
+    const Entry& entry = *(*found).second;
     if (entry.help_string.empty() && entry.keyword.empty() &&
         entry.navigator == HelpNavigator::topic && !entry.show_help.has_value()) {
-        if (const auto target = entry.target.lock(); target && target->is_alive()) {
-            target->clear_provider_help(provider_id_);
+        if (const std::shared_ptr<gui_forms::Control> target = entry.target.lock(); target && (*target).is_alive()) {
+            (*target).clear_provider_help(provider_id_);
         }
         entries_.erase(found);
     }
@@ -276,24 +282,26 @@ HelpProviderSnapshot HelpProvider::snapshot() const noexcept {
     result.mappings = entries_.size();
     result.requests = request_count_;
     result.handled_requests = handled_request_count_;
-    result.effective_mappings = static_cast<std::size_t>(std::count_if(
-        entries_.begin(), entries_.end(), [this](const auto& pair) {
-            const auto target = pair.second->target.lock();
-            return target && target->is_alive() && entry_effective(*pair.second);
-        }));
+    for (const EntryMap::value_type& pair : entries_) {
+        const std::shared_ptr<Control> target = (*pair.second).target.lock();
+        if (target && (*target).is_alive() && entry_effective(*pair.second)) {
+            ++result.effective_mappings;
+        }
+    }
     return result;
 }
 
 void HelpProvider::verify_dispose_thread() {
-    if (Window* owner = bound_window()) owner->verify_access("HelpProvider disposal");
+    if (Window* owner = bound_window()) (*owner).verify_access("HelpProvider disposal");
 }
 
 void HelpProvider::on_dispose() noexcept {
     try {
-        for (auto& [id, entry] : entries_) {
-            static_cast<void>(id);
-            if (const auto target = entry->target.lock(); target && target->is_alive()) {
-                target->clear_provider_help(provider_id_);
+        for (std::pair<const std::uint64_t, std::unique_ptr<Entry>>&
+                 mapped_entry : entries_) {
+            std::unique_ptr<Entry>& entry = mapped_entry.second;
+            if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {
+                (*target).clear_provider_help(provider_id_);
             }
         }
     } catch (...) {

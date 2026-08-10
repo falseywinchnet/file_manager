@@ -143,6 +143,9 @@ protected:
     bool process_mnemonic_self(char32_t character) override;
 
 private:
+    [[nodiscard]] bool should_serialize_image() const noexcept;
+    void on_image_list_changed(const ImageListChange& change);
+
     std::string text_;
     FontSpec font_{FontRole::control, 12.0, 400, false, 0.24};
     std::optional<BasicControlStyle> style_override_;

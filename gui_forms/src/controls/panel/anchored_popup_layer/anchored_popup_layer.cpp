@@ -22,7 +22,7 @@ AnchoredPopupLayer::AnchoredPopupLayer(
 }
 
 void AnchoredPopupLayer::validate_anchor(const Control::Ptr& anchor) const {
-    if (!anchor || !anchor->is_alive()) {
+    if (!anchor || !(*anchor).is_alive()) {
         throw std::invalid_argument("anchored popup requires a live owner control");
     }
 }
@@ -39,13 +39,13 @@ void AnchoredPopupLayer::set_anchor(Control::Ptr anchor) {
 void AnchoredPopupLayer::set_content(Control::Ptr content) {
     require_mutable();
     if (content == content_) return;
-    if (!content || !content->is_alive() || content->parent() ||
-        content->attached()) {
+    if (!content || !(*content).is_alive() || (*content).parent() ||
+        (*content).attached()) {
         throw std::invalid_argument(
             "anchored popup replacement content must be live and detached");
     }
     if (content_) {
-        static_cast<void>(remove_child(content_->runtime_id()));
+        static_cast<void>(remove_child((*content_).runtime_id()));
     }
     content_ = std::move(content);
     add_child(content_);
@@ -80,26 +80,26 @@ void AnchoredPopupLayer::set_dismiss_on_escape(bool enabled) {
 }
 
 Size AnchoredPopupLayer::measure(Size available) {
-    if (content_) static_cast<void>(content_->measure(placement_.preferred_size));
+    if (content_) static_cast<void>((*content_).measure(placement_.preferred_size));
     return available;
 }
 
 void AnchoredPopupLayer::arrange(Rect final_bounds) {
     Rect layer_bounds = final_bounds;
     if (Window* owner = window()) {
-        const Size client = owner->client_size();
+        const Size client = (*owner).client_size();
         layer_bounds = {0.0, 0.0, client.width, client.height};
     }
     arrange_self(layer_bounds);
     const Control::Ptr anchor = anchor_.lock();
-    if (!content_ || !anchor || !anchor->attached() ||
-        !anchor->effectively_visible()) {
+    if (!content_ || !anchor || !(*anchor).attached() ||
+        !(*anchor).effectively_visible()) {
         if (content_) set_child_layout(content_, {});
         resolved_ = {};
         return;
     }
     resolved_ = resolve_anchored_popup(
-        anchor->absolute_bounds(), {layer_bounds.width, layer_bounds.height},
+        (*anchor).absolute_bounds(), {layer_bounds.width, layer_bounds.height},
         placement_);
     set_child_layout(content_, resolved_.bounds);
 }

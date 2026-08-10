@@ -295,7 +295,7 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
             if (saw_trns || saw_idat) {
                 return {.error = ImageResourceError::invalid_transparency};
             }
-            const auto color = metadata.color_type;
+            const PngColorType color = metadata.color_type;
             const bool valid =
                 (color == PngColorType::grayscale && length == 2U) ||
                 (color == PngColorType::truecolor && length == 6U) ||

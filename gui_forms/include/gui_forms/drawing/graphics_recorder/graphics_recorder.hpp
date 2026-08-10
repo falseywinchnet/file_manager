@@ -29,8 +29,10 @@ struct GraphicsState final {
 
 struct GraphicsStateToken final {
     std::uint64_t value{};
-    friend constexpr bool operator==(const GraphicsStateToken&,
-                                     const GraphicsStateToken&) = default;
+    friend constexpr bool operator==(const GraphicsStateToken& left,
+                                     const GraphicsStateToken& right) noexcept {
+        return left.value == right.value;
+    }
 };
 
 enum class CommandKind : std::uint8_t {

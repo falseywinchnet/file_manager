@@ -16,6 +16,7 @@ Package service coordinates root policy, scanning, exact queries, and immutable 
 
 - `filemanager/engine/api`
 - `filemanager/engine/internal/catalog`
+- `filemanager/engine/internal/deployment`
 - `filemanager/engine/internal/exact`
 - `filemanager/engine/internal/generation`
 - `filemanager/engine/internal/live`
@@ -94,7 +95,7 @@ No declaration documentation comment is present.
 Kind: `function`. Source: `internal/service/lifecycle.go:38`.
 
 ```go
-func newServiceLifecycle() (serviceLifecycle, error)
+func newServiceLifecycle() (*serviceLifecycle, error)
 ```
 
 No declaration documentation comment is present.
@@ -181,7 +182,7 @@ Configuration returns the enacted configuration and a stable digest. Root curren
 
 ### Service.Inspect
 
-Kind: `method`. Source: `internal/service/query.go:99`.
+Kind: `method`. Source: `internal/service/query.go:107`.
 
 ```go
 func (s *Service) Inspect(ctx context.Context, ref api.ObjectRef) (api.Result, error)
@@ -191,7 +192,7 @@ Inspect returns one exact record and its stored provenance. A hard-linked object
 
 ### Service.Integrity
 
-Kind: `method`. Source: `internal/service/query.go:133`.
+Kind: `method`. Source: `internal/service/query.go:141`.
 
 ```go
 func (s *Service) Integrity(ctx context.Context) (api.IntegrityReport, error)
@@ -231,7 +232,7 @@ PlanRoots validates and canonicalizes an already-authorized root policy without 
 
 ### Service.Query
 
-Kind: `method`. Source: `internal/service/query.go:15`.
+Kind: `method`. Source: `internal/service/query.go:16`.
 
 ```go
 func (s *Service) Query(ctx context.Context, query api.Query) (api.QueryResponse, error)
@@ -241,7 +242,7 @@ Query searches one committed exact catalogue generation and returns evidence-bea
 
 ### Service.QueryLive
 
-Kind: `method`. Source: `internal/service/query.go:73`.
+Kind: `method`. Source: `internal/service/query.go:74`.
 
 ```go
 func (s *Service) QueryLive(ctx context.Context, query api.LiveQuery) (api.LiveQueryResponse, error)
@@ -251,7 +252,7 @@ QueryLive searches an already-approved filesystem scope without consulting or cr
 
 ### Service.Rebuild
 
-Kind: `method`. Source: `internal/service/reconciliation.go:119`.
+Kind: `method`. Source: `internal/service/reconciliation.go:137`.
 
 ```go
 func (s *Service) Rebuild(ctx context.Context, rootID api.RootID) (api.ReconcileReport, error)
@@ -261,7 +262,7 @@ Rebuild performs a full authoritative scan and publishes it through the same imm
 
 ### Service.Reconcile
 
-Kind: `method`. Source: `internal/service/reconciliation.go:14`.
+Kind: `method`. Source: `internal/service/reconciliation.go:16`.
 
 ```go
 func (s *Service) Reconcile(ctx context.Context, rootID api.RootID) (api.ReconcileReport, error)
@@ -501,7 +502,7 @@ No declaration documentation comment is present.
 
 ### Service.reconcile
 
-Kind: `method`. Source: `internal/service/reconciliation.go:23`.
+Kind: `method`. Source: `internal/service/reconciliation.go:25`.
 
 ```go
 func (s *Service) reconcile(ctx context.Context, rootID api.RootID, forcePublication bool) (api.ReconcileReport, error)

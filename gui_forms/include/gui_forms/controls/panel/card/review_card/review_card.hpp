@@ -25,8 +25,15 @@ struct ReviewRecord final {
     std::string verdict;
     ReviewDisposition disposition{ReviewDisposition::neutral};
 
-    friend bool operator==(const ReviewRecord&,
-                           const ReviewRecord&) = default;
+    friend bool operator==(const ReviewRecord& left,
+                           const ReviewRecord& right) noexcept(noexcept(
+        left.key == right.key && left.title == right.title &&
+        left.summary == right.summary && left.verdict == right.verdict &&
+        left.disposition == right.disposition)) {
+        return left.key == right.key && left.title == right.title &&
+               left.summary == right.summary && left.verdict == right.verdict &&
+               left.disposition == right.disposition;
+    }
 };
 
 // A typed, content-agnostic review projection over Card. It owns theme-aware

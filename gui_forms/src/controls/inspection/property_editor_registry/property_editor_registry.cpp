@@ -51,10 +51,10 @@ void PropertyEditorRegistry::clear_kind(BindingValueKind kind) {
 
 std::optional<std::string> PropertyEditorRegistry::factory_for(
     BindingValueKind kind) const {
-    const auto found = kind_mappings_.find(kind);
+    const KindMap::const_iterator found = kind_mappings_.find(kind);
     return found == kind_mappings_.end()
         ? std::optional<std::string>{}
-        : std::optional<std::string>{found->second};
+        : std::optional<std::string>{(*found).second};
 }
 
 std::optional<PropertyEditorBinding> PropertyEditorRegistry::create(
@@ -65,11 +65,12 @@ std::optional<PropertyEditorBinding> PropertyEditorRegistry::create(
     std::string service = explicit_service
         ? request.descriptor.editor_name : std::string{};
     if (service.empty()) {
-        const auto mapped = factory_for(binding_value_kind(request.value));
+        const std::optional<std::string> mapped = factory_for(binding_value_kind(request.value));
         if (mapped) service = *mapped;
     }
     if (service.empty()) return {};
-    const auto found = factories_.find(canonical_binding_name(service));
+    const FactoryMap::const_iterator found =
+        factories_.find(canonical_binding_name(service));
     if (found == factories_.end()) {
         if (explicit_service) {
             throw std::invalid_argument(
@@ -77,11 +78,11 @@ std::optional<PropertyEditorBinding> PropertyEditorRegistry::create(
         }
         return {};
     }
-    auto result = found->second(request);
+    std::optional<gui_forms::PropertyEditorBinding> result = (*found).second(request);
     if (!result) return {};
-    if (!result->control || !result->control->is_alive() ||
-        result->control->parent() || result->control->attached_window() ||
-        !result->synchronize || !result->connect_committed) {
+    if (!(*result).control || !(*(*result).control).is_alive() ||
+        (*(*result).control).parent() || (*(*result).control).attached_window() ||
+        !(*result).synchronize || !(*result).connect_committed) {
         throw std::invalid_argument(
             "Property editor factory returned an invalid retained binding");
     }
@@ -89,41 +90,41 @@ std::optional<PropertyEditorBinding> PropertyEditorRegistry::create(
 }
 
 std::shared_ptr<PropertyEditorRegistry> PropertyEditorRegistry::create_default() {
-    auto result = std::make_shared<PropertyEditorRegistry>();
-    static_cast<void>(result->register_factory(
+    std::shared_ptr<gui_forms::PropertyEditorRegistry> result = std::make_shared<PropertyEditorRegistry>();
+    static_cast<void>((*result).register_factory(
         "numeric-up-down", [](const PropertyEditorRequest& request)
             -> std::optional<PropertyEditorBinding> {
-            const auto number = binding_value_to_number(request.value);
+            const std::optional<double> number = binding_value_to_number(request.value);
             if (!number) return {};
-            auto editor = make_control<NumericUpDown>(StableId(request.stable_id));
-            editor->set_range(std::numeric_limits<double>::lowest(),
+            std::shared_ptr<gui_forms::NumericUpDown> editor = make_control<NumericUpDown>(StableId(request.stable_id));
+            (*editor).set_range(std::numeric_limits<double>::lowest(),
                               std::numeric_limits<double>::max());
-            editor->set_increment(0.1);
-            editor->set_decimal_places(4U);
-            editor->set_value(*number);
-            editor->set_enabled(request.writable);
-            editor->set_accessible_name(request.property_path);
-            editor->set_accessible_description(request.descriptor.description);
-            auto synchronizing = std::make_shared<bool>(false);
+            (*editor).set_increment(0.1);
+            (*editor).set_decimal_places(4U);
+            (*editor).set_value(*number);
+            (*editor).set_enabled(request.writable);
+            (*editor).set_accessible_name(request.property_path);
+            (*editor).set_accessible_description(request.descriptor.description);
+            std::shared_ptr<bool> synchronizing = std::make_shared<bool>(false);
             PropertyEditorBinding binding;
             binding.control = editor;
             binding.synchronize =
                 [weak = std::weak_ptr<NumericUpDown>(editor), synchronizing](
                     const BindingValue& value) {
-                    const auto retained = weak.lock();
-                    const auto converted = binding_value_to_number(value);
+                    const std::shared_ptr<gui_forms::NumericUpDown> retained = weak.lock();
+                    const std::optional<double> converted = binding_value_to_number(value);
                     if (!retained || !converted) return;
                     *synchronizing = true;
-                    retained->set_value(*converted);
+                    (*retained).set_value(*converted);
                     *synchronizing = false;
                 };
             binding.connect_committed =
                 [weak = std::weak_ptr<NumericUpDown>(editor), synchronizing](
                     Component& owner,
                     std::function<void(BindingValue)> committed) {
-                    const auto retained = weak.lock();
+                    const std::shared_ptr<gui_forms::NumericUpDown> retained = weak.lock();
                     return retained
-                        ? retained->value_changed().subscribe(
+                        ? (*retained).value_changed().subscribe(
                               owner,
                               [synchronizing,
                                committed = std::move(committed)](double value) {
@@ -135,47 +136,47 @@ std::shared_ptr<PropertyEditorRegistry> PropertyEditorRegistry::create_default()
                 };
             return binding;
         }));
-    static_cast<void>(result->register_factory(
+    static_cast<void>((*result).register_factory(
         "flags-value", [](const PropertyEditorRequest& request)
             -> std::optional<PropertyEditorBinding> {
             if (!request.descriptor.enumeration ||
-                !request.descriptor.enumeration->flags) return {};
-            const auto* value = std::get_if<PropertyEnumValue>(&request.value);
+                !(*request.descriptor.enumeration).flags) return {};
+            const gui_forms::PropertyEnumValue* value = std::get_if<PropertyEnumValue>(&request.value);
             if (!value) return {};
             const bool has_bit = std::any_of(
-                request.descriptor.enumeration->choices.begin(),
-                request.descriptor.enumeration->choices.end(),
+                (*request.descriptor.enumeration).choices.begin(),
+                (*request.descriptor.enumeration).choices.end(),
                 [](const PropertyEnumChoice& choice) {
                     return choice.value > 0 && std::has_single_bit(
                         static_cast<std::uint64_t>(choice.value));
                 });
             if (!has_bit) return {};
-            auto editor = make_control<FlagsValueEditor>(
+            std::shared_ptr<gui_forms::FlagsValueEditor> editor = make_control<FlagsValueEditor>(
                 StableId(request.stable_id), *request.descriptor.enumeration,
                 *value);
-            editor->set_enabled(request.writable);
-            editor->set_accessible_name(request.property_path);
-            editor->set_accessible_description(request.descriptor.description);
-            auto synchronizing = std::make_shared<bool>(false);
+            (*editor).set_enabled(request.writable);
+            (*editor).set_accessible_name(request.property_path);
+            (*editor).set_accessible_description(request.descriptor.description);
+            std::shared_ptr<bool> synchronizing = std::make_shared<bool>(false);
             PropertyEditorBinding binding;
             binding.control = editor;
             binding.synchronize =
                 [weak = std::weak_ptr<FlagsValueEditor>(editor), synchronizing](
                     const BindingValue& value) {
-                    const auto retained = weak.lock();
-                    const auto* flags = std::get_if<PropertyEnumValue>(&value);
+                    const std::shared_ptr<gui_forms::FlagsValueEditor> retained = weak.lock();
+                    const gui_forms::PropertyEnumValue* flags = std::get_if<PropertyEnumValue>(&value);
                     if (!retained || !flags) return;
                     *synchronizing = true;
-                    retained->set_value(*flags);
+                    (*retained).set_value(*flags);
                     *synchronizing = false;
                 };
             binding.connect_committed =
                 [weak = std::weak_ptr<FlagsValueEditor>(editor), synchronizing](
                     Component& owner,
                     std::function<void(BindingValue)> committed) {
-                    const auto retained = weak.lock();
+                    const std::shared_ptr<gui_forms::FlagsValueEditor> retained = weak.lock();
                     return retained
-                        ? retained->value_changed().subscribe(
+                        ? (*retained).value_changed().subscribe(
                               owner,
                               [synchronizing,
                                committed = std::move(committed)](
@@ -188,41 +189,41 @@ std::shared_ptr<PropertyEditorRegistry> PropertyEditorRegistry::create_default()
                 };
             return binding;
         }));
-    static_cast<void>(result->register_factory(
+    static_cast<void>((*result).register_factory(
         "color-value", [](const PropertyEditorRequest& request)
             -> std::optional<PropertyEditorBinding> {
-            const auto* value = std::get_if<Color>(&request.value);
+            const gui_forms::Color* value = std::get_if<Color>(&request.value);
             if (!value) return {};
-            auto editor = make_control<ColorValueEditor>(
+            std::shared_ptr<gui_forms::ColorValueEditor> editor = make_control<ColorValueEditor>(
                 StableId(request.stable_id), *value);
-            editor->set_enabled(request.writable);
-            editor->set_accessible_name(request.property_path);
-            editor->set_accessible_description(request.descriptor.description);
-            if (editor->editor()) {
-                editor->editor()->set_accessible_name(request.property_path);
-                editor->editor()->set_accessible_description(
+            (*editor).set_enabled(request.writable);
+            (*editor).set_accessible_name(request.property_path);
+            (*editor).set_accessible_description(request.descriptor.description);
+            if ((*editor).editor()) {
+                (*(*editor).editor()).set_accessible_name(request.property_path);
+                (*(*editor).editor()).set_accessible_description(
                     request.descriptor.description);
             }
-            auto synchronizing = std::make_shared<bool>(false);
+            std::shared_ptr<bool> synchronizing = std::make_shared<bool>(false);
             PropertyEditorBinding binding;
             binding.control = editor;
             binding.synchronize =
                 [weak = std::weak_ptr<ColorValueEditor>(editor), synchronizing](
                     const BindingValue& value) {
-                    const auto retained = weak.lock();
-                    const auto* color = std::get_if<Color>(&value);
+                    const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock();
+                    const gui_forms::Color* color = std::get_if<Color>(&value);
                     if (!retained || !color) return;
                     *synchronizing = true;
-                    retained->set_value(*color);
+                    (*retained).set_value(*color);
                     *synchronizing = false;
                 };
             binding.connect_committed =
                 [weak = std::weak_ptr<ColorValueEditor>(editor), synchronizing](
                     Component& owner,
                     std::function<void(BindingValue)> committed) {
-                    const auto retained = weak.lock();
+                    const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock();
                     return retained
-                        ? retained->value_changed().subscribe(
+                        ? (*retained).value_changed().subscribe(
                               owner,
                               [synchronizing,
                                committed = std::move(committed)](Color value) {
@@ -236,17 +237,17 @@ std::shared_ptr<PropertyEditorRegistry> PropertyEditorRegistry::create_default()
                 [weak = std::weak_ptr<ColorValueEditor>(editor)](
                     Component& owner,
                     std::function<void(const PropertyEditorInputError&)> failed) {
-                    const auto retained = weak.lock();
+                    const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock();
                     return retained
-                        ? retained->edit_failed().subscribe(owner,
+                        ? (*retained).edit_failed().subscribe(owner,
                               std::move(failed))
                         : SubscriptionToken{};
                 };
             return binding;
         }));
-    result->map_kind(BindingValueKind::number, "numeric-up-down");
-    result->map_kind(BindingValueKind::enumeration, "flags-value");
-    result->map_kind(BindingValueKind::color, "color-value");
+    (*result).map_kind(BindingValueKind::number, "numeric-up-down");
+    (*result).map_kind(BindingValueKind::enumeration, "flags-value");
+    (*result).map_kind(BindingValueKind::color, "color-value");
     return result;
 }
 

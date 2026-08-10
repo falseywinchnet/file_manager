@@ -1,0 +1,37 @@
+{
+  "rewriteCount": 5,
+  "rewrites": [
+    {
+      "baseOffset": 9990,
+      "fileSize": 33750,
+      "operatorOffset": 9995,
+      "path": "src/render/skia/raster/skia_raster.cpp"
+    },
+    {
+      "baseOffset": 10801,
+      "fileSize": 33750,
+      "operatorOffset": 10806,
+      "path": "src/render/skia/raster/skia_raster.cpp"
+    },
+    {
+      "baseOffset": 27129,
+      "fileSize": 33750,
+      "operatorOffset": 27134,
+      "path": "src/render/skia/raster/skia_raster.cpp"
+    },
+    {
+      "baseOffset": 27366,
+      "fileSize": 33750,
+      "operatorOffset": 27372,
+      "path": "src/render/skia/raster/skia_raster.cpp"
+    },
+    {
+      "baseOffset": 28063,
+      "fileSize": 33750,
+      "operatorOffset": 28068,
+      "path": "src/render/skia/raster/skia_raster.cpp"
+    }
+  ],
+  "schema": "gui.forms.pointer-arrow-rewrites/v1",
+  "sourceRoot": "gui_forms"
+}

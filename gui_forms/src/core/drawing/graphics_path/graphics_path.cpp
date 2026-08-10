@@ -176,16 +176,10 @@ void GraphicsPath::add_pie(RectF bounds, double start_angle,
     if (5U > maximum_elements - elements_.size()) {
         throw std::length_error("GUI.Drawing path element limit exceeded");
     }
-    constexpr double degrees_to_radians = 0.01745329251994329576923690768489;
     const PointF center{bounds.x + bounds.width * 0.5,
                         bounds.y + bounds.height * 0.5};
-    const auto at = [&](double angle) {
-        const double radians = angle * degrees_to_radians;
-        return PointF{center.x + bounds.width * 0.5 * std::cos(radians),
-                      center.y + bounds.height * 0.5 * std::sin(radians)};
-    };
-    const PointF start = at(start_angle);
-    const PointF end = at(start_angle + sweep_angle);
+    const PointF start = point_on_ellipse(bounds, start_angle);
+    const PointF end = point_on_ellipse(bounds, start_angle + sweep_angle);
     PathElement radial_start{PathVerb::line};
     radial_start.first = center;
     radial_start.second = start;
@@ -340,16 +334,13 @@ std::vector<PointF> GraphicsPath::path_points() const {
             const double center_y = element.rect.y + element.rect.height / 2.0;
             const double radius_x = element.rect.width / 2.0;
             const double radius_y = element.rect.height / 2.0;
-            const auto parameter_angle = [&](double geometric_degrees) {
-                const double geometric = geometric_degrees * degrees_to_radians;
-                return std::atan2(radius_x * std::sin(geometric),
-                                  radius_y * std::cos(geometric));
-            };
             constexpr double two_pi = 6.283185307179586476925286766559;
             constexpr double half_pi = 1.5707963267948966192313216916398;
             const double sweep = std::clamp(element.sweep_angle, -360.0, 360.0);
-            double start = parameter_angle(element.start_angle);
-            double finish = parameter_angle(element.start_angle + sweep);
+            double start = ellipse_parameter_angle(
+                radius_x, radius_y, element.start_angle);
+            double finish = ellipse_parameter_angle(
+                radius_x, radius_y, element.start_angle + sweep);
             if (sweep > 0.0) {
                 while (finish <= start) finish += two_pi;
                 if (sweep == 360.0) finish = start + two_pi;
@@ -357,11 +348,8 @@ std::vector<PointF> GraphicsPath::path_points() const {
                 while (finish >= start) finish -= two_pi;
                 if (sweep == -360.0) finish = start - two_pi;
             }
-            const auto point_at = [&](double parameter) {
-                return PointF{center_x + radius_x * std::cos(parameter),
-                              center_y + radius_y * std::sin(parameter)};
-            };
-            result.push_back(point_at(start));
+            result.push_back(ellipse_point(center_x, center_y, radius_x,
+                                           radius_y, start));
             while ((sweep > 0.0 && start < finish) ||
                    (sweep < 0.0 && start > finish)) {
                 const double delta = sweep > 0.0
@@ -369,8 +357,10 @@ std::vector<PointF> GraphicsPath::path_points() const {
                     : std::max(-half_pi, finish - start);
                 const double end = start + delta;
                 const double alpha = 4.0 / 3.0 * std::tan(delta / 4.0);
-                const PointF first = point_at(start);
-                const PointF last = point_at(end);
+                const PointF first = ellipse_point(
+                    center_x, center_y, radius_x, radius_y, start);
+                const PointF last = ellipse_point(
+                    center_x, center_y, radius_x, radius_y, end);
                 result.push_back({first.x - alpha * radius_x * std::sin(start),
                                   first.y + alpha * radius_y * std::cos(start)});
                 result.push_back({last.x + alpha * radius_x * std::sin(end),
@@ -390,62 +380,42 @@ std::vector<PointF> GraphicsPath::path_points() const {
 
 std::unique_ptr<GraphicsPath> GraphicsPath::clone() const {
     require_alive();
-    auto result = std::make_unique<GraphicsPath>(fill_mode_);
-    result->elements_ = elements_;
+    std::unique_ptr<gui_drawing::GraphicsPath> result = std::make_unique<GraphicsPath>(fill_mode_);
+    (*result).elements_ = elements_;
     return result;
 }
 
 RectF GraphicsPath::bounds() const {
     require_alive();
-    bool any = false;
-    double left{};
-    double top{};
-    double right{};
-    double bottom{};
-    const auto include_point = [&](PointF point) {
-        if (!any) {
-            left = right = point.x;
-            top = bottom = point.y;
-            any = true;
-            return;
-        }
-        left = std::min(left, point.x);
-        top = std::min(top, point.y);
-        right = std::max(right, point.x);
-        bottom = std::max(bottom, point.y);
-    };
-    const auto include_rect = [&](RectF value) {
-        include_point({value.left(), value.top()});
-        include_point({value.right(), value.bottom()});
-    };
+    RectBoundsAccumulator accumulator;
     for (const PathElement& element : elements_) {
         switch (element.verb) {
         case PathVerb::line:
-            include_point(element.first);
-            include_point(element.second);
+            accumulator.include(element.first);
+            accumulator.include(element.second);
             break;
         case PathVerb::quadratic:
-            include_point(element.first);
-            include_point(element.second);
-            include_point(element.third);
+            accumulator.include(element.first);
+            accumulator.include(element.second);
+            accumulator.include(element.third);
             break;
         case PathVerb::bezier:
-            include_point(element.first);
-            include_point(element.second);
-            include_point(element.third);
-            include_point(element.fourth);
+            accumulator.include(element.first);
+            accumulator.include(element.second);
+            accumulator.include(element.third);
+            accumulator.include(element.fourth);
             break;
         case PathVerb::rectangle:
         case PathVerb::ellipse:
         case PathVerb::arc:
-            include_rect(element.rect);
+            accumulator.include(element.rect);
             break;
         case PathVerb::start_figure:
         case PathVerb::close_figure:
             break;
         }
     }
-    return any ? RectF{left, top, right - left, bottom - top} : RectF{};
+    return accumulator.bounds();
 }
 
 PathSnapshot GraphicsPath::snapshot() const {
@@ -462,4 +432,3 @@ void GraphicsPath::append(PathElement element) {
 
 
 } // namespace gui_drawing
-

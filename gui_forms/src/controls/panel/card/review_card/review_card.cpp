@@ -37,19 +37,19 @@ bool valid_review_record(const ReviewRecord& record) noexcept {
 ReviewCard::ReviewCard(StableId stable_id)
     : Card(std::move(stable_id)),
       title_label_(make_control<Label>(
-          StableId(std::string(this->stable_id().value()) + ".title"))),
+          StableId(std::string((*this).stable_id().value()) + ".title"))),
       summary_label_(make_control<Label>(
-          StableId(std::string(this->stable_id().value()) + ".summary"))),
+          StableId(std::string((*this).stable_id().value()) + ".summary"))),
       verdict_label_(make_control<Label>(
-          StableId(std::string(this->stable_id().value()) + ".verdict"))) {
-    title_label_->set_text_style_role(TextStyleRole::heading);
-    title_label_->set_vertical_alignment(VerticalAlignment::center);
-    summary_label_->set_text_style_role(TextStyleRole::body);
-    summary_label_->set_text_wrapping(TextWrapping::word);
-    summary_label_->set_line_spacing(1.25);
-    summary_label_->set_vertical_alignment(VerticalAlignment::near);
-    verdict_label_->set_text_style_role(TextStyleRole::caption);
-    verdict_label_->set_vertical_alignment(VerticalAlignment::center);
+          StableId(std::string((*this).stable_id().value()) + ".verdict"))) {
+    (*title_label_).set_text_style_role(TextStyleRole::heading);
+    (*title_label_).set_vertical_alignment(VerticalAlignment::center);
+    (*summary_label_).set_text_style_role(TextStyleRole::body);
+    (*summary_label_).set_text_wrapping(TextWrapping::word);
+    (*summary_label_).set_line_spacing(1.25);
+    (*summary_label_).set_vertical_alignment(VerticalAlignment::near);
+    (*verdict_label_).set_text_style_role(TextStyleRole::caption);
+    (*verdict_label_).set_vertical_alignment(VerticalAlignment::center);
 }
 
 void ReviewCard::initialize_control_tree() {
@@ -69,9 +69,9 @@ void ReviewCard::set_record(ReviewRecord record) {
     if (record_ == record) return;
     initialize_control_tree();
     record_ = std::move(record);
-    title_label_->set_text(record_.title);
-    summary_label_->set_text(record_.summary);
-    verdict_label_->set_text(record_.verdict);
+    (*title_label_).set_text(record_.title);
+    (*summary_label_).set_text(record_.summary);
+    (*verdict_label_).set_text(record_.verdict);
     set_accessible_name(record_.title);
     set_accessible_description(record_.summary);
     set_visual_status(record_.disposition == ReviewDisposition::pending

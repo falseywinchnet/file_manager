@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../support/abi_control_adapter_support.hpp"
+#include "gui_forms/detail/algorithm/binary_search.hpp"
 
 namespace gui_forms::abi::detail {
 
@@ -18,7 +19,7 @@ public:
         // fields are leaf controls: keeping them there lets later container
         // siblings erase their border and text even when z-order is correct.
         set_paint_plane(gui_forms::PaintPlane::control);
-        const auto style = style_;
+        const gui_forms::BasicControlStyle style = style_;
         set_background(kind_ == FieldControlKind::tool_strip ? style.face : style.paper);
         set_border_style(kind_ == FieldControlKind::tool_strip
                              ? gui_forms::BorderStyle::none
@@ -118,8 +119,8 @@ public:
                                gf_field_edit_result& result) {
         require_mutable();
         if (direction != -1 && direction != 1) return false;
-        auto& source = direction < 0 ? undo_ : redo_;
-        auto& destination = direction < 0 ? redo_ : undo_;
+        std::deque<FieldSnapshot>& source = direction < 0 ? undo_ : redo_;
+        std::deque<FieldSnapshot>& destination = direction < 0 ? redo_ : undo_;
         if (source.empty()) {
             result = edit_result(false);
             return true;
@@ -176,12 +177,10 @@ public:
             return text_store_.utf8_offset(gui_forms::GraphemeIndex(index)).value();
         }
         const double content_x = std::max(0.0, local_x - text_left_ + horizontal_offset_);
-        const auto right = std::lower_bound(layout_positions_.begin(),
-                                            layout_positions_.end(), content_x);
-        if (right == layout_positions_.begin()) return layout_offsets_.front();
-        if (right == layout_positions_.end()) return layout_offsets_.back();
-        const std::size_t right_index = static_cast<std::size_t>(
-            std::distance(layout_positions_.begin(), right));
+        const std::size_t right_index = gui_forms::detail::lower_bound_index(
+            std::span<const double>(layout_positions_), content_x);
+        if (right_index == 0U) return layout_offsets_.front();
+        if (right_index == layout_positions_.size()) return layout_offsets_.back();
         const double left_distance = content_x - layout_positions_[right_index - 1U];
         const double right_distance = layout_positions_[right_index] - content_x;
         return layout_offsets_[left_distance < right_distance
@@ -193,7 +192,7 @@ public:
         if (position > text_.size() ||
             !text_store_.is_grapheme_boundary(gui_forms::Utf8Offset(position)) ||
             (direction != -1 && direction != 1)) return false;
-        const auto source = gui_forms::Utf8Offset(position);
+        const gui_forms::Utf8Offset source = gui_forms::Utf8Offset(position);
         result = (direction < 0
             ? text_store_.previous_grapheme_boundary(source)
             : text_store_.next_grapheme_boundary(source)).value();
@@ -203,7 +202,7 @@ public:
     void on_paint(gui_forms::Painter& painter, Rect damage) override {
         Panel::on_paint(painter, damage);
         const Rect bounds = local_bounds();
-        const auto style = style_;
+        const gui_forms::BasicControlStyle style = style_;
         const double button_width = kind_ == FieldControlKind::numeric_up_down
             ? std::min(18.0, std::max(0.0, bounds.width)) : 0.0;
         const double text_right = std::max(5.0, bounds.width - button_width -
@@ -304,7 +303,7 @@ public:
                               {center + 3.0, middle + 4.0}, style.dark_border, 1.0);
         }
         if (focused_ && bounds.width > 2.0 && bounds.height > 2.0) {
-            const auto focus = style.accent;
+            const Color focus = style.accent;
             painter.draw_line({1.0, 1.0}, {bounds.width - 1.0, 1.0}, focus, 1.0);
             painter.draw_line({1.0, 1.0}, {1.0, bounds.height - 1.0}, focus, 1.0);
             painter.draw_line({1.0, bounds.height - 1.0},
@@ -411,7 +410,7 @@ private:
     }
 
     void clear_redo() noexcept {
-        for (const auto& snapshot : redo_) history_bytes_ -= snapshot.text.size();
+        for (const gui_forms::abi::detail::FieldControl::FieldSnapshot& snapshot : redo_) history_bytes_ -= snapshot.text.size();
         redo_.clear();
     }
 
@@ -443,4 +442,3 @@ private:
 };
 
 } // namespace gui_forms::abi::detail
-

@@ -14,11 +14,11 @@ Bitmap::Bitmap(std::uint32_t width, std::uint32_t height,
         throw std::length_error("bitmap byte limit exceeded");
     }
     storage_ = std::make_shared<PixelStorage>();
-    storage_->width = width;
-    storage_->height = height;
-    storage_->pixel_format = pixel_format;
-    storage_->row_bytes = static_cast<std::size_t>(row_bytes);
-    storage_->bytes.resize(static_cast<std::size_t>(byte_count));
+    (*storage_).width = width;
+    (*storage_).height = height;
+    (*storage_).pixel_format = pixel_format;
+    (*storage_).row_bytes = static_cast<std::size_t>(row_bytes);
+    (*storage_).bytes.resize(static_cast<std::size_t>(byte_count));
     damage_history_.reserve(maximum_damage_history);
     stable_id_ = next_bitmap_id.fetch_add(1U, std::memory_order_relaxed);
     if (stable_id_ == 0U) {
@@ -28,17 +28,17 @@ Bitmap::Bitmap(std::uint32_t width, std::uint32_t height,
 
 std::uint32_t Bitmap::width() const {
     require_alive();
-    return storage_->width;
+    return (*storage_).width;
 }
 
 std::uint32_t Bitmap::height() const {
     require_alive();
-    return storage_->height;
+    return (*storage_).height;
 }
 
 PixelFormat Bitmap::pixel_format() const {
     require_alive();
-    return storage_->pixel_format;
+    return (*storage_).pixel_format;
 }
 
 std::uint64_t Bitmap::generation() const {
@@ -68,8 +68,8 @@ void Bitmap::make_transparent(Color key) {
     require_alive();
     require_unlocked();
     bool found = false;
-    for (std::uint32_t y = 0; y < storage_->height && !found; ++y) {
-        for (std::uint32_t x = 0; x < storage_->width; ++x) {
+    for (std::uint32_t y = 0; y < (*storage_).height && !found; ++y) {
+        for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
             const Color value = load_color(*storage_, x, y);
             if (value.alpha() != 0U && value.red() == key.red() &&
                 value.green() == key.green() &&
@@ -83,9 +83,9 @@ void Bitmap::make_transparent(Color key) {
 
     prepare_write();
     std::vector<RectI> damage;
-    for (std::uint32_t y = 0; y < storage_->height; ++y) {
+    for (std::uint32_t y = 0; y < (*storage_).height; ++y) {
         std::optional<std::uint32_t> run_start;
-        for (std::uint32_t x = 0; x < storage_->width; ++x) {
+        for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
             const Color value = load_color(*storage_, x, y);
             if (value.alpha() != 0U && value.red() == key.red() &&
                 value.green() == key.green() &&
@@ -102,15 +102,15 @@ void Bitmap::make_transparent(Color key) {
         if (run_start) {
             damage.push_back({static_cast<std::int32_t>(*run_start),
                               static_cast<std::int32_t>(y),
-                              static_cast<std::int32_t>(storage_->width - *run_start),
+                              static_cast<std::int32_t>((*storage_).width - *run_start),
                               1});
         }
         if (damage.size() > maximum_damage_rectangles) {
             damage.assign(1U, RectI{0, 0,
-                static_cast<std::int32_t>(storage_->width),
-                static_cast<std::int32_t>(storage_->height)});
-            for (++y; y < storage_->height; ++y) {
-                for (std::uint32_t x = 0; x < storage_->width; ++x) {
+                static_cast<std::int32_t>((*storage_).width),
+                static_cast<std::int32_t>((*storage_).height)});
+            for (++y; y < (*storage_).height; ++y) {
+                for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
                     const Color value = load_color(*storage_, x, y);
                     if (value.alpha() != 0U && value.red() == key.red() &&
                         value.green() == key.green() &&
@@ -130,20 +130,20 @@ std::unique_ptr<Bitmap> Bitmap::clone(RectI source) const {
     require_alive();
     require_unlocked();
     if (source.width <= 0 || source.height <= 0 || source.x < 0 || source.y < 0 ||
-        source.right() > storage_->width || source.bottom() > storage_->height) {
+        source.right() > (*storage_).width || source.bottom() > (*storage_).height) {
         throw std::invalid_argument("bitmap clone rectangle is outside the image");
     }
-    auto result = std::make_unique<Bitmap>(static_cast<std::uint32_t>(source.width),
+    std::unique_ptr<gui_drawing::Bitmap> result = std::make_unique<Bitmap>(static_cast<std::uint32_t>(source.width),
                                            static_cast<std::uint32_t>(source.height),
-                                           storage_->pixel_format);
+                                           (*storage_).pixel_format);
     for (std::int32_t y = 0; y < source.height; ++y) {
         const std::size_t input = pixel_offset(
             *storage_, static_cast<std::uint32_t>(source.x),
             static_cast<std::uint32_t>(source.y + y));
-        const std::size_t output = static_cast<std::size_t>(y) * result->storage_->row_bytes;
-        std::copy_n(storage_->bytes.begin() + static_cast<std::ptrdiff_t>(input),
-                    result->storage_->row_bytes,
-                    result->storage_->bytes.begin() + static_cast<std::ptrdiff_t>(output));
+        const std::size_t output = static_cast<std::size_t>(y) * (*(*result).storage_).row_bytes;
+        std::copy_n((*storage_).bytes.begin() + static_cast<std::ptrdiff_t>(input),
+                    (*(*result).storage_).row_bytes,
+                    (*(*result).storage_).bytes.begin() + static_cast<std::ptrdiff_t>(output));
     }
     return result;
 }
@@ -152,18 +152,18 @@ std::unique_ptr<Bitmap> Bitmap::thumbnail(std::uint32_t width,
                                           std::uint32_t height) const {
     require_alive();
     require_unlocked();
-    auto result = std::make_unique<Bitmap>(width, height, storage_->pixel_format);
+    std::unique_ptr<gui_drawing::Bitmap> result = std::make_unique<Bitmap>(width, height, (*storage_).pixel_format);
     for (std::uint32_t y = 0; y < height; ++y) {
         const std::uint32_t source_y = std::min(
-            storage_->height - 1U,
+            (*storage_).height - 1U,
             static_cast<std::uint32_t>((static_cast<std::uint64_t>(y) *
-                                        storage_->height) / height));
+                                        (*storage_).height) / height));
         for (std::uint32_t x = 0; x < width; ++x) {
             const std::uint32_t source_x = std::min(
-                storage_->width - 1U,
+                (*storage_).width - 1U,
                 static_cast<std::uint32_t>((static_cast<std::uint64_t>(x) *
-                                            storage_->width) / width));
-            store_color(*result->storage_, x, y,
+                                            (*storage_).width) / width));
+            store_color(*(*result).storage_, x, y,
                         load_color(*storage_, source_x, source_y));
         }
     }
@@ -175,22 +175,23 @@ std::unique_ptr<Bitmap> Bitmap::adjusted(
     require_alive();
     require_unlocked();
     const ImageAttributesSnapshot adjustment = attributes.snapshot();
-    auto result = std::make_unique<Bitmap>(storage_->width, storage_->height,
-                                           storage_->pixel_format);
-    for (std::uint32_t y = 0; y < storage_->height; ++y) {
-        for (std::uint32_t x = 0; x < storage_->width; ++x) {
+    std::unique_ptr<gui_drawing::Bitmap> result = std::make_unique<Bitmap>((*storage_).width, (*storage_).height,
+                                           (*storage_).pixel_format);
+    for (std::uint32_t y = 0; y < (*storage_).height; ++y) {
+        for (std::uint32_t x = 0; x < (*storage_).width; ++x) {
             Color input = load_color(*storage_, x, y);
-            const auto remap = std::find_if(
-                adjustment.remap_table.begin(), adjustment.remap_table.end(),
-                [&](const auto& entry) {
-                    return entry.old_color.argb() == input.argb();
-                });
-            if (remap != adjustment.remap_table.end()) input = remap->new_color;
+            std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator
+                remap = adjustment.remap_table.begin();
+            while (remap != adjustment.remap_table.end() &&
+                   (*remap).old_color.argb() != input.argb()) {
+                ++remap;
+            }
+            if (remap != adjustment.remap_table.end()) input = (*remap).new_color;
             if (!adjustment.has_color_matrix) {
-                store_color(*result->storage_, x, y, input);
+                store_color(*(*result).storage_, x, y, input);
                 continue;
             }
-            const auto& matrix = adjustment.color_matrix;
+            const std::array<double, 25>& matrix = adjustment.color_matrix;
             const double values[5] = {
                 input.red() / 255.0, input.green() / 255.0,
                 input.blue() / 255.0, input.alpha() / 255.0, 1.0};
@@ -200,7 +201,7 @@ std::unique_ptr<Bitmap> Bitmap::adjusted(
                     output[column] += values[row] * matrix[row * 5U + column];
                 }
             }
-            store_color(*result->storage_, x, y,
+            store_color(*(*result).storage_, x, y,
                         Color::from_argb(normalized_channel(output[3]),
                                          normalized_channel(output[0]),
                                          normalized_channel(output[1]),
@@ -220,10 +221,10 @@ BitmapLockView Bitmap::lock(BitmapLockMode mode) {
         throw std::overflow_error("bitmap lock token space exhausted");
     }
     lock_mode_ = mode;
-    return {storage_->bytes.data(),
-            mode == BitmapLockMode::read ? nullptr : storage_->bytes.data(),
-            storage_->row_bytes, storage_->width, storage_->height,
-            storage_->pixel_format, active_lock_token_};
+    return {(*storage_).bytes.data(),
+            mode == BitmapLockMode::read ? nullptr : (*storage_).bytes.data(),
+            (*storage_).row_bytes, (*storage_).width, (*storage_).height,
+            (*storage_).pixel_format, active_lock_token_};
 }
 
 void Bitmap::unlock(std::uint64_t token) {
@@ -240,8 +241,8 @@ void Bitmap::unlock(std::uint64_t token) {
     lock_mode_ = BitmapLockMode::read;
     if (wrote) {
         publish_mutation({RectI{0, 0,
-            static_cast<std::int32_t>(storage_->width),
-            static_cast<std::int32_t>(storage_->height)}});
+            static_cast<std::int32_t>((*storage_).width),
+            static_cast<std::int32_t>((*storage_).height)}});
     }
 }
 
@@ -254,8 +255,8 @@ BitmapEditView Bitmap::begin_edit(RectI bounds) {
     require_alive();
     require_unlocked();
     if (bounds.x < 0 || bounds.y < 0 || bounds.width <= 0 ||
-        bounds.height <= 0 || bounds.right() > storage_->width ||
-        bounds.bottom() > storage_->height) {
+        bounds.height <= 0 || bounds.right() > (*storage_).width ||
+        bounds.bottom() > (*storage_).height) {
         throw std::invalid_argument(
             "bitmap edit rectangle must be nonempty and inside the image");
     }
@@ -269,7 +270,7 @@ BitmapEditView Bitmap::begin_edit(RectI bounds) {
         const std::size_t source = pixel_offset(
             *storage_, static_cast<std::uint32_t>(bounds.x),
             static_cast<std::uint32_t>(bounds.y + row));
-        std::copy_n(storage_->bytes.data() + source, edit_row_bytes,
+        std::copy_n((*storage_).bytes.data() + source, edit_row_bytes,
                     active_edit_backup_.data() +
                         static_cast<std::size_t>(row) * edit_row_bytes);
     }
@@ -285,8 +286,8 @@ BitmapEditView Bitmap::begin_edit(RectI bounds) {
     const std::size_t origin = pixel_offset(
         *storage_, static_cast<std::uint32_t>(bounds.x),
         static_cast<std::uint32_t>(bounds.y));
-    return {storage_->bytes.data() + origin, storage_->bytes.data() + origin,
-            storage_->row_bytes, bounds, storage_->pixel_format,
+    return {(*storage_).bytes.data() + origin, (*storage_).bytes.data() + origin,
+            (*storage_).row_bytes, bounds, (*storage_).pixel_format,
             active_lock_token_};
 }
 
@@ -302,7 +303,7 @@ std::uint64_t Bitmap::commit_edit(std::uint64_t token) {
         const std::size_t storage_row = pixel_offset(
             *storage_, static_cast<std::uint32_t>(active_edit_bounds_.x),
             static_cast<std::uint32_t>(active_edit_bounds_.y + row));
-        const std::byte* current = storage_->bytes.data() + storage_row;
+        const std::byte* current = (*storage_).bytes.data() + storage_row;
         const std::byte* original = active_edit_backup_.data() +
             static_cast<std::size_t>(row) * edit_row_bytes;
         std::optional<std::int32_t> run_start;
@@ -365,7 +366,7 @@ void Bitmap::cancel_edit(std::uint64_t token) {
             static_cast<std::uint32_t>(active_edit_bounds_.y + row));
         std::copy_n(active_edit_backup_.data() +
                         static_cast<std::size_t>(row) * edit_row_bytes,
-                    edit_row_bytes, storage_->bytes.data() + destination);
+                    edit_row_bytes, (*storage_).bytes.data() + destination);
     }
     finish_edit();
 }
@@ -384,8 +385,8 @@ BitmapDamageSnapshot Bitmap::changes_since(std::uint64_t generation) const {
         generation < damage_history_.front().generation - 1U) {
         result.history_complete = false;
         result.rectangles.push_back({0, 0,
-            static_cast<std::int32_t>(storage_->width),
-            static_cast<std::int32_t>(storage_->height)});
+            static_cast<std::int32_t>((*storage_).width),
+            static_cast<std::int32_t>((*storage_).height)});
         return result;
     }
 
@@ -394,8 +395,8 @@ BitmapDamageSnapshot Bitmap::changes_since(std::uint64_t generation) const {
         if (result.rectangles.size() + record.rectangles.size() >
             maximum_damage_rectangles) {
             result.rectangles.assign(1U, RectI{0, 0,
-                static_cast<std::int32_t>(storage_->width),
-                static_cast<std::int32_t>(storage_->height)});
+                static_cast<std::int32_t>((*storage_).width),
+                static_cast<std::int32_t>((*storage_).height)});
             return result;
         }
         result.rectangles.insert(result.rectangles.end(),
@@ -410,9 +411,9 @@ ImageSnapshot Bitmap::snapshot() const {
     require_unlocked();
     ImageSnapshot result;
     result.stable_id = stable_id_;
-    result.width = storage_->width;
-    result.height = storage_->height;
-    result.pixel_format = storage_->pixel_format;
+    result.width = (*storage_).width;
+    result.height = (*storage_).height;
+    result.pixel_format = (*storage_).pixel_format;
     result.generation = generation_;
     result.storage_ = storage_;
     return result;
@@ -433,7 +434,7 @@ void Bitmap::require_unlocked() const {
 }
 
 void Bitmap::require_coordinate(std::uint32_t x, std::uint32_t y) const {
-    if (x >= storage_->width || y >= storage_->height) {
+    if (x >= (*storage_).width || y >= (*storage_).height) {
         throw std::out_of_range("bitmap pixel coordinate is outside the image");
     }
 }
@@ -475,4 +476,3 @@ void Bitmap::finish_edit() noexcept {
 
 
 } // namespace gui_drawing
-

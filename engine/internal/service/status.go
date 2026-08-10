@@ -48,7 +48,7 @@ func (s *Service) Status(_ context.Context) (api.Status, error) {
 		}
 	}
 	if len(snapshot.Roots) == 0 {
-		status.Warnings = append(status.Warnings, "no approved sandbox roots configured")
+		status.Warnings = append(status.Warnings, "no approved roots configured")
 	}
 	return s.decorateStatus(status), nil
 }
@@ -86,7 +86,7 @@ func (s *Service) persistentStatus() api.Status {
 	}
 	if len(snapshot.Roots) == 0 {
 		status.Ready = false
-		status.Warnings = append(status.Warnings, "no approved sandbox root configured")
+		status.Warnings = append(status.Warnings, "no approved root configured")
 	}
 	if s.recoveryProblems != 0 {
 		detail := "a full rebuild is required before quarantine"

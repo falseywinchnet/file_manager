@@ -4,6 +4,7 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -18,7 +19,23 @@ type OwnsFunc func(api.RootID, string) bool
 
 type Scanner struct{}
 
+var ErrRootIdentityChanged = errors.New("approved root object identity changed")
+
 func (Scanner) Scan(ctx context.Context, root api.RootSpec, owns OwnsFunc) (*catalog.Shard, error) {
+	return (Scanner{}).scan(ctx, root, "", owns)
+}
+
+// ScanApproved binds traversal to the exact directory object admitted by an
+// installed manifest. The comparison uses the already-open os.Root handle, so
+// a path replacement cannot race between validation and traversal.
+func (Scanner) ScanApproved(ctx context.Context, root api.RootSpec, expectedObjectID string, owns OwnsFunc) (*catalog.Shard, error) {
+	if expectedObjectID == "" {
+		return nil, errors.New("approved root object identity is required")
+	}
+	return (Scanner{}).scan(ctx, root, expectedObjectID, owns)
+}
+
+func (Scanner) scan(ctx context.Context, root api.RootSpec, expectedObjectID string, owns OwnsFunc) (*catalog.Shard, error) {
 	rootHandle, err := os.OpenRoot(root.Path)
 	if err != nil {
 		return nil, fmt.Errorf("open approved root: %w", err)
@@ -32,6 +49,9 @@ func (Scanner) Scan(ctx context.Context, root api.RootSpec, owns OwnsFunc) (*cat
 	rootIdentity, err := identity.Observe(rootHandle, ".", rootInfo)
 	if err != nil {
 		return nil, fmt.Errorf("observe approved root identity: %w", err)
+	}
+	if expectedObjectID != "" && rootIdentity.ObjectID() != expectedObjectID {
+		return nil, ErrRootIdentityChanged
 	}
 	rootObject := observedObject(rootIdentity, rootInfo)
 	observations := make([]catalog.ObservedBinding, 0, 1024)

@@ -7,6 +7,18 @@
 #include <utility>
 
 namespace gui_forms {
+namespace {
+
+struct DisconnectedOrMatchingWake final {
+    std::uint64_t sequence{};
+
+    [[nodiscard]] bool operator()(
+        const std::shared_ptr<detail::LiveSurfaceWake>& wake) const noexcept {
+        return !wake || (*wake).sequence == sequence;
+    }
+};
+
+} // namespace
 
 LiveSurfaceWakeConnection::LiveSurfaceWakeConnection(
     std::weak_ptr<detail::LiveSurfaceState> state,
@@ -30,17 +42,16 @@ LiveSurfaceWakeConnection& LiveSurfaceWakeConnection::operator=(
 }
 
 bool LiveSurfaceWakeConnection::connected() const noexcept {
-    return wake_ && wake_->connected.load(std::memory_order_acquire);
+    return wake_ && (*wake_).connected.load(std::memory_order_acquire);
 }
 
 void LiveSurfaceWakeConnection::disconnect() noexcept {
     if (!wake_) return;
-    wake_->connected.store(false, std::memory_order_release);
-    if (const auto state = state_.lock()) {
-        std::scoped_lock lock(state->mutex);
-        std::erase_if(state->wakes, [sequence = wake_->sequence](const auto& wake) {
-            return !wake || wake->sequence == sequence;
-        });
+    (*wake_).connected.store(false, std::memory_order_release);
+    if (const std::shared_ptr<gui_forms::detail::LiveSurfaceState> state = state_.lock()) {
+        std::scoped_lock lock((*state).mutex);
+        std::erase_if((*state).wakes,
+                      DisconnectedOrMatchingWake{(*wake_).sequence});
     }
     state_.reset();
     wake_.reset();

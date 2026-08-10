@@ -76,7 +76,7 @@ public:
                                    effective_font({FontRole::control, 10.0, 700, false}),
                                    style_.disabled_text);
         }
-        const auto dates = cell_dates();
+        const std::array<DateTimeValue, 42> dates = cell_dates();
         for (std::size_t cell = 0U; cell < dates.size(); ++cell) {
             const std::size_t row = cell / 7U;
             const std::size_t column = cell % 7U;
@@ -124,7 +124,7 @@ public:
         const Rect bounds = absolute_bounds();
         const Point local{event.position.x - bounds.x, event.position.y - bounds.y};
         if (event.action == PointerAction::move) {
-            const auto next = cell_at(local);
+            const std::optional<std::size_t> next = cell_at(local);
             if (next != hovered_cell_) {
                 hovered_cell_ = next;
                 invalidate(Dirty::paint);
@@ -153,7 +153,7 @@ public:
                 event.handled = true;
                 return;
             }
-            if (const auto cell = cell_at(local)) {
+            if (const std::optional<std::size_t> cell = cell_at(local)) {
                 const DateTimeValue date = cell_dates()[*cell];
                 if (civil_in_range(date, minimum_, maximum_)) {
                     selected_ = std::clamp(date, minimum_, maximum_);
@@ -163,7 +163,7 @@ public:
                 }
             }
         } else if (event.action == PointerAction::up) {
-            const auto cell = cell_at(local);
+            const std::optional<std::size_t> cell = cell_at(local);
             const bool commit = pressed_cell_ && cell == pressed_cell_;
             const bool acknowledge = commit || pressed_cell_.has_value() || header_pressed_;
             pressed_cell_.reset();
@@ -214,7 +214,7 @@ public:
 
     [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
         std::vector<SemanticNode> nodes;
-        const auto dates = cell_dates();
+        const std::array<DateTimeValue, 42> dates = cell_dates();
         const Rect popup = absolute_bounds();
         const double s = effective_text_scale();
         nodes.reserve(dates.size() + 2U);
@@ -270,7 +270,7 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view) override {
-        const std::string prefix(this->stable_id().value());
+        const std::string prefix((*this).stable_id().value());
         if (action == SemanticAction::press &&
             stable_id == prefix + ".previous_month") {
             if (!can_change_month(-1)) return false;

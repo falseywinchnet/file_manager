@@ -29,13 +29,19 @@ BindingContext::~BindingContext() {
     }
 }
 
+void BindingContext::SourceDisposedCallback::operator()() const {
+    if (context != nullptr) {
+        static_cast<void>((*context).remove_entry(source, true));
+    }
+}
+
 void BindingContext::add(const std::shared_ptr<BindingSource>& source) {
     static_cast<void>(manager(source));
 }
 
 Window* BindingContext::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 CurrencyManager& BindingContext::manager(
@@ -44,42 +50,47 @@ CurrencyManager& BindingContext::manager(
     if (!is_alive() || !owner) {
         throw std::logic_error("GUI.Forms cannot use a retired BindingContext");
     }
-    owner->verify_access("BindingContext lookup");
-    if (!source || !source->is_alive() || source->bound_window() != owner) {
+    (*owner).verify_access("BindingContext lookup");
+    if (!source || !(*source).is_alive() || (*source).bound_window() != owner) {
         throw std::invalid_argument(
             "GUI.Forms BindingContext source must belong to the same Window");
     }
-    std::erase_if(sources_, [](const auto& entry) {
-        return entry.second.source.expired();
-    });
+    SourceMap::iterator expired = sources_.begin();
+    while (expired != sources_.end()) {
+        if ((*expired).second.source.expired()) {
+            expired = sources_.erase(expired);
+        } else {
+            ++expired;
+        }
+    }
     if (!sources_.contains(source.get())) {
         BindingSource* key = source.get();
         SourceEntry entry;
         entry.source = source;
-        entry.disposed = source->disposed_event().subscribe(*this, [this, key] {
-            static_cast<void>(remove_entry(key, true));
-        });
+        entry.disposed = (*source).disposed_event().subscribe(
+            *this, SourceDisposedCallback{this, key});
         sources_.emplace(key, std::move(entry));
         BindingContextChange change{source.get(), true};
         collection_changed_.emit(change);
     }
-    return source->currency_manager();
+    return (*source).currency_manager();
 }
 
 bool BindingContext::contains(const BindingSource& source) const noexcept {
-    const auto found = sources_.find(const_cast<BindingSource*>(&source));
-    return found != sources_.end() && !found->second.source.expired();
+    const SourceMap::const_iterator found =
+        sources_.find(const_cast<BindingSource*>(&source));
+    return found != sources_.end() && !(*found).second.source.expired();
 }
 
 bool BindingContext::remove(const BindingSource& source) {
-    if (Window* owner = bound_window()) owner->verify_access("BindingContext removal");
+    if (Window* owner = bound_window()) (*owner).verify_access("BindingContext removal");
     return remove_entry(const_cast<BindingSource*>(&source), true);
 }
 
 bool BindingContext::remove_entry(BindingSource* source, bool publish) {
-    const auto found = sources_.find(source);
+    const SourceMap::iterator found = sources_.find(source);
     if (found == sources_.end()) return false;
-    SourceEntry removed = std::move(found->second);
+    SourceEntry removed = std::move((*found).second);
     sources_.erase(found);
     removed.disposed.disconnect();
     if (publish) {
@@ -90,10 +101,13 @@ bool BindingContext::remove_entry(BindingSource* source, bool publish) {
 }
 
 void BindingContext::clear() {
-    if (Window* owner = bound_window()) owner->verify_access("BindingContext clear");
+    if (Window* owner = bound_window()) (*owner).verify_access("BindingContext clear");
     std::vector<BindingSource*> removed;
     removed.reserve(sources_.size());
-    for (const auto& [source, entry] : sources_) {
+    for (const std::pair<BindingSource* const, SourceEntry>& source_entry :
+         sources_) {
+        BindingSource* const source = source_entry.first;
+        const SourceEntry& entry = source_entry.second;
         if (!entry.source.expired()) removed.push_back(source);
     }
     sources_.clear();
@@ -104,7 +118,7 @@ void BindingContext::clear() {
 }
 
 void BindingContext::verify_dispose_thread() {
-    if (Window* owner = bound_window()) owner->verify_access("BindingContext disposal");
+    if (Window* owner = bound_window()) (*owner).verify_access("BindingContext disposal");
 }
 
 void BindingContext::on_dispose() noexcept {

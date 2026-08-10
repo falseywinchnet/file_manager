@@ -41,7 +41,7 @@ void MetricsView::set_accent_width(double width) {
 
 std::string MetricsView::metrics_text() const {
     if (window() == nullptr) return "Detached";
-    const MetricsSnapshot metrics = window()->metrics_snapshot();
+    const MetricsSnapshot metrics = (*window()).metrics_snapshot();
     std::ostringstream text;
     text << metrics.control_count << " controls · "
          << metrics.paint_passes << " paints · "

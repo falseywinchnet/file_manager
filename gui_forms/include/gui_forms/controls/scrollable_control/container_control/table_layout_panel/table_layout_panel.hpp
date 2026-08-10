@@ -20,15 +20,20 @@ enum class TableSizeMode : std::uint8_t {
 struct TableLayoutStyle final {
     TableSizeMode size_mode{TableSizeMode::auto_size};
     double size{};
-    friend constexpr bool operator==(const TableLayoutStyle&,
-                                     const TableLayoutStyle&) = default;
+    friend constexpr bool operator==(const TableLayoutStyle& left,
+                                     const TableLayoutStyle& right) noexcept {
+        return left.size_mode == right.size_mode && left.size == right.size;
+    }
 };
 
 struct TableLayoutCellPosition final {
     std::size_t column{};
     std::size_t row{};
-    friend constexpr bool operator==(const TableLayoutCellPosition&,
-                                     const TableLayoutCellPosition&) = default;
+    friend constexpr bool operator==(
+        const TableLayoutCellPosition& left,
+        const TableLayoutCellPosition& right) noexcept {
+        return left.column == right.column && left.row == right.row;
+    }
 };
 
 enum class TableLayoutGrowStyle : std::uint8_t {
@@ -109,6 +114,9 @@ private:
         std::size_t column_span{1U};
         std::size_t row_span{1U};
     };
+    using MetadataMap = std::unordered_map<std::uint64_t, CellMetadata>;
+    using ResolvedCellMap =
+        std::unordered_map<std::uint64_t, TableLayoutCellPosition>;
 
     [[nodiscard]] CellMetadata& metadata_for(const Control& child);
     [[nodiscard]] const CellMetadata* metadata_for(const Control& child) const;
@@ -116,8 +124,8 @@ private:
     [[nodiscard]] Size layout_children(Size available, bool assign);
     static void validate_style(TableLayoutStyle style);
 
-    std::unordered_map<std::uint64_t, CellMetadata> metadata_;
-    std::unordered_map<std::uint64_t, TableLayoutCellPosition> resolved_cells_;
+    MetadataMap metadata_;
+    ResolvedCellMap resolved_cells_;
     std::vector<TableLayoutStyle> column_styles_{TableLayoutStyle{}};
     std::vector<TableLayoutStyle> row_styles_{TableLayoutStyle{}};
     std::vector<double> column_widths_;

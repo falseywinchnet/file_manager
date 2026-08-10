@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"filemanager/engine/api"
+	"filemanager/engine/internal/deployment"
 	"filemanager/engine/internal/sandbox"
 )
 
@@ -160,6 +162,41 @@ func TestLiveQueryDoesNotTraverseDirectorySymlink(t *testing.T) {
 	}
 	if !page.Complete || len(page.Results) != 1 || page.Results[0].Metadata.Kind != api.ObjectSymlink || page.Results[0].Object.Path != filepath.Join(canonicalSource, "needle-link") {
 		t.Fatalf("symlink live results = %+v", page)
+	}
+}
+
+func TestLiveQueryRejectsAnExcludedStartingScopeBeforeOpeningIt(t *testing.T) {
+	container := t.TempDir()
+	source := filepath.Join(container, "source")
+	excluded := filepath.Join(source, "private")
+	if err := os.MkdirAll(excluded, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(excluded, "needle-secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	objectID, err := deployment.RootObjectID(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := sandbox.NewApproved("test-installed", []sandbox.ApprovedRoot{{ID: "docs", Path: source, ObjectID: objectID, Exclusions: []string{"private"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := New(guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer engine.Close()
+	if _, err := engine.ApplyRoots(context.Background(), []api.RootSpec{{ID: "docs", Path: source}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = engine.QueryLive(context.Background(), api.LiveQuery{
+		QueryID: "excluded-scope", Scope: api.LiveQueryScope{RootID: "docs", RelativePath: "private", Descendants: true}, Text: "needle",
+	})
+	var fault *api.Fault
+	if !errors.As(err, &fault) || fault.Code != api.ErrorUnapprovedRoot {
+		t.Fatalf("excluded scope error = %v", err)
 	}
 }
 

@@ -196,13 +196,7 @@ func (a *Adapter) runNative(ctx context.Context, since uint64, started chan<- er
 
 //export goFilemanFSEventsCallback
 func goFilemanFSEventsCallback(token C.uintptr_t, count C.size_t, rawPaths, rawFlags unsafe.Pointer, through C.uint64_t) {
-	defer func() {
-		// Invalidation should drain callbacks before handle deletion. Treat a
-		// late system callback as dropped instead of crashing the service if a
-		// platform violates that ordering during teardown.
-		_ = recover()
-	}()
-	adapter, ok := cgo.Handle(token).Value().(*Adapter)
+	adapter, ok := adapterFromHandle(uintptr(token))
 	if !ok || count == 0 {
 		return
 	}
@@ -236,6 +230,20 @@ func goFilemanFSEventsCallback(token C.uintptr_t, count C.size_t, rawPaths, rawF
 	default:
 		adapter.recordDrop(batch.through)
 	}
+}
+
+func adapterFromHandle(token uintptr) (adapter *Adapter, ok bool) {
+	// Invalidation should drain callbacks before handle deletion. Isolate the
+	// one expected teardown panic here; callback parsing and queueing panics are
+	// programming defects and must not be silently swallowed.
+	defer func() {
+		if recover() != nil {
+			adapter = nil
+			ok = false
+		}
+	}()
+	adapter, ok = cgo.Handle(token).Value().(*Adapter)
+	return adapter, ok
 }
 
 func (a *Adapter) recordDrop(position uint64) {

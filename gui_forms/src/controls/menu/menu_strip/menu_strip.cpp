@@ -3,6 +3,7 @@
 #include "../menu_utilities.hpp"
 
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
@@ -43,29 +44,39 @@ std::uint64_t menu_virtual_runtime_id(std::string_view id) noexcept {
 MenuStrip::MenuStrip(StableId stable_id)
     : Control(std::move(stable_id)),
       popup_(std::make_unique<ContextMenu>(
-          std::string(this->stable_id().value()) + ".menu")) {
+          std::string((*this).stable_id().value()) + ".menu")) {
     set_focusable(true);
     set_cursor(CursorKind::arrow);
     set_paint_plane(PaintPlane::control);
-    popup_->set_root_navigation_handler(
-        [this](int direction) { return navigate_root(direction); });
-    popup_->set_outside_pointer_handler(
-        [this](const PointerEvent& event) { return handle_popup_pointer(event); });
-    popup_invoked_ = popup_->item_invoked().subscribe(
-        *this, [this](const MenuItemInvocation& invocation) {
-            if (!active_index_ || *active_index_ >= items_.size()) return;
-            MenuStripInvocation forwarded{std::string(this->stable_id().value()),
-                items_[*active_index_].stable_id, invocation};
-            item_invoked_.emit(forwarded);
-        });
-    popup_changed_ = popup_->open_changed().subscribe(
-        *this, [this](bool open_state) {
-            if (open_state || switching_) return;
-            if (!active_index_) return;
-            active_index_.reset();
-            invalidate(Dirty::paint | Dirty::semantics);
-            publish_change(open_changed_, active_index_);
-        });
+    (*popup_).set_root_navigation_handler(
+        detail::BoundMemberFunction<bool (MenuStrip::*)(int)>(
+            *this, &MenuStrip::navigate_root));
+    (*popup_).set_outside_pointer_handler(
+        detail::BoundMemberFunction<
+            bool (MenuStrip::*)(const PointerEvent&)>(
+                *this, &MenuStrip::handle_popup_pointer));
+    popup_invoked_ = (*popup_).item_invoked().subscribe(
+        *this, Delegate<const MenuItemInvocation&>::bind<
+            MenuStrip, &MenuStrip::on_popup_item_invoked>(*this));
+    popup_changed_ = (*popup_).open_changed().subscribe(
+        *this, Delegate<bool>::bind<
+            MenuStrip, &MenuStrip::on_popup_open_changed>(*this));
+}
+
+void MenuStrip::on_popup_item_invoked(
+    const MenuItemInvocation& invocation) {
+    if (!active_index_ || *active_index_ >= items_.size()) return;
+    MenuStripInvocation forwarded{
+        std::string(stable_id().value()),
+        items_[*active_index_].stable_id, invocation};
+    item_invoked_.emit(forwarded);
+}
+
+void MenuStrip::on_popup_open_changed(bool open_state) {
+    if (open_state || switching_ || !active_index_) return;
+    active_index_.reset();
+    invalidate(Dirty::paint | Dirty::semantics);
+    publish_change(open_changed_, active_index_);
 }
 
 MenuStrip::~MenuStrip() {
@@ -75,7 +86,7 @@ MenuStrip::~MenuStrip() {
 void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
     require_mutable();
     std::unordered_set<std::string> identities;
-    for (const auto& item : items) {
+    for (const gui_forms::MenuStripItemSpec& item : items) {
         if (item.stable_id.empty() || !validate_utf8(item.stable_id).valid() ||
             item.text.empty() || !validate_utf8(item.text).valid() ||
             item.items.empty() || !identities.insert(item.stable_id).second) {
@@ -116,15 +127,15 @@ bool MenuStrip::open(std::size_t index) {
     require_mutable();
     if (index >= items_.size() || !items_[index].visible ||
         !items_[index].enabled || !attached_window()) return false;
-    if (active_index_ == index && popup_->is_open()) return true;
-    switching_ = popup_->is_open();
-    if (switching_) popup_->close();
+    if (active_index_ == index && (*popup_).is_open()) return true;
+    switching_ = (*popup_).is_open();
+    if (switching_) (*popup_).close();
     active_index_ = index;
     hot_index_ = index;
-    popup_->set_items(items_[index].items);
-    const auto bounds = item_bounds();
+    (*popup_).set_items(items_[index].items);
+    const std::vector<Rect> bounds = item_bounds();
     const Rect absolute = absolute_bounds();
-    popup_->show(shared_from_this(),
+    (*popup_).show(shared_from_this(),
                  {absolute.x + bounds[index].x,
                   absolute.y + bounds[index].y + bounds[index].height - 1.0});
     switching_ = false;
@@ -135,11 +146,11 @@ bool MenuStrip::open(std::size_t index) {
 
 void MenuStrip::close() noexcept {
     if (!popup_) return;
-    popup_->close();
+    (*popup_).close();
 }
 
 bool MenuStrip::is_open() const noexcept {
-    return popup_ && popup_->is_open();
+    return popup_ && (*popup_).is_open();
 }
 
 Size MenuStrip::measure(Size available) {
@@ -168,7 +179,7 @@ std::optional<std::size_t> MenuStrip::index_at(Point window_point) const {
     const Rect absolute = absolute_bounds();
     if (!absolute.contains(window_point)) return {};
     const Point local{window_point.x - absolute.x, window_point.y - absolute.y};
-    const auto bounds = item_bounds();
+    const std::vector<Rect> bounds = item_bounds();
     for (std::size_t index = 0; index < bounds.size(); ++index) {
         if (items_[index].visible && bounds[index].contains(local)) return index;
     }
@@ -191,14 +202,14 @@ std::optional<std::size_t> MenuStrip::next_enabled(
 
 bool MenuStrip::navigate_root(int direction) {
     if (!active_index_) return false;
-    const auto next = next_enabled(*active_index_, direction);
+    const std::optional<std::size_t> next = next_enabled(*active_index_, direction);
     return next && open(*next);
 }
 
 bool MenuStrip::handle_popup_pointer(const PointerEvent& event) {
     if (event.action != PointerAction::move &&
         event.action != PointerAction::down) return false;
-    const auto index = index_at(event.position);
+    const std::optional<std::size_t> index = index_at(event.position);
     if (!index || !items_[*index].enabled) return false;
     set_hot(index);
     if (event.action == PointerAction::move && active_index_ != index) {
@@ -228,7 +239,7 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
     painter.draw_line({0.0, std::max(0.0, surface.height - 1.0)},
                       {surface.width, std::max(0.0, surface.height - 1.0)},
                       style.border, 1.0);
-    const auto bounds = item_bounds();
+    const std::vector<Rect> bounds = item_bounds();
     for (std::size_t index = 0; index < items_.size(); ++index) {
         if (!items_[index].visible) continue;
         const Rect item = bounds[index];
@@ -275,7 +286,7 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
 
 void MenuStrip::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::move) {
-        const auto index = index_at(event.position);
+        const std::optional<std::size_t> index = index_at(event.position);
         set_hot(index);
         if (is_open() && index && active_index_ != index &&
             items_[*index].enabled) {
@@ -286,7 +297,7 @@ void MenuStrip::on_pointer(PointerEvent& event) {
         set_hot({});
     } else if (event.action == PointerAction::down &&
                event.button == PointerButton::primary) {
-        const auto index = index_at(event.position);
+        const std::optional<std::size_t> index = index_at(event.position);
         if (index && items_[*index].enabled) {
             if (active_index_ == index && is_open()) close();
             else static_cast<void>(open(*index));
@@ -309,7 +320,7 @@ void MenuStrip::on_key(KeyEvent& event) {
     if (!current) return;
     if (event.physical_key == PhysicalKey::left ||
         event.physical_key == PhysicalKey::right) {
-        const auto next = next_enabled(*current,
+        const std::optional<std::size_t> next = next_enabled(*current,
             event.physical_key == PhysicalKey::right ? 1 : -1);
         if (next) {
             if (is_open()) static_cast<void>(open(*next));
@@ -353,7 +364,7 @@ SemanticDescriptor MenuStrip::semantic_descriptor() const {
 std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
     const Rect absolute = absolute_bounds();
-    const auto bounds = item_bounds();
+    const std::vector<Rect> bounds = item_bounds();
     for (std::size_t index = 0; index < items_.size(); ++index) {
         if (!items_[index].visible) continue;
         SemanticNode node;
@@ -383,9 +394,9 @@ std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
 bool MenuStrip::on_semantic_child_action(std::string_view id,
                                          SemanticAction action,
                                          std::string_view) {
-    const auto found = std::find_if(items_.begin(), items_.end(),
-        [id](const MenuStripItemSpec& item) { return item.stable_id == id; });
-    if (found == items_.end() || !found->visible || !found->enabled) return false;
+    std::vector<MenuStripItemSpec>::iterator found = items_.begin();
+    while (found != items_.end() && (*found).stable_id != id) ++found;
+    if (found == items_.end() || !(*found).visible || !(*found).enabled) return false;
     const std::size_t index = static_cast<std::size_t>(
         std::distance(items_.begin(), found));
     if (action == SemanticAction::collapse) {
@@ -395,7 +406,7 @@ bool MenuStrip::on_semantic_child_action(std::string_view id,
     }
     if (action != SemanticAction::focus && action != SemanticAction::press &&
         action != SemanticAction::expand) return false;
-    if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+    if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     set_hot(index);
     if (action != SemanticAction::focus) return open(index);
     return true;
@@ -403,11 +414,11 @@ bool MenuStrip::on_semantic_child_action(std::string_view id,
 
 bool MenuStrip::mnemonic_matches(char32_t character) const noexcept {
     if (!use_mnemonic_) return false;
-    return std::any_of(items_.begin(), items_.end(),
-        [character](const MenuStripItemSpec& item) {
-            return item.visible && item.enabled &&
-                   is_mnemonic(character, item.text);
-        });
+    for (const MenuStripItemSpec& item : items_) {
+        if (item.visible && item.enabled &&
+            is_mnemonic(character, item.text)) return true;
+    }
+    return false;
 }
 
 bool MenuStrip::process_mnemonic_self(char32_t character) {
@@ -424,13 +435,14 @@ bool MenuStrip::process_mnemonic_self(char32_t character) {
     const std::optional<std::size_t> current = active_index_
         ? active_index_ : hot_index_;
     if (current) {
-        const auto found = std::find(matches.begin(), matches.end(), *current);
+        const std::vector<std::size_t>::iterator found =
+            std::find(matches.begin(), matches.end(), *current);
         if (found != matches.end()) {
-            const auto next = std::next(found);
+            const std::vector<std::size_t>::iterator next = std::next(found);
             selected = next == matches.end() ? matches.front() : *next;
         }
     }
-    if (window() && !window()->request_focus(shared_from_this())) {
+    if (window() && !(*window()).request_focus(shared_from_this())) {
         // The mnemonic is still owned, but prevent-mode validation may reject
         // the focus transaction that would authorize opening the popup.
         return true;
@@ -441,7 +453,7 @@ bool MenuStrip::process_mnemonic_self(char32_t character) {
 
 void MenuStrip::on_dispose() noexcept {
     close();
-    if (popup_) popup_->dispose();
+    if (popup_) (*popup_).dispose();
 }
 
 

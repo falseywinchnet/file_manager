@@ -13,18 +13,25 @@ Timer::Timer(Window& window, std::chrono::milliseconds interval)
         throw std::invalid_argument("GUI.Forms Timer interval must be at least 1 ms");
     }
     window.verify_access("Timer construction");
-    callback_state_->owner = this;
+    (*callback_state_).owner = this;
 }
 
 Timer::~Timer() {
     request_.disconnect();
     enabled_ = false;
-    if (callback_state_) callback_state_->owner = nullptr;
+    if (callback_state_) (*callback_state_).owner = nullptr;
+}
+
+void Timer::ScheduledTickCallback::operator()(FrameTime) const {
+    const std::shared_ptr<CallbackState> callback_state = state.lock();
+    Timer* timer = callback_state ? (*callback_state).owner : nullptr;
+    if (!timer || !(*timer).is_alive() || !(*timer).enabled_) return;
+    (*timer).tick_.emit();
 }
 
 Window* Timer::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 void Timer::require_mutable_timer(std::string_view operation) const {
@@ -35,7 +42,7 @@ void Timer::require_mutable_timer(std::string_view operation) const {
     if (!owner) {
         throw std::logic_error("GUI.Forms cannot use a Timer after Window shutdown");
     }
-    owner->verify_access(operation);
+    (*owner).verify_access(operation);
 }
 
 void Timer::set_interval(std::chrono::milliseconds interval) {
@@ -73,14 +80,9 @@ void Timer::schedule(FrameTime first_deadline) {
         throw std::logic_error("GUI.Forms cannot schedule after Window shutdown");
     }
     enabled_ = true;
-    const std::weak_ptr<CallbackState> weak = callback_state_;
-    request_ = owner->schedule_ui_timer(
-        *this, interval_, first_deadline, [weak](FrameTime) {
-            const auto state = weak.lock();
-            Timer* timer = state ? state->owner : nullptr;
-            if (!timer || !timer->is_alive() || !timer->enabled_) return;
-            timer->tick_.emit();
-        });
+    request_ = (*owner).schedule_ui_timer(
+        *this, interval_, first_deadline,
+        ScheduledTickCallback{callback_state_});
 }
 
 void Timer::stop() {
@@ -91,14 +93,14 @@ void Timer::stop() {
 
 void Timer::verify_dispose_thread() {
     if (Window* owner = bound_window()) {
-        owner->verify_access("Timer disposal");
+        (*owner).verify_access("Timer disposal");
     }
 }
 
 void Timer::on_dispose() noexcept {
     enabled_ = false;
     request_.disconnect();
-    if (callback_state_) callback_state_->owner = nullptr;
+    if (callback_state_) (*callback_state_).owner = nullptr;
     window_lifetime_.reset();
 }
 

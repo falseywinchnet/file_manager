@@ -5,6 +5,16 @@
 #include <utility>
 
 namespace gui_forms {
+namespace {
+
+struct ExpiredRevocable final {
+    [[nodiscard]] bool operator()(
+        const std::weak_ptr<detail::Revocable>& candidate) const noexcept {
+        return candidate.expired();
+    }
+};
+
+} // namespace
 
 Component::~Component() = default;
 
@@ -22,14 +32,14 @@ void Component::dispose() {
 void Component::own_revocable(
     const std::weak_ptr<detail::Revocable>& revocable) {
     if (!is_alive()) {
-        if (auto work = revocable.lock()) {
-            work->disconnect();
+        if (std::shared_ptr<gui_forms::detail::Revocable> work = revocable.lock()) {
+            (*work).disconnect();
         }
         return;
     }
     owned_revocables_.erase(
         std::remove_if(owned_revocables_.begin(), owned_revocables_.end(),
-                       [](const auto& candidate) { return candidate.expired(); }),
+                       ExpiredRevocable{}),
         owned_revocables_.end());
     owned_revocables_.push_back(revocable);
 }
@@ -39,12 +49,14 @@ void Component::verify_dispose_thread() {}
 void Component::on_dispose() noexcept {}
 
 void Component::revoke_owned_work() noexcept {
-    auto owned = std::exchange(owned_revocables_, {});
+    std::vector<std::weak_ptr<gui_forms::detail::Revocable>> owned = std::exchange(owned_revocables_, {});
     // Revocables form an acquisition stack, so tear them down in strict
     // reverse order and never callback into a disposing owner.
-    for (auto item = owned.rbegin(); item != owned.rend(); ++item) {
-        if (auto revocable = item->lock()) {
-            revocable->disconnect();
+    for (std::vector<std::weak_ptr<gui_forms::detail::Revocable>>::reverse_iterator
+             item = owned.rbegin();
+         item != owned.rend(); ++item) {
+        if (std::shared_ptr<gui_forms::detail::Revocable> revocable = (*item).lock()) {
+            (*revocable).disconnect();
         }
     }
 }

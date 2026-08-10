@@ -13,18 +13,37 @@ namespace gui_forms {
 struct FontFaceId final {
     std::uint64_t value{};
     [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
-    friend constexpr auto operator<=>(const FontFaceId&,
-                                      const FontFaceId&) = default;
+    friend constexpr bool operator==(const FontFaceId& left,
+                                     const FontFaceId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const FontFaceId& left, const FontFaceId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 struct GlyphId final {
     std::uint32_t value{};
-    friend constexpr auto operator<=>(const GlyphId&, const GlyphId&) = default;
+    friend constexpr bool operator==(const GlyphId& left,
+                                     const GlyphId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const GlyphId& left, const GlyphId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 struct OpenTypeTag final {
     std::uint32_t value{};
     [[nodiscard]] constexpr bool valid() const noexcept { return value != 0; }
-    friend constexpr auto operator<=>(const OpenTypeTag&,
-                                      const OpenTypeTag&) = default;
+    friend constexpr bool operator==(const OpenTypeTag& left,
+                                     const OpenTypeTag& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const OpenTypeTag& left, const OpenTypeTag& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 
 [[nodiscard]] constexpr OpenTypeTag open_type_tag(
@@ -41,8 +60,11 @@ struct ShapingFeature final {
     OpenTypeTag tag{};
     std::uint32_t value{};
     Utf8Range range{};
-    friend constexpr bool operator==(const ShapingFeature&,
-                                     const ShapingFeature&) = default;
+    friend constexpr bool operator==(const ShapingFeature& left,
+                                     const ShapingFeature& right) noexcept {
+        return left.tag == right.tag && left.value == right.value &&
+               left.range == right.range;
+    }
 };
 struct ShapingRequest final {
     std::string_view utf8_text;
@@ -61,8 +83,14 @@ struct GlyphPlacement final {
     float advance_y{};
     float offset_x{};
     float offset_y{};
-    friend constexpr bool operator==(const GlyphPlacement&,
-                                     const GlyphPlacement&) = default;
+    friend constexpr bool operator==(const GlyphPlacement& left,
+                                     const GlyphPlacement& right) noexcept {
+        return left.glyph == right.glyph && left.cluster == right.cluster &&
+               left.advance_x == right.advance_x &&
+               left.advance_y == right.advance_y &&
+               left.offset_x == right.offset_x &&
+               left.offset_y == right.offset_y;
+    }
 };
 struct GlyphRun final {
     Utf8Range source_range{};

@@ -74,6 +74,8 @@ public:
                                   std::string_view value) override;
 
 private:
+    using RememberedFocusMap =
+        std::unordered_map<std::uint64_t, Control::WeakPtr>;
     [[nodiscard]] std::optional<std::size_t> index_of(
         const std::shared_ptr<TabPage>& page) const;
     void select_relative(int delta);
@@ -84,7 +86,7 @@ private:
 
     std::vector<std::weak_ptr<TabPage>> pages_;
     std::weak_ptr<TabPage> selected_page_;
-    std::unordered_map<std::uint64_t, Control::WeakPtr> remembered_focus_;
+    RememberedFocusMap remembered_focus_;
     BasicControlStyle style_;
     Size item_size_{120.0, 30.0};
     FontSpec font_{FontRole::control, 11.0, 600, false, 0.24};

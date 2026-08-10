@@ -2,6 +2,7 @@
 
 #include "gui_forms/c_api.h"
 
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -21,10 +22,11 @@ inline gf_result fail(gf_result result, std::string message) noexcept {
     return result;
 }
 
-template <typename Operation>
-gf_result translate(Operation&& operation) noexcept {
+template <typename Operation, typename... Arguments>
+gf_result translate(Operation operation, Arguments&&... arguments) noexcept {
     try {
-        return operation();
+        return std::invoke(operation,
+                           std::forward<Arguments>(arguments)...);
     } catch (const std::invalid_argument& error) {
         return fail(GF_ERROR_INVALID_ARGUMENT, error.what());
     } catch (const std::logic_error& error) {

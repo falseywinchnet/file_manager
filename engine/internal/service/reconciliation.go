@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"filemanager/engine/api"
+	"filemanager/engine/internal/catalog"
 	"filemanager/engine/internal/generation"
+	"filemanager/engine/internal/scan"
 )
 
 // Reconcile performs a complete authoritative metadata scan of an approved
@@ -32,12 +34,28 @@ func (s *Service) reconcile(ctx context.Context, rootID api.RootID, forcePublica
 	owns := func(root api.RootID, absolute string) bool {
 		return snapshot.OwnsProjected(root, absolute) && s.guard.Allows(root, absolute)
 	}
-	shard, err := s.scanner.Scan(ctx, projection.Spec, owns)
+	var shard *catalog.Shard
+	var err error
+	expectedObjectID := s.guard.ExpectedObjectID(rootID)
+	if expectedObjectID != "" {
+		scanner, ok := s.scanner.(interface {
+			ScanApproved(context.Context, api.RootSpec, string, scan.OwnsFunc) (*catalog.Shard, error)
+		})
+		if !ok {
+			return api.ReconcileReport{}, api.NewFault(api.ErrorInternal, "installed root scanner cannot verify root identity")
+		}
+		shard, err = scanner.ScanApproved(ctx, projection.Spec, expectedObjectID, owns)
+	} else {
+		shard, err = s.scanner.Scan(ctx, projection.Spec, owns)
+	}
 	if err != nil {
 		if contextErr := ctx.Err(); contextErr != nil {
 			return api.ReconcileReport{}, contextErr
 		}
 		_, _ = s.store.MarkStale(rootID, "last reconciliation failed")
+		if errors.Is(err, scan.ErrRootIdentityChanged) {
+			return api.ReconcileReport{}, api.WrapFault(api.ErrorUnapprovedRoot, "approved root identity changed", err)
+		}
 		return api.ReconcileReport{}, api.WrapFault(api.ErrorInternal, "reconcile approved root", err)
 	}
 	if s.durable != nil {

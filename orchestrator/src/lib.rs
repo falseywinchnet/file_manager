@@ -23,6 +23,7 @@ pub mod local_wire;
 pub mod release;
 pub mod runtime_health;
 mod service;
+pub mod worker_pool;
 
 pub use common::{ApiError, ApiErrorCode, Request, Response, TerminalStatus};
 pub use kernel::Kernel;

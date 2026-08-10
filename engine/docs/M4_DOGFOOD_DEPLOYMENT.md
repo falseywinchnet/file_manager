@@ -16,14 +16,29 @@ make arbitrary filesystem paths admissible.
 | `query.sock`, `admin.sock` | Unix sockets, `0600` | separated local authorities |
 | `query.token`, `admin.token` | `0600`, replaced each process start | independent 256-bit session credentials |
 | `discovery.json` | `0600`, replaced each process start | instance identity and endpoint paths |
+| store `ADMISSION` | same uid, regular file, `0600` | binds the checked generation to the exact manifest root identities and exclusions that produced it |
 | LaunchAgent plist | user LaunchAgents directory, `0644` | `RunAtLoad`/`KeepAlive` process supervision |
 
 Both endpoints validate the Unix peer uid before parsing a credential. Local
 messages use an eight-byte `ENG1` header containing a big-endian bounded JSON
-length. The current maximum is 1 MiB and each request has a 30-second service
-deadline. The query endpoint admits version/status/configuration, query,
-live-query, and inspect. The admin endpoint admits version/status/configuration,
-root plan/apply, reconcile, rebuild, integrity, and shutdown.
+length. The current maximum is 1 MiB. Query/admin connection counts are capped
+at 32/4; authentication, idle-frame, request, and write deadlines prevent an
+accepted connection from holding an unbounded process resource. Shutdown closes
+accepted sockets before waiting for their goroutines. The query endpoint admits
+version/status/configuration, query, live-query, and inspect. The admin endpoint
+admits version/status/configuration, root plan/apply, reconcile, rebuild,
+integrity, and shutdown.
+
+The service opens and identifies the approved root before scanning or starting
+a live traversal. Path replacement after manifest validation therefore fails
+closed instead of scanning the object that happened to appear at the same
+address. On startup, the `ADMISSION` record must name both the recovered
+generation and the digest of the current host/root/exclusion authority. A
+missing or mismatched record forces authoritative reconciliation before either
+socket is published. This is a policy-generation binding, not a clean-shutdown
+marker. A successful installed reconcile or rebuild advances the record before
+its response is acknowledged, so the next restart can recover that generation
+without manufacturing another source scan.
 
 ## M4 installation
 
@@ -39,7 +54,8 @@ M4 against the deterministic mirrored repository root:
 The installer builds with the M4 Go toolchain, installs the binary, creates and
 validates the host-bound manifest, lints the plist, bootstraps the exact
 LaunchAgent, waits for the query socket, and performs an authenticated status
-call. It never requests `sudo`.
+call. An upgrade whose admission policy is not yet bound may spend the readiness
+window doing the mandatory startup reconciliation. It never requests `sudo`.
 
 Useful authenticated calls on the M4 are:
 

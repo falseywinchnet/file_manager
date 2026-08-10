@@ -1,64 +1,83 @@
-# GUI.Forms in-place rewrite program
+# GUI.Forms exact-behavior rewrite program
 
-Status: **architect interview and rewrite design; implementation forbidden**.
+Status: **architect decisions reconciled; implementation forbidden until an
+explicit sibling start direction**.
 
-This directory holds instructions for a future sibling agent to rewrite the
-existing `../gui_forms/` implementation in place. It is deliberately outside
-the implementation subtree so planning work does not masquerade as a local
-GUI.Forms directive before the decisions are accepted.
+This directory holds the governing instructions for a future sibling to rewrite
+the existing `../gui_forms/` first-party C++ in place. It is planning material,
+not permission to begin.
 
-## Objective
+## Mission
 
-Rewrite GUI.Forms toward a deliberately selected BFFT house style while
-preserving its retained behavior, public C contract, platform boundaries, and
-measured conformance evidence.
+Rewrite production `include/` and `src/` first, then repair supporting
+first-party source where required, while preserving:
 
-Existing broader BFFT sources are not normative merely because they exist.
-Their uses of `auto`, capturing closures, and `std::vector` are recorded by the
-architect as unfinished cleanup debt, not permission for GUI.Forms.
+- files and directory organization;
+- behavior and dependent APIs, with only germane minor native C++ API changes;
+- C ABI ownership and semantics;
+- retained identities and lifecycle order;
+- control behavior, rendering behavior, host behavior, and dependent-library
+  boundaries;
+- tests, fixtures, and measured evidence.
 
-The intended direction is:
+This is not an STL purge, portability project, private-standard-library project,
+allocator rewrite, API redesign, or UEFI deliverable.
 
-- explicit named types rather than `auto`;
-- explicit allocation, ownership, capacity, and failure;
-- GUI.Forms-owned heap-array and range primitives instead of `std::vector`;
-- lambdas classified by capture, escape, allocation, and lifetime rather than
-  accepted or rejected as one undifferentiated feature;
-- `std::function` reduced to approved hosted seams, with important callback
-  roles moved to purpose-built in-house representations;
-- a complete audit of standard-library and libc heavy lifting, including
-  algorithms, text conversion, allocation, exceptions, threading, clocks,
-  filesystem access, and dynamic loading;
-- a portable nucleus whose contracts do not preclude a future UEFI/bare-metal
-  host and renderer.
+## Governing criterion: epistemic cost
 
-This is not a promise to remove every standard-library facility, target a
-freestanding implementation immediately, or port Skia/AppKit/Win32 to firmware.
-Those would be separate decisions.
+Remove constructs that make type, control flow, lifetime, allocation, or actual
+execution harder to know than the problem warrants.
 
-## Authority
+Compiler machinery is welcome when architecture has already made the decision
+and the compiler merely instantiates explicit machinery. It is undesirable when
+inference itself makes the architectural choice.
 
-The grand architect's statements recorded in `GIVENS.md` are authoritative.
-All unresolved language, runtime, ABI, and migration choices live in
-`DECISION_LEDGER.md`. No candidate becomes policy until discussed and marked
-`DECIDED` with owner approval.
+Consequently:
 
-The active GUI.Forms lifecycle decision and public/cross-project contracts must
-survive the rewrite unless separately amended through their existing decision
-and negotiation processes. Representation changes do not acquire permission to
-change event order, retained identity, host lifecycle, accessibility behavior,
-or ABI semantics.
+- ordinary useful STL facilities remain;
+- templates and `consteval` remain;
+- `auto`, trailing-return syntax, lambdas, coroutines, structured bindings,
+  generic lambdas, general `std::any`, and convenience-defaulted comparison
+  machinery are banned in scope; the existing WinForms-compatible Tag surface
+  is the only `std::any` exception;
+- `std::vector`, `std::unique_ptr`, `std::span`, `std::optional`,
+  `std::variant`, necessary RTTI, and the approved standard algorithms remain;
+- `std::function` remains generally allowed, with obvious waste audited;
+- events receive a named, zero-bind-allocation Delegate/Event design;
+- sorting and stable sorting receive a call-site workload audit and measured
+  small house alternatives where justified;
+- binary search is small enough to house-own;
+- special heap arrays, stable pools, allocators, and concurrency machinery enter
+  only for concrete workloads.
 
 ## Documents
 
-- `GIVENS.md` — architect requirements and observed facts.
-- `DECISION_LEDGER.md` — questions that must be resolved together.
-- `AUDIT_AND_MEASUREMENTS.md` — repeatable dependency inventory and baselines.
-- `MIGRATION_SKELETON.md` — phase structure without prematurely selected
-  implementation details.
-- `SIBLING_HANDOFF.md` — exact instructions for the future implementing agent.
+- `DECISION_LEDGER.md` — the architect's authoritative response, including
+  decided, open, and audit items.
+- `GIVENS.md` — compact operational policy extracted from the response.
+- `STYLE_REFERENCES.md` — pinned BFFT/Cleanup source evidence and its bounded
+  interpretation.
+- `SORT_AND_SEARCH_AUDIT.md` — current sorting and binary-search call-site map.
+- `OPEN_ITEMS.md` — resolved option catalogue retained as decision/reversal
+  evidence.
+- `AUDIT_AND_MEASUREMENTS.md` — repeatable rewrite audit method.
+- `MIGRATION_SKELETON.md` — candidate, behavior-preserving implementation order.
+- `SIBLING_HANDOFF.md` — instructions for the future implementing sibling.
+- `ARCHITECT_SELECTIONS.md` — authoritative closure of every option in
+  `OPEN_ITEMS.md`.
+- `FEATURE_EDGE_AUDIT.md` — observed C++20 feature edges and their selected
+  treatment.
+- `OWNERSHIP_AUDIT.md` — generated ownership/lifetime evidence banked for a
+  future lifecycle round.
+- `tools/trace_ownership.py` — reproducible ownership inventory generator.
+- `ENFORCEMENT_SPEC.md` — selected LibTooling, textual-control, and warning
+  ratchet design.
+- `IMPLEMENTATION_START_CHECKLIST.md` — exact preflight and first-batch handoff
+  for the implementing sibling.
 
 ## Current gate
 
-The next activity is discussion, not code. Begin with decision cluster A in the
-ledger: portability target, rewrite boundary, language level, and `auto` policy.
+The option interview is closed. Implementation remains blocked until the exact
+starting snapshot and overlap are recorded, semantic inventories/oracles are
+refreshed, the first batch is reviewed, and the architect explicitly directs
+the implementing sibling to begin.

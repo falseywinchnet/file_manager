@@ -37,8 +37,10 @@ public:
     [[nodiscard]] static std::shared_ptr<PropertyEditorRegistry> create_default();
 
 private:
-    std::map<std::string, PropertyEditorFactory> factories_;
-    std::map<BindingValueKind, std::string> kind_mappings_;
+    using FactoryMap = std::map<std::string, PropertyEditorFactory>;
+    using KindMap = std::map<BindingValueKind, std::string>;
+    FactoryMap factories_;
+    KindMap kind_mappings_;
 };
 
 } // namespace gui_forms

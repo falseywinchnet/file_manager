@@ -15,7 +15,7 @@ protected:
         const BOOL enumerated = EnumDisplayMonitors(
             nullptr, nullptr,
             [](HMONITOR monitor, HDC, LPRECT, LPARAM context) -> BOOL {
-                auto& monitors = *reinterpret_cast<std::vector<HostMonitor>*>(context);
+                std::vector<HostMonitor>& monitors = *reinterpret_cast<std::vector<HostMonitor>*>(context);
                 MONITORINFOEXW info{};
                 info.cbSize = sizeof(info);
                 if (!GetMonitorInfoW(monitor, &info)) return TRUE;

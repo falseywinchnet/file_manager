@@ -120,7 +120,7 @@ void ProgressBar::set_motion_policy(MotionPolicy policy) {
 MotionPolicy ProgressBar::effective_motion_policy() const noexcept {
     MotionPolicy policy = motion_policy_;
     if (window() != nullptr &&
-        window()->presentation_settings().reduced_motion) {
+        (*window()).presentation_settings().reduced_motion) {
         policy.reduced = true;
     }
     return policy;
@@ -158,20 +158,24 @@ void ProgressBar::update_animation_registration() {
     const FrameInterval interval = policy.frame_interval(
         std::chrono::milliseconds(16));
     last_animation_frame_ = FrameClock::now();
-    animation_frames_ = window()->activate_surface(
+    animation_frames_ = (*window()).activate_surface(
         shared_from_this(), interval, last_animation_frame_ + interval);
 }
 
 void ProgressBar::on_attached_to_window() {
     RangeControl::on_attached_to_window();
     if (window() != nullptr) {
-        presentation_subscription_ = window()->presentation_changed().subscribe(
-            *this, [this](const PresentationSettings&) {
-                update_animation_registration();
-                invalidate(Dirty::paint | Dirty::semantics);
-            });
+        presentation_subscription_ = (*window()).presentation_changed().subscribe(
+            *this,
+            Delegate<const PresentationSettings&>::bind<
+                ProgressBar, &ProgressBar::on_presentation_changed>(*this));
     }
     update_animation_registration();
+}
+
+void ProgressBar::on_presentation_changed(const PresentationSettings&) {
+    update_animation_registration();
+    invalidate(Dirty::paint | Dirty::semantics);
 }
 
 void ProgressBar::on_detached_from_window() noexcept {

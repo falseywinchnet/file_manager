@@ -1,5 +1,6 @@
 #include "gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp"
 
+#include "gui_forms/detail/algorithm/binary_search.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -22,7 +23,7 @@ void CheckedListBox::set_items(std::vector<std::string> items) {
         // If ListBox rejected the new collection before mutation, restore the
         // matching check model. If a user callback threw after mutation, the
         // new sizes already match and are the only coherent retained state.
-        if (this->items().size() == previous.size()) check_states_ = previous;
+        if ((*this).items().size() == previous.size()) check_states_ = previous;
         throw;
     }
     invalidate(Dirty::paint | Dirty::semantics);
@@ -142,12 +143,11 @@ void CheckedListBox::on_pointer(PointerEvent& event) {
         ListBox::on_pointer(event);
         return;
     }
-    const auto index = event.action == PointerAction::down &&
+    const std::optional<std::size_t> index = event.action == PointerAction::down &&
                            event.button == PointerButton::primary
         ? index_at(event.position) : std::optional<std::size_t>{};
-    const bool was_selected = index &&
-        std::binary_search(selected_indices().begin(), selected_indices().end(),
-                           *index);
+    const bool was_selected = index && detail::binary_search_contains(
+        selected_indices(), *index);
     ListBox::on_pointer(event);
     if (!is_alive() || !index || *index >= items().size()) return;
     if (check_on_click_ || was_selected) {
@@ -160,7 +160,7 @@ void CheckedListBox::on_key(KeyEvent& event) {
     if (event.action == KeyAction::down &&
         event.physical_key == PhysicalKey::space && focused_for_extension() &&
         enabled()) {
-        if (const auto index = active_index_for_extension()) {
+        if (const std::optional<std::size_t> index = active_index_for_extension()) {
             toggle_item(*index);
             event.handled = true;
         }
@@ -221,16 +221,16 @@ bool CheckedListBox::on_semantic_child_action(std::string_view stable_id,
     if (action != SemanticAction::press) {
         return ListBox::on_semantic_child_action(stable_id, action, value);
     }
-    const std::string prefix = std::string(this->stable_id().value()) + ".item.";
+    const std::string prefix = std::string((*this).stable_id().value()) + ".item.";
     if (!stable_id.starts_with(prefix)) return false;
     const std::string_view suffix = stable_id.substr(prefix.size());
     std::size_t index{};
-    const auto parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(),
+    const std::from_chars_result parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(),
                                         index);
     if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + suffix.size() ||
         index >= items().size()) return false;
     if (window() != nullptr) {
-        static_cast<void>(window()->request_focus(shared_from_this()));
+        static_cast<void>((*window()).request_focus(shared_from_this()));
     }
     select_index(index, false, false);
     if (is_alive()) toggle_item(index);

@@ -9,7 +9,7 @@
 namespace gui_forms {
 
 std::shared_ptr<const PropertyEnumDescriptor> picture_box_size_mode_enum() {
-    static const auto value = std::make_shared<const PropertyEnumDescriptor>(
+    static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
         PropertyEnumDescriptor{
             "System.Windows.Forms.PictureBoxSizeMode",
             {{"Normal", 0}, {"StretchImage", 1}, {"AutoSize", 2},
@@ -22,7 +22,7 @@ BindingValue picture_box_size_mode_value(PictureBoxSizeMode mode) {
     PropertyDescriptor descriptor;
     descriptor.kind = BindingValueKind::enumeration;
     descriptor.enumeration = picture_box_size_mode_enum();
-    const auto normalized = convert_property_value(
+    const std::optional<BindingValue> normalized = convert_property_value(
         BindingValue{static_cast<std::int64_t>(mode)}, descriptor);
     if (!normalized) {
         throw std::logic_error(

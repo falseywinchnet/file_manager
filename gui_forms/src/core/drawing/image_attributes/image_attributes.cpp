@@ -21,14 +21,16 @@ void ImageAttributes::set_remap_table(
     }
     std::vector<ImageAttributesSnapshot::ColorRemap> copy;
     copy.reserve(table.size());
-    for (const auto& entry : table) {
+    for (const gui_drawing::ImageAttributesSnapshot::ColorRemap& entry : table) {
         if (entry.old_color.is_empty() || entry.new_color.is_empty()) {
             throw std::invalid_argument("image color remaps require concrete colors");
         }
-        const auto duplicate = std::find_if(copy.begin(), copy.end(),
-            [&](const auto& existing) {
-                return existing.old_color.argb() == entry.old_color.argb();
-            });
+        std::vector<ImageAttributesSnapshot::ColorRemap>::iterator duplicate =
+            copy.begin();
+        while (duplicate != copy.end() &&
+               (*duplicate).old_color.argb() != entry.old_color.argb()) {
+            ++duplicate;
+        }
         if (duplicate != copy.end()) {
             throw std::invalid_argument("image color remap source colors must be unique");
         }
@@ -44,8 +46,8 @@ void ImageAttributes::reset_remap_table() {
 
 std::unique_ptr<ImageAttributes> ImageAttributes::clone() const {
     require_alive();
-    auto result = std::make_unique<ImageAttributes>();
-    result->value_ = value_;
+    std::unique_ptr<gui_drawing::ImageAttributes> result = std::make_unique<ImageAttributes>();
+    (*result).value_ = value_;
     return result;
 }
 
@@ -56,4 +58,3 @@ ImageAttributesSnapshot ImageAttributes::snapshot() const {
 
 
 } // namespace gui_drawing
-

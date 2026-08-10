@@ -31,7 +31,11 @@ struct RectI final {
     void intersect(RectI rect) noexcept;
     [[nodiscard]] static RectI intersection(RectI left, RectI right) noexcept;
     [[nodiscard]] static RectI united(RectI left, RectI right) noexcept;
-    friend constexpr bool operator==(const RectI&, const RectI&) = default;
+    friend constexpr bool operator==(const RectI& left,
+                                     const RectI& right) noexcept {
+        return left.x == right.x && left.y == right.y &&
+               left.width == right.width && left.height == right.height;
+    }
 };
 
 } // namespace gui_drawing

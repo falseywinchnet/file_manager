@@ -44,21 +44,31 @@ enum class BindingListChangeKind : std::uint8_t {
 };
 
 struct BindingRecord final {
+    using FieldMap = std::map<std::string, BindingValue>;
+    using ErrorMap = std::map<std::string, std::string>;
+
     BindingRecord() = default;
     BindingRecord(std::string identity,
-                  std::map<std::string, BindingValue> values,
+                  FieldMap values,
                   bool can_edit = true,
-                  std::map<std::string, std::string> error_values = {})
+                  ErrorMap error_values = {})
         : stable_id(std::move(identity)), fields(std::move(values)),
           editable(can_edit), errors(std::move(error_values)) {}
 
     std::string stable_id;
-    std::map<std::string, BindingValue> fields;
+    FieldMap fields;
     bool editable{true};
     // Keys share the canonical field vocabulary; empty means record-wide.
-    std::map<std::string, std::string> errors;
+    ErrorMap errors;
 
-    friend bool operator==(const BindingRecord&, const BindingRecord&) = default;
+    friend bool operator==(const BindingRecord& left,
+                           const BindingRecord& right) noexcept(noexcept(
+        left.stable_id == right.stable_id && left.fields == right.fields &&
+        left.editable == right.editable && left.errors == right.errors)) {
+        return left.stable_id == right.stable_id &&
+               left.fields == right.fields && left.editable == right.editable &&
+               left.errors == right.errors;
+    }
 };
 
 struct BindingListChange final {

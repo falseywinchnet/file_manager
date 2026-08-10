@@ -1,0 +1,1147 @@
+{
+  "rewriteCount": 190,
+  "rewrites": [
+    {
+      "baseOffset": 7263,
+      "fileSize": 21732,
+      "operatorOffset": 7269,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 7670,
+      "fileSize": 21732,
+      "operatorOffset": 7676,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 8032,
+      "fileSize": 21732,
+      "operatorOffset": 8038,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 11556,
+      "fileSize": 21732,
+      "operatorOffset": 11562,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 11938,
+      "fileSize": 21732,
+      "operatorOffset": 11944,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 20419,
+      "fileSize": 21732,
+      "operatorOffset": 20424,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 20560,
+      "fileSize": 21732,
+      "operatorOffset": 20565,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 20681,
+      "fileSize": 21732,
+      "operatorOffset": 20686,
+      "path": "src/abi/drawing_platform_windows.cpp"
+    },
+    {
+      "baseOffset": 1128,
+      "fileSize": 13943,
+      "operatorOffset": 1133,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 1904,
+      "fileSize": 13943,
+      "operatorOffset": 1912,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 2213,
+      "fileSize": 13943,
+      "operatorOffset": 2221,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 3372,
+      "fileSize": 13943,
+      "operatorOffset": 3380,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 3577,
+      "fileSize": 13943,
+      "operatorOffset": 3585,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 3641,
+      "fileSize": 13943,
+      "operatorOffset": 3649,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 3720,
+      "fileSize": 13943,
+      "operatorOffset": 3726,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 4706,
+      "fileSize": 13943,
+      "operatorOffset": 4714,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 5117,
+      "fileSize": 13943,
+      "operatorOffset": 5122,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 5199,
+      "fileSize": 13943,
+      "operatorOffset": 5205,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 5224,
+      "fileSize": 13943,
+      "operatorOffset": 5232,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 5776,
+      "fileSize": 13943,
+      "operatorOffset": 5784,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 6108,
+      "fileSize": 13943,
+      "operatorOffset": 6116,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 6771,
+      "fileSize": 13943,
+      "operatorOffset": 6779,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 8052,
+      "fileSize": 13943,
+      "operatorOffset": 8060,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 8788,
+      "fileSize": 13943,
+      "operatorOffset": 8793,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 9006,
+      "fileSize": 13943,
+      "operatorOffset": 9011,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 9515,
+      "fileSize": 13943,
+      "operatorOffset": 9521,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 9580,
+      "fileSize": 13943,
+      "operatorOffset": 9588,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 10167,
+      "fileSize": 13943,
+      "operatorOffset": 10175,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 10751,
+      "fileSize": 13943,
+      "operatorOffset": 10759,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 11382,
+      "fileSize": 13943,
+      "operatorOffset": 11390,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 12373,
+      "fileSize": 13943,
+      "operatorOffset": 12381,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 13381,
+      "fileSize": 13943,
+      "operatorOffset": 13386,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 13610,
+      "fileSize": 13943,
+      "operatorOffset": 13615,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 13692,
+      "fileSize": 13943,
+      "operatorOffset": 13710,
+      "path": "src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 77314,
+      "fileSize": 138137,
+      "operatorOffset": 77333,
+      "path": "src/abi/registry/registry.hpp"
+    },
+    {
+      "baseOffset": 77392,
+      "fileSize": 138137,
+      "operatorOffset": 77411,
+      "path": "src/abi/registry/registry.hpp"
+    },
+    {
+      "baseOffset": 77470,
+      "fileSize": 138137,
+      "operatorOffset": 77475,
+      "path": "src/abi/registry/registry.hpp"
+    },
+    {
+      "baseOffset": 79247,
+      "fileSize": 138137,
+      "operatorOffset": 79253,
+      "path": "src/abi/registry/registry.hpp"
+    },
+    {
+      "baseOffset": 17935,
+      "fileSize": 139870,
+      "operatorOffset": 17941,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 18053,
+      "fileSize": 139870,
+      "operatorOffset": 18058,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 18963,
+      "fileSize": 139870,
+      "operatorOffset": 18968,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 18994,
+      "fileSize": 139870,
+      "operatorOffset": 18999,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 19173,
+      "fileSize": 139870,
+      "operatorOffset": 19178,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 19430,
+      "fileSize": 139870,
+      "operatorOffset": 19435,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 25730,
+      "fileSize": 139870,
+      "operatorOffset": 25738,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 25763,
+      "fileSize": 139870,
+      "operatorOffset": 25771,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 25866,
+      "fileSize": 139870,
+      "operatorOffset": 25874,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 25918,
+      "fileSize": 139870,
+      "operatorOffset": 25926,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 25973,
+      "fileSize": 139870,
+      "operatorOffset": 25981,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26016,
+      "fileSize": 139870,
+      "operatorOffset": 26024,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26233,
+      "fileSize": 139870,
+      "operatorOffset": 26241,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26350,
+      "fileSize": 139870,
+      "operatorOffset": 26358,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26594,
+      "fileSize": 139870,
+      "operatorOffset": 26602,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26657,
+      "fileSize": 139870,
+      "operatorOffset": 26665,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26722,
+      "fileSize": 139870,
+      "operatorOffset": 26730,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26808,
+      "fileSize": 139870,
+      "operatorOffset": 26816,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 26872,
+      "fileSize": 139870,
+      "operatorOffset": 26880,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 27126,
+      "fileSize": 139870,
+      "operatorOffset": 27134,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 27925,
+      "fileSize": 139870,
+      "operatorOffset": 27933,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 28089,
+      "fileSize": 139870,
+      "operatorOffset": 28096,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 43366,
+      "fileSize": 139870,
+      "operatorOffset": 43371,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 43421,
+      "fileSize": 139870,
+      "operatorOffset": 43426,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 43925,
+      "fileSize": 139870,
+      "operatorOffset": 43932,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 47933,
+      "fileSize": 139870,
+      "operatorOffset": 47938,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 50942,
+      "fileSize": 139870,
+      "operatorOffset": 50947,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 51005,
+      "fileSize": 139870,
+      "operatorOffset": 51010,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 51234,
+      "fileSize": 139870,
+      "operatorOffset": 51239,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 56045,
+      "fileSize": 139870,
+      "operatorOffset": 56065,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 56103,
+      "fileSize": 139870,
+      "operatorOffset": 56123,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 74211,
+      "fileSize": 139870,
+      "operatorOffset": 74217,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 74613,
+      "fileSize": 139870,
+      "operatorOffset": 74620,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 74728,
+      "fileSize": 139870,
+      "operatorOffset": 74733,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75024,
+      "fileSize": 139870,
+      "operatorOffset": 75033,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75520,
+      "fileSize": 139870,
+      "operatorOffset": 75529,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75725,
+      "fileSize": 139870,
+      "operatorOffset": 75734,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75777,
+      "fileSize": 139870,
+      "operatorOffset": 75782,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75827,
+      "fileSize": 139870,
+      "operatorOffset": 75834,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 75878,
+      "fileSize": 139870,
+      "operatorOffset": 75884,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 78125,
+      "fileSize": 139870,
+      "operatorOffset": 78131,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 78434,
+      "fileSize": 139870,
+      "operatorOffset": 78440,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 78616,
+      "fileSize": 139870,
+      "operatorOffset": 78622,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 79619,
+      "fileSize": 139870,
+      "operatorOffset": 79625,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 83694,
+      "fileSize": 139870,
+      "operatorOffset": 83700,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 84148,
+      "fileSize": 139870,
+      "operatorOffset": 84154,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 87594,
+      "fileSize": 139870,
+      "operatorOffset": 87600,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 87987,
+      "fileSize": 139870,
+      "operatorOffset": 87993,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 89836,
+      "fileSize": 139870,
+      "operatorOffset": 89842,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97616,
+      "fileSize": 139870,
+      "operatorOffset": 97625,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97633,
+      "fileSize": 139870,
+      "operatorOffset": 97642,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97674,
+      "fileSize": 139870,
+      "operatorOffset": 97683,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97693,
+      "fileSize": 139870,
+      "operatorOffset": 97702,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97735,
+      "fileSize": 139870,
+      "operatorOffset": 97744,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97755,
+      "fileSize": 139870,
+      "operatorOffset": 97764,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97917,
+      "fileSize": 139870,
+      "operatorOffset": 97923,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 97996,
+      "fileSize": 139870,
+      "operatorOffset": 98002,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 99207,
+      "fileSize": 139870,
+      "operatorOffset": 99213,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 99569,
+      "fileSize": 139870,
+      "operatorOffset": 99575,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 100791,
+      "fileSize": 139870,
+      "operatorOffset": 100797,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 100896,
+      "fileSize": 139870,
+      "operatorOffset": 100902,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 102524,
+      "fileSize": 139870,
+      "operatorOffset": 102530,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 102617,
+      "fileSize": 139870,
+      "operatorOffset": 102623,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 102967,
+      "fileSize": 139870,
+      "operatorOffset": 102973,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 103832,
+      "fileSize": 139870,
+      "operatorOffset": 103838,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 103910,
+      "fileSize": 139870,
+      "operatorOffset": 103916,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 106158,
+      "fileSize": 139870,
+      "operatorOffset": 106164,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 106413,
+      "fileSize": 139870,
+      "operatorOffset": 106419,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 106484,
+      "fileSize": 139870,
+      "operatorOffset": 106490,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 107225,
+      "fileSize": 139870,
+      "operatorOffset": 107229,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 107282,
+      "fileSize": 139870,
+      "operatorOffset": 107286,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 107846,
+      "fileSize": 139870,
+      "operatorOffset": 107850,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 107885,
+      "fileSize": 139870,
+      "operatorOffset": 107889,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 107906,
+      "fileSize": 139870,
+      "operatorOffset": 107910,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 108016,
+      "fileSize": 139870,
+      "operatorOffset": 108020,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 108074,
+      "fileSize": 139870,
+      "operatorOffset": 108078,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 108423,
+      "fileSize": 139870,
+      "operatorOffset": 108429,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 111052,
+      "fileSize": 139870,
+      "operatorOffset": 111058,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 111099,
+      "fileSize": 139870,
+      "operatorOffset": 111106,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 111176,
+      "fileSize": 139870,
+      "operatorOffset": 111183,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 112093,
+      "fileSize": 139870,
+      "operatorOffset": 112099,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 112140,
+      "fileSize": 139870,
+      "operatorOffset": 112147,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 112190,
+      "fileSize": 139870,
+      "operatorOffset": 112196,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 112970,
+      "fileSize": 139870,
+      "operatorOffset": 112976,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 113017,
+      "fileSize": 139870,
+      "operatorOffset": 113024,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 113067,
+      "fileSize": 139870,
+      "operatorOffset": 113073,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 114096,
+      "fileSize": 139870,
+      "operatorOffset": 114102,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 114143,
+      "fileSize": 139870,
+      "operatorOffset": 114150,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 114193,
+      "fileSize": 139870,
+      "operatorOffset": 114199,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 115201,
+      "fileSize": 139870,
+      "operatorOffset": 115207,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 115248,
+      "fileSize": 139870,
+      "operatorOffset": 115255,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 115607,
+      "fileSize": 139870,
+      "operatorOffset": 115614,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 115826,
+      "fileSize": 139870,
+      "operatorOffset": 115833,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 116446,
+      "fileSize": 139870,
+      "operatorOffset": 116452,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 116493,
+      "fileSize": 139870,
+      "operatorOffset": 116500,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 116872,
+      "fileSize": 139870,
+      "operatorOffset": 116879,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 118656,
+      "fileSize": 139870,
+      "operatorOffset": 118662,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 118703,
+      "fileSize": 139870,
+      "operatorOffset": 118710,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 119078,
+      "fileSize": 139870,
+      "operatorOffset": 119085,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121139,
+      "fileSize": 139870,
+      "operatorOffset": 121145,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121186,
+      "fileSize": 139870,
+      "operatorOffset": 121193,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121442,
+      "fileSize": 139870,
+      "operatorOffset": 121449,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121594,
+      "fileSize": 139870,
+      "operatorOffset": 121600,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121825,
+      "fileSize": 139870,
+      "operatorOffset": 121832,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 121893,
+      "fileSize": 139870,
+      "operatorOffset": 121896,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 126007,
+      "fileSize": 139870,
+      "operatorOffset": 126013,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 126125,
+      "fileSize": 139870,
+      "operatorOffset": 126130,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 126192,
+      "fileSize": 139870,
+      "operatorOffset": 126197,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 135356,
+      "fileSize": 139870,
+      "operatorOffset": 135361,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 136328,
+      "fileSize": 139870,
+      "operatorOffset": 136341,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 137101,
+      "fileSize": 139870,
+      "operatorOffset": 137106,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 137174,
+      "fileSize": 139870,
+      "operatorOffset": 137179,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 137816,
+      "fileSize": 139870,
+      "operatorOffset": 137821,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 137874,
+      "fileSize": 139870,
+      "operatorOffset": 137879,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 138677,
+      "fileSize": 139870,
+      "operatorOffset": 138682,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 138823,
+      "fileSize": 139870,
+      "operatorOffset": 138828,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 138943,
+      "fileSize": 139870,
+      "operatorOffset": 138948,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 139171,
+      "fileSize": 139870,
+      "operatorOffset": 139184,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 139235,
+      "fileSize": 139870,
+      "operatorOffset": 139248,
+      "path": "src/host/windows/application/windows_host.cpp"
+    },
+    {
+      "baseOffset": 6840,
+      "fileSize": 23078,
+      "operatorOffset": 6847,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 7338,
+      "fileSize": 23078,
+      "operatorOffset": 7345,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 9823,
+      "fileSize": 23078,
+      "operatorOffset": 9837,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 14977,
+      "fileSize": 23078,
+      "operatorOffset": 14984,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 19379,
+      "fileSize": 23078,
+      "operatorOffset": 19393,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 19722,
+      "fileSize": 23078,
+      "operatorOffset": 19737,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 19764,
+      "fileSize": 23078,
+      "operatorOffset": 19779,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 19952,
+      "fileSize": 23078,
+      "operatorOffset": 19967,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20027,
+      "fileSize": 23078,
+      "operatorOffset": 20042,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20218,
+      "fileSize": 23078,
+      "operatorOffset": 20233,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20260,
+      "fileSize": 23078,
+      "operatorOffset": 20275,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20489,
+      "fileSize": 23078,
+      "operatorOffset": 20504,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20587,
+      "fileSize": 23078,
+      "operatorOffset": 20602,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20650,
+      "fileSize": 23078,
+      "operatorOffset": 20665,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20698,
+      "fileSize": 23078,
+      "operatorOffset": 20713,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20739,
+      "fileSize": 23078,
+      "operatorOffset": 20754,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20870,
+      "fileSize": 23078,
+      "operatorOffset": 20885,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20938,
+      "fileSize": 23078,
+      "operatorOffset": 20953,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 20999,
+      "fileSize": 23078,
+      "operatorOffset": 21014,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21049,
+      "fileSize": 23078,
+      "operatorOffset": 21064,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21094,
+      "fileSize": 23078,
+      "operatorOffset": 21109,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21250,
+      "fileSize": 23078,
+      "operatorOffset": 21265,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21551,
+      "fileSize": 23078,
+      "operatorOffset": 21566,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21764,
+      "fileSize": 23078,
+      "operatorOffset": 21779,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 21959,
+      "fileSize": 23078,
+      "operatorOffset": 21974,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22226,
+      "fileSize": 23078,
+      "operatorOffset": 22241,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22435,
+      "fileSize": 23078,
+      "operatorOffset": 22450,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22505,
+      "fileSize": 23078,
+      "operatorOffset": 22520,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22698,
+      "fileSize": 23078,
+      "operatorOffset": 22713,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22754,
+      "fileSize": 23078,
+      "operatorOffset": 22769,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22878,
+      "fileSize": 23078,
+      "operatorOffset": 22893,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 23014,
+      "fileSize": 23078,
+      "operatorOffset": 23029,
+      "path": "src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp"
+    },
+    {
+      "baseOffset": 22481,
+      "fileSize": 24156,
+      "operatorOffset": 22486,
+      "path": "src/host/windows/win32_compat_shim.cpp"
+    }
+  ],
+  "schema": "gui.forms.pointer-arrow-rewrites/v1",
+  "sourceRoot": "gui_forms"
+}

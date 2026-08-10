@@ -120,7 +120,7 @@ void EasingPreview::set_marker_size(double size) {
 MotionPolicy EasingPreview::effective_motion_policy() const noexcept {
     MotionPolicy policy = motion_policy_;
     if (window() != nullptr &&
-        window()->presentation_settings().reduced_motion) {
+        (*window()).presentation_settings().reduced_motion) {
         policy.reduced = true;
     }
     return policy;
@@ -215,12 +215,10 @@ SemanticDescriptor EasingPreview::semantic_descriptor() const {
 void EasingPreview::on_attached_to_window() {
     Control::on_attached_to_window();
     if (window() != nullptr) {
-        presentation_subscription_ = window()->presentation_changed().subscribe(
-            *this, [this](const PresentationSettings&) {
-                frames_.disconnect();
-                if (effective_motion_policy().active()) register_frames();
-                invalidate(Dirty::paint | Dirty::semantics);
-            });
+        presentation_subscription_ = (*window()).presentation_changed().subscribe(
+            *this,
+            Delegate<const PresentationSettings&>::bind<
+                EasingPreview, &EasingPreview::on_presentation_changed>(*this));
     }
     const FrameTime attached = FrameClock::now();
     if (!timeline_started_) {
@@ -231,6 +229,13 @@ void EasingPreview::on_attached_to_window() {
     }
     if (!motion_policy_.active()) timeline_.pause(attached);
     else register_frames();
+}
+
+void EasingPreview::on_presentation_changed(
+    const PresentationSettings&) {
+    frames_.disconnect();
+    if (effective_motion_policy().active()) register_frames();
+    invalidate(Dirty::paint | Dirty::semantics);
 }
 
 void EasingPreview::on_detached_from_window() noexcept {
@@ -248,7 +253,7 @@ void EasingPreview::register_frames() {
     const MotionPolicy policy = effective_motion_policy();
     if (window() == nullptr || !policy.active()) return;
     const FrameInterval interval = policy.frame_interval(16ms);
-    frames_ = window()->activate_surface(
+    frames_ = (*window()).activate_surface(
         shared_from_this(), interval, FrameClock::now() + interval);
 }
 

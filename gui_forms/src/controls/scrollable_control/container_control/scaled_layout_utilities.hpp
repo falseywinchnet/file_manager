@@ -9,6 +9,15 @@
 
 namespace gui_forms::scaled_layout_detail {
 
+struct SlotForRemovedChild final {
+    const std::unordered_set<std::uint64_t>* retained{};
+
+    [[nodiscard]] bool operator()(
+        const std::pair<const std::uint64_t, Rect>& entry) const {
+        return !(*retained).contains(entry.first);
+    }
+};
+
 inline void validate_design_size(Size size) {
     if (!std::isfinite(size.width) || !std::isfinite(size.height) ||
         size.width <= 0.0 || size.height <= 0.0) {
@@ -32,11 +41,9 @@ void reconcile_slots(Parent& parent,
     std::unordered_set<std::uint64_t> retained;
     retained.reserve(parent.children().size());
     for (const Control::Ptr& child : parent.children()) {
-        retained.insert(child->runtime_id().value);
+        retained.insert((*child).runtime_id().value);
     }
-    std::erase_if(slots, [&](const auto& entry) {
-        return !retained.contains(entry.first);
-    });
+    std::erase_if(slots, SlotForRemovedChild{&retained});
 }
 
 [[nodiscard]] inline Rect child_bounds(Size design_size, Rect bounds,

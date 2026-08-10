@@ -1,10 +1,12 @@
 #include "gui_forms/text.hpp"
+#include "gui_forms/detail/algorithm/binary_search.hpp"
 
 #include "../unicode/unicode_grapheme.hpp"
 #include "../unicode/unicode_grapheme_data.hpp"
 
 #include <algorithm>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <utility>
 
@@ -16,28 +18,35 @@ struct DecodedScalar final {
   std::size_t bytes{};
 };
 
+struct Utf8OffsetBeforeStyleSpan final {
+  [[nodiscard]] bool operator()(Utf8Offset value,
+                                const TextStyleSpan &span) const noexcept {
+    return value < span.range.start;
+  }
+};
+
 [[nodiscard]] constexpr bool continuation(std::uint8_t byte) noexcept {
   return (byte & 0xc0U) == 0x80U;
 }
 
 [[nodiscard]] DecodedScalar decode_valid(std::string_view text,
                                          std::size_t offset) noexcept {
-  const auto first = static_cast<std::uint8_t>(text[offset]);
+  const std::uint8_t first = static_cast<std::uint8_t>(text[offset]);
   if (first < 0x80U) {
     return {first, 1};
   }
-  const auto second = static_cast<std::uint8_t>(text[offset + 1U]);
+  const std::uint8_t second = static_cast<std::uint8_t>(text[offset + 1U]);
   if (first < 0xe0U) {
     return {static_cast<char32_t>(((first & 0x1fU) << 6U) | (second & 0x3fU)),
             2};
   }
-  const auto third = static_cast<std::uint8_t>(text[offset + 2U]);
+  const std::uint8_t third = static_cast<std::uint8_t>(text[offset + 2U]);
   if (first < 0xf0U) {
     return {static_cast<char32_t>(((first & 0x0fU) << 12U) |
                                   ((second & 0x3fU) << 6U) | (third & 0x3fU)),
             3};
   }
-  const auto fourth = static_cast<std::uint8_t>(text[offset + 3U]);
+  const std::uint8_t fourth = static_cast<std::uint8_t>(text[offset + 3U]);
   return {static_cast<char32_t>(((first & 0x07U) << 18U) |
                                 ((second & 0x3fU) << 12U) |
                                 ((third & 0x3fU) << 6U) | (fourth & 0x3fU)),
@@ -73,7 +82,7 @@ Utf8ValidationResult validate_utf8(std::string_view text) noexcept {
   Utf8ValidationResult result;
   std::size_t offset = 0;
   while (offset < text.size()) {
-    const auto first = static_cast<std::uint8_t>(text[offset]);
+    const std::uint8_t first = static_cast<std::uint8_t>(text[offset]);
     std::size_t length = 0;
     char32_t scalar = 0;
     if (first < 0x80U) {
@@ -114,7 +123,7 @@ Utf8ValidationResult validate_utf8(std::string_view text) noexcept {
 
     if (length > 1) {
       scalar = decode_valid(text, offset).value;
-      const auto second = static_cast<std::uint8_t>(text[offset + 1U]);
+      const std::uint8_t second = static_cast<std::uint8_t>(text[offset + 1U]);
       if ((first == 0xe0U && second < 0xa0U) ||
           (first == 0xf0U && second < 0x90U)) {
         result.error = Utf8ValidationError::overlong_encoding;
@@ -277,15 +286,13 @@ std::optional<TextStyleId> TextStore::style_at(Utf8Offset position) const {
   if (position == utf8_size()) {
     return std::nullopt;
   }
-  const auto iterator =
-      std::upper_bound(style_spans_.begin(), style_spans_.end(), position,
-                       [](Utf8Offset value, const TextStyleSpan &span) {
-                         return value < span.range.start;
-                       });
-  if (iterator == style_spans_.begin()) {
+  const std::size_t candidate_position = detail::upper_bound_index(
+      std::span<const TextStyleSpan>(style_spans_), position,
+      Utf8OffsetBeforeStyleSpan{});
+  if (candidate_position == 0U) {
     return std::nullopt;
   }
-  const TextStyleSpan &candidate = *std::prev(iterator);
+  const TextStyleSpan &candidate = style_spans_[candidate_position - 1U];
   return position < candidate.range.end ? std::optional(candidate.style)
                                         : std::nullopt;
 }
@@ -299,8 +306,8 @@ bool TextStore::is_scalar_boundary(Utf8Offset position) const noexcept {
 }
 
 bool TextStore::is_grapheme_boundary(Utf8Offset position) const noexcept {
-  return std::binary_search(grapheme_boundaries_.begin(),
-                            grapheme_boundaries_.end(), position.value());
+  return detail::binary_search_contains(
+      std::span<const std::size_t>(grapheme_boundaries_), position.value());
 }
 
 Utf8Offset TextStore::utf8_offset(Utf16Offset position) const {
@@ -369,16 +376,15 @@ ScalarIndex TextStore::scalar_index(Utf8Offset position) const {
 
 GraphemeIndex TextStore::grapheme_index(Utf8Offset position) const {
   validate_position(position);
-  const auto iterator = std::lower_bound(grapheme_boundaries_.begin(),
-                                         grapheme_boundaries_.end(),
-                                         position.value());
-  if (iterator == grapheme_boundaries_.end() || *iterator != position.value()) {
+  const std::size_t boundary_position = detail::lower_bound_index(
+      std::span<const std::size_t>(grapheme_boundaries_), position.value());
+  if (boundary_position == grapheme_boundaries_.size() ||
+      grapheme_boundaries_[boundary_position] != position.value()) {
     ++rejected_position_query_count_;
     throw std::invalid_argument(
         "GUI.Forms UTF-8 position splits an extended grapheme cluster");
   }
-  return GraphemeIndex(
-      static_cast<std::size_t>(iterator - grapheme_boundaries_.begin()));
+  return GraphemeIndex(boundary_position);
 }
 
 Utf8Offset TextStore::next_scalar_boundary(Utf8Offset position) const {

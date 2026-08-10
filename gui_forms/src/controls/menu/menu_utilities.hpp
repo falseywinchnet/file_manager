@@ -28,6 +28,14 @@ struct MenuSnapshot final {
     std::vector<MenuSnapshot> children;
 };
 
+struct ConsecutiveSeparators final {
+    [[nodiscard]] bool operator()(const MenuSnapshot& left,
+                                  const MenuSnapshot& right) const noexcept {
+        return left.kind == MenuItemKind::separator &&
+               right.kind == MenuItemKind::separator;
+    }
+};
+
 inline double row_height(const MenuSnapshot& item,
                          double text_scale) noexcept {
     return (item.kind == MenuItemKind::separator ? separator_row_height
@@ -83,7 +91,7 @@ inline std::vector<MenuSnapshot> snapshot_items(
         snapshot.command = spec.command;
         snapshot.text = spec.text;
         if (spec.command) {
-            snapshot.command_state = spec.command->state();
+            snapshot.command_state = (*spec.command).state();
             if (!snapshot.command_state.visible) continue;
             if (snapshot.text.empty()) snapshot.text = snapshot.command_state.text;
         }
@@ -100,10 +108,8 @@ inline std::vector<MenuSnapshot> snapshot_items(
         result.pop_back();
     }
     result.erase(std::unique(result.begin(), result.end(),
-        [](const MenuSnapshot& left, const MenuSnapshot& right) {
-            return left.kind == MenuItemKind::separator &&
-                   right.kind == MenuItemKind::separator;
-        }), result.end());
+                             ConsecutiveSeparators{}),
+                 result.end());
     return result;
 }
 

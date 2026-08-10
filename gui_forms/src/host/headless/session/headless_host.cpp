@@ -48,15 +48,15 @@ HeadlessHost::HeadlessHost(Window& window)
 
 HeadlessHost::~HeadlessHost() {
     if (window_ != nullptr) {
-        window_->set_paint_wake_handler({});
-        window_->set_dispatch_wake_handler({});
+        (*window_).set_paint_wake_handler({});
+        (*window_).set_dispatch_wake_handler({});
     }
 }
 
 DispatchDrainResult HeadlessHost::pump_dispatcher(
     std::size_t maximum_callbacks) {
     dispatcher_wake_pending_.store(false, std::memory_order_release);
-    return window_->drain_posted_work(maximum_callbacks);
+    return (*window_).drain_posted_work(maximum_callbacks);
 }
 
 HostDispatchResult HeadlessHost::dispatch(HostEventPayload payload,

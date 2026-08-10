@@ -47,6 +47,16 @@ func New(roots []api.RootSpec, config Config) (observation.Adapter, error)
 
 No declaration documentation comment is present.
 
+### adapterFromHandle
+
+Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:235`.
+
+```go
+func adapterFromHandle(token uintptr) (adapter *Adapter, ok bool)
+```
+
+No declaration documentation comment is present.
+
 ### goFilemanFSEventsCallback
 
 Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:198`.
@@ -59,7 +69,7 @@ export goFilemanFSEventsCallback
 
 ### newEpoch
 
-Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:361`.
+Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:369`.
 
 ```go
 func newEpoch() (string, error)
@@ -69,7 +79,7 @@ No declaration documentation comment is present.
 
 ### sendBatch
 
-Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:302`.
+Kind: `function`. Source: `internal/observation/fsevents/fsevents_darwin.go:310`.
 
 ```go
 func sendBatch(ctx context.Context, output chan<- observation.Batch, batch observation.Batch) bool
@@ -99,7 +109,7 @@ No declaration documentation comment is present.
 
 ### Adapter.deliver
 
-Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:255`.
+Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:263`.
 
 ```go
 func (a *Adapter) deliver(ctx context.Context, initial observation.Cursor, output chan<- observation.Batch)
@@ -109,7 +119,7 @@ No declaration documentation comment is present.
 
 ### Adapter.ownedPath
 
-Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:349`.
+Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:357`.
 
 ```go
 func (a *Adapter) ownedPath(value string) (api.RootSpec, string, bool)
@@ -119,7 +129,7 @@ No declaration documentation comment is present.
 
 ### Adapter.recordDrop
 
-Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:241`.
+Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:249`.
 
 ```go
 func (a *Adapter) recordDrop(position uint64)
@@ -139,7 +149,7 @@ No declaration documentation comment is present.
 
 ### Adapter.translate
 
-Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:311`.
+Kind: `method`. Source: `internal/observation/fsevents/fsevents_darwin.go:319`.
 
 ```go
 func (a *Adapter) translate(items []nativeItem) ([]observation.Event, bool)
@@ -209,7 +219,7 @@ No declaration documentation comment is present.
 
 ### _
 
-Kind: `variable`. Source: `internal/observation/fsevents/fsevents_darwin.go:369`.
+Kind: `variable`. Source: `internal/observation/fsevents/fsevents_darwin.go:377`.
 
 ```go
 var _ observation.Adapter = (*Adapter)(nil)
@@ -219,7 +229,7 @@ No declaration documentation comment is present.
 
 ### _
 
-Kind: `variable`. Source: `internal/observation/fsevents/fsevents_darwin.go:370`.
+Kind: `variable`. Source: `internal/observation/fsevents/fsevents_darwin.go:378`.
 
 ```go
 var _ observation.CoverageReporter = (*Adapter)(nil)

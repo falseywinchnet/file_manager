@@ -29,7 +29,7 @@ void ScaledPanel::add_at(Control::Ptr child, Rect design_bounds) {
     require_mutable();
     if (!child) throw std::invalid_argument("scaled layout child may not be null");
     scaled_layout_detail::validate_design_bounds(design_bounds);
-    const RuntimeId id = child->runtime_id();
+    const RuntimeId id = (*child).runtime_id();
     add_child(std::move(child));
     slots_[id.value] = design_bounds;
     invalidate(Dirty::layout);
@@ -46,9 +46,10 @@ void ScaledPanel::set_design_bounds(const Control& child, Rect design_bounds) {
 }
 
 std::optional<Rect> ScaledPanel::design_bounds(const Control& child) const {
-    const auto found = slots_.find(child.runtime_id().value);
+    const SlotMap::const_iterator found =
+        slots_.find(child.runtime_id().value);
     return found == slots_.end() ? std::nullopt
-                                : std::optional<Rect>(found->second);
+                                : std::optional<Rect>((*found).second);
 }
 
 void ScaledPanel::reconcile_slots() {
@@ -59,10 +60,11 @@ void ScaledPanel::arrange(Rect final_bounds) {
     reconcile_slots();
     arrange_self(final_bounds);
     for (const Control::Ptr& child : children()) {
-        const auto slot = slots_.find(child->runtime_id().value);
+        const SlotMap::iterator slot =
+            slots_.find((*child).runtime_id().value);
         if (slot == slots_.end()) continue;
         set_child_layout(child,
-                         scaled_layout_detail::child_bounds(design_size_, slot->second,
+                         scaled_layout_detail::child_bounds(design_size_, (*slot).second,
                                              final_bounds));
     }
 }

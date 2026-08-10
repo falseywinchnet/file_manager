@@ -1,8 +1,10 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
@@ -23,6 +25,13 @@ const (
 	LocalProtocol = "engine.local.v1"
 	frameMagic    = "ENG1"
 	frameHeader   = 8
+
+	maxQueryConnections = 32
+	maxAdminConnections = 4
+	handshakeTimeout    = 5 * time.Second
+	idleFrameTimeout    = 30 * time.Second
+	requestTimeout      = 30 * time.Second
+	writeTimeout        = 5 * time.Second
 )
 
 type EndpointFiles struct {
@@ -43,6 +52,13 @@ type Discovery struct {
 	QueryTokenFile string    `json:"query_token_file"`
 	AdminSocket    string    `json:"admin_socket"`
 	AdminTokenFile string    `json:"admin_token_file"`
+}
+
+type LocalOptions struct {
+	// AfterSuccessfulDispatch extends the acknowledgement boundary for an
+	// installed projection. Returning an error replaces the successful result
+	// with a redacted internal fault; the client may safely retry.
+	AfterSuccessfulDispatch func(Request, Response) error
 }
 
 type hello struct {
@@ -69,6 +85,10 @@ func Files(runtimeDir string) EndpointFiles {
 // ServeLocal creates distinct same-user query/admin endpoints. Credentials are
 // random per process instance and are never accepted on the other endpoint.
 func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service) error {
+	return ServeLocalWithOptions(ctx, runtimeDir, engine, LocalOptions{})
+}
+
+func ServeLocalWithOptions(ctx context.Context, runtimeDir string, engine *service.Service, options LocalOptions) error {
 	if engine == nil {
 		return errors.New("engine service is required")
 	}
@@ -76,6 +96,19 @@ func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service)
 	if err := verifyRuntimeDirectory(runtimeDir); err != nil {
 		return err
 	}
+	query, err := listenPrivate(files.QuerySock)
+	if err != nil {
+		return err
+	}
+	defer query.Close()
+	defer os.Remove(files.QuerySock)
+	admin, err := listenPrivate(files.AdminSock)
+	if err != nil {
+		return err
+	}
+	defer admin.Close()
+	defer os.Remove(files.AdminSock)
+	defer cleanupRuntime(files)
 	queryToken, err := rotateToken(files.QueryToken)
 	if err != nil {
 		return err
@@ -84,17 +117,6 @@ func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service)
 	if err != nil {
 		return err
 	}
-	query, err := listenPrivate(files.QuerySock)
-	if err != nil {
-		return err
-	}
-	defer query.Close()
-	admin, err := listenPrivate(files.AdminSock)
-	if err != nil {
-		return err
-	}
-	defer admin.Close()
-	defer cleanupRuntime(files)
 	discovery := Discovery{
 		Protocol: LocalProtocol, InstanceID: engine.Version().InstanceID, UID: os.Getuid(), StartedAt: time.Now().UTC(),
 		QuerySocket: files.QuerySock, QueryTokenFile: files.QueryToken,
@@ -108,25 +130,50 @@ func ServeLocal(ctx context.Context, runtimeDir string, engine *service.Service)
 	var once sync.Once
 	shutdown := func() { once.Do(cancel) }
 	errorsOut := make(chan error, 2)
-	go serveEndpoint(serverCtx, query, engine, AuthorityQuery, queryToken, shutdown, errorsOut)
-	go serveEndpoint(serverCtx, admin, engine, AuthorityAdmin, adminToken, shutdown, errorsOut)
+	connections := newConnectionSet()
+	var acceptors sync.WaitGroup
+	var handlers sync.WaitGroup
+	acceptors.Add(2)
+	go func() {
+		defer acceptors.Done()
+		serveEndpoint(serverCtx, query, engine, AuthorityQuery, queryToken, maxQueryConnections, connections, &handlers, shutdown, errorsOut, options)
+	}()
+	go func() {
+		defer acceptors.Done()
+		serveEndpoint(serverCtx, admin, engine, AuthorityAdmin, adminToken, maxAdminConnections, connections, &handlers, shutdown, errorsOut, options)
+	}()
+	var serveErr error
 	select {
 	case <-serverCtx.Done():
-		_ = query.Close()
-		_ = admin.Close()
-		if errors.Is(serverCtx.Err(), context.Canceled) {
-			return nil
+		if ctx.Err() != nil {
+			serveErr = ctx.Err()
 		}
-		return serverCtx.Err()
 	case err := <-errorsOut:
-		cancel()
-		_ = query.Close()
-		_ = admin.Close()
-		return err
+		serveErr = err
 	}
+	cancel()
+	_ = query.Close()
+	_ = admin.Close()
+	acceptors.Wait()
+	connections.CloseAll()
+	handlers.Wait()
+	return serveErr
 }
 
-func serveEndpoint(ctx context.Context, listener net.Listener, engine *service.Service, authority Authority, token string, shutdown func(), errorsOut chan<- error) {
+func serveEndpoint(
+	ctx context.Context,
+	listener net.Listener,
+	engine *service.Service,
+	authority Authority,
+	token string,
+	maximumConnections int,
+	connections *connectionSet,
+	handlers *sync.WaitGroup,
+	shutdown func(),
+	errorsOut chan<- error,
+	options LocalOptions,
+) {
+	slots := make(chan struct{}, maximumConnections)
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
@@ -139,13 +186,60 @@ func serveEndpoint(ctx context.Context, listener net.Listener, engine *service.S
 			}
 			return
 		}
-		go handleLocal(ctx, connection, engine, authority, token, shutdown)
+		select {
+		case slots <- struct{}{}:
+			connections.Add(connection)
+			handlers.Add(1)
+			go func() {
+				defer handlers.Done()
+				defer func() { <-slots }()
+				defer connections.Remove(connection)
+				handleLocal(ctx, connection, engine, authority, token, shutdown, options)
+			}()
+		default:
+			_ = connection.Close()
+		}
 	}
 }
 
-func handleLocal(ctx context.Context, connection net.Conn, engine *service.Service, authority Authority, token string, shutdown func()) {
+type connectionSet struct {
+	mu          sync.Mutex
+	connections map[net.Conn]struct{}
+}
+
+func newConnectionSet() *connectionSet {
+	return &connectionSet{connections: make(map[net.Conn]struct{})}
+}
+
+func (s *connectionSet) Add(connection net.Conn) {
+	s.mu.Lock()
+	s.connections[connection] = struct{}{}
+	s.mu.Unlock()
+}
+
+func (s *connectionSet) Remove(connection net.Conn) {
+	s.mu.Lock()
+	delete(s.connections, connection)
+	s.mu.Unlock()
+}
+
+func (s *connectionSet) CloseAll() {
+	s.mu.Lock()
+	connections := make([]net.Conn, 0, len(s.connections))
+	for connection := range s.connections {
+		connections = append(connections, connection)
+	}
+	s.mu.Unlock()
+	for _, connection := range connections {
+		_ = connection.Close()
+	}
+}
+
+func handleLocal(ctx context.Context, connection net.Conn, engine *service.Service, authority Authority, token string, shutdown func(), options LocalOptions) {
 	defer connection.Close()
-	_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
+	if err := connection.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		return
+	}
 	uid, err := peerUID(connection)
 	if err != nil || uid != os.Getuid() {
 		return
@@ -162,15 +256,30 @@ func handleLocal(ctx context.Context, connection net.Conn, engine *service.Servi
 	if err := writeFrame(connection, response); err != nil || !accepted {
 		return
 	}
-	_ = connection.SetDeadline(time.Time{})
+	if err := connection.SetDeadline(time.Time{}); err != nil {
+		return
+	}
 	for {
+		if err := connection.SetReadDeadline(time.Now().Add(idleFrameTimeout)); err != nil {
+			return
+		}
 		var request Request
 		if err := readFrame(connection, &request); err != nil {
 			return
 		}
-		requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		requestCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 		outgoing, stop := dispatchAuthorized(requestCtx, engine, request, authority)
 		cancel()
+		if outgoing.Error == nil && options.AfterSuccessfulDispatch != nil {
+			if err := options.AfterSuccessfulDispatch(request, outgoing); err != nil {
+				outgoing.Result = nil
+				outgoing.Error = publicFault(err)
+				stop = false
+			}
+		}
+		if err := connection.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+			return
+		}
 		if err := writeFrame(connection, outgoing); err != nil {
 			return
 		}
@@ -189,7 +298,7 @@ func CallLocal(ctx context.Context, runtimeDir string, authority Authority, requ
 	} else if authority != AuthorityQuery {
 		return Response{}, errors.New("authority must be query or admin")
 	}
-	token, err := os.ReadFile(tokenPath)
+	token, err := readToken(tokenPath)
 	if err != nil {
 		return Response{}, fmt.Errorf("read endpoint token: %w", err)
 	}
@@ -202,7 +311,7 @@ func CallLocal(ctx context.Context, runtimeDir string, authority Authority, requ
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = connection.SetDeadline(deadline)
 	}
-	if err := writeFrame(connection, hello{Protocol: LocalProtocol, Authority: authority, Token: string(token)}); err != nil {
+	if err := writeFrame(connection, hello{Protocol: LocalProtocol, Authority: authority, Token: token}); err != nil {
 		return Response{}, err
 	}
 	var accepted helloResponse
@@ -238,7 +347,7 @@ func readFrame(reader io.Reader, target any) error {
 	if _, err := io.ReadFull(reader, payload); err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytesReader(payload))
+	decoder := json.NewDecoder(bytes.NewReader(payload))
 	if err := decoder.Decode(target); err != nil {
 		return err
 	}
@@ -257,27 +366,23 @@ func writeFrame(writer io.Writer, value any) error {
 	if len(payload) == 0 || len(payload) > MaxJSONLFrameBytes {
 		return errors.New("Engine frame exceeds the bounded payload")
 	}
-	header := make([]byte, frameHeader)
-	copy(header, frameMagic)
-	binary.BigEndian.PutUint32(header[4:], uint32(len(payload)))
-	if _, err := writer.Write(header); err != nil {
-		return err
+	frame := make([]byte, frameHeader+len(payload))
+	copy(frame, frameMagic)
+	binary.BigEndian.PutUint32(frame[4:frameHeader], uint32(len(payload)))
+	copy(frame[frameHeader:], payload)
+	for len(frame) != 0 {
+		written, writeErr := writer.Write(frame)
+		if written > 0 {
+			frame = frame[written:]
+		}
+		if writeErr != nil {
+			return writeErr
+		}
+		if written == 0 {
+			return io.ErrShortWrite
+		}
 	}
-	_, err = writer.Write(payload)
-	return err
-}
-
-func bytesReader(payload []byte) *byteReader { return &byteReader{payload: payload} }
-
-type byteReader struct{ payload []byte }
-
-func (r *byteReader) Read(p []byte) (int, error) {
-	if len(r.payload) == 0 {
-		return 0, io.EOF
-	}
-	n := copy(p, r.payload)
-	r.payload = r.payload[n:]
-	return n, nil
+	return nil
 }
 
 func rotateToken(path string) (string, error) {
@@ -290,6 +395,25 @@ func rotateToken(path string) (string, error) {
 		return "", err
 	}
 	return token, nil
+}
+
+func readToken(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 || info.Size() != sha256.Size*2 {
+		return "", errors.New("endpoint token must be a regular 0600 256-bit hexadecimal credential")
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	decoded := make([]byte, sha256.Size)
+	if _, err := hex.Decode(decoded, payload); err != nil {
+		return "", errors.New("endpoint token is not a 256-bit hexadecimal credential")
+	}
+	return string(payload), nil
 }
 
 func constantToken(left, right string) bool {
@@ -344,9 +468,14 @@ func writePrivateJSON(path string, value any) error {
 }
 
 func writePrivate(path string, payload []byte) error {
-	temporary := path + ".new"
-	file, err := os.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	file, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+"-*.new")
 	if err != nil {
+		return err
+	}
+	temporary := file.Name()
+	defer os.Remove(temporary)
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
 		return err
 	}
 	if _, err = file.Write(payload); err == nil {
@@ -357,11 +486,6 @@ func writePrivate(path string, payload []byte) error {
 		err = closeErr
 	}
 	if err != nil {
-		_ = os.Remove(temporary)
-		return err
-	}
-	if err := os.Chmod(temporary, 0o600); err != nil {
-		_ = os.Remove(temporary)
 		return err
 	}
 	return os.Rename(temporary, path)

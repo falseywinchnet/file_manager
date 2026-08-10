@@ -1,6 +1,9 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 
 #include "../input_control_utilities.hpp"
+#include "gui_forms/detail/algorithm/binary_search.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/host.hpp"
 #include "gui_forms/window.hpp"
 
@@ -24,16 +27,16 @@ TextBox::TextBox(StableId stable_id, std::string text)
         {"Text", BindingValueKind::text, "Appearance",
          "Editable UTF-8 text content.", BindingValue{std::string{}},
          invalidation::text_content},
-        [this] { return BindingValue{std::string(store_.utf8())}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::text);
-            if (!converted) throw std::invalid_argument("TextBox.Text binding requires text");
-            set_text(std::get<std::string>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return text_changed_.subscribe(owner,
-                [changed = std::move(changed)](const std::string&) { changed(); });
-        }, {}, {}});
+        detail::BoundMemberFunction<BindingValue (TextBox::*)() const>(
+            *this, &TextBox::text_property_value),
+        detail::ConvertedPropertySetter<TextBox, std::string>(
+            *this, &TextBox::set_text, BindingValueKind::text,
+            "TextBox.Text binding requires text"),
+        detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
+}
+
+BindingValue TextBox::text_property_value() const {
+    return BindingValue{std::string(store_.utf8())};
 }
 
 void TextBox::set_text(std::string text) {
@@ -165,9 +168,9 @@ void TextBox::push_history(std::deque<Snapshot>& history, Snapshot snapshot) {
     history.push_back(std::move(snapshot));
     while (undo_.size() + redo_.size() > maximum_history_entries_ ||
            history_bytes_ > maximum_history_bytes_) {
-        auto* source = !undo_.empty() ? &undo_ : &redo_;
-        history_bytes_ -= source->front().text.size();
-        source->pop_front();
+        std::deque<Snapshot>* source = !undo_.empty() ? &undo_ : &redo_;
+        history_bytes_ -= (*source).front().text.size();
+        (*source).pop_front();
     }
 }
 
@@ -258,10 +261,10 @@ bool TextBox::delete_selection() {
 bool TextBox::copy() {
     require_mutable();
     if (selection_.empty() || password_protected() || window() == nullptr ||
-        window()->host_services() == nullptr) {
+        (*window()).host_services() == nullptr) {
         return false;
     }
-    return window()->host_services()->write_clipboard_text(selected_text()).accepted();
+    return (*(*window()).host_services()).write_clipboard_text(selected_text()).accepted();
 }
 
 bool TextBox::cut() {
@@ -274,11 +277,11 @@ bool TextBox::cut() {
 
 bool TextBox::paste() {
     require_mutable();
-    if (read_only_ || window() == nullptr || window()->host_services() == nullptr) {
+    if (read_only_ || window() == nullptr || (*window()).host_services() == nullptr) {
         return false;
     }
     const HostClipboardTextResult result =
-        window()->host_services()->read_clipboard_text();
+        (*(*window()).host_services()).read_clipboard_text();
     return result.status.accepted() && result.has_text &&
         replace_selection(result.text_utf8);
 }
@@ -305,11 +308,11 @@ double TextBox::boundary_x(Utf8Offset offset) const noexcept {
         return static_cast<double>(store_.grapheme_index(offset).value()) *
             effective_font(font_).size * 0.55;
     }
-    const auto found = std::lower_bound(layout_offsets_.begin(),
-                                        layout_offsets_.end(), offset.value());
-    const std::size_t index = found == layout_offsets_.end()
+    const std::size_t found = detail::lower_bound_index(
+        std::span<const std::uint64_t>(layout_offsets_), offset.value());
+    const std::size_t index = found == layout_offsets_.size()
         ? layout_offsets_.size() - 1U
-        : static_cast<std::size_t>(std::distance(layout_offsets_.begin(), found));
+        : found;
     return layout_positions_[index];
 }
 
@@ -377,16 +380,14 @@ Utf8Offset TextBox::position_at(double local_x) const noexcept {
             store_.grapheme_count().value());
         return store_.utf8_offset(GraphemeIndex(grapheme));
     }
-    const auto right = std::lower_bound(layout_positions_.begin(),
-                                        layout_positions_.end(), content_x);
-    if (right == layout_positions_.begin()) {
+    const std::size_t index = detail::lower_bound_index(
+        std::span<const double>(layout_positions_), content_x);
+    if (index == 0U) {
         return Utf8Offset(layout_offsets_.front());
     }
-    if (right == layout_positions_.end()) {
+    if (index == layout_positions_.size()) {
         return Utf8Offset(layout_offsets_.back());
     }
-    const std::size_t index = static_cast<std::size_t>(
-        std::distance(layout_positions_.begin(), right));
     const double left_distance = content_x - layout_positions_[index - 1U];
     const double right_distance = layout_positions_[index] - content_x;
     return Utf8Offset(layout_offsets_[left_distance < right_distance
@@ -511,7 +512,7 @@ void TextBox::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary) {
         if (window() != nullptr) {
-            static_cast<void>(window()->request_focus(shared_from_this()));
+            static_cast<void>((*window()).request_focus(shared_from_this()));
         }
         const Utf8Offset position = position_at(local_x);
         const bool extend = includes(event.modifiers, Modifier::shift);
@@ -671,7 +672,7 @@ void TextBox::reset_caret_blink() {
 
 void TextBox::schedule_caret_blink() {
     if (focused_ && attached() && window() != nullptr) {
-        caret_frame_ = window()->schedule_paint(
+        caret_frame_ = (*window()).schedule_paint(
             shared_from_this(), FrameClock::now() + std::chrono::milliseconds(530));
     }
 }

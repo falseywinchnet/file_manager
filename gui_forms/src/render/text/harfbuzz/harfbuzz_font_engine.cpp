@@ -96,6 +96,30 @@ public:
         Face& operator=(Face&&) = delete;
     };
 
+    struct FacePreference final {
+        FontSpec font;
+
+        [[nodiscard]] int tier(const Face& face) const noexcept {
+            if (face.role && *face.role == font.role) return 0;
+            if (face.role && *face.role == FontRole::content) return 1;
+            return 2;
+        }
+
+        [[nodiscard]] bool operator()(const Face* left,
+                                      const Face* right) const noexcept {
+            const int left_tier = tier(*left);
+            const int right_tier = tier(*right);
+            if (left_tier != right_tier) return left_tier < right_tier;
+            const int left_italic = (*left).italic == font.italic ? 0 : 1;
+            const int right_italic = (*right).italic == font.italic ? 0 : 1;
+            if (left_italic != right_italic) {
+                return left_italic < right_italic;
+            }
+            return std::abs(static_cast<int>((*left).weight) - font.weight) <
+                   std::abs(static_cast<int>((*right).weight) - font.weight);
+        }
+    };
+
     LibraryOwner library;
     std::vector<Face> faces;
     std::uint64_t next_face_id{1U};
@@ -114,23 +138,7 @@ public:
                 result.push_back(&face);
             }
         }
-        std::stable_sort(result.begin(), result.end(), [&](Face* left, Face* right) {
-            const auto tier = [&](Face* face) {
-                if (face->role && *face->role == font.role) return 0;
-                if (face->role && *face->role == FontRole::content) return 1;
-                return 2;
-            };
-            const int left_tier = tier(left);
-            const int right_tier = tier(right);
-            if (left_tier != right_tier) {
-                return left_tier < right_tier;
-            }
-            const int left_italic = left->italic == font.italic ? 0 : 1;
-            const int right_italic = right->italic == font.italic ? 0 : 1;
-            if (left_italic != right_italic) return left_italic < right_italic;
-            return std::abs(static_cast<int>(left->weight) - font.weight) <
-                   std::abs(static_cast<int>(right->weight) - font.weight);
-        });
+        std::stable_sort(result.begin(), result.end(), FacePreference{font});
         return result;
     }
 
@@ -158,9 +166,9 @@ public:
             library.value, reinterpret_cast<const FT_Byte*>(owned.data()),
             static_cast<FT_Long>(owned.size()), static_cast<FT_Long>(face_index),
             &native);
-        if (opened != 0 || native == nullptr || native->num_glyphs <= 0 ||
-            native->num_glyphs > maximum_glyphs ||
-            (native->face_flags & FT_FACE_FLAG_SCALABLE) == 0 ||
+        if (opened != 0 || native == nullptr || (*native).num_glyphs <= 0 ||
+            (*native).num_glyphs > maximum_glyphs ||
+            ((*native).face_flags & FT_FACE_FLAG_SCALABLE) == 0 ||
             FT_Select_Charmap(native, FT_ENCODING_UNICODE) != 0) {
             if (native != nullptr) FT_Done_Face(native);
             return std::nullopt;
@@ -221,9 +229,9 @@ public:
             pen_y += advance_y;
         }
         result.width = std::max(result.width, pen_x);
-        if (face.face->size != nullptr) {
-            const double ascent = face.face->size->metrics.ascender / 64.0;
-            const double descent = -face.face->size->metrics.descender / 64.0;
+        if ((*face.face).size != nullptr) {
+            const double ascent = (*(*face.face).size).metrics.ascender / 64.0;
+            const double descent = -(*(*face.face).size).metrics.descender / 64.0;
             result.ascent = std::max(result.ascent, ascent);
             result.descent = std::max(result.descent, descent);
             result.height = std::max(result.height, ascent + descent);
@@ -240,13 +248,13 @@ HarfBuzzFontEngine::~HarfBuzzFontEngine() = default;
 std::optional<FontFaceId> HarfBuzzFontEngine::register_typeface(
     FontRole role, std::uint16_t weight, bool italic,
     std::span<const std::byte> encoded, std::uint32_t face_index) {
-    return impl_->register_face(role, weight, italic, encoded, face_index);
+    return (*impl_).register_face(role, weight, italic, encoded, face_index);
 }
 
 std::optional<FontFaceId> HarfBuzzFontEngine::register_fallback_typeface(
     std::uint16_t weight, bool italic, std::span<const std::byte> encoded,
     std::uint32_t face_index) {
-    return impl_->register_face(
+    return (*impl_).register_face(
         std::nullopt, weight, italic, encoded, face_index);
 }
 
@@ -259,7 +267,7 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
     if (!validate_utf8(utf8).valid() || !valid_font_spec(font)) {
         return result;
     }
-    std::vector<Impl::Face*> candidates = impl_->candidates(font);
+    std::vector<Impl::Face*> candidates = (*impl_).candidates(font);
     if (candidates.empty()) {
         result.missing_primary_face = true;
         return result;
@@ -294,7 +302,7 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
     for (std::size_t index = 0U; index < segments.size(); ++index) {
         const Segment& segment = segments[index];
         const double before = result.width;
-        impl_->append_run(result, *segment.face, utf8, segment.range, font, origin,
+        (*impl_).append_run(result, *segment.face, utf8, segment.range, font, origin,
                           index + 1U != segments.size());
         origin += std::max(0.0, result.width - before);
     }
@@ -302,7 +310,7 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
 }
 
 std::size_t HarfBuzzFontEngine::face_count() const noexcept {
-    return impl_->faces.size();
+    return (*impl_).faces.size();
 }
 
 } // namespace gui_forms::render::text

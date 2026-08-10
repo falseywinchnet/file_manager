@@ -15,9 +15,10 @@ void DamageRegion::add(Rect rect) {
     bool merged = true;
     while (merged) {
         merged = false;
-        for (auto iterator = rectangles_.begin(); iterator != rectangles_.end(); ++iterator) {
+        for (std::vector<Rect>::iterator iterator = rectangles_.begin();
+             iterator != rectangles_.end(); ++iterator) {
             const Rect united = Rect::united(*iterator, rect);
-            const double exact_union_area = iterator->area() + rect.area() -
+            const double exact_union_area = (*iterator).area() + rect.area() -
                                             Rect::intersection(*iterator, rect).area();
             const double tolerance = std::max(1.0, exact_union_area) * 1.0e-12;
             if (std::abs(united.area() - exact_union_area) <= tolerance) {

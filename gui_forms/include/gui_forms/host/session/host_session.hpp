@@ -7,6 +7,7 @@
 namespace gui_forms {
 
 class Window;
+struct PointerCaptureChange;
 
 // Experimental 0.x host seam. It normalizes host events into the retained
 // Window without admitting any platform type into the portable API.
@@ -32,6 +33,18 @@ public:
     [[nodiscard]] HostSessionSnapshot snapshot() const;
 
 private:
+    void observe_pointer_capture(const PointerCaptureChange& change);
+    void observe_modal_transition(const HostModalTransition& transition);
+
+    struct DispatchVisitor final {
+        HostSession* session{};
+        HostDispatchResult* result{};
+        HostEvent* event{};
+
+        template <typename Payload>
+        void operator()(Payload& payload) const;
+    };
+
     Window* window_{};
     HostServices* services_{};
     std::thread::id ui_thread_;

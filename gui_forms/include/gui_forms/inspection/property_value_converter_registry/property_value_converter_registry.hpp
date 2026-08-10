@@ -16,8 +16,17 @@ struct PropertyConversionContext final {
     std::string decimal_separator{"."};
     std::string group_separator{","};
     bool use_grouping{};
-    friend bool operator==(const PropertyConversionContext&,
-                           const PropertyConversionContext&) = default;
+    friend bool operator==(const PropertyConversionContext& left,
+                           const PropertyConversionContext& right) noexcept(
+        noexcept(left.culture_name == right.culture_name &&
+                 left.decimal_separator == right.decimal_separator &&
+                 left.group_separator == right.group_separator &&
+                 left.use_grouping == right.use_grouping)) {
+        return left.culture_name == right.culture_name &&
+               left.decimal_separator == right.decimal_separator &&
+               left.group_separator == right.group_separator &&
+               left.use_grouping == right.use_grouping;
+    }
 };
 
 struct PropertyValueConverter final {
@@ -61,8 +70,10 @@ public:
     create_default();
 
 private:
-    std::map<std::string, PropertyValueConverter> converters_;
-    std::map<BindingValueKind, std::string> kind_mappings_;
+    using ConverterMap = std::map<std::string, PropertyValueConverter>;
+    using KindMap = std::map<BindingValueKind, std::string>;
+    ConverterMap converters_;
+    KindMap kind_mappings_;
     PropertyConversionContext context_;
 };
 

@@ -64,20 +64,26 @@ void FlowLayoutPanel::set_flow_break(const Control& child, bool flow_break) {
 
 bool FlowLayoutPanel::flow_break(const Control& child) const {
     if (child.parent().get() != this || !child.is_alive()) return false;
-    const auto found = flow_breaks_.find(child.runtime_id().value);
-    return found != flow_breaks_.end() && found->second;
+    const FlowBreakMap::const_iterator found =
+        flow_breaks_.find(child.runtime_id().value);
+    return found != flow_breaks_.end() && (*found).second;
 }
 
 void FlowLayoutPanel::reconcile_flow_breaks() {
     std::unordered_set<std::uint64_t> live;
     for (const Control::Ptr& child : children()) {
-        if (child && child->is_alive() && child->parent().get() == this) {
-            live.insert(child->runtime_id().value);
+        if (child && (*child).is_alive() && (*child).parent().get() == this) {
+            live.insert((*child).runtime_id().value);
         }
     }
-    std::erase_if(flow_breaks_, [&live](const auto& entry) {
-        return !live.contains(entry.first);
-    });
+    FlowBreakMap::iterator entry = flow_breaks_.begin();
+    while (entry != flow_breaks_.end()) {
+        if (!live.contains((*entry).first)) {
+            entry = flow_breaks_.erase(entry);
+        } else {
+            ++entry;
+        }
+    }
 }
 
 Size FlowLayoutPanel::layout_children(Size available, bool assign) {
@@ -107,18 +113,13 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
 
     std::vector<Line> lines;
     Line line;
-    const auto flush_line = [&lines, &line] {
-        if (line.items.empty()) return;
-        lines.push_back(std::move(line));
-        line = {};
-    };
     const std::vector<Control::Ptr> retained = snapshot_layout_children();
     for (const Control::Ptr& child : retained) {
-        if (!is_current_layout_child(child) || !child->visible()) continue;
+        if (!is_current_layout_child(child) || !(*child).visible()) continue;
         const Size desired = preferred_child_size(child, inner);
         if (!is_alive()) return {};
-        if (!is_current_layout_child(child) || !child->visible()) continue;
-        Item item{child, desired, child->margin(), flow_break(*child)};
+        if (!is_current_layout_child(child) || !(*child).visible()) continue;
+        Item item{child, desired, (*child).margin(), flow_break(*child)};
         const double item_main = horizontal
             ? horizontal_extent(item.margin) + item.desired.width
             : vertical_extent(item.margin) + item.desired.height;
@@ -128,15 +129,22 @@ Size FlowLayoutPanel::layout_children(Size available, bool assign) {
         const double preceding_spacing = line.items.empty() ? 0.0 : main_spacing;
         if (!line.items.empty() && wrap_contents_ &&
             line.main + preceding_spacing + item_main > main_limit) {
-            flush_line();
+            lines.push_back(std::move(line));
+            line = {};
         }
         if (!line.items.empty()) line.main += main_spacing;
         line.main += item_main;
         line.cross = std::max(line.cross, item_cross);
         line.items.push_back(std::move(item));
-        if (line.items.back().break_after) flush_line();
+        if (!line.items.empty() && line.items.back().break_after) {
+            lines.push_back(std::move(line));
+            line = {};
+        }
     }
-    flush_line();
+    if (!line.items.empty()) {
+        lines.push_back(std::move(line));
+        line = {};
+    }
 
     double cross_origin = 0.0;
     double content_main = 0.0;

@@ -24,14 +24,14 @@ Window::Window(Control::Ptr root, Size client_size)
       lifetime_(std::make_shared<detail::WindowLifetime>()),
       ui_thread_(std::this_thread::get_id()),
       dispatcher_state_(std::make_shared<detail::DispatcherState>(ui_thread_)) {
-    lifetime_->window = this;
+    (*lifetime_).window = this;
     if (!root_) {
         throw std::invalid_argument("GUI.Forms window requires a retained root control");
     }
-    if (root_->parent()) {
+    if ((*root_).parent()) {
         throw std::logic_error("GUI.Forms window root may not already have a parent");
     }
-    if (!root_->is_alive()) {
+    if (!(*root_).is_alive()) {
         throw std::logic_error("GUI.Forms window root may not be disposed");
     }
     attach_subtree(root_, {});
@@ -45,21 +45,21 @@ Window::~Window() {
     abandon_deferred_input();
     shutdown_dispatcher();
     while (!accelerators_.empty()) {
-        accelerators_.back()->disconnect();
+        (*accelerators_.back()).disconnect();
     }
     while (!popups_.empty()) {
-        popups_.back()->disconnect();
+        (*popups_.back()).disconnect();
     }
     focus_scopes_.clear();
-    for (const auto& request : frame_requests_) {
-        request->disconnect();
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+        (*request).disconnect();
     }
     frame_requests_.clear();
     update_frame_schedule_metrics();
     if (root_) {
         detach_subtree(root_);
     }
-    lifetime_->window = nullptr;
+    (*lifetime_).window = nullptr;
 }
 void Window::resize(Size client_size) {
     require_ui_thread("window resize");
@@ -75,8 +75,8 @@ void Window::resize(Size client_size) {
     if (surface_epoch_ == 0U) ++surface_epoch_;
     add_damage_all_planes(old_bounds);
     mark_subtree_dirty(*root_, invalidation::bounds);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay, invalidation::bounds);
         }
     }
@@ -94,8 +94,8 @@ void Window::set_scale(double scale) {
     ++surface_epoch_;
     if (surface_epoch_ == 0U) ++surface_epoch_;
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
         }
     }
@@ -120,12 +120,12 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     // the new logical metrics.
     if (text_scale_changed) {
         while (!popups_.empty()) {
-            popups_.back()->disconnect();
+            (*popups_.back()).disconnect();
         }
     }
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
         }
     }
@@ -140,8 +140,8 @@ void Window::set_theme(std::shared_ptr<const Theme> theme) {
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay,
                                Dirty::style | Dirty::paint | Dirty::semantics);
         }
@@ -154,8 +154,8 @@ void Window::set_active(bool active) {
     if (active_ == active) return;
     active_ = active;
     mark_subtree_dirty(*root_, Dirty::style | Dirty::paint | Dirty::semantics);
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             mark_subtree_dirty(*overlay,
                                Dirty::style | Dirty::paint | Dirty::semantics);
         }

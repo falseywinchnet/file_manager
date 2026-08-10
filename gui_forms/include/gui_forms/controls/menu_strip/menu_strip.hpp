@@ -87,6 +87,8 @@ private:
         std::size_t start, int direction) const;
     bool navigate_root(int direction);
     bool handle_popup_pointer(const PointerEvent& event);
+    void on_popup_item_invoked(const MenuItemInvocation& invocation);
+    void on_popup_open_changed(bool open_state);
     void set_hot(std::optional<std::size_t> index);
 
     std::vector<MenuStripItemSpec> items_;

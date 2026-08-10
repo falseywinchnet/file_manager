@@ -88,10 +88,12 @@ void register_packaged_fonts() {
     thread_local bool attempted = false;
     if (attempted) return;
     attempted = true;
-    const auto path = module_directory() / "fonts" / "PortsmouthRapids.ttf";
-    const auto bold_path = module_directory() / "fonts" / "PortsmouthRapids-Bold.ttf";
-    const auto bytes = read_file(path);
-    const auto bold_bytes = read_file(bold_path);
+    const std::filesystem::path path =
+        module_directory() / "fonts" / "PortsmouthRapids.ttf";
+    const std::filesystem::path bold_path =
+        module_directory() / "fonts" / "PortsmouthRapids-Bold.ttf";
+    const std::vector<std::byte> bytes = read_file(path);
+    const std::vector<std::byte> bold_bytes = read_file(bold_path);
     const bool registered = !bytes.empty() &&
         executor().register_typeface("Portsmouth Rapids", bytes, 0U);
     const bool bold_registered = !bold_bytes.empty() &&
@@ -163,7 +165,7 @@ std::vector<std::byte> registered_font_bytes(std::wstring_view family,
             path = std::filesystem::path(
                 std::wstring(windows_path.data(), count)) / L"Fonts" / path;
         }
-        if (auto encoded = read_file(path); !encoded.empty()) return encoded;
+        if (std::vector<std::byte> encoded = read_file(path); !encoded.empty()) return encoded;
     }
     return {};
 }
@@ -209,7 +211,7 @@ void ensure_platform_font(std::string_view family, std::uint32_t style) {
     if (font != nullptr) DeleteObject(font);
     DeleteDC(device);
     if (!registered) {
-        const auto bytes = registered_font_bytes(requested, style);
+        const std::vector<std::byte> bytes = registered_font_bytes(requested, style);
         encoded_size = bytes.size();
         registered = !bytes.empty() &&
             executor().register_typeface(family, bytes, style & 1U);
@@ -241,9 +243,10 @@ void ensure_platform_font(std::string_view, std::uint32_t) {}
 
 void ensure_recorder_fonts(const GraphicsRecorder& recorder,
                            std::uint64_t first_command) {
-    const auto commands = recorder.commands();
+    const std::span<const gui_drawing::DrawingCommand> commands =
+        recorder.commands();
     if (first_command >= commands.size()) return;
-    for (const auto& command : commands.subspan(
+    for (const gui_drawing::DrawingCommand& command : commands.subspan(
              static_cast<std::size_t>(first_command))) {
         if (command.kind == gui_drawing::CommandKind::draw_string) {
             ensure_platform_font(command.font.family, command.font.style);
@@ -339,18 +342,18 @@ gd_result measure_string(const void* font, const void* format,
     }
     try {
         register_packaged_fonts();
-        const auto& native_font = *static_cast<const gui_drawing::Font*>(font);
-        const auto font_snapshot = native_font.snapshot();
+        const gui_drawing::Font& native_font = *static_cast<const gui_drawing::Font*>(font);
+        const gui_drawing::FontSnapshot font_snapshot = native_font.snapshot();
         ensure_platform_font(font_snapshot.family, font_snapshot.style);
         gui_drawing::StringFormatSnapshot native_format{};
         if (format != nullptr) {
-            native_format = static_cast<const gui_drawing::StringFormat*>(format)->snapshot();
+            native_format = (*static_cast<const gui_drawing::StringFormat*>(format)).snapshot();
         }
         const gui_drawing::SizeF size = executor().measure_string(
             {text.data, static_cast<std::size_t>(text.size)},
             font_snapshot, native_format, layout_width);
-        measured->width = size.width;
-        measured->height = size.height;
+        (*measured).width = size.width;
+        (*measured).height = size.height;
         return GD_OK;
     } catch (...) {
         return GD_ERROR_INTERNAL;

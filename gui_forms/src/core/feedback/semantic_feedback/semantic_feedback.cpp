@@ -46,7 +46,7 @@ SemanticFeedbackRecord SemanticFeedback::emit(SemanticFeedbackKind kind) {
     if (!is_alive() || window_ == nullptr) {
         throw std::logic_error("disposed semantic feedback cannot emit");
     }
-    window_->verify_access("semantic feedback emission");
+    (*window_).verify_access("semantic feedback emission");
     std::uint64_t timestamp = clock_();
     if (timestamp <= last_timestamp_) timestamp = last_timestamp_ + 1U;
     last_timestamp_ = timestamp;
@@ -56,9 +56,9 @@ SemanticFeedbackRecord SemanticFeedback::emit(SemanticFeedbackKind kind) {
     record.kind = kind;
     record.cue = cue_for(kind);
     record.timestamp_nanoseconds = timestamp;
-    record.sound_enabled = window_->presentation_settings().sound_enabled;
-    if (HostServices* services = window_->host_services()) {
-        const HostServiceStatus status = services->play_sound_cue(
+    record.sound_enabled = (*window_).presentation_settings().sound_enabled;
+    if (HostServices* services = (*window_).host_services()) {
+        const HostServiceStatus status = (*services).play_sound_cue(
             {record.cue, record.sound_enabled ? 1.0 : 0.0, timestamp});
         record.host_accepted = status.accepted();
         record.sound_presented = record.sound_enabled && status.accepted();
@@ -75,7 +75,7 @@ SemanticFeedbackRecord SemanticFeedback::emit(SemanticFeedbackKind kind) {
 
 void SemanticFeedback::set_maximum_records(std::size_t maximum) {
     if (!is_alive()) throw std::logic_error("disposed semantic feedback cannot mutate");
-    if (window_ != nullptr) window_->verify_access("feedback history mutation");
+    if (window_ != nullptr) (*window_).verify_access("feedback history mutation");
     if (maximum == 0U || maximum > 65'536U) {
         throw std::invalid_argument(
             "semantic feedback history must contain 1 through 65536 records");
@@ -89,7 +89,7 @@ void SemanticFeedback::set_maximum_records(std::size_t maximum) {
 
 void SemanticFeedback::clear() {
     if (!is_alive()) throw std::logic_error("disposed semantic feedback cannot mutate");
-    if (window_ != nullptr) window_->verify_access("feedback history clear");
+    if (window_ != nullptr) (*window_).verify_access("feedback history clear");
     records_.clear();
     dropped_record_count_ = 0U;
 }

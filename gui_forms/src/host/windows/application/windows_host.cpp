@@ -101,11 +101,11 @@ std::string utf8_from_wide(std::wstring_view text) {
 
 std::wstring native_filter(const std::vector<HostFileDialogFilter>& filters) {
     std::wstring result;
-    for (const auto& filter : filters) {
+    for (const gui_forms::HostFileDialogFilter& filter : filters) {
         std::wstring label = wide_from_utf8(filter.label);
         if (label.empty()) label = L"Files";
         std::wstring pattern;
-        for (const auto& extension_utf8 : filter.extensions) {
+        for (const std::basic_string<char>& extension_utf8 : filter.extensions) {
             std::wstring extension = wide_from_utf8(extension_utf8);
             while (!extension.empty() && (extension.front() == L'.' ||
                                            extension.front() == L'*')) {
@@ -421,9 +421,9 @@ LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
         GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
         const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
-        state = static_cast<TooltipPopup*>(create->lpCreateParams);
+        state = static_cast<TooltipPopup*>((*create).lpCreateParams);
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-        state->window = window;
+        (*state).window = window;
     }
     switch (message) {
     case WM_ERASEBKGND: return 1;
@@ -445,17 +445,17 @@ LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
         DeleteObject(border);
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, RGB(31, 37, 44));
-        HGDIOBJ old_font = state && state->font ? SelectObject(dc, state->font) : nullptr;
+        HGDIOBJ old_font = state && (*state).font ? SelectObject(dc, (*state).font) : nullptr;
         RECT text_bounds{8, 5, std::max(8L, bounds.right - 8),
                          std::max(5L, bounds.bottom - 5)};
-        if (state) DrawTextW(dc, state->text.c_str(), -1, &text_bounds,
+        if (state) DrawTextW(dc, (*state).text.c_str(), -1, &text_bounds,
                              DT_WORDBREAK | DT_NOPREFIX | DT_LEFT);
         if (old_font) SelectObject(dc, old_font);
         EndPaint(window, &paint);
         return 0;
     }
     case WM_NCDESTROY:
-        if (state) state->window = nullptr;
+        if (state) (*state).window = nullptr;
         return 0;
     default: return DefWindowProcW(window, message, wparam, lparam);
     }
@@ -603,36 +603,36 @@ public:
         std::unordered_set<std::uint64_t> active;
         for (const ImageId id : registry.image_ids()) {
             active.insert(id.value);
-            const auto resource = registry.find(id);
+            const std::optional<ImageResourceView> resource = registry.find(id);
             if (!resource) { synchronized = false; continue; }
             const auto existing = images_.find(id.value);
             if (existing != images_.end() &&
-                existing->second.content_hash == resource->content_hash) continue;
+                (*existing).second.content_hash == (*resource).content_hash) continue;
             DecodedImage decoded;
-            decoded.content_hash = resource->content_hash;
-            decoded.width = resource->metadata.width;
-            decoded.height = resource->metadata.height;
-            if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+            decoded.content_hash = (*resource).content_hash;
+            decoded.width = (*resource).metadata.width;
+            decoded.height = (*resource).metadata.height;
+            if ((*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
                 const std::size_t expected =
                     static_cast<std::size_t>(decoded.width) * decoded.height * 4U;
-                if (resource->row_bytes !=
+                if ((*resource).row_bytes !=
                         static_cast<std::uint64_t>(decoded.width) * 4U ||
-                    resource->encoded.size() != expected) {
+                    (*resource).encoded.size() != expected) {
                     images_.erase(id.value);
                     synchronized = false;
                     continue;
                 }
                 if (existing != images_.end() &&
-                    existing->second.width == decoded.width &&
-                    existing->second.height == decoded.height) {
-                    existing->second.content_hash = decoded.content_hash;
-                    std::memcpy(existing->second.pixels.data(),
-                                resource->encoded.data(), expected);
+                    (*existing).second.width == decoded.width &&
+                    (*existing).second.height == decoded.height) {
+                    (*existing).second.content_hash = decoded.content_hash;
+                    std::memcpy((*existing).second.pixels.data(),
+                                (*resource).encoded.data(), expected);
                     continue;
                 }
                 decoded.pixels.resize(
                     static_cast<std::size_t>(decoded.width) * decoded.height);
-                std::memcpy(decoded.pixels.data(), resource->encoded.data(), expected);
+                std::memcpy(decoded.pixels.data(), (*resource).encoded.data(), expected);
             } else {
                 if (factory == nullptr && FAILED(CoCreateInstance(
                         CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
@@ -650,10 +650,10 @@ public:
             images_.insert_or_assign(id.value, std::move(decoded));
         }
         for (auto iterator = images_.begin(); iterator != images_.end();) {
-            iterator = active.contains(iterator->first) ? std::next(iterator)
+            iterator = active.contains((*iterator).first) ? std::next(iterator)
                                                         : images_.erase(iterator);
         }
-        if (factory != nullptr) factory->Release();
+        if (factory != nullptr) (*factory).Release();
         image_registry_ = &registry;
         image_revision_ = snapshot.revision;
         images_synchronized_ = synchronized;
@@ -742,7 +742,7 @@ public:
         if (area.empty()) return;
         const unsigned alpha = color.alpha;
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (pixel_allowed(x, y)) blend_pixel(row[x], color, alpha);
             }
@@ -757,7 +757,7 @@ public:
         radius = std::clamp(radius, 0.0,
                             std::max(0.0, std::min(rect.width, rect.height) * 0.5));
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
                 if (pixel_allowed(x, y) && inside_rounded(sample, rect, radius)) {
@@ -788,7 +788,7 @@ public:
                          rect.width - line * 2.0, rect.height - line * 2.0};
         const double inner_radius = std::max(0.0, radius - line);
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
                 const bool in_outer = inside_rounded(sample, rect, radius);
@@ -828,7 +828,7 @@ public:
         const double length_squared = dx * dx + dy * dy;
         if (length_squared <= 0.0) return;
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
@@ -854,7 +854,7 @@ public:
         center.x += state().tx;
         center.y += state().ty;
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const double sample_x = ((x + 0.5) / scale_ - center.x) /
@@ -886,7 +886,7 @@ public:
         const double radius = std::max(0.0, corner_radius + spread);
         const double sigma = std::max(blur_radius * 0.5, 0.25 / scale_);
         for (int y = area.top; y < area.bottom; ++y) {
-            auto* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
@@ -984,8 +984,8 @@ public:
         if (found == images_.end()) return;
         draw_image_region(
             image,
-            {0.0, 0.0, static_cast<double>(found->second.width),
-             static_cast<double>(found->second.height)},
+            {0.0, 0.0, static_cast<double>((*found).second.width),
+             static_cast<double>((*found).second.height)},
             destination, opacity);
     }
 
@@ -997,7 +997,7 @@ public:
             !std::isfinite(opacity) || opacity <= 0.0 || memory_dc_ == nullptr) {
             return;
         }
-        LiveSurfaceFrame frame = surface->acquire_latest();
+        LiveSurfaceFrame frame = (*surface).acquire_latest();
         if (!frame || frame.width() == 0U || frame.height() == 0U ||
             frame.row_bytes() != static_cast<std::uint64_t>(frame.width()) * 4U ||
             frame.pixels().empty()) {
@@ -1031,7 +1031,7 @@ public:
                     static_cast<std::size_t>(copy_right - copy_left) * 4U;
                 const std::size_t source_stride =
                     static_cast<std::size_t>(frame.row_bytes());
-                const auto* source = frame.pixels().data();
+                const std::byte* source = frame.pixels().data();
                 for (int y = copy_top; y < copy_bottom; ++y) {
                     const std::size_t source_y =
                         static_cast<std::size_t>(y - destination_y);
@@ -1071,7 +1071,7 @@ public:
             !std::isfinite(opacity) || opacity <= 0.0) {
             return;
         }
-        const DecodedImage& source = found->second;
+        const DecodedImage& source = (*found).second;
         const Rect source_bounds{0.0, 0.0, static_cast<double>(source.width),
                                  static_cast<double>(source.height)};
         if (!source_bounds.contains(source_rect)) return;
@@ -1082,14 +1082,14 @@ public:
         const unsigned global_alpha = static_cast<unsigned>(
             std::lround(std::clamp(opacity, 0.0, 1.0) * 255.0));
         for (int y = area.top; y < area.bottom; ++y) {
-            const auto source_y = std::min<std::uint32_t>(
+            const unsigned int source_y = std::min<std::uint32_t>(
                 source.height - 1U,
                 static_cast<std::uint32_t>(source_rect.y + std::max(
                     0.0, (y - top) * source_rect.height / height)));
-            auto* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
-                const auto source_x = std::min<std::uint32_t>(
+                const unsigned int source_x = std::min<std::uint32_t>(
                     source.width - 1U,
                     static_cast<std::uint32_t>(source_rect.x + std::max(
                         0.0, (x - left) * source_rect.width / width)));
@@ -1122,13 +1122,13 @@ public:
             !std::isfinite(source_pixel_size.height) ||
             !std::isfinite(logical_tile_size.width) ||
             !std::isfinite(logical_tile_size.height) ||
-            source_pixel_size.width != found->second.width ||
-            source_pixel_size.height != found->second.height ||
+            source_pixel_size.width != (*found).second.width ||
+            source_pixel_size.height != (*found).second.height ||
             logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
             !std::isfinite(opacity) || opacity <= 0.0) {
             return;
         }
-        const DecodedImage& source = found->second;
+        const DecodedImage& source = (*found).second;
         const double left = (destination.x + state().tx) * scale_;
         const double top = (destination.y + state().ty) * scale_;
         const double tile_width = logical_tile_size.width * scale_;
@@ -1137,14 +1137,14 @@ public:
             std::lround(std::clamp(opacity, 0.0, 1.0) * 255.0));
         for (int y = area.top; y < area.bottom; ++y) {
             const double tile_y = std::fmod(std::max(0.0, y - top), tile_height);
-            const auto source_y = std::min<std::uint32_t>(
+            const unsigned int source_y = std::min<std::uint32_t>(
                 source.height - 1U,
                 static_cast<std::uint32_t>(tile_y * source.height / tile_height));
-            auto* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const double tile_x = std::fmod(std::max(0.0, x - left), tile_width);
-                const auto source_x = std::min<std::uint32_t>(
+                const unsigned int source_x = std::min<std::uint32_t>(
                     source.width - 1U,
                     static_cast<std::uint32_t>(tile_x * source.width / tile_width));
                 const std::uint32_t source_pixel =
@@ -1226,8 +1226,8 @@ private:
     [[nodiscard]] bool pixel_allowed(int x, int y) const noexcept {
         if (!state().rounded_clip) return true;
         const Point point{(x + 0.5) / scale_, (y + 0.5) / scale_};
-        return inside_rounded(point, state().rounded_clip->rect,
-                              state().rounded_clip->radius);
+        return inside_rounded(point, (*state().rounded_clip).rect,
+                              (*state().rounded_clip).radius);
     }
     static void blend_pixel(std::uint32_t& destination, Color color,
                             unsigned alpha) noexcept {
@@ -1599,7 +1599,7 @@ private:
         IWICFormatConverter* converter{};
         HRESULT status = factory.CreateStream(&stream);
         if (SUCCEEDED(status)) {
-            status = stream->InitializeFromMemory(
+            status = (*stream).InitializeFromMemory(
                 reinterpret_cast<BYTE*>(const_cast<std::byte*>(resource.encoded.data())),
                 static_cast<DWORD>(resource.encoded.size()));
         }
@@ -1607,16 +1607,16 @@ private:
             status = factory.CreateDecoderFromStream(stream, nullptr,
                 WICDecodeMetadataCacheOnLoad, &decoder);
         }
-        if (SUCCEEDED(status)) status = decoder->GetFrame(0, &frame);
+        if (SUCCEEDED(status)) status = (*decoder).GetFrame(0, &frame);
         UINT width{};
         UINT height{};
-        if (SUCCEEDED(status)) status = frame->GetSize(&width, &height);
+        if (SUCCEEDED(status)) status = (*frame).GetSize(&width, &height);
         if (SUCCEEDED(status) && (width != output.width || height != output.height)) {
             status = E_FAIL;
         }
         if (SUCCEEDED(status)) status = factory.CreateFormatConverter(&converter);
         if (SUCCEEDED(status)) {
-            status = converter->Initialize(frame, GUID_WICPixelFormat32bppPBGRA,
+            status = (*converter).Initialize(frame, GUID_WICPixelFormat32bppPBGRA,
                 WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
         }
         if (SUCCEEDED(status)) {
@@ -1624,13 +1624,13 @@ private:
             const UINT stride = output.width * 4U;
             const std::size_t bytes = output.pixels.size() * sizeof(std::uint32_t);
             if (bytes > MAXDWORD) status = E_OUTOFMEMORY;
-            else status = converter->CopyPixels(nullptr, stride, static_cast<UINT>(bytes),
+            else status = (*converter).CopyPixels(nullptr, stride, static_cast<UINT>(bytes),
                                                 reinterpret_cast<BYTE*>(output.pixels.data()));
         }
-        if (converter != nullptr) converter->Release();
-        if (frame != nullptr) frame->Release();
-        if (decoder != nullptr) decoder->Release();
-        if (stream != nullptr) stream->Release();
+        if (converter != nullptr) (*converter).Release();
+        if (frame != nullptr) (*frame).Release();
+        if (decoder != nullptr) (*decoder).Release();
+        if (stream != nullptr) (*stream).Release();
         return SUCCEEDED(status);
     }
 
@@ -1695,17 +1695,17 @@ public:
         const Size logical{(client.right - client.left) / scale_,
                            (client.bottom - client.top) / scale_};
         raster_.resize(logical, scale_);
-        model_->metrics().set_renderer(
+        (*model_).metrics().set_renderer(
             "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts", true);
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
-        model_->set_dispatch_wake_handler([this] {
+        (*model_).set_dispatch_wake_handler([this] {
             if (hwnd_ != nullptr) {
                 PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
             }
         });
-        model_->set_paint_wake_handler([this] {
+        (*model_).set_paint_wake_handler([this] {
             request_render_wake();
         });
         if (options_.host_ready) {
@@ -1726,7 +1726,7 @@ public:
         }
         // One FIFO initialization turn runs before presentation. Work posted by
         // those callbacks stays deferred to the ordinary next host turn.
-        static_cast<void>(model_->drain_posted_work());
+        static_cast<void>((*model_).drain_posted_work());
         if (options_.dispatch_pending) options_.dispatch_pending();
         native_phase_ = NativePhase::ready;
         collect_damage();
@@ -1821,7 +1821,7 @@ public:
             // of retained layout and input. A modal-loop timer is the native
             // Win32 clock bridge for exactly that interval.
             in_size_move_ = true;
-            if (model_->has_live_surface_presentations()) {
+            if ((*model_).has_live_surface_presentations()) {
                 SetTimer(hwnd_, modal_live_surface_timer,
                          live_surface_period_milliseconds, nullptr);
             }
@@ -1832,7 +1832,7 @@ public:
             mark_live_frame_due();
             return 0;
         case managed_dispatch_message:
-            static_cast<void>(model_->drain_posted_work());
+            static_cast<void>((*model_).drain_posted_work());
             if (options_.dispatch_pending) options_.dispatch_pending();
             collect_damage();
             return 0;
@@ -1899,7 +1899,7 @@ public:
                 native_phase_ = NativePhase::closed;
                 if (options_.closed) options_.closed();
             }
-            model_->set_paint_wake_handler({});
+            (*model_).set_paint_wake_handler({});
             session_.shutdown();
             native_phase_ = NativePhase::shutdown;
             services_.shutdown();
@@ -1910,7 +1910,7 @@ public:
         return DefWindowProcW(hwnd_, message, wparam, lparam);
     }
 
-    std::string metrics_json() const { return model_->metrics_snapshot().to_json(); }
+    std::string metrics_json() const { return (*model_).metrics_snapshot().to_json(); }
     std::string host_json() const {
         return "{\"session\":" + session_.snapshot().to_json() +
                ",\"services\":" + services_.snapshot().to_json() +
@@ -1955,7 +1955,7 @@ private:
     }
 
     HostDialogResult show_dialog(const HostDialogRequest& request) {
-        model_->release_pointer();
+        (*model_).release_pointer();
         synchronize_capture();
         hide_tooltip();
         return std::visit([this, &request](const auto& payload) -> HostDialogResult {
@@ -2120,17 +2120,17 @@ private:
         const double next = std::max(1.0, HIWORD(wparam) / 96.0);
         if (next != scale_) { scale_ = next; dispatch(HostScaleEvent{scale_}); }
         if (const RECT* suggested = reinterpret_cast<const RECT*>(lparam)) {
-            SetWindowPos(hwnd_, nullptr, suggested->left, suggested->top,
-                         suggested->right - suggested->left,
-                         suggested->bottom - suggested->top,
+            SetWindowPos(hwnd_, nullptr, (*suggested).left, (*suggested).top,
+                         (*suggested).right - (*suggested).left,
+                         (*suggested).bottom - (*suggested).top,
                          SWP_NOACTIVATE | SWP_NOZORDER);
         }
         resize();
     }
 
     void collect_damage() {
-        static_cast<void>(model_->poll_frame_schedule(FrameClock::now()));
-        DamageRegion damage = model_->take_damage();
+        static_cast<void>((*model_).poll_frame_schedule(FrameClock::now()));
+        DamageRegion damage = (*model_).take_damage();
         if (!damage.empty()) {
             const Rect bounds = damage.bounds();
             pending_damage_.add(bounds);
@@ -2153,13 +2153,13 @@ private:
             }
         }
         KillTimer(hwnd_, scheduler_timer);
-        if (const auto wake = model_->next_wake()) {
+        if (const std::optional<FrameTime> wake = (*model_).next_wake()) {
             const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
                 *wake - FrameClock::now()).count();
             SetTimer(hwnd_, scheduler_timer,
                      static_cast<UINT>(std::clamp<std::int64_t>(milliseconds, 1, 60'000)), nullptr);
         }
-        const bool needs_live_clock = model_->has_live_surface_presentations();
+        const bool needs_live_clock = (*model_).has_live_surface_presentations();
         if (needs_live_clock && !live_clock_armed_) {
             LARGE_INTEGER first_due{};
             first_due.QuadPart = -static_cast<LONGLONG>(
@@ -2188,9 +2188,9 @@ private:
         ++live_presentation_drains_;
         const auto started = std::chrono::steady_clock::now();
         std::vector<LiveSurfacePresentation> updates =
-            model_->take_live_surface_presentations();
+            (*model_).take_live_surface_presentations();
         live_updates_sampled_ += updates.size();
-        if (!model_->has_live_surface_presentations() && live_clock_armed_) {
+        if (!(*model_).has_live_surface_presentations() && live_clock_armed_) {
             CancelWaitableTimer(live_frame_clock_);
             live_clock_armed_ = false;
         }
@@ -2200,7 +2200,7 @@ private:
             live_updates_failed_ += updates.size();
             return;
         }
-        for (const auto& update : updates) {
+        for (const gui_forms::LiveSurfacePresentation& update : updates) {
             if (raster_.present_live_surface(target, update)) {
                 ++live_updates_presented_;
             } else {
@@ -2208,7 +2208,7 @@ private:
             }
         }
         ReleaseDC(hwnd_, target);
-        const auto duration = static_cast<std::uint64_t>(
+        const std::uint64_t duration = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started).count());
         live_present_duration_nanoseconds_ += duration;
@@ -2226,15 +2226,15 @@ private:
                                  (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
         }
         raster_.begin_frame();
-        static_cast<void>(raster_.synchronize_images(model_->image_resources()));
+        static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const std::optional<PaintReceipt> receipt =
-            model_->paint(raster_, pending_damage_.bounds());
+            (*model_).paint(raster_, pending_damage_.bounds());
         const bool presented = receipt && raster_.present(dc, paint_state.rcPaint);
         EndPaint(hwnd_, &paint_state);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - started);
         if (presented &&
-            model_->notify_presented(*receipt,
+            (*model_).notify_presented(*receipt,
                                      static_cast<std::uint64_t>(elapsed.count()))) {
             pending_damage_.clear();
         }
@@ -2255,8 +2255,8 @@ private:
         event.click_count = message == WM_LBUTTONDBLCLK ||
             message == WM_RBUTTONDBLCLK || message == WM_MBUTTONDBLCLK ? 2U : 1U;
         if (trace_win32_input()) {
-            const auto target = model_->hit_test(event.position);
-            const auto target_id = target ? target->stable_id().value() : std::string_view{"<none>"};
+            const auto target = (*model_).hit_test(event.position);
+            const std::string_view target_id = target ? (*target).stable_id().value() : std::string_view{"<none>"};
             std::fprintf(stderr,
                          "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
                          static_cast<unsigned>(message), static_cast<unsigned>(action),
@@ -2311,14 +2311,14 @@ private:
     }
 
     void synchronize_capture() {
-        const bool requested = model_->captured_control() != nullptr;
+        const bool requested = (*model_).captured_control() != nullptr;
         if (requested && GetCapture() != hwnd_) SetCapture(hwnd_);
         if (!requested && GetCapture() == hwnd_) ReleaseCapture();
     }
 
     bool update_cursor(Point position) const {
-        const auto target = model_->hit_test(position);
-        const CursorKind cursor = target ? target->effective_cursor() : CursorKind::arrow;
+        const auto target = (*model_).hit_test(position);
+        const CursorKind cursor = target ? (*target).effective_cursor() : CursorKind::arrow;
         // The class cursor is authoritative for the ordinary pointer. Let
         // DefWindowProc complete WM_SETCURSOR for that case instead of writing
         // process-global cursor state again from every WM_MOUSEMOVE turn.
@@ -2332,8 +2332,8 @@ private:
                   static_cast<LONG>(std::ceil(options_.minimum_size.width * scale_)),
                   static_cast<LONG>(std::ceil(options_.minimum_size.height * scale_))};
         AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0);
-        info->ptMinTrackSize.x = rect.right - rect.left;
-        info->ptMinTrackSize.y = rect.bottom - rect.top;
+        (*info).ptMinTrackSize.x = rect.right - rect.left;
+        (*info).ptMinTrackSize.y = rect.bottom - rect.top;
     }
 
     LRESULT close() {
@@ -2348,16 +2348,16 @@ private:
     }
 
     LRESULT automation(const COPYDATASTRUCT* data) {
-        if (!options_.automation_enabled || data == nullptr || data->lpData == nullptr ||
-            data->cbData == 0 || data->cbData > maximum_automation_command) return FALSE;
-        const char* bytes = static_cast<const char*>(data->lpData);
-        std::string command(bytes, bytes + data->cbData);
+        if (!options_.automation_enabled || data == nullptr || (*data).lpData == nullptr ||
+            (*data).cbData == 0 || (*data).cbData > maximum_automation_command) return FALSE;
+        const char* bytes = static_cast<const char*>((*data).lpData);
+        std::string command(bytes, bytes + (*data).cbData);
         while (!command.empty() && command.back() == '\0') command.pop_back();
         constexpr std::string_view prefix = "GUI.Forms.Automation/1 ";
         if (!command.starts_with(prefix)) return FALSE;
         command.erase(0, prefix.size());
         if (command == "snapshot") {
-            const DispatcherSnapshot dispatcher = model_->dispatcher_snapshot();
+            const DispatcherSnapshot dispatcher = (*model_).dispatcher_snapshot();
             std::fprintf(
                 stdout,
                 "{\"automation\":\"snapshot\",\"window\":%s,\"host\":%s,"
@@ -2402,10 +2402,10 @@ private:
             double local_y{};
             if (!(input >> id >> local_x >> local_y) || !std::isfinite(local_x) ||
                 !std::isfinite(local_y)) return FALSE;
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) return FALSE;
-            const Rect bounds = control->absolute_bounds();
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input()) return FALSE;
+            const Rect bounds = (*control).absolute_bounds();
             const Point point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
                               bounds.y + std::clamp(local_y, 0.0, bounds.height)};
             const bool handled = dispatch(PointerEvent{
@@ -2421,10 +2421,10 @@ private:
         constexpr std::string_view focus = "focus ";
         if (command.starts_with(focus)) {
             const std::string id = command.substr(focus.size());
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input() ||
-                !model_->request_focus(control)) return FALSE;
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input() ||
+                !(*model_).request_focus(control)) return FALSE;
             std::fprintf(stdout, "{\"automation\":\"focus\",\"id\":\"%s\"}\n",
                          id.c_str());
             std::fflush(stdout);
@@ -2437,10 +2437,10 @@ private:
             if (separator == std::string::npos) return FALSE;
             const std::string id = payload.substr(0, separator);
             const std::string text = payload.substr(separator + 1U);
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input() ||
-                !model_->request_focus(control)) return FALSE;
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input() ||
+                !(*model_).request_focus(control)) return FALSE;
             const bool handled = dispatch(TextInputEvent{text}).handled;
             collect_damage();
             std::fprintf(stdout,
@@ -2459,10 +2459,10 @@ private:
             if (!(input >> id >> physical >> action) ||
                 (action != "down" && action != "up")) return FALSE;
             if (!(input >> modifiers)) modifiers = 0;
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input() ||
-                !model_->request_focus(control)) return FALSE;
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input() ||
+                !(*model_).request_focus(control)) return FALSE;
             KeyEvent event;
             event.action = action == "down" ? KeyAction::down : KeyAction::up;
             event.physical_key = physical;
@@ -2479,20 +2479,20 @@ private:
         constexpr std::string_view activate = "activate ";
         if (command.starts_with(activate)) {
             const std::string id = command.substr(activate.size());
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) {
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input()) {
                 std::fprintf(stdout,
                              "{\"automation\":\"activate\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
                              id.c_str(), !control ? "not-found" : "ineligible");
                 std::fflush(stdout);
                 return FALSE;
             }
-            control->on_activate();
+            (*control).on_activate();
             collect_damage();
             std::fprintf(stdout,
                          "{\"automation\":\"activate\",\"id\":\"%s\",\"stable_id\":\"%s\"}\n",
-                         id.c_str(), control->stable_id().value().data());
+                         id.c_str(), (*control).stable_id().value().data());
             std::fflush(stdout);
             return TRUE;
         }
@@ -2504,16 +2504,16 @@ private:
             double local_y{};
             if (!(input >> id >> local_x >> local_y) || !std::isfinite(local_x) ||
                 !std::isfinite(local_y)) return FALSE;
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) {
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input()) {
                 std::fprintf(stdout,
                              "{\"automation\":\"click-at\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
                              id.c_str(), !control ? "not-found" : "ineligible");
                 std::fflush(stdout);
                 return FALSE;
             }
-            const Rect bounds = control->absolute_bounds();
+            const Rect bounds = (*control).absolute_bounds();
             const Point point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
                               bounds.y + std::clamp(local_y, 0.0, bounds.height)};
             const bool handled_down = dispatch(PointerEvent{
@@ -2545,16 +2545,16 @@ private:
                 !std::isfinite(end_x) || !std::isfinite(end_y)) return FALSE;
             if (!(input >> requested_steps)) requested_steps = 8U;
             const unsigned steps = std::clamp(requested_steps, 1U, 256U);
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) {
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input()) {
                 std::fprintf(stdout,
                              "{\"automation\":\"drag\",\"id\":\"%s\",\"accepted\":false,\"reason\":\"%s\"}\n",
                              id.c_str(), !control ? "not-found" : "ineligible");
                 std::fflush(stdout);
                 return FALSE;
             }
-            const Rect bounds = control->absolute_bounds();
+            const Rect bounds = (*control).absolute_bounds();
             const auto point_at = [&](double local_x, double local_y) {
                 return Point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
                              bounds.y + std::clamp(local_y, 0.0, bounds.height)};
@@ -2590,19 +2590,19 @@ private:
             std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"request\"}\n",
                          id.c_str());
             std::fflush(stdout);
-            const auto control = options_.automation_resolve
-                ? options_.automation_resolve(id) : model_->find(id);
-            if (!control || !control->eligible_for_input()) return FALSE;
+            const std::shared_ptr<gui_forms::Control> control = options_.automation_resolve
+                ? options_.automation_resolve(id) : (*model_).find(id);
+            if (!control || !(*control).eligible_for_input()) return FALSE;
             std::fprintf(stdout, "{\"automation\":\"click-phase\",\"id\":\"%s\",\"phase\":\"resolved\"}\n",
                          id.c_str());
             std::fflush(stdout);
-            const Rect bounds = control->absolute_bounds();
+            const Rect bounds = (*control).absolute_bounds();
             const Point center{bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0};
-            const auto hit = model_->hit_test(center);
+            const auto hit = (*model_).hit_test(center);
             std::fprintf(stdout,
                          "{\"automation\":\"click-target\",\"id\":\"%s\",\"resolved\":\"%s\",\"hit\":\"%s\",\"x\":%.3f,\"y\":%.3f}\n",
-                         id.c_str(), control->stable_id().value().data(),
-                         hit ? hit->stable_id().value().data() : "", center.x,
+                         id.c_str(), (*control).stable_id().value().data(),
+                         hit ? (*hit).stable_id().value().data() : "", center.x,
                          center.y);
             std::fflush(stdout);
             PointerEvent down{PointerAction::down, PointerButton::primary, center,
@@ -2701,11 +2701,11 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
     auto* state = reinterpret_cast<WindowsHostState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
         const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
-        state = static_cast<WindowsHostState*>(create->lpCreateParams);
+        state = static_cast<WindowsHostState*>((*create).lpCreateParams);
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-        state->bind_window(window);
+        (*state).bind_window(window);
     }
-    if (state != nullptr) return state->message(message, wparam, lparam);
+    if (state != nullptr) return (*state).message(message, wparam, lparam);
     return DefWindowProcW(window, message, wparam, lparam);
 }
 
@@ -2909,7 +2909,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
                 ex_style, window_class_name, title.c_str(), style, CW_USEDEFAULT,
                 CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top,
                 owner, nullptr, instance, state.get());
-            if (window == nullptr || !state->initialize(window)) {
+            if (window == nullptr || !(*state).initialize(window)) {
                 if (window != nullptr) DestroyWindow(window);
                 for (HWND created : handles) {
                     if (IsWindow(created)) DestroyWindow(created);
@@ -2934,7 +2934,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     }
 
     for (std::size_t index = 0; index < windows.size(); ++index) {
-        if (!states[index]->will_show()) {
+        if (!(*states[index]).will_show()) {
             for (HWND created : handles) {
                 if (IsWindow(created)) DestroyWindow(created);
             }
@@ -2955,8 +2955,8 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
         std::vector<HANDLE> clocks;
         clocks.reserve(states.size());
         for (const auto& state : states) {
-            if (state->live_frame_clock() != nullptr) {
-                clocks.push_back(state->live_frame_clock());
+            if ((*state).live_frame_clock() != nullptr) {
+                clocks.push_back((*state).live_frame_clock());
             }
         }
         if (clocks.size() >= MAXIMUM_WAIT_OBJECTS) {
@@ -2971,8 +2971,8 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             wait < WAIT_OBJECT_0 + clocks.size()) {
             const HANDLE ready = clocks[wait - WAIT_OBJECT_0];
             for (const auto& state : states) {
-                if (state->live_frame_clock() == ready) {
-                    state->mark_live_frame_due();
+                if ((*state).live_frame_clock() == ready) {
+                    (*state).mark_live_frame_due();
                     break;
                 }
             }
@@ -2995,20 +2995,20 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             }
         }
         for (const auto& state : states) {
-            const HANDLE clock = state->live_frame_clock();
+            const HANDLE clock = (*state).live_frame_clock();
             if (clock != nullptr &&
                 WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
-                state->mark_live_frame_due();
+                (*state).mark_live_frame_due();
             }
         }
         if (!quit) {
-            for (const auto& state : states) state->present_pending_frame();
+            for (const auto& state : states) (*state).present_pending_frame();
         }
     }
     for (HWND window : handles) if (IsWindow(window)) DestroyWindow(window);
     for (std::size_t index = 0; index < windows.size(); ++index) {
-        const std::string metrics = states[index]->metrics_json();
-        const std::string host = states[index]->host_json();
+        const std::string metrics = (*states[index]).metrics_json();
+        const std::string host = (*states[index]).host_json();
         if (windows[index].options.print_metrics_on_close) {
             std::fprintf(stdout,
                          "{\"stable_id\":\"%s\",\"window\":%s,\"host\":%s}\n",

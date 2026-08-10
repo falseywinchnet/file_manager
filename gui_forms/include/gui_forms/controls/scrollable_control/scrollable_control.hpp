@@ -138,10 +138,14 @@ private:
                        double old_value, double new_value);
     void paint_axis(Painter& painter, ScrollOrientation orientation,
                     const AxisGeometry& geometry) const;
+    void append_semantic_axis(std::vector<SemanticNode>& nodes,
+                              Rect absolute, ScrollOrientation orientation,
+                              const ScrollProperties& axis) const;
     void axis_properties_changed(ScrollOrientation orientation,
                                  bool position_changed);
     static void validate_size(Size size, const char* message);
     static void validate_axis_value(double value, const char* message);
+    [[nodiscard]] static double normalize_wheel_delta(double delta) noexcept;
 
     ScrollProperties horizontal_scroll_;
     ScrollProperties vertical_scroll_;

@@ -602,7 +602,7 @@ extern "C" HDC WINAPI gf_compat_BeginPaint(
     if (!endpoint_dc(window, &dc)) return ::BeginPaint(window, paint);
     if (paint != nullptr) {
         std::memset(paint, 0, sizeof(*paint));
-        paint->hdc = dc;
+        (*paint).hdc = dc;
     }
     return dc;
 }

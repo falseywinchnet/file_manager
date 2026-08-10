@@ -7,13 +7,19 @@ namespace gui_forms {
 struct Point {
     double x{};
     double y{};
-    friend constexpr bool operator==(const Point&, const Point&) = default;
+    friend constexpr bool operator==(const Point& left,
+                                     const Point& right) noexcept {
+        return left.x == right.x && left.y == right.y;
+    }
 };
 
 struct Size {
     double width{};
     double height{};
-    friend constexpr bool operator==(const Size&, const Size&) = default;
+    friend constexpr bool operator==(const Size& left,
+                                     const Size& right) noexcept {
+        return left.width == right.width && left.height == right.height;
+    }
 };
 
 struct Rect {
@@ -21,7 +27,11 @@ struct Rect {
     double y{};
     double width{};
     double height{};
-    friend constexpr bool operator==(const Rect&, const Rect&) = default;
+    friend constexpr bool operator==(const Rect& left,
+                                     const Rect& right) noexcept {
+        return left.x == right.x && left.y == right.y &&
+               left.width == right.width && left.height == right.height;
+    }
 
     [[nodiscard]] constexpr bool empty() const noexcept {
         return width <= 0.0 || height <= 0.0;
@@ -55,7 +65,11 @@ struct Insets {
     double top{};
     double right{};
     double bottom{};
-    friend constexpr bool operator==(const Insets&, const Insets&) = default;
+    friend constexpr bool operator==(const Insets& left,
+                                     const Insets& right) noexcept {
+        return left.left == right.left && left.top == right.top &&
+               left.right == right.right && left.bottom == right.bottom;
+    }
 };
 
 } // namespace gui_forms

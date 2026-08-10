@@ -148,7 +148,7 @@ last valid manifest/segment pair. An unchanged authoritative scan returns the
 current generation without a segment/manifest write; explicit rebuild still
 forces a checked replacement. It does not yet
 implement live delta-run publication/compaction, a committed observation watermark,
-lexical text, live fuzzy search, framed production IPC, or live-plus-committed
+lexical text, live fuzzy search, general production IPC, or live-plus-committed
 merging. A standalone delta writer/reader is measured but is not referenced by
 the live manifest or service query path; the measured one-run overlay has the
 same separation. Multi-run/consolidation experiments retain that separation;

@@ -91,6 +91,10 @@ protected:
     void paint_label_text(Painter& painter, std::string_view text) const;
 
 private:
+    [[nodiscard]] PropertyValueOrigin font_property_origin() const noexcept;
+    [[nodiscard]] PropertyValueOrigin foreground_property_origin() const noexcept;
+    [[nodiscard]] BindingValue maximum_lines_property_value() const;
+    void set_maximum_lines_property_value(const BindingValue& value);
     [[nodiscard]] bool mnemonic_matches(
         char32_t character) const noexcept override;
     bool process_mnemonic_self(char32_t character) override;

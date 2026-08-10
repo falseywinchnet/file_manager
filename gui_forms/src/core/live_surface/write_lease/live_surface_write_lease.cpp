@@ -36,19 +36,19 @@ LiveSurfaceWriteLease& LiveSurfaceWriteLease::operator=(
 }
 
 std::uint32_t LiveSurfaceWriteLease::width() const noexcept {
-    return buffer_ ? buffer_->description.width : 0U;
+    return buffer_ ? (*buffer_).description.width : 0U;
 }
 
 std::uint32_t LiveSurfaceWriteLease::height() const noexcept {
-    return buffer_ ? buffer_->description.height : 0U;
+    return buffer_ ? (*buffer_).description.height : 0U;
 }
 
 std::uint64_t LiveSurfaceWriteLease::row_bytes() const noexcept {
-    return buffer_ ? buffer_->row_bytes : 0U;
+    return buffer_ ? (*buffer_).row_bytes : 0U;
 }
 
 std::span<std::byte> LiveSurfaceWriteLease::pixels() noexcept {
-    return buffer_ ? std::span<std::byte>(buffer_->pixels)
+    return buffer_ ? std::span<std::byte>((*buffer_).pixels)
                    : std::span<std::byte>{};
 }
 
@@ -57,34 +57,34 @@ std::uint64_t LiveSurfaceWriteLease::publish(Rect damage) {
     std::vector<std::shared_ptr<detail::LiveSurfaceWake>> wakes;
     std::uint64_t published{};
     {
-        std::scoped_lock lock(state_->mutex);
-        if (state_->epoch != epoch_ || state_->writing_slot != slot_ ||
-            slot_ >= state_->buffers.size() ||
-            state_->buffers[slot_].get() != buffer_.get()) {
+        std::scoped_lock lock((*state_).mutex);
+        if ((*state_).epoch != epoch_ || (*state_).writing_slot != slot_ ||
+            slot_ >= (*state_).buffers.size() ||
+            (*state_).buffers[slot_].get() != buffer_.get()) {
             state_.reset();
             buffer_.reset();
             return 0U;
         }
-        const Rect bounds = detail::full_live_surface_damage(buffer_->description);
+        const Rect bounds = detail::full_live_surface_damage((*buffer_).description);
         if (damage.empty()) damage = bounds;
         damage = Rect::intersection(damage, bounds);
-        state_->published_slot = slot_;
-        state_->writing_slot = state_->buffers.size();
-        state_->damage = damage.empty() ? bounds : damage;
-        ++state_->generation;
-        ++state_->publishes;
-        published = state_->generation;
-        wakes = state_->wakes;
+        (*state_).published_slot = slot_;
+        (*state_).writing_slot = (*state_).buffers.size();
+        (*state_).damage = damage.empty() ? bounds : damage;
+        ++(*state_).generation;
+        ++(*state_).publishes;
+        published = (*state_).generation;
+        wakes = (*state_).wakes;
     }
     state_.reset();
     buffer_.reset();
-    for (const auto& wake : wakes) {
-        if (!wake || !wake->connected.load(std::memory_order_acquire) ||
-            !wake->callback) {
+    for (const std::shared_ptr<gui_forms::detail::LiveSurfaceWake>& wake : wakes) {
+        if (!wake || !(*wake).connected.load(std::memory_order_acquire) ||
+            !(*wake).callback) {
             continue;
         }
         try {
-            wake->callback();
+            (*wake).callback();
         } catch (...) {
             // Publication remains committed when a retiring consumer faults.
         }
@@ -94,9 +94,9 @@ std::uint64_t LiveSurfaceWriteLease::publish(Rect damage) {
 
 void LiveSurfaceWriteLease::abandon() noexcept {
     if (state_) {
-        std::scoped_lock lock(state_->mutex);
-        if (state_->epoch == epoch_ && state_->writing_slot == slot_) {
-            state_->writing_slot = state_->buffers.size();
+        std::scoped_lock lock((*state_).mutex);
+        if ((*state_).epoch == epoch_ && (*state_).writing_slot == slot_) {
+            (*state_).writing_slot = (*state_).buffers.size();
         }
     }
     state_.reset();

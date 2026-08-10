@@ -28,7 +28,7 @@ Binding::Binding(Control& target, std::string property_name,
       data_member_(canonical_binding_name(data_member)),
       options_(std::move(options)) {
     detail::validate_binding_options(options_);
-    if (!source || !source->is_alive()) {
+    if (!source || !(*source).is_alive()) {
         throw std::invalid_argument("GUI.Forms Binding requires a live BindingSource");
     }
     if (!target.is_alive()) {
@@ -46,45 +46,62 @@ Binding::~Binding() {
     }
 }
 
+void Binding::SourceChangedCallback::operator()(
+    const BindingListChange& change) const {
+    if (const std::shared_ptr<Binding> self = binding.lock()) {
+        (*self).source_changed(change);
+    }
+}
+
+void Binding::SourceDisposedCallback::operator()() const {
+    if (const std::shared_ptr<Binding> self = binding.lock()) {
+        (*self).source_changed_.disconnect();
+        (*self).target_changed_.disconnect();
+        (*self).target_validating_.disconnect();
+        (*self).active_ = false;
+        (*self).source_.reset();
+    }
+}
+
+void Binding::TargetChangedCallback::operator()() const {
+    if (const std::shared_ptr<Binding> self = binding.lock()) {
+        (*self).target_changed();
+    }
+}
+
+void Binding::TargetValidatingCallback::operator()(
+    ControlValidationEvent& event) const {
+    if (const std::shared_ptr<Binding> self = binding.lock();
+        self && (*self).active_ &&
+        (*self).options_.data_source_update_mode ==
+            DataSourceUpdateMode::on_validation) {
+        event.cancel = !(*self).validate() || event.cancel;
+    }
+}
+
 void Binding::start() {
     if (active_) return;
-    const auto source = source_.lock();
-    if (!target_ || !target_->is_alive() || !source || !source->is_alive()) {
+    const std::shared_ptr<gui_forms::BindingSource> source = source_.lock();
+    if (!target_ || !(*target_).is_alive() || !source || !(*source).is_alive()) {
         throw std::logic_error("GUI.Forms cannot start a binding with a retired endpoint");
     }
-    const BindableProperty* property = target_->find_bindable_property(property_name_);
-    if (!property || !property->descriptor.readable || !property->get) {
+    const BindableProperty* property = (*target_).find_bindable_property(property_name_);
+    if (!property || !(*property).descriptor.readable || !(*property).get) {
         throw std::invalid_argument("GUI.Forms Binding target property is not readable");
     }
     const std::weak_ptr<Binding> weak = weak_from_this();
-    source_changed_ = source->model_changed_.subscribe(*this,
-        [weak](const BindingListChange& change) {
-            if (const auto self = weak.lock()) self->source_changed(change);
-        });
-    source_disposed_ = source->disposed_event().subscribe(*this, [weak] {
-        if (const auto self = weak.lock()) {
-            self->source_changed_.disconnect();
-            self->target_changed_.disconnect();
-            self->target_validating_.disconnect();
-            self->active_ = false;
-            self->source_.reset();
-        }
-    });
-    if (property->connect_changed) {
-        target_changed_ = property->connect_changed(*this, [weak] {
-            if (const auto self = weak.lock()) self->target_changed();
-        });
+    source_changed_ = (*source).model_changed_.subscribe(*this,
+        SourceChangedCallback{weak});
+    source_disposed_ = (*source).disposed_event().subscribe(
+        *this, SourceDisposedCallback{weak});
+    if ((*property).connect_changed) {
+        target_changed_ = (*property).connect_changed(
+            *this, TargetChangedCallback{weak});
     }
-    target_validating_ = target_->validating().subscribe(
-        *this, [weak](ControlValidationEvent& event) {
-            if (const auto self = weak.lock(); self && self->active_ &&
-                self->options_.data_source_update_mode ==
-                    DataSourceUpdateMode::on_validation) {
-                event.cancel = !self->validate() || event.cancel;
-            }
-        });
+    target_validating_ = (*target_).validating().subscribe(
+        *this, TargetValidatingCallback{weak});
     active_ = true;
-    source->register_binding(shared_from_this());
+    (*source).register_binding(shared_from_this());
     if (options_.control_update_mode == ControlUpdateMode::on_property_changed) {
         static_cast<void>(update_control(true));
     }
@@ -92,8 +109,8 @@ void Binding::start() {
 
 void Binding::set_options(BindingOptions options) {
     detail::validate_binding_options(options);
-    if (target_ && target_->attached_window()) {
-        target_->attached_window()->verify_access("Binding options mutation");
+    if (target_ && (*target_).attached_window()) {
+        (*(*target_).attached_window()).verify_access("Binding options mutation");
     }
     options_ = std::move(options);
     if (active_ &&
@@ -136,19 +153,19 @@ bool Binding::update_control(bool automatic) {
     if (automatic && options_.control_update_mode == ControlUpdateMode::never) {
         return false;
     }
-    const auto self = shared_from_this();
-    const auto source = source_.lock();
+    const std::shared_ptr<gui_forms::Binding> self = shared_from_this();
+    const std::shared_ptr<gui_forms::BindingSource> source = source_.lock();
     const BindableProperty* property =
-        target_ ? target_->find_bindable_property(property_name_) : nullptr;
-    if (!source || !source->is_alive() || !target_ || !target_->is_alive() ||
-        !property || !property->descriptor.writable || !property->set) {
+        target_ ? (*target_).find_bindable_property(property_name_) : nullptr;
+    if (!source || !(*source).is_alive() || !target_ || !(*target_).is_alive() ||
+        !property || !(*property).descriptor.writable || !(*property).set) {
         ++failed_updates_;
         return complete(BindingCompleteContext::control_update,
                         BindingCompleteState::data_error,
                         detail::binding_failure_text(
                             "control update", property_name_, data_member_));
     }
-    const auto source_value = source->current_field(data_member_);
+    const std::optional<BindingValue> source_value = (*source).current_field(data_member_);
     if (!source_value) {
         ++failed_updates_;
         return complete(BindingCompleteContext::control_update,
@@ -164,7 +181,7 @@ bool Binding::update_control(bool automatic) {
         }
         if (options_.formatting_enabled) {
             BindingConvertEvent event{
-                proposed, property->descriptor.kind, false};
+                proposed, (*property).descriptor.kind, false};
             format_.emit(event);
             proposed = std::move(event.value);
             if (!event.handled && !options_.format_string.empty()) {
@@ -172,12 +189,12 @@ bool Binding::update_control(bool automatic) {
                     proposed, options_.format_string);
             }
         }
-        const auto converted = convert_property_value(
-            proposed, property->descriptor);
+        const std::optional<BindingValue> converted = convert_property_value(
+            proposed, (*property).descriptor);
         if (!converted) {
             throw std::invalid_argument("binding value cannot convert to target kind");
         }
-        property->set(*converted);
+        (*property).set(*converted);
         ++control_reads_;
         ++successful_updates_;
         updating_ = false;
@@ -205,12 +222,12 @@ bool Binding::update_source(bool automatic) {
     }
     if (automatic && options_.data_source_update_mode !=
                          DataSourceUpdateMode::on_property_changed) return false;
-    const auto self = shared_from_this();
-    const auto source = source_.lock();
+    const std::shared_ptr<gui_forms::Binding> self = shared_from_this();
+    const std::shared_ptr<gui_forms::BindingSource> source = source_.lock();
     const BindableProperty* property =
-        target_ ? target_->find_bindable_property(property_name_) : nullptr;
-    if (!source || !source->is_alive() || !target_ || !target_->is_alive() ||
-        !property || !property->descriptor.readable || !property->get) {
+        target_ ? (*target_).find_bindable_property(property_name_) : nullptr;
+    if (!source || !(*source).is_alive() || !target_ || !(*target_).is_alive() ||
+        !property || !(*property).descriptor.readable || !(*property).get) {
         ++failed_updates_;
         return complete(BindingCompleteContext::data_source_update,
                         BindingCompleteState::data_error,
@@ -219,12 +236,12 @@ bool Binding::update_source(bool automatic) {
     }
     try {
         updating_ = true;
-        BindingValue proposed = property->get();
+        BindingValue proposed = (*property).get();
         if (!std::holds_alternative<std::monostate>(options_.null_value) &&
             proposed == options_.null_value) {
             proposed = options_.data_source_null_value;
         }
-        const auto existing = source->current_field(data_member_);
+        const std::optional<BindingValue> existing = (*source).current_field(data_member_);
         const BindingValueKind desired = existing
             ? binding_value_kind(*existing) : binding_value_kind(proposed);
         if (options_.formatting_enabled) {
@@ -232,11 +249,11 @@ bool Binding::update_source(bool automatic) {
             parse_.emit(event);
             proposed = std::move(event.value);
         }
-        const auto converted = convert_binding_value(proposed, desired);
+        const std::optional<BindingValue> converted = convert_binding_value(proposed, desired);
         if (!converted) {
             throw std::invalid_argument("binding value cannot convert to source kind");
         }
-        const bool changed = source->set_current_field(data_member_, *converted);
+        const bool changed = (*source).set_current_field(data_member_, *converted);
         ++source_writes_;
         ++successful_updates_;
         updating_ = false;
@@ -262,13 +279,13 @@ bool Binding::complete(BindingCompleteContext context,
     BindingCompleteEvent completion{this, context, state, std::move(error), false};
     if (options_.formatting_enabled) {
         binding_complete_.emit(completion);
-        if (const auto source = source_.lock(); source && source->is_alive()) {
-            source->binding_complete().emit(completion);
+        if (const std::shared_ptr<gui_forms::BindingSource> source = source_.lock(); source && (*source).is_alive()) {
+            (*source).binding_complete().emit(completion);
         }
     }
     if (!completion.error_text.empty()) {
-        if (const auto source = source_.lock()) {
-            try { source->data_error().emit(completion.error_text); } catch (...) {}
+        if (const std::shared_ptr<gui_forms::BindingSource> source = source_.lock()) {
+            try { (*source).data_error().emit(completion.error_text); } catch (...) {}
         }
     }
     return state == BindingCompleteState::success && !completion.cancel;
@@ -281,18 +298,18 @@ BindingSnapshot Binding::snapshot() const {
 }
 
 void Binding::verify_dispose_thread() {
-    if (target_ && target_->attached_window()) {
-        target_->attached_window()->verify_access("Binding disposal");
-    } else if (const auto source = source_.lock()) {
-        if (Window* owner = source->bound_window()) {
-            owner->verify_access("Binding disposal");
+    if (target_ && (*target_).attached_window()) {
+        (*(*target_).attached_window()).verify_access("Binding disposal");
+    } else if (const std::shared_ptr<gui_forms::BindingSource> source = source_.lock()) {
+        if (Window* owner = (*source).bound_window()) {
+            (*owner).verify_access("Binding disposal");
         }
     }
 }
 
 void Binding::on_dispose() noexcept {
     active_ = false;
-    if (const auto source = source_.lock()) source->unregister_binding(this);
+    if (const std::shared_ptr<gui_forms::BindingSource> source = source_.lock()) (*source).unregister_binding(this);
     source_changed_.disconnect();
     source_disposed_.disconnect();
     target_changed_.disconnect();

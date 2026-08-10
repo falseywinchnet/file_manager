@@ -18,6 +18,7 @@ esac
   /opt/homebrew/bin/cmake -S "$repo" -B "$build_dir" -G "Unix Makefiles" \
   -DCMAKE_TOOLCHAIN_FILE="$repo/cmake/toolchains/x86_64-w64-mingw32.cmake" \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DGUI_FORMS_ENABLE_SKIA=ON \
   -DGUI_FORMS_SKIA_PREBUILT=ON \
   -DGUI_FORMS_SKIA_OUT="$skia_out" \

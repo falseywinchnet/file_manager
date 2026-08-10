@@ -6,6 +6,8 @@
 
 namespace gui_forms {
 
+struct PresentationSettings;
+
 enum class ProgressBarVisualStyle : std::uint8_t {
     blocks,
     continuous,
@@ -32,8 +34,18 @@ struct ProgressBarAnimationAppearance final {
     double laser_edge_extent{13.0};
     double laser_phase_pitch{10.0};
 
-    friend constexpr bool operator==(const ProgressBarAnimationAppearance&,
-                                     const ProgressBarAnimationAppearance&) = default;
+    friend constexpr bool operator==(
+        const ProgressBarAnimationAppearance& left,
+        const ProgressBarAnimationAppearance& right) noexcept {
+        return left.luminance_color == right.luminance_color &&
+               left.stripe_color == right.stripe_color &&
+               left.laser_phase_color == right.laser_phase_color &&
+               left.laser_edge_color == right.laser_edge_color &&
+               left.laser_spark_color == right.laser_spark_color &&
+               left.pulse_extent == right.pulse_extent &&
+               left.laser_edge_extent == right.laser_edge_extent &&
+               left.laser_phase_pitch == right.laser_phase_pitch;
+    }
 };
 
 class ProgressBar : public RangeControl {
@@ -91,6 +103,7 @@ protected:
 
 private:
     void update_animation_registration();
+    void on_presentation_changed(const PresentationSettings& settings);
     [[nodiscard]] bool animated_style() const noexcept;
 
     ProgressBarVisualStyle visual_style_{ProgressBarVisualStyle::continuous};

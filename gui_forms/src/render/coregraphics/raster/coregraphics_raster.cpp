@@ -134,6 +134,8 @@ public:
         DecodedImage& operator=(const DecodedImage&) = delete;
     };
 
+    using ImageMap = std::unordered_map<std::uint64_t, DecodedImage>;
+
     ~Impl() {
         if (context != nullptr) {
             CGContextRelease(context);
@@ -159,7 +161,7 @@ public:
         }
         if (selected != nullptr) {
             return CTFontCreateCopyWithAttributes(
-                selected->font, static_cast<CGFloat>(spec.size), nullptr, nullptr);
+                (*selected).font, static_cast<CGFloat>(spec.size), nullptr, nullptr);
         }
         return CTFontCreateWithName(fallback_family(spec.role),
                                     static_cast<CGFloat>(spec.size), nullptr);
@@ -168,7 +170,7 @@ public:
     CGContextRef context{};
     CGColorSpaceRef color_space{CGColorSpaceCreateWithName(kCGColorSpaceSRGB)};
     std::vector<std::byte> storage;
-    std::unordered_map<std::uint64_t, DecodedImage> images;
+    ImageMap images;
     std::vector<RegisteredTypeface> registered_typefaces;
     Size logical_size{};
     double scale{1.0};
@@ -187,7 +189,7 @@ CoreGraphicsRaster::~CoreGraphicsRaster() = default;
 
 bool CoreGraphicsRaster::resize(Size logical_size, double scale) {
     if (!std::isfinite(scale) || scale <= 0.0 || logical_size.width <= 0.0 ||
-        logical_size.height <= 0.0 || impl_->color_space == nullptr) {
+        logical_size.height <= 0.0 || (*impl_).color_space == nullptr) {
         return false;
     }
     const double requested_width = std::ceil(logical_size.width * scale);
@@ -200,9 +202,9 @@ bool CoreGraphicsRaster::resize(Size logical_size, double scale) {
         std::max<std::uint32_t>(1, static_cast<std::uint32_t>(requested_width));
     const std::uint32_t height =
         std::max<std::uint32_t>(1, static_cast<std::uint32_t>(requested_height));
-    if (impl_->context != nullptr && width == impl_->width && height == impl_->height &&
-        scale == impl_->scale) {
-        impl_->logical_size = logical_size;
+    if ((*impl_).context != nullptr && width == (*impl_).width && height == (*impl_).height &&
+        scale == (*impl_).scale) {
+        (*impl_).logical_size = logical_size;
         return false;
     }
     const std::size_t row_bytes = static_cast<std::size_t>(width) * 4U;
@@ -210,69 +212,69 @@ bool CoreGraphicsRaster::resize(Size logical_size, double scale) {
         return false;
     }
 
-    if (impl_->context != nullptr) {
-        CGContextRelease(impl_->context);
-        impl_->context = nullptr;
+    if ((*impl_).context != nullptr) {
+        CGContextRelease((*impl_).context);
+        (*impl_).context = nullptr;
     }
-    impl_->storage.assign(row_bytes * height, std::byte{});
+    (*impl_).storage.assign(row_bytes * height, std::byte{});
     constexpr CGBitmapInfo bitmap_info =
         static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
         static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
-    impl_->context = CGBitmapContextCreate(
-        impl_->storage.data(), width, height, 8, row_bytes,
-        impl_->color_space, bitmap_info);
-    if (impl_->context == nullptr) {
-        impl_->storage.clear();
+    (*impl_).context = CGBitmapContextCreate(
+        (*impl_).storage.data(), width, height, 8, row_bytes,
+        (*impl_).color_space, bitmap_info);
+    if ((*impl_).context == nullptr) {
+        (*impl_).storage.clear();
         return false;
     }
-    CGContextSetShouldAntialias(impl_->context, true);
-    CGContextSetAllowsAntialiasing(impl_->context, true);
-    CGContextClearRect(impl_->context, CGRectMake(0, 0, width, height));
-    impl_->logical_size = logical_size;
-    impl_->scale = scale;
-    impl_->width = width;
-    impl_->height = height;
-    impl_->row_bytes = row_bytes;
-    impl_->nested_saves = 0;
-    impl_->frame_active = false;
+    CGContextSetShouldAntialias((*impl_).context, true);
+    CGContextSetAllowsAntialiasing((*impl_).context, true);
+    CGContextClearRect((*impl_).context, CGRectMake(0, 0, width, height));
+    (*impl_).logical_size = logical_size;
+    (*impl_).scale = scale;
+    (*impl_).width = width;
+    (*impl_).height = height;
+    (*impl_).row_bytes = row_bytes;
+    (*impl_).nested_saves = 0;
+    (*impl_).frame_active = false;
     return true;
 }
 
 void CoreGraphicsRaster::begin_frame(const DamageRegion& damage) {
-    if (impl_->context == nullptr) {
+    if ((*impl_).context == nullptr) {
         return;
     }
     end_frame();
-    CGContextSaveGState(impl_->context);
-    impl_->frame_active = true;
+    CGContextSaveGState((*impl_).context);
+    (*impl_).frame_active = true;
     // Bitmap storage is addressed bottom-up by Quartz while GUI.Forms and its
     // byte-export contract are top-down. Establish the logical y-down surface
     // before applying any damage or display-chunk command.
-    CGContextTranslateCTM(impl_->context, 0, impl_->height);
-    CGContextScaleCTM(impl_->context, impl_->scale, -impl_->scale);
+    CGContextTranslateCTM((*impl_).context, 0, (*impl_).height);
+    CGContextScaleCTM((*impl_).context, (*impl_).scale, -(*impl_).scale);
     if (!damage.empty()) {
-        CGContextBeginPath(impl_->context);
+        CGContextBeginPath((*impl_).context);
         for (const Rect rect : damage.rectangles()) {
             // Damage is a device-pixel contract. A fractional logical edge
             // must include the whole device pixel or repeated partial paints
             // can leave an antialiased seam that a full paint does not.
-            CGContextAddRect(impl_->context, to_cg_rect(
-                detail::align_damage_outward(rect, impl_->scale)));
+            CGContextAddRect((*impl_).context, to_cg_rect(
+                detail::align_damage_outward(rect, (*impl_).scale)));
         }
-        CGContextClip(impl_->context);
+        CGContextClip((*impl_).context);
     }
 }
 
 void CoreGraphicsRaster::end_frame() {
-    if (impl_->context == nullptr || !impl_->frame_active) {
+    if ((*impl_).context == nullptr || !(*impl_).frame_active) {
         return;
     }
-    while (impl_->nested_saves > 0) {
-        CGContextRestoreGState(impl_->context);
-        --impl_->nested_saves;
+    while ((*impl_).nested_saves > 0) {
+        CGContextRestoreGState((*impl_).context);
+        --(*impl_).nested_saves;
     }
-    CGContextRestoreGState(impl_->context);
-    impl_->frame_active = false;
+    CGContextRestoreGState((*impl_).context);
+    (*impl_).frame_active = false;
 }
 
 bool CoreGraphicsRaster::register_typeface(FontRole role,
@@ -304,18 +306,18 @@ bool CoreGraphicsRaster::register_typeface(FontRole role,
     if (font == nullptr) {
         return false;
     }
-    impl_->registered_typefaces.emplace_back(role, weight, italic, font);
+    (*impl_).registered_typefaces.emplace_back(role, weight, italic, font);
     return true;
 }
 
 bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
     const ImageRegistrySnapshot snapshot = registry.snapshot();
-    const bool same_registry = &registry == impl_->image_registry;
-    if (same_registry && snapshot.revision == impl_->image_registry_revision) {
-        return impl_->image_registry_synchronized;
+    const bool same_registry = &registry == (*impl_).image_registry;
+    if (same_registry && snapshot.revision == (*impl_).image_registry_revision) {
+        return (*impl_).image_registry_synchronized;
     }
     if (!same_registry) {
-        impl_->images.clear();
+        (*impl_).images.clear();
     }
 
     bool synchronized = true;
@@ -327,25 +329,25 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             synchronized = false;
             continue;
         }
-        const auto existing = impl_->images.find(id.value);
-        if (existing != impl_->images.end() &&
-            existing->second.content_hash == resource->content_hash) {
+        const Impl::ImageMap::const_iterator existing = (*impl_).images.find(id.value);
+        if (existing != (*impl_).images.end() &&
+            (*existing).second.content_hash == (*resource).content_hash) {
             continue;
         }
 
         CGImageRef source_image = nullptr;
-        if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+        if ((*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
             const std::size_t tight_row_bytes =
-                static_cast<std::size_t>(resource->metadata.width) * 4U;
-            if (resource->row_bytes == tight_row_bytes &&
-                resource->encoded.size() ==
-                    tight_row_bytes * resource->metadata.height) {
-                std::vector<std::byte> rgba(resource->encoded.size());
+                static_cast<std::size_t>((*resource).metadata.width) * 4U;
+            if ((*resource).row_bytes == tight_row_bytes &&
+                (*resource).encoded.size() ==
+                    tight_row_bytes * (*resource).metadata.height) {
+                std::vector<std::byte> rgba((*resource).encoded.size());
                 for (std::size_t offset = 0; offset < rgba.size(); offset += 4U) {
-                    rgba[offset] = resource->encoded[offset + 2U];
-                    rgba[offset + 1U] = resource->encoded[offset + 1U];
-                    rgba[offset + 2U] = resource->encoded[offset];
-                    rgba[offset + 3U] = resource->encoded[offset + 3U];
+                    rgba[offset] = (*resource).encoded[offset + 2U];
+                    rgba[offset + 1U] = (*resource).encoded[offset + 1U];
+                    rgba[offset + 2U] = (*resource).encoded[offset];
+                    rgba[offset + 3U] = (*resource).encoded[offset + 3U];
                 }
                 CFDataRef data = CFDataCreate(
                     kCFAllocatorDefault,
@@ -357,8 +359,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
                     static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
                     static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
                 source_image = provider == nullptr ? nullptr : CGImageCreate(
-                    resource->metadata.width, resource->metadata.height, 8, 32,
-                    tight_row_bytes, impl_->color_space, source_info, provider,
+                    (*resource).metadata.width, (*resource).metadata.height, 8, 32,
+                    tight_row_bytes, (*impl_).color_space, source_info, provider,
                     nullptr, false, kCGRenderingIntentDefault);
                 if (provider != nullptr) CGDataProviderRelease(provider);
                 if (data != nullptr) CFRelease(data);
@@ -366,8 +368,8 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
         } else {
             CFDataRef encoded = CFDataCreate(
                 kCFAllocatorDefault,
-                reinterpret_cast<const UInt8*>(resource->encoded.data()),
-                static_cast<CFIndex>(resource->encoded.size()));
+                reinterpret_cast<const UInt8*>((*resource).encoded.data()),
+                static_cast<CFIndex>((*resource).encoded.size()));
             CGImageSourceRef source = encoded == nullptr
                 ? nullptr
                 : CGImageSourceCreateWithData(encoded, nullptr);
@@ -378,38 +380,38 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             if (source != nullptr) CFRelease(source);
         }
         if (source_image == nullptr ||
-            CGImageGetWidth(source_image) != resource->metadata.width ||
-            CGImageGetHeight(source_image) != resource->metadata.height) {
+            CGImageGetWidth(source_image) != (*resource).metadata.width ||
+            CGImageGetHeight(source_image) != (*resource).metadata.height) {
             if (source_image != nullptr) {
                 CGImageRelease(source_image);
             }
-            impl_->images.erase(id.value);
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
 
         const std::size_t row_bytes =
-            static_cast<std::size_t>(resource->metadata.width) * 4U;
-        if (resource->metadata.height >
+            static_cast<std::size_t>((*resource).metadata.width) * 4U;
+        if ((*resource).metadata.height >
             std::numeric_limits<std::size_t>::max() / row_bytes) {
             CGImageRelease(source_image);
-            impl_->images.erase(id.value);
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
-        std::vector<std::byte> pixels(row_bytes * resource->metadata.height);
+        std::vector<std::byte> pixels(row_bytes * (*resource).metadata.height);
         constexpr CGBitmapInfo bitmap_info =
             static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) |
             static_cast<CGBitmapInfo>(kCGBitmapByteOrder32Big);
         CGContextRef decode_context = CGBitmapContextCreate(
-            pixels.data(), resource->metadata.width, resource->metadata.height,
-            8, row_bytes, impl_->color_space, bitmap_info);
+            pixels.data(), (*resource).metadata.width, (*resource).metadata.height,
+            8, row_bytes, (*impl_).color_space, bitmap_info);
         if (decode_context != nullptr) {
-            CGContextTranslateCTM(decode_context, 0, resource->metadata.height);
+            CGContextTranslateCTM(decode_context, 0, (*resource).metadata.height);
             CGContextScaleCTM(decode_context, 1, -1);
             CGContextDrawImage(
                 decode_context,
-                CGRectMake(0, 0, resource->metadata.width, resource->metadata.height),
+                CGRectMake(0, 0, (*resource).metadata.width, (*resource).metadata.height),
                 source_image);
         }
         CGImageRelease(source_image);
@@ -420,120 +422,121 @@ bool CoreGraphicsRaster::synchronize_images(const ImageRegistry& registry) {
             CGContextRelease(decode_context);
         }
         if (decoded == nullptr) {
-            impl_->images.erase(id.value);
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
-        impl_->images.insert_or_assign(
-            id.value, Impl::DecodedImage(resource->content_hash, decoded));
+        (*impl_).images.insert_or_assign(
+            id.value, Impl::DecodedImage((*resource).content_hash, decoded));
     }
-    for (auto iterator = impl_->images.begin(); iterator != impl_->images.end();) {
-        if (!active.contains(iterator->first)) {
-            iterator = impl_->images.erase(iterator);
+    for (Impl::ImageMap::iterator iterator = (*impl_).images.begin();
+         iterator != (*impl_).images.end();) {
+        if (!active.contains((*iterator).first)) {
+            iterator = (*impl_).images.erase(iterator);
         } else {
             ++iterator;
         }
     }
-    impl_->image_registry = &registry;
-    impl_->image_registry_revision = snapshot.revision;
-    impl_->image_registry_synchronized = synchronized;
+    (*impl_).image_registry = &registry;
+    (*impl_).image_registry_revision = snapshot.revision;
+    (*impl_).image_registry_synchronized = synchronized;
     return synchronized;
 }
 
 const void* CoreGraphicsRaster::pixels() const noexcept {
-    return impl_->storage.empty() ? nullptr : impl_->storage.data();
+    return (*impl_).storage.empty() ? nullptr : (*impl_).storage.data();
 }
 
-std::size_t CoreGraphicsRaster::row_bytes() const noexcept { return impl_->row_bytes; }
-std::uint32_t CoreGraphicsRaster::pixel_width() const noexcept { return impl_->width; }
-std::uint32_t CoreGraphicsRaster::pixel_height() const noexcept { return impl_->height; }
-std::size_t CoreGraphicsRaster::byte_size() const noexcept { return impl_->storage.size(); }
+std::size_t CoreGraphicsRaster::row_bytes() const noexcept { return (*impl_).row_bytes; }
+std::uint32_t CoreGraphicsRaster::pixel_width() const noexcept { return (*impl_).width; }
+std::uint32_t CoreGraphicsRaster::pixel_height() const noexcept { return (*impl_).height; }
+std::size_t CoreGraphicsRaster::byte_size() const noexcept { return (*impl_).storage.size(); }
 
 void CoreGraphicsRaster::save() {
-    if (impl_->context != nullptr && impl_->frame_active) {
-        CGContextSaveGState(impl_->context);
-        ++impl_->nested_saves;
+    if ((*impl_).context != nullptr && (*impl_).frame_active) {
+        CGContextSaveGState((*impl_).context);
+        ++(*impl_).nested_saves;
     }
 }
 
 void CoreGraphicsRaster::restore() {
-    if (impl_->context != nullptr && impl_->frame_active && impl_->nested_saves > 0) {
-        CGContextRestoreGState(impl_->context);
-        --impl_->nested_saves;
+    if ((*impl_).context != nullptr && (*impl_).frame_active && (*impl_).nested_saves > 0) {
+        CGContextRestoreGState((*impl_).context);
+        --(*impl_).nested_saves;
     }
 }
 
 void CoreGraphicsRaster::translate(Point offset) {
-    if (impl_->context != nullptr) {
-        CGContextTranslateCTM(impl_->context, offset.x, offset.y);
+    if ((*impl_).context != nullptr) {
+        CGContextTranslateCTM((*impl_).context, offset.x, offset.y);
     }
 }
 
 void CoreGraphicsRaster::clip_rect(Rect rect) {
-    if (impl_->context != nullptr) {
-        CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    if ((*impl_).context != nullptr) {
+        CGContextClipToRect((*impl_).context, to_cg_rect(rect));
     }
 }
 
 void CoreGraphicsRaster::clip_rounded_rect(Rect rect, double radius) {
-    if (impl_->context == nullptr) return;
+    if ((*impl_).context == nullptr) return;
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
-    CGContextAddPath(impl_->context, path);
-    CGContextClip(impl_->context);
+    CGContextAddPath((*impl_).context, path);
+    CGContextClip((*impl_).context);
     CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::fill_rect(Rect rect, Color color) {
-    if (impl_->context != nullptr) {
-        set_color(impl_->context, color);
-        CGContextFillRect(impl_->context, to_cg_rect(rect));
+    if ((*impl_).context != nullptr) {
+        set_color((*impl_).context, color);
+        CGContextFillRect((*impl_).context, to_cg_rect(rect));
     }
 }
 
 void CoreGraphicsRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
-    if (impl_->context == nullptr) return;
+    if ((*impl_).context == nullptr) return;
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
-    set_color(impl_->context, color);
-    CGContextAddPath(impl_->context, path);
-    CGContextFillPath(impl_->context);
+    set_color((*impl_).context, color);
+    CGContextAddPath((*impl_).context, path);
+    CGContextFillPath((*impl_).context);
     CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::stroke_rect(Rect rect, Color color, double width) {
-    if (impl_->context != nullptr) {
-        set_color(impl_->context, color);
-        CGContextSetLineWidth(impl_->context, width);
-        CGContextStrokeRect(impl_->context, to_cg_rect(rect));
+    if ((*impl_).context != nullptr) {
+        set_color((*impl_).context, color);
+        CGContextSetLineWidth((*impl_).context, width);
+        CGContextStrokeRect((*impl_).context, to_cg_rect(rect));
     }
 }
 
 void CoreGraphicsRaster::stroke_rounded_rect(Rect rect, double radius,
                                              Color color, double width) {
-    if (impl_->context == nullptr) return;
+    if ((*impl_).context == nullptr) return;
     CGPathRef path = rounded_path(rect, radius);
     if (path == nullptr) return;
-    set_color(impl_->context, color);
-    CGContextSetLineWidth(impl_->context, width);
-    CGContextAddPath(impl_->context, path);
-    CGContextStrokePath(impl_->context);
+    set_color((*impl_).context, color);
+    CGContextSetLineWidth((*impl_).context, width);
+    CGContextAddPath((*impl_).context, path);
+    CGContextStrokePath((*impl_).context);
     CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::fill_linear_gradient(
     Rect rect, Point start, Point end,
     std::span<const GradientStop> stops) {
-    if (impl_->context == nullptr || rect.empty()) return;
-    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    if ((*impl_).context == nullptr || rect.empty()) return;
+    CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
-    CGContextSaveGState(impl_->context);
-    CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    CGContextSaveGState((*impl_).context);
+    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
     CGContextDrawLinearGradient(
-        impl_->context, gradient, CGPointMake(start.x, start.y),
+        (*impl_).context, gradient, CGPointMake(start.x, start.y),
         CGPointMake(end.x, end.y),
         kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
-    CGContextRestoreGState(impl_->context);
+    CGContextRestoreGState((*impl_).context);
     CGGradientRelease(gradient);
 }
 
@@ -544,7 +547,7 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
         fill_linear_gradient(rect, start, end, stops);
         return;
     }
-    if (impl_->context == nullptr || rect.empty() ||
+    if ((*impl_).context == nullptr || rect.empty() ||
         !valid_gradient_stops(stops) ||
         (spread != GradientSpreadMode::repeat &&
          spread != GradientSpreadMode::reflect)) {
@@ -580,7 +583,7 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
         Painter::fill_linear_gradient_spread(rect, start, end, stops, spread);
         return;
     }
-    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
     const double length = std::sqrt(length_squared);
     const Point perpendicular{-dy / length, dx / length};
@@ -591,67 +594,67 @@ void CoreGraphicsRaster::fill_linear_gradient_spread(
             (corner.y - start.y) * perpendicular.y) + 1.0);
     }
 
-    CGContextSaveGState(impl_->context);
-    CGContextClipToRect(impl_->context, to_cg_rect(rect));
+    CGContextSaveGState((*impl_).context);
+    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
     for (double period = first_period; period < final_period; period += 1.0) {
         const Point band_start{start.x + dx * period,
                                start.y + dy * period};
         const Point band_end{band_start.x + dx, band_start.y + dy};
-        CGContextSaveGState(impl_->context);
-        CGContextBeginPath(impl_->context);
-        CGContextMoveToPoint(impl_->context,
+        CGContextSaveGState((*impl_).context);
+        CGContextBeginPath((*impl_).context);
+        CGContextMoveToPoint((*impl_).context,
                              band_start.x - perpendicular.x * reach,
                              band_start.y - perpendicular.y * reach);
-        CGContextAddLineToPoint(impl_->context,
+        CGContextAddLineToPoint((*impl_).context,
                                 band_end.x - perpendicular.x * reach,
                                 band_end.y - perpendicular.y * reach);
-        CGContextAddLineToPoint(impl_->context,
+        CGContextAddLineToPoint((*impl_).context,
                                 band_end.x + perpendicular.x * reach,
                                 band_end.y + perpendicular.y * reach);
-        CGContextAddLineToPoint(impl_->context,
+        CGContextAddLineToPoint((*impl_).context,
                                 band_start.x + perpendicular.x * reach,
                                 band_start.y + perpendicular.y * reach);
-        CGContextClosePath(impl_->context);
-        CGContextClip(impl_->context);
+        CGContextClosePath((*impl_).context);
+        CGContextClip((*impl_).context);
         const bool reversed = spread == GradientSpreadMode::reflect &&
             std::fmod(std::abs(period), 2.0) >= 1.0;
         CGContextDrawLinearGradient(
-            impl_->context, gradient,
+            (*impl_).context, gradient,
             CGPointMake(reversed ? band_end.x : band_start.x,
                         reversed ? band_end.y : band_start.y),
             CGPointMake(reversed ? band_start.x : band_end.x,
                         reversed ? band_start.y : band_end.y),
             static_cast<CGGradientDrawingOptions>(0));
-        CGContextRestoreGState(impl_->context);
+        CGContextRestoreGState((*impl_).context);
     }
-    CGContextRestoreGState(impl_->context);
+    CGContextRestoreGState((*impl_).context);
     CGGradientRelease(gradient);
 }
 
 void CoreGraphicsRaster::fill_radial_gradient(
     Rect rect, Point center, Size radii,
     std::span<const GradientStop> stops) {
-    if (impl_->context == nullptr || rect.empty() || radii.width <= 0.0 ||
+    if ((*impl_).context == nullptr || rect.empty() || radii.width <= 0.0 ||
         radii.height <= 0.0) {
         return;
     }
-    CGGradientRef gradient = create_gradient(impl_->color_space, stops);
+    CGGradientRef gradient = create_gradient((*impl_).color_space, stops);
     if (gradient == nullptr) return;
-    CGContextSaveGState(impl_->context);
-    CGContextClipToRect(impl_->context, to_cg_rect(rect));
-    CGContextTranslateCTM(impl_->context, center.x, center.y);
-    CGContextScaleCTM(impl_->context, radii.width, radii.height);
+    CGContextSaveGState((*impl_).context);
+    CGContextClipToRect((*impl_).context, to_cg_rect(rect));
+    CGContextTranslateCTM((*impl_).context, center.x, center.y);
+    CGContextScaleCTM((*impl_).context, radii.width, radii.height);
     CGContextDrawRadialGradient(
-        impl_->context, gradient, CGPointZero, 0.0, CGPointZero, 1.0,
+        (*impl_).context, gradient, CGPointZero, 0.0, CGPointZero, 1.0,
         kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
-    CGContextRestoreGState(impl_->context);
+    CGContextRestoreGState((*impl_).context);
     CGGradientRelease(gradient);
 }
 
 void CoreGraphicsRaster::draw_box_shadow(Rect rect, double corner_radius,
                                          Point offset, double blur_radius,
                                          double spread, Color color) {
-    if (impl_->context == nullptr || rect.empty() || color.alpha == 0U ||
+    if ((*impl_).context == nullptr || rect.empty() || color.alpha == 0U ||
         blur_radius < 0.0) {
         return;
     }
@@ -667,26 +670,26 @@ void CoreGraphicsRaster::draw_box_shadow(Rect rect, double corner_radius,
         color.red / divisor, color.green / divisor, color.blue / divisor,
         color.alpha / divisor);
     if (shadow != nullptr) {
-        CGContextSaveGState(impl_->context);
+        CGContextSaveGState((*impl_).context);
         CGContextSetShadowWithColor(
-            impl_->context, CGSizeMake(offset.x, offset.y), blur_radius, shadow);
-        set_color(impl_->context, Color::rgba(0, 0, 0, 255));
-        CGContextAddPath(impl_->context, path);
-        CGContextFillPath(impl_->context);
-        CGContextRestoreGState(impl_->context);
+            (*impl_).context, CGSizeMake(offset.x, offset.y), blur_radius, shadow);
+        set_color((*impl_).context, Color::rgba(0, 0, 0, 255));
+        CGContextAddPath((*impl_).context, path);
+        CGContextFillPath((*impl_).context);
+        CGContextRestoreGState((*impl_).context);
         CGColorRelease(shadow);
     }
     CGPathRelease(path);
 }
 
 void CoreGraphicsRaster::draw_line(Point from, Point to, Color color, double width) {
-    if (impl_->context != nullptr) {
-        set_color(impl_->context, color);
-        CGContextSetLineWidth(impl_->context, width);
-        CGContextBeginPath(impl_->context);
-        CGContextMoveToPoint(impl_->context, from.x, from.y);
-        CGContextAddLineToPoint(impl_->context, to.x, to.y);
-        CGContextStrokePath(impl_->context);
+    if ((*impl_).context != nullptr) {
+        set_color((*impl_).context, color);
+        CGContextSetLineWidth((*impl_).context, width);
+        CGContextBeginPath((*impl_).context);
+        CGContextMoveToPoint((*impl_).context, from.x, from.y);
+        CGContextAddLineToPoint((*impl_).context, to.x, to.y);
+        CGContextStrokePath((*impl_).context);
     }
 }
 
@@ -694,14 +697,14 @@ void CoreGraphicsRaster::draw_text_utf8(Point origin,
                                         std::string_view text,
                                         FontSpec font_spec,
                                         Color color) {
-    if (impl_->context == nullptr || text.empty()) {
+    if ((*impl_).context == nullptr || text.empty()) {
         return;
     }
     CFStringRef string = CFStringCreateWithBytes(
         kCFAllocatorDefault,
         reinterpret_cast<const UInt8*>(text.data()),
         static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
-    CTFontRef font = impl_->typeface(font_spec);
+    CTFontRef font = (*impl_).typeface(font_spec);
     constexpr CGFloat divisor = 255.0;
     CGColorRef foreground = CGColorCreateGenericRGB(
         color.red / divisor, color.green / divisor, color.blue / divisor,
@@ -728,11 +731,11 @@ void CoreGraphicsRaster::draw_text_utf8(Point origin,
         : CFAttributedStringCreate(kCFAllocatorDefault, string, attributes);
     CTLineRef line = attributed == nullptr ? nullptr : CTLineCreateWithAttributedString(attributed);
     if (line != nullptr) {
-        CGContextSaveGState(impl_->context);
-        CGContextSetTextMatrix(impl_->context, CGAffineTransformMakeScale(1, -1));
-        CGContextSetTextPosition(impl_->context, origin.x, origin.y);
-        CTLineDraw(line, impl_->context);
-        CGContextRestoreGState(impl_->context);
+        CGContextSaveGState((*impl_).context);
+        CGContextSetTextMatrix((*impl_).context, CGAffineTransformMakeScale(1, -1));
+        CGContextSetTextPosition((*impl_).context, origin.x, origin.y);
+        CTLineDraw(line, (*impl_).context);
+        CGContextRestoreGState((*impl_).context);
         CFRelease(line);
     }
     if (attributed != nullptr) CFRelease(attributed);
@@ -749,7 +752,7 @@ Size CoreGraphicsRaster::measure_text_utf8(std::string_view text,
     CFStringRef string = CFStringCreateWithBytes(
         kCFAllocatorDefault, reinterpret_cast<const UInt8*>(text.data()),
         static_cast<CFIndex>(text.size()), kCFStringEncodingUTF8, false);
-    CTFontRef font = impl_->typeface(font_spec);
+    CTFontRef font = (*impl_).typeface(font_spec);
     if (string == nullptr || font == nullptr) {
         if (string != nullptr) CFRelease(string);
         if (font != nullptr) CFRelease(font);
@@ -787,19 +790,19 @@ Size CoreGraphicsRaster::measure_text_utf8(std::string_view text,
 }
 
 void CoreGraphicsRaster::draw_image(ImageId image, Rect destination, double opacity) {
-    const auto found = impl_->images.find(image.value);
-    if (impl_->context == nullptr || found == impl_->images.end() || opacity <= 0.0) {
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    if ((*impl_).context == nullptr || found == (*impl_).images.end() || opacity <= 0.0) {
         return;
     }
-    CGContextSaveGState(impl_->context);
-    CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
-    CGContextTranslateCTM(impl_->context, destination.x,
+    CGContextSaveGState((*impl_).context);
+    CGContextSetAlpha((*impl_).context, std::clamp(opacity, 0.0, 1.0));
+    CGContextTranslateCTM((*impl_).context, destination.x,
                           destination.y + destination.height);
-    CGContextScaleCTM(impl_->context, 1, -1);
-    CGContextDrawImage(impl_->context,
+    CGContextScaleCTM((*impl_).context, 1, -1);
+    CGContextDrawImage((*impl_).context,
                        CGRectMake(0, 0, destination.width, destination.height),
-                       found->second.image);
-    CGContextRestoreGState(impl_->context);
+                       (*found).second.image);
+    CGContextRestoreGState((*impl_).context);
 }
 
 void CoreGraphicsRaster::draw_image_region(ImageId image, Rect source,
@@ -811,68 +814,68 @@ void CoreGraphicsRaster::draw_image_region(ImageId image, Rect source,
 void CoreGraphicsRaster::draw_image_region_sampled(
     ImageId image, Rect source, Rect destination, ImageSampling sampling,
     double opacity) {
-    const auto found = impl_->images.find(image.value);
-    if (impl_->context == nullptr || found == impl_->images.end() ||
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    if ((*impl_).context == nullptr || found == (*impl_).images.end() ||
         source.empty() || destination.empty() || !source.finite() ||
         !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
         return;
     }
     const Rect image_bounds{
         0.0, 0.0,
-        static_cast<double>(CGImageGetWidth(found->second.image)),
-        static_cast<double>(CGImageGetHeight(found->second.image))};
+        static_cast<double>(CGImageGetWidth((*found).second.image)),
+        static_cast<double>(CGImageGetHeight((*found).second.image))};
     if (!image_bounds.contains(source)) return;
     CGImageRef cropped = CGImageCreateWithImageInRect(
-        found->second.image,
+        (*found).second.image,
         CGRectMake(source.x, source.y, source.width, source.height));
     if (cropped == nullptr) return;
-    CGContextSaveGState(impl_->context);
-    CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
+    CGContextSaveGState((*impl_).context);
+    CGContextSetAlpha((*impl_).context, std::clamp(opacity, 0.0, 1.0));
     CGContextSetInterpolationQuality(
-        impl_->context, sampling == ImageSampling::nearest
+        (*impl_).context, sampling == ImageSampling::nearest
             ? kCGInterpolationNone : kCGInterpolationHigh);
-    CGContextTranslateCTM(impl_->context, destination.x,
+    CGContextTranslateCTM((*impl_).context, destination.x,
                           destination.y + destination.height);
-    CGContextScaleCTM(impl_->context, 1, -1);
-    CGContextSetInterpolationQuality(impl_->context, kCGInterpolationHigh);
-    CGContextDrawImage(impl_->context,
+    CGContextScaleCTM((*impl_).context, 1, -1);
+    CGContextSetInterpolationQuality((*impl_).context, kCGInterpolationHigh);
+    CGContextDrawImage((*impl_).context,
                        CGRectMake(0, 0, destination.width, destination.height),
                        cropped);
-    CGContextRestoreGState(impl_->context);
+    CGContextRestoreGState((*impl_).context);
     CGImageRelease(cropped);
 }
 
 void CoreGraphicsRaster::fill_image_pattern(
     ImageId image, Size source_pixel_size, Rect destination,
     Size logical_tile_size, ImagePatternWrap wrap, double opacity) {
-    const auto found = impl_->images.find(image.value);
-    if (impl_->context == nullptr || found == impl_->images.end() ||
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    if ((*impl_).context == nullptr || found == (*impl_).images.end() ||
         wrap != ImagePatternWrap::tile || destination.empty() ||
         !destination.finite() || !std::isfinite(source_pixel_size.width) ||
         !std::isfinite(source_pixel_size.height) ||
         !std::isfinite(logical_tile_size.width) ||
         !std::isfinite(logical_tile_size.height) ||
-        source_pixel_size.width != CGImageGetWidth(found->second.image) ||
-        source_pixel_size.height != CGImageGetHeight(found->second.image) ||
+        source_pixel_size.width != CGImageGetWidth((*found).second.image) ||
+        source_pixel_size.height != CGImageGetHeight((*found).second.image) ||
         logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
         !std::isfinite(opacity) || opacity <= 0.0) {
         return;
     }
-    CGContextSaveGState(impl_->context);
-    CGContextClipToRect(impl_->context, to_cg_rect(destination));
-    CGContextSetAlpha(impl_->context, std::clamp(opacity, 0.0, 1.0));
-    CGContextTranslateCTM(impl_->context, destination.x,
+    CGContextSaveGState((*impl_).context);
+    CGContextClipToRect((*impl_).context, to_cg_rect(destination));
+    CGContextSetAlpha((*impl_).context, std::clamp(opacity, 0.0, 1.0));
+    CGContextTranslateCTM((*impl_).context, destination.x,
                           destination.y + logical_tile_size.height);
-    CGContextScaleCTM(impl_->context,
+    CGContextScaleCTM((*impl_).context,
                       logical_tile_size.width / source_pixel_size.width,
                       -logical_tile_size.height / source_pixel_size.height);
-    CGContextSetInterpolationQuality(impl_->context, kCGInterpolationHigh);
+    CGContextSetInterpolationQuality((*impl_).context, kCGInterpolationHigh);
     CGContextDrawTiledImage(
-        impl_->context,
+        (*impl_).context,
         CGRectMake(0.0, 0.0, source_pixel_size.width,
                    source_pixel_size.height),
-        found->second.image);
-    CGContextRestoreGState(impl_->context);
+        (*found).second.image);
+    CGContextRestoreGState((*impl_).context);
 }
 
 } // namespace gui_forms::render

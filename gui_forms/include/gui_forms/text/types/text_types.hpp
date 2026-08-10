@@ -12,8 +12,14 @@ public:
     explicit constexpr TextUnitIndex(std::size_t value = 0) noexcept
         : value_(value) {}
     [[nodiscard]] constexpr std::size_t value() const noexcept { return value_; }
-    friend constexpr auto operator<=>(const TextUnitIndex&,
-                                      const TextUnitIndex&) = default;
+    friend constexpr bool operator==(const TextUnitIndex& left,
+                                     const TextUnitIndex& right) noexcept {
+        return left.value_ == right.value_;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const TextUnitIndex& left, const TextUnitIndex& right) noexcept {
+        return left.value_ <=> right.value_;
+    }
 private:
     std::size_t value_{};
 };
@@ -32,8 +38,11 @@ using LineIndex = TextUnitIndex<LineIndexTag>;
 template <typename Position> struct TextRange final {
     Position start{};
     Position end{};
-    friend constexpr bool operator==(const TextRange&,
-                                     const TextRange&) = default;
+    friend constexpr bool operator==(const TextRange& left,
+                                     const TextRange& right) noexcept(noexcept(
+        left.start == right.start && left.end == right.end)) {
+        return left.start == right.start && left.end == right.end;
+    }
     [[nodiscard]] constexpr bool empty() const noexcept { return start == end; }
 };
 
@@ -64,15 +73,23 @@ struct Utf8ValidationResult final {
 
 struct TextStyleId final {
     std::uint32_t value{};
-    friend constexpr auto operator<=>(const TextStyleId&,
-                                      const TextStyleId&) = default;
+    friend constexpr bool operator==(const TextStyleId& left,
+                                     const TextStyleId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const TextStyleId& left, const TextStyleId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 
 struct TextStyleSpan final {
     Utf8Range range{};
     TextStyleId style{};
-    friend constexpr bool operator==(const TextStyleSpan&,
-                                     const TextStyleSpan&) = default;
+    friend constexpr bool operator==(const TextStyleSpan& left,
+                                     const TextStyleSpan& right) noexcept {
+        return left.range == right.range && left.style == right.style;
+    }
 };
 
 struct TextStoreLimits final {
@@ -93,8 +110,21 @@ struct TextStoreSnapshot final {
     std::uint64_t metadata_rebuild_count{};
     std::uint64_t rejected_mutation_count{};
     std::uint64_t rejected_position_query_count{};
-    friend constexpr bool operator==(const TextStoreSnapshot&,
-                                     const TextStoreSnapshot&) = default;
+    friend constexpr bool operator==(const TextStoreSnapshot& left,
+                                     const TextStoreSnapshot& right) noexcept {
+        return left.utf8_bytes == right.utf8_bytes &&
+               left.utf16_units == right.utf16_units &&
+               left.scalars == right.scalars &&
+               left.graphemes == right.graphemes && left.lines == right.lines &&
+               left.style_spans == right.style_spans &&
+               left.revision == right.revision &&
+               left.edit_count == right.edit_count &&
+               left.style_update_count == right.style_update_count &&
+               left.metadata_rebuild_count == right.metadata_rebuild_count &&
+               left.rejected_mutation_count == right.rejected_mutation_count &&
+               left.rejected_position_query_count ==
+                   right.rejected_position_query_count;
+    }
 };
 
 struct TextEditResult final {

@@ -16,17 +16,17 @@ void ToolTipBubble::initialize_control_tree() {
     if (label_) return;
     label_ = make_control<Label>(
         StableId(std::string(stable_id().value()) + ".text"), text_);
-    label_->set_paint_plane(PaintPlane::overlay);
-    label_->set_font({FontRole::content, 12.0, 400, false});
-    label_->set_foreground(Color::rgba(24, 31, 38));
-    label_->set_text_wrapping(TextWrapping::word);
-    label_->set_vertical_alignment(VerticalAlignment::center);
+    (*label_).set_paint_plane(PaintPlane::overlay);
+    (*label_).set_font({FontRole::content, 12.0, 400, false});
+    (*label_).set_foreground(Color::rgba(24, 31, 38));
+    (*label_).set_text_wrapping(TextWrapping::word);
+    (*label_).set_vertical_alignment(VerticalAlignment::center);
     add_child(label_);
 }
 
 void ToolTipBubble::set_content_size(Size size) {
     initialize_control_tree();
-    label_->set_requested_bounds(
+    (*label_).set_requested_bounds(
         {7.0, 4.0, std::max(0.0, size.width - 17.0),
          std::max(0.0, size.height - 11.0)});
 }

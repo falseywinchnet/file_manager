@@ -41,6 +41,11 @@ private:
     struct CallbackState final {
         Timer* owner{};
     };
+    struct ScheduledTickCallback final {
+        std::weak_ptr<CallbackState> state;
+
+        void operator()(FrameTime now) const;
+    };
 
     [[nodiscard]] Window* bound_window() const noexcept;
     void require_mutable_timer(std::string_view operation) const;

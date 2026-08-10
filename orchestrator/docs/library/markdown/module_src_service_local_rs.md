@@ -2,7 +2,7 @@
 
 Status: **OBSERVED bounded Unix daemon host**.
 
-Owns fixed worker-pool concurrency, bounded pending sessions, authentication handoff, serialized kernel dispatch, fail-closed panic containment, and coordinated shutdown.
+Owns four fixed blocking session workers with independently owned bounded queues, authentication handoff, concurrent kernel dispatch, fail-closed panic containment, and coordinated shutdown.
 
 Source: [src/service/local.rs](../../../src/service/local.rs)
 
@@ -10,7 +10,7 @@ Source: [src/service/local.rs](../../../src/service/local.rs)
 
 - Bind or serve an owned UnixEndpoint.
 - Attach the optional development Engine child.
-- Limit workers and pending sessions.
+- Round-robin accepted streams across independent worker queues while preserving the aggregate pending-session ceiling.
 - Interrupt active sessions and join workers during shutdown.
 - Record relaxed runtime health counters.
 
@@ -69,7 +69,7 @@ pub(crate) fn serve_owned(endpoint: UnixEndpoint, kernel: Kernel) -> Result<(), 
 pub(super) fn serve_endpoint(endpoint: &UnixEndpoint, kernel: Kernel) -> Result<(), String>
 ```
 
-### [run_contained_worker](../../../src/service/local.rs#L108)
+### [run_contained_worker](../../../src/service/local.rs#L115)
 
 `fn` · `private`
 
@@ -77,31 +77,31 @@ pub(super) fn serve_endpoint(endpoint: &UnixEndpoint, kernel: Kernel) -> Result<
 fn run_contained_worker<F>(shutdown: &AtomicBool, worker: F) -> Result<(), ()> where F: FnOnce(),
 ```
 
-### [serve_connection](../../../src/service/local.rs#L120)
+### [serve_connection](../../../src/service/local.rs#L127)
 
 `fn` · `private`
 
 ```rust
-fn serve_connection( stream: &mut UnixStream, kernel: &Arc<Mutex<Kernel>>, shutdown: &AtomicBool, health: &RuntimeHealth, ) -> Result<(), String>
+fn serve_connection( stream: &mut UnixStream, kernel: &Arc<Kernel>, shutdown: &AtomicBool, health: &RuntimeHealth, ) -> Result<(), String>
 ```
 
-### [accept_sessions](../../../src/service/local.rs#L148)
+### [accept_sessions](../../../src/service/local.rs#L150)
 
 `fn` · `private`
 
 ```rust
-fn accept_sessions( endpoint: &UnixEndpoint, sender: &SyncSender<UnixStream>, shutdown: &AtomicBool, rejected: &AtomicU64, health: &RuntimeHealth, ) -> Result<(), String>
+fn accept_sessions( endpoint: &UnixEndpoint, senders: &[SyncSender<UnixStream>], shutdown: &AtomicBool, rejected: &AtomicU64, health: &RuntimeHealth, ) -> Result<(), String>
 ```
 
-### [session_worker](../../../src/service/local.rs#L178)
+### [session_worker](../../../src/service/local.rs#L195)
 
 `fn` · `private`
 
 ```rust
-fn session_worker( worker_id: usize, endpoint: &UnixEndpoint, receiver: &Arc<Mutex<Receiver<UnixStream>>>, kernel: &Arc<Mutex<Kernel>>, shutdown: &Arc<AtomicBool>, active: &Arc<Mutex<HashMap<usize, UnixStream>>>, health: &Arc<RuntimeHealth>, )
+fn session_worker( worker_id: usize, endpoint: &UnixEndpoint, receiver: &Receiver<UnixStream>, kernel: &Arc<Kernel>, shutdown: &Arc<AtomicBool>, active: &Arc<Mutex<HashMap<usize, UnixStream>>>, health: &Arc<RuntimeHealth>, )
 ```
 
-### [ActiveSessionHealth](../../../src/service/local.rs#L246)
+### [ActiveSessionHealth](../../../src/service/local.rs#L251)
 
 `struct` · `private`
 
@@ -109,7 +109,7 @@ fn session_worker( worker_id: usize, endpoint: &UnixEndpoint, receiver: &Arc<Mut
 struct ActiveSessionHealth
 ```
 
-### [new](../../../src/service/local.rs#L251)
+### [new](../../../src/service/local.rs#L256)
 
 `fn` · `private`
 
@@ -117,7 +117,7 @@ struct ActiveSessionHealth
 fn new(health: Arc<RuntimeHealth>) -> Self
 ```
 
-### [drop](../../../src/service/local.rs#L258)
+### [drop](../../../src/service/local.rs#L263)
 
 `fn` · `private`
 
@@ -125,7 +125,7 @@ fn new(health: Arc<RuntimeHealth>) -> Self
 fn drop(&mut self)
 ```
 
-### [close_active_sessions](../../../src/service/local.rs#L263)
+### [close_active_sessions](../../../src/service/local.rs#L268)
 
 `fn` · `private`
 
@@ -133,7 +133,7 @@ fn drop(&mut self)
 fn close_active_sessions(active: &Mutex<HashMap<usize, UnixStream>>)
 ```
 
-### [remove_active_session](../../../src/service/local.rs#L273)
+### [remove_active_session](../../../src/service/local.rs#L278)
 
 `fn` · `private`
 
@@ -141,7 +141,7 @@ fn close_active_sessions(active: &Mutex<HashMap<usize, UnixStream>>)
 fn remove_active_session(active: &Mutex<HashMap<usize, UnixStream>>, worker_id: usize)
 ```
 
-### [call_local](../../../src/service/local.rs#L279)
+### [call_local](../../../src/service/local.rs#L284)
 
 `fn` · `pub(crate)`
 
@@ -149,7 +149,7 @@ fn remove_active_session(active: &Mutex<HashMap<usize, UnixStream>>, worker_id: 
 pub(crate) fn call_local(runtime_directory: &Path, method: &str) -> Result<Response, String>
 ```
 
-### [worker_panic_requests_daemon_shutdown](../../../src/service/local.rs#L293)
+### [worker_panic_requests_daemon_shutdown](../../../src/service/local.rs#L298)
 
 `fn` · `private`
 

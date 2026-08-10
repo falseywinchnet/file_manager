@@ -23,14 +23,14 @@ UpdateScope& UpdateScope::operator=(UpdateScope&& other) noexcept {
 
 void UpdateScope::perform_layout() {
     if (window_) {
-        window_->perform_layout();
+        (*window_).perform_layout();
     }
 }
 
 void UpdateScope::close() {
     if (window_) {
         Window* closing = std::exchange(window_, nullptr);
-        closing->leave_update_scope();
+        (*closing).leave_update_scope();
     }
 }
 

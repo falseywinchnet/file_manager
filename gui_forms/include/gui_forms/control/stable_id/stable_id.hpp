@@ -11,7 +11,10 @@ class StableId final {
 public:
     explicit StableId(std::string value);
     [[nodiscard]] std::string_view value() const noexcept { return value_; }
-    friend bool operator==(const StableId&, const StableId&) = default;
+    friend bool operator==(const StableId& left,
+                           const StableId& right) noexcept {
+        return left.value_ == right.value_;
+    }
 
 private:
     std::string value_;

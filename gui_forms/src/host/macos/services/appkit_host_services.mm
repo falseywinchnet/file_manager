@@ -126,7 +126,7 @@ NSURL* native_directory_url(const std::string& path) {
 NSArray<UTType*>* native_allowed_types(
     const std::vector<gui_forms::HostFileDialogFilter>& filters) {
     NSMutableArray<UTType*>* types = [[NSMutableArray alloc] init];
-    for (const auto& filter : filters) {
+    for (const gui_forms::HostFileDialogFilter& filter : filters) {
         for (const std::string& extension : filter.extensions) {
             std::string normalized = extension;
             while (!normalized.empty() && normalized.front() == '.') {
@@ -329,7 +329,10 @@ protected:
                 NSButton* defaultButton = nil;
                 NSModalResponse cancelResponse = 0;
                 for (std::size_t index = 0U; index < buttons.size(); ++index) {
-                    const auto& [title, choice] = buttons[index];
+                    const std::pair<NSString*, HostDialogChoice>& button_choice =
+                        buttons[index];
+                    NSString* const title = button_choice.first;
+                    const HostDialogChoice choice = button_choice.second;
                     NSButton* button = [alert addButtonWithTitle:title];
                     // Keep cancellation and default activation independent:
                     // Escape must always reach an admitted cancel choice, while

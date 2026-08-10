@@ -12,6 +12,7 @@ namespace gui_forms {
 
 class BindingSource;
 class Control;
+struct ControlValidationEvent;
 
 class Binding final : public Component,
                       public std::enable_shared_from_this<Binding> {
@@ -60,6 +61,26 @@ private:
                   BindingCompleteState state, std::string error = {});
     void source_changed(const BindingListChange& change);
     void target_changed();
+
+    struct SourceChangedCallback final {
+        std::weak_ptr<Binding> binding;
+        void operator()(const BindingListChange& change) const;
+    };
+
+    struct SourceDisposedCallback final {
+        std::weak_ptr<Binding> binding;
+        void operator()() const;
+    };
+
+    struct TargetChangedCallback final {
+        std::weak_ptr<Binding> binding;
+        void operator()() const;
+    };
+
+    struct TargetValidatingCallback final {
+        std::weak_ptr<Binding> binding;
+        void operator()(ControlValidationEvent& event) const;
+    };
 
     Control* target_{};
     std::weak_ptr<BindingSource> source_;

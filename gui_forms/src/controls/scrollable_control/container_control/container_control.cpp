@@ -19,8 +19,8 @@ bool ContainerControl::contains_descendant(const Control::Ptr& control) const no
     if (!control || control.get() == this) {
         return false;
     }
-    for (Control::Ptr ancestor = control->parent(); ancestor;
-         ancestor = ancestor->parent()) {
+    for (Control::Ptr ancestor = (*control).parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
         if (ancestor.get() == this) {
             return true;
         }
@@ -33,7 +33,7 @@ Control::Ptr ContainerControl::active_control() const noexcept {
     if (owner == nullptr) {
         return {};
     }
-    Control::Ptr focused = owner->focused_control();
+    Control::Ptr focused = (*owner).focused_control();
     return contains_descendant(focused) ? focused : Control::Ptr{};
 }
 
@@ -42,7 +42,7 @@ bool ContainerControl::request_active_control(const Control::Ptr& control) {
     if (!contains_descendant(control) || window() == nullptr) {
         return false;
     }
-    return window()->request_focus(control);
+    return (*window()).request_focus(control);
 }
 
 bool ContainerControl::clear_active_control() {
@@ -50,16 +50,16 @@ bool ContainerControl::clear_active_control() {
     if (window() == nullptr || !active_control()) {
         return false;
     }
-    return window()->request_focus({});
+    return (*window()).request_focus({});
 }
 
 AutoValidate ContainerControl::effective_auto_validate() const noexcept {
     for (const Control* current = this; current != nullptr;) {
-        if (const auto* container = dynamic_cast<const ContainerControl*>(current);
-            container != nullptr && container->auto_validate_ != AutoValidate::inherit) {
-            return container->auto_validate_;
+        if (const ContainerControl* container = dynamic_cast<const ContainerControl*>(current);
+            container != nullptr && (*container).auto_validate_ != AutoValidate::inherit) {
+            return (*container).auto_validate_;
         }
-        const Control::Ptr owner = current->parent();
+        const Control::Ptr owner = (*current).parent();
         current = owner.get();
     }
     return AutoValidate::enable_prevent_focus_change;
@@ -85,8 +85,8 @@ bool ContainerControl::validate(bool check_auto_validate) {
     Control::Ptr current = active_control();
     bool accepted = true;
     while (current && current.get() != this) {
-        accepted = window()->validate_control(current, this, false) && accepted;
-        current = current->parent();
+        accepted = (*window()).validate_control(current, this, false) && accepted;
+        current = (*current).parent();
     }
     return accepted;
 }
@@ -94,7 +94,7 @@ bool ContainerControl::validate(bool check_auto_validate) {
 bool ContainerControl::validate_children(ValidationConstraints constraints) {
     require_mutable();
     return window() == nullptr
-        ? true : window()->validate_children(shared_from_this(), constraints);
+        ? true : (*window()).validate_children(shared_from_this(), constraints);
 }
 
 SemanticDescriptor ContainerControl::semantic_descriptor() const {

@@ -24,7 +24,12 @@ public:
     [[nodiscard]] constexpr double m22() const noexcept { return m22_; }
     [[nodiscard]] constexpr double dx() const noexcept { return dx_; }
     [[nodiscard]] constexpr double dy() const noexcept { return dy_; }
-    friend constexpr bool operator==(const Matrix&, const Matrix&) = default;
+    friend constexpr bool operator==(const Matrix& left,
+                                     const Matrix& right) noexcept {
+        return left.m11_ == right.m11_ && left.m12_ == right.m12_ &&
+               left.m21_ == right.m21_ && left.m22_ == right.m22_ &&
+               left.dx_ == right.dx_ && left.dy_ == right.dy_;
+    }
 
 private:
     double m11_{1.0};

@@ -11,7 +11,7 @@ public:
 
     void disconnect() noexcept override {
         if (connected_ && window_ != nullptr) {
-            window_->close_popup(*this);
+            (*window_).close_popup(*this);
         }
     }
     [[nodiscard]] bool connected() const noexcept override { return connected_; }

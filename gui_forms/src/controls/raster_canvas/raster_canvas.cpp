@@ -50,7 +50,7 @@ void RasterCanvas::set_bitmap(std::shared_ptr<gui_drawing::Bitmap> bitmap) {
     require_mutable();
     if (bitmap_ == bitmap) return;
     if (Window* owner = window(); image_.value != 0U && owner != nullptr) {
-        static_cast<void>(owner->remove_image(image_));
+        static_cast<void>((*owner).remove_image(image_));
     }
     bitmap_ = std::move(bitmap);
     image_ = {};
@@ -130,17 +130,17 @@ void RasterCanvas::set_transparency_cell_size(double size) {
 bool RasterCanvas::publish_full_bitmap() {
     Window* owner = window();
     if (!bitmap_ || owner == nullptr) return false;
-    const gui_drawing::ImageSnapshot snapshot = bitmap_->snapshot();
+    const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
     ImageLoadResult loaded;
     if (snapshot.pixel_format == gui_drawing::PixelFormat::bgra32_premultiplied) {
-        loaded = owner->load_bgra32_premultiplied(
+        loaded = (*owner).load_bgra32_premultiplied(
             snapshot.width, snapshot.height, snapshot.row_bytes(),
             snapshot.pixels());
     } else {
-        const auto converted = rgba_to_bgra(
+        const std::vector<std::byte> converted = rgba_to_bgra(
             snapshot.pixels(), snapshot.row_bytes(), snapshot.width,
             snapshot.height);
-        loaded = owner->load_bgra32_premultiplied(
+        loaded = (*owner).load_bgra32_premultiplied(
             snapshot.width, snapshot.height,
             static_cast<std::uint64_t>(snapshot.width) * 4U, converted);
     }
@@ -162,9 +162,9 @@ bool RasterCanvas::synchronize_bitmap() {
     }
 
     const gui_drawing::BitmapDamageSnapshot changes =
-        bitmap_->changes_since(presented_generation_);
+        (*bitmap_).changes_since(presented_generation_);
     if (changes.empty()) return true;
-    const gui_drawing::ImageSnapshot snapshot = bitmap_->snapshot();
+    const gui_drawing::ImageSnapshot snapshot = (*bitmap_).snapshot();
     for (const gui_drawing::RectI rect : changes.rectangles) {
         const std::size_t source_offset =
             static_cast<std::size_t>(rect.y) * snapshot.row_bytes() +
@@ -184,7 +184,7 @@ bool RasterCanvas::synchronize_bitmap() {
             patch = converted;
             source_row_bytes = static_cast<std::uint64_t>(rect.width) * 4U;
         }
-        const ImageLoadResult updated = window()->patch_bgra32_premultiplied(
+        const ImageLoadResult updated = (*window()).patch_bgra32_premultiplied(
             image_, static_cast<std::uint32_t>(rect.x),
             static_cast<std::uint32_t>(rect.y),
             static_cast<std::uint32_t>(rect.width),
@@ -223,13 +223,13 @@ gui_drawing::RectF RasterCanvas::visible_bitmap_bounds() const {
     if (!bitmap_) return {};
     const Rect client = client_rectangle();
     const double left = std::clamp(view_origin_.x, 0.0,
-                                   static_cast<double>(bitmap_->width()));
+                                   static_cast<double>((*bitmap_).width()));
     const double top = std::clamp(view_origin_.y, 0.0,
-                                  static_cast<double>(bitmap_->height()));
+                                  static_cast<double>((*bitmap_).height()));
     const double right = std::clamp(view_origin_.x + client.width / zoom_,
-                                    0.0, static_cast<double>(bitmap_->width()));
+                                    0.0, static_cast<double>((*bitmap_).width()));
     const double bottom = std::clamp(view_origin_.y + client.height / zoom_,
-                                     0.0, static_cast<double>(bitmap_->height()));
+                                     0.0, static_cast<double>((*bitmap_).height()));
     return {left, top, std::max(0.0, right - left),
             std::max(0.0, bottom - top)};
 }
@@ -290,8 +290,8 @@ SemanticDescriptor RasterCanvas::semantic_descriptor() const {
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     if (bitmap_) {
-        descriptor.value = std::to_string(bitmap_->width()) + " x " +
-            std::to_string(bitmap_->height()) + " at " +
+        descriptor.value = std::to_string((*bitmap_).width()) + " x " +
+            std::to_string((*bitmap_).height()) + " at " +
             std::to_string(zoom_ * 100.0) + "%";
     }
     descriptor.exposed = bitmap_ != nullptr || !descriptor.name.empty() ||

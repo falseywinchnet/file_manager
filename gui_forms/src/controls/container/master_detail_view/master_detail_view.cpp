@@ -8,13 +8,16 @@
 namespace gui_forms {
 namespace {
 
+bool valid_master_detail_extent(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0 && value <= 16384.0;
+}
+
 bool valid_layout(const MasterDetailLayout& layout) noexcept {
     const double values[] = {layout.master_extent, layout.splitter_width,
                              layout.splitter_hit_width, layout.master_minimum,
                              layout.detail_minimum, layout.compact_threshold};
-    if (!std::all_of(std::begin(values), std::end(values), [](double value) {
-            return std::isfinite(value) && value >= 0.0 && value <= 16384.0;
-        })) {
+    if (!std::all_of(std::begin(values), std::end(values),
+                     valid_master_detail_extent)) {
         return false;
     }
     return layout.splitter_width > 0.0 &&
@@ -39,7 +42,7 @@ MasterDetailLayout themed_master_detail_layout(const Theme& theme) noexcept {
 MasterDetailView::MasterDetailView(StableId stable_id)
     : ContainerControl(std::move(stable_id)),
       split_(make_control<SplitContainer>(
-          StableId(std::string(this->stable_id().value()) + ".split"))) {
+          StableId(std::string((*this).stable_id().value()) + ".split"))) {
     configure_split();
 }
 
@@ -60,21 +63,21 @@ Control::Ptr MasterDetailView::replace_role(
     }
     if (replacement &&
         (replacement.get() == this || replacement == split_ ||
-         replacement == split_->first_panel() ||
-         replacement == split_->second_panel() ||
-         replacement == split_->splitter_control())) {
+         replacement == (*split_).first_panel() ||
+         replacement == (*split_).second_panel() ||
+         replacement == (*split_).splitter_control())) {
         throw std::logic_error(
             "master/detail role cannot own its composition infrastructure");
     }
-    if (replacement && replacement->parent()) {
+    if (replacement && (*replacement).parent()) {
         throw std::logic_error("master/detail role control already has a parent");
     }
     Control::Ptr previous = slot;
     if (replacement) {
-        replacement->set_dock(DockStyle::fill);
-        panel->add_child(replacement);
+        (*replacement).set_dock(DockStyle::fill);
+        (*panel).add_child(replacement);
     }
-    if (slot) previous = panel->remove_child(slot->runtime_id());
+    if (slot) previous = (*panel).remove_child((*slot).runtime_id());
     slot = std::move(replacement);
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
@@ -82,23 +85,23 @@ Control::Ptr MasterDetailView::replace_role(
 }
 
 Control::Ptr MasterDetailView::set_master(Control::Ptr control) {
-    return replace_role(master_, split_->first_panel(), std::move(control));
+    return replace_role(master_, (*split_).first_panel(), std::move(control));
 }
 
 Control::Ptr MasterDetailView::set_detail(Control::Ptr control) {
-    return replace_role(detail_, split_->second_panel(), std::move(control));
+    return replace_role(detail_, (*split_).second_panel(), std::move(control));
 }
 
 void MasterDetailView::configure_split() {
     const MasterDetailLayout layout = effective_master_detail_layout();
-    split_->set_orientation(layout.orientation);
-    split_->set_splitter_width(layout.splitter_width);
-    split_->set_splitter_hit_width(layout.splitter_hit_width);
-    split_->set_first_minimum(layout.master_minimum);
-    split_->set_second_minimum(layout.detail_minimum);
-    split_->set_splitter_fixed(!layout.resizable);
-    split_->set_fixed_panel(SplitFixedPanel::first);
-    split_->set_splitter_distance(layout.master_extent);
+    (*split_).set_orientation(layout.orientation);
+    (*split_).set_splitter_width(layout.splitter_width);
+    (*split_).set_splitter_hit_width(layout.splitter_hit_width);
+    (*split_).set_first_minimum(layout.master_minimum);
+    (*split_).set_second_minimum(layout.detail_minimum);
+    (*split_).set_splitter_fixed(!layout.resizable);
+    (*split_).set_fixed_panel(SplitFixedPanel::first);
+    (*split_).set_splitter_distance(layout.master_extent);
 }
 
 MasterDetailLayout MasterDetailView::effective_master_detail_layout() const noexcept {
@@ -186,37 +189,37 @@ void MasterDetailView::apply_display_mode(MasterDetailDisplayMode mode,
     const MasterDetailDisplayMode previous = effective_display_mode_;
     switch (mode) {
     case MasterDetailDisplayMode::side_by_side:
-        if (split_->first_collapsed()) {
-            split_->set_first_collapsed(false,
+        if ((*split_).first_collapsed()) {
+            (*split_).set_first_collapsed(false,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
-        if (split_->second_collapsed()) {
-            split_->set_second_collapsed(false,
+        if ((*split_).second_collapsed()) {
+            (*split_).set_second_collapsed(false,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
         break;
     case MasterDetailDisplayMode::master_only:
-        if (split_->first_collapsed()) {
-            split_->set_first_collapsed(false,
+        if ((*split_).first_collapsed()) {
+            (*split_).set_first_collapsed(false,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
-        if (!split_->second_collapsed()) {
-            split_->set_second_collapsed(true,
+        if (!(*split_).second_collapsed()) {
+            (*split_).set_second_collapsed(true,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
         break;
     case MasterDetailDisplayMode::detail_only:
-        if (split_->second_collapsed()) {
-            split_->set_second_collapsed(false,
+        if ((*split_).second_collapsed()) {
+            (*split_).set_second_collapsed(false,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
-        if (!split_->first_collapsed()) {
-            split_->set_first_collapsed(true,
+        if (!(*split_).first_collapsed()) {
+            (*split_).set_first_collapsed(true,
                 automatic ? SplitCollapseOrigin::automatic_accommodation
                           : SplitCollapseOrigin::programmatic);
         }
@@ -238,22 +241,22 @@ Size MasterDetailView::measure(Size available) {
     const Control::Ptr retained_detail = detail_;
     Size master_desired;
     Size detail_desired;
-    if (retained_master && retained_master->is_alive() &&
-        retained_master->parent() == split_->first_panel()) {
-        master_desired = retained_master->measure(available);
+    if (retained_master && (*retained_master).is_alive() &&
+        (*retained_master).parent() == (*split_).first_panel()) {
+        master_desired = (*retained_master).measure(available);
         if (!is_alive()) return {};
-        if (master_ != retained_master || !retained_master->is_alive() ||
-            retained_master->parent() != split_->first_panel()) {
+        if (master_ != retained_master || !(*retained_master).is_alive() ||
+            (*retained_master).parent() != (*split_).first_panel()) {
             master_desired = {};
             invalidate(Dirty::measure | Dirty::arrange);
         }
     }
-    if (retained_detail && retained_detail->is_alive() &&
-        retained_detail->parent() == split_->second_panel()) {
-        detail_desired = retained_detail->measure(available);
+    if (retained_detail && (*retained_detail).is_alive() &&
+        (*retained_detail).parent() == (*split_).second_panel()) {
+        detail_desired = (*retained_detail).measure(available);
         if (!is_alive()) return {};
-        if (detail_ != retained_detail || !retained_detail->is_alive() ||
-            retained_detail->parent() != split_->second_panel()) {
+        if (detail_ != retained_detail || !(*retained_detail).is_alive() ||
+            (*retained_detail).parent() != (*split_).second_panel()) {
             detail_desired = {};
             invalidate(Dirty::measure | Dirty::arrange);
         }

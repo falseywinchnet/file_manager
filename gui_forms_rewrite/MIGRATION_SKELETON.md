@@ -1,125 +1,121 @@
-# Migration skeleton
+# Exact-behavior migration skeleton
 
-Status: **CANDIDATE sequence only; no implementation permission**.
+Status: **DECIDED sequence under O-030-A; does not itself authorize work**.
 
-This sequence exists to structure discussion. Exact phases change after the
-decision ledger closes.
+This sequence is intentionally conservative and does not authorize work.
 
-## Phase 0 — freeze meaning, not code
+## Phase 0 — close and freeze
 
-- Record the exact rewrite source snapshot.
-- Reconcile concurrent user work before touching overlapping files.
-- Freeze behavioral oracles and ABI fixtures.
-- Close R-001 through R-021 or explicitly defer nonblocking items.
-- Define directory/layer profiles and exemptions.
-- Approve the first constrained build target.
+- Treat `ARCHITECT_SELECTIONS.md` and O-032-A as the closed decision/completion
+  authority.
+- Record the exact dirty-tree reconciliation point.
+- Refresh semantic inventories.
+- Freeze public declarations, ABI fixtures, lifecycle traces, and dependent
+  boundaries as equivalence oracles.
+- Select enforcement tooling and temporary-exemption format.
 
-Exit: accepted rewrite ADR(s), accepted house grammar, source inventory, and
-architect implementation direction.
+Exit: architect implementation direction and a reviewed first batch.
 
-## Phase 1 — enforcement in observation mode
+## Phase 1 — policy gate in observation mode
 
-- Add AST inventory and include/symbol dependency reports.
-- Generate violations without failing existing code.
-- Check reports into the rewrite evidence area, not generated documentation.
-- Establish ratchets so new violations cannot appear after a layer enters
-  migration.
+- Add the narrow AST-backed banned-construct checker.
+- Report violations without immediately failing legacy files.
+- Ratchet each file/directory to zero new violations once touched.
+- Keep experiment folders out of the production policy scope.
 
-Exit: complete classified inventory with no unknown high-risk callback,
-ownership, or public-container sites.
+Exit: complete classified inventory with exact replacement categories.
 
-## Phase 2 — base and allocation laboratory
+## Phase 2 — binary-search toolbox proof
 
-- Implement only the accepted checked arithmetic, status, allocator, view, and
-  heap-array primitives.
-- Prove them independently under normal and injected failure.
-- Compare code size and performance against the standard controls.
-- Reject or revise primitives that merely imitate STL badly.
+- Implement tiny named lower-bound, upper-bound, and exact-search templates.
+- Use explicit comparator/functor types.
+- Prove boundary, duplicate, overflow, fuzz, and standard-equivalence behavior.
+- Migrate current binary-search-family call sites to the selected contiguous
+  range/index core, recording any germane minor native C++ API delta.
 
-Exit: primitive contracts accepted for production use.
+Why early: it is small, explicitly approved, and proves toolbox style without
+entangling ownership.
 
-## Phase 3 — one vertical retained slice
+## Phase 3 — Delegate/Event proof
 
-Migrate a deliberately small but semantically rich path, likely:
+- Characterize current event semantics and allocations.
+- Design named `Delegate<Signature>` binding with no heap allocation merely to
+  bind a target.
+- Add the Delegate-first Event path while retaining the legacy `std::function`
+  overload for compatibility.
+- Keep Event subscription order, token revocation, reentrancy, removal, emission,
+  disposal, and exception semantics distinct from Delegate invocation.
+- Migrate one behavior-rich event family and compare exact traces/allocations.
+- Expand only after the proof survives real controls and C ABI-facing behavior.
 
-- stable ID/value geometry;
-- one retained container and child collection;
-- one event;
-- one dispatcher work item;
-- one simple control;
-- headless host trace;
-- C ABI projection.
+Dispatch, commands, timers, host services, and paint callbacks do not join this
+phase automatically.
 
-The exact slice is a decision. It must exercise ownership, allocation,
-callbacks, lifecycle, and public seams without involving every renderer.
+## Phase 4 — explicit-language waves
 
-Exit: old/new behavior matches and the house primitives survive real use.
+Migrate small related production file groups while preserving paths and exact
+behavior; report permitted minor native C++ API changes:
 
-## Phase 4 — container waves
+1. replace `auto`/structured bindings/trailing returns with explicit named types;
+2. replace lambdas with named comparators, functors, helpers, contexts,
+   delegates, or trampolines;
+3. replace pointer arrow syntax with explicit dereference and dot;
+4. replace banned comparison conveniences with only required named operators;
+5. remove `std::any` outside the existing WinForms-compatible Tag exception and
+   remove coroutine constructs where present according to concrete behavior;
+6. replace the one current ASCII-lowercase `std::transform` with a direct loop;
+7. replace the requires-expression with the explicit initialization trait and
+   apply the selected C++20-feature policy.
 
-Migrate by semantic category, not global token replacement:
+Do not mix shared-ownership redesign, dispatch redesign, allocator propagation,
+or dependency changes into these waves.
 
-1. immutable/fixed snapshots and byte buffers;
-2. private growable collections;
-3. child/component/registry ownership collections;
-4. public return/argument types with compatibility bridges;
-5. associative collections after their lookup/order requirements are measured;
-6. render/text/image planes and high-volume buffers.
+## Phase 5 — sorting laboratory and call-site migration
 
-Each wave removes its bridge or records why it remains.
+- Gather real workload distributions for every sort/stable-sort site.
+- Implement the smallest justified candidate set.
+- Start the laboratory with the selected stable-insertion, run-aware stable
+  merge/adaptive, and explicit-stack unstable partition/introspective
+  candidates.
+- Benchmark against libc++ and Windows standard-library controls.
+- Preserve exact ordering and stability.
+- Migrate only call sites where a house choice is measured or materially more
+  inspectable.
+- Retain standard sorting where no candidate earns replacement, recording that
+  result honestly.
 
-## Phase 5 — callback waves
+## Phase 6 — focused `std::function` cleanup
 
-Migrate separately:
+- Audit semantic roles after lambdas are gone and events are migrated.
+- Clean only obvious allocation-heavy, copy-heavy, opaque, or lifetime-awkward
+  cases.
+- Use named machinery and keep ordinary justified `std::function` uses.
+- Do not force dispatch or platform services through Delegate/Event.
 
-1. synchronous visitors/predicates;
-2. C ABI callbacks;
-3. retained events/subscriptions;
-4. host service tables;
-5. dispatcher work/cancellation;
-6. cross-thread tasks;
-7. paint/animation hot paths;
-8. inspector/converter extension points.
+## Phase 7 — specialized storage experiments, only if earned
 
-Do not introduce one universal callable merely to finish the wave faster.
+- Evaluate BFFT-style heap arrays only for presently large, non-growing heap
+  allocations that are edited in place.
+- Leave ordinary growable collections as `std::vector`.
+- Keep hive-like stable pools, allocator work, and concurrency replacements out
+  unless separately opened from measured GUI.Forms need.
 
-## Phase 6 — explicit types and lambda grammar
+## Phase 8 — supporting-source repair and closure
 
-Once house containers and callbacks expose stable named types:
+- After production is rewritten, update tests, demo, tools, compatibility, and
+  first-party generators/output only where required to compile, exercise, or
+  represent the production contract.
+- Bring normative production source to zero unapproved banned constructs.
+- Close or architect-approve every narrow exemption.
+- Run exact lifecycle, ABI, headless, control, renderer, host, accessibility,
+  managed-facade, and installed-consumer gates.
+- Regenerate documentation only after declarations and source organization are
+  confirmed unchanged.
+- Record measured sorting choices and negative results.
+- Verify no BFFT link dependency and no speculative portability restructuring.
 
-- replace `auto` with meaningful names;
-- convert disallowed lambdas to named functions, functors, listeners, or work
-  records;
-- retain only approved category- and layer-specific exemptions;
-- enable enforcement ratchets per migrated directory.
+## Batch law
 
-Doing this earlier would spell unstable implementation types and create churn.
-
-## Phase 7 — hosted-runtime extraction
-
-- move filesystem, streams, locale, formatting, dynamic loading, clocks,
-  scheduling, synchronization, and platform services behind accepted seams;
-- implement the normal desktop backend first;
-- build the constrained nucleus against the selected runtime/shim;
-- prove actual link and execution, not header-only compilation.
-
-## Phase 8 — subsystem closure
-
-Migrate core, controls, drawing, render adapters, text engine, hosts, and ABI in
-bounded batches. Preserve independent buildability and run the full applicable
-test matrix after every batch.
-
-## Phase 9 — compatibility and cleanup
-
-- remove expired standard-container/callback bridges;
-- close or explicitly retain exemptions;
-- regenerate library documentation only after public declarations stabilize;
-- validate managed facade and installed consumer projections;
-- run native desktop, headless, ABI, renderer, and constrained-runtime gates;
-- record negative results and residual hosted dependencies.
-
-## Phase 10 — completion audit
-
-Evaluate the accepted R-021 criteria. A successful desktop rewrite does not
-automatically satisfy the later UEFI/framebuffer milestone.
-
+Every batch remains compilable, reviewable, and reversible. It names exact
+files, behavior oracle, replacement category, tests, measurements, and rollback.
+A mass token replacement is never a batch.

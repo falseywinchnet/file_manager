@@ -41,6 +41,8 @@ struct PropertyList::Impl final {
         Rect reset_bounds{};
         Rect validation_bounds{};
     };
+    using RowList = std::vector<RowState>;
+    using GroupList = std::vector<PropertyGroupSpec>;
 
     explicit Impl(PropertyList& public_owner) : owner(public_owner) {}
 
@@ -56,12 +58,13 @@ struct PropertyList::Impl final {
     }
 
     RowState* find_row(std::string_view id) noexcept {
-        const auto found = std::find_if(rows.begin(), rows.end(),
+        const RowList::iterator found = std::find_if(rows.begin(), rows.end(),
             [this, id](const RowState& row) { return spec(row).stable_id == id; });
         return found == rows.end() ? nullptr : &*found;
     }
     const RowState* find_row(std::string_view id) const noexcept {
-        const auto found = std::find_if(rows.begin(), rows.end(),
+        const RowList::const_iterator found =
+            std::find_if(rows.begin(), rows.end(),
             [this, id](const RowState& row) { return spec(row).stable_id == id; });
         return found == rows.end() ? nullptr : &*found;
     }
@@ -69,27 +72,27 @@ struct PropertyList::Impl final {
     [[nodiscard]] bool row_visible(const RowState& state) const noexcept {
         const PropertyRowSpec* current = &spec(state);
         std::size_t remaining = groups[state.group_index].rows.size();
-        while (!current->parent_id.empty() && remaining-- > 0U) {
-            const RowState* parent = find_row(current->parent_id);
-            if (!parent || parent->group_index != state.group_index ||
+        while (!(*current).parent_id.empty() && remaining-- > 0U) {
+            const RowState* parent = find_row((*current).parent_id);
+            if (!parent || (*parent).group_index != state.group_index ||
                 !spec(*parent).expandable || !spec(*parent).expanded) {
                 return false;
             }
             current = &spec(*parent);
         }
-        return current->parent_id.empty();
+        return (*current).parent_id.empty();
     }
 
     void clear_editors() noexcept {
         for (RowState& row : rows) {
-            if (row.editor && row.editor->parent().get() == &owner) {
-                Control::Ptr removed = owner.remove_child(row.editor->runtime_id());
-                if (removed && removed->is_alive()) removed->dispose();
+            if (row.editor && (*row.editor).parent().get() == &owner) {
+                Control::Ptr removed = owner.remove_child((*row.editor).runtime_id());
+                if (removed && (*removed).is_alive()) (*removed).dispose();
             }
-            if (row.reset_button && row.reset_button->parent().get() == &owner) {
+            if (row.reset_button && (*row.reset_button).parent().get() == &owner) {
                 Control::Ptr removed = owner.remove_child(
-                    row.reset_button->runtime_id());
-                if (removed && removed->is_alive()) removed->dispose();
+                    (*row.reset_button).runtime_id());
+                if (removed && (*removed).is_alive()) (*removed).dispose();
             }
         }
         rows.clear();
@@ -106,51 +109,52 @@ struct PropertyList::Impl final {
                 state.row_index = row_index;
                 state.committed_value = row.value;
                 if (row.editor == PropertyEditorKind::text) {
-                    auto editor = make_control<TextBox>(
+                    std::shared_ptr<gui_forms::TextBox> editor = make_control<TextBox>(
                         StableId(row.stable_id + ".editor"), row.value);
-                    editor->set_font({FontRole::content, 10.0, 400, false});
-                    editor->set_accessible_name(row.name);
-                    editor->set_accessible_description(row.description);
-                    editor->set_enabled(row.enabled);
+                    (*editor).set_font({FontRole::content, 10.0, 400, false});
+                    (*editor).set_accessible_name(row.name);
+                    (*editor).set_accessible_description(row.description);
+                    (*editor).set_enabled(row.enabled);
                     state.editor = editor;
                     owner.add_child(editor);
                 } else if (row.editor == PropertyEditorKind::choice) {
-                    auto editor = make_control<ComboBox>(
+                    std::shared_ptr<gui_forms::ComboBox> editor = make_control<ComboBox>(
                         StableId(row.stable_id + ".editor"));
-                    editor->set_items(row.choices);
-                    const auto selected = std::find(row.choices.begin(),
+                    (*editor).set_items(row.choices);
+                    const std::vector<std::string>::iterator selected =
+                        std::find(row.choices.begin(),
                                                     row.choices.end(), row.value);
                     if (selected != row.choices.end()) {
-                        editor->set_selected_index(static_cast<std::size_t>(
+                        (*editor).set_selected_index(static_cast<std::size_t>(
                             std::distance(row.choices.begin(), selected)));
                     }
-                    editor->set_font({FontRole::content, 10.0, 400, false});
-                    editor->set_accessible_name(row.name);
-                    editor->set_accessible_description(row.description);
-                    editor->set_enabled(row.enabled);
+                    (*editor).set_font({FontRole::content, 10.0, 400, false});
+                    (*editor).set_accessible_name(row.name);
+                    (*editor).set_accessible_description(row.description);
+                    (*editor).set_enabled(row.enabled);
                     state.editor = editor;
                     owner.add_child(editor);
                 } else if (row.editor == PropertyEditorKind::boolean) {
                     const bool checked = binding_value_to_bool(
                         BindingValue{row.value}).value_or(false);
-                    auto editor = make_control<CheckBox>(
+                    std::shared_ptr<gui_forms::CheckBox> editor = make_control<CheckBox>(
                         StableId(row.stable_id + ".editor"),
                         checked ? "True" : "False");
-                    editor->set_checked(checked);
-                    editor->set_font({FontRole::content, 10.0, 400, false});
-                    editor->set_accessible_name(row.name);
-                    editor->set_accessible_description(row.description);
-                    editor->set_enabled(row.enabled);
+                    (*editor).set_checked(checked);
+                    (*editor).set_font({FontRole::content, 10.0, 400, false});
+                    (*editor).set_accessible_name(row.name);
+                    (*editor).set_accessible_description(row.description);
+                    (*editor).set_enabled(row.enabled);
                     state.editor = editor;
                     owner.add_child(editor);
                 }
                 if (row.resettable) {
-                    auto reset = make_control<Button>(
+                    std::shared_ptr<gui_forms::Button> reset = make_control<Button>(
                         StableId(row.stable_id + ".reset"), "Reset");
-                    reset->set_font({FontRole::control, 8.5, 600, false});
-                    reset->set_enabled(row.enabled && row.reset_enabled);
-                    reset->set_accessible_name("Reset " + row.name);
-                    reset->set_accessible_description(
+                    (*reset).set_font({FontRole::control, 8.5, 600, false});
+                    (*reset).set_enabled(row.enabled && row.reset_enabled);
+                    (*reset).set_accessible_name("Reset " + row.name);
+                    (*reset).set_accessible_description(
                         "Restore " + row.name + " to its declared default");
                     state.reset_button = reset;
                     owner.add_child(reset);
@@ -163,8 +167,8 @@ struct PropertyList::Impl final {
 
     void connect_row(RowState& state) {
         const std::string row_id = spec(state).stable_id;
-        if (const auto text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
-            state.value_subscription = text->text_changed().subscribe(
+        if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
+            state.value_subscription = (*text).text_changed().subscribe(
                 owner, [this, row_id](const std::string& value) {
                     if (synchronizing) return;
                     RowState* row = find_row(row_id);
@@ -176,13 +180,13 @@ struct PropertyList::Impl final {
                         PropertyValueChange{
                             row_id, previous, model.value, false});
                 });
-            state.commit_subscription = text->committed().subscribe(
+            state.commit_subscription = (*text).committed().subscribe(
                 owner, [this, row_id](const std::string& value) {
                     RowState* row = find_row(row_id);
                     if (!row) return;
                     PropertyRowSpec& model = spec(*row);
-                    const std::string previous = row->committed_value;
-                    row->committed_value = value;
+                    const std::string previous = (*row).committed_value;
+                    (*row).committed_value = value;
                     model.value = value;
                     if (model.required && value.empty()) {
                         model.validation_message = model.name + " is required";
@@ -193,50 +197,50 @@ struct PropertyList::Impl final {
                     owner.invalidate(Dirty::measure | Dirty::layout | Dirty::paint |
                                      Dirty::semantics);
                 });
-            state.cancel_subscription = text->cancelled().subscribe(
+            state.cancel_subscription = (*text).cancelled().subscribe(
                 owner, [this, row_id] {
                     RowState* row = find_row(row_id);
                     if (!row) return;
                     synchronizing = true;
-                    if (const auto editor =
-                            std::dynamic_pointer_cast<TextBox>(row->editor)) {
-                        editor->set_text(row->committed_value);
+                    if (const std::shared_ptr<gui_forms::TextBox> editor =
+                            std::dynamic_pointer_cast<TextBox>((*row).editor)) {
+                        (*editor).set_text((*row).committed_value);
                     }
-                    spec(*row).value = row->committed_value;
+                    spec(*row).value = (*row).committed_value;
                     synchronizing = false;
                     owner.invalidate(Dirty::paint | Dirty::semantics);
                 });
-        } else if (const auto choice =
+        } else if (const std::shared_ptr<gui_forms::ComboBox> choice =
                        std::dynamic_pointer_cast<ComboBox>(state.editor)) {
-            state.value_subscription = choice->selected_index_changed().subscribe(
+            state.value_subscription = (*choice).selected_index_changed().subscribe(
                 owner, [this, row_id, weak_choice = std::weak_ptr<ComboBox>(choice)](
                     std::optional<std::size_t>) {
                     if (synchronizing) return;
                     RowState* row = find_row(row_id);
-                    const auto editor = weak_choice.lock();
+                    const std::shared_ptr<gui_forms::ComboBox> editor = weak_choice.lock();
                     if (!row || !editor) return;
                     PropertyRowSpec& model = spec(*row);
-                    const std::string previous = row->committed_value;
-                    model.value = std::string(editor->selected_text());
-                    row->committed_value = model.value;
+                    const std::string previous = (*row).committed_value;
+                    model.value = std::string((*editor).selected_text());
+                    (*row).committed_value = model.value;
                     PropertyValueChange change{row_id, previous, model.value, true};
                     owner.publish_change(owner.value_changed_, change);
                     owner.value_committed_.emit(change);
                 });
-        } else if (const auto check =
+        } else if (const std::shared_ptr<gui_forms::CheckBox> check =
                        std::dynamic_pointer_cast<CheckBox>(state.editor)) {
-            state.value_subscription = check->checked_changed().subscribe(
+            state.value_subscription = (*check).checked_changed().subscribe(
                 owner, [this, row_id,
                         weak_check = std::weak_ptr<CheckBox>(check)](bool checked) {
                     if (synchronizing) return;
                     RowState* row = find_row(row_id);
-                    const auto editor = weak_check.lock();
+                    const std::shared_ptr<gui_forms::CheckBox> editor = weak_check.lock();
                     if (!row || !editor) return;
                     PropertyRowSpec& model = spec(*row);
-                    const std::string previous = row->committed_value;
+                    const std::string previous = (*row).committed_value;
                     model.value = checked ? "True" : "False";
-                    row->committed_value = model.value;
-                    editor->set_text(model.value);
+                    (*row).committed_value = model.value;
+                    (*editor).set_text(model.value);
                     PropertyValueChange change{
                         row_id, previous, model.value, true};
                     owner.publish_change(owner.value_changed_, change);
@@ -244,18 +248,18 @@ struct PropertyList::Impl final {
                 });
         }
         if (state.editor) {
-            state.focus_subscription = state.editor->focus_observed().subscribe(
+            state.focus_subscription = (*state.editor).focus_observed().subscribe(
                 owner, [this, row_id](bool focused) {
                     if (focused) ensure_visible(row_id);
                 });
         }
         if (state.reset_button) {
-            state.reset_subscription = state.reset_button->clicked().subscribe(
+            state.reset_subscription = (*state.reset_button).clicked().subscribe(
                 owner, [this, row_id](ButtonBase&) {
                     owner.reset_requested_.emit({row_id});
                 });
             state.reset_focus_subscription =
-                state.reset_button->focus_observed().subscribe(
+                (*state.reset_button).focus_observed().subscribe(
                 owner, [this, row_id](bool focused) {
                     if (focused) ensure_visible(row_id);
                 });
@@ -346,10 +350,10 @@ struct PropertyList::Impl final {
             const bool visible = groups[state.group_index].expanded &&
                 row_visible(state);
             if (state.editor) {
-                state.editor->set_visible(visible);
+                (*state.editor).set_visible(visible);
             }
             if (state.reset_button) {
-                state.reset_button->set_visible(visible);
+                (*state.reset_button).set_visible(visible);
             }
             if (visible && state.editor) {
                 owner.set_child_layout(state.editor,
@@ -370,11 +374,11 @@ struct PropertyList::Impl final {
         RowState* row = find_row(row_id);
         if (!row) return;
         const double viewport = owner.committed_arranged_bounds().height;
-        if (row->row_bounds.y < scroll_offset) {
-            scroll_offset = row->row_bounds.y;
-        } else if (row->row_bounds.y + row->row_bounds.height >
+        if ((*row).row_bounds.y < scroll_offset) {
+            scroll_offset = (*row).row_bounds.y;
+        } else if ((*row).row_bounds.y + (*row).row_bounds.height >
                    scroll_offset + viewport) {
-            scroll_offset = row->row_bounds.y + row->row_bounds.height - viewport;
+            scroll_offset = (*row).row_bounds.y + (*row).row_bounds.height - viewport;
         }
         scroll_offset = std::clamp(scroll_offset, 0.0,
             std::max(0.0, content_height - viewport));
@@ -424,8 +428,8 @@ struct PropertyList::Impl final {
     }
 
     PropertyList& owner;
-    std::vector<PropertyGroupSpec> groups;
-    std::vector<RowState> rows;
+    GroupList groups;
+    RowList rows;
     Control::Ptr header;
     double header_height{};
     double label_width{76.0};
@@ -445,13 +449,13 @@ PropertyList::PropertyList(StableId stable_id)
 PropertyList::~PropertyList() = default;
 
 const std::vector<PropertyGroupSpec>& PropertyList::groups() const noexcept {
-    return impl_->groups;
+    return (*impl_).groups;
 }
 
 void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
     require_mutable();
     std::unordered_set<std::string> identities;
-    for (const auto& group : groups) {
+    for (const gui_forms::PropertyGroupSpec& group : groups) {
         require_property_text(group.stable_id, "group ID");
         require_property_text(group.title, "group title");
         if (group.stable_id.empty() || group.title.empty() ||
@@ -460,7 +464,7 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
                 "PropertyList groups require unique nonempty identities and titles");
         }
         std::unordered_map<std::string, const PropertyRowSpec*> prior_rows;
-        for (const auto& row : group.rows) {
+        for (const gui_forms::PropertyRowSpec& row : group.rows) {
             require_property_text(row.stable_id, "row ID");
             require_property_text(row.name, "row name");
             require_property_text(row.value, "row value");
@@ -483,10 +487,12 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
                         "PropertyList root rows must have depth zero");
                 }
             } else {
-                const auto parent = prior_rows.find(row.parent_id);
+                const std::unordered_map<
+                    std::string, const PropertyRowSpec*>::iterator parent =
+                    prior_rows.find(row.parent_id);
                 if (parent == prior_rows.end() ||
-                    !parent->second->expandable ||
-                    row.depth != parent->second->depth + 1U) {
+                    !(*(*parent).second).expandable ||
+                    row.depth != (*(*parent).second).depth + 1U) {
                     throw std::invalid_argument(
                         "PropertyList child rows require an earlier expandable parent at the preceding depth");
                 }
@@ -495,7 +501,7 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
                 throw std::invalid_argument(
                     "PropertyList choice rows require at least one choice");
             }
-            for (const auto& choice : row.choices) {
+            for (const std::string& choice : row.choices) {
                 require_property_text(choice, "choice");
             }
             if (row.editor == PropertyEditorKind::choice && !row.value.empty() &&
@@ -512,10 +518,10 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
             prior_rows.emplace(row.stable_id, &row);
         }
     }
-    impl_->groups = std::move(groups);
-    impl_->scroll_offset = 0.0;
-    impl_->rebuild_editors();
-    impl_->recompute_geometry();
+    (*impl_).groups = std::move(groups);
+    (*impl_).scroll_offset = 0.0;
+    (*impl_).rebuild_editors();
+    (*impl_).recompute_geometry();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
 }
@@ -523,9 +529,9 @@ void PropertyList::set_groups(std::vector<PropertyGroupSpec> groups) {
 bool PropertyList::set_value(std::string_view row_id, std::string value) {
     require_mutable();
     require_property_text(value, "row value");
-    Impl::RowState* row = impl_->find_row(row_id);
+    Impl::RowState* row = (*impl_).find_row(row_id);
     if (!row) return false;
-    PropertyRowSpec& model = impl_->spec(*row);
+    PropertyRowSpec& model = (*impl_).spec(*row);
     if (model.editor == PropertyEditorKind::choice && !value.empty() &&
         std::find(model.choices.begin(), model.choices.end(), value) ==
             model.choices.end()) {
@@ -537,26 +543,27 @@ bool PropertyList::set_value(std::string_view row_id, std::string value) {
         throw std::invalid_argument(
             "PropertyList Boolean value must be True, False, 1, or 0");
     }
-    if (model.value == value && row->committed_value == value) return true;
-    impl_->synchronizing = true;
+    if (model.value == value && (*row).committed_value == value) return true;
+    (*impl_).synchronizing = true;
     model.value = value;
-    row->committed_value = value;
-    if (const auto text = std::dynamic_pointer_cast<TextBox>(row->editor)) {
-        text->set_text(value);
-    } else if (const auto choice = std::dynamic_pointer_cast<ComboBox>(row->editor)) {
-        const auto found = std::find(model.choices.begin(), model.choices.end(), value);
-        choice->set_selected_index(found == model.choices.end()
+    (*row).committed_value = value;
+    if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>((*row).editor)) {
+        (*text).set_text(value);
+    } else if (const std::shared_ptr<gui_forms::ComboBox> choice = std::dynamic_pointer_cast<ComboBox>((*row).editor)) {
+        const std::vector<std::string>::iterator found =
+            std::find(model.choices.begin(), model.choices.end(), value);
+        (*choice).set_selected_index(found == model.choices.end()
             ? std::optional<std::size_t>{}
             : std::optional<std::size_t>{static_cast<std::size_t>(
                 std::distance(model.choices.begin(), found))});
-    } else if (const auto check =
-                   std::dynamic_pointer_cast<CheckBox>(row->editor)) {
+    } else if (const std::shared_ptr<gui_forms::CheckBox> check =
+                   std::dynamic_pointer_cast<CheckBox>((*row).editor)) {
         const bool checked = binding_value_to_bool(
             BindingValue{value}).value_or(false);
-        check->set_checked(checked);
-        check->set_text(checked ? "True" : "False");
+        (*check).set_checked(checked);
+        (*check).set_text(checked ? "True" : "False");
     }
-    impl_->synchronizing = false;
+    (*impl_).synchronizing = false;
     invalidate(Dirty::paint | Dirty::semantics);
     return true;
 }
@@ -565,18 +572,18 @@ bool PropertyList::set_description(std::string_view row_id,
                                    std::string description) {
     require_mutable();
     require_property_text(description, "row description");
-    Impl::RowState* row = impl_->find_row(row_id);
+    Impl::RowState* row = (*impl_).find_row(row_id);
     if (!row) return false;
-    PropertyRowSpec& model = impl_->spec(*row);
+    PropertyRowSpec& model = (*impl_).spec(*row);
     if (model.description == description) return true;
     model.description = std::move(description);
-    if (row->editor) {
+    if ((*row).editor) {
         std::string accessible = model.description;
         if (!model.validation_message.empty()) {
             if (!accessible.empty()) accessible += " · ";
             accessible += "Error: " + model.validation_message;
         }
-        row->editor->set_accessible_description(std::move(accessible));
+        (*(*row).editor).set_accessible_description(std::move(accessible));
     }
     invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
     return true;
@@ -585,21 +592,21 @@ bool PropertyList::set_description(std::string_view row_id,
 bool PropertyList::set_validation(std::string_view row_id, std::string message) {
     require_mutable();
     require_property_text(message, "validation message");
-    Impl::RowState* row = impl_->find_row(row_id);
+    Impl::RowState* row = (*impl_).find_row(row_id);
     if (!row) return false;
-    PropertyRowSpec& model = impl_->spec(*row);
+    PropertyRowSpec& model = (*impl_).spec(*row);
     if (model.validation_message == message) return true;
     model.validation_message = std::move(message);
-    if (row->editor) {
+    if ((*row).editor) {
         std::string description = model.description;
         if (!model.validation_message.empty()) {
             if (!description.empty()) description += " · ";
             description += "Error: " + model.validation_message;
         }
-        row->editor->set_accessible_description(std::move(description));
+        (*(*row).editor).set_accessible_description(std::move(description));
     }
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     return true;
@@ -607,41 +614,42 @@ bool PropertyList::set_validation(std::string_view row_id, std::string message) 
 
 bool PropertyList::set_reset_enabled(std::string_view row_id, bool enabled) {
     require_mutable();
-    Impl::RowState* row = impl_->find_row(row_id);
-    if (!row || !impl_->spec(*row).resettable || !row->reset_button) return false;
-    PropertyRowSpec& model = impl_->spec(*row);
+    Impl::RowState* row = (*impl_).find_row(row_id);
+    if (!row || !(*impl_).spec(*row).resettable || !(*row).reset_button) return false;
+    PropertyRowSpec& model = (*impl_).spec(*row);
     if (model.reset_enabled == enabled) return true;
     model.reset_enabled = enabled;
-    row->reset_button->set_enabled(model.enabled && enabled);
+    (*(*row).reset_button).set_enabled(model.enabled && enabled);
     invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
     return true;
 }
 
 bool PropertyList::set_group_expanded(std::string_view id, bool expanded) {
     require_mutable();
-    const auto found = std::find_if(impl_->groups.begin(), impl_->groups.end(),
+    const Impl::GroupList::iterator found =
+        std::find_if((*impl_).groups.begin(), (*impl_).groups.end(),
         [id](const PropertyGroupSpec& group) { return group.stable_id == id; });
-    if (found == impl_->groups.end()) return false;
-    if (found->expanded == expanded) return true;
-    found->expanded = expanded;
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    if (found == (*impl_).groups.end()) return false;
+    if ((*found).expanded == expanded) return true;
+    (*found).expanded = expanded;
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     publish_change(group_changed_,
-                   PropertyGroupChange{found->stable_id, expanded});
+                   PropertyGroupChange{(*found).stable_id, expanded});
     return true;
 }
 
 bool PropertyList::set_row_expanded(std::string_view id, bool expanded) {
     require_mutable();
-    Impl::RowState* row = impl_->find_row(id);
-    if (!row || !impl_->spec(*row).expandable) return false;
-    PropertyRowSpec& model = impl_->spec(*row);
+    Impl::RowState* row = (*impl_).find_row(id);
+    if (!row || !(*impl_).spec(*row).expandable) return false;
+    PropertyRowSpec& model = (*impl_).spec(*row);
     if (model.expanded == expanded) return true;
     model.expanded = expanded;
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     publish_change(row_expansion_changed_,
@@ -650,70 +658,70 @@ bool PropertyList::set_row_expanded(std::string_view id, bool expanded) {
 }
 
 std::optional<bool> PropertyList::row_expanded(std::string_view id) const {
-    const Impl::RowState* row = impl_->find_row(id);
-    return row && impl_->spec(*row).expandable
-        ? std::optional<bool>{impl_->spec(*row).expanded}
+    const Impl::RowState* row = (*impl_).find_row(id);
+    return row && (*impl_).spec(*row).expandable
+        ? std::optional<bool>{(*impl_).spec(*row).expanded}
         : std::optional<bool>{};
 }
 
 std::optional<std::string> PropertyList::value(std::string_view id) const {
-    const Impl::RowState* row = impl_->find_row(id);
-    return row ? std::optional<std::string>{impl_->spec(*row).value}
+    const Impl::RowState* row = (*impl_).find_row(id);
+    return row ? std::optional<std::string>{(*impl_).spec(*row).value}
                : std::optional<std::string>{};
 }
 
 Control::Ptr PropertyList::editor(std::string_view id) const {
-    const Impl::RowState* row = impl_->find_row(id);
-    return row ? row->editor : Control::Ptr{};
+    const Impl::RowState* row = (*impl_).find_row(id);
+    return row ? (*row).editor : Control::Ptr{};
 }
 
 bool PropertyList::replace_editor(std::string_view id, Control::Ptr editor) {
     require_mutable();
-    Impl::RowState* row = impl_->find_row(id);
+    Impl::RowState* row = (*impl_).find_row(id);
     if (!row) return false;
-    if (!editor || !editor->is_alive() || editor->parent() ||
-        editor->attached_window()) {
+    if (!editor || !(*editor).is_alive() || (*editor).parent() ||
+        (*editor).attached_window()) {
         throw std::invalid_argument(
             "PropertyList replacement editor must be an unattached live control");
     }
-    PropertyRowSpec& model = impl_->spec(*row);
-    if (!model.enabled) editor->set_enabled(false);
-    if (editor->accessible_name().empty()) {
-        editor->set_accessible_name(model.name);
+    PropertyRowSpec& model = (*impl_).spec(*row);
+    if (!model.enabled) (*editor).set_enabled(false);
+    if ((*editor).accessible_name().empty()) {
+        (*editor).set_accessible_name(model.name);
     }
-    if (editor->accessible_description().empty()) {
-        editor->set_accessible_description(model.description);
+    if ((*editor).accessible_description().empty()) {
+        (*editor).set_accessible_description(model.description);
     }
 
     // Attach first so an identity/lifecycle failure leaves the existing editor
     // and its subscriptions intact.
     add_child(editor);
-    Control::Ptr previous = row->editor;
-    row->value_subscription.disconnect();
-    row->commit_subscription.disconnect();
-    row->cancel_subscription.disconnect();
-    row->focus_subscription.disconnect();
-    row->editor = editor;
+    Control::Ptr previous = (*row).editor;
+    (*row).value_subscription.disconnect();
+    (*row).commit_subscription.disconnect();
+    (*row).cancel_subscription.disconnect();
+    (*row).focus_subscription.disconnect();
+    (*row).editor = editor;
     model.editor = PropertyEditorKind::custom;
-    row->focus_subscription = editor->focus_observed().subscribe(
+    (*row).focus_subscription = (*editor).focus_observed().subscribe(
         *this, [implementation = impl_.get(), row_id = std::string(id)](
                    bool focused) {
-            if (focused) implementation->ensure_visible(row_id);
+            if (focused) (*implementation).ensure_visible(row_id);
         });
-    if (previous && previous->parent().get() == this) {
-        Control::Ptr removed = remove_child(previous->runtime_id());
-        if (removed && removed->is_alive()) removed->dispose();
+    if (previous && (*previous).parent().get() == this) {
+        Control::Ptr removed = remove_child((*previous).runtime_id());
+        if (removed && (*removed).is_alive()) (*removed).dispose();
     }
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     return true;
 }
 
 std::shared_ptr<Button> PropertyList::reset_button(std::string_view id) const {
-    const Impl::RowState* row = impl_->find_row(id);
-    return row ? row->reset_button : std::shared_ptr<Button>{};
+    const Impl::RowState* row = (*impl_).find_row(id);
+    return row ? (*row).reset_button : std::shared_ptr<Button>{};
 }
 
 void PropertyList::set_header_content(Control::Ptr content, double height) {
@@ -723,83 +731,83 @@ void PropertyList::set_header_content(Control::Ptr content, double height) {
         throw std::invalid_argument(
             "PropertyList header requires content and a 0 through 4096 height");
     }
-    if (impl_->header == content && impl_->header_height == height) return;
-    if (impl_->header && impl_->header->parent().get() == this) {
-        Control::Ptr previous = remove_child(impl_->header->runtime_id());
-        if (previous && previous->is_alive()) previous->dispose();
+    if ((*impl_).header == content && (*impl_).header_height == height) return;
+    if ((*impl_).header && (*(*impl_).header).parent().get() == this) {
+        Control::Ptr previous = remove_child((*(*impl_).header).runtime_id());
+        if (previous && (*previous).is_alive()) (*previous).dispose();
     }
-    impl_->header = std::move(content);
-    impl_->header_height = height;
-    if (impl_->header) add_child(impl_->header);
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    (*impl_).header = std::move(content);
+    (*impl_).header_height = height;
+    if ((*impl_).header) add_child((*impl_).header);
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
 }
 
 Control::Ptr PropertyList::header_content() const noexcept {
-    return impl_->header;
+    return (*impl_).header;
 }
 
-double PropertyList::header_height() const noexcept { return impl_->header_height; }
+double PropertyList::header_height() const noexcept { return (*impl_).header_height; }
 
 void PropertyList::set_header_height(double height) {
     require_mutable();
     if (!std::isfinite(height) || height < 0.0 || height > 4096.0 ||
-        (!impl_->header && height != 0.0)) {
+        (!(*impl_).header && height != 0.0)) {
         throw std::invalid_argument("PropertyList header height must be 0 through 4096");
     }
-    if (impl_->header_height == height) return;
-    impl_->header_height = height;
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    if ((*impl_).header_height == height) return;
+    (*impl_).header_height = height;
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
 }
 
-double PropertyList::label_width() const noexcept { return impl_->label_width; }
+double PropertyList::label_width() const noexcept { return (*impl_).label_width; }
 
 void PropertyList::set_label_width(double width) {
     require_mutable();
     if (!std::isfinite(width) || width < 40.0 || width > 320.0) {
         throw std::invalid_argument("PropertyList label width must be 40 through 320");
     }
-    if (impl_->label_width == width) return;
-    impl_->label_width = width;
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    if ((*impl_).label_width == width) return;
+    (*impl_).label_width = width;
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
     invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
 }
 
-double PropertyList::scroll_offset() const noexcept { return impl_->scroll_offset; }
+double PropertyList::scroll_offset() const noexcept { return (*impl_).scroll_offset; }
 
 void PropertyList::set_scroll_offset(double offset) {
     require_mutable();
     if (!std::isfinite(offset)) {
         throw std::invalid_argument("PropertyList scroll offset must be finite");
     }
-    const double maximum = std::max(0.0, impl_->content_height -
+    const double maximum = std::max(0.0, (*impl_).content_height -
                                           committed_arranged_bounds().height);
     const double next = std::clamp(offset, 0.0, maximum);
-    if (next == impl_->scroll_offset) return;
-    impl_->scroll_offset = next;
-    impl_->arrange_editors();
+    if (next == (*impl_).scroll_offset) return;
+    (*impl_).scroll_offset = next;
+    (*impl_).arrange_editors();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
-double PropertyList::content_height() const noexcept { return impl_->content_height; }
+double PropertyList::content_height() const noexcept { return (*impl_).content_height; }
 
 Size PropertyList::measure(Size available) {
     return {available.width, std::min(available.height,
         std::max(property_group_height * effective_text_scale(),
-                 impl_->content_height))};
+                 (*impl_).content_height))};
 }
 
 void PropertyList::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    impl_->recompute_geometry();
-    impl_->arrange_editors();
+    (*impl_).recompute_geometry();
+    (*impl_).arrange_editors();
 }
 
 void PropertyList::on_paint(Painter& painter, Rect) {
@@ -819,10 +827,10 @@ void PropertyList::on_paint(Painter& painter, Rect) {
     const FontSpec validation_font = effective_font(
         {FontRole::content, 8.5, 600, false});
     painter.fill_rect(bounds, background());
-    double y = impl_->header_height - impl_->scroll_offset;
+    double y = (*impl_).header_height - (*impl_).scroll_offset;
     for (std::size_t group_index = 0;
-         group_index < impl_->groups.size(); ++group_index) {
-        const PropertyGroupSpec& group = impl_->groups[group_index];
+         group_index < (*impl_).groups.size(); ++group_index) {
+        const PropertyGroupSpec& group = (*impl_).groups[group_index];
         painter.fill_rect({0.0, y, bounds.width, group_height},
                           Color::rgba(216, 224, 236));
         painter.draw_line({0.0, y + group_height - 1.0},
@@ -839,16 +847,16 @@ void PropertyList::on_paint(Painter& painter, Rect) {
                                style.text);
         y += group_height;
         if (!group.expanded) continue;
-        for (const Impl::RowState& row_state : impl_->rows) {
+        for (const Impl::RowState& row_state : (*impl_).rows) {
             if (row_state.group_index != group_index) continue;
-            const PropertyRowSpec& row = impl_->spec(row_state);
-            if (!impl_->row_visible(row_state)) continue;
+            const PropertyRowSpec& row = (*impl_).spec(row_state);
+            if (!(*impl_).row_visible(row_state)) continue;
             const Rect name{row_state.name_bounds.x,
-                            row_state.name_bounds.y - impl_->scroll_offset,
+                            row_state.name_bounds.y - (*impl_).scroll_offset,
                             row_state.name_bounds.width,
                             row_state.name_bounds.height};
             const Rect value_bounds{row_state.value_bounds.x,
-                                    row_state.value_bounds.y - impl_->scroll_offset,
+                                    row_state.value_bounds.y - (*impl_).scroll_offset,
                                     row_state.value_bounds.width,
                                     row_state.value_bounds.height};
             if (row.expandable) {
@@ -866,7 +874,7 @@ void PropertyList::on_paint(Painter& painter, Rect) {
             }
             if (!row.validation_message.empty()) {
                 const Rect validation{row_state.validation_bounds.x,
-                    row_state.validation_bounds.y - impl_->scroll_offset,
+                    row_state.validation_bounds.y - (*impl_).scroll_offset,
                     row_state.validation_bounds.width,
                     row_state.validation_bounds.height};
                 painter.draw_text_utf8({validation.x,
@@ -877,21 +885,21 @@ void PropertyList::on_paint(Painter& painter, Rect) {
             }
             painter.draw_line({property_padding * s,
                                row_state.row_bounds.y + row_state.row_bounds.height -
-                                   impl_->scroll_offset - 1.0},
+                                   (*impl_).scroll_offset - 1.0},
                               {std::max(property_padding * s,
                                         bounds.width - property_padding * s),
                                row_state.row_bounds.y + row_state.row_bounds.height -
-                                   impl_->scroll_offset - 1.0},
+                                   (*impl_).scroll_offset - 1.0},
                               Color::rgba(211, 219, 229), 1.0);
             y += row_state.row_bounds.height;
         }
     }
-    if (impl_->content_height > bounds.height && bounds.height > 12.0) {
-        const double ratio = bounds.height / impl_->content_height;
+    if ((*impl_).content_height > bounds.height && bounds.height > 12.0) {
+        const double ratio = bounds.height / (*impl_).content_height;
         const double thumb_height = std::max(18.0, bounds.height * ratio);
-        const double maximum = impl_->content_height - bounds.height;
+        const double maximum = (*impl_).content_height - bounds.height;
         const double thumb_y = maximum <= 0.0 ? 0.0 :
-            (bounds.height - thumb_height) * impl_->scroll_offset / maximum;
+            (bounds.height - thumb_height) * (*impl_).scroll_offset / maximum;
         painter.fill_rect({std::max(0.0, bounds.width - 4.0), thumb_y,
                            3.0, thumb_height}, style.border);
     }
@@ -899,7 +907,7 @@ void PropertyList::on_paint(Painter& painter, Rect) {
 
 void PropertyList::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::wheel && event.wheel_delta.y != 0.0) {
-        set_scroll_offset(impl_->scroll_offset +
+        set_scroll_offset((*impl_).scroll_offset +
             (event.wheel_delta.y > 0.0 ? -54.0 : 54.0) *
                 effective_text_scale());
         event.handled = true;
@@ -907,18 +915,18 @@ void PropertyList::on_pointer(PointerEvent& event) {
     }
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary) {
-        if (Impl::RowState* row = impl_->disclosure_at(event.position)) {
-            const PropertyRowSpec& model = impl_->spec(*row);
+        if (Impl::RowState* row = (*impl_).disclosure_at(event.position)) {
+            const PropertyRowSpec& model = (*impl_).spec(*row);
             static_cast<void>(set_row_expanded(model.stable_id,
                                                !model.expanded));
             event.handled = true;
             return;
         }
-        const auto group = impl_->group_at(event.position);
+        const std::optional<std::size_t> group = (*impl_).group_at(event.position);
         if (group) {
             static_cast<void>(set_group_expanded(
-                impl_->groups[*group].stable_id,
-                !impl_->groups[*group].expanded));
+                (*impl_).groups[*group].stable_id,
+                !(*impl_).groups[*group].expanded));
             event.handled = true;
         }
     }
@@ -926,9 +934,9 @@ void PropertyList::on_pointer(PointerEvent& event) {
 
 void PropertyList::on_key(KeyEvent& event) {
     if (event.action != KeyAction::down) return;
-    double next = impl_->scroll_offset;
+    double next = (*impl_).scroll_offset;
     if (event.physical_key == PhysicalKey::home) next = 0.0;
-    else if (event.physical_key == PhysicalKey::end) next = impl_->content_height;
+    else if (event.physical_key == PhysicalKey::end) next = (*impl_).content_height;
     else if (event.physical_key == PhysicalKey::page_up) {
         next -= committed_arranged_bounds().height;
     } else if (event.physical_key == PhysicalKey::page_down) {
@@ -953,10 +961,10 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
     const Rect absolute = absolute_bounds();
     const double group_height = property_group_height * effective_text_scale();
-    double y = impl_->header_height - impl_->scroll_offset;
+    double y = (*impl_).header_height - (*impl_).scroll_offset;
     for (std::size_t group_index = 0;
-         group_index < impl_->groups.size(); ++group_index) {
-        const PropertyGroupSpec& group = impl_->groups[group_index];
+         group_index < (*impl_).groups.size(); ++group_index) {
+        const PropertyGroupSpec& group = (*impl_).groups[group_index];
         SemanticNode header;
         header.stable_id = group.stable_id;
         header.runtime_id = property_virtual_runtime_id(header.stable_id);
@@ -972,10 +980,10 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
         nodes.push_back(std::move(header));
         y += group_height;
         if (!group.expanded) continue;
-        for (const Impl::RowState& row_state : impl_->rows) {
+        for (const Impl::RowState& row_state : (*impl_).rows) {
             if (row_state.group_index != group_index) continue;
-            const PropertyRowSpec& row = impl_->spec(row_state);
-            if (!impl_->row_visible(row_state)) continue;
+            const PropertyRowSpec& row = (*impl_).spec(row_state);
+            if (!(*impl_).row_visible(row_state)) continue;
             if (row.editor == PropertyEditorKind::read_only) {
                 SemanticNode node;
                 node.stable_id = row.stable_id;
@@ -987,7 +995,7 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
                     ? row.description : row.description + " · Error: " +
                                             row.validation_message;
                 node.bounds = {absolute.x,
-                    absolute.y + row_state.row_bounds.y - impl_->scroll_offset,
+                    absolute.y + row_state.row_bounds.y - (*impl_).scroll_offset,
                     absolute.width, row_state.row_bounds.height};
                 node.states = SemanticState::visible;
                 if (row.enabled) node.states |= SemanticState::enabled;
@@ -1007,12 +1015,13 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
 bool PropertyList::on_semantic_child_action(std::string_view id,
                                             SemanticAction action,
                                             std::string_view) {
-    const auto found = std::find_if(impl_->groups.begin(), impl_->groups.end(),
+    const Impl::GroupList::iterator found =
+        std::find_if((*impl_).groups.begin(), (*impl_).groups.end(),
         [id](const PropertyGroupSpec& group) { return group.stable_id == id; });
-    if (found != impl_->groups.end()) {
+    if (found != (*impl_).groups.end()) {
         if (action == SemanticAction::focus) {
             if (window()) {
-                static_cast<void>(window()->request_focus(shared_from_this()));
+                static_cast<void>((*window()).request_focus(shared_from_this()));
             }
             return true;
         }
@@ -1022,8 +1031,8 @@ bool PropertyList::on_semantic_child_action(std::string_view id,
         }
         return false;
     }
-    const Impl::RowState* row = impl_->find_row(id);
-    if (row && impl_->spec(*row).expandable &&
+    const Impl::RowState* row = (*impl_).find_row(id);
+    if (row && (*impl_).spec(*row).expandable &&
         (action == SemanticAction::expand ||
          action == SemanticAction::collapse)) {
         return set_row_expanded(id, action == SemanticAction::expand);
@@ -1034,8 +1043,8 @@ bool PropertyList::on_semantic_child_action(std::string_view id,
 void PropertyList::on_dispose() noexcept {
     // Component::dispose marks the control disposing before entering this
     // callback. Control::on_dispose owns the disposal-safe child detach path.
-    impl_->rows.clear();
-    impl_->header.reset();
+    (*impl_).rows.clear();
+    (*impl_).header.reset();
     Control::on_dispose();
 }
 

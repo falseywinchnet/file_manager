@@ -11,6 +11,10 @@ publish = false
 name = "orchestrator"
 path = "src/main.rs"
 
+[[bin]]
+name = "orchestrator-worker-bench"
+path = "src/bin/worker_bench.rs"
+
 [dependencies]
 getrandom = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -25,7 +29,7 @@ nix = { version = "0.31.3", default-features = false, features = ["fs", "socket"
 service-binding = "3.0.0"
 
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 
 [lints.clippy]
 all = "deny"

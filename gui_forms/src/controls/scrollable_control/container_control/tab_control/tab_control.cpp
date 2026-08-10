@@ -34,8 +34,8 @@ std::vector<std::shared_ptr<TabPage>> TabControl::pages() const {
     std::vector<std::shared_ptr<TabPage>> result;
     result.reserve(pages_.size());
     for (const std::weak_ptr<TabPage>& weak : pages_) {
-        if (const auto page = weak.lock();
-            page && page->is_alive() && page->parent().get() == this) {
+        if (const std::shared_ptr<gui_forms::TabPage> page = weak.lock();
+            page && (*page).is_alive() && (*page).parent().get() == this) {
             result.push_back(page);
         }
     }
@@ -47,7 +47,7 @@ std::size_t TabControl::page_count() const {
 }
 
 std::shared_ptr<TabPage> TabControl::page_at(std::size_t index) const {
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     if (index >= live.size()) throw std::out_of_range("TabControl page index");
     return live[index];
 }
@@ -55,8 +55,9 @@ std::shared_ptr<TabPage> TabControl::page_at(std::size_t index) const {
 std::optional<std::size_t> TabControl::index_of(
     const std::shared_ptr<TabPage>& page) const {
     if (!page) return std::nullopt;
-    const auto live = pages();
-    const auto found = std::find(live.begin(), live.end(), page);
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    const std::vector<std::shared_ptr<TabPage>>::const_iterator found =
+        std::find(live.begin(), live.end(), page);
     if (found == live.end()) return std::nullopt;
     return static_cast<std::size_t>(found - live.begin());
 }
@@ -69,12 +70,12 @@ void TabControl::add_page(std::shared_ptr<TabPage> page) {
     require_mutable();
     if (!page) throw std::invalid_argument("TabControl page may not be null");
     if (index_of(page)) return;
-    page->set_visible(false);
+    (*page).set_visible(false);
     add_child(page);
     pages_.push_back(page);
     if (!selected_page_.lock()) {
         selected_page_ = page;
-        page->set_visible(true);
+        (*page).set_visible(true);
         const TabSelectionChange change{std::nullopt, 0U};
         publish_change(selected_index_changed_, change);
     }
@@ -84,8 +85,9 @@ void TabControl::add_page(std::shared_ptr<TabPage> page) {
 
 std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
     require_mutable();
-    const auto live_before = pages();
-    const auto found = std::find_if(
+    const std::vector<std::shared_ptr<TabPage>> live_before = pages();
+    const std::vector<std::shared_ptr<TabPage>>::const_iterator found =
+        std::find_if(
         live_before.begin(), live_before.end(),
         [&page](const auto& candidate) { return candidate.get() == &page; });
     if (found == live_before.end()) return {};
@@ -95,19 +97,19 @@ std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
     const bool removing_selected = selected_page_.lock().get() == &page;
     pages_.erase(std::remove_if(
         pages_.begin(), pages_.end(), [&page](const std::weak_ptr<TabPage>& weak) {
-            const auto candidate = weak.lock();
+            const std::shared_ptr<gui_forms::TabPage> candidate = weak.lock();
             return !candidate || candidate.get() == &page;
         }), pages_.end());
     const Control::Ptr removed = remove_child(page.runtime_id());
     if (!removed) return {};
 
-    const auto live_after = pages();
+    const std::vector<std::shared_ptr<TabPage>> live_after = pages();
     if (removing_selected) {
         selected_page_.reset();
         if (!live_after.empty()) {
             const std::size_t next = std::min(removed_index, live_after.size() - 1U);
             selected_page_ = live_after[next];
-            live_after[next]->set_visible(true);
+            (*live_after[next]).set_visible(true);
         }
     }
     const std::optional<std::size_t> new_selected = selected_index();
@@ -122,11 +124,11 @@ std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
 
 void TabControl::remember_page_focus(const std::shared_ptr<TabPage>& page) {
     if (!page || window() == nullptr) return;
-    const Control::Ptr focused = window()->focused_control();
+    const Control::Ptr focused = (*window()).focused_control();
     if (!focused) return;
-    for (Control::Ptr current = focused; current; current = current->parent()) {
+    for (Control::Ptr current = focused; current; current = (*current).parent()) {
         if (current == page) {
-            remembered_focus_[page->runtime_id().value] = focused;
+            remembered_focus_[(*page).runtime_id().value] = focused;
             return;
         }
     }
@@ -135,42 +137,43 @@ void TabControl::remember_page_focus(const std::shared_ptr<TabPage>& page) {
 void TabControl::restore_page_focus(const std::shared_ptr<TabPage>& page,
                                     bool selection_owned_focus) {
     if (!selection_owned_focus || !page || window() == nullptr) return;
-    const auto found = remembered_focus_.find(page->runtime_id().value);
+    const RememberedFocusMap::iterator found =
+        remembered_focus_.find((*page).runtime_id().value);
     if (found != remembered_focus_.end()) {
-        if (const Control::Ptr candidate = found->second.lock();
-            candidate && candidate->eligible_for_input()) {
-            for (Control::Ptr current = candidate; current; current = current->parent()) {
+        if (const Control::Ptr candidate = (*found).second.lock();
+            candidate && (*candidate).eligible_for_input()) {
+            for (Control::Ptr current = candidate; current; current = (*current).parent()) {
                 if (current == page) {
-                    if (window()->request_focus(candidate)) return;
+                    if ((*window()).request_focus(candidate)) return;
                     break;
                 }
             }
         }
     }
-    static_cast<void>(window()->request_focus(shared_from_this()));
+    static_cast<void>((*window()).request_focus(shared_from_this()));
 }
 
 void TabControl::set_selected_index(std::size_t index) {
     require_mutable();
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     if (index >= live.size()) throw std::out_of_range("TabControl selected index");
     const std::optional<std::size_t> old_index = selected_index();
     if (old_index && *old_index == index) return;
-    const auto old_page = selected_page_.lock();
+    const std::shared_ptr<gui_forms::TabPage> old_page = selected_page_.lock();
     bool selection_owned_focus{};
     if (old_page && window() != nullptr) {
-        const Control::Ptr focused = window()->focused_control();
-        for (Control::Ptr current = focused; current; current = current->parent()) {
+        const Control::Ptr focused = (*window()).focused_control();
+        for (Control::Ptr current = focused; current; current = (*current).parent()) {
             if (current == old_page) {
                 selection_owned_focus = true;
                 break;
             }
         }
         remember_page_focus(old_page);
-        old_page->set_visible(false);
+        (*old_page).set_visible(false);
     }
     selected_page_ = live[index];
-    live[index]->set_visible(true);
+    (*live[index]).set_visible(true);
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     restore_page_focus(live[index], selection_owned_focus);
@@ -179,7 +182,7 @@ void TabControl::set_selected_index(std::size_t index) {
 }
 
 void TabControl::set_selected_tab(const std::shared_ptr<TabPage>& page) {
-    const auto index = index_of(page);
+    const std::optional<std::size_t> index = index_of(page);
     if (!index) throw std::invalid_argument("TabPage does not belong to TabControl");
     set_selected_index(*index);
 }
@@ -273,16 +276,16 @@ Size TabControl::measure(Size available) {
 void TabControl::reconcile_pages() {
     pages_.erase(std::remove_if(
         pages_.begin(), pages_.end(), [this](const std::weak_ptr<TabPage>& weak) {
-            const auto page = weak.lock();
-            return !page || !page->is_alive() || page->parent().get() != this;
+            const std::shared_ptr<gui_forms::TabPage> page = weak.lock();
+            return !page || !(*page).is_alive() || (*page).parent().get() != this;
         }), pages_.end());
-    auto selected = selected_page_.lock();
-    if (selected && selected->is_alive() && selected->parent().get() == this) return;
+    std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
+    if (selected && (*selected).is_alive() && (*selected).parent().get() == this) return;
     selected_page_.reset();
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     if (!live.empty()) {
         selected_page_ = live.front();
-        live.front()->set_visible(true);
+        (*live.front()).set_visible(true);
     }
 }
 
@@ -290,10 +293,10 @@ void TabControl::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     reconcile_pages();
     const Rect display = display_bounds();
-    const auto selected = selected_page_.lock();
-    for (const auto& page : pages()) {
+    const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
+    for (const std::shared_ptr<gui_forms::TabPage>& page : pages()) {
         set_child_layout(page, display);
-        page->set_visible(page == selected);
+        (*page).set_visible(page == selected);
     }
 }
 
@@ -307,7 +310,7 @@ void TabControl::on_paint(Painter& painter, Rect) {
                          std::max(0.0, display.width - 1.0),
                          std::max(0.0, display.height - 1.0)},
                         style_.border, 1.0);
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     const FontSpec font = effective_font(font_);
     const std::optional<std::size_t> selected = selected_index();
     for (std::size_t index = 0U; index < live.size(); ++index) {
@@ -343,12 +346,12 @@ void TabControl::on_paint(Painter& painter, Rect) {
                                    std::max(0.0, tab.height - 2.0)}, style_.paper);
             }
         }
-        const double text_width = static_cast<double>(live[index]->text().size()) *
+        const double text_width = static_cast<double>((*live[index]).text().size()) *
                                   font.size * 0.55;
         painter.draw_text_utf8(
             {tab.x + std::max(5.0, (tab.width - text_width) * 0.5),
              tab.y + (tab.height + font.size) * 0.5 - 2.0},
-            live[index]->text(), font, enabled() ? style_.text
+            (*live[index]).text(), font, enabled() ? style_.text
                                                   : style_.disabled_text);
         if (active && focused_) {
             painter.stroke_rect({tab.x + 4.5, tab.y + 4.5,
@@ -371,11 +374,11 @@ void TabControl::on_pointer(PointerEvent& event) {
         event.button != PointerButton::primary) return;
     const Rect absolute = absolute_bounds();
     const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     for (std::size_t index = 0U; index < live.size(); ++index) {
         if (!tab_bounds(index).contains(local)) continue;
         if (window() != nullptr) {
-            static_cast<void>(window()->request_focus(shared_from_this()));
+            static_cast<void>((*window()).request_focus(shared_from_this()));
         }
         pointer_engaged_ = true;
         set_selected_index(index);
@@ -385,18 +388,18 @@ void TabControl::on_pointer(PointerEvent& event) {
 }
 
 void TabControl::select_relative(int delta) {
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     if (live.empty()) return;
     const std::size_t current = selected_index().value_or(0U);
-    const auto count = static_cast<std::ptrdiff_t>(live.size());
-    const auto next = (static_cast<std::ptrdiff_t>(current) + delta + count) % count;
+    const std::ptrdiff_t count = static_cast<std::ptrdiff_t>(live.size());
+    const std::ptrdiff_t next = (static_cast<std::ptrdiff_t>(current) + delta + count) % count;
     set_selected_index(static_cast<std::size_t>(next));
 }
 
 void TabControl::on_key_preview(KeyEvent& event) {
     if (event.action != KeyAction::down || !enabled() || page_count() == 0U ||
         window() == nullptr) return;
-    const auto modifiers = static_cast<std::uint8_t>(event.modifiers);
+    const std::uint8_t modifiers = static_cast<std::uint8_t>(event.modifiers);
     const bool command =
         (modifiers & static_cast<std::uint8_t>(Modifier::control)) != 0U ||
         (modifiers & static_cast<std::uint8_t>(Modifier::meta)) != 0U;
@@ -407,7 +410,7 @@ void TabControl::on_key_preview(KeyEvent& event) {
         event.handled = true;
         return;
     }
-    if (window()->focused_control().get() != this) return;
+    if ((*window()).focused_control().get() != this) return;
     if (event.physical_key == PhysicalKey::home) {
         set_selected_index(0U);
     } else if (event.physical_key == PhysicalKey::end) {
@@ -445,7 +448,7 @@ SemanticDescriptor TabControl::semantic_descriptor() const {
     descriptor.role = SemanticRole::tab_group;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
-    if (const auto selected = selected_page_.lock()) descriptor.value = selected->text();
+    if (const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock()) descriptor.value = (*selected).text();
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
     return descriptor;
@@ -453,16 +456,16 @@ SemanticDescriptor TabControl::semantic_descriptor() const {
 
 std::vector<SemanticNode> TabControl::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     nodes.reserve(live.size());
     const Rect absolute = absolute_bounds();
-    const auto selected = selected_page_.lock();
+    const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
     for (std::size_t index = 0U; index < live.size(); ++index) {
         SemanticNode node;
-        node.stable_id = std::string(live[index]->stable_id().value()) + ".tab";
+        node.stable_id = std::string((*live[index]).stable_id().value()) + ".tab";
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
-        node.name = live[index]->text();
+        node.name = (*live[index]).text();
         const Rect local = tab_bounds(index);
         node.bounds = {absolute.x + local.x, absolute.y + local.y,
                        local.width, local.height};
@@ -481,12 +484,12 @@ bool TabControl::on_semantic_child_action(std::string_view child_stable_id,
                                           std::string_view) {
     if (action != SemanticAction::focus && action != SemanticAction::select &&
         action != SemanticAction::press) return false;
-    const auto live = pages();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
     for (std::size_t index = 0U; index < live.size(); ++index) {
         if (child_stable_id !=
-            std::string(live[index]->stable_id().value()) + ".tab") continue;
+            std::string((*live[index]).stable_id().value()) + ".tab") continue;
         if (window() != nullptr) {
-            static_cast<void>(window()->request_focus(shared_from_this()));
+            static_cast<void>((*window()).request_focus(shared_from_this()));
         }
         set_selected_index(index);
         return true;

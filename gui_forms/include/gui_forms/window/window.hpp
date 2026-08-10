@@ -24,6 +24,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -73,8 +74,18 @@ private:
 struct KeyGesture final {
     std::uint32_t physical_key{};
     Modifier modifiers{Modifier::none};
-    friend constexpr auto operator<=>(const KeyGesture&,
-                                      const KeyGesture&) = default;
+    friend constexpr bool operator==(const KeyGesture& left,
+                                     const KeyGesture& right) noexcept {
+        return left.physical_key == right.physical_key &&
+               left.modifiers == right.modifiers;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const KeyGesture& left, const KeyGesture& right) noexcept {
+        const std::strong_ordering key_order =
+            left.physical_key <=> right.physical_key;
+        return key_order != 0
+            ? key_order : left.modifiers <=> right.modifiers;
+    }
 };
 
 struct AcceleratorOptions final {
@@ -157,8 +168,14 @@ struct FocusScopeId final {
     [[nodiscard]] explicit constexpr operator bool() const noexcept {
         return value != 0;
     }
-    friend constexpr auto operator<=>(const FocusScopeId&,
-                                      const FocusScopeId&) = default;
+    friend constexpr bool operator==(const FocusScopeId& left,
+                                     const FocusScopeId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const FocusScopeId& left, const FocusScopeId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 
 inline constexpr std::size_t maximum_focus_scope_depth = 32U;
@@ -452,8 +469,51 @@ private:
     friend class detail::PopupAttachment;
     friend class detail::AcceleratorAttachment;
 
+    using ControlList = std::vector<Control::Ptr>;
+    using StableIdMap = std::unordered_map<std::string, Control::WeakPtr>;
+    using PopupList =
+        std::vector<std::shared_ptr<detail::PopupAttachment>>;
+    using AcceleratorList =
+        std::vector<std::shared_ptr<detail::AcceleratorAttachment>>;
+
+    struct FocusChangePublication final {
+        Window* window{};
+        Control::Ptr control;
+        bool focused{};
+        void operator()() const;
+    };
+    struct FocusScopePublication final {
+        Window* window{};
+        Control::Ptr owner;
+        std::shared_ptr<unsigned char> identity;
+        FocusScopeChange change;
+        void operator()() const;
+    };
+    struct PointerCapturePublication final {
+        Window* window{};
+        Control::Ptr owner;
+        PointerCaptureChange change;
+        void operator()() const;
+    };
+    struct ControlAvailabilityPublication final {
+        Window* window{};
+        Control::Ptr control;
+        ControlAvailabilityChange change;
+        void operator()() const;
+    };
+    struct DeferredInputVisitor final {
+        Window* window{};
+        template <typename InputEvent>
+        void operator()(InputEvent&& event) const;
+    };
+
     void attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent);
+    void attach_subtree_state(const Control::Ptr& control,
+                              const Control::WeakPtr& parent,
+                              ControlList& attached);
     void detach_subtree(const Control::Ptr& control);
+    void detach_subtree_state(const Control::Ptr& control,
+                              ControlList& detached);
     void dispose_subtree(const Control::Ptr& control) noexcept;
     void revoke_interaction_for_subtree(const Control::Ptr& control,
                                         bool notify_focus);
@@ -471,6 +531,19 @@ private:
         const Control::Ptr& control) const noexcept;
     [[nodiscard]] std::vector<Control::Ptr> focus_candidates(
         const Control::Ptr& scope_root) const;
+    static bool tab_order_less(const Control::Ptr& left,
+                               const Control::Ptr& right) noexcept;
+    void collect_focus_candidates(const Control::Ptr& control,
+                                  ControlList& result,
+                                  bool focusable_only) const;
+    void collect_mnemonic_candidates(const Control::Ptr& control,
+                                     const Control::Ptr& root,
+                                     char32_t character,
+                                     ControlList& result) const;
+    void validate_children_recursive(const Control::Ptr& parent,
+                                     const Control::Ptr& container,
+                                     ValidationConstraints constraints,
+                                     bool& accepted);
     [[nodiscard]] bool validate_focus_transition(
         const Control::Ptr& previous, const Control::Ptr& destination,
         AutoValidate mode);
@@ -481,10 +554,15 @@ private:
     void on_hit_test_transparency_changed(const Control::Ptr& control);
     void publish_control_availability(Control& control);
     void register_subtree(const Control::Ptr& control);
+    void collect_subtree_registration(
+        const Control::Ptr& control, ControlList& controls,
+        std::unordered_set<std::string>& local_ids);
     void unregister_subtree(const Control::Ptr& control);
     void mark_dirty(Control& control, Dirty dirty);
     void mark_paint_dirty(Control& control, Rect local_damage);
     void mark_subtree_dirty(Control& control, Dirty dirty);
+    void apply_subtree_dirty(Control& control, Dirty dirty,
+                             double& requested_damage_area);
     void mark_child_layout_slot(Control& control);
     void change_paint_plane(Control& control, PaintPlane plane);
     void add_damage(Rect damage, PaintPlane plane);
@@ -536,6 +614,8 @@ private:
                                  std::uint64_t& callbacks);
     [[nodiscard]] bool has_runnable_layout_dirty(
         const Control::Ptr& control) const noexcept;
+    [[nodiscard]] bool has_any_runnable_layout_dirty() const noexcept;
+    [[nodiscard]] bool has_popup_layout_dirty() const noexcept;
     void note_suspended_layout_request(Control& control) noexcept;
     void commit_layout_requests_recursive(const Control::Ptr& control) noexcept;
     [[nodiscard]] Dirty recompute_subtree_dirty(const Control::Ptr& control) noexcept;
@@ -557,6 +637,11 @@ private:
         const Control::Ptr& destination);
     [[nodiscard]] bool dispatch_mnemonic(char32_t character);
     [[nodiscard]] bool dispatch_dialog_button(bool accept);
+    [[nodiscard]] bool dispatch_dialog_key(const KeyEvent& event);
+    void merge_drag_route(DragDispatchResult& aggregate,
+                          const Control::Ptr& target, DragEvent event);
+    void leave_drag_target(const DragEvent& event,
+                           DragDispatchResult& aggregate);
     void clear_dialog_targets_for_subtree(const Control::Ptr& control) noexcept;
     void require_ui_thread(std::string_view operation);
 
@@ -569,7 +654,7 @@ private:
     Event<const Theme&> theme_changed_;
     Event<bool> active_changed_;
     bool active_{true};
-    std::unordered_map<std::string, Control::WeakPtr> stable_ids_;
+    StableIdMap stable_ids_;
     Control::WeakPtr focused_;
     Control::WeakPtr accept_button_;
     Control::WeakPtr cancel_button_;
@@ -603,15 +688,16 @@ private:
         FocusScopeOptions options{};
         bool active{true};
     };
-    std::vector<FocusScopeState> focus_scopes_;
+    using FocusScopeList = std::vector<FocusScopeState>;
+    FocusScopeList focus_scopes_;
     Event<const FocusScopeChange&> focus_scope_changed_;
     std::uint64_t next_focus_scope_id_{1U};
     Control::WeakPtr captured_;
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
     Event<const ControlAvailabilityChange&> control_availability_changed_;
-    std::vector<std::shared_ptr<detail::PopupAttachment>> popups_;
-    std::vector<std::shared_ptr<detail::AcceleratorAttachment>> accelerators_;
+    PopupList popups_;
+    AcceleratorList accelerators_;
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;
@@ -625,12 +711,34 @@ private:
         std::uint64_t sampled_generation{};
         bool sampled_with_overlay_clip{};
     };
-    std::unordered_map<std::uint64_t, LiveSurfaceRegistration>
-        live_surface_registrations_;
+    using LiveSurfaceRegistrationMap =
+        std::unordered_map<std::uint64_t, LiveSurfaceRegistration>;
+    struct PaintControlCheckpoint final {
+        Control::Ptr control;
+        std::shared_ptr<const detail::DisplayChunk> chunk;
+    };
+    using PaintControlCheckpointList =
+        std::vector<PaintControlCheckpoint>;
+    void collect_paint_checkpoints(
+        const Control::Ptr& control, PaintControlCheckpointList& checkpoints);
+    void abandon_paint(const PaintControlCheckpointList& checkpoints,
+                       std::uint64_t generation_before, Rect paint_bounds);
+    [[nodiscard]] Rect paint_plane_bounds(
+        std::size_t index, Rect requested_damage, Rect paint_bounds,
+        Rect window_bounds) const;
+    [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
+    [[nodiscard]] bool has_plane_damage() const noexcept;
+    void collect_visible_overlay_rectangles(
+        const Control::Ptr& control, std::vector<Rect>& rectangles) const;
+    [[nodiscard]] static std::vector<Rect> subtract_rectangle(
+        Rect source, Rect cover);
+    LiveSurfaceRegistrationMap live_surface_registrations_;
     Metrics metrics_;
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};
-    std::vector<std::shared_ptr<detail::ScheduledFrameRequest>> frame_requests_;
+    using FrameRequestList =
+        std::vector<std::shared_ptr<detail::ScheduledFrameRequest>>;
+    FrameRequestList frame_requests_;
     bool in_frame_poll_{};
     std::shared_ptr<detail::WindowLifetime> lifetime_;
     std::thread::id ui_thread_;

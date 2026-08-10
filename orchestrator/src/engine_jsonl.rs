@@ -12,9 +12,17 @@ use std::fmt::{Display, Formatter};
 use std::io::BufReader;
 use std::io::{BufRead, Read, Write};
 use std::path::Path;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, SyncSender};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 pub const MAX_ENGINE_JSONL_FRAME_BYTES: usize = 1_048_576;
+const ENGINE_CHILD_QUEUE_DEPTH: usize = 1;
+const ENGINE_CHILD_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(2);
+const ENGINE_CHILD_CALL_TIMEOUT: Duration = Duration::from_secs(6);
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct EngineJsonlFault {
@@ -33,6 +41,9 @@ pub enum EngineJsonlError {
     ResponseIdMismatch { expected: String, actual: String },
     MalformedResponse,
     Remote(EngineJsonlFault),
+    Timeout { operation: String },
+    WorkerUnavailable,
+    WorkerPanicked,
 }
 
 impl Display for EngineJsonlError {
@@ -60,6 +71,11 @@ impl Display for EngineJsonlError {
                 )
             }
             Self::Remote(fault) => write!(formatter, "engine {}: {}", fault.code, fault.message),
+            Self::Timeout { operation } => {
+                write!(formatter, "engine worker timed out during {operation}")
+            }
+            Self::WorkerUnavailable => write!(formatter, "engine worker is unavailable"),
+            Self::WorkerPanicked => write!(formatter, "engine worker panicked"),
         }
     }
 }
@@ -171,6 +187,21 @@ impl<R: BufRead, W: Write> EngineJsonlPeer<R, W> {
     }
 }
 
+pub trait EngineJsonlCaller {
+    /// Executes one correlated Engine operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed transport, protocol, worker, timeout, or remote error.
+    fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError>;
+}
+
+impl<R: BufRead, W: Write> EngineJsonlCaller for EngineJsonlPeer<R, W> {
+    fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError> {
+        Self::call(self, method, params)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct EngineCatalogueWirePlan {
     #[serde(default)]
@@ -216,15 +247,129 @@ struct EngineLiveWireResponse {
 /// peer authentication are separate gates and must not infer availability from
 /// construction of this adapter.
 #[derive(Debug)]
-pub struct EngineJsonlSearchAdapter<R, W> {
-    peer: EngineJsonlPeer<R, W>,
+pub struct EngineJsonlSearchAdapter<C> {
+    peer: C,
 }
 
 #[derive(Debug)]
 pub struct EngineJsonlChild {
-    adapter: EngineJsonlSearchAdapter<BufReader<ChildStdout>, ChildStdin>,
-    child: Child,
+    adapter: EngineJsonlSearchAdapter<EngineWorkerPeer>,
+    child: Arc<Mutex<Child>>,
+    worker: Option<JoinHandle<()>>,
+    healthy: Arc<AtomicBool>,
     live_available: bool,
+}
+
+#[derive(Debug)]
+struct EngineWorkerPeer {
+    sender: SyncSender<EngineWorkerCommand>,
+    child: Arc<Mutex<Child>>,
+    healthy: Arc<AtomicBool>,
+    timeout: Duration,
+}
+
+#[derive(Debug)]
+enum EngineWorkerCommand {
+    Call {
+        method: String,
+        params: Value,
+        reply: SyncSender<Result<Value, EngineJsonlError>>,
+    },
+    Stop,
+}
+
+impl EngineJsonlCaller for EngineWorkerPeer {
+    fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError> {
+        if !self.healthy.load(Ordering::Acquire) {
+            return Err(EngineJsonlError::WorkerUnavailable);
+        }
+        let (reply, result) = mpsc::sync_channel(1);
+        self.sender
+            .send(EngineWorkerCommand::Call {
+                method: method.to_owned(),
+                params: params.clone(),
+                reply,
+            })
+            .map_err(|_| EngineJsonlError::WorkerUnavailable)?;
+        match result.recv_timeout(self.timeout) {
+            Ok(response) => response,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.healthy.store(false, Ordering::Release);
+                kill_engine_child(&self.child);
+                Err(EngineJsonlError::Timeout {
+                    operation: method.to_owned(),
+                })
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                self.healthy.store(false, Ordering::Release);
+                Err(EngineJsonlError::WorkerUnavailable)
+            }
+        }
+    }
+}
+
+impl EngineWorkerPeer {
+    fn stop(&self) {
+        let _ = self.sender.send(EngineWorkerCommand::Stop);
+    }
+}
+
+fn run_engine_worker<C: EngineJsonlCaller>(
+    mut peer: C,
+    receiver: &Receiver<EngineWorkerCommand>,
+    healthy: &AtomicBool,
+) {
+    while let Ok(command) = receiver.recv() {
+        let EngineWorkerCommand::Call {
+            method,
+            params,
+            reply,
+        } = command
+        else {
+            break;
+        };
+        let response =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| peer.call(&method, &params)))
+                .unwrap_or(Err(EngineJsonlError::WorkerPanicked));
+        let terminal = response
+            .as_ref()
+            .is_err_and(engine_worker_error_is_terminal);
+        let _ = reply.send(response);
+        if terminal {
+            break;
+        }
+    }
+    healthy.store(false, Ordering::Release);
+}
+
+fn engine_worker_error_is_terminal(error: &EngineJsonlError) -> bool {
+    !matches!(
+        error,
+        EngineJsonlError::InvalidRequest
+            | EngineJsonlError::Encode(_)
+            | EngineJsonlError::Remote(_)
+    )
+}
+
+fn kill_engine_child(child: &Mutex<Child>) {
+    if let Ok(mut child) = child.lock() {
+        let _ = child.kill();
+    }
+}
+
+fn wait_engine_child(child: &Mutex<Child>) {
+    let Ok(mut child) = child.lock() else {
+        return;
+    };
+    for _ in 0..100 {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => thread::sleep(Duration::from_millis(10)),
+            Err(_) => break,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 impl EngineJsonlChild {
@@ -258,19 +403,42 @@ impl EngineJsonlChild {
         let stdout = child.stdout.take().ok_or_else(|| {
             EngineJsonlError::Io(std::io::Error::other("Engine child stdout was not piped"))
         })?;
-        let mut result = Self {
-            adapter: EngineJsonlSearchAdapter::new(EngineJsonlPeer::new(
-                BufReader::new(stdout),
-                stdin,
-            )),
-            child,
-            live_available: false,
+        let child = Arc::new(Mutex::new(child));
+        let healthy = Arc::new(AtomicBool::new(true));
+        let (sender, receiver) = mpsc::sync_channel(ENGINE_CHILD_QUEUE_DEPTH);
+        let worker_health = Arc::clone(&healthy);
+        let worker = match thread::Builder::new()
+            .name("orc-engine-jsonl".to_owned())
+            .spawn(move || {
+                run_engine_worker(
+                    EngineJsonlPeer::new(BufReader::new(stdout), stdin),
+                    &receiver,
+                    &worker_health,
+                );
+            }) {
+            Ok(worker) => worker,
+            Err(error) => {
+                kill_engine_child(&child);
+                return Err(EngineJsonlError::Io(error));
+            }
         };
-        let version = result
-            .adapter
-            .peer_mut()
-            .call("engine.version", &json!({}))?;
-        result.live_available = version["capabilities"]
+        let mut peer = EngineWorkerPeer {
+            sender,
+            child: Arc::clone(&child),
+            healthy: Arc::clone(&healthy),
+            timeout: ENGINE_CHILD_HANDSHAKE_TIMEOUT,
+        };
+        let version = match peer.call("engine.version", &json!({})) {
+            Ok(version) => version,
+            Err(error) => {
+                peer.stop();
+                let _ = worker.join();
+                wait_engine_child(&child);
+                return Err(error);
+            }
+        };
+        peer.timeout = ENGINE_CHILD_CALL_TIMEOUT;
+        let live_available = version["capabilities"]
             .as_array()
             .is_some_and(|capabilities| {
                 let available = |id: &str| {
@@ -280,7 +448,13 @@ impl EngineJsonlChild {
                 };
                 available("engine.live.query") && available("contract.ORC-ENG-004")
             });
-        Ok(result)
+        Ok(Self {
+            adapter: EngineJsonlSearchAdapter::new(peer),
+            child,
+            worker: Some(worker),
+            healthy,
+            live_available,
+        })
     }
 }
 
@@ -294,32 +468,40 @@ impl EngineSearchProvider for EngineJsonlChild {
     }
 
     fn live_available(&self) -> bool {
-        self.live_available
+        self.live_available && self.healthy.load(Ordering::Acquire)
     }
 }
 
 impl Drop for EngineJsonlChild {
     fn drop(&mut self) {
-        let _ = self.adapter.peer_mut().call("engine.shutdown", &json!({}));
-        let _ = self.child.wait();
+        if self.healthy.load(Ordering::Acquire) {
+            let _ = self.adapter.peer_mut().call("engine.shutdown", &json!({}));
+        }
+        self.adapter.peer_mut().stop();
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+        wait_engine_child(&self.child);
     }
 }
 
-impl<R: BufRead, W: Write> EngineJsonlSearchAdapter<R, W> {
+impl<C> EngineJsonlSearchAdapter<C> {
     #[must_use]
-    pub const fn new(peer: EngineJsonlPeer<R, W>) -> Self {
+    pub const fn new(peer: C) -> Self {
         Self { peer }
     }
 
     #[must_use]
-    pub fn into_peer(self) -> EngineJsonlPeer<R, W> {
+    pub fn into_peer(self) -> C {
         self.peer
     }
 
-    pub fn peer_mut(&mut self) -> &mut EngineJsonlPeer<R, W> {
+    pub const fn peer_mut(&mut self) -> &mut C {
         &mut self.peer
     }
+}
 
+impl<C: EngineJsonlCaller> EngineJsonlSearchAdapter<C> {
     fn catalogue_params(request: &EngineSearchRequest) -> Value {
         let cursor = request.cursor.as_ref().and_then(|cursor| {
             (cursor.source == EngineSearchCursorSource::Catalogue).then_some(&cursor.value)
@@ -356,7 +538,7 @@ impl<R: BufRead, W: Write> EngineJsonlSearchAdapter<R, W> {
     }
 }
 
-impl<R: BufRead, W: Write> EngineSearchProvider for EngineJsonlSearchAdapter<R, W> {
+impl<C: EngineJsonlCaller> EngineSearchProvider for EngineJsonlSearchAdapter<C> {
     fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture {
         if !request.is_well_formed() {
             return catalogue_failure(
@@ -529,6 +711,11 @@ fn project_engine_error(
             };
             (terminal, fault.code, fault.message)
         }
+        EngineJsonlError::Timeout { operation } => (
+            TerminalStatus::Timeout,
+            "ENGINE_WORKER_TIMEOUT".to_owned(),
+            format!("Engine development transport timed out during {operation}"),
+        ),
         other => (
             TerminalStatus::Unavailable,
             "ENGINE_TRANSPORT_UNAVAILABLE".to_owned(),
@@ -551,19 +738,54 @@ const fn error_kind(error: &EngineJsonlError) -> &'static str {
         EngineJsonlError::ResponseIdMismatch { .. } => "response_id_mismatch",
         EngineJsonlError::MalformedResponse => "malformed_response",
         EngineJsonlError::Remote(_) => "remote",
+        EngineJsonlError::Timeout { .. } => "timeout",
+        EngineJsonlError::WorkerUnavailable => "worker_unavailable",
+        EngineJsonlError::WorkerPanicked => "worker_panicked",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        EngineJsonlError, EngineJsonlPeer, EngineJsonlSearchAdapter, MAX_ENGINE_JSONL_FRAME_BYTES,
+        EngineJsonlCaller, EngineJsonlError, EngineJsonlPeer, EngineJsonlSearchAdapter,
+        EngineWorkerCommand, EngineWorkerPeer, MAX_ENGINE_JSONL_FRAME_BYTES, run_engine_worker,
+        wait_engine_child,
     };
     use crate::common::TerminalStatus;
     use crate::engine_contract::{EngineSearchBudget, EngineSearchRequest};
     use crate::engine_port::EngineSearchProvider;
     use serde_json::json;
     use std::io::{BufReader, Cursor};
+    use std::process::{Command, Stdio};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex, mpsc};
+    use std::thread;
+    use std::time::Duration;
+
+    struct PanickingCaller;
+
+    impl EngineJsonlCaller for PanickingCaller {
+        fn call(
+            &mut self,
+            _method: &str,
+            _params: &serde_json::Value,
+        ) -> Result<serde_json::Value, EngineJsonlError> {
+            panic!("contained engine worker panic");
+        }
+    }
+
+    struct SlowCaller;
+
+    impl EngineJsonlCaller for SlowCaller {
+        fn call(
+            &mut self,
+            _method: &str,
+            _params: &serde_json::Value,
+        ) -> Result<serde_json::Value, EngineJsonlError> {
+            thread::sleep(Duration::from_millis(100));
+            Ok(json!({}))
+        }
+    }
 
     #[test]
     fn bounded_peer_correlates_one_successful_response() {
@@ -650,6 +872,70 @@ mod tests {
         let projected = adapter.query_catalogue(&search_request());
         assert_eq!(projected.terminal, TerminalStatus::Unavailable);
         assert!(projected.is_well_formed());
+    }
+
+    #[test]
+    fn engine_worker_panic_is_contained_and_marks_worker_unavailable() {
+        let healthy = Arc::new(AtomicBool::new(true));
+        let worker_health = Arc::clone(&healthy);
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let worker = thread::spawn(move || {
+            run_engine_worker(PanickingCaller, &receiver, &worker_health);
+        });
+        let (reply, result) = mpsc::sync_channel(1);
+        sender
+            .send(EngineWorkerCommand::Call {
+                method: "engine.version".to_owned(),
+                params: json!({}),
+                reply,
+            })
+            .expect("submit panic fixture");
+        assert!(matches!(
+            result.recv_timeout(Duration::from_secs(1)),
+            Ok(Err(EngineJsonlError::WorkerPanicked))
+        ));
+        worker.join().expect("contained worker exits");
+        assert!(!healthy.load(Ordering::Acquire));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn engine_worker_timeout_kills_the_owned_child_and_fails_closed() {
+        let child = Command::new("/bin/sh")
+            .args(["-c", "sleep 60"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .spawn()
+            .expect("timeout fixture child");
+        let child = Arc::new(Mutex::new(child));
+        let healthy = Arc::new(AtomicBool::new(true));
+        let worker_health = Arc::clone(&healthy);
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let worker = thread::spawn(move || {
+            run_engine_worker(SlowCaller, &receiver, &worker_health);
+        });
+        let mut peer = EngineWorkerPeer {
+            sender,
+            child: Arc::clone(&child),
+            healthy: Arc::clone(&healthy),
+            timeout: Duration::from_millis(20),
+        };
+        assert!(matches!(
+            peer.call("engine.query_live", &json!({})),
+            Err(EngineJsonlError::Timeout { .. })
+        ));
+        peer.stop();
+        worker.join().expect("slow worker exits");
+        wait_engine_child(&child);
+        assert!(!healthy.load(Ordering::Acquire));
+        assert!(
+            child
+                .lock()
+                .expect("child lock")
+                .try_wait()
+                .expect("child status")
+                .is_some()
+        );
     }
 
     fn search_request() -> EngineSearchRequest {

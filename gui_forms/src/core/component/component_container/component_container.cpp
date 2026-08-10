@@ -25,22 +25,23 @@ void ComponentContainer::add(Component::Ptr component) {
 }
 
 Component::Ptr ComponentContainer::remove(const Component& component) {
-    const auto found = std::find_if(
-        components_.begin(), components_.end(),
-        [&](const auto& item) { return item.get() == &component; });
+    ComponentList::iterator found = components_.begin();
+    while (found != components_.end() && (*found).get() != &component) {
+        ++found;
+    }
     if (found == components_.end()) {
         return {};
     }
-    auto removed = std::move(*found);
+    std::shared_ptr<Component> removed = std::move(*found);
     components_.erase(found);
     return removed;
 }
 
 bool ComponentContainer::contains(const Component& component) const noexcept {
-    return std::any_of(components_.begin(), components_.end(),
-                       [&](const auto& item) {
-                           return item.get() == &component;
-                       });
+    for (const Component::Ptr& item : components_) {
+        if (item.get() == &component) return true;
+    }
+    return false;
 }
 
 void ComponentContainer::dispose() {
@@ -48,9 +49,9 @@ void ComponentContainer::dispose() {
         return;
     }
     disposed_ = true;
-    auto owned = std::exchange(components_, {});
-    for (const auto& component : owned) {
-        component->dispose();
+    std::vector<std::shared_ptr<gui_forms::Component>> owned = std::exchange(components_, {});
+    for (const std::shared_ptr<gui_forms::Component>& component : owned) {
+        (*component).dispose();
     }
 }
 

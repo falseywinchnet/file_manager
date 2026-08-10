@@ -13,7 +13,7 @@ public:
           callback_(std::move(callback)), options_(options) {}
 
     void disconnect() noexcept override {
-        if (connected_ && window_) window_->close_accelerator(*this);
+        if (connected_ && window_) (*window_).close_accelerator(*this);
     }
     [[nodiscard]] bool connected() const noexcept override { return connected_; }
     [[nodiscard]] Component* owner() const noexcept { return owner_; }

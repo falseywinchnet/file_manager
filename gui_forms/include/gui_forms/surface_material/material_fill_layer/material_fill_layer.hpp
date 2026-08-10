@@ -57,8 +57,30 @@ struct MaterialFillLayer final {
         ImageId image, Size pixel_size, Insets source_slice,
         double source_pixels_per_logical_pixel = 1.0,
         double opacity = 1.0);
-    friend bool operator==(const MaterialFillLayer&,
-                           const MaterialFillLayer&) = default;
+    friend bool operator==(const MaterialFillLayer& left,
+                           const MaterialFillLayer& right) noexcept(noexcept(
+        left.kind == right.kind &&
+        left.coordinate_space == right.coordinate_space &&
+        left.color == right.color && left.start == right.start &&
+        left.end == right.end && left.center == right.center &&
+        left.radii == right.radii && left.stops == right.stops &&
+        left.spread == right.spread && left.image == right.image &&
+        left.image_pixel_size == right.image_pixel_size &&
+        left.image_slice == right.image_slice &&
+        left.image_scale == right.image_scale &&
+        left.opacity == right.opacity && left.image_mode == right.image_mode)) {
+        return left.kind == right.kind &&
+               left.coordinate_space == right.coordinate_space &&
+               left.color == right.color && left.start == right.start &&
+               left.end == right.end && left.center == right.center &&
+               left.radii == right.radii && left.stops == right.stops &&
+               left.spread == right.spread && left.image == right.image &&
+               left.image_pixel_size == right.image_pixel_size &&
+               left.image_slice == right.image_slice &&
+               left.image_scale == right.image_scale &&
+               left.opacity == right.opacity &&
+               left.image_mode == right.image_mode;
+    }
 };
 
 } // namespace gui_forms

@@ -99,7 +99,7 @@ func (m *Manager) Reset() {
 
 func (m *Manager) Close() { m.Reset() }
 
-func (m *Manager) Query(ctx context.Context, root api.RootSpec, query api.LiveQuery, owns OwnsFunc) (api.LiveQueryResponse, error) {
+func (m *Manager) Query(ctx context.Context, root api.RootSpec, expectedObjectID string, query api.LiveQuery, owns OwnsFunc) (api.LiveQueryResponse, error) {
 	m.mu.Lock()
 	now := m.now()
 	m.expire(now)
@@ -119,7 +119,7 @@ func (m *Manager) Query(ctx context.Context, root api.RootSpec, query api.LiveQu
 			m.mu.Unlock()
 			return api.LiveQueryResponse{}, api.NewFault(api.ErrorResourceBudget, "live-query session ceiling reached")
 		}
-		current, err = newSession(root, query, now)
+		current, err = newSession(root, expectedObjectID, query, now)
 		if err != nil {
 			m.mu.Unlock()
 			return api.LiveQueryResponse{}, err
@@ -204,7 +204,7 @@ func clampBudget(request api.LiveQueryBudget) (api.LiveQueryBudget, error) {
 	return request, nil
 }
 
-func newSession(root api.RootSpec, query api.LiveQuery, now time.Time) (*session, error) {
+func newSession(root api.RootSpec, expectedObjectID string, query api.LiveQuery, now time.Time) (*session, error) {
 	rootHandle, err := os.OpenRoot(root.Path)
 	if err != nil {
 		return nil, api.WrapFault(api.ErrorUnapprovedRoot, "approved live-query root is unavailable", err)
@@ -217,6 +217,20 @@ func newSession(root api.RootSpec, query api.LiveQuery, now time.Time) (*session
 	if err != nil {
 		rootHandle.Close()
 		return nil, api.WrapFault(api.ErrorNotFound, "live-query scope is unavailable", err)
+	}
+	rootInfo, err := rootHandle.Lstat(".")
+	if err != nil {
+		rootHandle.Close()
+		return nil, api.WrapFault(api.ErrorUnapprovedRoot, "approved live-query root identity is unavailable", err)
+	}
+	rootIdentity, err := identity.Observe(rootHandle, ".", rootInfo)
+	if err != nil {
+		rootHandle.Close()
+		return nil, api.WrapFault(api.ErrorUnapprovedRoot, "approved live-query root identity is unavailable", err)
+	}
+	if expectedObjectID != "" && rootIdentity.ObjectID() != expectedObjectID {
+		rootHandle.Close()
+		return nil, api.NewFault(api.ErrorUnapprovedRoot, "approved live-query root identity changed")
 	}
 	if !info.IsDir() {
 		rootHandle.Close()

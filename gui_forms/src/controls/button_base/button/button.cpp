@@ -61,7 +61,7 @@ void Button::on_activate() {
     // DialogResult before the Form/Window observes it.
     if (dialog_result_ != DialogResult::none && is_alive() &&
         attached_window() == owner && owner != nullptr) {
-        owner->set_dialog_result(dialog_result_);
+        (*owner).set_dialog_result(dialog_result_);
     }
 }
 

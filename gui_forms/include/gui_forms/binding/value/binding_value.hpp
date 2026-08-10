@@ -25,8 +25,13 @@ struct PropertyEnumValue final {
     std::string type_name;
     std::string name;
     std::int64_t value{};
-    friend bool operator==(const PropertyEnumValue&,
-                           const PropertyEnumValue&) = default;
+    friend bool operator==(const PropertyEnumValue& left,
+                           const PropertyEnumValue& right) noexcept(noexcept(
+        left.type_name == right.type_name && left.name == right.name &&
+        left.value == right.value)) {
+        return left.type_name == right.type_name && left.name == right.name &&
+               left.value == right.value;
+    }
 };
 
 struct PropertyObjectMember;
@@ -54,8 +59,29 @@ struct PropertyObjectMember final {
     bool standard_values_exclusive{};
     std::string converter_name;
     std::string editor_name;
-    friend bool operator==(const PropertyObjectMember&,
-                           const PropertyObjectMember&) = default;
+    friend bool operator==(const PropertyObjectMember& left,
+                           const PropertyObjectMember& right) noexcept(noexcept(
+        left.name == right.name && left.description == right.description &&
+        left.value == right.value && left.writable == right.writable &&
+        left.declared_kind == right.declared_kind &&
+        left.nullable == right.nullable &&
+        left.enumeration == right.enumeration &&
+        left.standard_values == right.standard_values &&
+        left.standard_values_exclusive == right.standard_values_exclusive &&
+        left.converter_name == right.converter_name &&
+        left.editor_name == right.editor_name)) {
+        return left.name == right.name &&
+               left.description == right.description &&
+               left.value == right.value && left.writable == right.writable &&
+               left.declared_kind == right.declared_kind &&
+               left.nullable == right.nullable &&
+               left.enumeration == right.enumeration &&
+               left.standard_values == right.standard_values &&
+               left.standard_values_exclusive ==
+                   right.standard_values_exclusive &&
+               left.converter_name == right.converter_name &&
+               left.editor_name == right.editor_name;
+    }
 };
 
 struct PropertyObjectData final {
@@ -120,16 +146,24 @@ enum class PropertyValueOrigin : std::uint8_t {
 struct PropertyEnumChoice final {
     std::string name;
     std::int64_t value{};
-    friend bool operator==(const PropertyEnumChoice&,
-                           const PropertyEnumChoice&) = default;
+    friend bool operator==(const PropertyEnumChoice& left,
+                           const PropertyEnumChoice& right) noexcept(noexcept(
+        left.name == right.name && left.value == right.value)) {
+        return left.name == right.name && left.value == right.value;
+    }
 };
 
 struct PropertyEnumDescriptor final {
     std::string type_name;
     std::vector<PropertyEnumChoice> choices;
     bool flags{};
-    friend bool operator==(const PropertyEnumDescriptor&,
-                           const PropertyEnumDescriptor&) = default;
+    friend bool operator==(const PropertyEnumDescriptor& left,
+                           const PropertyEnumDescriptor& right) noexcept(noexcept(
+        left.type_name == right.type_name && left.choices == right.choices &&
+        left.flags == right.flags)) {
+        return left.type_name == right.type_name &&
+               left.choices == right.choices && left.flags == right.flags;
+    }
 };
 
 inline constexpr std::size_t maximum_property_enum_choices = 256U;

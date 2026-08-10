@@ -8,13 +8,20 @@
 
 namespace gui_forms {
 
+struct PresentationSettings;
+
 struct EasingPreviewTrack final {
     EasingCurve curve{EasingCurve::linear};
     std::string label;
     Color color{};
 
-    friend bool operator==(const EasingPreviewTrack&,
-                           const EasingPreviewTrack&) = default;
+    friend bool operator==(const EasingPreviewTrack& left,
+                           const EasingPreviewTrack& right) noexcept(noexcept(
+        left.curve == right.curve && left.label == right.label &&
+        left.color == right.color)) {
+        return left.curve == right.curve && left.label == right.label &&
+               left.color == right.color;
+    }
 };
 
 // A retained animation/easing conformance surface.
@@ -56,6 +63,7 @@ protected:
 
 private:
     void register_frames();
+    void on_presentation_changed(const PresentationSettings& settings);
     [[nodiscard]] std::string motion_readout(double presented_phase) const;
 
     FrameRequestToken frames_;

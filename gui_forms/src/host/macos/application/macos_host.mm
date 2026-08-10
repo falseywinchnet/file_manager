@@ -307,7 +307,7 @@ static std::vector<DragDataItem> drag_items_for(NSPasteboard* pasteboard) {
             [type lengthOfBytesUsingEncoding:NSUTF8StringEncoding] <=
                 DragLimits::maximum_media_type_bytes &&
             data.length <= DragLimits::maximum_total_bytes - total_bytes) {
-            const auto* begin = static_cast<const std::uint8_t*>(data.bytes);
+            const std::uint8_t* begin = static_cast<const std::uint8_t*>(data.bytes);
             result.emplace_back(DragBinaryData{
                 media, std::vector<std::uint8_t>(begin, begin + data.length)});
         }
@@ -350,7 +350,7 @@ static bool register_bundle_typeface(SkiaRaster& raster,
     if (data == nil || data.length == 0) {
         return false;
     }
-    const auto* bytes = static_cast<const std::byte*>(data.bytes);
+    const std::byte* bytes = static_cast<const std::byte*>(data.bytes);
     return raster.register_typeface(role, weight, italic,
                                     std::span<const std::byte>(bytes, data.length));
 }
@@ -368,7 +368,7 @@ static bool register_bundle_fallback_typeface(SkiaRaster& raster,
                                         options:NSDataReadingMappedIfSafe
                                           error:nil];
     if (data == nil || data.length == 0) return false;
-    const auto* bytes = static_cast<const std::byte*>(data.bytes);
+    const std::byte* bytes = static_cast<const std::byte*>(data.bytes);
     return raster.register_fallback_typeface(
         weight, italic, std::span<const std::byte>(bytes, data.length));
 }
@@ -774,13 +774,13 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         dispatch_resume(_wakeSource);
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
-        _model->set_dispatch_wake_handler([weakSelf] {
+        (*_model).set_dispatch_wake_handler([weakSelf] {
             dispatch_async(dispatch_get_main_queue(), ^{
                 GUIFormsView* strongSelf = weakSelf;
                 if (strongSelf != nil) [strongSelf drainPostedWork];
             });
         });
-        _model->set_paint_wake_handler([weakSelf] {
+        (*_model).set_paint_wake_handler([weakSelf] {
             dispatch_async(dispatch_get_main_queue(), ^{
                 GUIFormsView* strongSelf = weakSelf;
                 if (strongSelf != nil) [strongSelf collectDamage];
@@ -814,7 +814,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                 _raster, @"NotoSansCJKjp-Regular", @"otf") &&
             register_bundle_fallback_typeface(
                 _raster, @"NotoEmoji-Regular", @"ttf");
-        _model->metrics().set_renderer(
+        (*_model).metrics().set_renderer(
             fonts_ready
                 ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts + CJK/emoji fallback"
                 : "Skia CPU m152 · incomplete bundled font pack",
@@ -847,7 +847,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler {
     _closeRequestSubscription.disconnect();
     if (_hostSession != nullptr && handler) {
-        _closeRequestSubscription = _hostSession->closing().subscribe(std::move(handler));
+        _closeRequestSubscription = (*_hostSession).closing().subscribe(std::move(handler));
     }
 }
 
@@ -862,7 +862,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     event.sequence = _nextHostSequence++;
     event.timestamp_nanoseconds = timestamp;
     event.payload = std::move(payload);
-    return _hostSession->dispatch(std::move(event));
+    return (*_hostSession).dispatch(std::move(event));
 }
 
 - (BOOL)requestClose {
@@ -912,7 +912,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (_hostAttached == NO || _hostServices == nullptr) {
         return;
     }
-    HostMonitorResult monitors = _hostServices->query_monitors();
+    HostMonitorResult monitors = (*_hostServices).query_monitors();
     if (!monitors.status.accepted()) {
         return;
     }
@@ -949,7 +949,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 
 - (NSArray*)accessibilityChildren {
     if (!_model) return @[];
-    const gui_forms::SemanticSnapshot snapshot = _model->semantic_snapshot();
+    const gui_forms::SemanticSnapshot snapshot = (*_model).semantic_snapshot();
     if (_semanticAccessibilityChildren != nil &&
         _accessibilityCacheGeneration == snapshot.generation) {
         return _semanticAccessibilityChildren;
@@ -993,7 +993,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (action == SemanticAction::focus) {
         [self.window makeFirstResponder:self];
     }
-    const bool handled = _model->perform_semantic_action(identifier, action, actionValue);
+    const bool handled = (*_model).perform_semantic_action(identifier, action, actionValue);
     if (handled) {
         [self collectDamage];
         NSAccessibilityPostNotification(self, NSAccessibilityValueChangedNotification);
@@ -1031,11 +1031,11 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     }
     [self hideHostTooltip];
     if (_hostSession != nullptr) {
-        _hostSession->shutdown();
+        (*_hostSession).shutdown();
         _hostSession.reset();
     }
     if (_hostServices != nullptr) {
-        _hostServices->shutdown();
+        (*_hostServices).shutdown();
         _hostServices.reset();
     }
     _model.reset();
@@ -1047,19 +1047,19 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                 HostPathDialogResult{}};
     }
     [self hideHostTooltip];
-    return _hostServices->show_dialog(request);
+    return (*_hostServices).show_dialog(request);
 }
 
 - (HostClipboardTextResult)readHostClipboard {
     if (_hostServices == nullptr) {
         return {{HostServiceError::after_shutdown}, {}, 0, false};
     }
-    return _hostServices->read_clipboard_text();
+    return (*_hostServices).read_clipboard_text();
 }
 
 - (HostServiceStatus)writeHostClipboard:(std::string_view)text {
     if (_hostServices == nullptr) return {HostServiceError::after_shutdown};
-    return _hostServices->write_clipboard_text(text);
+    return (*_hostServices).write_clipboard_text(text);
 }
 
 - (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request {
@@ -1164,8 +1164,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
             return;
         }
         static_cast<void>(
-            _model->poll_frame_schedule(std::chrono::steady_clock::now()));
-        const std::uint64_t semanticGeneration = _model->semantic_generation();
+            (*_model).poll_frame_schedule(std::chrono::steady_clock::now()));
+        const std::uint64_t semanticGeneration = (*_model).semantic_generation();
         if (semanticGeneration != _lastSemanticGeneration) {
             _lastSemanticGeneration = semanticGeneration;
             _semanticAccessibilityChildren = nil;
@@ -1173,7 +1173,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
             NSAccessibilityPostNotification(
                 self, NSAccessibilityLayoutChangedNotification);
         }
-        DamageRegion damage = _model->take_damage();
+        DamageRegion damage = (*_model).take_damage();
         const double scale =
             self.window == nil ? 1.0 : self.window.backingScaleFactor;
         for (GFRect rect : damage.rectangles()) {
@@ -1193,7 +1193,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 
 - (void)startDisplayLinkIfNeeded {
     if (_displayLink == nullptr || !_model || self.window == nil ||
-        _hostOccluded == YES || !_model->has_live_surface_presentations() ||
+        _hostOccluded == YES || !(*_model).has_live_surface_presentations() ||
         CVDisplayLinkIsRunning(_displayLink)) {
         return;
     }
@@ -1221,8 +1221,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 - (void)displayLinkTick {
     if (!_model || self.window == nil || _hostOccluded == YES) return;
     std::vector<LiveSurfacePresentation> updates =
-        _model->take_live_surface_presentations();
-    if (!_model->has_live_surface_presentations()) {
+        (*_model).take_live_surface_presentations();
+    if (!(*_model).has_live_surface_presentations()) {
         [self stopDisplayLink];
         return;
     }
@@ -1244,7 +1244,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 - (void)drainPostedWork {
     try {
         if (!_model) return;
-        static_cast<void>(_model->drain_posted_work());
+        static_cast<void>((*_model).drain_posted_work());
         [self collectDamage];
     } catch (const std::exception& error) {
         [self recordNativeCallbackFault:"posted-work" message:error.what()];
@@ -1257,18 +1257,19 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (!_model || _wakeSource == nil) {
         return;
     }
-    const auto wake = _model->next_wake();
+    const std::optional<gui_forms::FrameTime> wake = (*_model).next_wake();
     if (!wake) {
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
         return;
     }
-    const auto now = std::chrono::steady_clock::now();
-    const auto delay = std::max(std::chrono::milliseconds(1),
+    const std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
+    const std::chrono::duration<long long, std::ratio<1, 1000>> delay = std::max(std::chrono::milliseconds(1),
                                 std::chrono::duration_cast<std::chrono::milliseconds>(
                                     *wake - now));
-    const auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        delay).count();
+    const std::chrono::nanoseconds::rep nanoseconds =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(delay).count();
     dispatch_source_set_timer(
         _wakeSource,
         dispatch_time(DISPATCH_TIME_NOW, static_cast<std::int64_t>(nanoseconds)),
@@ -1312,8 +1313,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                                   DISPATCH_TIME_FOREVER, 0);
     }
     if (_model) {
-        _model->set_paint_wake_handler({});
-        _model->shutdown_dispatcher();
+        (*_model).set_paint_wake_handler({});
+        (*_model).shutdown_dispatcher();
     }
     if (_hostSession) {
         static_cast<void>([self dispatchHostPayload:HostShutdownEvent{}
@@ -1386,7 +1387,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     if (!_model) {
         return;
     }
-    const auto started = std::chrono::steady_clock::now();
+    const std::chrono::steady_clock::time_point started =
+        std::chrono::steady_clock::now();
     const double scale = self.window == nil ? 1.0 : self.window.backingScaleFactor;
     const GFSize logicalSize{self.bounds.size.width, self.bounds.size.height};
     if (_raster.resize(logicalSize, scale)) {
@@ -1397,7 +1399,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
                                 dirtyRect.size.width, dirtyRect.size.height});
     }
 
-    static_cast<void>(_raster.synchronize_images(_model->image_resources()));
+    static_cast<void>(_raster.synchronize_images((*_model).image_resources()));
     DamageRegion frameDamage = _pendingDamage;
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         frameDamage.add(update.clip);
@@ -1405,7 +1407,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     _raster.begin_frame(frameDamage);
     std::optional<PaintReceipt> receipt;
     if (!_pendingDamage.empty()) {
-        receipt = _model->paint(_raster, _pendingDamage.bounds());
+        receipt = (*_model).paint(_raster, _pendingDamage.bounds());
     }
     for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
         _raster.save();
@@ -1444,12 +1446,12 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         CGColorSpaceRelease(colorSpace);
         CGDataProviderRelease(provider);
     }
-    const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    const std::chrono::duration<long long, std::ratio<1, 1000000000>> elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - started);
     if (presented) {
         _pendingLivePresentations.clear();
         if (receipt &&
-            _model->notify_presented(*receipt,
+            (*_model).notify_presented(*receipt,
                 static_cast<std::uint64_t>(elapsed.count()))) {
             _pendingDamage.clear();
         }
@@ -1481,16 +1483,16 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     static_cast<void>([self dispatchHostPayload:std::move(input)
                                timestampNanoseconds:host_event_nanoseconds(event)]);
     if (_hostServices != nullptr) {
-        const auto target = _model->hit_test(position);
-        static_cast<void>(_hostServices->set_cursor(
-            target ? target->effective_cursor() : CursorKind::arrow));
+        const gui_forms::Control::Ptr target = (*_model).hit_test(position);
+        static_cast<void>((*_hostServices).set_cursor(
+            target ? (*target).effective_cursor() : CursorKind::arrow));
     }
     [self collectDamage];
 }
 
 - (void)mouseExited:(NSEvent*)event {
     if (_hostServices != nullptr) {
-        static_cast<void>(_hostServices->set_cursor(CursorKind::arrow));
+        static_cast<void>((*_hostServices).set_cursor(CursorKind::arrow));
     }
 }
 
@@ -1641,8 +1643,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         *actualRange = range;
     }
     NSRect caret = NSMakeRect(0.0, 0.0, 1.0, 18.0);
-    if (const auto focused = _model->focused_control()) {
-        const GFRect bounds = focused->absolute_bounds();
+    if (const gui_forms::Control::Ptr focused = (*_model).focused_control()) {
+        const GFRect bounds = (*focused).absolute_bounds();
         caret = NSMakeRect(bounds.x, bounds.y, 1.0, bounds.height);
     }
     const NSRect inWindow = [self convertRect:caret toView:nil];
@@ -1660,14 +1662,14 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 }
 
 - (std::string)metricsJSON {
-    return _model ? _model->metrics_snapshot().to_json() : std::string("{}");
+    return _model ? (*_model).metrics_snapshot().to_json() : std::string("{}");
 }
 
 - (std::string)hostJSON {
     const std::string session = _hostSession
-        ? _hostSession->snapshot().to_json() : std::string("{}");
+        ? (*_hostSession).snapshot().to_json() : std::string("{}");
     const std::string services = _hostServices
-        ? _hostServices->snapshot().to_json() : std::string("{}");
+        ? (*_hostServices).snapshot().to_json() : std::string("{}");
     return "{\"session\":" + session + ",\"services\":" + services +
         ",\"native_callback_faults\":" +
         std::to_string(_nativeCallbackFaults) + "}";
@@ -1703,7 +1705,7 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
 - (void)windowWillClose:(NSNotification*)notification {
     [_view notifyClosed];
     if (_closedHandler) {
-        auto callback = std::move(_closedHandler);
+        std::function<void()> callback = std::move(_closedHandler);
         _closedHandler = {};
         callback();
     }
@@ -1897,11 +1899,12 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
         std::string_view owner = entry.owner_id;
         for (std::size_t depth = 0; !owner.empty(); ++depth) {
             if (depth >= windows.size()) return 2;
-            const auto parent = std::find_if(
+            const std::vector<MacApplicationWindow>::iterator parent =
+                std::find_if(
                 windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
                     return candidate.stable_id == owner;
                 });
-            owner = parent->owner_id;
+            owner = (*parent).owner_id;
         }
     }
     if (primary_count != 1U) return 2;
@@ -1959,7 +1962,8 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 [nativeWindow center];
                 continue;
             }
-            const auto owner = std::find_if(
+            const std::vector<MacApplicationWindow>::iterator owner =
+                std::find_if(
                 windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
                     return candidate.stable_id == entry.owner_id;
                 });

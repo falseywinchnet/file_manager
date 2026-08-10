@@ -67,16 +67,17 @@ namespace {
 
 [[nodiscard]] std::string ascii_lower(std::string_view value) {
     std::string result(value);
-    std::transform(result.begin(), result.end(), result.begin(), [](char entry) {
-        return entry >= 'A' && entry <= 'Z' ? static_cast<char>(entry + ('a' - 'A'))
-                                            : entry;
-    });
+    for (char& entry : result) {
+        if (entry >= 'A' && entry <= 'Z') {
+            entry = static_cast<char>(entry + ('a' - 'A'));
+        }
+    }
     return result;
 }
 
 [[nodiscard]] std::size_t first_utf8_codepoint_size(std::string_view text) noexcept {
     if (text.empty()) return 0U;
-    const auto first = static_cast<unsigned char>(text.front());
+    const unsigned char first = static_cast<unsigned char>(text.front());
     if ((first & 0x80U) == 0U) return 1U;
     if ((first & 0xe0U) == 0xc0U) return std::min<std::size_t>(2U, text.size());
     if ((first & 0xf0U) == 0xe0U) return std::min<std::size_t>(3U, text.size());
@@ -117,11 +118,12 @@ namespace {
         const Color source = Color::from_argb(
             alpha, unpremultiply(red, alpha), unpremultiply(green, alpha),
             unpremultiply(blue, alpha));
-        const auto found = std::find_if(
+        const std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator
+            found = std::find_if(
             attributes.remap_table.begin(), attributes.remap_table.end(),
             [&](const auto& entry) { return entry.old_color.argb() == source.argb(); });
         if (found == attributes.remap_table.end()) continue;
-        const Color replacement = found->new_color;
+        const Color replacement = (*found).new_color;
         const std::uint8_t out_alpha = replacement.alpha();
         const std::uint8_t out_red = premultiply(replacement.red(), out_alpha);
         const std::uint8_t out_green = premultiply(replacement.green(), out_alpha);
@@ -374,7 +376,7 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
         sk_sp<SkImage> image = SkImages::RasterFromData(
             info, std::move(data), extent * sizeof(SkColor));
         if (image) {
-            paint.setShader(image->makeShader(
+            paint.setShader((*image).makeShader(
                 SkTileMode::kRepeat, SkTileMode::kRepeat,
                 SkSamplingOptions(SkFilterMode::kNearest)));
         }
@@ -396,7 +398,7 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
             return;
         }
         const SkMatrix local = to_sk_matrix(brush.transform);
-        paint.setShader(image->makeShader(
+        paint.setShader((*image).makeShader(
             texture_tile_mode_x(brush.wrap_mode),
             texture_tile_mode_y(brush.wrap_mode),
             sampling_for(state), local));
@@ -459,11 +461,11 @@ public:
         : bitmap_(&bitmap), token_(token) {}
     ~BitmapUnlock() {
         if (bitmap_ != nullptr) {
-            try { bitmap_->unlock(token_); } catch (...) {}
+            try { (*bitmap_).unlock(token_); } catch (...) {}
         }
     }
     void release() {
-        bitmap_->unlock(token_);
+        (*bitmap_).unlock(token_);
         bitmap_ = nullptr;
     }
 
@@ -476,6 +478,9 @@ private:
 
 class SkiaExecutor::Impl final {
 public:
+    using TypefaceMap =
+        std::unordered_map<std::string, sk_sp<SkTypeface>>;
+
     sk_sp<SkFontMgr> font_manager{
 #if defined(__APPLE__)
         SkFontMgr_New_CoreText(nullptr)
@@ -483,14 +488,16 @@ public:
         SkFontMgr_New_Custom_Empty()
 #endif
     };
-    std::unordered_map<std::string, sk_sp<SkTypeface>> typefaces;
+    TypefaceMap typefaces;
 
     [[nodiscard]] sk_sp<SkTypeface> typeface(std::string_view family,
                                              std::uint32_t style) const {
-        const auto found = typefaces.find(typeface_key(family, style));
-        if (found != typefaces.end()) return found->second;
-        const auto regular = typefaces.find(typeface_key(family, 0U));
-        if (regular != typefaces.end()) return regular->second;
+        const TypefaceMap::const_iterator found =
+            typefaces.find(typeface_key(family, style));
+        if (found != typefaces.end()) return (*found).second;
+        const TypefaceMap::const_iterator regular =
+            typefaces.find(typeface_key(family, 0U));
+        if (regular != typefaces.end()) return (*regular).second;
         const SkFontStyle requested(
             (style & 1U) != 0U ? SkFontStyle::kBold_Weight
                                : SkFontStyle::kNormal_Weight,
@@ -498,16 +505,18 @@ public:
             (style & 2U) != 0U ? SkFontStyle::kItalic_Slant
                                : SkFontStyle::kUpright_Slant);
         if (!family.empty()) {
-            if (sk_sp<SkTypeface> platform = font_manager->matchFamilyStyle(
+            if (sk_sp<SkTypeface> platform = (*font_manager).matchFamilyStyle(
                     std::string(family).c_str(), requested)) {
                 return platform;
             }
         }
-        const auto fallback = typefaces.find(typeface_key("Portsmouth Rapids", style));
-        if (fallback != typefaces.end()) return fallback->second;
-        const auto regular_fallback = typefaces.find(typeface_key("Portsmouth Rapids", 0U));
-        if (regular_fallback != typefaces.end()) return regular_fallback->second;
-        if (sk_sp<SkTypeface> platform = font_manager->legacyMakeTypeface(
+        const TypefaceMap::const_iterator fallback =
+            typefaces.find(typeface_key("Portsmouth Rapids", style));
+        if (fallback != typefaces.end()) return (*fallback).second;
+        const TypefaceMap::const_iterator regular_fallback =
+            typefaces.find(typeface_key("Portsmouth Rapids", 0U));
+        if (regular_fallback != typefaces.end()) return (*regular_fallback).second;
+        if (sk_sp<SkTypeface> platform = (*font_manager).legacyMakeTypeface(
                 nullptr, requested)) {
             return platform;
         }
@@ -547,15 +556,15 @@ bool SkiaExecutor::register_typeface(std::string_view family,
     // bounded number of faces and choose the requested family/style instead of
     // silently using collection face zero.
     for (int index = 0; index < 64; ++index) {
-        sk_sp<SkTypeface> candidate = impl_->font_manager->makeFromData(data, index);
+        sk_sp<SkTypeface> candidate = (*(*impl_).font_manager).makeFromData(data, index);
         if (!candidate) {
             if (index == 0) return false;
             break;
         }
         SkString candidate_family;
-        candidate->getFamilyName(&candidate_family);
+        (*candidate).getFamilyName(&candidate_family);
         const bool exact_family = ascii_lower(candidate_family.c_str()) == requested_family;
-        const int weight_distance = std::abs(candidate->fontStyle().weight() -
+        const int weight_distance = std::abs((*candidate).fontStyle().weight() -
                                              requested_weight);
         const int score = (exact_family ? 100000 : 0) - weight_distance;
         if (score > best_score) {
@@ -565,7 +574,7 @@ bool SkiaExecutor::register_typeface(std::string_view family,
         if (exact_family && weight_distance == 0) break;
     }
     if (!best) return false;
-    impl_->typefaces[typeface_key(family, style)] = std::move(best);
+    (*impl_).typefaces[typeface_key(family, style)] = std::move(best);
     return true;
 }
 
@@ -577,7 +586,7 @@ SizeF SkiaExecutor::measure_string(std::string_view utf8,
         throw std::invalid_argument("text measurement arguments are invalid");
     }
     if (utf8.empty()) return {};
-    const SkFont font = impl_->font(font_spec);
+    const SkFont font = (*impl_).font(font_spec);
     SkFontMetrics metrics{};
     font.getMetrics(&metrics);
     const bool fit_black_box = (format.flags & UINT32_C(0x0004)) != 0U;
@@ -658,25 +667,25 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
         const std::span<const DrawingCommand> commands = recorder.commands();
         if (first_command > commands.size()) return {RasterError::invalid_argument};
         if (first_command == commands.size()) return {};
-        auto scratch = target.clone({0, 0, static_cast<std::int32_t>(target.width()),
+        std::unique_ptr<Bitmap> scratch = target.clone({0, 0, static_cast<std::int32_t>(target.width()),
                                       static_cast<std::int32_t>(target.height())});
-        const BitmapLockView scratch_lock = scratch->lock(BitmapLockMode::write);
+        const BitmapLockView scratch_lock = (*scratch).lock(BitmapLockMode::write);
         BitmapUnlock unlock_scratch(*scratch, scratch_lock.token);
         const SkImageInfo info = image_info(scratch_lock.width, scratch_lock.height,
                                             scratch_lock.pixel_format);
         sk_sp<SkSurface> surface = SkSurfaces::WrapPixels(
             info, scratch_lock.writable_data, scratch_lock.row_bytes);
         if (!surface) return {RasterError::target_unavailable};
-        SkCanvas* canvas = surface->getCanvas();
+        SkCanvas* canvas = (*surface).getCanvas();
         std::size_t executed{};
         for (const DrawingCommand& command : commands.subspan(first_command)) {
-            canvas->restoreToCount(1);
-            canvas->resetMatrix();
+            (*canvas).restoreToCount(1);
+            (*canvas).resetMatrix();
             if (command.state.clip) {
-                canvas->clipRect(to_sk_rect(*command.state.clip),
+                (*canvas).clipRect(to_sk_rect(*command.state.clip),
                                  SkClipOp::kIntersect, false);
             }
-            canvas->setMatrix(to_sk_matrix(command.state.transform));
+            (*canvas).setMatrix(to_sk_matrix(command.state.transform));
 
             SkPaint paint;
             configure_paint(paint, command.state);
@@ -690,26 +699,26 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             case CommandKind::set_quality:
                 break;
             case CommandKind::clear:
-                canvas->clear(to_sk_color(command.color));
+                (*canvas).clear(to_sk_color(command.color));
                 break;
             case CommandKind::fill_rectangle:
                 configure_brush(paint, command.brush, command.state);
-                canvas->drawRect(to_sk_rect(command.rect), paint);
+                (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_rectangle:
                 configure_pen(paint, command.pen, command.state);
-                canvas->drawRect(to_sk_rect(command.rect), paint);
+                (*canvas).drawRect(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::draw_line:
                 configure_pen(paint, command.pen, command.state);
-                canvas->drawLine(static_cast<SkScalar>(command.first.x),
+                (*canvas).drawLine(static_cast<SkScalar>(command.first.x),
                                  static_cast<SkScalar>(command.first.y),
                                  static_cast<SkScalar>(command.second.x),
                                  static_cast<SkScalar>(command.second.y), paint);
                 break;
             case CommandKind::draw_string: {
                 paint.setColor(to_sk_color(command.color));
-                SkFont font = impl_->font(command.font);
+                SkFont font = (*impl_).font(command.font);
                 const SkScalar overhang = (command.format.flags & UINT32_C(0x0004)) == 0U ?
                     static_cast<SkScalar>(pixel_font_size(command.font) / 6.0) : 0.0F;
                 SkFontMetrics metrics;
@@ -733,7 +742,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                             width / 2.0F : width;
                     }
                     if (!line.empty()) {
-                        canvas->drawSimpleText(
+                        (*canvas).drawSimpleText(
                             line.data(), line.size(), SkTextEncoding::kUTF8, x,
                             first_baseline + line_height * static_cast<SkScalar>(line_index),
                             font, paint);
@@ -746,11 +755,11 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             }
             case CommandKind::draw_ellipse:
                 configure_pen(paint, command.pen, command.state);
-                canvas->drawOval(to_sk_rect(command.rect), paint);
+                (*canvas).drawOval(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::fill_ellipse:
                 configure_brush(paint, command.brush, command.state);
-                canvas->drawOval(to_sk_rect(command.rect), paint);
+                (*canvas).drawOval(to_sk_rect(command.rect), paint);
                 break;
             case CommandKind::fill_polygon: {
                 SkPathBuilder builder(command.path.fill_mode == FillMode::alternate ?
@@ -763,16 +772,16 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 }
                 builder.close();
                 configure_brush(paint, command.brush, command.state);
-                canvas->drawPath(builder.detach(), paint);
+                (*canvas).drawPath(builder.detach(), paint);
                 break;
             }
             case CommandKind::draw_path:
                 configure_pen(paint, command.pen, command.state);
-                canvas->drawPath(to_sk_path(command.path), paint);
+                (*canvas).drawPath(to_sk_path(command.path), paint);
                 break;
             case CommandKind::fill_path:
                 configure_brush(paint, command.brush, command.state);
-                canvas->drawPath(to_sk_path(command.path), paint);
+                (*canvas).drawPath(to_sk_path(command.path), paint);
                 break;
             case CommandKind::draw_image: {
                 if (!command.image.has_pixels()) {
@@ -791,7 +800,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
                 apply_image_attributes(paint, command.image_attributes);
                 const RectF source{command.first.x, command.first.y,
                                    command.second.x, command.second.y};
-                canvas->drawImageRect(image.get(), to_sk_rect(source),
+                (*canvas).drawImageRect(image.get(), to_sk_rect(source),
                                       to_sk_rect(command.rect),
                                       sampling_for(command.state), &paint,
                                       SkCanvas::kStrict_SrcRectConstraint);
@@ -801,7 +810,7 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
             ++executed;
         }
         unlock_scratch.release();
-        const ImageSnapshot rendered = scratch->snapshot();
+        const ImageSnapshot rendered = (*scratch).snapshot();
         const BitmapLockView target_lock = target.lock(BitmapLockMode::write);
         BitmapUnlock unlock_target(target, target_lock.token);
         if (rendered.pixels().size() !=
@@ -836,7 +845,7 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
         if (!codec || codec_result != SkCodec::kSuccess) {
             return {.error = RasterError::decode_failed};
         }
-        const SkImageInfo source = codec->getInfo();
+        const SkImageInfo source = (*codec).getInfo();
         if (source.width() <= 0 || source.height() <= 0 ||
             static_cast<std::uint32_t>(source.width()) > limits.maximum_width ||
             static_cast<std::uint32_t>(source.height()) > limits.maximum_height ||
@@ -844,15 +853,15 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
                 limits.maximum_pixels) {
             return {.error = RasterError::dimension_limit_exceeded};
         }
-        auto bitmap = std::make_unique<Bitmap>(
+        std::unique_ptr<gui_drawing::Bitmap> bitmap = std::make_unique<Bitmap>(
             static_cast<std::uint32_t>(source.width()),
             static_cast<std::uint32_t>(source.height()),
             PixelFormat::bgra32_premultiplied);
-        const BitmapLockView lock = bitmap->lock(BitmapLockMode::write);
+        const BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
         BitmapUnlock unlock(*bitmap, lock.token);
         const SkImageInfo output = image_info(lock.width, lock.height,
                                               lock.pixel_format);
-        if (codec->getPixels(output, lock.writable_data, lock.row_bytes) !=
+        if ((*codec).getPixels(output, lock.writable_data, lock.row_bytes) !=
             SkCodec::kSuccess) {
             return {.error = RasterError::decode_failed};
         }
@@ -862,12 +871,12 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
         // which becomes an opaque pale square when that raster is composited by
         // another retained surface. Detect the impossible premultiplied values
         // and normalize the complete decoded image exactly once.
-        auto* pixels = reinterpret_cast<std::uint8_t*>(lock.writable_data);
+        std::uint8_t* pixels = reinterpret_cast<std::uint8_t*>(lock.writable_data);
         bool straight_alpha{};
         for (std::uint32_t y = 0; y < lock.height && !straight_alpha; ++y) {
-            const auto* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
+            const std::uint8_t* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
             for (std::uint32_t x = 0; x < lock.width; ++x) {
-                const auto* pixel = row + static_cast<std::size_t>(x) * 4U;
+                const std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
                 const std::uint8_t alpha = pixel[3];
                 if (pixel[0] > alpha || pixel[1] > alpha || pixel[2] > alpha) {
                     straight_alpha = true;
@@ -877,9 +886,9 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
         }
         if (straight_alpha) {
             for (std::uint32_t y = 0; y < lock.height; ++y) {
-                auto* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
+                std::uint8_t* row = pixels + static_cast<std::size_t>(y) * lock.row_bytes;
                 for (std::uint32_t x = 0; x < lock.width; ++x) {
-                    auto* pixel = row + static_cast<std::size_t>(x) * 4U;
+                    std::uint8_t* pixel = row + static_cast<std::size_t>(x) * 4U;
                     const std::uint8_t alpha = pixel[3];
                     pixel[0] = premultiply(pixel[0], alpha);
                     pixel[1] = premultiply(pixel[1], alpha);
@@ -921,16 +930,16 @@ std::vector<std::byte> SkiaExecutor::encode_png(
         options.fFilterFlags = SkPngEncoder::FilterFlag::kAll;
         options.fZLibLevel = 6;
         sk_sp<SkData> encoded = SkPngEncoder::Encode(pixmap, options);
-        if (!encoded || encoded->size() == 0U) {
+        if (!encoded || (*encoded).size() == 0U) {
             set_error(RasterError::encode_failed);
             return {};
         }
-        if (encoded->size() > limits.maximum_encoded_bytes) {
+        if ((*encoded).size() > limits.maximum_encoded_bytes) {
             set_error(RasterError::encoded_limit_exceeded);
             return {};
         }
-        std::vector<std::byte> result(encoded->size());
-        std::memcpy(result.data(), encoded->data(), encoded->size());
+        std::vector<std::byte> result((*encoded).size());
+        std::memcpy(result.data(), (*encoded).data(), (*encoded).size());
         set_error(RasterError::none);
         return result;
     } catch (const std::logic_error&) {

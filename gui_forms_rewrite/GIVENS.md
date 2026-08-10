@@ -1,136 +1,153 @@
-# Rewrite givens and observed facts
+# GUI.Forms rewrite operational policy
 
 Date: 2026-08-10
 
-## GIVEN — direct architect requirements
+Authority: extracted from `DECISION_LEDGER.md` and the later closure in
+`ARCHITECT_SELECTIONS.md`. The later selections control if an older `OPEN`
+label differs.
 
-### G-001 — plan now; do not rewrite now
+## Rewrite boundary
 
-Prepare a massive in-place rewrite plan and leave executable instructions for a
-future sibling. The current task must not change GUI.Forms implementation.
+- Plan now; do not implement now.
+- A future sibling performs the rewrite after explicit direction.
+- Rewrite `include/` and production `src/` first as the normative scope.
+- After production changes, update first-party tests, demo, tools,
+  compatibility code, and generated output only where needed to compile,
+  exercise, or represent the new production source. Fix first-party generators
+  before generated output.
+- Preserve file organization, ABI ownership, semantics, behavior,
+  dependent-library boundaries, and platform boundaries.
+- Minor native C++ API changes germane to the rewrite are permitted and must be
+  reported by batch. They do not authorize C ABI, dependency, hosted-object,
+  or behavioral changes.
 
-### G-002 — selective BFFT house style
+## Governing idea
 
-GUI.Forms will use a house style derived from selected BFFT values. The project
-will hand-select which constraints matter. It will not blindly copy every idiom
-present in the BFFT repository.
+Epistemic cost is the criterion. Remove machinery that hides type, control flow,
+lifetime, allocation, or actual execution more than the problem warrants.
+Compiler machinery is good when it instantiates an explicit architectural
+decision; inference is bad when it makes the decision for the source.
 
-The broader BFFT subsystems that use `auto`, capturing lambdas, and
-`std::vector` do not represent a competing approved style. The architect has
-identified them as undesirable cleanup debt that BFFT itself has not yet
-removed. They may be studied as migration examples and failure evidence, but
-must not be cited to admit the same constructs into rewritten GUI.Forms.
+## Banned in in-scope first-party C++
 
-### G-003 — no `auto`
+- `auto` and `decltype(auto)`;
+- trailing-return `->` syntax;
+- pointer member `->` syntax—dereference explicitly and use dot;
+- all lambdas, including captureless and generic lambdas;
+- structured bindings;
+- coroutines;
+- `std::any`, except the existing bounded WinForms-compatible Tag surface,
+  backing storage, disposal behavior, and necessary compatibility tests/shims;
+- convenience-defaulted spaceship/comparison machinery; define only required
+  comparisons.
 
-Rewritten GUI.Forms production source does not use `auto`. The decision ledger
-must close edge cases such as explicit ordering return types, structured
-bindings, iterator spellings, and third-party-facing types; these edge cases do
-not silently weaken the requirement.
+`decltype(expression)` is permitted only in named private type-trait/detection
+plumbing. `decltype(auto)` remains banned.
 
-### G-004 — explicit typing
+## Permitted and encouraged where appropriate
 
-Important types, ownership, ranges, callback state, and conversions are written
-explicitly. “Explicit” must become a reviewable grammar rather than a preference
-applied inconsistently.
+- explicit named types and aliases;
+- templates used as explicit, inspectable toolbox machinery;
+- `consteval`;
+- `if constexpr`, pack expansion, and predictable compile-time folding in
+  named templates/functors;
+- `std::vector` as the ordinary growable contiguous collection;
+- `std::unique_ptr`;
+- `std::shared_ptr` and `std::weak_ptr` under the current retained ownership
+  model; changing them is a separate lifecycle project;
+- `std::span`, `std::optional`, and `std::variant`;
+- RTTI where the existing architecture requires it;
+- exceptions at genuine subsystem/failure boundaries, never as routine control
+  flow and never across ABI boundaries;
+- `std::function` generally, subject to focused audit of conspicuously wasteful,
+  opaque, allocation-heavy, or lifetime-awkward uses.
 
-### G-005 — GUI.Forms-owned heap arrays
+GUI.Forms remains in C++20 language mode and may use current toolchains. Audit
+actual features added in C++20; the mode does not admit every C++20/C++23 idea.
+Ranges/views require a concrete proposal. Designated initialization remains for
+plain option records; stateful result alternatives use named factories. Clear
+bit predicates remain; representation casts require a concrete case.
 
-GUI.Forms will use its own heap-array/storage vocabulary instead of
-`std::vector`. The exact family of fixed-size, growable, small-buffer, borrowed,
-and arena-backed types remains to be designed and measured.
+## Approved standard algorithms
 
-### G-006 — lambdas require classification
+Keep:
 
-Lambda policy depends on the kind of lambda. Capture, escape, ownership,
-allocation, ABI visibility, thread transfer, and use as a local algorithm
-predicate must be discussed separately.
+- `min`, `max`, `clamp`;
+- `find`, `find_if`;
+- erase/remove;
+- `copy`, `copy_n`;
+- range `move` and ordinary object `move`;
+- `accumulate`, `inner_product`;
+- `any_of`, `all_of`, `none_of`;
+- `visit`.
 
-### G-007 — reduce, do not automatically abolish, `std::function`
+Do not replace other algorithms merely because they are standard-library
+facilities.
 
-The rewrite will constrain `std::function`. The project must decide which uses
-remain permitted and which callback roles become in-house types.
+The one current ASCII-lowercase `std::transform` becomes a direct explicit
+loop. Other unlisted clear standard algorithms remain by default.
 
-### G-008 — future UEFI/bare-metal pressure
+## Algorithms requiring deliberate ownership
 
-GUI.Forms should someday be capable of supporting a meaningful UEFI or
-bare-metal configuration. The present rewrite is a pragmatic first step:
-minimize hosted assumptions and improve portability without pretending the
-complete desktop stack is immediately firmware-ready.
+- Audit every `std::sort` and `std::stable_sort` call site against actual sizes,
+  ordering, duplicates, stability, element movement, comparator cost, hotness,
+  scratch tolerance, and cross-STL behavior.
+- Build only a small, descriptive house sort collection selected and measured
+  against representative GUI.Forms workloads and standard implementations.
+- The laboratory candidate set is stable insertion, run-aware stable
+  merge/adaptive sorting, and explicit-stack unstable partition/introspective
+  sorting. Ship only the measured subset.
+- House-own the small binary-search family with a contiguous range/index core.
+- Do not casually introduce heap algorithms; choose an explicit data structure
+  if priority behavior is actually needed.
 
-### G-009 — audit libc and standard-library heavy lifting
+## Events and callbacks
 
-The program must inventory what libc and the C++ standard library do for
-GUI.Forms, including search and sorting algorithms. Replacements must be chosen
-from evidence, not from name-count reduction.
+- All lambdas are replaced by named functions, functors, context structures,
+  delegates, or platform trampolines.
+- `std::function` is not globally replaced.
+- Events are the principal approved house abstraction:
+  `Delegate<Signature>` handles named binding; `Event<Signature>` handles
+  ordering, subscription, revocation, removal, and emission.
+- Retain a legacy `std::function` Event overload while first-party production
+  code migrates to the Delegate-first path.
+- Binding a delegate must not allocate merely to store the callback.
+- Commands, dispatch, timers, host services, and paint callbacks remain separate
+  design questions because their lifetime and concurrency semantics differ.
 
-### G-010 — sibling implementation
+## Allocation and content failure
 
-Another sibling will perform the rewrite after the decisions and opening gate.
-This directory must be sufficient to prevent that sibling from guessing the
-architect's intent.
+- No allocator replacement or allocator propagation is currently authorized.
+- A process allocator experiment such as a mimalloc-like alternative is
+  separate from object architecture.
+- GUI infrastructure is not redesigned for routine OOM recovery.
+- Bounded content/resource allocations may fail into an explicit safe state,
+  warn usefully, and leave the application stable and closable.
 
-## OBSERVED — current GUI.Forms source snapshot
+## Specialized storage
 
-These are textual inventory results from the dirty working tree on 2026-08-10.
-They are orientation, not a frozen baseline:
+- Do not replace `std::vector` wholesale.
+- The pinned BFFT `heap_array` style is admitted only for a presently large,
+  non-growing heap allocation that is edited in place. It is not for small
+  arrays or collections whose contract includes growth.
+- BFFT implementation may be copied/adapted; GUI.Forms must not link to BFFT.
+- Hive-inspired stable pools are later workload experiments, preferably using
+  generation handles if adopted. They are not rewrite completion criteria.
 
-- production scope inspected: `gui_forms/include` and `gui_forms/src`;
-- approximately 80,523 lines across 421 C/C++/Objective-C++ files;
-- `auto`: 1,640 textual occurrences in 109 files;
-- likely lambda definitions: 753 matching lines;
-- `std::vector`: 577 occurrences in 126 files;
-- `std::function`: 181 occurrences in 42 files;
-- `throw`: present in 109 files;
-- `std::shared_ptr`: present in 103 files;
-- `std::weak_ptr`: present in 37 files;
-- `std::unique_ptr`: present in 36 files;
-- `std::string`: present in 195 files;
-- `std::optional`: present in 86 files;
-- standard algorithms are used substantially, led by `min`, `max`, `clamp`,
-  `find`, `find_if`, sorting, erasure, copying, and accumulation.
+## Portability non-goal
 
-The most frequent included hosted headers include `utility`, `algorithm`,
-`stdexcept`, `vector`, `string`, `memory`, `string_view`, `optional`,
-`unordered_set`, `span`, `functional`, `unordered_map`, `array`, `sstream`,
-`chrono`, `atomic`, `thread`, `numeric`, and `mutex`.
+No firmware, framebuffer, freestanding nucleus, picolibc, klibc, UEFI shim, or
+constrained-runtime proof belongs to this rewrite. Future constrained-host work
+must open as its own project with actual requirements.
 
-Current GUI.Forms explicitly requires C++20 with extensions disabled. Its local
-guardrails do not currently impose the proposed house-style restrictions.
+## Current source orientation
 
-## OBSERVED — BFFT source
+The 2026-08-10 dirty-tree audit observed about 80,523 lines across 421 production
+C/C++/Objective-C++ files, with 1,640 textual `auto` occurrences, roughly 753
+lambda-like lines, 577 `std::vector` occurrences, and 181 `std::function`
+occurrences. These are orientation only; the sibling must refresh them from the
+implementation-start snapshot using semantic tooling.
 
-The available source is `/Users/ultimussecundai/bfft`; the older evidence
-register path is stale. Its useful central patterns include:
-
-- a stable C ABI using opaque plans/workspaces, pointer-plus-size buffers,
-  explicit status results, and caller-visible storage requirements;
-- reusable workspaces to avoid hidden hot-loop allocation;
-- a thin RAII C++ layer over the C authority;
-- C++17 as the baseline, with C++20/C++23 checks;
-- warnings-as-errors in its standards checks.
-
-The BFFT repository is not yet a literal no-`auto`, classified-lambda,
-no-`std::vector` codebase. Its broader sources and convenience wrapper use all
-three. **GIVEN architect interpretation:** those uses are undesirable legacy
-deviations that were never cleaned up, not positive evidence for admitting the
-constructs. “BFFT house style” means the intended selected discipline visible
-most clearly in its stable C seam, explicit caller storage, reusable workspaces,
-and bounded core—not the union of every construct currently found in BFFT.
-
-## Not yet decided
-
-The givens do not decide:
-
-- whether the portable nucleus is C++17, C++20, or a smaller language subset;
-- whether all controls or only lower layers join the first minimal-runtime
-  profile;
-- exact lambda categories;
-- callback storage layout and inline capacity;
-- allocator API and out-of-memory policy;
-- replacement policy for strings, associative containers, ownership pointers,
-  exceptions, RTTI, threading, clocks, atomics, or algorithms;
-- whether picolibc, klibc, EDK II facilities, or a purpose-built shim is the
-  first minimal-runtime conformance environment;
-- public C++ source compatibility during migration;
-- schedule, batch size, or completion date.
+The generated `OWNERSHIP_AUDIT.md` preserves ownership evidence for a future
+lifecycle round. The current rewrite does not alter shared/weak retained
+ownership.

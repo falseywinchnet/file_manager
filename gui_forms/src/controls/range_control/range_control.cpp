@@ -1,4 +1,5 @@
 #include "gui_forms/controls/range_control/range_control.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 
 #include "range_control_rendering.hpp"
 
@@ -16,16 +17,12 @@ RangeControl::RangeControl(StableId stable_id)
         {"Value", BindingValueKind::number, "Behavior",
          "Current value within the retained range.", BindingValue{0.0},
          Dirty::paint | Dirty::semantics},
-        [this] { return BindingValue{value_}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::number);
-            if (!converted) throw std::invalid_argument("RangeControl.Value binding requires a number");
-            set_value(std::get<double>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return value_changed_.subscribe(owner,
-                [changed = std::move(changed)](double) { changed(); });
-        }, {}, {}});
+        detail::BindingMemberGetter<RangeControl, double>(
+            *this, &RangeControl::value_),
+        detail::ConvertedPropertySetter<RangeControl, double>(
+            *this, &RangeControl::set_value, BindingValueKind::number,
+            "RangeControl.Value binding requires a number"),
+        detail::EventChangeConnector<double>(value_changed_), {}, {}});
 }
 
 double RangeControl::normalized_value() const noexcept {

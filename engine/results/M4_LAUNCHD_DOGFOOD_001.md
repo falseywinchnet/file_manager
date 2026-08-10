@@ -64,6 +64,15 @@ bad frame magic/size, and query-to-admin method denial.
 9. After the hardened no-follow manifest loader, corrected installer readiness
    gate, documentation, and evidence record were mirrored, a final
    authoritative reconciliation published generation 2 with 28,552 bindings.
+10. The concurrency/admission hardening upgrade introduced a generation-bound
+    `ADMISSION` record. Its first startup reconciled before endpoint publication,
+    produced generation 4 with 30,632 bindings, and returned healthy integrity.
+    A launchd restart rotated instance/credential identity and recovered
+    generation 4 without a redundant publication.
+11. The installed publication-acknowledgement hook advanced `ADMISSION` with a
+    final manual reconciliation to generation 5 before returning success. The
+    next launchd restart recovered generation 5 on the first readiness poll and
+    did not rescan or create generation 6.
 
 Observed instance ids included
 `1aa6cfe81124c98f33f0dc0726d58294`,
@@ -71,6 +80,9 @@ Observed instance ids included
 `5595e89f0f4ca4a822e23f5f4cb9a589`,
 `16702dc4932a404ce814392d37245fba`, and
 `f42c8c4f34cfb637deaa53d371c3d48c`.
+The hardening upgrade additionally observed
+`98603bd809262ce0f12c6ecbab8f59b2` and
+`61ca6c10714a2e7452904ceb8ed354dd`.
 
 Final filesystem protections were observed as:
 
@@ -78,6 +90,7 @@ Final filesystem protections were observed as:
 - deployment manifest: same uid, regular, `0600`;
 - query/admin sockets: same uid, socket, `0600`;
 - query/admin tokens and discovery: same uid, regular, `0600`.
+- admission record: same uid, regular, `0600`, finally bound to generation 5.
 
 ## Retained negative result
 

@@ -17,6 +17,10 @@ const std::uint8_t* pixel_at(const std::uint8_t* pixels,
            static_cast<std::size_t>(x * scale) * 4U;
 }
 
+unsigned channel_distance(std::uint8_t first, std::uint8_t second) noexcept {
+    return first > second ? first - second : second - first;
+}
+
 } // namespace
 
 int main() {
@@ -51,7 +55,7 @@ int main() {
         std::fputs("failed to open bundled control font\n", stderr);
         return 2;
     }
-    const auto font_size = font_file.tellg();
+    const std::ifstream::pos_type font_size = font_file.tellg();
     if (font_size <= 0) {
         return 3;
     }
@@ -94,7 +98,7 @@ int main() {
         repeating_gradient, gui_forms::GradientSpreadMode::repeat);
     raster.end_frame();
 
-    const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());
+    const std::uint8_t* pixels = static_cast<const std::uint8_t*>(raster.pixels());
     if (pixels == nullptr || raster.byte_size() == 0 ||
         pixels[0] != 241U || pixels[1] != 238U || pixels[2] != 226U ||
         pixels[3] != 255U) {
@@ -115,9 +119,6 @@ int main() {
         pixels, raster.row_bytes(), 2, 114, 70);
     const std::uint8_t* pattern_repeat = pixel_at(
         pixels, raster.row_bytes(), 2, 122, 70);
-    const auto channel_distance = [](std::uint8_t first, std::uint8_t second) {
-        return first > second ? first - second : second - first;
-    };
     if (channel_distance(repeat_first[0], repeat_second[0]) > 2U ||
         channel_distance(repeat_first[1], repeat_second[1]) > 2U ||
         channel_distance(repeat_first[2], repeat_second[2]) > 2U ||

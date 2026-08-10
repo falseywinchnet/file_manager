@@ -15,7 +15,7 @@ pub(crate) fn serve_stdio() -> Result<(), String> {
 }
 
 fn serve<R: BufRead, W: Write>(input: &mut R, output: &mut W) -> Result<(), String> {
-    let mut kernel = Kernel::new();
+    let kernel = Kernel::new();
     loop {
         let response =
             match read_bounded_line(input, MAX_FRAME_BYTES).map_err(|error| error.to_string())? {

@@ -95,6 +95,7 @@ protected:
     void on_attached_to_window() override;
 
 private:
+    void on_image_list_changed(const ImageListChange& change);
     void rebuild_visible();
     [[nodiscard]] std::optional<std::size_t> item_index(
         std::string_view stable_id) const noexcept;

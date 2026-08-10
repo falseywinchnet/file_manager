@@ -301,8 +301,8 @@
     "src/service/local.rs": {
       "category": "Service hosts",
       "status": "OBSERVED bounded Unix daemon host",
-      "summary": "Owns fixed worker-pool concurrency, bounded pending sessions, authentication handoff, serialized kernel dispatch, fail-closed panic containment, and coordinated shutdown.",
-      "responsibilities": ["Bind or serve an owned UnixEndpoint.", "Attach the optional development Engine child.", "Limit workers and pending sessions.", "Interrupt active sessions and join workers during shutdown.", "Record relaxed runtime health counters."],
+      "summary": "Owns four fixed blocking session workers with independently owned bounded queues, authentication handoff, concurrent kernel dispatch, fail-closed panic containment, and coordinated shutdown.",
+      "responsibilities": ["Bind or serve an owned UnixEndpoint.", "Attach the optional development Engine child.", "Round-robin accepted streams across independent worker queues while preserving the aggregate pending-session ceiling.", "Interrupt active sessions and join workers during shutdown.", "Record relaxed runtime health counters."],
       "boundaries": ["Endpoint publication and authentication stay in local_endpoint.", "Frame encoding stays in local_wire.", "Kernel semantics stay in kernel.rs.", "The Engine adapter is development-only."],
       "contracts": ["orchestrator.local 1.0 host", "ORC-LIF-001 lifecycle", "ORC-FE-001 local dispatch"]
     },
@@ -326,7 +326,7 @@
       "category": "Semantic core",
       "status": "OBSERVED Core 1.0 semantic dispatcher",
       "summary": "Validates transport-neutral requests, dispatches Core methods, projects immutable status/bootstrap state, brokers search, and owns deterministic shutdown state.",
-      "responsibilities": ["Validate attacker-controlled envelope fields before reflection.", "Enforce critical-extension, cancellation, deadline, contract, and response-budget law.", "Build status and frontend bootstrap snapshots from canonical catalogues.", "Route unified search through the typed provider port.", "Keep plugin and semantic-fact operations explicit stubs."],
+      "responsibilities": ["Validate attacker-controlled envelope fields before reflection.", "Enforce critical-extension, cancellation, deadline, contract, and response-budget law.", "Build status and frontend bootstrap snapshots from canonical catalogues.", "Route unified search through a separately locked typed provider port without holding lifecycle state.", "Keep plugin and semantic-fact operations explicit stubs."],
       "boundaries": ["Owns no socket, thread, UI, database, or provider-private type.", "Does not decide the external GUI.Forms or architect gates."],
       "contracts": ["ORC-COM-001", "ORC-LIF-001", "ORC-FE-001", "ORC-ENG-004"]
     },
@@ -337,6 +337,14 @@
       "responsibilities": ["Reject invalid state transitions.", "Publish immutable lifecycle snapshots.", "Support restart as a new process or explicit lifecycle generation."],
       "boundaries": ["Does not supervise processes or activate platform services."],
       "contracts": ["ORC-LIF-001"]
+    },
+    "src/worker_pool.rs": {
+      "category": "Worker infrastructure",
+      "status": "OBSERVED available internal compute primitive",
+      "summary": "Provides a persistent fixed-worker synchronous batch executor with bounded atomic range claims and one formally documented unsafe type-erasure seam.",
+      "responsibilities": ["Serialize borrowed batch publication.", "Claim every task exactly once with one acquire claim per participating worker and bounded relaxed range claims.", "Contain and count Rust task panics while draining remaining work.", "Join partial construction and destruction synchronously."],
+      "boundaries": ["Does not own service, provider, plugin, or filesystem authority.", "Does not replace blocking session workers or the owned Engine child worker.", "Makes no universal throughput-optimality claim."],
+      "contracts": ["Internal implementation primitive; no cross-project contract"]
     },
     "src/contract.rs": {
       "category": "Canonical catalogues",
@@ -413,8 +421,8 @@
     "src/engine_jsonl.rs": {
       "category": "Provider integration",
       "status": "OBSERVED bounded development adapter; not production IPC",
-      "summary": "Supervises a separately built Go Engine over correlated bounded JSONL and projects its catalogue/live responses into typed Orchestrator outcomes.",
-      "responsibilities": ["Bound Engine JSONL frames.", "Correlate exactly one response to each request.", "Validate version and required live-query capabilities.", "Map remote errors without empty-success substitution.", "Terminate the child on adapter drop."],
+      "summary": "Supervises a separately built Go Engine through one owned bounded worker over correlated JSONL and projects its catalogue/live responses into typed Orchestrator outcomes.",
+      "responsibilities": ["Bound Engine JSONL frames and the worker command queue.", "Correlate exactly one response to each request.", "Validate version and required live-query capabilities.", "Fail closed on worker panic or timeout and kill the owned child to break blocked I/O.", "Map remote errors without empty-success substitution.", "Stop, join, and reap the child on adapter drop."],
       "boundaries": ["Does not claim installed Engine discovery, authentication, endpoint separation, or service supervision."],
       "contracts": ["Development projection of ORC-ENG-001 and ORC-ENG-004"]
     }

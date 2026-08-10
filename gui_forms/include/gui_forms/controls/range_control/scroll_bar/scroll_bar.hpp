@@ -56,6 +56,8 @@ protected:
     void on_detached_from_window() noexcept override;
 
 private:
+    void paint_button(Painter& painter, Rect button, ScrollBarPart part,
+                      bool incrementing, const BasicControlStyle& colors);
     [[nodiscard]] double axis_coordinate(Point local_point) const noexcept;
     [[nodiscard]] double value_from_thumb_coordinate(double coordinate) const noexcept;
     bool apply_part(ScrollBarPart part);

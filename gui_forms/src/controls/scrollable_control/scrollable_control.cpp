@@ -155,22 +155,22 @@ Size ScrollableControl::content_extent() {
     const Insets own_padding = padding();
     const std::vector<Control::Ptr> retained = snapshot_layout_children();
     for (const Control::Ptr& child : retained) {
-        if (!is_current_layout_child(child) || !child->visible() ||
-            child->dock() != DockStyle::none) continue;
-        Rect bounds = child->requested_bounds();
-        if (child->auto_size()) {
-            const Size preferred = child->get_preferred_size({0.0, 0.0});
+        if (!is_current_layout_child(child) || !(*child).visible() ||
+            (*child).dock() != DockStyle::none) continue;
+        Rect bounds = (*child).requested_bounds();
+        if ((*child).auto_size()) {
+            const Size preferred = (*child).get_preferred_size({0.0, 0.0});
             if (!is_alive()) return extent;
-            if (!is_current_layout_child(child) || !child->visible() ||
-                child->dock() != DockStyle::none) {
+            if (!is_current_layout_child(child) || !(*child).visible() ||
+                (*child).dock() != DockStyle::none) {
                 continue;
             }
-            bounds.width = child->auto_size_mode() == AutoSizeMode::grow_only
+            bounds.width = (*child).auto_size_mode() == AutoSizeMode::grow_only
                 ? std::max(bounds.width, preferred.width) : preferred.width;
-            bounds.height = child->auto_size_mode() == AutoSizeMode::grow_only
+            bounds.height = (*child).auto_size_mode() == AutoSizeMode::grow_only
                 ? std::max(bounds.height, preferred.height) : preferred.height;
         }
-        const Insets child_margin = child->margin();
+        const Insets child_margin = (*child).margin();
         extent.width = std::max(
             extent.width,
             std::max(0.0, bounds.x) + bounds.width + child_margin.right +
@@ -281,9 +281,9 @@ void ScrollableControl::arrange(Rect final_bounds) {
     Control::arrange(final_bounds);
     if (scroll_position_ == Point{}) return;
     for (const Control::Ptr& child : children()) {
-        if (!child || !child->is_alive() || !child->visible() ||
-            child->dock() != DockStyle::none) continue;
-        Rect bounds = child->committed_arranged_bounds();
+        if (!child || !(*child).is_alive() || !(*child).visible() ||
+            (*child).dock() != DockStyle::none) continue;
+        Rect bounds = (*child).committed_arranged_bounds();
         bounds.x -= scroll_position_.x;
         bounds.y -= scroll_position_.y;
         set_child_layout(child, bounds);
@@ -370,9 +370,9 @@ Point ScrollableControl::scroll_to_control(const Control& control) const {
         // a control without inventing zero-sized arranged geometry.
         bounds = control.requested_bounds();
         for (Control::Ptr ancestor = control.parent(); ancestor;
-             ancestor = ancestor->parent()) {
+             ancestor = (*ancestor).parent()) {
             if (ancestor.get() == this) break;
-            const Rect parent_bounds = ancestor->requested_bounds();
+            const Rect parent_bounds = (*ancestor).requested_bounds();
             bounds.x += parent_bounds.x;
             bounds.y += parent_bounds.y;
         }
@@ -581,12 +581,8 @@ bool ScrollableControl::handle_scroll_pointer(PointerEvent& event) {
 
 bool ScrollableControl::handle_wheel(PointerEvent& event) {
     if (event.action != PointerAction::wheel || event.handled) return false;
-    auto normalized = [](double delta) {
-        if (delta == 0.0) return 0.0;
-        return std::abs(delta) <= 8.0 ? delta * 48.0 : delta;
-    };
-    const double vertical_delta = -normalized(event.wheel_delta.y);
-    const double horizontal_delta = -normalized(event.wheel_delta.x);
+    const double vertical_delta = -normalize_wheel_delta(event.wheel_delta.y);
+    const double horizontal_delta = -normalize_wheel_delta(event.wheel_delta.x);
     bool changed{};
     if (vertical_scroll_.visible_ && vertical_scroll_.enabled_ &&
         vertical_delta != 0.0) {
@@ -612,6 +608,11 @@ bool ScrollableControl::handle_wheel(PointerEvent& event) {
     }
     if (changed) event.handled = true;
     return changed;
+}
+
+double ScrollableControl::normalize_wheel_delta(double delta) noexcept {
+    if (delta == 0.0) return 0.0;
+    return std::abs(delta) <= 8.0 ? delta * 48.0 : delta;
 }
 
 void ScrollableControl::on_pointer(PointerEvent& event) {
@@ -701,35 +702,39 @@ std::vector<SemanticNode>
 ScrollableControl::semantic_virtual_children() const {
     std::vector<SemanticNode> result = Control::semantic_virtual_children();
     const Rect absolute = absolute_bounds();
-    auto append = [&](ScrollOrientation orientation,
-                      const ScrollProperties& axis) {
-        if (!axis.visible_) return;
-        SemanticNode node;
-        node.stable_id = std::string(stable_id().value()) +
-            (orientation == ScrollOrientation::horizontal
-                 ? ".horizontal-scroll" : ".vertical-scroll");
-        node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
-        node.role = SemanticRole::scroll_bar;
-        node.name = orientation == ScrollOrientation::horizontal
-            ? "Horizontal scroll bar" : "Vertical scroll bar";
-        node.numeric_value = axis.value_;
-        node.minimum_value = axis.minimum_;
-        node.maximum_value = axis.maximum_position();
-        const Rect local = axis_geometry(orientation).bar;
-        node.bounds = {absolute.x + local.x, absolute.y + local.y,
-                       local.width, local.height};
-        node.states = SemanticState::visible;
-        if (axis.enabled_ && effectively_enabled()) {
-            node.states |= SemanticState::enabled;
-            node.actions = {SemanticAction::increment,
-                            SemanticAction::decrement,
-                            SemanticAction::set_value};
-        }
-        result.push_back(std::move(node));
-    };
-    append(ScrollOrientation::horizontal, horizontal_scroll_);
-    append(ScrollOrientation::vertical, vertical_scroll_);
+    append_semantic_axis(result, absolute, ScrollOrientation::horizontal,
+                         horizontal_scroll_);
+    append_semantic_axis(result, absolute, ScrollOrientation::vertical,
+                         vertical_scroll_);
     return result;
+}
+
+void ScrollableControl::append_semantic_axis(
+    std::vector<SemanticNode>& nodes, Rect absolute,
+    ScrollOrientation orientation, const ScrollProperties& axis) const {
+    if (!axis.visible_) return;
+    SemanticNode node;
+    node.stable_id = std::string(stable_id().value()) +
+        (orientation == ScrollOrientation::horizontal
+             ? ".horizontal-scroll" : ".vertical-scroll");
+    node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+    node.role = SemanticRole::scroll_bar;
+    node.name = orientation == ScrollOrientation::horizontal
+        ? "Horizontal scroll bar" : "Vertical scroll bar";
+    node.numeric_value = axis.value_;
+    node.minimum_value = axis.minimum_;
+    node.maximum_value = axis.maximum_position();
+    const Rect local = axis_geometry(orientation).bar;
+    node.bounds = {absolute.x + local.x, absolute.y + local.y,
+                   local.width, local.height};
+    node.states = SemanticState::visible;
+    if (axis.enabled_ && effectively_enabled()) {
+        node.states |= SemanticState::enabled;
+        node.actions = {SemanticAction::increment,
+                        SemanticAction::decrement,
+                        SemanticAction::set_value};
+    }
+    nodes.push_back(std::move(node));
 }
 
 bool ScrollableControl::on_semantic_child_action(

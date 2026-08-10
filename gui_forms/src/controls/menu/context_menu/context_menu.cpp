@@ -38,7 +38,7 @@ struct ContextMenu::Impl final {
     explicit Impl(ContextMenu& public_owner) : owner(public_owner) {}
 
     [[nodiscard]] double text_scale() const noexcept {
-        return window ? window->presentation_settings().text_scale : 1.0;
+        return window ? (*window).presentation_settings().text_scale : 1.0;
     }
 
     class MenuLayer final : public Panel {
@@ -285,7 +285,7 @@ struct ContextMenu::Impl final {
         bool on_semantic_action(SemanticAction action,
                                 std::string_view) override {
             if (action == SemanticAction::focus) {
-                if (window()) return window()->request_focus(shared_from_this());
+                if (window()) return (*window()).request_focus(shared_from_this());
                 return false;
             }
             if (action == SemanticAction::press &&
@@ -332,28 +332,27 @@ struct ContextMenu::Impl final {
     void show(const Control::Ptr& invoker, Point position,
               const std::vector<MenuItemSpec>& specs) {
         close();
-        if (!invoker || !invoker->attached_window()) {
+        if (!invoker || !(*invoker).attached_window()) {
             throw std::logic_error("ContextMenu requires an attached owner control");
         }
         snapshot = snapshot_items(specs);
         if (snapshot.empty()) {
             throw std::logic_error("ContextMenu has no visible items to show");
         }
-        window = invoker->attached_window();
+        window = (*invoker).attached_window();
         owner_control = invoker;
-        const Size client = window->client_size();
+        const Size client = (*window).client_size();
         layer = make_control<MenuLayer>(
             StableId(owner.stable_id_ + ".popup.layer"), *this);
-        layer->set_requested_bounds({0.0, 0.0, client.width, client.height});
+        (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
         open_panel(0U, snapshot, position.x, position.y, {});
-        popup_token = window->open_popup(invoker, layer);
+        popup_token = (*window).open_popup(invoker, layer);
         if (Event<>* closed = popup_token.closed_event()) {
-            popup_revocation = closed->subscribe(owner, [this] {
-                on_popup_revoked();
-            });
+            popup_revocation = (*closed).subscribe(
+                owner, Delegate<>::bind<Impl, &Impl::on_popup_revoked>(*this));
         }
         Control::Ptr preferred = first_focusable(0U);
-        focus_scope = window->begin_focus_scope(layer, preferred);
+        focus_scope = (*window).begin_focus_scope(layer, preferred);
         open = true;
         owner.open_changed_.emit(true);
     }
@@ -363,7 +362,7 @@ struct ContextMenu::Impl final {
         closing = true;
         if (window && focus_scope) {
             try {
-                static_cast<void>(window->end_focus_scope(focus_scope));
+                static_cast<void>((*window).end_focus_scope(focus_scope));
             } catch (...) {
             }
         }
@@ -380,7 +379,7 @@ struct ContextMenu::Impl final {
         if (closing) return;
         if (window && focus_scope) {
             try {
-                static_cast<void>(window->end_focus_scope(
+                static_cast<void>((*window).end_focus_scope(
                     focus_scope, FocusScopeCloseReason::owner_unavailable));
             } catch (...) {
             }
@@ -406,7 +405,7 @@ struct ContextMenu::Impl final {
                     std::optional<std::size_t> parent_index) {
         if (!layer || !window || depth >= maximum_menu_depth) return;
         remove_panels_from(depth);
-        const Size client = window->client_size();
+        const Size client = (*window).client_size();
         const double panel_width = std::max(
             0.0, std::min(owner.preferred_width_ * text_scale(),
                           client.width - 8.0));
@@ -428,16 +427,16 @@ struct ContextMenu::Impl final {
         state.panel = make_control<MenuPanel>(
             StableId(owner.stable_id_ + ".popup.panel." + std::to_string(depth)),
             *this, depth);
-        state.panel->set_requested_bounds({x, y, panel_width, viewport});
+        (*state.panel).set_requested_bounds({x, y, panel_width, viewport});
         state.rows.reserve(items.size());
         for (std::size_t index = 0; index < items.size(); ++index) {
-            auto row = make_control<MenuRow>(
+            std::shared_ptr<gui_forms::ContextMenu::Impl::MenuRow> row = make_control<MenuRow>(
                 StableId(owner.stable_id_ + ".popup.row." + items[index].stable_id),
                 *this, depth, index, items[index]);
-            state.panel->add_child(row);
+            (*state.panel).add_child(row);
             state.rows.push_back(std::move(row));
         }
-        layer->add_child(state.panel);
+        (*layer).add_child(state.panel);
         panels.push_back(std::move(state));
         layout_rows(depth);
     }
@@ -448,10 +447,10 @@ struct ContextMenu::Impl final {
         double y = menu_border - state.scroll_offset;
         for (std::size_t index = 0; index < state.rows.size(); ++index) {
             const double height = row_height((*state.items)[index], text_scale());
-            state.rows[index]->set_requested_bounds(
+            (*state.rows[index]).set_requested_bounds(
                 {menu_border, y,
                  std::max(0.0, state.width - menu_border * 2.0), height});
-            state.rows[index]->set_visible(
+            (*state.rows[index]).set_visible(
                 y + height > menu_border && y < state.viewport_height - menu_border);
             y += height;
         }
@@ -459,10 +458,10 @@ struct ContextMenu::Impl final {
 
     void remove_panels_from(std::size_t depth) {
         while (panels.size() > depth) {
-            const auto panel = panels.back().panel;
+            const std::shared_ptr<MenuPanel> panel = panels.back().panel;
             panels.pop_back();
-            if (layer && panel && panel->parent().get() == layer.get()) {
-                static_cast<void>(layer->remove_child(panel->runtime_id()));
+            if (layer && panel && (*panel).parent().get() == layer.get()) {
+                static_cast<void>((*layer).remove_child((*panel).runtime_id()));
             }
         }
         if (depth > 0U && depth - 1U < panels.size()) {
@@ -476,11 +475,11 @@ struct ContextMenu::Impl final {
 
     [[nodiscard]] Control::Ptr first_focusable(std::size_t depth) const {
         if (depth >= panels.size()) return {};
-        for (const auto& row : panels[depth].rows) {
-            if (row->focusable() && row->effectively_visible()) return row;
+        for (const std::shared_ptr<gui_forms::ContextMenu::Impl::MenuRow>& row : panels[depth].rows) {
+            if ((*row).focusable() && (*row).effectively_visible()) return row;
         }
-        for (const auto& row : panels[depth].rows) {
-            if (row->focusable()) return row;
+        for (const std::shared_ptr<gui_forms::ContextMenu::Impl::MenuRow>& row : panels[depth].rows) {
+            if ((*row).focusable()) return row;
         }
         return {};
     }
@@ -521,10 +520,10 @@ struct ContextMenu::Impl final {
     void hover(std::size_t depth, std::size_t index) {
         if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
         for (std::size_t current = 0; current < panels[depth].rows.size(); ++current) {
-            panels[depth].rows[current]->set_hot(current == index);
+            (*panels[depth].rows[current]).set_hot(current == index);
         }
-        if (window && panels[depth].rows[index]->focusable()) {
-            static_cast<void>(window->request_focus(panels[depth].rows[index]));
+        if (window && (*panels[depth].rows[index]).focusable()) {
+            static_cast<void>((*window).request_focus(panels[depth].rows[index]));
         }
         const MenuSnapshot& item = (*panels[depth].items)[index];
         if (item.kind == MenuItemKind::submenu) {
@@ -540,9 +539,9 @@ struct ContextMenu::Impl final {
         if (item.kind != MenuItemKind::submenu || item.children.empty()) return;
         if (panels[depth].child_source_index != index ||
             panels.size() <= depth + 1U) {
-            const Rect parent = panels[depth].panel->absolute_bounds();
-            const Rect row = panels[depth].rows[index]->absolute_bounds();
-            const Size client = window->client_size();
+            const Rect parent = (*panels[depth].panel).absolute_bounds();
+            const Rect row = (*panels[depth].rows[index]).absolute_bounds();
+            const Size client = (*window).client_size();
             const double child_width = std::max(
                 0.0, std::min(owner.preferred_width_ * text_scale(),
                               client.width - 8.0));
@@ -556,7 +555,7 @@ struct ContextMenu::Impl final {
         }
         if (focus_first && window) {
             if (const Control::Ptr first = first_focusable(depth + 1U)) {
-                static_cast<void>(window->request_focus(first));
+                static_cast<void>((*window).request_focus(first));
             }
         }
     }
@@ -571,7 +570,7 @@ struct ContextMenu::Impl final {
         remove_panels_from(depth);
         if (window && parent && depth - 1U < panels.size() &&
             *parent < panels[depth - 1U].rows.size()) {
-            static_cast<void>(window->request_focus(
+            static_cast<void>((*window).request_focus(
                 panels[depth - 1U].rows[*parent]));
         }
     }
@@ -587,9 +586,9 @@ struct ContextMenu::Impl final {
                 (raw % static_cast<std::ptrdiff_t>(count) +
                  static_cast<std::ptrdiff_t>(count)) %
                 static_cast<std::ptrdiff_t>(count));
-            if (panels[depth].rows[candidate]->focusable()) {
+            if ((*panels[depth].rows[candidate]).focusable()) {
                 ensure_visible(depth, candidate);
-                if (window) static_cast<void>(window->request_focus(
+                if (window) static_cast<void>((*window).request_focus(
                     panels[depth].rows[candidate]));
                 return;
             }
@@ -598,20 +597,20 @@ struct ContextMenu::Impl final {
 
     void focus_edge(std::size_t depth, bool last) {
         if (depth >= panels.size()) return;
-        auto& rows = panels[depth].rows;
+        std::vector<std::shared_ptr<MenuRow>>& rows = panels[depth].rows;
         if (last) {
             for (std::size_t index = rows.size(); index > 0U; --index) {
-                if (rows[index - 1U]->focusable()) {
+                if ((*rows[index - 1U]).focusable()) {
                     ensure_visible(depth, index - 1U);
-                    if (window) static_cast<void>(window->request_focus(rows[index - 1U]));
+                    if (window) static_cast<void>((*window).request_focus(rows[index - 1U]));
                     return;
                 }
             }
         } else {
             for (std::size_t index = 0U; index < rows.size(); ++index) {
-                if (rows[index]->focusable()) {
+                if ((*rows[index]).focusable()) {
                     ensure_visible(depth, index);
-                    if (window) static_cast<void>(window->request_focus(rows[index]));
+                    if (window) static_cast<void>((*window).request_focus(rows[index]));
                     return;
                 }
             }
@@ -628,9 +627,9 @@ struct ContextMenu::Impl final {
         if (item.kind == MenuItemKind::separator || !item.command ||
             !item.command_state.enabled) return;
         const std::string source_id = std::string(
-            panels[depth].rows[index]->stable_id().value());
-        const std::string command_id = item.command->stable_id();
-        if (!item.command->execute(source_id)) return;
+            (*panels[depth].rows[index]).stable_id().value());
+        const std::string command_id = (*item.command).stable_id();
+        if (!(*item.command).execute(source_id)) return;
         MenuItemInvocation invocation{owner.stable_id_, item.stable_id,
                                       command_id, source_id};
         owner.item_invoked_.emit(invocation);
@@ -702,25 +701,25 @@ void ContextMenu::show(const Control::Ptr& owner, Point window_position) {
     if (!std::isfinite(window_position.x) || !std::isfinite(window_position.y)) {
         throw std::invalid_argument("ContextMenu position must be finite");
     }
-    impl_->show(owner, window_position, items_);
+    (*impl_).show(owner, window_position, items_);
 }
 
 void ContextMenu::close() noexcept {
-    if (impl_) impl_->close();
+    if (impl_) (*impl_).close();
 }
 
 bool ContextMenu::is_open() const noexcept {
-    return impl_ && impl_->open;
+    return impl_ && (*impl_).open;
 }
 
 void ContextMenu::set_root_navigation_handler(
     std::function<bool(int)> handler) {
-    impl_->root_navigation_handler = std::move(handler);
+    (*impl_).root_navigation_handler = std::move(handler);
 }
 
 void ContextMenu::set_outside_pointer_handler(
     std::function<bool(const PointerEvent&)> handler) {
-    impl_->outside_pointer_handler = std::move(handler);
+    (*impl_).outside_pointer_handler = std::move(handler);
 }
 
 void ContextMenu::on_dispose() noexcept {

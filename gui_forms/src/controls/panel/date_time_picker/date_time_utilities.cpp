@@ -147,25 +147,30 @@ bool civil_in_range(DateTimeValue value, DateTimeValue minimum,
     return result;
 }
 
+[[nodiscard]] bool valid_provider_text(const std::string& value) {
+    return !value.empty() && validate_utf8(value).valid();
+}
+
 void validate_provider(const DateTimeFormatProvider& provider) {
-    const auto valid_text = [](const std::string& value) {
-        return !value.empty() && validate_utf8(value).valid();
-    };
-    for (const auto& value : provider.month_names) {
-        if (!valid_text(value)) throw std::invalid_argument("DateTime month name");
+    for (const std::string& value : provider.month_names) {
+        if (!valid_provider_text(value))
+            throw std::invalid_argument("DateTime month name");
     }
-    for (const auto& value : provider.abbreviated_month_names) {
-        if (!valid_text(value)) throw std::invalid_argument("DateTime abbreviated month name");
+    for (const std::string& value : provider.abbreviated_month_names) {
+        if (!valid_provider_text(value))
+            throw std::invalid_argument("DateTime abbreviated month name");
     }
-    for (const auto& value : provider.day_names) {
-        if (!valid_text(value)) throw std::invalid_argument("DateTime day name");
+    for (const std::string& value : provider.day_names) {
+        if (!valid_provider_text(value))
+            throw std::invalid_argument("DateTime day name");
     }
-    for (const auto& value : provider.abbreviated_day_names) {
-        if (!valid_text(value)) throw std::invalid_argument("DateTime abbreviated day name");
+    for (const std::string& value : provider.abbreviated_day_names) {
+        if (!valid_provider_text(value))
+            throw std::invalid_argument("DateTime abbreviated day name");
     }
-    if (!valid_text(provider.long_date_pattern) ||
-        !valid_text(provider.short_date_pattern) ||
-        !valid_text(provider.time_pattern) ||
+    if (!valid_provider_text(provider.long_date_pattern) ||
+        !valid_provider_text(provider.short_date_pattern) ||
+        !valid_provider_text(provider.time_pattern) ||
         !validate_utf8(provider.am_designator).valid() ||
         !validate_utf8(provider.pm_designator).valid()) {
         throw std::invalid_argument("DateTime format provider text");
@@ -186,11 +191,11 @@ bool parse_iso_date(std::string_view text, DateTimeValue& value) {
     int year{};
     unsigned month{};
     unsigned day{};
-    const auto year_result =
+    const std::from_chars_result year_result =
         std::from_chars(text.data(), text.data() + 4U, year);
-    const auto month_result =
+    const std::from_chars_result month_result =
         std::from_chars(text.data() + 5U, text.data() + 7U, month);
-    const auto day_result =
+    const std::from_chars_result day_result =
         std::from_chars(text.data() + 8U, text.data() + 10U, day);
     if (year_result.ec != std::errc{} ||
         month_result.ec != std::errc{} ||

@@ -25,7 +25,15 @@ struct HostMonitor final {
     double scale{1.0};
     bool primary{};
 
-    friend bool operator==(const HostMonitor&, const HostMonitor&) = default;
+    friend bool operator==(const HostMonitor& left,
+                           const HostMonitor& right) noexcept(noexcept(
+        left.id == right.id && left.frame == right.frame &&
+        left.work_area == right.work_area && left.scale == right.scale &&
+        left.primary == right.primary)) {
+        return left.id == right.id && left.frame == right.frame &&
+               left.work_area == right.work_area && left.scale == right.scale &&
+               left.primary == right.primary;
+    }
 };
 
 enum class HostServiceError : std::uint8_t {
@@ -111,8 +119,12 @@ struct HostFileDialogFilter final {
     std::string label;
     std::vector<std::string> extensions;
 
-    friend bool operator==(const HostFileDialogFilter&,
-                           const HostFileDialogFilter&) = default;
+    friend bool operator==(const HostFileDialogFilter& left,
+                           const HostFileDialogFilter& right) noexcept(noexcept(
+        left.label == right.label && left.extensions == right.extensions)) {
+        return left.label == right.label &&
+               left.extensions == right.extensions;
+    }
 };
 
 struct HostMessageDialogRequest final {

@@ -26,8 +26,15 @@ struct SemanticFeedbackRecord final {
     bool sound_enabled{};
     bool host_accepted{};
     bool sound_presented{};
-    friend constexpr bool operator==(const SemanticFeedbackRecord&,
-                                     const SemanticFeedbackRecord&) = default;
+    friend constexpr bool operator==(const SemanticFeedbackRecord& left,
+                                     const SemanticFeedbackRecord& right) noexcept {
+        return left.sequence == right.sequence && left.kind == right.kind &&
+               left.cue == right.cue &&
+               left.timestamp_nanoseconds == right.timestamp_nanoseconds &&
+               left.sound_enabled == right.sound_enabled &&
+               left.host_accepted == right.host_accepted &&
+               left.sound_presented == right.sound_presented;
+    }
 };
 
 [[nodiscard]] const char* semantic_feedback_kind_name(

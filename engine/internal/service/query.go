@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"path/filepath"
 	"time"
 
 	"filemanager/engine/api"
@@ -88,10 +89,17 @@ func (s *Service) QueryLive(ctx context.Context, query api.LiveQuery) (api.LiveQ
 	if err != nil || resolved != projection.Spec.Path {
 		return api.LiveQueryResponse{}, api.WrapFault(api.ErrorUnapprovedRoot, "approved live-query root no longer resolves inside the sandbox", err)
 	}
+	scopeRelative := filepath.Clean(filepath.FromSlash(query.Scope.RelativePath))
+	if query.Scope.RelativePath == "" {
+		scopeRelative = "."
+	}
+	if !s.guard.Allows(projection.Spec.ID, filepath.Join(projection.Spec.Path, scopeRelative)) {
+		return api.LiveQueryResponse{}, api.NewFault(api.ErrorUnapprovedRoot, "live-query scope is excluded by the approved root policy")
+	}
 	owns := func(root api.RootID, absolute string) bool {
 		return snapshot.Owns(root, absolute) && s.guard.Allows(root, absolute)
 	}
-	return s.live.Query(ctx, projection.Spec, query, owns)
+	return s.live.Query(ctx, projection.Spec, s.guard.ExpectedObjectID(projection.Spec.ID), query, owns)
 }
 
 // Inspect returns one exact record and its stored provenance. A hard-linked

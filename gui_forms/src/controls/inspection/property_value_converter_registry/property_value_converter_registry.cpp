@@ -55,17 +55,18 @@ void PropertyValueConverterRegistry::clear_kind(BindingValueKind kind) {
 
 std::optional<std::string> PropertyValueConverterRegistry::converter_for(
     BindingValueKind kind) const {
-    const auto found = kind_mappings_.find(kind);
+    const KindMap::const_iterator found = kind_mappings_.find(kind);
     return found == kind_mappings_.end()
         ? std::optional<std::string>{}
-        : std::optional<std::string>{found->second};
+        : std::optional<std::string>{(*found).second};
 }
 
 const PropertyValueConverter* PropertyValueConverterRegistry::find(
     std::string_view name) const noexcept {
     if (name.empty() || !validate_utf8(name).valid()) return nullptr;
-    const auto found = converters_.find(canonical_binding_name(name));
-    return found == converters_.end() ? nullptr : &found->second;
+    const ConverterMap::const_iterator found =
+        converters_.find(canonical_binding_name(name));
+    return found == converters_.end() ? nullptr : &(*found).second;
 }
 
 std::string PropertyValueConverterRegistry::format(
@@ -73,14 +74,14 @@ std::string PropertyValueConverterRegistry::format(
     if (binding_value_kind(value) == BindingValueKind::null) return "(none)";
     std::string service = descriptor.converter_name;
     if (service.empty()) {
-        const auto mapped = converter_for(descriptor.kind);
+        const std::optional<std::string> mapped = converter_for(descriptor.kind);
         if (mapped) service = *mapped;
     }
     const PropertyValueConverter* converter = find(service);
     std::string result = converter
-        ? (converter->format_with_context
-               ? converter->format_with_context(value, descriptor, context_)
-               : converter->format(value, descriptor))
+        ? ((*converter).format_with_context
+               ? (*converter).format_with_context(value, descriptor, context_)
+               : (*converter).format(value, descriptor))
         : binding_value_to_string(value);
     if (result.size() > 64U * 1024U || !validate_utf8(result).valid()) {
         throw std::invalid_argument(
@@ -103,15 +104,15 @@ std::optional<BindingValue> PropertyValueConverterRegistry::parse(
     if (descriptor.standard_values_exclusive) return {};
     std::string service = descriptor.converter_name;
     if (service.empty()) {
-        const auto mapped = converter_for(descriptor.kind);
+        const std::optional<std::string> mapped = converter_for(descriptor.kind);
         if (mapped) service = *mapped;
     }
     const PropertyValueConverter* converter = find(service);
     if (!converter) return {};
-    const auto result = converter->parse_with_context
-        ? converter->parse_with_context(text, current, descriptor, context_)
-        : converter->parse(text, current, descriptor);
-    const auto converted = result
+    const std::optional<BindingValue> result = (*converter).parse_with_context
+        ? (*converter).parse_with_context(text, current, descriptor, context_)
+        : (*converter).parse(text, current, descriptor);
+    const std::optional<BindingValue> converted = result
         ? convert_property_value(*result, descriptor)
         : std::optional<BindingValue>{};
     return converted && valid_property_value_tree(*converted)
@@ -126,11 +127,11 @@ void PropertyValueConverterRegistry::set_context(
 
 std::shared_ptr<PropertyValueConverterRegistry>
 PropertyValueConverterRegistry::create_default() {
-    auto result = std::make_shared<PropertyValueConverterRegistry>();
+    std::shared_ptr<gui_forms::PropertyValueConverterRegistry> result = std::make_shared<PropertyValueConverterRegistry>();
     PropertyValueConverter invariant;
     invariant.format = [](const BindingValue& value,
                           const PropertyDescriptor&) {
-        if (const auto* boolean = std::get_if<bool>(&value)) {
+        if (const bool* boolean = std::get_if<bool>(&value)) {
             return std::string(*boolean ? "True" : "False");
         }
         return binding_value_to_string(value);
@@ -143,7 +144,7 @@ PropertyValueConverterRegistry::create_default() {
     invariant.format_with_context = [](
         const BindingValue& value, const PropertyDescriptor& descriptor,
         const PropertyConversionContext& context) {
-        if (const auto* boolean = std::get_if<bool>(&value)) {
+        if (const bool* boolean = std::get_if<bool>(&value)) {
             return std::string(*boolean ? "True" : "False");
         }
         std::string formatted = binding_value_to_string(value);
@@ -161,7 +162,7 @@ PropertyValueConverterRegistry::create_default() {
         if (descriptor.kind == BindingValueKind::signed_integer ||
             descriptor.kind == BindingValueKind::unsigned_integer ||
             descriptor.kind == BindingValueKind::number) {
-            const auto normalized = invariant_number_text(text, context);
+            const std::optional<std::string> normalized = invariant_number_text(text, context);
             return normalized
                 ? convert_property_value(BindingValue{*normalized}, descriptor)
                 : std::optional<BindingValue>{};
@@ -169,27 +170,27 @@ PropertyValueConverterRegistry::create_default() {
         return convert_property_value(BindingValue{std::string(text)},
                                       descriptor);
     };
-    static_cast<void>(result->register_converter("invariant", invariant));
+    static_cast<void>((*result).register_converter("invariant", invariant));
     for (const BindingValueKind kind : {
              BindingValueKind::boolean, BindingValueKind::signed_integer,
              BindingValueKind::unsigned_integer, BindingValueKind::number,
              BindingValueKind::text, BindingValueKind::enumeration}) {
-        result->map_kind(kind, "invariant");
+        (*result).map_kind(kind, "invariant");
     }
     PropertyValueConverter color_hex;
     color_hex.format = [](const BindingValue& value,
                           const PropertyDescriptor&) {
-        const auto* color = std::get_if<Color>(&value);
+        const gui_forms::Color* color = std::get_if<Color>(&value);
         return color ? ColorValueEditor::format_value(*color) : std::string{};
     };
     color_hex.parse = [](std::string_view text, const BindingValue&,
                          const PropertyDescriptor&) -> std::optional<BindingValue> {
-        const auto color = ColorValueEditor::parse_value(text);
+        const std::optional<Color> color = ColorValueEditor::parse_value(text);
         return color ? std::optional<BindingValue>{BindingValue{*color}}
                      : std::optional<BindingValue>{};
     };
-    static_cast<void>(result->register_converter("color-hex", color_hex));
-    result->map_kind(BindingValueKind::color, "color-hex");
+    static_cast<void>((*result).register_converter("color-hex", color_hex));
+    (*result).map_kind(BindingValueKind::color, "color-hex");
     return result;
 }
 

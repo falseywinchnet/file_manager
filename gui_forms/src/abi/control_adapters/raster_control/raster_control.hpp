@@ -36,7 +36,7 @@ public:
         require_mutable();
         if (encoded.empty()) {
             if (window() != nullptr && image_.value != 0) {
-                static_cast<void>(window()->remove_image(image_));
+                static_cast<void>((*window()).remove_image(image_));
             }
             image_ = {};
             encoded_.clear();
@@ -47,7 +47,7 @@ public:
             invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
             return true;
         }
-        const auto validation = gui_forms::validate_png(encoded);
+        const PngValidationResult validation = gui_forms::validate_png(encoded);
         if (!validation) {
             return false;
         }
@@ -59,9 +59,9 @@ public:
         bool replacement_invalidated = false;
         if (window() != nullptr) {
             const bool replacing = image_.value != 0;
-            const auto loaded = replacing
-                ? window()->replace_png(image_, encoded_, *this)
-                : window()->load_png(encoded_);
+            const ImageLoadResult loaded = replacing
+                ? (*window()).replace_png(image_, encoded_, *this)
+                : (*window()).load_png(encoded_);
             if (!loaded) {
                 return false;
             }
@@ -86,13 +86,13 @@ public:
             const bool replacing = image_.value != 0;
             const bool same_size = replacing && width == pixel_width_ &&
                 height == pixel_height_;
-            const auto loaded = same_size
-                ? window()->update_bgra32_premultiplied(
+            const ImageLoadResult loaded = same_size
+                ? (*window()).update_bgra32_premultiplied(
                     image_, width, height, row_bytes, pixels, *this)
                 : replacing
-                ? window()->replace_bgra32_premultiplied(
+                ? (*window()).replace_bgra32_premultiplied(
                     image_, width, height, row_bytes, pixels, *this)
-                : window()->load_bgra32_premultiplied(
+                : (*window()).load_bgra32_premultiplied(
                     width, height, row_bytes, pixels);
             if (!loaded) {
                 return false;
@@ -140,7 +140,7 @@ public:
         const Rect bounds = committed_arranged_bounds();
         if (live_surface_) {
             const std::uint64_t candidate_generation =
-                live_surface_->snapshot().published_generation;
+                (*live_surface_).snapshot().published_generation;
             painter.draw_live_surface(live_surface_,
                                       {0.0, 0.0, bounds.width, bounds.height},
                                       1.0);
@@ -149,11 +149,11 @@ public:
             // prevents a fast producer from filling the UI queue while one
             // frame is still waiting to render. If publication raced the
             // paint, latest-frame semantics request exactly one follow-up.
-            const auto wake_state = live_wake_state_;
-            if (wake_state && wake_state->connected.load(
+            const std::shared_ptr<LiveWakeState> wake_state = live_wake_state_;
+            if (wake_state && (*wake_state).connected.load(
                                   std::memory_order_acquire)) {
-                wake_state->queued.store(false, std::memory_order_release);
-                if (live_surface_->snapshot().published_generation !=
+                (*wake_state).queued.store(false, std::memory_order_release);
+                if ((*live_surface_).snapshot().published_generation !=
                     candidate_generation) {
                     queue_live_surface_paint(
                         std::static_pointer_cast<RasterControl>(
@@ -202,9 +202,9 @@ protected:
     void on_attached_to_window() override {
         ScrollableControl::on_attached_to_window();
         if (!encoded_.empty() && image_.value == 0) {
-            const auto loaded = encoding_ == ImageResourceEncoding::png
-                ? window()->load_png(encoded_)
-                : window()->load_bgra32_premultiplied(
+            const ImageLoadResult loaded = encoding_ == ImageResourceEncoding::png
+                ? (*window()).load_png(encoded_)
+                : (*window()).load_bgra32_premultiplied(
                     pixel_width_, pixel_height_, pixel_row_bytes_, encoded_);
             if (loaded) {
                 image_ = loaded.image;
@@ -216,16 +216,16 @@ protected:
     void on_detached_from_window() noexcept override {
         disconnect_live_surface_wake();
         if (window() != nullptr && image_.value != 0) {
-            if (const auto resource = window()->image_resources().find(image_);
+            if (const std::optional<ImageResourceView> resource = (*window()).image_resources().find(image_);
                 resource &&
-                resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
+                (*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
                 try {
-                    encoded_.assign(resource->encoded.begin(), resource->encoded.end());
+                    encoded_.assign((*resource).encoded.begin(), (*resource).encoded.end());
                 } catch (...) {
                     encoded_.clear();
                 }
             }
-            static_cast<void>(window()->remove_image(image_));
+            static_cast<void>((*window()).remove_image(image_));
         }
         image_ = {};
         ScrollableControl::on_detached_from_window();
@@ -240,64 +240,64 @@ private:
     static void queue_live_surface_paint(
         const std::weak_ptr<RasterControl>& weak_target,
         const std::weak_ptr<LiveWakeState>& weak_state) noexcept {
-        const auto state = weak_state.lock();
-        if (!state || !state->connected.load(std::memory_order_acquire) ||
-            state->queued.exchange(true, std::memory_order_acq_rel)) {
+        const std::shared_ptr<gui_forms::abi::detail::RasterControl::LiveWakeState> state = weak_state.lock();
+        if (!state || !(*state).connected.load(std::memory_order_acquire) ||
+            (*state).queued.exchange(true, std::memory_order_acq_rel)) {
             return;
         }
-        const auto target = weak_target.lock();
+        const std::shared_ptr<gui_forms::abi::detail::RasterControl> target = weak_target.lock();
         if (!target) {
-            state->queued.store(false, std::memory_order_release);
+            (*state).queued.store(false, std::memory_order_release);
             return;
         }
         try {
-            static_cast<void>(target->begin_invoke(
+            static_cast<void>((*target).begin_invoke(
                 [weak_target, weak_state] {
-                    const auto queued_state = weak_state.lock();
-                    if (!queued_state || !queued_state->connected.load(
+                    const std::shared_ptr<gui_forms::abi::detail::RasterControl::LiveWakeState> queued_state = weak_state.lock();
+                    if (!queued_state || !(*queued_state).connected.load(
                                              std::memory_order_acquire)) {
                         return;
                     }
-                    if (const auto queued_target = weak_target.lock()) {
-                        if (auto* owner = queued_target->window();
+                    if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> queued_target = weak_target.lock()) {
+                        if (Window* owner = (*queued_target).window();
                             owner != nullptr &&
-                            owner->queue_live_surface_presentation(
-                                queued_target, queued_target->live_surface_)) {
+                            (*owner).queue_live_surface_presentation(
+                                queued_target, (*queued_target).live_surface_)) {
                             // The host consumes the newest immutable generation
                             // as a compositor layer. Rearm publication now;
                             // no retained paint transaction is outstanding.
-                            queued_state->queued.store(
+                            (*queued_state).queued.store(
                                 false, std::memory_order_release);
                             return;
                         }
-                        queued_target->invalidate(
+                        (*queued_target).invalidate(
                             gui_forms::invalidation::paint_only);
                     }
                     // Do not rearm here. The retained paint transaction owns
                     // release after it samples the newest complete candidate.
                 }));
         } catch (...) {
-            state->queued.store(false, std::memory_order_release);
+            (*state).queued.store(false, std::memory_order_release);
         }
     }
 
     void connect_live_surface_wake() {
         disconnect_live_surface_wake();
         if (!live_surface_ || window() == nullptr) return;
-        const auto self = std::static_pointer_cast<RasterControl>(
+        const std::shared_ptr<gui_forms::abi::detail::RasterControl> self = std::static_pointer_cast<RasterControl>(
             shared_from_this());
-        if (window()->queue_live_surface_presentation(self, live_surface_)) {
+        if ((*window()).queue_live_surface_presentation(self, live_surface_)) {
             // Registration is persistent. The terminal host display clock now
             // samples newest generations; producer publication must not post
             // one dispatcher callback per frame.
             live_surface_direct_ = true;
             return;
         }
-        auto wake_state = std::make_shared<LiveWakeState>();
+        std::shared_ptr<gui_forms::abi::detail::RasterControl::LiveWakeState> wake_state = std::make_shared<LiveWakeState>();
         live_wake_state_ = wake_state;
         const std::weak_ptr<RasterControl> weak_target =
             self;
-        live_wake_ = live_surface_->connect_presentation_wake(
+        live_wake_ = (*live_surface_).connect_presentation_wake(
             [weak_target, weak_state = std::weak_ptr<LiveWakeState>(wake_state)] {
                 queue_live_surface_paint(weak_target, weak_state);
             });
@@ -306,7 +306,7 @@ private:
     void disconnect_live_surface_wake() noexcept {
         live_surface_direct_ = false;
         if (live_wake_state_) {
-            live_wake_state_->connected.store(false, std::memory_order_release);
+            (*live_wake_state_).connected.store(false, std::memory_order_release);
         }
         live_wake_.disconnect();
         live_wake_state_.reset();

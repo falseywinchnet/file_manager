@@ -29,10 +29,12 @@ struct DispatchWork final {
 };
 
 struct DispatcherState final {
+    using Queue = std::deque<std::shared_ptr<DispatchWork>>;
+
     explicit DispatcherState(std::thread::id thread) : ui_thread(thread) {}
 
     mutable std::mutex mutex;
-    std::deque<std::shared_ptr<DispatchWork>> queue;
+    Queue queue;
     std::function<void()> wake;
     std::thread::id ui_thread;
     std::uint64_t next_sequence{1U};

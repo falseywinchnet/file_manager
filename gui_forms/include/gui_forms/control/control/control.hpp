@@ -18,11 +18,13 @@
 #include <compare>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <map>
 #include <mutex>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -44,11 +46,47 @@ struct HelpRequestEvent;
 namespace detail {
 class DisplayChunk;
 struct DispatcherState;
+
+template <typename ControlType, typename = void>
+struct HasControlTreeInitializer final : std::false_type {};
+
+template <typename ControlType>
+struct HasControlTreeInitializer<
+    ControlType,
+    std::void_t<decltype(std::declval<ControlType&>().initialize_control_tree())>>
+    final : std::true_type {};
+
+template <typename EventType, typename... Values>
+class DeferredEventPublication final {
+public:
+    DeferredEventPublication(EventType& event, Values... values)
+        : event_(&event), values_(std::move(values)...) {}
+
+    void operator()() {
+        emit(std::index_sequence_for<Values...>{});
+    }
+
+private:
+    template <std::size_t... Indexes>
+    void emit(std::index_sequence<Indexes...>) {
+        (*event_).emit(std::get<Indexes>(values_)...);
+    }
+
+    EventType* event_{};
+    std::tuple<Values...> values_;
+};
 }
 
 struct RuntimeId {
     std::uint64_t value{};
-    friend constexpr auto operator<=>(const RuntimeId&, const RuntimeId&) = default;
+    friend constexpr bool operator==(const RuntimeId& left,
+                                     const RuntimeId& right) noexcept {
+        return left.value == right.value;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const RuntimeId& left, const RuntimeId& right) noexcept {
+        return left.value <=> right.value;
+    }
 };
 
 enum class DockStyle : std::uint8_t {
@@ -608,15 +646,13 @@ protected:
     // re-entering a partially initialized native control.
     template <typename... EventArguments, typename... Values>
     void publish_change(Event<EventArguments...>& event, Values&&... values) {
-        auto payload = std::make_tuple(
-            std::decay_t<Values>(std::forward<Values>(values))...);
+        using Publication = detail::DeferredEventPublication<
+            Event<EventArguments...>, std::decay_t<Values>...>;
         publish_change(
             static_cast<const void*>(&event),
-            [&event, payload = std::move(payload)]() mutable {
-                std::apply(
-                    [&event](auto&... stored) { event.emit(stored...); },
-                    payload);
-            });
+            Publication(event,
+                        std::decay_t<Values>(
+                            std::forward<Values>(values))...));
     }
     // Language/object adapters may use Control solely as the retained lifetime
     // and PropertyGrid owner. They clear the stock visual schema before
@@ -657,11 +693,36 @@ private:
     void verify_dispose_thread() override;
     void publish_change(const void* event_key,
                         std::function<void()> publication);
+    void define_structural_property(PropertyDescriptor descriptor,
+                                    PropertyRegistration::Getter get,
+                                    PropertyRegistration::Setter set);
+    [[nodiscard]] static bool tab_order_less(const Ptr& left,
+                                             const Ptr& right) noexcept;
+    static void collect_tab_order_controls(const Control& owner,
+                                           std::vector<Ptr>& ordered);
+    static void apply_subtree_dirty(Control& control, Dirty requested_dirty);
+    static void collect_mnemonic_candidates(const Ptr& control,
+                                            char32_t character,
+                                            std::vector<Ptr>& candidates);
+    [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
+        dock_style_property_enum();
+    [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
+        anchor_styles_property_enum();
+    [[nodiscard]] static std::shared_ptr<const PropertyEnumDescriptor>
+        auto_size_mode_property_enum();
+    [[nodiscard]] static BindingValue current_enum_property_value(
+        std::shared_ptr<const PropertyEnumDescriptor> enumeration,
+        std::int64_t value);
 
     struct DeferredInitializationChange final {
         const void* event_key{};
         std::function<void()> publication;
     };
+    using ChildList = std::vector<Ptr>;
+    using ProviderTextMap = std::map<std::uint64_t, std::string>;
+    using BindablePropertyMap = std::map<std::string, BindableProperty>;
+    using DeferredInitializationChangeList =
+        std::vector<DeferredInitializationChange>;
 
     static std::atomic<std::uint64_t> next_runtime_id_;
     RuntimeId runtime_id_;
@@ -669,7 +730,7 @@ private:
     std::string name_;
     std::any tag_;
     WeakPtr parent_;
-    std::vector<Ptr> children_;
+    ChildList children_;
     Window* window_{};
     // Atomic shared_ptr free functions make BeginInvoke safe to acquire from a
     // worker while the UI thread attaches or detaches this control.
@@ -719,8 +780,8 @@ private:
     std::string accessible_description_;
     // Ordered by provider identity so semantic traces remain byte-for-byte
     // deterministic when multiple nonvisual providers extend one control.
-    std::map<std::uint64_t, std::string> provider_errors_;
-    std::map<std::uint64_t, std::string> provider_help_;
+    ProviderTextMap provider_errors_;
+    ProviderTextMap provider_help_;
     Event<Dirty, bool> initialization_completed_;
     Event<const std::string&> name_changed_;
     Event<bool> visible_changed_;
@@ -733,34 +794,240 @@ private:
     Event<bool> focus_observed_;
     Event<Rect> arranged_bounds_changed_;
     Event<HelpRequestEvent&> help_requested_;
-    std::map<std::string, BindableProperty> bindable_properties_;
+    BindablePropertyMap bindable_properties_;
     mutable std::unique_ptr<ControlBindingsCollection> data_bindings_;
     Dirty pending_initialization_dirty_{Dirty::none};
     std::uint64_t initialization_depth_{};
     bool pending_initialization_subtree_{};
-    std::vector<DeferredInitializationChange>
-        pending_initialization_changes_;
+    DeferredInitializationChangeList pending_initialization_changes_;
     bool lifecycle_notification_{};
     std::uint32_t layout_suspend_depth_{};
     bool layout_deferred_{};
     std::uint64_t layout_requested_revision_{};
     std::uint64_t layout_committed_revision_{};
+
+    enum class RegisteredProperty : std::uint8_t {
+        name,
+        visible,
+        enabled,
+        auto_size,
+        causes_validation,
+        bounds,
+        minimum_size,
+        maximum_size,
+        margin,
+        padding,
+        auto_scroll_offset,
+        dock,
+        anchor,
+        auto_size_mode,
+        tab_index,
+        tab_stop,
+        allow_drop,
+        hit_test_transparent,
+        accessible_name,
+        accessible_description,
+    };
+
+    template <RegisteredProperty Property>
+    struct RegisteredPropertyGetter final {
+        Control* control{};
+
+        BindingValue operator()() const {
+            if constexpr (Property == RegisteredProperty::name) {
+                return BindingValue{(*control).name_};
+            } else if constexpr (Property == RegisteredProperty::visible) {
+                return BindingValue{(*control).visible_};
+            } else if constexpr (Property == RegisteredProperty::enabled) {
+                return BindingValue{(*control).enabled_};
+            } else if constexpr (Property == RegisteredProperty::auto_size) {
+                return BindingValue{(*control).auto_size()};
+            } else if constexpr (
+                Property == RegisteredProperty::causes_validation) {
+                return BindingValue{(*control).causes_validation_};
+            } else if constexpr (Property == RegisteredProperty::bounds) {
+                return BindingValue{(*control).requested_bounds_};
+            } else if constexpr (
+                Property == RegisteredProperty::minimum_size) {
+                return BindingValue{(*control).minimum_size_};
+            } else if constexpr (
+                Property == RegisteredProperty::maximum_size) {
+                return BindingValue{(*control).maximum_size_};
+            } else if constexpr (Property == RegisteredProperty::margin) {
+                return BindingValue{(*control).margin_};
+            } else if constexpr (Property == RegisteredProperty::padding) {
+                return BindingValue{(*control).padding_};
+            } else if constexpr (
+                Property == RegisteredProperty::auto_scroll_offset) {
+                return BindingValue{(*control).auto_scroll_offset_};
+            } else if constexpr (Property == RegisteredProperty::dock) {
+                return Control::current_enum_property_value(
+                    Control::dock_style_property_enum(),
+                    static_cast<std::int64_t>((*control).dock_));
+            } else if constexpr (Property == RegisteredProperty::anchor) {
+                return Control::current_enum_property_value(
+                    Control::anchor_styles_property_enum(),
+                    static_cast<std::int64_t>((*control).anchor_));
+            } else if constexpr (
+                Property == RegisteredProperty::auto_size_mode) {
+                return Control::current_enum_property_value(
+                    Control::auto_size_mode_property_enum(),
+                    static_cast<std::int64_t>((*control).auto_size_mode_));
+            } else if constexpr (Property == RegisteredProperty::tab_index) {
+                return BindingValue{static_cast<std::uint64_t>(
+                    (*control).tab_index_)};
+            } else if constexpr (Property == RegisteredProperty::tab_stop) {
+                return BindingValue{(*control).tab_stop_};
+            } else if constexpr (Property == RegisteredProperty::allow_drop) {
+                return BindingValue{(*control).allow_drop_};
+            } else if constexpr (
+                Property == RegisteredProperty::hit_test_transparent) {
+                return BindingValue{(*control).hit_test_transparent_};
+            } else if constexpr (
+                Property == RegisteredProperty::accessible_name) {
+                return BindingValue{(*control).accessible_name_};
+            } else {
+                static_assert(
+                    Property == RegisteredProperty::accessible_description);
+                return BindingValue{(*control).accessible_description_};
+            }
+        }
+    };
+
+    template <RegisteredProperty Property>
+    struct RegisteredPropertySetter final {
+        Control* control{};
+
+        void operator()(const BindingValue& value) const {
+            if constexpr (Property == RegisteredProperty::name) {
+                const std::optional<BindingValue> converted =
+                    convert_binding_value(value, BindingValueKind::text);
+                if (!converted) {
+                    throw std::invalid_argument("Name binding requires text");
+                }
+                (*control).set_name(std::get<std::string>(*converted));
+            } else if constexpr (Property == RegisteredProperty::visible) {
+                const std::optional<BindingValue> converted =
+                    convert_binding_value(value, BindingValueKind::boolean);
+                if (!converted) {
+                    throw std::invalid_argument(
+                        "Visible binding requires Boolean");
+                }
+                (*control).set_visible(std::get<bool>(*converted));
+            } else if constexpr (Property == RegisteredProperty::enabled) {
+                const std::optional<BindingValue> converted =
+                    convert_binding_value(value, BindingValueKind::boolean);
+                if (!converted) {
+                    throw std::invalid_argument(
+                        "Enabled binding requires Boolean");
+                }
+                (*control).set_enabled(std::get<bool>(*converted));
+            } else if constexpr (Property == RegisteredProperty::auto_size) {
+                (*control).set_auto_size(std::get<bool>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::causes_validation) {
+                (*control).set_causes_validation(std::get<bool>(value));
+            } else if constexpr (Property == RegisteredProperty::bounds) {
+                (*control).set_requested_bounds(std::get<Rect>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::minimum_size) {
+                (*control).set_minimum_size(std::get<Size>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::maximum_size) {
+                (*control).set_maximum_size(std::get<Size>(value));
+            } else if constexpr (Property == RegisteredProperty::margin) {
+                (*control).set_margin(std::get<Insets>(value));
+            } else if constexpr (Property == RegisteredProperty::padding) {
+                (*control).set_padding(std::get<Insets>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::auto_scroll_offset) {
+                (*control).set_auto_scroll_offset(std::get<Point>(value));
+            } else if constexpr (Property == RegisteredProperty::dock) {
+                (*control).set_dock(static_cast<DockStyle>(
+                    std::get<PropertyEnumValue>(value).value));
+            } else if constexpr (Property == RegisteredProperty::anchor) {
+                (*control).set_anchor(static_cast<AnchorStyles>(
+                    std::get<PropertyEnumValue>(value).value));
+            } else if constexpr (
+                Property == RegisteredProperty::auto_size_mode) {
+                (*control).set_auto_size_mode(static_cast<AutoSizeMode>(
+                    std::get<PropertyEnumValue>(value).value));
+            } else if constexpr (Property == RegisteredProperty::tab_index) {
+                const std::uint64_t index = std::get<std::uint64_t>(value);
+                if (index > std::numeric_limits<std::uint32_t>::max()) {
+                    throw std::out_of_range(
+                        "GUI.Forms TabIndex exceeds UInt32");
+                }
+                (*control).set_tab_index(static_cast<std::uint32_t>(index));
+            } else if constexpr (Property == RegisteredProperty::tab_stop) {
+                (*control).set_tab_stop(std::get<bool>(value));
+            } else if constexpr (Property == RegisteredProperty::allow_drop) {
+                (*control).set_allow_drop(std::get<bool>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::hit_test_transparent) {
+                (*control).set_hit_test_transparent(std::get<bool>(value));
+            } else if constexpr (
+                Property == RegisteredProperty::accessible_name) {
+                (*control).set_accessible_name(std::get<std::string>(value));
+            } else {
+                static_assert(
+                    Property == RegisteredProperty::accessible_description);
+                (*control).set_accessible_description(
+                    std::get<std::string>(value));
+            }
+        }
+    };
+
+    struct RegisteredPropertyChangeRelay final {
+        std::function<void()> changed;
+
+        template <typename Value>
+        void operator()(const Value&) const {
+            changed();
+        }
+    };
+
+    template <RegisteredProperty Property>
+    struct RegisteredPropertyConnector final {
+        Control* control{};
+
+        SubscriptionToken operator()(Component& owner,
+                                     std::function<void()> changed) const {
+            RegisteredPropertyChangeRelay relay{std::move(changed)};
+            if constexpr (Property == RegisteredProperty::name) {
+                return (*control).name_changed_.subscribe(owner,
+                                                          std::move(relay));
+            } else if constexpr (Property == RegisteredProperty::visible) {
+                return (*control).visible_changed_.subscribe(
+                    owner, std::move(relay));
+            } else if constexpr (Property == RegisteredProperty::enabled) {
+                return (*control).enabled_changed_.subscribe(
+                    owner, std::move(relay));
+            } else if constexpr (Property == RegisteredProperty::auto_size) {
+                return (*control).auto_size_changed_.subscribe(
+                    owner, std::move(relay));
+            } else {
+                static_assert(
+                    Property == RegisteredProperty::causes_validation);
+                return (*control).causes_validation_changed_.subscribe(
+                    owner, std::move(relay));
+            }
+        }
+    };
 };
 
 template <typename ControlType, typename... Arguments>
 [[nodiscard]] std::shared_ptr<ControlType> make_control(StableId stable_id,
                                                         Arguments&&... arguments) {
     static_assert(std::is_base_of_v<Control, ControlType>);
-    auto control = std::make_shared<ControlType>(
+    std::shared_ptr<ControlType> control = std::make_shared<ControlType>(
         std::move(stable_id), std::forward<Arguments>(arguments)...);
     // Retained compound controls cannot safely establish parent links from
     // their constructor because Control::add_child intentionally requires a
     // live shared owner for cycle checks. A type may opt into this bounded
     // post-construction step; ordinary leaf controls pay no runtime cost.
-    if constexpr (requires(ControlType& value) {
-                      value.initialize_control_tree();
-                  }) {
-        control->initialize_control_tree();
+    if constexpr (detail::HasControlTreeInitializer<ControlType>::value) {
+        (*control).initialize_control_tree();
     }
     return control;
 }

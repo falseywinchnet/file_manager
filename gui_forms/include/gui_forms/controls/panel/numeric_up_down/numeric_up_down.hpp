@@ -40,6 +40,15 @@ public:
                             std::string_view value) override;
 
 private:
+    struct EditorChangeCallback final {
+        std::weak_ptr<NumericUpDown> target;
+        void operator()(const std::string&) const;
+    };
+    struct SpinnerStepCallback final {
+        std::weak_ptr<NumericUpDown> target;
+        void operator()(int direction) const;
+    };
+
     void step(int direction);
     void commit_editor_text();
     void synchronize_editor();

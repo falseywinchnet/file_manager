@@ -2,17 +2,18 @@
 
 Status: **OBSERVED bounded development adapter; not production IPC**.
 
-Supervises a separately built Go Engine over correlated bounded JSONL and projects its catalogue/live responses into typed Orchestrator outcomes.
+Supervises a separately built Go Engine through one owned bounded worker over correlated JSONL and projects its catalogue/live responses into typed Orchestrator outcomes.
 
 Source: [src/engine_jsonl.rs](../../../src/engine_jsonl.rs)
 
 ## Responsibilities
 
-- Bound Engine JSONL frames.
+- Bound Engine JSONL frames and the worker command queue.
 - Correlate exactly one response to each request.
 - Validate version and required live-query capabilities.
+- Fail closed on worker panic or timeout and kill the owned child to break blocked I/O.
 - Map remote errors without empty-success substitution.
-- Terminate the child on adapter drop.
+- Stop, join, and reap the child on adapter drop.
 
 ## Boundary
 
@@ -24,7 +25,7 @@ Source: [src/engine_jsonl.rs](../../../src/engine_jsonl.rs)
 
 ## Source inventory
 
-### [MAX_ENGINE_JSONL_FRAME_BYTES](../../../src/engine_jsonl.rs#L17)
+### [MAX_ENGINE_JSONL_FRAME_BYTES](../../../src/engine_jsonl.rs#L22)
 
 `const` · `pub`
 
@@ -32,7 +33,31 @@ Source: [src/engine_jsonl.rs](../../../src/engine_jsonl.rs)
 pub const MAX_ENGINE_JSONL_FRAME_BYTES: usize = 1_048_576;
 ```
 
-### [EngineJsonlFault](../../../src/engine_jsonl.rs#L20)
+### [ENGINE_CHILD_QUEUE_DEPTH](../../../src/engine_jsonl.rs#L23)
+
+`const` · `private`
+
+```rust
+const ENGINE_CHILD_QUEUE_DEPTH: usize = 1;
+```
+
+### [ENGINE_CHILD_HANDSHAKE_TIMEOUT](../../../src/engine_jsonl.rs#L24)
+
+`const` · `private`
+
+```rust
+const ENGINE_CHILD_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(2);
+```
+
+### [ENGINE_CHILD_CALL_TIMEOUT](../../../src/engine_jsonl.rs#L25)
+
+`const` · `private`
+
+```rust
+const ENGINE_CHILD_CALL_TIMEOUT: Duration = Duration::from_secs(6);
+```
+
+### [EngineJsonlFault](../../../src/engine_jsonl.rs#L28)
 
 `struct` · `pub`
 
@@ -40,7 +65,7 @@ pub const MAX_ENGINE_JSONL_FRAME_BYTES: usize = 1_048_576;
 pub struct EngineJsonlFault
 ```
 
-### [EngineJsonlError](../../../src/engine_jsonl.rs#L26)
+### [EngineJsonlError](../../../src/engine_jsonl.rs#L34)
 
 `enum` · `pub`
 
@@ -48,7 +73,7 @@ pub struct EngineJsonlFault
 pub enum EngineJsonlError
 ```
 
-### [fmt](../../../src/engine_jsonl.rs#L39)
+### [fmt](../../../src/engine_jsonl.rs#L50)
 
 `fn` · `private`
 
@@ -56,7 +81,7 @@ pub enum EngineJsonlError
 fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result
 ```
 
-### [source](../../../src/engine_jsonl.rs#L68)
+### [source](../../../src/engine_jsonl.rs#L84)
 
 `fn` · `private`
 
@@ -64,7 +89,7 @@ fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result
 fn source(&self) -> Option<&(dyn Error + 'static)>
 ```
 
-### [from](../../../src/engine_jsonl.rs#L78)
+### [from](../../../src/engine_jsonl.rs#L94)
 
 `fn` · `private`
 
@@ -72,7 +97,7 @@ fn source(&self) -> Option<&(dyn Error + 'static)>
 fn from(error: std::io::Error) -> Self
 ```
 
-### [EngineJsonlRequest](../../../src/engine_jsonl.rs#L84)
+### [EngineJsonlRequest](../../../src/engine_jsonl.rs#L100)
 
 `struct` · `private`
 
@@ -80,7 +105,7 @@ fn from(error: std::io::Error) -> Self
 struct EngineJsonlRequest<'a>
 ```
 
-### [EngineJsonlResponse](../../../src/engine_jsonl.rs#L91)
+### [EngineJsonlResponse](../../../src/engine_jsonl.rs#L107)
 
 `struct` · `private`
 
@@ -88,7 +113,7 @@ struct EngineJsonlRequest<'a>
 struct EngineJsonlResponse
 ```
 
-### [EngineJsonlPeer](../../../src/engine_jsonl.rs#L100)
+### [EngineJsonlPeer](../../../src/engine_jsonl.rs#L116)
 
 `struct` · `pub`
 
@@ -96,7 +121,7 @@ struct EngineJsonlResponse
 pub struct EngineJsonlPeer<R, W>
 ```
 
-### [new](../../../src/engine_jsonl.rs#L108)
+### [new](../../../src/engine_jsonl.rs#L124)
 
 `fn` · `pub`
 
@@ -104,7 +129,7 @@ pub struct EngineJsonlPeer<R, W>
 pub const fn new(reader: R, writer: W) -> Self
 ```
 
-### [call](../../../src/engine_jsonl.rs#L123)
+### [call](../../../src/engine_jsonl.rs#L139)
 
 `fn` · `pub`
 
@@ -112,7 +137,7 @@ pub const fn new(reader: R, writer: W) -> Self
 pub fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError>
 ```
 
-### [into_parts](../../../src/engine_jsonl.rs#L169)
+### [into_parts](../../../src/engine_jsonl.rs#L185)
 
 `fn` · `pub`
 
@@ -120,7 +145,31 @@ pub fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJson
 pub fn into_parts(self) -> (R, W)
 ```
 
-### [EngineCatalogueWirePlan](../../../src/engine_jsonl.rs#L175)
+### [EngineJsonlCaller](../../../src/engine_jsonl.rs#L190)
+
+`trait` · `pub`
+
+```rust
+pub trait EngineJsonlCaller
+```
+
+### [call](../../../src/engine_jsonl.rs#L196)
+
+`fn` · `private`
+
+```rust
+fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError>;
+```
+
+### [call](../../../src/engine_jsonl.rs#L200)
+
+`fn` · `private`
+
+```rust
+fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError>
+```
+
+### [EngineCatalogueWirePlan](../../../src/engine_jsonl.rs#L206)
 
 `struct` · `private`
 
@@ -128,7 +177,7 @@ pub fn into_parts(self) -> (R, W)
 struct EngineCatalogueWirePlan
 ```
 
-### [EngineCatalogueWireResponse](../../../src/engine_jsonl.rs#L183)
+### [EngineCatalogueWireResponse](../../../src/engine_jsonl.rs#L214)
 
 `struct` · `private`
 
@@ -136,7 +185,7 @@ struct EngineCatalogueWirePlan
 struct EngineCatalogueWireResponse
 ```
 
-### [EngineLiveWireResponse](../../../src/engine_jsonl.rs#L196)
+### [EngineLiveWireResponse](../../../src/engine_jsonl.rs#L227)
 
 `struct` · `private`
 
@@ -144,15 +193,15 @@ struct EngineCatalogueWireResponse
 struct EngineLiveWireResponse
 ```
 
-### [EngineJsonlSearchAdapter](../../../src/engine_jsonl.rs#L219)
+### [EngineJsonlSearchAdapter](../../../src/engine_jsonl.rs#L250)
 
 `struct` · `pub`
 
 ```rust
-pub struct EngineJsonlSearchAdapter<R, W>
+pub struct EngineJsonlSearchAdapter<C>
 ```
 
-### [EngineJsonlChild](../../../src/engine_jsonl.rs#L224)
+### [EngineJsonlChild](../../../src/engine_jsonl.rs#L255)
 
 `struct` · `pub`
 
@@ -160,7 +209,71 @@ pub struct EngineJsonlSearchAdapter<R, W>
 pub struct EngineJsonlChild
 ```
 
-### [spawn](../../../src/engine_jsonl.rs#L238)
+### [EngineWorkerPeer](../../../src/engine_jsonl.rs#L264)
+
+`struct` · `private`
+
+```rust
+struct EngineWorkerPeer
+```
+
+### [EngineWorkerCommand](../../../src/engine_jsonl.rs#L272)
+
+`enum` · `private`
+
+```rust
+enum EngineWorkerCommand
+```
+
+### [call](../../../src/engine_jsonl.rs#L282)
+
+`fn` · `private`
+
+```rust
+fn call(&mut self, method: &str, params: &Value) -> Result<Value, EngineJsonlError>
+```
+
+### [stop](../../../src/engine_jsonl.rs#L312)
+
+`fn` · `private`
+
+```rust
+fn stop(&self)
+```
+
+### [run_engine_worker](../../../src/engine_jsonl.rs#L317)
+
+`fn` · `private`
+
+```rust
+fn run_engine_worker<C: EngineJsonlCaller>( mut peer: C, receiver: &Receiver<EngineWorkerCommand>, healthy: &AtomicBool, )
+```
+
+### [engine_worker_error_is_terminal](../../../src/engine_jsonl.rs#L345)
+
+`fn` · `private`
+
+```rust
+fn engine_worker_error_is_terminal(error: &EngineJsonlError) -> bool
+```
+
+### [kill_engine_child](../../../src/engine_jsonl.rs#L354)
+
+`fn` · `private`
+
+```rust
+fn kill_engine_child(child: &Mutex<Child>)
+```
+
+### [wait_engine_child](../../../src/engine_jsonl.rs#L360)
+
+`fn` · `private`
+
+```rust
+fn wait_engine_child(child: &Mutex<Child>)
+```
+
+### [spawn](../../../src/engine_jsonl.rs#L383)
 
 `fn` · `pub`
 
@@ -168,7 +281,7 @@ pub struct EngineJsonlChild
 pub fn spawn( binary: &Path, sandbox_root: &Path, root_id: &str, root_path: &Path, ) -> Result<Self, EngineJsonlError>
 ```
 
-### [query_catalogue](../../../src/engine_jsonl.rs#L288)
+### [query_catalogue](../../../src/engine_jsonl.rs#L462)
 
 `fn` · `private`
 
@@ -176,7 +289,7 @@ pub fn spawn( binary: &Path, sandbox_root: &Path, root_id: &str, root_path: &Pat
 fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture
 ```
 
-### [query_live](../../../src/engine_jsonl.rs#L292)
+### [query_live](../../../src/engine_jsonl.rs#L466)
 
 `fn` · `private`
 
@@ -184,7 +297,7 @@ fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResul
 fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResultFixture
 ```
 
-### [live_available](../../../src/engine_jsonl.rs#L296)
+### [live_available](../../../src/engine_jsonl.rs#L470)
 
 `fn` · `private`
 
@@ -192,7 +305,7 @@ fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResult
 fn live_available(&self) -> bool
 ```
 
-### [drop](../../../src/engine_jsonl.rs#L302)
+### [drop](../../../src/engine_jsonl.rs#L476)
 
 `fn` · `private`
 
@@ -200,31 +313,31 @@ fn live_available(&self) -> bool
 fn drop(&mut self)
 ```
 
-### [new](../../../src/engine_jsonl.rs#L310)
+### [new](../../../src/engine_jsonl.rs#L490)
 
 `fn` · `pub`
 
 ```rust
-pub const fn new(peer: EngineJsonlPeer<R, W>) -> Self
+pub const fn new(peer: C) -> Self
 ```
 
-### [into_peer](../../../src/engine_jsonl.rs#L315)
+### [into_peer](../../../src/engine_jsonl.rs#L495)
 
 `fn` · `pub`
 
 ```rust
-pub fn into_peer(self) -> EngineJsonlPeer<R, W>
+pub fn into_peer(self) -> C
 ```
 
-### [peer_mut](../../../src/engine_jsonl.rs#L319)
+### [peer_mut](../../../src/engine_jsonl.rs#L499)
 
 `fn` · `pub`
 
 ```rust
-pub fn peer_mut(&mut self) -> &mut EngineJsonlPeer<R, W>
+pub const fn peer_mut(&mut self) -> &mut C
 ```
 
-### [catalogue_params](../../../src/engine_jsonl.rs#L323)
+### [catalogue_params](../../../src/engine_jsonl.rs#L505)
 
 `fn` · `private`
 
@@ -232,7 +345,7 @@ pub fn peer_mut(&mut self) -> &mut EngineJsonlPeer<R, W>
 fn catalogue_params(request: &EngineSearchRequest) -> Value
 ```
 
-### [live_params](../../../src/engine_jsonl.rs#L341)
+### [live_params](../../../src/engine_jsonl.rs#L523)
 
 `fn` · `private`
 
@@ -240,7 +353,7 @@ fn catalogue_params(request: &EngineSearchRequest) -> Value
 fn live_params(request: &EngineSearchRequest) -> Value
 ```
 
-### [query_catalogue](../../../src/engine_jsonl.rs#L360)
+### [query_catalogue](../../../src/engine_jsonl.rs#L542)
 
 `fn` · `private`
 
@@ -248,7 +361,7 @@ fn live_params(request: &EngineSearchRequest) -> Value
 fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture
 ```
 
-### [query_live](../../../src/engine_jsonl.rs#L413)
+### [query_live](../../../src/engine_jsonl.rs#L595)
 
 `fn` · `private`
 
@@ -256,7 +369,7 @@ fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResul
 fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResultFixture
 ```
 
-### [catalogue_failure](../../../src/engine_jsonl.rs#L462)
+### [catalogue_failure](../../../src/engine_jsonl.rs#L644)
 
 `fn` · `private`
 
@@ -264,7 +377,7 @@ fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResult
 fn catalogue_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> EngineQueryResultFixture
 ```
 
-### [live_failure](../../../src/engine_jsonl.rs#L485)
+### [live_failure](../../../src/engine_jsonl.rs#L667)
 
 `fn` · `private`
 
@@ -272,7 +385,7 @@ fn catalogue_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> 
 fn live_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> EngineLiveQueryResultFixture
 ```
 
-### [project_engine_error](../../../src/engine_jsonl.rs#L513)
+### [project_engine_error](../../../src/engine_jsonl.rs#L695)
 
 `fn` · `private`
 
@@ -280,7 +393,7 @@ fn live_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> Engin
 fn project_engine_error( error: EngineJsonlError, operation: &str, ) -> (TerminalStatus, String, String)
 ```
 
-### [error_kind](../../../src/engine_jsonl.rs#L543)
+### [error_kind](../../../src/engine_jsonl.rs#L730)
 
 `fn` · `private`
 
@@ -288,7 +401,39 @@ fn project_engine_error( error: EngineJsonlError, operation: &str, ) -> (Termina
 const fn error_kind(error: &EngineJsonlError) -> &'static str
 ```
 
-### [bounded_peer_correlates_one_successful_response](../../../src/engine_jsonl.rs#L569)
+### [PanickingCaller](../../../src/engine_jsonl.rs#L765)
+
+`struct` · `private`
+
+```rust
+struct PanickingCaller;
+```
+
+### [call](../../../src/engine_jsonl.rs#L768)
+
+`fn` · `private`
+
+```rust
+fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serde_json::Value, EngineJsonlError>
+```
+
+### [SlowCaller](../../../src/engine_jsonl.rs#L777)
+
+`struct` · `private`
+
+```rust
+struct SlowCaller;
+```
+
+### [call](../../../src/engine_jsonl.rs#L780)
+
+`fn` · `private`
+
+```rust
+fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serde_json::Value, EngineJsonlError>
+```
+
+### [bounded_peer_correlates_one_successful_response](../../../src/engine_jsonl.rs#L791)
 
 `fn` · `private`
 
@@ -296,7 +441,7 @@ const fn error_kind(error: &EngineJsonlError) -> &'static str
 fn bounded_peer_correlates_one_successful_response()
 ```
 
-### [remote_fault_is_not_an_empty_success](../../../src/engine_jsonl.rs#L586)
+### [remote_fault_is_not_an_empty_success](../../../src/engine_jsonl.rs#L808)
 
 `fn` · `private`
 
@@ -304,7 +449,7 @@ fn bounded_peer_correlates_one_successful_response()
 fn remote_fault_is_not_an_empty_success()
 ```
 
-### [response_identity_mismatch_fails_closed](../../../src/engine_jsonl.rs#L597)
+### [response_identity_mismatch_fails_closed](../../../src/engine_jsonl.rs#L819)
 
 `fn` · `private`
 
@@ -312,7 +457,7 @@ fn remote_fault_is_not_an_empty_success()
 fn response_identity_mismatch_fails_closed()
 ```
 
-### [oversized_response_is_rejected_without_unbounded_allocation](../../../src/engine_jsonl.rs#L608)
+### [oversized_response_is_rejected_without_unbounded_allocation](../../../src/engine_jsonl.rs#L830)
 
 `fn` · `private`
 
@@ -320,7 +465,7 @@ fn response_identity_mismatch_fails_closed()
 fn oversized_response_is_rejected_without_unbounded_allocation()
 ```
 
-### [exact_wire_result_projects_generation_cursor_and_partial_roots](../../../src/engine_jsonl.rs#L620)
+### [exact_wire_result_projects_generation_cursor_and_partial_roots](../../../src/engine_jsonl.rs#L842)
 
 `fn` · `private`
 
@@ -328,7 +473,7 @@ fn oversized_response_is_rejected_without_unbounded_allocation()
 fn exact_wire_result_projects_generation_cursor_and_partial_roots()
 ```
 
-### [unavailable_live_method_projects_typed_unsupported_result](../../../src/engine_jsonl.rs#L634)
+### [unavailable_live_method_projects_typed_unsupported_result](../../../src/engine_jsonl.rs#L856)
 
 `fn` · `private`
 
@@ -336,7 +481,7 @@ fn exact_wire_result_projects_generation_cursor_and_partial_roots()
 fn unavailable_live_method_projects_typed_unsupported_result()
 ```
 
-### [missing_catalogue_projects_unavailable_not_unsupported](../../../src/engine_jsonl.rs#L645)
+### [missing_catalogue_projects_unavailable_not_unsupported](../../../src/engine_jsonl.rs#L867)
 
 `fn` · `private`
 
@@ -344,7 +489,23 @@ fn unavailable_live_method_projects_typed_unsupported_result()
 fn missing_catalogue_projects_unavailable_not_unsupported()
 ```
 
-### [search_request](../../../src/engine_jsonl.rs#L655)
+### [engine_worker_panic_is_contained_and_marks_worker_unavailable](../../../src/engine_jsonl.rs#L878)
+
+`fn` · `private`
+
+```rust
+fn engine_worker_panic_is_contained_and_marks_worker_unavailable()
+```
+
+### [engine_worker_timeout_kills_the_owned_child_and_fails_closed](../../../src/engine_jsonl.rs#L903)
+
+`fn` · `private`
+
+```rust
+fn engine_worker_timeout_kills_the_owned_child_and_fails_closed()
+```
+
+### [search_request](../../../src/engine_jsonl.rs#L941)
 
 `fn` · `private`
 

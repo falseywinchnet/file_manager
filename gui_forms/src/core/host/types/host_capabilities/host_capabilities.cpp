@@ -52,7 +52,9 @@ std::string HostCapabilities::to_json() const {
            << "\",\"available_bits\":"
            << static_cast<std::uint64_t>(available) << ",\"capabilities\":[";
     bool first = true;
-    for (const auto& [capability, name] : names) {
+    for (const std::pair<HostCapability, const char*>& named_capability : names) {
+        const HostCapability capability = named_capability.first;
+        const char* const name = named_capability.second;
         if (!supports(capability)) continue;
         output << (first ? "\"" : ",\"") << name << '"';
         first = false;

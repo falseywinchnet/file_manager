@@ -34,10 +34,10 @@ std::shared_ptr<LiveSurfaceBuffer> make_live_surface_buffer(
     const std::uint64_t byte_count = row_bytes * description.height;
     if (byte_count > std::numeric_limits<std::size_t>::max()) return {};
     try {
-        auto result = std::make_shared<LiveSurfaceBuffer>();
-        result->description = description;
-        result->row_bytes = row_bytes;
-        result->pixels.resize(static_cast<std::size_t>(byte_count));
+        std::shared_ptr<gui_forms::detail::LiveSurfaceBuffer> result = std::make_shared<LiveSurfaceBuffer>();
+        (*result).description = description;
+        (*result).row_bytes = row_bytes;
+        (*result).pixels.resize(static_cast<std::size_t>(byte_count));
         return result;
     } catch (const std::bad_alloc&) {
         return {};

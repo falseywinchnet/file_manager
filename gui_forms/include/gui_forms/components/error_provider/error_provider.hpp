@@ -138,6 +138,10 @@ protected:
 
 private:
     struct Entry;
+    using EntryMap =
+        std::unordered_map<std::uint64_t, std::unique_ptr<Entry>>;
+    using BindingErrorMap = std::unordered_map<
+        const Binding*, std::pair<std::weak_ptr<Control>, std::string>>;
 
     [[nodiscard]] Window* bound_window() const noexcept;
     void require_access(std::string_view operation) const;
@@ -154,7 +158,7 @@ private:
     void binding_completed(BindingCompleteEvent& event);
 
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
-    std::unordered_map<std::uint64_t, std::unique_ptr<Entry>> entries_;
+    EntryMap entries_;
     std::unique_ptr<ToolTip> tool_tip_;
     SubscriptionToken availability_subscription_;
     SubscriptionToken presentation_subscription_;
@@ -170,8 +174,7 @@ private:
     std::weak_ptr<BindingSource> data_source_;
     std::string data_member_;
     std::unordered_map<std::uint64_t, std::weak_ptr<Control>> bound_targets_;
-    std::unordered_map<const Binding*, std::pair<std::weak_ptr<Control>, std::string>>
-        binding_errors_;
+    BindingErrorMap binding_errors_;
     std::any tag_;
     std::chrono::milliseconds blink_rate_{250};
     ErrorBlinkStyle blink_style_{ErrorBlinkStyle::blink_if_different_error};

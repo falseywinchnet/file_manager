@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn configure_and_query<R: BufRead, W: Write>(
-    broker: &mut EngineSearchBroker<EngineJsonlSearchAdapter<R, W>>,
+    broker: &mut EngineSearchBroker<EngineJsonlSearchAdapter<EngineJsonlPeer<R, W>>>,
     indexed_root: Option<&OsStr>,
     exact_name: Option<&OsStr>,
 ) -> Result<Option<Value>, Box<dyn Error>> {

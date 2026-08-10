@@ -47,8 +47,9 @@ public:
     }
 
 private:
+    using BindingList = std::vector<std::shared_ptr<Binding>>;
     Control* target_{};
-    std::vector<std::shared_ptr<Binding>> bindings_;
+    BindingList bindings_;
     DataSourceUpdateMode default_update_mode_{
         DataSourceUpdateMode::on_validation};
 };

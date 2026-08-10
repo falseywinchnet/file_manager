@@ -85,3 +85,38 @@ func TestLoadSecureRejectsLooseModeAndSymlink(t *testing.T) {
 		t.Fatal("manifest symlink was admitted")
 	}
 }
+
+func TestAdmissionDigestAndGenerationBindRecoveredProjection(t *testing.T) {
+	manifest, _ := fixtureManifest(t)
+	digest := manifest.AdmissionDigest()
+	if err := CommitAdmission(manifest.StoreRoot, digest, 7); err != nil {
+		t.Fatal(err)
+	}
+	matches, err := AdmissionMatches(manifest.StoreRoot, digest, 7)
+	if err != nil || !matches {
+		t.Fatalf("committed admission match=%v err=%v", matches, err)
+	}
+	if matches, err := AdmissionMatches(manifest.StoreRoot, digest, 6); err != nil || matches {
+		t.Fatalf("older generation match=%v err=%v", matches, err)
+	}
+	changed := manifest
+	changed.Roots = append([]Root(nil), manifest.Roots...)
+	changed.Roots[0].Exclusions = []string{"private", "newly-excluded"}
+	changedDigest := changed.AdmissionDigest()
+	if changedDigest == digest {
+		t.Fatal("exclusion change did not change admission digest")
+	}
+	if matches, err := AdmissionMatches(manifest.StoreRoot, changedDigest, 7); err != nil || matches {
+		t.Fatalf("changed policy match=%v err=%v", matches, err)
+	}
+}
+
+func TestAdmissionDigestIgnoresEquivalentExclusionOrder(t *testing.T) {
+	manifest, _ := fixtureManifest(t)
+	manifest.Roots[0].Exclusions = []string{"second", "first"}
+	left := manifest.AdmissionDigest()
+	manifest.Roots[0].Exclusions = []string{"first", "second"}
+	if right := manifest.AdmissionDigest(); left != right {
+		t.Fatalf("equivalent policy digests differ: %q != %q", left, right)
+	}
+}

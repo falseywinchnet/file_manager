@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"filemanager/engine/api"
+	"filemanager/engine/internal/identity"
 )
 
 var ErrOutsideRoot = errors.New("path is outside sandbox root")
@@ -83,6 +84,16 @@ func NewApproved(deployment string, approved []ApprovedRoot) (*Guard, error) {
 		if path == volumeRoot {
 			return nil, fmt.Errorf("approved root %q may not be a filesystem root", candidate.ID)
 		}
+		if candidate.ObjectID == "" {
+			return nil, fmt.Errorf("approved root %q object identity is required", candidate.ID)
+		}
+		objectID, err := observeRootObjectID(path)
+		if err != nil {
+			return nil, fmt.Errorf("observe approved root %q: %w", candidate.ID, err)
+		}
+		if objectID != candidate.ObjectID {
+			return nil, fmt.Errorf("approved root %q identity changed", candidate.ID)
+		}
 		exclusions, err := canonicalExclusions(candidate.Exclusions)
 		if err != nil {
 			return nil, fmt.Errorf("approved root %q exclusions: %w", candidate.ID, err)
@@ -109,6 +120,23 @@ func canonicalExclusions(values []string) ([]string, error) {
 	}
 	sort.Strings(result)
 	return result, nil
+}
+
+func observeRootObjectID(path string) (string, error) {
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+	info, err := root.Lstat(".")
+	if err != nil {
+		return "", err
+	}
+	observed, err := identity.Observe(root, ".", info)
+	if err != nil {
+		return "", err
+	}
+	return observed.ObjectID(), nil
 }
 
 func canonicalDirectory(path string) (string, error) {
@@ -154,7 +182,18 @@ func (g *Guard) ResolveRoot(root api.RootSpec) (string, error) {
 	if resolved != approved.Path {
 		return "", ErrOutsideRoot
 	}
+	objectID, err := observeRootObjectID(resolved)
+	if err != nil || objectID != approved.ObjectID {
+		return "", ErrOutsideRoot
+	}
 	return resolved, nil
+}
+
+func (g *Guard) ExpectedObjectID(rootID api.RootID) string {
+	if approved, exists := g.approved[rootID]; exists {
+		return approved.ObjectID
+	}
+	return ""
 }
 
 // Allows is the final per-entry admission predicate. Root ownership prevents

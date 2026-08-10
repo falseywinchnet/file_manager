@@ -160,13 +160,13 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
     bool configure(std::uint32_t requested_width,
                    std::uint32_t requested_height) noexcept {
         if (GetCurrentThreadId() != owner_thread) return false;
-        const auto next_width = std::max<std::uint32_t>(1U, requested_width);
-        const auto next_height = std::max<std::uint32_t>(1U, requested_height);
+        const unsigned int next_width = std::max<std::uint32_t>(1U, requested_width);
+        const unsigned int next_height = std::max<std::uint32_t>(1U, requested_height);
         std::scoped_lock lock(state_mutex);
         if (released || compatibility_handle == 0U) return false;
         if (width == next_width && height == next_height) return true;
         std::scoped_lock publish_lock(surface_publish_mutex);
-        if (!surface->reconfigure({next_width, next_height}) ||
+        if (!(*surface).reconfigure({next_width, next_height}) ||
             !create_backing(next_width, next_height)) {
             return false;
         }
@@ -180,12 +180,12 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         if (released || pixels == nullptr || !surface) return false;
         const auto started = std::chrono::steady_clock::now();
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = surface->try_acquire_write(false);
+        auto lease = (*surface).try_acquire_write(false);
         if (!lease) return false;
         std::span<std::byte> destination = lease.pixels();
         if (destination.size() !=
             static_cast<std::size_t>(width) * height * 4U) return false;
-        const auto* source = reinterpret_cast<const std::byte*>(pixels);
+        const std::byte* source = reinterpret_cast<const std::byte*>(pixels);
         std::memcpy(destination.data(), source, destination.size());
         // Conventional GDI drawing does not preserve the alpha byte. The
         // endpoint is an opaque WinForms Control surface, so publish opaque
@@ -237,7 +237,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
             pending.pixels[index] = std::byte{0xff};
         }
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = pending.target->try_acquire_write(false);
+        auto lease = (*pending.target).try_acquire_write(false);
         if (!lease || lease.width() != pending.width ||
             lease.height() != pending.height ||
             lease.pixels().size() != pending.pixels.size()) {
@@ -284,7 +284,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
             // consumer work and must not serialize subsequent GDI calls.
             lock.unlock();
             const bool published = captured && publish_pending(pending);
-            const auto duration = static_cast<std::uint64_t>(
+            const std::uint64_t duration = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - started).count());
             record_compatibility_copy_duration(duration);
@@ -363,7 +363,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         if (released || pixels == nullptr || submitted_width != width ||
             submitted_height != height) return false;
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = surface->try_acquire_write(false);
+        auto lease = (*surface).try_acquire_write(false);
         if (!lease) return false;
         const std::size_t packed_row = static_cast<std::size_t>(width) * 4U;
         for (std::uint32_t row = 0; row < height; ++row) {
@@ -482,53 +482,53 @@ std::shared_ptr<WindowsCompatibilityPaintEndpoint>
 WindowsCompatibilityPaintEndpoint::acquire(
     std::uint32_t width, std::uint32_t height) {
     auto implementation = std::make_unique<Implementation>();
-    if (!implementation->create(width, height)) return {};
+    if (!(*implementation).create(width, height)) return {};
     return std::shared_ptr<WindowsCompatibilityPaintEndpoint>(
         new WindowsCompatibilityPaintEndpoint(std::move(implementation)));
 }
 
 std::uintptr_t WindowsCompatibilityPaintEndpoint::compatibility_handle() const noexcept {
     if (!implementation_) return 0;
-    std::scoped_lock lock(implementation_->state_mutex);
-    return implementation_->compatibility_handle;
+    std::scoped_lock lock((*implementation_).state_mutex);
+    return (*implementation_).compatibility_handle;
 }
 
 std::uintptr_t WindowsCompatibilityPaintEndpoint::device_context() const noexcept {
     if (!implementation_) return 0;
-    std::scoped_lock lock(implementation_->state_mutex);
-    return reinterpret_cast<std::uintptr_t>(implementation_->memory_dc);
+    std::scoped_lock lock((*implementation_).state_mutex);
+    return reinterpret_cast<std::uintptr_t>((*implementation_).memory_dc);
 }
 
 std::shared_ptr<LiveSurface>
 WindowsCompatibilityPaintEndpoint::live_surface() const noexcept {
     if (!implementation_) return {};
-    std::scoped_lock lock(implementation_->state_mutex);
-    return implementation_->surface;
+    std::scoped_lock lock((*implementation_).state_mutex);
+    return (*implementation_).surface;
 }
 
 bool WindowsCompatibilityPaintEndpoint::publish_device_context(
     std::uintptr_t device_context) noexcept {
     if (!implementation_ || device_context == 0U) return false;
-    std::scoped_lock lock(implementation_->state_mutex);
+    std::scoped_lock lock((*implementation_).state_mutex);
     if (device_context !=
-        reinterpret_cast<std::uintptr_t>(implementation_->memory_dc)) {
+        reinterpret_cast<std::uintptr_t>((*implementation_).memory_dc)) {
         return false;
     }
-    implementation_->explicit_present = true;
-    ++implementation_->content_revision;
-    ++implementation_->publish_requests;
+    (*implementation_).explicit_present = true;
+    ++(*implementation_).content_revision;
+    ++(*implementation_).publish_requests;
     compatibility_paint_metrics.requests.fetch_add(
         1U, std::memory_order_relaxed);
-    implementation_->publish_requested = false;
-    const bool result = implementation_->publish_locked();
+    (*implementation_).publish_requested = false;
+    const bool result = (*implementation_).publish_locked();
     if (result) {
-        implementation_->published_revision =
-            implementation_->content_revision;
-        ++implementation_->publish_commits;
+        (*implementation_).published_revision =
+            (*implementation_).content_revision;
+        ++(*implementation_).publish_commits;
         compatibility_paint_metrics.commits.fetch_add(
             1U, std::memory_order_relaxed);
     } else {
-        ++implementation_->publish_drops;
+        ++(*implementation_).publish_drops;
         compatibility_paint_metrics.drops.fetch_add(
             1U, std::memory_order_relaxed);
     }
@@ -537,47 +537,47 @@ bool WindowsCompatibilityPaintEndpoint::publish_device_context(
 
 bool WindowsCompatibilityPaintEndpoint::begin_device_context_write(
     std::uintptr_t device_context) noexcept {
-    return implementation_ && implementation_->begin_write(device_context);
+    return implementation_ && (*implementation_).begin_write(device_context);
 }
 
 bool WindowsCompatibilityPaintEndpoint::end_device_context_write(
     std::uintptr_t device_context, bool publish) noexcept {
     return implementation_ &&
-        implementation_->end_write(device_context, publish);
+        (*implementation_).end_write(device_context, publish);
 }
 
 bool WindowsCompatibilityPaintEndpoint::configure(
     std::uint32_t width, std::uint32_t height) noexcept {
-    return implementation_ && implementation_->configure(width, height);
+    return implementation_ && (*implementation_).configure(width, height);
 }
 
 bool WindowsCompatibilityPaintEndpoint::submit_bgra32_premultiplied(
     std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
     std::span<const std::byte> pixels) noexcept {
-    return implementation_ && implementation_->submit(
+    return implementation_ && (*implementation_).submit(
         width, height, row_bytes, pixels);
 }
 
 void WindowsCompatibilityPaintEndpoint::touch(bool explicit_boundary) noexcept {
     if (implementation_) {
-        std::scoped_lock lock(implementation_->state_mutex);
+        std::scoped_lock lock((*implementation_).state_mutex);
         static_cast<void>(
-            implementation_->request_publish_locked(explicit_boundary));
+            (*implementation_).request_publish_locked(explicit_boundary));
     }
 }
 
 bool WindowsCompatibilityPaintEndpoint::drain_now() noexcept {
     if (!implementation_ ||
-        GetCurrentThreadId() != implementation_->owner_thread) return false;
-    return implementation_->drain();
+        GetCurrentThreadId() != (*implementation_).owner_thread) return false;
+    return (*implementation_).drain();
 }
 
 std::string WindowsCompatibilityPaintEndpoint::snapshot() const {
-    return implementation_ ? implementation_->snapshot() : "state:retired";
+    return implementation_ ? (*implementation_).snapshot() : "state:retired";
 }
 
 void WindowsCompatibilityPaintEndpoint::release() noexcept {
-    if (implementation_) implementation_->release();
+    if (implementation_) (*implementation_).release();
 }
 
 

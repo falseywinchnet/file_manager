@@ -20,8 +20,13 @@ struct ShapedGlyph final {
     float y{};
     float advance_x{};
     float advance_y{};
-    friend constexpr bool operator==(const ShapedGlyph&,
-                                     const ShapedGlyph&) = default;
+    friend constexpr bool operator==(const ShapedGlyph& left,
+                                     const ShapedGlyph& right) noexcept {
+        return left.glyph == right.glyph && left.cluster == right.cluster &&
+               left.x == right.x && left.y == right.y &&
+               left.advance_x == right.advance_x &&
+               left.advance_y == right.advance_y;
+    }
 };
 
 struct ShapedFontRun final {

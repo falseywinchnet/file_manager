@@ -20,8 +20,13 @@ bool valid_scale(double scale) noexcept {
     return std::isfinite(scale) && scale > 0.0;
 }
 
+bool valid_monitor_rectangle(Rect rectangle) noexcept {
+    return std::isfinite(rectangle.x) && std::isfinite(rectangle.y) &&
+           valid_size({rectangle.width, rectangle.height});
+}
+
 bool valid_utf8(std::string_view text) noexcept {
-    const auto* bytes = reinterpret_cast<const unsigned char*>(text.data());
+    const unsigned char* bytes = reinterpret_cast<const unsigned char*>(text.data());
     std::size_t index = 0;
     while (index < text.size()) {
         const unsigned char lead = bytes[index];
@@ -65,13 +70,57 @@ bool valid_utf8(std::string_view text) noexcept {
 }
 
 bool valid_monitor(const HostMonitor& monitor) noexcept {
-    const auto valid_rect = [](Rect rect) {
-        return std::isfinite(rect.x) && std::isfinite(rect.y) &&
-               valid_size({rect.width, rect.height});
-    };
-    return !monitor.id.empty() && valid_rect(monitor.frame) &&
-           valid_rect(monitor.work_area) && valid_scale(monitor.scale);
+    return !monitor.id.empty() && valid_monitor_rectangle(monitor.frame) &&
+           valid_monitor_rectangle(monitor.work_area) &&
+           valid_scale(monitor.scale);
 }
+
+class DragDataValidator final {
+public:
+    explicit DragDataValidator(std::size_t& total) noexcept : total_(&total) {}
+
+    template <typename DataValue>
+    bool operator()(const DataValue& data) const noexcept {
+        using Data =
+            std::remove_cv_t<std::remove_reference_t<DataValue>>;
+        if constexpr (std::is_same_v<Data, DragTextData>) {
+            return data.text_utf8.size() <= DragLimits::maximum_text_bytes &&
+                   data.text_utf8.find('\0') == std::string::npos &&
+                   valid_utf8(data.text_utf8) && add_size(data.text_utf8.size());
+        } else if constexpr (std::is_same_v<Data, DragFileListData>) {
+            if (data.paths_utf8.empty() ||
+                data.paths_utf8.size() > DragLimits::maximum_paths) {
+                return false;
+            }
+            for (const std::string& path : data.paths_utf8) {
+                if (path.empty() ||
+                    path.size() > DragLimits::maximum_path_bytes ||
+                    path.find('\0') != std::string::npos ||
+                    !valid_utf8(path) || !add_size(path.size())) {
+                    return false;
+                }
+            }
+            return true;
+        } else if constexpr (std::is_same_v<Data, DragBinaryData>) {
+            return !data.media_type.empty() &&
+                   data.media_type.size() <=
+                       DragLimits::maximum_media_type_bytes &&
+                   data.media_type.find('\0') == std::string::npos &&
+                   valid_utf8(data.media_type) && add_size(data.bytes.size());
+        } else {
+            return false;
+        }
+    }
+
+private:
+    bool add_size(std::size_t value) const noexcept {
+        if (value > DragLimits::maximum_total_bytes - *total_) return false;
+        *total_ += value;
+        return true;
+    }
+
+    std::size_t* total_{};
+};
 
 bool valid_monitor_set(const std::vector<HostMonitor>& monitors) {
     if (monitors.empty() || monitors.size() > 64U) {
@@ -93,7 +142,7 @@ bool valid_drag_event(const DragEvent& event) noexcept {
         static_cast<std::uint8_t>(DragEffect::copy) |
         static_cast<std::uint8_t>(DragEffect::move) |
         static_cast<std::uint8_t>(DragEffect::link);
-    const auto effects = static_cast<std::uint8_t>(event.allowed_effects);
+    const std::uint8_t effects = static_cast<std::uint8_t>(event.allowed_effects);
     if (event.session_id == 0 || !std::isfinite(event.position.x) ||
         !std::isfinite(event.position.y) || (effects & ~known_effects) != 0 ||
         event.accepted_effect != DragEffect::none ||
@@ -105,41 +154,9 @@ bool valid_drag_event(const DragEvent& event) noexcept {
         return false;
     }
     std::size_t total = 0;
-    const auto add_size = [&total](std::size_t value) {
-        if (value > DragLimits::maximum_total_bytes - total) {
-            return false;
-        }
-        total += value;
-        return true;
-    };
+    const DragDataValidator validator(total);
     for (const DragDataItem& item : event.items) {
-        const bool valid = std::visit([&add_size](const auto& data) {
-            using Data = std::decay_t<decltype(data)>;
-            if constexpr (std::is_same_v<Data, DragTextData>) {
-                return data.text_utf8.size() <= DragLimits::maximum_text_bytes &&
-                       data.text_utf8.find('\0') == std::string::npos &&
-                       valid_utf8(data.text_utf8) && add_size(data.text_utf8.size());
-            } else if constexpr (std::is_same_v<Data, DragFileListData>) {
-                if (data.paths_utf8.empty() ||
-                    data.paths_utf8.size() > DragLimits::maximum_paths) {
-                    return false;
-                }
-                for (const std::string& path : data.paths_utf8) {
-                    if (path.empty() || path.size() > DragLimits::maximum_path_bytes ||
-                        path.find('\0') != std::string::npos || !valid_utf8(path) ||
-                        !add_size(path.size())) {
-                        return false;
-                    }
-                }
-                return true;
-            } else if constexpr (std::is_same_v<Data, DragBinaryData>) {
-                return !data.media_type.empty() &&
-                       data.media_type.size() <= DragLimits::maximum_media_type_bytes &&
-                       data.media_type.find('\0') == std::string::npos &&
-                       valid_utf8(data.media_type) && add_size(data.bytes.size());
-            }
-            return false;
-        }, item);
+        const bool valid = std::visit(validator, item);
         if (!valid) {
             return false;
         }
@@ -158,10 +175,10 @@ bool valid_dialog_filter(const HostFileDialogFilter& filter) noexcept {
         !valid_dialog_string(filter.label)) {
         return false;
     }
-    return std::all_of(filter.extensions.begin(), filter.extensions.end(),
-                       [](const std::string& extension) {
-                           return !extension.empty() && valid_dialog_string(extension);
-                       });
+    for (const std::string& extension : filter.extensions) {
+        if (extension.empty() || !valid_dialog_string(extension)) return false;
+    }
+    return true;
 }
 
 bool choice_allowed(HostMessageButtons buttons, HostDialogChoice choice) noexcept {
@@ -181,43 +198,112 @@ bool choice_allowed(HostMessageButtons buttons, HostDialogChoice choice) noexcep
     return false;
 }
 
-bool valid_dialog_request(const HostDialogRequest& request) noexcept {
-    if (request.request_id == 0 || !valid_dialog_string(request.owner_id)) {
-        return false;
-    }
-    return std::visit([](const auto& payload) {
-        using Payload = std::decay_t<decltype(payload)>;
+struct DialogRequestValidator final {
+    template <typename PayloadValue>
+    bool operator()(const PayloadValue& payload) const noexcept {
+        using Payload =
+            std::remove_cv_t<std::remove_reference_t<PayloadValue>>;
         if constexpr (std::is_same_v<Payload, HostMessageDialogRequest>) {
             return valid_dialog_string(payload.title) &&
                    valid_dialog_string(payload.message) &&
                    choice_allowed(payload.buttons, payload.default_choice);
-        } else if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
+        } else if constexpr (
+            std::is_same_v<Payload, HostOpenFileDialogRequest>) {
             return valid_dialog_string(payload.title) &&
                    valid_dialog_string(payload.initial_directory) &&
                    valid_dialog_string(payload.suggested_name) &&
-                   payload.filters.size() <= HostServices::maximum_dialog_filters &&
+                   payload.filters.size() <=
+                       HostServices::maximum_dialog_filters &&
                    std::all_of(payload.filters.begin(), payload.filters.end(),
-                               valid_dialog_filter);
-        } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
+                               &valid_dialog_filter);
+        } else if constexpr (
+            std::is_same_v<Payload, HostSaveFileDialogRequest>) {
             return valid_dialog_string(payload.title) &&
                    valid_dialog_string(payload.initial_directory) &&
                    valid_dialog_string(payload.suggested_name) &&
                    valid_dialog_string(payload.default_extension) &&
-                   payload.filters.size() <= HostServices::maximum_dialog_filters &&
+                   payload.filters.size() <=
+                       HostServices::maximum_dialog_filters &&
                    std::all_of(payload.filters.begin(), payload.filters.end(),
-                               valid_dialog_filter);
-        } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
+                               &valid_dialog_filter);
+        } else if constexpr (
+            std::is_same_v<Payload, HostFolderDialogRequest>) {
             return valid_dialog_string(payload.title) &&
                    valid_dialog_string(payload.initial_directory);
-        } else if constexpr (std::is_same_v<Payload, HostColorDialogRequest>) {
+        } else if constexpr (
+            std::is_same_v<Payload, HostColorDialogRequest>) {
             return valid_dialog_string(payload.title);
+        } else {
+            return false;
         }
+    }
+};
+
+struct DialogOutcomeVisitor final {
+    template <typename ResultValue>
+    HostDialogOutcome operator()(const ResultValue& value) const noexcept {
+        return value.outcome;
+    }
+};
+
+struct DialogResultValidator final {
+    const HostDialogResult* result{};
+
+    template <typename RequestValue>
+    bool operator()(const RequestValue& request) const noexcept {
+        using Request =
+            std::remove_cv_t<std::remove_reference_t<RequestValue>>;
+        if constexpr (std::is_same_v<Request, HostMessageDialogRequest>) {
+            const HostMessageDialogResult* value =
+                std::get_if<HostMessageDialogResult>(&(*result).payload);
+            if (value == nullptr) return false;
+            return (*value).outcome == HostDialogOutcome::accepted ?
+                choice_allowed(request.buttons, (*value).choice) :
+                (*value).choice == HostDialogChoice::none ||
+                    (*value).choice == HostDialogChoice::cancel;
+        } else if constexpr (
+            std::is_same_v<Request, HostOpenFileDialogRequest> ||
+            std::is_same_v<Request, HostSaveFileDialogRequest> ||
+            std::is_same_v<Request, HostFolderDialogRequest>) {
+            const HostPathDialogResult* value =
+                std::get_if<HostPathDialogResult>(&(*result).payload);
+            if (value == nullptr ||
+                (*value).paths.size() > HostServices::maximum_dialog_paths) {
+                return false;
+            }
+            if ((*value).outcome == HostDialogOutcome::cancelled) {
+                return (*value).paths.empty();
+            }
+            bool multiple = false;
+            if constexpr (
+                std::is_same_v<Request, HostOpenFileDialogRequest>) {
+                multiple = request.allow_multiple;
+            }
+            if ((*value).paths.empty() ||
+                (!multiple && (*value).paths.size() != 1U)) {
+                return false;
+            }
+            return std::all_of((*value).paths.begin(), (*value).paths.end(),
+                               &valid_dialog_string);
+        } else if constexpr (
+            std::is_same_v<Request, HostColorDialogRequest>) {
+            return std::holds_alternative<HostColorDialogResult>(
+                (*result).payload);
+        } else {
+            return false;
+        }
+    }
+};
+
+bool valid_dialog_request(const HostDialogRequest& request) noexcept {
+    if (request.request_id == 0 || !valid_dialog_string(request.owner_id)) {
         return false;
-    }, request.payload);
+    }
+    return std::visit(DialogRequestValidator{}, request.payload);
 }
 
 HostDialogOutcome dialog_outcome(const HostDialogResultPayload& payload) noexcept {
-    return std::visit([](const auto& value) { return value.outcome; }, payload);
+    return std::visit(DialogOutcomeVisitor{}, payload);
 }
 
 bool valid_dialog_result(const HostDialogRequest& request,
@@ -225,42 +311,7 @@ bool valid_dialog_result(const HostDialogRequest& request,
     if (!result.status.accepted() || result.request_id != request.request_id) {
         return false;
     }
-    return std::visit([&result](const auto& request_payload) {
-        using Request = std::decay_t<decltype(request_payload)>;
-        if constexpr (std::is_same_v<Request, HostMessageDialogRequest>) {
-            const auto* value = std::get_if<HostMessageDialogResult>(&result.payload);
-            if (value == nullptr) {
-                return false;
-            }
-            return value->outcome == HostDialogOutcome::accepted
-                ? choice_allowed(request_payload.buttons, value->choice)
-                : value->choice == HostDialogChoice::none ||
-                      value->choice == HostDialogChoice::cancel;
-        } else if constexpr (std::is_same_v<Request, HostOpenFileDialogRequest> ||
-                             std::is_same_v<Request, HostSaveFileDialogRequest> ||
-                             std::is_same_v<Request, HostFolderDialogRequest>) {
-            const auto* value = std::get_if<HostPathDialogResult>(&result.payload);
-            if (value == nullptr || value->paths.size() >
-                    HostServices::maximum_dialog_paths) {
-                return false;
-            }
-            if (value->outcome == HostDialogOutcome::cancelled) {
-                return value->paths.empty();
-            }
-            bool multiple = false;
-            if constexpr (std::is_same_v<Request, HostOpenFileDialogRequest>) {
-                multiple = request_payload.allow_multiple;
-            }
-            if (value->paths.empty() || (!multiple && value->paths.size() != 1U)) {
-                return false;
-            }
-            return std::all_of(value->paths.begin(), value->paths.end(),
-                               valid_dialog_string);
-        } else if constexpr (std::is_same_v<Request, HostColorDialogRequest>) {
-            return std::holds_alternative<HostColorDialogResult>(result.payload);
-        }
-        return false;
-    }, request.payload);
+    return std::visit(DialogResultValidator{&result}, request.payload);
 }
 
 } // namespace
@@ -491,7 +542,7 @@ HostServiceStatus HostServices::set_sound_cue_coalescing_window(
     std::chrono::nanoseconds window) {
     HostServiceStatus status = validate_request(HostCapability::sound_cues);
     if (!status.accepted()) return status;
-    constexpr auto maximum = std::chrono::seconds(5);
+    constexpr std::chrono::seconds maximum = std::chrono::seconds(5);
     if (window < std::chrono::nanoseconds::zero() || window > maximum) {
         status.error = HostServiceError::invalid_argument;
         ++snapshot_.rejected_requests;

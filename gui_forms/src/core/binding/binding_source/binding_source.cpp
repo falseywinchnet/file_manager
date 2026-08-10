@@ -34,8 +34,8 @@ BindingSource::~BindingSource() {
 }
 
 Window* BindingSource::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 void BindingSource::require_access(std::string_view operation) const {
@@ -46,7 +46,7 @@ void BindingSource::require_access(std::string_view operation) const {
     if (!owner) {
         throw std::logic_error("GUI.Forms cannot use BindingSource after Window shutdown");
     }
-    owner->verify_access(operation);
+    (*owner).verify_access(operation);
 }
 
 void BindingSource::normalize_record(BindingRecord& record) {
@@ -54,7 +54,9 @@ void BindingSource::normalize_record(BindingRecord& record) {
         throw std::invalid_argument("GUI.Forms binding record stable ID may not be empty");
     }
     std::map<std::string, BindingValue> normalized;
-    for (auto& [name, value] : record.fields) {
+    for (std::pair<const std::string, BindingValue>& field : record.fields) {
+        const std::string& name = field.first;
+        BindingValue& value = field.second;
         const std::string canonical = canonical_binding_name(name);
         if (!normalized.emplace(canonical, std::move(value)).second) {
             throw std::invalid_argument(
@@ -64,7 +66,10 @@ void BindingSource::normalize_record(BindingRecord& record) {
     }
     record.fields = std::move(normalized);
     std::map<std::string, std::string> normalized_errors;
-    for (auto& [name, error] : record.errors) {
+    for (std::pair<const std::string, std::string>& field_error :
+         record.errors) {
+        const std::string& name = field_error.first;
+        std::string& error = field_error.second;
         if (!validate_utf8(error).valid()) {
             throw std::invalid_argument(
                 "GUI.Forms binding record error text must be valid UTF-8");
@@ -96,15 +101,16 @@ void BindingSource::set_records(std::vector<BindingRecord> records,
     require_access("BindingSource data-source replacement");
     validate_records(records);
     std::string previous_id;
-    if (const BindingRecord* before = current()) previous_id = before->stable_id;
+    if (const BindingRecord* before = current()) previous_id = (*before).stable_id;
     const std::ptrdiff_t previous_position = position_;
     records_ = std::move(records);
     position_ = records_.empty() ? -1 : 0;
     if (!previous_id.empty()) {
-        const auto found = std::find_if(records_.begin(), records_.end(),
-            [&previous_id](const BindingRecord& record) {
-                return record.stable_id == previous_id;
-            });
+        RecordList::iterator found = records_.begin();
+        while (found != records_.end() &&
+               (*found).stable_id != previous_id) {
+            ++found;
+        }
         if (found != records_.end()) {
             position_ = std::distance(records_.begin(), found);
         }
@@ -117,7 +123,7 @@ void BindingSource::set_records(std::vector<BindingRecord> records,
     ++resets_;
     const BindingRecord* after = current();
     if (previous_position != position_ ||
-        previous_id != (after ? after->stable_id : std::string{})) {
+        previous_id != (after ? (*after).stable_id : std::string{})) {
         ++position_changes_;
         position_changed_.emit(position_);
         current_changed_.emit();
@@ -134,9 +140,10 @@ std::optional<BindingValue> BindingSource::current_field(
     std::string_view field) const {
     const BindingRecord* record = current();
     if (!record) return std::nullopt;
-    const auto found = record->fields.find(canonical_binding_name(field));
-    return found == record->fields.end()
-        ? std::optional<BindingValue>{} : std::optional<BindingValue>{found->second};
+    const BindingRecord::FieldMap::const_iterator found =
+        (*record).fields.find(canonical_binding_name(field));
+    return found == (*record).fields.end()
+        ? std::optional<BindingValue>{} : std::optional<BindingValue>{(*found).second};
 }
 
 std::string BindingSource::current_error(std::string_view field) const {
@@ -144,17 +151,18 @@ std::string BindingSource::current_error(std::string_view field) const {
     if (!record) return {};
     const std::string canonical = field.empty()
         ? std::string{} : canonical_binding_name(field);
-    const auto found = record->errors.find(canonical);
-    return found == record->errors.end() ? std::string{} : found->second;
+    const BindingRecord::ErrorMap::const_iterator found =
+        (*record).errors.find(canonical);
+    return found == (*record).errors.end() ? std::string{} : (*found).second;
 }
 
 std::vector<std::shared_ptr<Binding>> BindingSource::bindings() const {
     require_access("BindingSource binding query");
     std::vector<std::shared_ptr<Binding>> result;
     result.reserve(bindings_.size());
-    for (const auto& item : bindings_) {
-        if (const auto binding = item.lock();
-            binding && binding->is_alive() && binding->active()) {
+    for (const std::weak_ptr<gui_forms::Binding>& item : bindings_) {
+        if (const std::shared_ptr<gui_forms::Binding> binding = item.lock();
+            binding && (*binding).is_alive() && (*binding).active()) {
             result.push_back(binding);
         }
     }
@@ -198,10 +206,10 @@ bool BindingSource::move_previous() {
 bool BindingSource::begin_edit() {
     require_access("BindingSource edit begin");
     const BindingRecord* record = current();
-    if (!allow_edit_ || !record || !record->editable) return false;
-    if (edit_snapshot_ && edit_stable_id_ == record->stable_id) return true;
+    if (!allow_edit_ || !record || !(*record).editable) return false;
+    if (edit_snapshot_ && edit_stable_id_ == (*record).stable_id) return true;
     edit_snapshot_ = *record;
-    edit_stable_id_ = record->stable_id;
+    edit_stable_id_ = (*record).stable_id;
     return true;
 }
 
@@ -209,15 +217,16 @@ bool BindingSource::set_current_field(std::string_view field, BindingValue value
     require_access("BindingSource field mutation");
     BindingRecord* record = position_ < 0 ? nullptr
         : &records_[static_cast<std::size_t>(position_)];
-    if (!record || !allow_edit_ || !record->editable) return false;
+    if (!record || !allow_edit_ || !(*record).editable) return false;
     const std::string canonical = canonical_binding_name(field);
-    const auto found = record->fields.find(canonical);
-    if (found != record->fields.end() && found->second == value) return false;
+    const BindingRecord::FieldMap::iterator found =
+        (*record).fields.find(canonical);
+    if (found != (*record).fields.end() && (*found).second == value) return false;
     static_cast<void>(begin_edit());
-    record->fields[canonical] = std::move(value);
+    (*record).fields[canonical] = std::move(value);
     ++field_changes_;
     publish_model_change({BindingListChangeKind::item_changed, position_,
-                          record->stable_id, canonical, false});
+                          (*record).stable_id, canonical, false});
     current_item_changed_.emit();
     return true;
 }
@@ -229,10 +238,11 @@ std::size_t BindingSource::insert(std::size_t index, BindingRecord record) {
         throw std::out_of_range("GUI.Forms BindingSource insertion index is out of range");
     }
     normalize_record(record);
-    if (std::any_of(records_.begin(), records_.end(), [&record](const auto& item) {
-            return item.stable_id == record.stable_id;
-        })) {
-        throw std::invalid_argument("GUI.Forms BindingSource stable ID already exists");
+    for (const BindingRecord& item : records_) {
+        if (item.stable_id == record.stable_id) {
+            throw std::invalid_argument(
+                "GUI.Forms BindingSource stable ID already exists");
+        }
     }
     const std::ptrdiff_t old_position = position_;
     const std::string stable_id = record.stable_id;
@@ -262,7 +272,7 @@ bool BindingSource::remove_at(std::size_t index) {
     }
     if (index >= records_.size()) return false;
     const std::ptrdiff_t old_position = position_;
-    const std::string old_current = current() ? current()->stable_id : std::string{};
+    const std::string old_current = current() ? (*current()).stable_id : std::string{};
     const std::string removed_id = records_[index].stable_id;
     if (edit_stable_id_ == removed_id) {
         edit_snapshot_.reset();
@@ -277,7 +287,7 @@ bool BindingSource::remove_at(std::size_t index) {
     }
     publish_model_change({BindingListChangeKind::item_removed,
                           static_cast<std::ptrdiff_t>(index), removed_id, {}, false});
-    const std::string new_current = current() ? current()->stable_id : std::string{};
+    const std::string new_current = current() ? (*current()).stable_id : std::string{};
     if (old_position != position_ || old_current != new_current) {
         ++position_changes_;
         position_changed_.emit(position_);
@@ -316,8 +326,9 @@ std::optional<std::size_t> BindingSource::find(
     std::string_view field, const BindingValue& value) const {
     const std::string canonical = canonical_binding_name(field);
     for (std::size_t index = 0; index < records_.size(); ++index) {
-        const auto found = records_[index].fields.find(canonical);
-        if (found != records_[index].fields.end() && found->second == value) {
+        const BindingRecord::FieldMap::const_iterator found =
+            records_[index].fields.find(canonical);
+        if (found != records_[index].fields.end() && (*found).second == value) {
             return index;
         }
     }
@@ -349,16 +360,18 @@ void BindingSource::set_allow_remove(bool allow) {
 void BindingSource::cancel_edit() {
     require_access("BindingSource edit cancellation");
     if (!edit_snapshot_) return;
-    const auto found = std::find_if(records_.begin(), records_.end(), [this](const auto& item) {
-        return item.stable_id == edit_stable_id_;
-    });
+    RecordList::iterator found = records_.begin();
+    while (found != records_.end() &&
+           (*found).stable_id != edit_stable_id_) {
+        ++found;
+    }
     if (found != records_.end()) {
         const std::ptrdiff_t index = std::distance(records_.begin(), found);
         *found = *edit_snapshot_;
         edit_snapshot_.reset();
         edit_stable_id_.clear();
         publish_model_change({BindingListChangeKind::item_changed, index,
-                              found->stable_id, {}, false});
+                              (*found).stable_id, {}, false});
         if (index == position_) current_item_changed_.emit();
         return;
     }
@@ -427,7 +440,7 @@ BindingSourceSnapshot BindingSource::snapshot() const {
     result.count = records_.size();
     result.position = position_;
     if (const BindingRecord* record = current()) {
-        result.current_stable_id = record->stable_id;
+        result.current_stable_id = (*record).stable_id;
     }
     result.revision = revision_;
     result.resets = resets_;
@@ -454,7 +467,7 @@ void BindingSource::publish_model_change(const BindingListChange& change) {
 void BindingSource::publish_current_transition(std::ptrdiff_t old_position) {
     ++position_changes_;
     publish_model_change({BindingListChangeKind::position_changed, position_,
-                          current() ? current()->stable_id : std::string{}, {}, false});
+                          current() ? (*current()).stable_id : std::string{}, {}, false});
     static_cast<void>(old_position);
     position_changed_.emit(position_);
     current_changed_.emit();
@@ -462,7 +475,7 @@ void BindingSource::publish_current_transition(std::ptrdiff_t old_position) {
 }
 
 void BindingSource::verify_dispose_thread() {
-    if (Window* owner = bound_window()) owner->verify_access("BindingSource disposal");
+    if (Window* owner = bound_window()) (*owner).verify_access("BindingSource disposal");
 }
 
 void BindingSource::on_dispose() noexcept {
@@ -487,33 +500,48 @@ void BindingSource::on_dispose() noexcept {
 
 void BindingSource::register_binding(const std::shared_ptr<Binding>& binding) {
     require_access("Binding registration");
-    std::erase_if(bindings_, [](const auto& item) { return item.expired(); });
-    const auto found = std::find_if(bindings_.begin(), bindings_.end(),
-        [&binding](const auto& item) {
-            const auto existing = item.lock();
-            return existing && existing.get() == binding.get();
-        });
-    if (found == bindings_.end()) bindings_.push_back(binding);
+    compact_expired_bindings();
+    for (const std::weak_ptr<Binding>& item : bindings_) {
+        const std::shared_ptr<Binding> existing = item.lock();
+        if (existing && existing.get() == binding.get()) return;
+    }
+    bindings_.push_back(binding);
 }
 
 void BindingSource::unregister_binding(const Binding* binding) noexcept {
-    std::erase_if(bindings_, [binding](const auto& item) {
-        const auto existing = item.lock();
-        return !existing || existing.get() == binding;
-    });
+    WeakBindingList::iterator item = bindings_.begin();
+    while (item != bindings_.end()) {
+        const std::shared_ptr<Binding> existing = (*item).lock();
+        if (!existing || existing.get() == binding) {
+            item = bindings_.erase(item);
+        } else {
+            ++item;
+        }
+    }
+}
+
+void BindingSource::compact_expired_bindings() noexcept {
+    WeakBindingList::iterator item = bindings_.begin();
+    while (item != bindings_.end()) {
+        if ((*item).expired()) {
+            item = bindings_.erase(item);
+        } else {
+            ++item;
+        }
+    }
 }
 
 bool BindingSource::transfer_bindings(bool source_to_control) {
     require_access(source_to_control ? "Binding push" : "Binding pull");
-    const auto snapshot = bindings_;
+    const std::vector<std::weak_ptr<Binding>> snapshot = bindings_;
     bool accepted = true;
-    for (const auto& item : snapshot) {
-        if (const auto binding = item.lock(); binding && binding->is_alive()) {
-            accepted = (source_to_control ? binding->read_value()
-                                          : binding->write_value()) && accepted;
+    for (const std::weak_ptr<gui_forms::Binding>& item : snapshot) {
+        if (const std::shared_ptr<gui_forms::Binding> binding = item.lock(); binding && (*binding).is_alive()) {
+            accepted = (source_to_control ? (*binding).read_value()
+                                          : (*binding).write_value()) && accepted;
         }
     }
-    std::erase_if(bindings_, [](const auto& item) { return item.expired(); });
+    compact_expired_bindings();
     return accepted;
 }
 

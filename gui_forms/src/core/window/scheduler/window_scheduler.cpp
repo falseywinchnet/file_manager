@@ -14,26 +14,26 @@ bool Window::needs_frame() const noexcept {
 
 std::optional<FrameTime> Window::next_wake() const noexcept {
     std::optional<FrameTime> result;
-    for (const auto& request : frame_requests_) {
-        if (!request->connected()) {
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+        if (!(*request).connected()) {
             continue;
         }
-        if (request->kind == detail::FrameRequestKind::ui_timer) {
-            if (!result || request->deadline < *result) {
-                result = request->deadline;
+        if ((*request).kind == detail::FrameRequestKind::ui_timer) {
+            if (!result || (*request).deadline < *result) {
+                result = (*request).deadline;
             }
             continue;
         }
         if (occluded_) {
             continue;
         }
-        const auto target = request->target.lock();
-        if (!target || !target->is_alive() || target->window_ != this ||
-            !target->effectively_visible()) {
+        const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
+        if (!target || !(*target).is_alive() || (*target).window_ != this ||
+            !(*target).effectively_visible()) {
             continue;
         }
-        if (!result || request->deadline < *result) {
-            result = request->deadline;
+        if (!result || (*request).deadline < *result) {
+            result = (*request).deadline;
         }
     }
     return result;
@@ -42,17 +42,17 @@ std::optional<FrameTime> Window::next_wake() const noexcept {
 FrameRequestToken Window::schedule_paint(const Control::Ptr& control,
                                          FrameTime deadline) {
     require_ui_thread("frame deadline scheduling");
-    if (!control || !control->is_alive() || control->window_ != this) {
+    if (!control || !(*control).is_alive() || (*control).window_ != this) {
         throw std::logic_error("GUI.Forms frame deadline requires an attached control");
     }
     compact_frame_requests();
     if (frame_requests_.size() >= maximum_scheduled_frame_requests) {
         throw std::length_error("GUI.Forms scheduled frame request limit reached");
     }
-    auto request = std::make_shared<detail::ScheduledFrameRequest>(
+    std::shared_ptr<gui_forms::detail::ScheduledFrameRequest> request = std::make_shared<detail::ScheduledFrameRequest>(
         detail::FrameRequestKind::deadline, control, deadline);
     frame_requests_.push_back(request);
-    control->own_revocable(request);
+    (*control).own_revocable(request);
     metrics_.record_frame_request();
     update_frame_schedule_metrics();
     return FrameRequestToken(request);
@@ -62,7 +62,7 @@ FrameRequestToken Window::activate_surface(const Control::Ptr& control,
                                            FrameInterval interval,
                                            FrameTime first_deadline) {
     require_ui_thread("active surface scheduling");
-    if (!control || !control->is_alive() || control->window_ != this) {
+    if (!control || !(*control).is_alive() || (*control).window_ != this) {
         throw std::logic_error("GUI.Forms active surface requires an attached control");
     }
     if (interval < minimum_active_surface_interval) {
@@ -73,10 +73,10 @@ FrameRequestToken Window::activate_surface(const Control::Ptr& control,
         active_surface_count() >= maximum_active_surfaces) {
         throw std::length_error("GUI.Forms active surface limit reached");
     }
-    auto request = std::make_shared<detail::ScheduledFrameRequest>(
+    std::shared_ptr<gui_forms::detail::ScheduledFrameRequest> request = std::make_shared<detail::ScheduledFrameRequest>(
         detail::FrameRequestKind::active_surface, control, first_deadline, interval);
     frame_requests_.push_back(request);
-    control->own_revocable(request);
+    (*control).own_revocable(request);
     metrics_.record_frame_request();
     update_frame_schedule_metrics();
     return FrameRequestToken(request);
@@ -99,7 +99,7 @@ FrameRequestToken Window::schedule_ui_timer(
     if (frame_requests_.size() >= maximum_scheduled_frame_requests) {
         throw std::length_error("GUI.Forms scheduled frame request limit reached");
     }
-    auto request = std::make_shared<detail::ScheduledFrameRequest>(
+    std::shared_ptr<gui_forms::detail::ScheduledFrameRequest> request = std::make_shared<detail::ScheduledFrameRequest>(
         first_deadline, interval, std::move(callback));
     frame_requests_.push_back(request);
     owner.own_revocable(request);
@@ -132,24 +132,25 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
     std::unordered_set<std::uint64_t> invalidated_controls;
     std::unordered_set<std::uint64_t> frame_callbacks;
     std::unordered_set<std::uint64_t> faulted_controls;
-    const auto requests = frame_requests_;
-    for (const auto& request : requests) {
-        if (!request->connected() || request->deadline > now) {
+    const std::vector<std::shared_ptr<detail::ScheduledFrameRequest>> requests = frame_requests_;
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : requests) {
+        if (!(*request).connected() || (*request).deadline > now) {
             continue;
         }
-        if (request->kind == detail::FrameRequestKind::ui_timer) {
+        if ((*request).kind == detail::FrameRequestKind::ui_timer) {
             ++result.ui_timer_ticks;
-            const FrameInterval lateness = now - request->deadline;
-            const auto skipped = lateness / request->interval;
+            const FrameInterval lateness = now - (*request).deadline;
+            const FrameInterval::rep skipped =
+                lateness / (*request).interval;
             result.coalesced_requests += static_cast<std::uint64_t>(skipped);
-            request->deadline += request->interval * (skipped + 1);
+            (*request).deadline += (*request).interval * (skipped + 1);
             metrics_.record_callback_emitted();
-            const auto callback = request->callback;
+            const std::function<void(FrameTime)> callback = (*request).callback;
             if (callback) {
                 try {
                     callback(now);
                 } catch (...) {
-                    request->disconnect();
+                    (*request).disconnect();
                     ++result.callback_faults;
                     metrics_.record_frame_callback_fault();
                 }
@@ -160,57 +161,58 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             result.suppressed_by_occlusion = true;
             continue;
         }
-        const auto target = request->target.lock();
-        if (!target || !target->is_alive() || target->window_ != this) {
-            request->disconnect();
+        const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
+        if (!target || !(*target).is_alive() || (*target).window_ != this) {
+            (*request).disconnect();
             continue;
         }
-        if (!target->effectively_visible()) {
-            if (request->kind == detail::FrameRequestKind::active_surface) {
-                request->deadline = now + request->interval;
+        if (!(*target).effectively_visible()) {
+            if ((*request).kind == detail::FrameRequestKind::active_surface) {
+                (*request).deadline = now + (*request).interval;
             }
             continue;
         }
-        if (faulted_controls.contains(target->runtime_id().value)) {
-            request->disconnect();
+        if (faulted_controls.contains((*target).runtime_id().value)) {
+            (*request).disconnect();
             continue;
         }
 
-        if (request->kind == detail::FrameRequestKind::deadline) {
+        if ((*request).kind == detail::FrameRequestKind::deadline) {
             ++result.deadlines_fired;
-            request->disconnect();
+            (*request).disconnect();
         } else {
             ++result.active_surface_ticks;
-            const FrameInterval lateness = now - request->deadline;
-            const auto skipped = lateness / request->interval;
+            const FrameInterval lateness = now - (*request).deadline;
+            const FrameInterval::rep skipped =
+                lateness / (*request).interval;
             result.coalesced_requests += static_cast<std::uint64_t>(skipped);
             // Never issue a burst of catch-up frames. A late active surface
             // emits one invalidation and starts its next interval from now.
-            request->deadline = now + request->interval;
+            (*request).deadline = now + (*request).interval;
         }
 
-        if (frame_callbacks.insert(target->runtime_id().value).second) {
+        if (frame_callbacks.insert((*target).runtime_id().value).second) {
             metrics_.record_callback_emitted();
             try {
-                target->on_frame(now);
+                (*target).on_frame(now);
             } catch (...) {
-                request->disconnect();
-                faulted_controls.insert(target->runtime_id().value);
+                (*request).disconnect();
+                faulted_controls.insert((*target).runtime_id().value);
                 ++result.callback_faults;
                 metrics_.record_frame_callback_fault();
                 continue;
             }
-            if (!target->is_alive() || target->window_ != this) {
+            if (!(*target).is_alive() || (*target).window_ != this) {
                 continue;
             }
         }
 
-        const bool already_requested = has_dirty(target->dirty_, Dirty::paint) ||
-            !invalidated_controls.insert(target->runtime_id().value).second;
+        const bool already_requested = has_dirty((*target).dirty_, Dirty::paint) ||
+            !invalidated_controls.insert((*target).runtime_id().value).second;
         if (already_requested) {
             ++result.coalesced_requests;
         } else {
-            target->invalidate(invalidation::paint_only);
+            (*target).invalidate(invalidation::paint_only);
         }
     }
 
@@ -225,8 +227,8 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
 
 void Window::cancel_frame_requests() {
     require_ui_thread("frame schedule cancellation");
-    for (const auto& request : frame_requests_) {
-        request->disconnect();
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+        (*request).disconnect();
     }
     frame_requests_.clear();
     update_frame_schedule_metrics();
@@ -240,11 +242,11 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
     occluded_ = occluded;
     metrics_.record_occlusion_transition(occluded);
     if (!occluded) {
-        for (const auto& request : frame_requests_) {
-            if (request->connected() &&
-                request->kind == detail::FrameRequestKind::active_surface &&
-                request->deadline < transition_time) {
-                request->deadline = transition_time;
+        for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+            if ((*request).connected() &&
+                (*request).kind == detail::FrameRequestKind::active_surface &&
+                (*request).deadline < transition_time) {
+                (*request).deadline = transition_time;
             }
         }
         if (paint_dirty_) request_paint_wake();

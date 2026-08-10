@@ -114,7 +114,11 @@ func TestApprovedGuardCannotWidenManifestPolicy(t *testing.T) {
 	if err := os.Mkdir(outside, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	guard, err := NewApproved("m4-dogfood", []ApprovedRoot{{ID: "source", Path: root, Exclusions: []string{"private/cache"}}})
+	objectID, err := observeRootObjectID(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := NewApproved("m4-dogfood", []ApprovedRoot{{ID: "source", Path: root, ObjectID: objectID, Exclusions: []string{"private/cache"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,5 +140,30 @@ func TestApprovedGuardCannotWidenManifestPolicy(t *testing.T) {
 	}
 	if !guard.Allows("source", filepath.Join(canonicalRoot, "public", "entry")) {
 		t.Fatal("non-excluded approved path was rejected")
+	}
+}
+
+func TestApprovedGuardRejectsAReplacementAtTheSamePath(t *testing.T) {
+	container := t.TempDir()
+	root := filepath.Join(container, "approved")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	objectID, err := observeRootObjectID(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := NewApproved("test-installed", []ApprovedRoot{{ID: "source", Path: root, ObjectID: objectID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(root, root+"-old"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := guard.ResolveRoot(api.RootSpec{ID: "source", Path: root}); !errors.Is(err, ErrOutsideRoot) {
+		t.Fatalf("replacement root error = %v, want ErrOutsideRoot", err)
 	}
 }

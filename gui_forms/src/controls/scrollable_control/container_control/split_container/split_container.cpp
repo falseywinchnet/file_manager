@@ -23,7 +23,7 @@ void require_finite_nonnegative(double value, const char* message) {
 
 SplitContainer::SplitContainer(StableId stable_id)
     : ContainerControl(std::move(stable_id)) {
-    const std::string prefix(this->stable_id().value());
+    const std::string prefix((*this).stable_id().value());
     first_panel_ = make_control<SplitterPanel>(StableId(prefix + ".panel1"));
     second_panel_ = make_control<SplitterPanel>(StableId(prefix + ".panel2"));
     splitter_ = make_control<SplitterGrip>(StableId(prefix + ".splitter"));
@@ -159,7 +159,7 @@ void SplitContainer::set_first_collapsed(bool collapsed,
             automatic_collapse_threshold_) {
         automatic_collapse_suppressed_ = true;
     }
-    first_panel_->set_visible(!collapsed);
+    (*first_panel_).set_visible(!collapsed);
     static_cast<SplitterGrip&>(*splitter_).set_collapse_appearance(
         collapse_panel_, collapse_target_is_collapsed());
     const double total = axis_extent(committed_arranged_bounds());
@@ -194,7 +194,7 @@ void SplitContainer::set_second_collapsed(bool collapsed,
             automatic_collapse_threshold_) {
         automatic_collapse_suppressed_ = true;
     }
-    second_panel_->set_visible(!collapsed);
+    (*second_panel_).set_visible(!collapsed);
     static_cast<SplitterGrip&>(*splitter_).set_collapse_appearance(
         collapse_panel_, collapse_target_is_collapsed());
     const double total = axis_extent(committed_arranged_bounds());
@@ -324,15 +324,15 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.button == PointerButton::primary && on_collapse_tab) {
         collapse_tab_tracking_ = true;
         pointer_tracking_ = false;
-        if (window() != nullptr) window()->request_focus(splitter_);
-        splitter_->set_pointer_capture(true);
+        if (window() != nullptr) (*window()).request_focus(splitter_);
+        (*splitter_).set_pointer_capture(true);
         event.handled = true;
         return;
     }
     if (collapse_tab_tracking_) {
         if (event.action == PointerAction::up) {
             collapse_tab_tracking_ = false;
-            splitter_->set_pointer_capture(false);
+            (*splitter_).set_pointer_capture(false);
             if (on_collapse_tab) {
                 toggle_collapse_target(SplitCollapseOrigin::user);
             }
@@ -343,11 +343,11 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
     if (splitter_fixed_ || first_collapsed_ || second_collapsed_) return;
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary &&
-        splitter_->absolute_bounds().contains(event.position)) {
+        (*splitter_).absolute_bounds().contains(event.position)) {
         pointer_tracking_ = true;
         pointer_offset_ = pointer_axis(event.position) - effective_distance_;
-        if (window() != nullptr) window()->request_focus(splitter_);
-        splitter_->set_pointer_capture(true);
+        if (window() != nullptr) (*window()).request_focus(splitter_);
+        (*splitter_).set_pointer_capture(true);
         event.handled = true;
     } else if (event.action == PointerAction::move && pointer_tracking_) {
         set_distance(pointer_axis(event.position) - pointer_offset_,
@@ -363,7 +363,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
 
 void SplitContainer::on_key_preview(KeyEvent& event) {
     if (event.action != KeyAction::down || window() == nullptr ||
-        window()->focused_control() != splitter_) return;
+        (*window()).focused_control() != splitter_) return;
     if (collapse_panel_ != SplitFixedPanel::none &&
         (event.physical_key == PhysicalKey::enter ||
          event.physical_key == PhysicalKey::space)) {
@@ -468,7 +468,7 @@ double SplitContainer::constrained_distance(double requested,
 }
 
 Rect SplitContainer::collapse_tab_bounds() const noexcept {
-    const Rect bounds = splitter_->absolute_bounds();
+    const Rect bounds = (*splitter_).absolute_bounds();
     if (orientation_ == Orientation::vertical) {
         const double height = std::min(34.0, bounds.height);
         return {bounds.x, bounds.y + std::max(0.0, (bounds.height - height) * 0.5),
@@ -546,14 +546,14 @@ void SplitContainer::set_distance(double distance, SplitChangeReason reason) {
 void SplitContainer::transfer_focus_from(
     const std::shared_ptr<SplitterPanel>& panel) {
     if (window() == nullptr) return;
-    const Control::Ptr focused = window()->focused_control();
-    if (focused == panel || panel->contains_descendant(focused)) {
-        window()->request_focus(splitter_);
+    const Control::Ptr focused = (*window()).focused_control();
+    if (focused == panel || (*panel).contains_descendant(focused)) {
+        (*window()).request_focus(splitter_);
     }
 }
 
 void SplitContainer::update_splitter_cursor() {
-    auto& splitter = static_cast<SplitterGrip&>(*splitter_);
+    SplitterGrip& splitter = static_cast<SplitterGrip&>(*splitter_);
     splitter.set_orientation(orientation_);
     splitter.set_visible_width(splitter_width_);
 }

@@ -24,7 +24,8 @@ public:
     [[nodiscard]] bool is_disposed() const noexcept { return disposed_; }
 
 private:
-    std::vector<Component::Ptr> components_;
+    using ComponentList = std::vector<Component::Ptr>;
+    ComponentList components_;
     bool disposed_{};
 };
 

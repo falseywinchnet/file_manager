@@ -1,7 +1,8 @@
 # Engine service implementation map
 
-Status: **OBSERVED development implementation map; DECIDED semantic boundaries;
-production supervisor and authenticated local transport remain gated**.
+Status: **OBSERVED development implementation map and M4-only installed
+projection; DECIDED semantic boundaries; general production adapters remain
+gated**.
 
 This document maps the running Go backend after the service-coordination
 refactor. It describes implementation ownership, not a new cross-project ABI or
@@ -56,6 +57,13 @@ checked header/manifest, restores its approved root only after containment
 validation, recovers the last complete generation, and preserves rejected
 artifacts through quarantine when a valid reader exists.
 
+Installed startup rechecks authority at two distinct layers. The guard binds
+the actual opened root object to the manifest identity for scan and live-query
+traversal. The deployment `ADMISSION` record binds the recovered checked
+generation to the current host/root/exclusion digest; mismatch forces a scan
+and checked publication before local endpoints open. Installed reconcile and
+rebuild acknowledgements advance that record to their resulting generation.
+
 **OBSERVED limitation:** persistent mode currently admits one root. Root policy
 is not acknowledged as durable until reconciliation commits a checked
 generation. The live tiered manifest, committed observation watermark, and
@@ -65,7 +73,8 @@ root-policy revision remain open work.
 
 ### Exact catalogue query
 
-1. Transport decodes one bounded JSONL frame and maps a canonical method.
+1. Transport decodes one bounded JSONL or authenticated `ENG1` frame and maps a
+   canonical method.
 2. Lifecycle admits a query operation and binds it to service-lifetime
    cancellation.
 3. Service snapshots approved-root routing and pins the current reader (or the
@@ -79,8 +88,8 @@ root-policy revision remain open work.
 
 ### Catalogue-independent live query
 
-1. Service verifies the root is already in policy and still canonically resolves
-   inside the sandbox.
+1. Service verifies the root is already in policy, the requested starting scope
+   is not excluded, and the already-opened root retains its admitted identity.
 2. `internal/live` creates or resumes a process-local session with a 30-second
    expiry and a 32-session process ceiling.
 3. Metadata-only traversal stays within result, visit, stat, wall-time,
@@ -104,9 +113,11 @@ reader stays usable until that point.
 The API exposes machine-readable faults while retaining internal causes only in
 the process. Empty success never substitutes for invalid input, unavailable
 state, budget exhaustion, stale configuration, expired generation, or integrity
-failure. The development JSONL loop is sequential; multiplexed cancellation,
-peer-derived caller identity, and separated authenticated query/admin endpoints
-remain production transport gates.
+failure. The development JSONL loop is sequential. The M4 projection has
+same-uid authenticated query/admin Unix sockets with distinct credentials, 32
+query and 4 admin connection slots, and bounded handshake, idle, request, and
+write time. Multiplexed cancellation and the general system-service transports
+remain gates.
 
 ## Build and developer installation
 

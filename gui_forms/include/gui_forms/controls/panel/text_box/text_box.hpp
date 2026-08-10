@@ -28,8 +28,10 @@ struct TextSelection final {
         return end().value() - start().value();
     }
     [[nodiscard]] bool empty() const noexcept { return anchor == caret; }
-    friend constexpr bool operator==(const TextSelection&,
-                                     const TextSelection&) = default;
+    friend constexpr bool operator==(const TextSelection& left,
+                                     const TextSelection& right) noexcept {
+        return left.anchor == right.anchor && left.caret == right.caret;
+    }
 };
 
 class TextBox final : public Panel {
@@ -103,6 +105,8 @@ protected:
     void on_detached_from_window() noexcept override;
 
 private:
+    [[nodiscard]] BindingValue text_property_value() const;
+
     struct Snapshot final {
         std::string text;
         TextSelection selection;

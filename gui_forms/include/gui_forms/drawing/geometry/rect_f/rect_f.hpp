@@ -26,7 +26,11 @@ struct RectF final {
     void intersect(RectF rect) noexcept;
     [[nodiscard]] static RectF intersection(RectF left, RectF right) noexcept;
     [[nodiscard]] static RectF united(RectF left, RectF right) noexcept;
-    friend constexpr bool operator==(const RectF&, const RectF&) = default;
+    friend constexpr bool operator==(const RectF& left,
+                                     const RectF& right) noexcept {
+        return left.x == right.x && left.y == right.y &&
+               left.width == right.width && left.height == right.height;
+    }
 };
 
 } // namespace gui_drawing

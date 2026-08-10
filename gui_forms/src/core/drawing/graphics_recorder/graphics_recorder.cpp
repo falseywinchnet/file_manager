@@ -17,14 +17,14 @@ GraphicsStateToken GraphicsRecorder::save() {
 
 void GraphicsRecorder::restore(GraphicsStateToken token) {
     require_recordable();
-    const auto found = std::find_if(saved_.rbegin(), saved_.rend(),
-                                    [token](const SavedState& value) {
-                                        return value.token == token;
-                                    });
+    std::vector<SavedState>::reverse_iterator found = saved_.rbegin();
+    while (found != saved_.rend() && (*found).token != token) {
+        ++found;
+    }
     if (token.value == 0 || found == saved_.rend()) {
         throw std::invalid_argument("graphics state token is invalid or already restored");
     }
-    state_ = found->state;
+    state_ = (*found).state;
     saved_.erase(found.base() - 1, saved_.end());
     DrawingCommand command;
     command.kind = CommandKind::restore;
@@ -103,7 +103,7 @@ GraphicsState GraphicsRecorder::current_state() const {
 bool GraphicsRecorder::is_visible(PointF point) const {
     require_alive();
     require_finite(point, "visibility point");
-    return !state_.clip || state_.clip->contains(state_.transform.transform(point));
+    return !state_.clip || (*state_.clip).contains(state_.transform.transform(point));
 }
 
 SizeF GraphicsRecorder::measure_string(std::string_view utf8, const Font& font,
@@ -419,4 +419,3 @@ void GraphicsRecorder::append(DrawingCommand command) {
 }
 
 } // namespace gui_drawing
-

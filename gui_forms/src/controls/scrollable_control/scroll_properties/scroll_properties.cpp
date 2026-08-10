@@ -14,17 +14,17 @@
 namespace gui_forms {
 
 void ScrollProperties::set_enabled(bool enabled) {
-    if (owner_ == nullptr || owner_->auto_scroll()) return;
+    if (owner_ == nullptr || (*owner_).auto_scroll()) return;
     if (enabled_ == enabled) return;
     enabled_ = enabled;
-    owner_->axis_properties_changed(orientation_, false);
+    (*owner_).axis_properties_changed(orientation_, false);
 }
 
 void ScrollProperties::set_visible(bool visible) {
-    if (owner_ == nullptr || owner_->auto_scroll()) return;
+    if (owner_ == nullptr || (*owner_).auto_scroll()) return;
     if (visible_ == visible) return;
     visible_ = visible;
-    owner_->axis_properties_changed(orientation_, false);
+    (*owner_).axis_properties_changed(orientation_, false);
 }
 
 void ScrollProperties::set_minimum(double minimum) {
@@ -34,23 +34,23 @@ void ScrollProperties::set_minimum(double minimum) {
         throw std::invalid_argument(
             "scroll minimum must be finite and nonnegative");
     }
-    if (owner_ != nullptr && owner_->auto_scroll()) return;
+    if (owner_ != nullptr && (*owner_).auto_scroll()) return;
     if (minimum_ == minimum) return;
     minimum_ = minimum;
     maximum_ = std::max(maximum_, minimum_);
     value_ = std::clamp(value_, minimum_, maximum_);
-    owner_->axis_properties_changed(orientation_, true);
+    (*owner_).axis_properties_changed(orientation_, true);
 }
 
 void ScrollProperties::set_maximum(double maximum) {
     ScrollableControl::validate_axis_value(
         maximum, "scroll maximum must be finite");
-    if (owner_ != nullptr && owner_->auto_scroll()) return;
+    if (owner_ != nullptr && (*owner_).auto_scroll()) return;
     if (maximum_ == maximum) return;
     maximum_ = maximum;
     if (minimum_ > maximum_) minimum_ = maximum_;
     value_ = std::clamp(value_, minimum_, maximum_);
-    owner_->axis_properties_changed(orientation_, true);
+    (*owner_).axis_properties_changed(orientation_, true);
 }
 
 double ScrollProperties::large_change() const noexcept {
@@ -67,7 +67,7 @@ void ScrollProperties::set_large_change(double value) {
     if (large_change_ == value) return;
     large_change_ = value;
     large_change_authored_ = true;
-    owner_->axis_properties_changed(orientation_, true);
+    (*owner_).axis_properties_changed(orientation_, true);
 }
 
 double ScrollProperties::small_change() const noexcept {
@@ -84,7 +84,7 @@ void ScrollProperties::set_small_change(double value) {
     if (small_change_ == value) return;
     small_change_ = value;
     small_change_authored_ = true;
-    owner_->axis_properties_changed(orientation_, false);
+    (*owner_).axis_properties_changed(orientation_, false);
 }
 
 void ScrollProperties::set_value(double value) {
@@ -97,7 +97,7 @@ void ScrollProperties::set_value(double value) {
         value_ = value;
         return;
     }
-    static_cast<void>(owner_->apply_axis_value(
+    static_cast<void>((*owner_).apply_axis_value(
         orientation_, value, ScrollEventType::thumb_position, false));
 }
 

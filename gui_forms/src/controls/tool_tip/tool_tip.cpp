@@ -38,7 +38,7 @@ ToolTip::ToolTip(Window& window)
     : window_lifetime_(window.lifetime_), timer_(std::make_unique<Timer>(window)),
       provider_id_(next_provider_id.fetch_add(1U)) {
     window.verify_access("ToolTip construction");
-    timer_subscription_ = timer_->tick().subscribe(*this, [this] { timer_tick(); });
+    timer_subscription_ = (*timer_).tick().subscribe(*this, [this] { timer_tick(); });
 }
 
 ToolTip::~ToolTip() {
@@ -53,8 +53,8 @@ ToolTip::~ToolTip() {
 }
 
 Window* ToolTip::bound_window() const noexcept {
-    const auto lifetime = window_lifetime_.lock();
-    return lifetime ? lifetime->window : nullptr;
+    const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();
+    return lifetime ? (*lifetime).window : nullptr;
 }
 
 void ToolTip::require_access(std::string_view operation) const {
@@ -65,25 +65,26 @@ void ToolTip::require_access(std::string_view operation) const {
     if (!owner) {
         throw std::logic_error("GUI.Forms cannot use a ToolTip after Window shutdown");
     }
-    owner->verify_access(operation);
+    (*owner).verify_access(operation);
 }
 
 ToolTip::Entry* ToolTip::find_entry(const Control& target) {
-    const auto found = entries_.find(target.runtime_id().value);
-    return found == entries_.end() ? nullptr : found->second.get();
+    const EntryMap::iterator found = entries_.find(target.runtime_id().value);
+    return found == entries_.end() ? nullptr : (*found).second.get();
 }
 
 const ToolTip::Entry* ToolTip::find_entry(const Control& target) const {
-    const auto found = entries_.find(target.runtime_id().value);
-    return found == entries_.end() ? nullptr : found->second.get();
+    const EntryMap::const_iterator found =
+        entries_.find(target.runtime_id().value);
+    return found == entries_.end() ? nullptr : (*found).second.get();
 }
 
 void ToolTip::set_tool_tip(const std::shared_ptr<Control>& target,
                            std::string text) {
     require_access("ToolTip mapping mutation");
     Window* owner = bound_window();
-    if (!target || !target->is_alive() || !target->attached() ||
-        owner->find(target->stable_id().value()).get() != target.get()) {
+    if (!target || !(*target).is_alive() || !(*target).attached() ||
+        (*owner).find((*target).stable_id().value()).get() != target.get()) {
         throw std::invalid_argument(
             "GUI.Forms ToolTip target must be a live attached control in its Window");
     }
@@ -95,45 +96,45 @@ void ToolTip::set_tool_tip(const std::shared_ptr<Control>& target,
         return;
     }
     if (Entry* existing = find_entry(*target)) {
-        existing->text = std::move(text);
+        (*existing).text = std::move(text);
         if (visible_target_.lock() == target) {
             show_now(target, keyboard_initiated_, auto_pop_delay_);
         }
         return;
     }
 
-    auto entry = std::make_unique<Entry>();
-    entry->target = target;
-    entry->text = std::move(text);
+    std::unique_ptr<gui_forms::ToolTip::Entry> entry = std::make_unique<Entry>();
+    (*entry).target = target;
+    (*entry).text = std::move(text);
     const std::weak_ptr<Control> weak_target = target;
-    entry->pointer = target->pointer_observed().subscribe(
+    (*entry).pointer = (*target).pointer_observed().subscribe(
         *this, [this, weak_target](const PointerEvent& event) {
-            if (const auto control = weak_target.lock()) target_pointer(control, event);
+            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_pointer(control, event);
         });
-    entry->focus = target->focus_observed().subscribe(
+    (*entry).focus = (*target).focus_observed().subscribe(
         *this, [this, weak_target](bool focused) {
-            if (const auto control = weak_target.lock()) target_focus(control, focused);
+            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_focus(control, focused);
         });
-    entry->bounds = target->arranged_bounds_changed().subscribe(
+    (*entry).bounds = (*target).arranged_bounds_changed().subscribe(
         *this, [this, weak_target](Rect) {
-            if (const auto control = weak_target.lock()) target_moved(control);
+            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_moved(control);
         });
-    entries_.emplace(target->runtime_id().value, std::move(entry));
+    entries_.emplace((*target).runtime_id().value, std::move(entry));
 }
 
 std::string ToolTip::tool_tip(const Control& target) const {
     const Entry* entry = find_entry(target);
-    return entry ? entry->text : std::string{};
+    return entry ? (*entry).text : std::string{};
 }
 
 bool ToolTip::remove_tool_tip(const Control& target) {
     require_access("ToolTip mapping removal");
-    const auto found = entries_.find(target.runtime_id().value);
+    const EntryMap::iterator found = entries_.find(target.runtime_id().value);
     if (found == entries_.end()) return false;
     if (pending_target_.lock().get() == &target) {
         pending_target_.reset();
         pending_action_ = PendingAction::none;
-        if (timer_->enabled()) timer_->stop();
+        if ((*timer_).enabled()) (*timer_).stop();
     }
     if (visible_target_.lock().get() == &target) close_overlay(true);
     entries_.erase(found);
@@ -188,7 +189,7 @@ void ToolTip::set_maximum_width(double width) {
     if (maximum_width_ == width) return;
     maximum_width_ = width;
     if (visible()) {
-        if (const auto target = visible_target_.lock()) {
+        if (const std::shared_ptr<gui_forms::Control> target = visible_target_.lock()) {
             show_now(target, keyboard_initiated_, auto_pop_delay_);
         }
     }
@@ -222,8 +223,8 @@ void ToolTip::target_moved(const std::shared_ptr<Control>& target) {
 void ToolTip::schedule_show(const std::shared_ptr<Control>& target,
                             bool keyboard_initiated, Point pointer_position) {
     const Entry* entry = find_entry(*target);
-    if (!entry || !target->effectively_visible() ||
-        (!show_always_ && !target->effectively_enabled())) return;
+    if (!entry || !(*target).effectively_visible() ||
+        (!show_always_ && !(*target).effectively_enabled())) return;
     pending_target_ = target;
     keyboard_initiated_ = keyboard_initiated;
     anchor_to_target_ = keyboard_initiated;
@@ -235,21 +236,21 @@ void ToolTip::schedule_show(const std::shared_ptr<Control>& target,
 }
 
 void ToolTip::arm(std::chrono::milliseconds delay, PendingAction action) {
-    if (timer_->enabled()) timer_->stop();
+    if ((*timer_).enabled()) (*timer_).stop();
     pending_action_ = action;
     if (delay.count() == 0) {
         timer_tick();
         return;
     }
-    timer_->set_interval(delay);
-    timer_->start();
+    (*timer_).set_interval(delay);
+    (*timer_).start();
 }
 
 void ToolTip::timer_tick() {
-    if (timer_->enabled()) timer_->stop();
+    if ((*timer_).enabled()) (*timer_).stop();
     const PendingAction action = std::exchange(pending_action_, PendingAction::none);
     if (action == PendingAction::show) {
-        const auto target = pending_target_.lock();
+        const std::shared_ptr<gui_forms::Control> target = pending_target_.lock();
         pending_target_.reset();
         if (target) show_now(target, keyboard_initiated_, auto_pop_delay_);
     } else if (action == PendingAction::auto_hide) {
@@ -279,26 +280,26 @@ void ToolTip::show_now(const std::shared_ptr<Control>& target,
                        std::optional<std::chrono::milliseconds> duration) {
     Window* owner = bound_window();
     Entry* entry = target ? find_entry(*target) : nullptr;
-    if (!owner || !entry || !target->effectively_visible() ||
-        (!show_always_ && !target->effectively_enabled())) return;
+    if (!owner || !entry || !(*target).effectively_visible() ||
+        (!show_always_ && !(*target).effectively_enabled())) return;
 
-    if (timer_->enabled()) timer_->stop();
+    if ((*timer_).enabled()) (*timer_).stop();
     pending_action_ = PendingAction::none;
     pending_target_.reset();
 
     if (visible()) close_overlay(true);
     const std::string prefix = "tooltip." + std::to_string(provider_id_) + "." +
-                               std::to_string(target->runtime_id().value);
-    auto layer = make_control<ToolTipLayer>(StableId(prefix + ".layer"));
-    layer->set_requested_bounds(
-        {0.0, 0.0, owner->client_size().width, owner->client_size().height});
-    auto bubble = make_control<ToolTipBubble>(StableId(prefix + ".bubble"), entry->text);
-    const Size size = tool_tip_size(entry->text, maximum_width_);
-    bubble->set_content_size(size);
-    bubble->set_requested_bounds({0.0, 0.0, size.width, size.height});
-    layer->add_child(bubble);
+                               std::to_string((*target).runtime_id().value);
+    std::shared_ptr<gui_forms::ToolTipLayer> layer = make_control<ToolTipLayer>(StableId(prefix + ".layer"));
+    (*layer).set_requested_bounds(
+        {0.0, 0.0, (*owner).client_size().width, (*owner).client_size().height});
+    std::shared_ptr<gui_forms::ToolTipBubble> bubble = make_control<ToolTipBubble>(StableId(prefix + ".bubble"), (*entry).text);
+    const Size size = tool_tip_size((*entry).text, maximum_width_);
+    (*bubble).set_content_size(size);
+    (*bubble).set_requested_bounds({0.0, 0.0, size.width, size.height});
+    (*layer).add_child(bubble);
 
-    PopupToken token = owner->open_popup(
+    PopupToken token = (*owner).open_popup(
         target, layer, PopupOptions{.require_enabled_owner = !show_always_});
     overlay_layer_ = layer;
     overlay_bubble_ = bubble;
@@ -306,28 +307,28 @@ void ToolTip::show_now(const std::shared_ptr<Control>& target,
     keyboard_initiated_ = keyboard_initiated;
     popup_ = std::make_unique<PopupHolder>(std::move(token));
     const std::weak_ptr<detail::WindowLifetime> weak_window = window_lifetime_;
-    if (Event<>* closed = popup_->token.closed_event()) {
-        popup_subscription_ = closed->subscribe(*this, [this, weak_window] {
-            if (const auto lifetime = weak_window.lock(); lifetime && lifetime->window) {
+    if (Event<>* closed = (*popup_).token.closed_event()) {
+        popup_subscription_ = (*closed).subscribe(*this, [this, weak_window] {
+            if (const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = weak_window.lock(); lifetime && (*lifetime).window) {
                 popup_revoked();
             }
         });
     }
     position_overlay();
-    ToolTipEvent change{std::string(target->stable_id().value()), entry->text,
+    ToolTipEvent change{std::string((*target).stable_id().value()), (*entry).text,
                         true, keyboard_initiated};
     visibility_changed_.emit(change);
-    if (duration && duration->count() > 0) arm(*duration, PendingAction::auto_hide);
+    if (duration && (*duration).count() > 0) arm(*duration, PendingAction::auto_hide);
 }
 
 void ToolTip::position_overlay() {
     Window* owner = bound_window();
-    const auto target = visible_target_.lock();
-    const auto bubble = std::dynamic_pointer_cast<ToolTipBubble>(overlay_bubble_);
+    const std::shared_ptr<gui_forms::Control> target = visible_target_.lock();
+    const std::shared_ptr<gui_forms::ToolTipBubble> bubble = std::dynamic_pointer_cast<ToolTipBubble>(overlay_bubble_);
     if (!owner || !target || !bubble) return;
-    const Rect anchor = target->absolute_bounds();
-    const Rect current = bubble->requested_bounds();
-    const Size client = owner->client_size();
+    const Rect anchor = (*target).absolute_bounds();
+    const Rect current = (*bubble).requested_bounds();
+    const Size client = (*owner).client_size();
     double x = anchor_to_target_ ? anchor.x + 8.0 : pointer_position_.x + 14.0;
     double y = anchor_to_target_ ? anchor.y + anchor.height + 7.0
                                  : pointer_position_.y + 19.0;
@@ -340,19 +341,19 @@ void ToolTip::position_overlay() {
     }
     y = std::clamp(y, 4.0, std::max(4.0, client.height - current.height - 4.0));
     x = std::clamp(x, 4.0, std::max(4.0, client.width - current.width - 4.0));
-    bubble->set_requested_bounds({x, y, current.width, current.height});
+    (*bubble).set_requested_bounds({x, y, current.width, current.height});
 }
 
 void ToolTip::hide() {
     require_access("ToolTip hide");
     pending_target_.reset();
     pending_action_ = PendingAction::none;
-    if (timer_->enabled()) timer_->stop();
+    if ((*timer_).enabled()) (*timer_).stop();
     close_overlay(true);
 }
 
 bool ToolTip::visible() const noexcept {
-    return popup_ && popup_->token.connected();
+    return popup_ && (*popup_).token.connected();
 }
 
 std::shared_ptr<Control> ToolTip::active_control() const noexcept {
@@ -360,36 +361,36 @@ std::shared_ptr<Control> ToolTip::active_control() const noexcept {
 }
 
 void ToolTip::close_overlay(bool emit_change) {
-    const auto target = visible_target_.lock();
+    const std::shared_ptr<gui_forms::Control> target = visible_target_.lock();
     std::string text;
     if (target) {
-        if (const Entry* entry = find_entry(*target)) text = entry->text;
+        if (const Entry* entry = find_entry(*target)) text = (*entry).text;
     }
     const bool was_visible = visible();
     popup_subscription_.disconnect();
-    auto popup = std::move(popup_);
+    std::unique_ptr<PopupHolder> popup = std::move(popup_);
     // PopupAttachment deliberately keeps weak control references so the
     // Window cannot create an ownership cycle. Keep our retained overlay tree
     // alive until disconnect lets Window detach it and remove every stable ID.
     // Releasing these first leaves an expired attachment and a poisoned ID
     // registry that faults the next tooltip for the same target.
-    if (popup) popup->token.disconnect();
+    if (popup) (*popup).token.disconnect();
     overlay_layer_.reset();
     overlay_bubble_.reset();
     visible_target_.reset();
     if (was_visible) last_hidden_ = FrameClock::now();
     if (emit_change && was_visible && target) {
-        ToolTipEvent change{std::string(target->stable_id().value()), std::move(text),
+        ToolTipEvent change{std::string((*target).stable_id().value()), std::move(text),
                             false, keyboard_initiated_};
         visibility_changed_.emit(change);
     }
 }
 
 void ToolTip::popup_revoked() {
-    const auto target = visible_target_.lock();
+    const std::shared_ptr<gui_forms::Control> target = visible_target_.lock();
     std::string text;
     if (target) {
-        if (const Entry* entry = find_entry(*target)) text = entry->text;
+        if (const Entry* entry = find_entry(*target)) text = (*entry).text;
     }
     popup_subscription_.disconnect();
     popup_.reset();
@@ -398,21 +399,21 @@ void ToolTip::popup_revoked() {
     visible_target_.reset();
     last_hidden_ = FrameClock::now();
     if (target) {
-        ToolTipEvent change{std::string(target->stable_id().value()), std::move(text),
+        ToolTipEvent change{std::string((*target).stable_id().value()), std::move(text),
                             false, keyboard_initiated_};
         visibility_changed_.emit(change);
     }
 }
 
 void ToolTip::verify_dispose_thread() {
-    if (Window* owner = bound_window()) owner->verify_access("ToolTip disposal");
+    if (Window* owner = bound_window()) (*owner).verify_access("ToolTip disposal");
 }
 
 void ToolTip::on_dispose() noexcept {
     try {
         pending_target_.reset();
         pending_action_ = PendingAction::none;
-        if (timer_ && timer_->is_alive()) timer_->dispose();
+        if (timer_ && (*timer_).is_alive()) (*timer_).dispose();
         close_overlay(false);
         entries_.clear();
     } catch (...) {

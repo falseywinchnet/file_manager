@@ -1,5 +1,7 @@
 #include "gui_forms/controls/label/label.hpp"
 #include "../basic/basic_control_rendering.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
@@ -18,16 +20,12 @@ Label::Label(StableId stable_id, std::string text)
         {"Text", BindingValueKind::text, "Appearance",
          "Text displayed by the label.", BindingValue{std::string{}},
          invalidation::text_content},
-        [this] { return BindingValue{text_}; },
-        [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(value, BindingValueKind::text);
-            if (!converted) throw std::invalid_argument("Label.Text binding requires text");
-            set_text(std::get<std::string>(*converted));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return text_changed_.subscribe(owner,
-                [changed = std::move(changed)](const std::string&) { changed(); });
-        }, {}, {}});
+        detail::BindingMemberGetter<Label, std::string>(
+            *this, &Label::text_),
+        detail::ConvertedPropertySetter<Label, std::string>(
+            *this, &Label::set_text, BindingValueKind::text,
+            "Label.Text binding requires text"),
+        detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 
     PropertyDescriptor font;
     font.name = "Font";
@@ -39,16 +37,17 @@ Label::Label(StableId stable_id, std::string text)
     font.bindable = false;
     define_bindable_property({
         std::move(font),
-        [this] { return BindingValue{this->font()}; },
-        [this](const BindingValue& value) {
-            set_font(std::get<FontSpec>(value));
-        }, {},
-        [this] { clear_font(); },
-        [this] { return has_font_override(); },
-        [this] {
-            return has_font_override() ? PropertyValueOrigin::local
-                                       : PropertyValueOrigin::inherited;
-        }});
+        detail::BindingNoexceptMethodGetter<Label, FontSpec>(
+            *this, &Label::font),
+        detail::DirectPropertySetter<Label, FontSpec>(
+            *this, &Label::set_font), {},
+        detail::BoundMemberFunction<void (Label::*)()>(
+            *this, &Label::clear_font),
+        detail::BoundMemberFunction<bool (Label::*)() const noexcept>(
+            *this, &Label::has_font_override),
+        detail::BoundMemberFunction<
+            PropertyValueOrigin (Label::*)() const noexcept>(
+                *this, &Label::font_property_origin)});
 
     PropertyDescriptor foreground;
     foreground.name = "ForeColor";
@@ -60,16 +59,17 @@ Label::Label(StableId stable_id, std::string text)
     foreground.bindable = false;
     define_bindable_property({
         std::move(foreground),
-        [this] { return BindingValue{this->foreground()}; },
-        [this](const BindingValue& value) {
-            set_foreground(std::get<Color>(value));
-        }, {},
-        [this] { clear_foreground(); },
-        [this] { return has_foreground_override(); },
-        [this] {
-            return has_foreground_override() ? PropertyValueOrigin::local
-                                             : PropertyValueOrigin::inherited;
-        }});
+        detail::BindingNoexceptMethodGetter<Label, Color>(
+            *this, &Label::foreground),
+        detail::DirectPropertySetter<Label, Color>(
+            *this, &Label::set_foreground), {},
+        detail::BoundMemberFunction<void (Label::*)()>(
+            *this, &Label::clear_foreground),
+        detail::BoundMemberFunction<bool (Label::*)() const noexcept>(
+            *this, &Label::has_foreground_override),
+        detail::BoundMemberFunction<
+            PropertyValueOrigin (Label::*)() const noexcept>(
+                *this, &Label::foreground_property_origin)});
 
     PropertyDescriptor maximum_lines;
     maximum_lines.name = "MaximumLines";
@@ -82,13 +82,31 @@ Label::Label(StableId stable_id, std::string text)
     maximum_lines.bindable = false;
     define_bindable_property({
         std::move(maximum_lines),
-        [this] {
-            return BindingValue{static_cast<std::uint64_t>(maximum_lines_)};
-        },
-        [this](const BindingValue& value) {
-            set_maximum_lines(static_cast<std::size_t>(
-                std::get<std::uint64_t>(value)));
-        }, {}, {}, {}});
+        detail::BoundMemberFunction<BindingValue (Label::*)() const>(
+            *this, &Label::maximum_lines_property_value),
+        detail::BoundMemberFunction<
+            void (Label::*)(const BindingValue&)>(
+                *this, &Label::set_maximum_lines_property_value),
+        {}, {}, {}});
+}
+
+PropertyValueOrigin Label::font_property_origin() const noexcept {
+    return has_font_override() ? PropertyValueOrigin::local
+                               : PropertyValueOrigin::inherited;
+}
+
+PropertyValueOrigin Label::foreground_property_origin() const noexcept {
+    return has_foreground_override() ? PropertyValueOrigin::local
+                                     : PropertyValueOrigin::inherited;
+}
+
+BindingValue Label::maximum_lines_property_value() const {
+    return BindingValue{static_cast<std::uint64_t>(maximum_lines_)};
+}
+
+void Label::set_maximum_lines_property_value(const BindingValue& value) {
+    set_maximum_lines(static_cast<std::size_t>(
+        std::get<std::uint64_t>(value)));
 }
 
 void Label::set_text(std::string text) {
@@ -270,10 +288,10 @@ void Label::set_use_mnemonic(bool value) {
 Size Label::measure(Size available) {
     const Rect requested = requested_bounds();
     const std::string text = display_text();
-    const FontSpec font = effective_font(this->font());
+    const FontSpec font = effective_font((*this).font());
     const double wrap_width = requested.width > 0.0
         ? requested.width : available.width;
-    auto lines = label_lines(text, font, std::max(0.0, wrap_width - 4.0),
+    std::vector<std::string> lines = label_lines(text, font, std::max(0.0, wrap_width - 4.0),
                              text_wrapping_);
     if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
         lines.resize(maximum_lines_);
@@ -297,8 +315,8 @@ std::string Label::display_text() const {
 
 void Label::paint_label_text(Painter& painter, std::string_view text) const {
     const Rect arranged = committed_arranged_bounds();
-    const FontSpec font = effective_font(this->font());
-    auto lines = label_lines(text, font, std::max(0.0, arranged.width - 4.0),
+    const FontSpec font = effective_font((*this).font());
+    std::vector<std::string> lines = label_lines(text, font, std::max(0.0, arranged.width - 4.0),
                              text_wrapping_);
     if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
         lines.resize(maximum_lines_);

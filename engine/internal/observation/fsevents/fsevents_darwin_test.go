@@ -6,12 +6,25 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime/cgo"
 	"testing"
 	"time"
 
 	"filemanager/engine/api"
 	"filemanager/engine/internal/observation"
 )
+
+func TestAdapterFromHandleContainsOnlyLateTeardownLookup(t *testing.T) {
+	adapter := &Adapter{}
+	handle := cgo.NewHandle(adapter)
+	if observed, ok := adapterFromHandle(uintptr(handle)); !ok || observed != adapter {
+		t.Fatal("live cgo handle did not resolve to its adapter")
+	}
+	handle.Delete()
+	if observed, ok := adapterFromHandle(uintptr(handle)); ok || observed != nil {
+		t.Fatal("deleted cgo handle was accepted")
+	}
+}
 
 func TestFSEventsObservesDisposableRootWithChainedCursor(t *testing.T) {
 	root := t.TempDir()

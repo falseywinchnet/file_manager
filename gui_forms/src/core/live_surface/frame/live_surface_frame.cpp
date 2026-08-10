@@ -13,24 +13,24 @@ LiveSurfaceFrame::LiveSurfaceFrame(
       damage_(damage) {}
 
 std::uint32_t LiveSurfaceFrame::width() const noexcept {
-    return buffer_ ? buffer_->description.width : 0U;
+    return buffer_ ? (*buffer_).description.width : 0U;
 }
 
 std::uint32_t LiveSurfaceFrame::height() const noexcept {
-    return buffer_ ? buffer_->description.height : 0U;
+    return buffer_ ? (*buffer_).description.height : 0U;
 }
 
 std::uint64_t LiveSurfaceFrame::row_bytes() const noexcept {
-    return buffer_ ? buffer_->row_bytes : 0U;
+    return buffer_ ? (*buffer_).row_bytes : 0U;
 }
 
 LiveSurfacePixelFormat LiveSurfaceFrame::pixel_format() const noexcept {
-    return buffer_ ? buffer_->description.pixel_format
+    return buffer_ ? (*buffer_).description.pixel_format
                    : LiveSurfacePixelFormat::bgra32_premultiplied_srgb;
 }
 
 std::span<const std::byte> LiveSurfaceFrame::pixels() const noexcept {
-    return buffer_ ? std::span<const std::byte>(buffer_->pixels)
+    return buffer_ ? std::span<const std::byte>((*buffer_).pixels)
                    : std::span<const std::byte>{};
 }
 

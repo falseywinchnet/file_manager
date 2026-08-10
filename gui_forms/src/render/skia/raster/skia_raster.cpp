@@ -126,6 +126,8 @@ public:
         sk_sp<SkImage> image;
     };
 
+    using ImageMap = std::unordered_map<std::uint64_t, DecodedImage>;
+
     struct TextRun final {
         std::size_t offset{};
         std::size_t length{};
@@ -140,7 +142,7 @@ public:
         SkFontMgr_New_Custom_Empty()
 #endif
     };
-    std::unordered_map<std::uint64_t, DecodedImage> images;
+    ImageMap images;
     std::vector<RegisteredTypeface> registered_typefaces;
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     text::HarfBuzzFontEngine text_engine;
@@ -153,7 +155,7 @@ public:
     bool image_registry_synchronized{true};
 
     [[nodiscard]] SkCanvas* canvas() const noexcept {
-        return surface ? surface->getCanvas() : nullptr;
+        return surface ? (*surface).getCanvas() : nullptr;
     }
 
     [[nodiscard]] static SkFontStyle font_style(FontSpec spec) {
@@ -179,7 +181,7 @@ public:
             }
         }
         if (registered != nullptr) {
-            return registered->face;
+            return (*registered).face;
         }
 
         const SkFontStyle style = font_style(spec);
@@ -189,9 +191,9 @@ public:
         } else if (spec.role == FontRole::monospace) {
             family = "Menlo";
         }
-        sk_sp<SkTypeface> face = fonts->matchFamilyStyle(family, style);
+        sk_sp<SkTypeface> face = (*fonts).matchFamilyStyle(family, style);
         if (!face) {
-            face = fonts->legacyMakeTypeface(nullptr, style);
+            face = (*fonts).legacyMakeTypeface(nullptr, style);
         }
         return face;
     }
@@ -221,27 +223,27 @@ public:
             const char* const scalar_start = cursor;
             const SkUnichar scalar = SkUTF::NextUTF8(&cursor, end);
             sk_sp<SkTypeface> face = primary;
-            if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
+            if (scalar >= 0 && (!face || (*face).unicharToGlyph(scalar) == 0U)) {
                 for (const RegisteredTypeface& candidate : registered_typefaces) {
                     const bool house_body_fallback =
                         spec.role != FontRole::content && !candidate.fallback &&
                         candidate.role == FontRole::content;
                     if ((candidate.fallback || house_body_fallback) && candidate.face &&
-                        candidate.face->unicharToGlyph(scalar) != 0U) {
+                        (*candidate.face).unicharToGlyph(scalar) != 0U) {
                         face = candidate.face;
                         break;
                     }
                 }
             }
-            if (scalar >= 0 && (!face || face->unicharToGlyph(scalar) == 0U)) {
-                face = fonts->matchFamilyStyleCharacter(
+            if (scalar >= 0 && (!face || (*face).unicharToGlyph(scalar) == 0U)) {
+                face = (*fonts).matchFamilyStyleCharacter(
                     nullptr, style, nullptr, 0, scalar);
                 if (!face) {
                     face = primary;
                 }
             }
             const bool same_face = (!current && !face) ||
-                (current && face && current->uniqueID() == face->uniqueID());
+                (current && face && (*current).uniqueID() == (*face).uniqueID());
             if (!same_face) {
                 const std::size_t scalar_offset = static_cast<std::size_t>(
                     scalar_start - text.data());
@@ -270,18 +272,18 @@ bool SkiaRaster::register_typeface(FontRole role,
         return false;
     }
     sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-    sk_sp<SkTypeface> face = impl_->fonts->makeFromData(std::move(data));
+    sk_sp<SkTypeface> face = (*(*impl_).fonts).makeFromData(std::move(data));
     if (!face) {
         return false;
     }
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     const std::optional<FontFaceId> text_face =
-        impl_->text_engine.register_typeface(role, weight, italic, encoded);
+        (*impl_).text_engine.register_typeface(role, weight, italic, encoded);
     if (!text_face) return false;
-    impl_->registered_typefaces.push_back(
+    (*impl_).registered_typefaces.push_back(
         {role, weight, italic, false, std::move(face), *text_face});
 #else
-    impl_->registered_typefaces.push_back(
+    (*impl_).registered_typefaces.push_back(
         {role, weight, italic, false, std::move(face)});
 #endif
     return true;
@@ -291,16 +293,16 @@ bool SkiaRaster::register_fallback_typeface(
     std::uint16_t weight, bool italic, std::span<const std::byte> encoded) {
     if (encoded.empty()) return false;
     sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
-    sk_sp<SkTypeface> face = impl_->fonts->makeFromData(std::move(data));
+    sk_sp<SkTypeface> face = (*(*impl_).fonts).makeFromData(std::move(data));
     if (!face) return false;
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     const std::optional<FontFaceId> text_face =
-        impl_->text_engine.register_fallback_typeface(weight, italic, encoded);
+        (*impl_).text_engine.register_fallback_typeface(weight, italic, encoded);
     if (!text_face) return false;
-    impl_->registered_typefaces.push_back(
+    (*impl_).registered_typefaces.push_back(
         {FontRole::content, weight, italic, true, std::move(face), *text_face});
 #else
-    impl_->registered_typefaces.push_back(
+    (*impl_).registered_typefaces.push_back(
         {FontRole::content, weight, italic, true, std::move(face)});
 #endif
     return true;
@@ -319,9 +321,9 @@ bool SkiaRaster::resize(Size logical_size, double scale) {
     }
     const int width = std::max(1, static_cast<int>(requested_width));
     const int height = std::max(1, static_cast<int>(requested_height));
-    if (impl_->surface && width == impl_->surface->width() &&
-        height == impl_->surface->height() && scale == impl_->scale) {
-        impl_->logical_size = logical_size;
+    if ((*impl_).surface && width == (*(*impl_).surface).width() &&
+        height == (*(*impl_).surface).height() && scale == (*impl_).scale) {
+        (*impl_).logical_size = logical_size;
         return false;
     }
 
@@ -336,56 +338,56 @@ bool SkiaRaster::resize(Size logical_size, double scale) {
     if (!replacement) {
         return false;
     }
-    replacement->getCanvas()->clear(SK_ColorTRANSPARENT);
-    impl_->surface = std::move(replacement);
-    impl_->logical_size = logical_size;
-    impl_->scale = scale;
+    (*(*replacement).getCanvas()).clear(SK_ColorTRANSPARENT);
+    (*impl_).surface = std::move(replacement);
+    (*impl_).logical_size = logical_size;
+    (*impl_).scale = scale;
     return true;
 }
 
 void SkiaRaster::begin_frame(const DamageRegion& damage) {
-    SkCanvas* canvas = impl_->canvas();
+    SkCanvas* canvas = (*impl_).canvas();
     if (!canvas) {
         return;
     }
-    canvas->restoreToCount(1);
-    canvas->resetMatrix();
-    canvas->scale(static_cast<SkScalar>(impl_->scale),
-                  static_cast<SkScalar>(impl_->scale));
-    canvas->save();
-    impl_->save_floor = canvas->getSaveCount();
+    (*canvas).restoreToCount(1);
+    (*canvas).resetMatrix();
+    (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
+                  static_cast<SkScalar>((*impl_).scale));
+    (*canvas).save();
+    (*impl_).save_floor = (*canvas).getSaveCount();
 
     if (!damage.empty()) {
         SkRegion region;
         for (Rect rect : damage.rectangles()) {
             const SkIRect pixels = SkIRect::MakeLTRB(
-                static_cast<int>(std::floor(rect.x * impl_->scale)),
-                static_cast<int>(std::floor(rect.y * impl_->scale)),
-                static_cast<int>(std::ceil((rect.x + rect.width) * impl_->scale)),
-                static_cast<int>(std::ceil((rect.y + rect.height) * impl_->scale)));
+                static_cast<int>(std::floor(rect.x * (*impl_).scale)),
+                static_cast<int>(std::floor(rect.y * (*impl_).scale)),
+                static_cast<int>(std::ceil((rect.x + rect.width) * (*impl_).scale)),
+                static_cast<int>(std::ceil((rect.y + rect.height) * (*impl_).scale)));
             region.op(pixels, SkRegion::kUnion_Op);
         }
-        canvas->resetMatrix();
-        canvas->clipRegion(region);
-        canvas->scale(static_cast<SkScalar>(impl_->scale),
-                      static_cast<SkScalar>(impl_->scale));
+        (*canvas).resetMatrix();
+        (*canvas).clipRegion(region);
+        (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
+                      static_cast<SkScalar>((*impl_).scale));
     }
 }
 
 void SkiaRaster::end_frame() {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->restoreToCount(1);
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).restoreToCount(1);
     }
 }
 
 bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
     const ImageRegistrySnapshot snapshot = registry.snapshot();
-    const bool same_registry = &registry == impl_->image_registry;
-    if (same_registry && snapshot.revision == impl_->image_registry_revision) {
-        return impl_->image_registry_synchronized;
+    const bool same_registry = &registry == (*impl_).image_registry;
+    if (same_registry && snapshot.revision == (*impl_).image_registry_revision) {
+        return (*impl_).image_registry_synchronized;
     }
     if (!same_registry) {
-        impl_->images.clear();
+        (*impl_).images.clear();
     }
 
     bool synchronized = true;
@@ -397,68 +399,68 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             synchronized = false;
             continue;
         }
-        const auto existing = impl_->images.find(id.value);
-        if (existing != impl_->images.end() &&
-            existing->second.content_hash == resource->content_hash) {
+        const Impl::ImageMap::const_iterator existing = (*impl_).images.find(id.value);
+        if (existing != (*impl_).images.end() &&
+            (*existing).second.content_hash == (*resource).content_hash) {
             continue;
         }
 
-        if (resource->metadata.width >
+        if ((*resource).metadata.width >
                 static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
-            resource->metadata.height >
+            (*resource).metadata.height >
                 static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
-            resource->metadata.decoded_byte_count >
+            (*resource).metadata.decoded_byte_count >
                 std::numeric_limits<std::size_t>::max()) {
-            impl_->images.erase(id.value);
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
 
         const SkImageInfo output_info = SkImageInfo::Make(
-            static_cast<int>(resource->metadata.width),
-            static_cast<int>(resource->metadata.height),
-            resource->encoding == ImageResourceEncoding::bgra32_premultiplied
+            static_cast<int>((*resource).metadata.width),
+            static_cast<int>((*resource).metadata.height),
+            (*resource).encoding == ImageResourceEncoding::bgra32_premultiplied
                 ? kBGRA_8888_SkColorType : kRGBA_8888_SkColorType,
             kPremul_SkAlphaType,
             SkColorSpace::MakeSRGB());
         const std::size_t row_bytes = output_info.minRowBytes();
-        if (row_bytes != static_cast<std::size_t>(resource->metadata.width) * 4U ||
+        if (row_bytes != static_cast<std::size_t>((*resource).metadata.width) * 4U ||
             output_info.computeByteSize(row_bytes) !=
-                resource->metadata.decoded_byte_count) {
-            impl_->images.erase(id.value);
+                (*resource).metadata.decoded_byte_count) {
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
         std::vector<std::byte> pixels;
         sk_sp<SkData> pixel_data;
-        if (resource->encoding == ImageResourceEncoding::bgra32_premultiplied) {
-            if (resource->row_bytes != row_bytes ||
-                resource->encoded.size() != resource->metadata.decoded_byte_count) {
-                impl_->images.erase(id.value);
+        if ((*resource).encoding == ImageResourceEncoding::bgra32_premultiplied) {
+            if ((*resource).row_bytes != row_bytes ||
+                (*resource).encoded.size() != (*resource).metadata.decoded_byte_count) {
+                (*impl_).images.erase(id.value);
                 synchronized = false;
                 continue;
             }
             pixel_data = SkData::MakeWithCopy(
-                resource->encoded.data(), resource->encoded.size());
+                (*resource).encoded.data(), (*resource).encoded.size());
         } else {
             sk_sp<SkData> encoded = SkData::MakeWithCopy(
-                resource->encoded.data(), resource->encoded.size());
+                (*resource).encoded.data(), (*resource).encoded.size());
             SkCodec::Result codec_result = SkCodec::kInternalError;
             std::unique_ptr<SkCodec> codec =
                 SkPngDecoder::Decode(std::move(encoded), &codec_result);
             if (!codec || codec_result != SkCodec::kSuccess ||
-                codec->getInfo().width() !=
-                    static_cast<int>(resource->metadata.width) ||
-                codec->getInfo().height() !=
-                    static_cast<int>(resource->metadata.height)) {
-                impl_->images.erase(id.value);
+                (*codec).getInfo().width() !=
+                    static_cast<int>((*resource).metadata.width) ||
+                (*codec).getInfo().height() !=
+                    static_cast<int>((*resource).metadata.height)) {
+                (*impl_).images.erase(id.value);
                 synchronized = false;
                 continue;
             }
-            pixels.resize(resource->metadata.decoded_byte_count);
-            if (codec->getPixels(output_info, pixels.data(), row_bytes) !=
+            pixels.resize((*resource).metadata.decoded_byte_count);
+            if ((*codec).getPixels(output_info, pixels.data(), row_bytes) !=
                 SkCodec::kSuccess) {
-                impl_->images.erase(id.value);
+                (*impl_).images.erase(id.value);
                 synchronized = false;
                 continue;
             }
@@ -469,41 +471,42 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
         sk_sp<SkImage> image =
             SkImages::RasterFromData(output_info, std::move(pixel_data), row_bytes);
         if (!image) {
-            impl_->images.erase(id.value);
+            (*impl_).images.erase(id.value);
             synchronized = false;
             continue;
         }
-        impl_->images[id.value] = {resource->content_hash, std::move(image)};
+        (*impl_).images[id.value] = {(*resource).content_hash, std::move(image)};
     }
-    for (auto iterator = impl_->images.begin(); iterator != impl_->images.end();) {
-        if (!active.contains(iterator->first)) {
-            iterator = impl_->images.erase(iterator);
+    for (Impl::ImageMap::iterator iterator = (*impl_).images.begin();
+         iterator != (*impl_).images.end();) {
+        if (!active.contains((*iterator).first)) {
+            iterator = (*impl_).images.erase(iterator);
         } else {
             ++iterator;
         }
     }
-    impl_->image_registry_revision = snapshot.revision;
-    impl_->image_registry = &registry;
-    impl_->image_registry_synchronized = synchronized;
+    (*impl_).image_registry_revision = snapshot.revision;
+    (*impl_).image_registry = &registry;
+    (*impl_).image_registry_synchronized = synchronized;
     return synchronized;
 }
 
 const void* SkiaRaster::pixels() const noexcept {
     SkPixmap pixmap;
-    return impl_->surface && impl_->surface->peekPixels(&pixmap) ? pixmap.addr() : nullptr;
+    return (*impl_).surface && (*(*impl_).surface).peekPixels(&pixmap) ? pixmap.addr() : nullptr;
 }
 
 std::size_t SkiaRaster::row_bytes() const noexcept {
     SkPixmap pixmap;
-    return impl_->surface && impl_->surface->peekPixels(&pixmap) ? pixmap.rowBytes() : 0;
+    return (*impl_).surface && (*(*impl_).surface).peekPixels(&pixmap) ? pixmap.rowBytes() : 0;
 }
 
 std::uint32_t SkiaRaster::pixel_width() const noexcept {
-    return impl_->surface ? static_cast<std::uint32_t>(impl_->surface->width()) : 0;
+    return (*impl_).surface ? static_cast<std::uint32_t>((*(*impl_).surface).width()) : 0;
 }
 
 std::uint32_t SkiaRaster::pixel_height() const noexcept {
-    return impl_->surface ? static_cast<std::uint32_t>(impl_->surface->height()) : 0;
+    return (*impl_).surface ? static_cast<std::uint32_t>((*(*impl_).surface).height()) : 0;
 }
 
 std::size_t SkiaRaster::byte_size() const noexcept {
@@ -511,64 +514,64 @@ std::size_t SkiaRaster::byte_size() const noexcept {
 }
 
 void SkiaRaster::save() {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->save();
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).save();
     }
 }
 
 void SkiaRaster::restore() {
-    if (SkCanvas* canvas = impl_->canvas();
-        canvas && canvas->getSaveCount() > impl_->save_floor) {
-        canvas->restore();
+    if (SkCanvas* canvas = (*impl_).canvas();
+        canvas && (*canvas).getSaveCount() > (*impl_).save_floor) {
+        (*canvas).restore();
     }
 }
 
 void SkiaRaster::translate(Point offset) {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->translate(static_cast<SkScalar>(offset.x), static_cast<SkScalar>(offset.y));
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).translate(static_cast<SkScalar>(offset.x), static_cast<SkScalar>(offset.y));
     }
 }
 
 void SkiaRaster::clip_rect(Rect rect) {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->clipRect(to_sk_rect(rect), SkClipOp::kIntersect, false);
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).clipRect(to_sk_rect(rect), SkClipOp::kIntersect, false);
     }
 }
 
 void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->clipRRect(to_sk_rrect(rect, radius), SkClipOp::kIntersect, true);
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).clipRRect(to_sk_rrect(rect, radius), SkClipOp::kIntersect, true);
     }
 }
 
 void SkiaRaster::fill_rect(Rect rect, Color color) {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->drawRect(to_sk_rect(rect), make_paint(color));
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).drawRect(to_sk_rect(rect), make_paint(color));
     }
 }
 
 void SkiaRaster::fill_rounded_rect(Rect rect, double radius, Color color) {
-    if (SkCanvas* canvas = impl_->canvas()) {
-        canvas->drawRRect(to_sk_rrect(rect, radius), make_paint(color));
+    if (SkCanvas* canvas = (*impl_).canvas()) {
+        (*canvas).drawRRect(to_sk_rrect(rect, radius), make_paint(color));
     }
 }
 
 void SkiaRaster::stroke_rect(Rect rect, Color color, double width) {
-    if (SkCanvas* canvas = impl_->canvas()) {
+    if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
         paint.setStyle(SkPaint::kStroke_Style);
         paint.setStrokeWidth(static_cast<SkScalar>(width));
-        canvas->drawRect(to_sk_rect(rect), paint);
+        (*canvas).drawRect(to_sk_rect(rect), paint);
     }
 }
 
 void SkiaRaster::stroke_rounded_rect(Rect rect, double radius, Color color,
                                     double width) {
-    if (SkCanvas* canvas = impl_->canvas()) {
+    if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
         paint.setStyle(SkPaint::kStroke_Style);
         paint.setStrokeWidth(static_cast<SkScalar>(width));
-        canvas->drawRRect(to_sk_rrect(rect, radius), paint);
+        (*canvas).drawRRect(to_sk_rrect(rect, radius), paint);
     }
 }
 
@@ -582,7 +585,7 @@ void SkiaRaster::fill_linear_gradient(
 void SkiaRaster::fill_linear_gradient_spread(
     Rect rect, Point start, Point end,
     std::span<const GradientStop> stops, GradientSpreadMode spread) {
-    SkCanvas* canvas = impl_->canvas();
+    SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || !valid_gradient_stops(stops) ||
         (spread != GradientSpreadMode::pad &&
          spread != GradientSpreadMode::repeat &&
@@ -600,13 +603,13 @@ void SkiaRaster::fill_linear_gradient_spread(
     SkPaint paint;
     paint.setAntiAlias(true);
     paint.setShader(std::move(shader));
-    canvas->drawRect(to_sk_rect(rect), paint);
+    (*canvas).drawRect(to_sk_rect(rect), paint);
 }
 
 void SkiaRaster::fill_radial_gradient(
     Rect rect, Point center, Size radii,
     std::span<const GradientStop> stops) {
-    SkCanvas* canvas = impl_->canvas();
+    SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || radii.width <= 0.0 ||
         radii.height <= 0.0 || !valid_gradient_stops(stops)) {
         return;
@@ -618,25 +621,25 @@ void SkiaRaster::fill_radial_gradient(
     SkPaint paint;
     paint.setAntiAlias(true);
     paint.setShader(std::move(shader));
-    canvas->save();
-    canvas->clipRect(to_sk_rect(rect), SkClipOp::kIntersect, true);
-    canvas->translate(static_cast<SkScalar>(center.x),
+    (*canvas).save();
+    (*canvas).clipRect(to_sk_rect(rect), SkClipOp::kIntersect, true);
+    (*canvas).translate(static_cast<SkScalar>(center.x),
                       static_cast<SkScalar>(center.y));
-    canvas->scale(static_cast<SkScalar>(radii.width),
+    (*canvas).scale(static_cast<SkScalar>(radii.width),
                   static_cast<SkScalar>(radii.height));
-    canvas->drawRect(SkRect::MakeLTRB(
+    (*canvas).drawRect(SkRect::MakeLTRB(
         static_cast<SkScalar>((rect.x - center.x) / radii.width),
         static_cast<SkScalar>((rect.y - center.y) / radii.height),
         static_cast<SkScalar>((rect.x + rect.width - center.x) / radii.width),
         static_cast<SkScalar>((rect.y + rect.height - center.y) / radii.height)),
         paint);
-    canvas->restore();
+    (*canvas).restore();
 }
 
 void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
                                  double blur_radius, double spread,
                                  Color color) {
-    SkCanvas* canvas = impl_->canvas();
+    SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
         blur_radius < 0.0) {
         return;
@@ -650,16 +653,16 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
             kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
             false));
     }
-    canvas->drawRRect(to_sk_rrect(
+    (*canvas).drawRRect(to_sk_rrect(
         shadow, std::max(0.0, corner_radius + spread)), paint);
 }
 
 void SkiaRaster::draw_line(Point from, Point to, Color color, double width) {
-    if (SkCanvas* canvas = impl_->canvas()) {
+    if (SkCanvas* canvas = (*impl_).canvas()) {
         SkPaint paint = make_paint(color);
         paint.setStyle(SkPaint::kStroke_Style);
         paint.setStrokeWidth(static_cast<SkScalar>(width));
-        canvas->drawLine(static_cast<SkScalar>(from.x), static_cast<SkScalar>(from.y),
+        (*canvas).drawLine(static_cast<SkScalar>(from.x), static_cast<SkScalar>(from.y),
                          static_cast<SkScalar>(to.x), static_cast<SkScalar>(to.y), paint);
     }
 }
@@ -668,12 +671,12 @@ void SkiaRaster::draw_text_utf8(Point origin,
                                 std::string_view text,
                                 FontSpec font_spec,
                                 Color color) {
-    if (SkCanvas* canvas = impl_->canvas(); canvas && !text.empty()) {
+    if (SkCanvas* canvas = (*impl_).canvas(); canvas && !text.empty()) {
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-        const text::ShapedText shaped = impl_->text_engine.shape(text, font_spec);
+        const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
         const SkPaint paint = make_paint(color);
         for (const text::ShapedFontRun& run : shaped.runs) {
-            const sk_sp<SkTypeface> face = impl_->typeface(run.face);
+            const sk_sp<SkTypeface> face = (*impl_).typeface(run.face);
             if (!face || run.glyphs.empty()) continue;
             SkFont font(face, static_cast<SkScalar>(font_spec.size));
             font.setEdging(SkFont::Edging::kAntiAlias);
@@ -689,7 +692,7 @@ void SkiaRaster::draw_text_utf8(Point origin,
                 positions.push_back({glyph.x, glyph.y});
                 clusters.push_back(static_cast<std::uint32_t>(glyph.cluster.value()));
             }
-            canvas->drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
+            (*canvas).drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
                                SkSpan<const SkPoint>(positions),
                                SkSpan<const std::uint32_t>(clusters),
                                SkSpan<const char>(text.data(), text.size()),
@@ -700,11 +703,11 @@ void SkiaRaster::draw_text_utf8(Point origin,
 #else
         SkScalar x = static_cast<SkScalar>(origin.x);
         const SkPaint paint = make_paint(color);
-        for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
+        for (const Impl::TextRun& run : (*impl_).text_runs(text, font_spec)) {
             SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
             font.setEdging(SkFont::Edging::kAntiAlias);
             const char* bytes = text.data() + run.offset;
-            canvas->drawSimpleText(bytes, run.length, SkTextEncoding::kUTF8,
+            (*canvas).drawSimpleText(bytes, run.length, SkTextEncoding::kUTF8,
                                    x, static_cast<SkScalar>(origin.y), font, paint);
             x += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
         }
@@ -716,12 +719,12 @@ Size SkiaRaster::measure_text_utf8(std::string_view text,
                                    FontSpec font_spec) {
     if (text.empty()) return {0.0, font_spec.size};
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-    const text::ShapedText shaped = impl_->text_engine.shape(text, font_spec);
+    const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
     return {std::max(0.0, shaped.width), std::max(0.0, shaped.height)};
 #else
     double width{};
     double height{};
-    for (const Impl::TextRun& run : impl_->text_runs(text, font_spec)) {
+    for (const Impl::TextRun& run : (*impl_).text_runs(text, font_spec)) {
         SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
         const char* bytes = text.data() + run.offset;
         width += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
@@ -735,25 +738,25 @@ Size SkiaRaster::measure_text_utf8(std::string_view text,
 }
 
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
-    const auto found = impl_->images.find(image.value);
-    if (SkCanvas* canvas = impl_->canvas();
-        canvas && found != impl_->images.end() && opacity > 0.0) {
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    if (SkCanvas* canvas = (*impl_).canvas();
+        canvas && found != (*impl_).images.end() && opacity > 0.0) {
         SkPaint paint;
         paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
         paint.setAntiAlias(true);
-        canvas->drawImageRect(found->second.image.get(), to_sk_rect(destination),
+        (*canvas).drawImageRect((*found).second.image.get(), to_sk_rect(destination),
                               SkSamplingOptions(SkFilterMode::kLinear), &paint);
     }
 }
 
 void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
                                    Rect destination, double opacity) {
-    SkCanvas* canvas = impl_->canvas();
+    SkCanvas* canvas = (*impl_).canvas();
     if (canvas == nullptr || !surface || destination.empty() ||
         !destination.finite() || !std::isfinite(opacity) || opacity <= 0.0) {
         return;
     }
-    LiveSurfaceFrame frame = surface->acquire_latest();
+    LiveSurfaceFrame frame = (*surface).acquire_latest();
     if (!frame || frame.width() == 0U || frame.height() == 0U ||
         frame.row_bytes() < static_cast<std::uint64_t>(frame.width()) * 4U ||
         frame.pixels().empty()) {
@@ -772,7 +775,7 @@ void SkiaRaster::draw_live_surface(std::shared_ptr<LiveSurface> surface,
     SkPaint paint;
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
     paint.setAntiAlias(false);
-    canvas->drawImageRect(
+    (*canvas).drawImageRect(
         image.get(),
         SkRect::MakeWH(static_cast<SkScalar>(frame.width()),
                        static_cast<SkScalar>(frame.height())),
@@ -790,22 +793,22 @@ void SkiaRaster::draw_image_region(ImageId image, Rect source,
 void SkiaRaster::draw_image_region_sampled(
     ImageId image, Rect source, Rect destination, ImageSampling sampling,
     double opacity) {
-    const auto found = impl_->images.find(image.value);
-    SkCanvas* canvas = impl_->canvas();
-    if (canvas == nullptr || found == impl_->images.end() || source.empty() ||
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    SkCanvas* canvas = (*impl_).canvas();
+    if (canvas == nullptr || found == (*impl_).images.end() || source.empty() ||
         destination.empty() || !source.finite() || !destination.finite() ||
         !std::isfinite(opacity) || opacity <= 0.0) {
         return;
     }
     const Rect image_bounds{
         0.0, 0.0,
-        static_cast<double>(found->second.image->width()),
-        static_cast<double>(found->second.image->height())};
+        static_cast<double>((*(*found).second.image).width()),
+        static_cast<double>((*(*found).second.image).height())};
     if (!image_bounds.contains(source)) return;
     SkPaint paint;
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
     paint.setAntiAlias(true);
-    canvas->drawImageRect(found->second.image.get(), to_sk_rect(source),
+    (*canvas).drawImageRect((*found).second.image.get(), to_sk_rect(source),
                           to_sk_rect(destination),
                           SkSamplingOptions(sampling == ImageSampling::nearest
                               ? SkFilterMode::kNearest : SkFilterMode::kLinear),
@@ -816,16 +819,16 @@ void SkiaRaster::draw_image_region_sampled(
 void SkiaRaster::fill_image_pattern(
     ImageId image, Size source_pixel_size, Rect destination,
     Size logical_tile_size, ImagePatternWrap wrap, double opacity) {
-    const auto found = impl_->images.find(image.value);
-    SkCanvas* canvas = impl_->canvas();
-    if (canvas == nullptr || found == impl_->images.end() ||
+    const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
+    SkCanvas* canvas = (*impl_).canvas();
+    if (canvas == nullptr || found == (*impl_).images.end() ||
         wrap != ImagePatternWrap::tile || destination.empty() ||
         !destination.finite() || !std::isfinite(source_pixel_size.width) ||
         !std::isfinite(source_pixel_size.height) ||
         !std::isfinite(logical_tile_size.width) ||
         !std::isfinite(logical_tile_size.height) ||
-        source_pixel_size.width != found->second.image->width() ||
-        source_pixel_size.height != found->second.image->height() ||
+        source_pixel_size.width != (*(*found).second.image).width() ||
+        source_pixel_size.height != (*(*found).second.image).height() ||
         logical_tile_size.width <= 0.0 || logical_tile_size.height <= 0.0 ||
         !std::isfinite(opacity) || opacity <= 0.0) {
         return;
@@ -841,10 +844,10 @@ void SkiaRaster::fill_image_pattern(
     SkPaint paint;
     paint.setAlphaf(static_cast<float>(std::clamp(opacity, 0.0, 1.0)));
     paint.setAntiAlias(false);
-    paint.setShader(found->second.image->makeShader(
+    paint.setShader((*(*found).second.image).makeShader(
         SkTileMode::kRepeat, SkTileMode::kRepeat,
         SkSamplingOptions(SkFilterMode::kLinear), local));
-    canvas->drawRect(to_sk_rect(destination), paint);
+    (*canvas).drawRect(to_sk_rect(destination), paint);
 }
 
 } // namespace gui_forms::render

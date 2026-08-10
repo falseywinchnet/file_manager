@@ -30,64 +30,64 @@ public:
             throw std::invalid_argument(
                 "property proxy definitions require complete size-prefixed records");
         }
-        auto state = std::make_shared<PropertyState>();
-        std::memcpy(&state->callbacks, &callbacks,
+        std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> state = std::make_shared<PropertyState>();
+        std::memcpy(&(*state).callbacks, &callbacks,
                     std::min<std::size_t>(callbacks.struct_size,
-                                          sizeof(state->callbacks)));
-        state->descriptor = copy_descriptor(authored);
-        if (state->descriptor.readable && callbacks.get == nullptr) {
+                                          sizeof((*state).callbacks)));
+        (*state).descriptor = copy_descriptor(authored);
+        if ((*state).descriptor.readable && callbacks.get == nullptr) {
             throw std::invalid_argument(
                 "readable foreign properties require a getter callback");
         }
-        if (state->descriptor.writable && callbacks.set == nullptr) {
+        if ((*state).descriptor.writable && callbacks.set == nullptr) {
             throw std::invalid_argument(
                 "writable foreign properties require a setter callback");
         }
-        if (state->descriptor.resettable && callbacks.reset == nullptr) {
+        if ((*state).descriptor.resettable && callbacks.reset == nullptr) {
             throw std::invalid_argument(
                 "resettable foreign properties require a reset callback");
         }
-        if (!state->descriptor.editor_name.empty() &&
-            state->callbacks.edit == nullptr) {
+        if (!(*state).descriptor.editor_name.empty() &&
+            (*state).callbacks.edit == nullptr) {
             throw std::invalid_argument(
                 "foreign property editor identities require an edit callback");
         }
         const std::string canonical = gui_forms::canonical_binding_name(
-            state->descriptor.name);
+            (*state).descriptor.name);
         if (properties_.contains(canonical)) {
             throw std::invalid_argument(
                 "foreign property names must be unique ignoring case");
         }
 
         gui_forms::PropertyRegistration registration;
-        registration.descriptor = state->descriptor;
+        registration.descriptor = (*state).descriptor;
         if (registration.descriptor.readable) {
-            registration.get = [state] { return state->get(); };
+            registration.get = [state] { return (*state).get(); };
         }
         if (registration.descriptor.writable) {
             registration.set = [state](const gui_forms::BindingValue& value) {
-                state->set(value);
-                state->changed.emit();
+                (*state).set(value);
+                (*state).changed.emit();
             };
         }
         if (registration.descriptor.change_notifications) {
             registration.connect_changed = [state](
                 gui_forms::Component& owner, std::function<void()> changed) {
-                return state->changed.subscribe(owner, std::move(changed));
+                return (*state).changed.subscribe(owner, std::move(changed));
             };
         }
         if (registration.descriptor.resettable) {
             registration.reset = [state] {
-                state->reset();
-                state->changed.emit();
+                (*state).reset();
+                (*state).changed.emit();
             };
         }
         if (callbacks.should_serialize != nullptr) {
             registration.should_serialize = [state] {
-                return state->should_serialize();
+                return (*state).should_serialize();
             };
             registration.origin = [state] {
-                return state->should_serialize()
+                return (*state).should_serialize()
                     ? gui_forms::PropertyValueOrigin::local
                     : gui_forms::PropertyValueOrigin::defaulted;
             };
@@ -104,39 +104,40 @@ public:
             throw std::invalid_argument(
                 "foreign property change names must identify a definition");
         }
-        found->second->changed.emit();
+        (*(*found).second).changed.emit();
     }
 
     void install_converters(gui_forms::PropertyValueConverterRegistry& target) {
-        for (const auto& [canonical, state] : properties_) {
-            static_cast<void>(canonical);
-            const std::string& name = state->descriptor.converter_name;
+        for (const std::pair<const std::string,
+                 std::shared_ptr<PropertyState>>& property : properties_) {
+            const std::shared_ptr<PropertyState>& state = property.second;
+            const std::string& name = (*state).descriptor.converter_name;
             if (name.empty() || target.find(name) != nullptr ||
-                state->callbacks.format == nullptr) {
+                (*state).callbacks.format == nullptr) {
                 continue;
             }
             gui_forms::PropertyValueConverter converter;
-            if (state->callbacks.format != nullptr) {
+            if ((*state).callbacks.format != nullptr) {
                 converter.format = [weak = std::weak_ptr<PropertyState>(state)](
                     const gui_forms::BindingValue& value,
                     const gui_forms::PropertyDescriptor&) {
-                    const auto current = weak.lock();
+                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> current = weak.lock();
                     if (!current) {
                         throw std::logic_error(
                             "foreign property converter outlived its proxy");
                     }
-                    return current->format(value);
+                    return (*current).format(value);
                 };
             }
             converter.parse = [weak = std::weak_ptr<PropertyState>(state)](
                 std::string_view text, const gui_forms::BindingValue&,
                 const gui_forms::PropertyDescriptor&) {
-                const auto current = weak.lock();
+                const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> current = weak.lock();
                 if (!current) {
                     throw std::logic_error(
                         "foreign property converter outlived its proxy");
                 }
-                return current->parse(text);
+                return (*current).parse(text);
             };
             if (!target.register_converter(name, std::move(converter))) {
                 throw std::logic_error(
@@ -147,10 +148,11 @@ public:
 
     void install_editors(gui_forms::PropertyEditorRegistry& target,
                          std::set<std::string>& installed) {
-        for (const auto& [canonical, state] : properties_) {
-            static_cast<void>(canonical);
-            const std::string& name = state->descriptor.editor_name;
-            if (name.empty() || state->callbacks.edit == nullptr ||
+        for (const std::pair<const std::string,
+                 std::shared_ptr<PropertyState>>& property : properties_) {
+            const std::shared_ptr<PropertyState>& state = property.second;
+            const std::string& name = (*state).descriptor.editor_name;
+            if (name.empty() || (*state).callbacks.edit == nullptr ||
                 !installed.insert(name).second) {
                 continue;
             }
@@ -158,37 +160,37 @@ public:
                 name, [weak = std::weak_ptr<PropertyState>(state)](
                           const gui_forms::PropertyEditorRequest& request)
                     -> std::optional<gui_forms::PropertyEditorBinding> {
-                    const auto retained = weak.lock();
+                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> retained = weak.lock();
                     if (!retained) {
                         throw std::logic_error(
                             "foreign property editor outlived its proxy");
                     }
-                    auto button = gui_forms::make_control<gui_forms::Button>(
+                    std::shared_ptr<gui_forms::Button> button = gui_forms::make_control<gui_forms::Button>(
                         StableId(request.stable_id));
                     auto current = std::make_shared<gui_forms::BindingValue>(
                         request.value);
-                    auto failures = std::make_shared<
+                    std::shared_ptr<gui_forms::Event<const gui_forms::PropertyEditorInputError &>> failures = std::make_shared<
                         gui_forms::Event<const gui_forms::PropertyEditorInputError&>>();
                     const auto update_text = [weak_button =
                             std::weak_ptr<gui_forms::Button>(button), weak](
                             const gui_forms::BindingValue& value) {
-                        const auto editor = weak_button.lock();
-                        const auto state = weak.lock();
+                        const std::shared_ptr<gui_forms::Button> editor = weak_button.lock();
+                        const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> state = weak.lock();
                         if (!editor || !state) return;
-                        std::string display = state->format(value);
+                        std::string display = (*state).format(value);
                         if (display.size() > 96U) {
                             display.resize(93U);
                             display += "...";
                         }
-                        editor->set_text(display.empty()
+                        (*editor).set_text(display.empty()
                             ? std::string("Edit \xE2\x80\xA6")
                             : display + "  \xE2\x80\xA6");
                     };
                     update_text(*current);
-                    button->set_accessible_name(request.property_path);
-                    button->set_accessible_description(
+                    (*button).set_accessible_name(request.property_path);
+                    (*button).set_accessible_description(
                         request.descriptor.description);
-                    button->set_enabled(request.writable);
+                    (*button).set_enabled(request.writable);
 
                     gui_forms::PropertyEditorBinding binding;
                     binding.control = button;
@@ -202,20 +204,20 @@ public:
                          weak, current, failures](
                             gui_forms::Component& owner,
                             std::function<void(gui_forms::BindingValue)> committed) {
-                            const auto editor = weak_button.lock();
+                            const std::shared_ptr<gui_forms::Button> editor = weak_button.lock();
                             if (!editor) return gui_forms::SubscriptionToken{};
-                            return editor->clicked().subscribe(
+                            return (*editor).clicked().subscribe(
                                 owner, [weak, current, failures,
                                         committed = std::move(committed)](
                                            gui_forms::ButtonBase&) {
-                                    const auto state = weak.lock();
+                                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> state = weak.lock();
                                     if (!state) return;
                                     try {
-                                        committed(state->edit(*current));
+                                        committed((*state).edit(*current));
                                     } catch (const std::exception& error) {
                                         const gui_forms::PropertyEditorInputError failure{
-                                            state->format(*current), error.what()};
-                                        failures->emit(failure);
+                                            (*state).format(*current), error.what()};
+                                        (*failures).emit(failure);
                                     }
                                 });
                         };
@@ -224,7 +226,7 @@ public:
                                    std::function<void(
                                        const gui_forms::PropertyEditorInputError&)>
                                        failed) {
-                            return failures->subscribe(owner, std::move(failed));
+                            return (*failures).subscribe(owner, std::move(failed));
                         };
                     return binding;
                 });
@@ -305,26 +307,26 @@ private:
     static gf_property_value to_abi(const gui_forms::BindingValue& value) {
         gf_property_value result{};
         result.kind = abi_kind(gui_forms::binding_value_kind(value));
-        if (const auto* item = std::get_if<bool>(&value)) {
+        if (const bool* item = std::get_if<bool>(&value)) {
             result.boolean_value = *item ? 1U : 0U;
-        } else if (const auto* item = std::get_if<std::int64_t>(&value)) {
+        } else if (const long long* item = std::get_if<std::int64_t>(&value)) {
             result.signed_value = *item;
-        } else if (const auto* item = std::get_if<std::uint64_t>(&value)) {
+        } else if (const unsigned long long* item = std::get_if<std::uint64_t>(&value)) {
             result.unsigned_value = *item;
-        } else if (const auto* item = std::get_if<double>(&value)) {
+        } else if (const double* item = std::get_if<double>(&value)) {
             result.number_value = *item;
-        } else if (const auto* item = std::get_if<std::string>(&value)) {
-            result.text_value = {item->data(), item->size()};
-        } else if (const auto* item = std::get_if<gui_forms::Color>(&value)) {
+        } else if (const std::string* item = std::get_if<std::string>(&value)) {
+            result.text_value = {(*item).data(), (*item).size()};
+        } else if (const gui_forms::Color* item = std::get_if<gui_forms::Color>(&value)) {
             result.color_argb =
-                (static_cast<std::uint32_t>(item->alpha) << 24U) |
-                (static_cast<std::uint32_t>(item->red) << 16U) |
-                (static_cast<std::uint32_t>(item->green) << 8U) |
-                static_cast<std::uint32_t>(item->blue);
-        } else if (const auto* item =
+                (static_cast<std::uint32_t>((*item).alpha) << 24U) |
+                (static_cast<std::uint32_t>((*item).red) << 16U) |
+                (static_cast<std::uint32_t>((*item).green) << 8U) |
+                static_cast<std::uint32_t>((*item).blue);
+        } else if (const gui_forms::PropertyEnumValue* item =
                        std::get_if<gui_forms::PropertyEnumValue>(&value)) {
-            result.signed_value = item->value;
-            result.text_value = {item->name.data(), item->name.size()};
+            result.signed_value = (*item).value;
+            result.text_value = {(*item).name.data(), (*item).name.size()};
         }
         return result;
     }
@@ -335,7 +337,7 @@ private:
         if (value.kind == GF_PROPERTY_NULL) {
             return gui_forms::BindingValue{};
         }
-        const auto expected = native_kind(value.kind);
+        const gui_forms::BindingValueKind expected = native_kind(value.kind);
         if (expected != descriptor.kind) {
             throw std::invalid_argument(
                 "foreign callback returned a value outside its declared kind");
@@ -365,17 +367,17 @@ private:
             std::string name = std::move(text);
             if (name.empty() && descriptor.enumeration) {
                 const auto found = std::find_if(
-                    descriptor.enumeration->choices.begin(),
-                    descriptor.enumeration->choices.end(),
+                    (*descriptor.enumeration).choices.begin(),
+                    (*descriptor.enumeration).choices.end(),
                     [&](const gui_forms::PropertyEnumChoice& choice) {
                         return choice.value == value.signed_value;
                     });
-                if (found != descriptor.enumeration->choices.end()) {
-                    name = found->name;
+                if (found != (*descriptor.enumeration).choices.end()) {
+                    name = (*found).name;
                 }
             }
             return gui_forms::BindingValue{gui_forms::PropertyEnumValue{
-                descriptor.enumeration ? descriptor.enumeration->type_name
+                descriptor.enumeration ? (*descriptor.enumeration).type_name
                                        : std::string{},
                 std::move(name), value.signed_value}};
         }
@@ -465,17 +467,17 @@ private:
                 "foreign enum choices are missing or unbounded");
         }
         if (result.kind == gui_forms::BindingValueKind::enumeration) {
-            auto enumeration =
+            std::shared_ptr<gui_forms::PropertyEnumDescriptor> enumeration =
                 std::make_shared<gui_forms::PropertyEnumDescriptor>();
-            enumeration->type_name = copy_text(
+            (*enumeration).type_name = copy_text(
                 authored.enum_type_name, 256U, "property enum type");
-            enumeration->flags =
+            (*enumeration).flags =
                 (authored.flags & GF_PROPERTY_ENUM_FLAGS) != 0U;
-            enumeration->choices.reserve(
+            (*enumeration).choices.reserve(
                 static_cast<std::size_t>(authored.enum_choice_count));
             for (std::uint64_t index = 0U;
                  index < authored.enum_choice_count; ++index) {
-                enumeration->choices.push_back({
+                (*enumeration).choices.push_back({
                     copy_text(authored.enum_choices[index].name,
                               gui_forms::maximum_property_enum_text_bytes,
                               "property enum choice"),
@@ -608,4 +610,3 @@ private:
 };
 
 } // namespace gui_forms::abi::detail
-

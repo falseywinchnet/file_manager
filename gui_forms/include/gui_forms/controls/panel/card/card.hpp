@@ -13,8 +13,13 @@ struct CardLayout final {
     double header_extent{30.0};
     double footer_extent{30.0};
 
-    friend constexpr bool operator==(const CardLayout&,
-                                     const CardLayout&) = default;
+    friend constexpr bool operator==(const CardLayout& left,
+                                     const CardLayout& right) noexcept {
+        return left.padding == right.padding &&
+               left.section_gap == right.section_gap &&
+               left.header_extent == right.header_extent &&
+               left.footer_extent == right.footer_extent;
+    }
 };
 
 // Controls whether activation is purely notificational or also updates the

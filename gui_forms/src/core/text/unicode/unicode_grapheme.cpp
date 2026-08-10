@@ -1,9 +1,10 @@
 #include "unicode_grapheme.hpp"
 
 #include "unicode_grapheme_data.hpp"
+#include "gui_forms/detail/algorithm/binary_search.hpp"
 
-#include <algorithm>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace gui_forms::detail {
@@ -19,26 +20,33 @@ struct Scalar final {
   bool extended_pictographic{};
 };
 
+template <typename Value>
+struct ScalarBeforeUnicodeRange final {
+  [[nodiscard]] constexpr bool operator()(
+      char32_t scalar,
+      const unicode_data::UnicodeRange<Value> &range) const noexcept {
+    return scalar < range.first;
+  }
+};
+
 template <typename Value, std::size_t Size>
 [[nodiscard]] constexpr Value
 lookup(char32_t scalar,
        const std::array<unicode_data::UnicodeRange<Value>, Size> &ranges,
        Value missing) noexcept {
-  const auto iterator = std::upper_bound(
-      ranges.begin(), ranges.end(), scalar,
-      [](char32_t value, const unicode_data::UnicodeRange<Value> &range) {
-        return value < range.first;
-      });
-  if (iterator == ranges.begin()) {
+  const std::size_t position = upper_bound_index(
+      std::span<const unicode_data::UnicodeRange<Value>, Size>(ranges), scalar,
+      ScalarBeforeUnicodeRange<Value>{});
+  if (position == 0U) {
     return missing;
   }
-  const auto &candidate = *std::prev(iterator);
+  const unicode_data::UnicodeRange<Value> &candidate = ranges[position - 1U];
   return scalar <= candidate.last ? candidate.value : missing;
 }
 
 [[nodiscard]] char32_t decode(std::string_view text,
                               std::size_t &offset) noexcept {
-  const auto first = static_cast<std::uint8_t>(text[offset++]);
+  const std::uint8_t first = static_cast<std::uint8_t>(text[offset++]);
   if (first < 0x80U) {
     return first;
   }

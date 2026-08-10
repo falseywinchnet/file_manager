@@ -24,8 +24,17 @@ struct MasterDetailLayout final {
     double compact_threshold{720.0};
     bool resizable{true};
 
-    friend constexpr bool operator==(const MasterDetailLayout&,
-                                     const MasterDetailLayout&) = default;
+    friend constexpr bool operator==(const MasterDetailLayout& left,
+                                     const MasterDetailLayout& right) noexcept {
+        return left.orientation == right.orientation &&
+               left.master_extent == right.master_extent &&
+               left.splitter_width == right.splitter_width &&
+               left.splitter_hit_width == right.splitter_hit_width &&
+               left.master_minimum == right.master_minimum &&
+               left.detail_minimum == right.detail_minimum &&
+               left.compact_threshold == right.compact_threshold &&
+               left.resizable == right.resizable;
+    }
 };
 
 struct MasterDetailPresentationChange final {

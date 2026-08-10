@@ -178,8 +178,9 @@ TableLayoutPanel::CellMetadata& TableLayoutPanel::metadata_for(
 const TableLayoutPanel::CellMetadata* TableLayoutPanel::metadata_for(
     const Control& child) const {
     if (child.parent().get() != this || !child.is_alive()) return nullptr;
-    const auto found = metadata_.find(child.runtime_id().value);
-    return found == metadata_.end() ? nullptr : &found->second;
+    const MetadataMap::const_iterator found =
+        metadata_.find(child.runtime_id().value);
+    return found == metadata_.end() ? nullptr : &(*found).second;
 }
 
 void TableLayoutPanel::set_cell_position(
@@ -207,10 +208,11 @@ std::optional<TableLayoutCellPosition> TableLayoutPanel::cell_position(
     const Control& child) const {
     if (child.parent().get() != this || !child.is_alive()) return std::nullopt;
     if (attached_window() != nullptr) static_cast<void>(arranged_bounds());
-    const auto resolved = resolved_cells_.find(child.runtime_id().value);
-    if (resolved != resolved_cells_.end()) return resolved->second;
+    const ResolvedCellMap::const_iterator resolved =
+        resolved_cells_.find(child.runtime_id().value);
+    if (resolved != resolved_cells_.end()) return (*resolved).second;
     const CellMetadata* metadata = metadata_for(child);
-    return metadata == nullptr ? std::nullopt : metadata->position;
+    return metadata == nullptr ? std::nullopt : (*metadata).position;
 }
 
 void TableLayoutPanel::set_column_span(const Control& child, std::size_t span) {
@@ -226,7 +228,7 @@ void TableLayoutPanel::set_column_span(const Control& child, std::size_t span) {
 
 std::size_t TableLayoutPanel::column_span(const Control& child) const {
     const CellMetadata* metadata = metadata_for(child);
-    return metadata == nullptr ? 1U : metadata->column_span;
+    return metadata == nullptr ? 1U : (*metadata).column_span;
 }
 
 void TableLayoutPanel::set_row_span(const Control& child, std::size_t span) {
@@ -242,14 +244,14 @@ void TableLayoutPanel::set_row_span(const Control& child, std::size_t span) {
 
 std::size_t TableLayoutPanel::row_span(const Control& child) const {
     const CellMetadata* metadata = metadata_for(child);
-    return metadata == nullptr ? 1U : metadata->row_span;
+    return metadata == nullptr ? 1U : (*metadata).row_span;
 }
 
 void TableLayoutPanel::reconcile_metadata() {
     std::unordered_set<std::uint64_t> live;
     for (const Control::Ptr& child : children()) {
-        if (child && child->is_alive() && child->parent().get() == this) {
-            live.insert(child->runtime_id().value);
+        if (child && (*child).is_alive() && (*child).parent().get() == this) {
+            live.insert((*child).runtime_id().value);
         }
     }
     std::erase_if(metadata_, [&live](const auto& entry) {
@@ -272,7 +274,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     const auto resize_grid = [&occupied, &rows, &columns](std::size_t new_columns,
                                                           std::size_t new_rows) {
         if (new_columns != columns) {
-            for (auto& row : occupied) row.resize(new_columns, false);
+            for (std::vector<bool>& row : occupied) row.resize(new_columns, false);
             columns = new_columns;
         }
         if (new_rows != rows) {
@@ -335,33 +337,33 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
 
     const std::vector<Control::Ptr> retained = snapshot_layout_children();
     for (const Control::Ptr& child : retained) {
-        if (!is_current_layout_child(child) || !child->visible()) continue;
+        if (!is_current_layout_child(child) || !(*child).visible()) continue;
         const CellMetadata* metadata = std::as_const(*this).metadata_for(*child);
-        if (metadata == nullptr || !metadata->position) {
+        if (metadata == nullptr || !(*metadata).position) {
             automatic.push_back(child);
             continue;
         }
-        const TableLayoutCellPosition position = *metadata->position;
-        if (!grow_to_fit(position, metadata->column_span, metadata->row_span)) {
+        const TableLayoutCellPosition position = *(*metadata).position;
+        if (!grow_to_fit(position, (*metadata).column_span, (*metadata).row_span)) {
             overflow.push_back(child);
             continue;
         }
-        if (!region_free(position.column, position.row, metadata->column_span,
-                         metadata->row_span)) {
+        if (!region_free(position.column, position.row, (*metadata).column_span,
+                         (*metadata).row_span)) {
             overflow.push_back(child);
             continue;
         }
-        occupy(position.column, position.row, metadata->column_span,
-               metadata->row_span);
-        resolved.push_back({child, position, metadata->column_span,
-                            metadata->row_span, {}, child->margin()});
+        occupy(position.column, position.row, (*metadata).column_span,
+               (*metadata).row_span);
+        resolved.push_back({child, position, (*metadata).column_span,
+                            (*metadata).row_span, {}, (*child).margin()});
     }
 
     for (const Control::Ptr& child : automatic) {
         const CellMetadata* metadata = std::as_const(*this).metadata_for(*child);
         const std::size_t column_span = metadata == nullptr
-            ? 1U : metadata->column_span;
-        const std::size_t row_span = metadata == nullptr ? 1U : metadata->row_span;
+            ? 1U : (*metadata).column_span;
+        const std::size_t row_span = metadata == nullptr ? 1U : (*metadata).row_span;
         if ((column_span > columns &&
              grow_style_ != TableLayoutGrowStyle::add_columns) ||
             (row_span > rows && grow_style_ != TableLayoutGrowStyle::add_rows)) {
@@ -395,9 +397,9 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             overflow.push_back(child);
             continue;
         }
-        occupy(position->column, position->row, column_span, row_span);
+        occupy((*position).column, (*position).row, column_span, row_span);
         resolved.push_back({child, *position, column_span, row_span, {},
-                            child->margin()});
+                            (*child).margin()});
     }
 
     std::vector<TableLayoutStyle> column_styles = column_styles_;
@@ -410,14 +412,14 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     std::vector<TrackSpanDemand> row_spans;
     for (Item& item : resolved) {
         if (!is_current_layout_child(item.control) ||
-            !item.control->visible()) {
+            !(*item.control).visible()) {
             item.control.reset();
             continue;
         }
         item.desired = preferred_child_size(item.control, inner);
         if (!is_alive()) return {};
         if (!is_current_layout_child(item.control) ||
-            !item.control->visible()) {
+            !(*item.control).visible()) {
             item.control.reset();
             continue;
         }
@@ -461,7 +463,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
 
     for (const Item& item : resolved) {
         if (!item.control || !is_current_layout_child(item.control)) continue;
-        resolved_cells_[item.control->runtime_id().value] = item.position;
+        resolved_cells_[(*item.control).runtime_id().value] = item.position;
         if (!assign) continue;
         const double cell_width =
             column_offsets[item.position.column + item.column_span] -
@@ -481,7 +483,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
         double child_height = std::min(item.desired.height, available_height);
         double child_x = cell_x;
         double child_y = cell_y;
-        switch (item.control->dock()) {
+        switch ((*item.control).dock()) {
         case DockStyle::fill:
             child_width = available_width;
             child_height = available_height;
@@ -501,7 +503,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             child_height = available_height;
             break;
         case DockStyle::none: {
-            const AnchorStyles anchor = item.control->anchor();
+            const AnchorStyles anchor = (*item.control).anchor();
             const bool left = has_anchor(anchor, AnchorStyles::left);
             const bool right = has_anchor(anchor, AnchorStyles::right);
             const bool top = has_anchor(anchor, AnchorStyles::top);
@@ -534,16 +536,17 @@ Control::Ptr TableLayoutPanel::control_from_position(std::size_t column,
                                                       std::size_t row) const {
     if (attached_window() != nullptr) static_cast<void>(arranged_bounds());
     for (const Control::Ptr& child : children()) {
-        if (!child || !child->is_alive() || !child->visible()) continue;
-        const auto position = resolved_cells_.find(child->runtime_id().value);
+        if (!child || !(*child).is_alive() || !(*child).visible()) continue;
+        const ResolvedCellMap::const_iterator position =
+            resolved_cells_.find((*child).runtime_id().value);
         if (position == resolved_cells_.end()) continue;
         const CellMetadata* metadata = metadata_for(*child);
         const std::size_t column_span = metadata == nullptr
-            ? 1U : metadata->column_span;
-        const std::size_t row_span = metadata == nullptr ? 1U : metadata->row_span;
-        if (column >= position->second.column &&
-            column < position->second.column + column_span &&
-            row >= position->second.row && row < position->second.row + row_span) {
+            ? 1U : (*metadata).column_span;
+        const std::size_t row_span = metadata == nullptr ? 1U : (*metadata).row_span;
+        if (column >= (*position).second.column &&
+            column < (*position).second.column + column_span &&
+            row >= (*position).second.row && row < (*position).second.row + row_span) {
             return child;
         }
     }

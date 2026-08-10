@@ -6,17 +6,19 @@
 namespace gui_forms {
 namespace {
 
+std::uint8_t interpolate_channel(std::uint8_t left, std::uint8_t right,
+                                 double amount) noexcept {
+    return static_cast<std::uint8_t>(std::lround(
+        static_cast<double>(left) +
+        (static_cast<double>(right) - static_cast<double>(left)) * amount));
+}
+
 Color interpolate(Color first, Color second, double amount) noexcept {
     amount = std::clamp(amount, 0.0, 1.0);
-    const auto channel = [amount](std::uint8_t left, std::uint8_t right) {
-        return static_cast<std::uint8_t>(std::lround(
-            static_cast<double>(left) +
-            (static_cast<double>(right) - static_cast<double>(left)) * amount));
-    };
-    return Color::rgba(channel(first.red, second.red),
-                       channel(first.green, second.green),
-                       channel(first.blue, second.blue),
-                       channel(first.alpha, second.alpha));
+    return Color::rgba(interpolate_channel(first.red, second.red, amount),
+                       interpolate_channel(first.green, second.green, amount),
+                       interpolate_channel(first.blue, second.blue, amount),
+                       interpolate_channel(first.alpha, second.alpha, amount));
 }
 
 Color sample_gradient(std::span<const GradientStop> stops, double offset) noexcept {

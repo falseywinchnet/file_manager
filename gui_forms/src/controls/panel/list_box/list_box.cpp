@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/list_box/list_box.hpp"
 
 #include "../input_control_utilities.hpp"
+#include "gui_forms/detail/algorithm/binary_search.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
@@ -11,6 +12,17 @@
 #include <utility>
 
 namespace gui_forms {
+namespace {
+
+struct SelectionOutsideItemCount final {
+    std::size_t item_count{};
+
+    [[nodiscard]] bool operator()(std::size_t index) const noexcept {
+        return index >= item_count;
+    }
+};
+
+} // namespace
 using namespace input_control_detail;
 
 ListBox::ListBox(StableId stable_id) : Panel(std::move(stable_id)) {
@@ -29,8 +41,10 @@ void ListBox::set_items(std::vector<std::string> items) {
     items_ = std::move(items);
     item_stable_ids_.clear();
     const std::vector<std::size_t> previous = selected_;
-    selected_.erase(std::remove_if(selected_.begin(), selected_.end(),
-        [this](std::size_t index) { return index >= items_.size(); }), selected_.end());
+    selected_.erase(
+        std::remove_if(selected_.begin(), selected_.end(),
+                       SelectionOutsideItemCount{items_.size()}),
+        selected_.end());
     if (active_index_ && *active_index_ >= items_.size()) active_index_.reset();
     if (anchor_index_ && *anchor_index_ >= items_.size()) anchor_index_.reset();
     top_index_ = items_.empty() ? 0U : std::min(top_index_, items_.size() - 1U);
@@ -141,7 +155,7 @@ void ListBox::apply_selection(std::vector<std::size_t> selection,
     std::sort(selection.begin(), selection.end());
     selection.erase(std::unique(selection.begin(), selection.end()), selection.end());
     const std::vector<std::size_t> previous = selected_;
-    const auto previous_active = active_index_;
+    const std::optional<std::size_t> previous_active = active_index_;
     selected_ = std::move(selection);
     active_index_ = active;
     if (previous == selected_ && previous_active == active_index_) return;
@@ -169,7 +183,8 @@ void ListBox::select_index(std::size_t index, bool extend, bool toggle) {
         apply_selection(std::move(next), index);
     } else if (toggle) {
         std::vector<std::size_t> next = selected_;
-        const auto found = std::find(next.begin(), next.end(), index);
+        const std::vector<std::size_t>::iterator found =
+            std::find(next.begin(), next.end(), index);
         if (found == next.end()) next.push_back(index);
         else next.erase(found);
         apply_selection(std::move(next), index);
@@ -277,7 +292,8 @@ void ListBox::on_paint(Painter& painter, Rect damage) {
     const std::size_t end = std::min(items_.size(), top_index_ + visible);
     for (std::size_t index = top_index_; index < end; ++index) {
         const double y = 2.0 + static_cast<double>(index - top_index_) * row_height;
-        const bool selected = std::binary_search(selected_.begin(), selected_.end(), index);
+        const bool selected = detail::binary_search_contains(
+            std::span<const std::size_t>(selected_), index);
         const bool hovered = hovered_index_ == index;
         const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
         const ControlVisualRecipe& row_recipe = effective_theme().resolve(
@@ -325,7 +341,7 @@ void ListBox::paint_row_adornment(Painter&, std::size_t, Rect, bool,
 void ListBox::on_pointer(PointerEvent& event) {
     if (!eligible_for_input()) return;
     if (event.action == PointerAction::move) {
-        const auto next = index_at(event.position);
+        const std::optional<std::size_t> next = index_at(event.position);
         if (next != hovered_index_) {
             hovered_index_ = next;
             invalidate(Dirty::paint);
@@ -349,15 +365,15 @@ void ListBox::on_pointer(PointerEvent& event) {
         return;
     }
     if (event.action == PointerAction::down && event.button == PointerButton::primary) {
-        if (window() != nullptr) static_cast<void>(window()->request_focus(shared_from_this()));
-        if (const auto index = index_at(event.position)) {
+        if (window() != nullptr) static_cast<void>((*window()).request_focus(shared_from_this()));
+        if (const std::optional<std::size_t> index = index_at(event.position)) {
             select_index(*index, includes(event.modifiers, Modifier::shift),
                          command_modifier(event.modifiers));
             event.handled = true;
         }
     } else if (event.action == PointerAction::up &&
                event.button == PointerButton::primary) {
-        if (const auto index = index_at(event.position);
+        if (const std::optional<std::size_t> index = index_at(event.position);
             index && active_index_ == index) {
             item_activated_.emit(*index);
             event.handled = true;
@@ -396,7 +412,7 @@ SemanticDescriptor ListBox::semantic_descriptor() const {
     descriptor.role = SemanticRole::list;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
-    if (const auto selected = selected_index()) {
+    if (const std::optional<std::size_t> selected = selected_index()) {
         descriptor.value = items_[*selected];
     } else if (!selected_.empty()) {
         descriptor.value = std::to_string(selected_.size()) + " items selected";
@@ -432,7 +448,8 @@ std::vector<SemanticNode> ListBox::semantic_virtual_children() const {
         if (index >= top_index_ && index < visible_end) {
             node.states |= SemanticState::visible;
         }
-        if (std::binary_search(selected_.begin(), selected_.end(), index)) {
+        if (detail::binary_search_contains(
+                std::span<const std::size_t>(selected_), index)) {
             node.states |= SemanticState::selected;
         }
         if (focused_ && active_index_ == index) node.states |= SemanticState::focused;
@@ -448,7 +465,8 @@ bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
                                        std::string_view) {
     std::size_t index{};
     if (!item_stable_ids_.empty()) {
-        const auto found = std::find(item_stable_ids_.begin(),
+        const std::vector<std::string>::iterator found =
+            std::find(item_stable_ids_.begin(),
                                      item_stable_ids_.end(), child_stable_id);
         if (found == item_stable_ids_.end()) return false;
         index = static_cast<std::size_t>(
@@ -457,7 +475,7 @@ bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
         const std::string prefix = std::string(stable_id().value()) + ".item.";
         if (!child_stable_id.starts_with(prefix)) return false;
         const std::string_view suffix = child_stable_id.substr(prefix.size());
-        const auto parsed = std::from_chars(
+        const std::from_chars_result parsed = std::from_chars(
             suffix.data(), suffix.data() + suffix.size(), index);
         if (parsed.ec != std::errc{} ||
             parsed.ptr != suffix.data() + suffix.size() ||
@@ -466,7 +484,7 @@ bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
     if (action != SemanticAction::focus && action != SemanticAction::select &&
         action != SemanticAction::press) return false;
     if (window() != nullptr) {
-        static_cast<void>(window()->request_focus(shared_from_this()));
+        static_cast<void>((*window()).request_focus(shared_from_this()));
     }
     select_index(index, false, false);
     if (action == SemanticAction::press && is_alive()) {

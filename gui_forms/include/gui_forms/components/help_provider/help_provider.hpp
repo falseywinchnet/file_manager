@@ -96,7 +96,14 @@ protected:
 
 private:
     struct Entry;
+    struct FocusedHelpAccelerator final {
+        HelpProvider* provider{};
+
+        bool operator()() const;
+    };
     class AcceleratorHolder;
+    using EntryMap =
+        std::unordered_map<std::uint64_t, std::unique_ptr<Entry>>;
 
     [[nodiscard]] Window* bound_window() const noexcept;
     void require_access(std::string_view operation) const;
@@ -109,7 +116,7 @@ private:
     bool request_focused_help();
 
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
-    std::unordered_map<std::uint64_t, std::unique_ptr<Entry>> entries_;
+    EntryMap entries_;
     std::unique_ptr<AcceleratorHolder> accelerator_;
     Event<HelpRequestEvent&> help_requested_;
     std::any tag_;

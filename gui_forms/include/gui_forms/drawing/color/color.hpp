@@ -55,7 +55,11 @@ public:
     }
     [[nodiscard]] double brightness() const noexcept;
 
-    friend constexpr bool operator==(const Color&, const Color&) = default;
+    friend constexpr bool operator==(const Color& left,
+                                     const Color& right) noexcept {
+        return left.argb_ == right.argb_ && left.empty_ == right.empty_ &&
+               left.known_ == right.known_;
+    }
 
 private:
     constexpr Color(std::uint32_t argb, bool empty, bool known) noexcept
@@ -78,8 +82,11 @@ struct LinearSrgb final {
     double green{};
     double blue{};
     double alpha{1.0};
-    friend constexpr bool operator==(const LinearSrgb&,
-                                     const LinearSrgb&) = default;
+    friend constexpr bool operator==(const LinearSrgb& left,
+                                     const LinearSrgb& right) noexcept {
+        return left.red == right.red && left.green == right.green &&
+               left.blue == right.blue && left.alpha == right.alpha;
+    }
 };
 
 struct XyzD65 final {
@@ -87,7 +94,11 @@ struct XyzD65 final {
     double y{};
     double z{};
     double alpha{1.0};
-    friend constexpr bool operator==(const XyzD65&, const XyzD65&) = default;
+    friend constexpr bool operator==(const XyzD65& left,
+                                     const XyzD65& right) noexcept {
+        return left.x == right.x && left.y == right.y && left.z == right.z &&
+               left.alpha == right.alpha;
+    }
 };
 
 struct Oklab final {
@@ -95,7 +106,11 @@ struct Oklab final {
     double a{};
     double b{};
     double alpha{1.0};
-    friend constexpr bool operator==(const Oklab&, const Oklab&) = default;
+    friend constexpr bool operator==(const Oklab& left,
+                                     const Oklab& right) noexcept {
+        return left.lightness == right.lightness && left.a == right.a &&
+               left.b == right.b && left.alpha == right.alpha;
+    }
 };
 
 struct Oklch final {
@@ -103,7 +118,13 @@ struct Oklch final {
     double chroma{};
     double hue_degrees{};
     double alpha{1.0};
-    friend constexpr bool operator==(const Oklch&, const Oklch&) = default;
+    friend constexpr bool operator==(const Oklch& left,
+                                     const Oklch& right) noexcept {
+        return left.lightness == right.lightness &&
+               left.chroma == right.chroma &&
+               left.hue_degrees == right.hue_degrees &&
+               left.alpha == right.alpha;
+    }
 };
 
 struct SrgbConversion final {

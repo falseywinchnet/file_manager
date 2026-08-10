@@ -17,8 +17,13 @@ struct PresentationSettings final {
     bool high_contrast{};
     bool reduced_motion{};
     bool sound_enabled{true};
-    friend constexpr bool operator==(const PresentationSettings&,
-                                     const PresentationSettings&) = default;
+    friend constexpr bool operator==(const PresentationSettings& left,
+                                     const PresentationSettings& right) noexcept {
+        return left.text_scale == right.text_scale &&
+               left.high_contrast == right.high_contrast &&
+               left.reduced_motion == right.reduced_motion &&
+               left.sound_enabled == right.sound_enabled;
+    }
 };
 
 // Immutable host placement for the newest generation of one live surface.
@@ -67,8 +72,18 @@ struct PaintReceipt final {
     [[nodiscard]] explicit constexpr operator bool() const noexcept {
         return rendered_revision != 0U && surface_epoch != 0U;
     }
-    friend constexpr auto operator<=>(const PaintReceipt&,
-                                      const PaintReceipt&) = default;
+    friend constexpr bool operator==(const PaintReceipt& left,
+                                     const PaintReceipt& right) noexcept {
+        return left.rendered_revision == right.rendered_revision &&
+               left.surface_epoch == right.surface_epoch;
+    }
+    friend constexpr std::strong_ordering operator<=>(
+        const PaintReceipt& left, const PaintReceipt& right) noexcept {
+        const std::strong_ordering revision_order =
+            left.rendered_revision <=> right.rendered_revision;
+        return revision_order != 0
+            ? revision_order : left.surface_epoch <=> right.surface_epoch;
+    }
 };
 
 } // namespace gui_forms

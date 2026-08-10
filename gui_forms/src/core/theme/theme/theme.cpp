@@ -114,16 +114,25 @@ void paint_nine_patch(Painter& painter, Rect bounds,
     }
 }
 
+bool valid_spacing_value(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0 && value <= 4096.0;
+}
+
+bool valid_geometry_value(double value) noexcept {
+    return std::isfinite(value) && value > 0.0 && value <= 16384.0;
+}
+
+bool valid_motion_duration(std::chrono::milliseconds duration) noexcept {
+    return duration.count() > 0 && duration.count() <= 60'000;
+}
+
 bool valid_structure(const ThemeStructureTokens& structure) noexcept {
     const ThemeSpacingTokens& spacing = structure.spacing;
     const double spacing_values[] = {
         spacing.micro, spacing.xsmall, spacing.small, spacing.medium,
         spacing.large, spacing.xlarge, spacing.section};
     if (!std::all_of(std::begin(spacing_values), std::end(spacing_values),
-                     [](double value) {
-                         return std::isfinite(value) && value >= 0.0 &&
-                                value <= 4096.0;
-                     }) ||
+                     &valid_spacing_value) ||
         !(spacing.micro <= spacing.xsmall &&
           spacing.xsmall <= spacing.small &&
           spacing.small <= spacing.medium &&
@@ -141,10 +150,7 @@ bool valid_structure(const ThemeStructureTokens& structure) noexcept {
         geometry.navigation_extent, geometry.navigation_minimum,
         geometry.content_minimum, geometry.compact_breakpoint};
     if (!std::all_of(std::begin(geometry_values), std::end(geometry_values),
-                     [](double value) {
-                         return std::isfinite(value) && value > 0.0 &&
-                                value <= 16384.0;
-                     }) ||
+                     &valid_geometry_value) ||
         !(geometry.compact_control_height <= geometry.control_height &&
           geometry.control_height <= geometry.large_control_height &&
           geometry.splitter_width <= geometry.splitter_hit_width &&
@@ -162,14 +168,11 @@ bool valid_structure(const ThemeStructureTokens& structure) noexcept {
         return false;
     }
 
-    const auto valid_duration = [](std::chrono::milliseconds duration) {
-        return duration.count() > 0 && duration.count() <= 60'000;
-    };
     const ThemeMotionTokens& motion = structure.motion;
-    return valid_duration(motion.quick) &&
-           valid_duration(motion.standard) &&
-           valid_duration(motion.emphasized) &&
-           valid_duration(motion.busy_cycle) &&
+    return valid_motion_duration(motion.quick) &&
+           valid_motion_duration(motion.standard) &&
+           valid_motion_duration(motion.emphasized) &&
+           valid_motion_duration(motion.busy_cycle) &&
            motion.quick <= motion.standard &&
            motion.standard <= motion.emphasized;
 }
@@ -204,7 +207,7 @@ ControlVisualRecipe recipe(Color top, Color bottom, Color border, Color text,
 ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
                                      Color text, double radius = 3.0) {
     ControlRoleRecipes result;
-    auto& values = result.ordinary;
+    std::array<ControlVisualRecipe, control_surface_state_count>& values = result.ordinary;
     values[static_cast<std::size_t>(ControlSurfaceState::normal)] =
         recipe(top, bottom, border, text, radius);
     values[static_cast<std::size_t>(ControlSurfaceState::hot)] =
@@ -272,7 +275,7 @@ ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
     result.high_contrast_selected = result.high_contrast;
     for (ControlVisualRecipe& selected : result.high_contrast_selected) {
         const Color state_border = selected.material.border
-            ? selected.material.border->color : Color::rgba(255, 255, 0);
+            ? (*selected.material.border).color : Color::rgba(255, 255, 0);
         selected.material = surface(Color::rgba(255, 255, 255),
                                     Color::rgba(255, 255, 255),
                                     state_border, radius);
@@ -303,8 +306,8 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
         return false;
     }
     if (material.border &&
-        (!std::isfinite(material.border->width) ||
-         material.border->width <= 0.0 || material.border->width > 64.0)) {
+        (!std::isfinite((*material.border).width) ||
+         (*material.border).width <= 0.0 || (*material.border).width > 64.0)) {
         return false;
     }
     for (const MaterialShadow& shadow : material.shadows) {
@@ -442,13 +445,13 @@ void paint_surface_material(Painter& painter, Rect bounds,
     }
     if (clipped) painter.restore();
     if (material.border) {
-        const double inset = material.border->width * 0.5;
+        const double inset = (*material.border).width * 0.5;
         painter.stroke_rounded_rect(
             {bounds.x + inset, bounds.y + inset,
              std::max(0.0, bounds.width - inset * 2.0),
              std::max(0.0, bounds.height - inset * 2.0)},
             std::max(0.0, material.corner_radius - inset),
-            material.border->color, material.border->width);
+            (*material.border).color, (*material.border).width);
     }
 }
 
@@ -474,12 +477,14 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
         throw std::invalid_argument("theme id must contain 1 to 128 bytes");
     }
     for (const ControlRoleRecipes& role : definition.roles) {
-        const auto validate = [](const auto& recipes) {
-            return std::all_of(recipes.begin(), recipes.end(), valid_recipe);
-        };
-        if (!validate(role.ordinary) || !validate(role.selected) ||
-            !validate(role.high_contrast) ||
-            !validate(role.high_contrast_selected)) {
+        if (!std::all_of(role.ordinary.begin(), role.ordinary.end(),
+                         &valid_recipe) ||
+            !std::all_of(role.selected.begin(), role.selected.end(),
+                         &valid_recipe) ||
+            !std::all_of(role.high_contrast.begin(),
+                         role.high_contrast.end(), &valid_recipe) ||
+            !std::all_of(role.high_contrast_selected.begin(),
+                         role.high_contrast_selected.end(), &valid_recipe)) {
             throw std::invalid_argument("theme contains an invalid visual recipe");
         }
     }
@@ -549,7 +554,7 @@ ThemeDefinition windows_professional_theme_definition() {
         professional_role(Color::rgba(238, 242, 246),
                           Color::rgba(220, 227, 234),
                           Color::rgba(118, 139, 158), ink, 2.0);
-    auto& progress =
+    ControlRoleRecipes& progress =
         result.roles[static_cast<std::size_t>(ControlVisualRole::progress)];
     for (ControlVisualRecipe& selected : progress.selected) {
         selected.text = Color::rgba(255, 255, 255);

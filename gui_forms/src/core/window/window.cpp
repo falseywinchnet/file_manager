@@ -1,5 +1,6 @@
 #include "gui_forms/window.hpp"
 #include "gui_forms/live_surface.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
 #include "../dispatcher/state/dispatcher_state.hpp"
 #include "../display/chunk/display_chunk.hpp"
 #include "../display/recording_painter/recording_painter.hpp"
@@ -47,7 +48,7 @@ bool contains_control(const Control::Ptr& root, const Control::Ptr& candidate) {
     if (root == candidate) {
         return true;
     }
-    for (const auto& child : root->children()) {
+    for (const std::shared_ptr<gui_forms::Control>& child : (*root).children()) {
         if (contains_control(child, candidate)) {
             return true;
         }
@@ -62,12 +63,16 @@ bool single_allowed_effect(DragEffect effect, DragEffect allowed) noexcept {
            has_drag_effect(allowed, effect);
 }
 
+double bounded_visual_outset(double value) noexcept {
+    return std::isfinite(value) ? std::clamp(value, 0.0, 16384.0) : 0.0;
+}
+
 [[nodiscard]] bool current_semantic_identity(
     const Control::Ptr& control, const Control* expected_parent,
     const Window* owner) noexcept {
-    return control && control->is_alive() &&
-           control->attached_window() == owner &&
-           control->parent().get() == expected_parent;
+    return control && (*control).is_alive() &&
+           (*control).attached_window() == owner &&
+           (*control).parent().get() == expected_parent;
 }
 
 void append_semantic_nodes(const Control::Ptr& control,
@@ -77,14 +82,14 @@ void append_semantic_nodes(const Control::Ptr& control,
                            std::vector<SemanticNode>& destination,
                            std::size_t& count) {
     if (!current_semantic_identity(control, expected_parent, owner) ||
-        !control->effectively_visible()) return;
-    SemanticDescriptor descriptor = control->semantic_descriptor();
+        !(*control).effectively_visible()) return;
+    SemanticDescriptor descriptor = (*control).semantic_descriptor();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
-    control->apply_provider_semantics(descriptor);
+    (*control).apply_provider_semantics(descriptor);
     std::vector<SemanticNode> descendants;
     if (!descriptor.exposed || descriptor.include_descendants) {
-        const std::vector<Control::Ptr> children(control->children().begin(),
-                                                 control->children().end());
+        const std::vector<Control::Ptr> children((*control).children().begin(),
+                                                 (*control).children().end());
         for (const Control::Ptr& child : children) {
             if (!current_semantic_identity(child, control.get(), owner)) continue;
             append_semantic_nodes(child, control.get(), owner, focused,
@@ -92,7 +97,7 @@ void append_semantic_nodes(const Control::Ptr& control,
         }
         if (!current_semantic_identity(control, expected_parent, owner)) return;
         std::vector<SemanticNode> virtual_children =
-            control->semantic_virtual_children();
+            (*control).semantic_virtual_children();
         if (!current_semantic_identity(control, expected_parent, owner)) return;
         count += virtual_children.size();
         descendants.insert(descendants.end(),
@@ -106,8 +111,8 @@ void append_semantic_nodes(const Control::Ptr& control,
         return;
     }
     SemanticNode node;
-    node.runtime_id = control->runtime_id().value;
-    node.stable_id = std::string(control->stable_id().value());
+    node.runtime_id = (*control).runtime_id().value;
+    node.stable_id = std::string((*control).stable_id().value());
     node.role = descriptor.role;
     node.name = descriptor.name;
     node.value = descriptor.value;
@@ -115,12 +120,12 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.numeric_value = descriptor.numeric_value;
     node.minimum_value = descriptor.minimum_value;
     node.maximum_value = descriptor.maximum_value;
-    node.bounds = control->absolute_bounds();
+    node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
-    if (control->effectively_enabled()) node.states |= SemanticState::enabled;
+    if ((*control).effectively_enabled()) node.states |= SemanticState::enabled;
     node.states |= SemanticState::visible;
-    if (control->focusable()) node.states |= SemanticState::focusable;
+    if ((*control).focusable()) node.states |= SemanticState::focusable;
     if (control == focused) node.states |= SemanticState::focused;
     node.actions = descriptor.actions;
     node.children = std::move(descendants);
@@ -132,16 +137,16 @@ bool dispatch_semantic_child_action(Control::Ptr control,
                                     std::string_view stable_id,
                                     SemanticAction action,
                                     std::string_view value) {
-    if (!control || !control->effectively_visible() ||
-        !control->effectively_enabled()) return false;
-    Window* const owner = control->attached_window();
-    if (control->on_semantic_child_action(stable_id, action, value)) return true;
-    if (!control->is_alive() || control->attached_window() != owner) return false;
-    const std::vector<Control::Ptr> children(control->children().begin(),
-                                             control->children().end());
+    if (!control || !(*control).effectively_visible() ||
+        !(*control).effectively_enabled()) return false;
+    Window* const owner = (*control).attached_window();
+    if ((*control).on_semantic_child_action(stable_id, action, value)) return true;
+    if (!(*control).is_alive() || (*control).attached_window() != owner) return false;
+    const std::vector<Control::Ptr> children((*control).children().begin(),
+                                             (*control).children().end());
     for (const Control::Ptr& child : children) {
-        if (!child || !child->is_alive() || child->parent() != control ||
-            child->attached_window() != owner) {
+        if (!child || !(*child).is_alive() || (*child).parent() != control ||
+            (*child).attached_window() != owner) {
             continue;
         }
         if (dispatch_semantic_child_action(child, stable_id, action, value)) return true;
@@ -150,6 +155,60 @@ bool dispatch_semantic_child_action(Control::Ptr control,
 }
 
 } // namespace
+
+void Window::FocusChangePublication::operator()() const {
+    if (!control ||
+        (focused ? !(*window).eligible(control)
+                 : (!(*control).is_alive() || (*control).window_ != window))) {
+        return;
+    }
+    (*window).metrics_.record_callback_emitted();
+    (*control).on_focus_changed(focused);
+    if ((*control).is_alive()) {
+        (*control).focus_observed_.emit(focused);
+    }
+    if (!(*control).is_alive()) return;
+    if (!focused || (*window).eligible(control)) {
+        (*control).invalidate(invalidation::focus);
+    } else {
+        (*window).focused_.reset();
+    }
+}
+
+void Window::FocusScopePublication::operator()() const {
+    if (!owner || !(*owner).is_alive() || (*owner).window_ != window) return;
+    (*window).focus_scope_changed_.emit(change);
+}
+
+void Window::PointerCapturePublication::operator()() const {
+    if (!owner || !(*owner).is_alive() || (*owner).window_ != window) return;
+    (*window).pointer_capture_changed_.emit(change);
+}
+
+void Window::ControlAvailabilityPublication::operator()() const {
+    if (!control || !(*control).is_alive() || (*control).window_ != window) {
+        return;
+    }
+    (*window).control_availability_changed_.emit(change);
+}
+
+template <typename InputEvent>
+void Window::DeferredInputVisitor::operator()(InputEvent&& event) const {
+    using EventType =
+        std::remove_cv_t<std::remove_reference_t<InputEvent>>;
+    if constexpr (std::is_same_v<EventType, PointerEvent>) {
+        static_cast<void>((*window).dispatch_pointer(std::move(event)));
+    } else if constexpr (std::is_same_v<EventType, KeyEvent>) {
+        static_cast<void>((*window).dispatch_key(std::move(event)));
+    } else if constexpr (std::is_same_v<EventType, TextInputEvent>) {
+        static_cast<void>((*window).dispatch_text(std::move(event)));
+    } else if constexpr (std::is_same_v<EventType, DragEvent>) {
+        static_cast<void>((*window).dispatch_drag(std::move(event)));
+    } else {
+        static_cast<void>((*window).perform_semantic_action(
+            event.stable_id, event.action, event.value));
+    }
+}
 
 
 ImageLoadResult Window::load_png(std::span<const std::byte> encoded) {
@@ -266,7 +325,7 @@ AcceleratorToken Window::register_accelerator(
         throw std::invalid_argument(
             "accelerator requires a live owner, physical key, and callback");
     }
-    auto attachment = std::make_shared<detail::AcceleratorAttachment>(
+    std::shared_ptr<gui_forms::detail::AcceleratorAttachment> attachment = std::make_shared<detail::AcceleratorAttachment>(
         *this, owner, gesture, std::move(callback), options);
     accelerators_.push_back(attachment);
     owner.own_revocable(attachment);
@@ -275,27 +334,29 @@ AcceleratorToken Window::register_accelerator(
 
 void Window::close_accelerator(
     detail::AcceleratorAttachment& accelerator) noexcept {
-    const auto found = std::find_if(accelerators_.begin(), accelerators_.end(),
-        [&accelerator](const auto& candidate) {
-            return candidate.get() == &accelerator;
-        });
+    AcceleratorList::iterator found = accelerators_.begin();
+    while (found != accelerators_.end() &&
+           (*found).get() != &accelerator) {
+        ++found;
+    }
     if (found == accelerators_.end()) return;
-    (*found)->revoke();
+    (*(*found)).revoke();
     accelerators_.erase(found);
 }
 
 bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
     if (event.action != KeyAction::down) return false;
-    const auto snapshot = accelerators_;
-    for (auto iterator = snapshot.rbegin(); iterator != snapshot.rend(); ++iterator) {
-        const auto& accelerator = *iterator;
-        if (!accelerator || !accelerator->connected() ||
-            accelerator->options().before_focused_route != preemptive ||
-            accelerator->gesture().physical_key != event.physical_key ||
-            accelerator->gesture().modifiers != event.modifiers) continue;
-        Component* owner = accelerator->owner();
-        if (!owner || !owner->is_alive()) continue;
-        if (accelerator->invoke()) return true;
+    const AcceleratorList snapshot = accelerators_;
+    for (AcceleratorList::const_reverse_iterator iterator = snapshot.rbegin();
+         iterator != snapshot.rend(); ++iterator) {
+        const std::shared_ptr<gui_forms::detail::AcceleratorAttachment>& accelerator = *iterator;
+        if (!accelerator || !(*accelerator).connected() ||
+            (*accelerator).options().before_focused_route != preemptive ||
+            (*accelerator).gesture().physical_key != event.physical_key ||
+            (*accelerator).gesture().modifiers != event.modifiers) continue;
+        Component* owner = (*accelerator).owner();
+        if (!owner || !(*owner).is_alive()) continue;
+        if ((*accelerator).invoke()) return true;
     }
     return false;
 }
@@ -304,16 +365,16 @@ PopupToken Window::open_popup(const Control::Ptr& owner,
                               const Control::Ptr& popup,
                               PopupOptions options) {
     require_ui_thread("popup attachment");
-    const bool owner_available = owner && owner->window_ == this &&
-        owner->is_alive() && owner->effectively_visible() &&
-        (!options.require_enabled_owner || owner->effectively_enabled());
+    const bool owner_available = owner && (*owner).window_ == this &&
+        (*owner).is_alive() && (*owner).effectively_visible() &&
+        (!options.require_enabled_owner || (*owner).effectively_enabled());
     if (!owner_available) {
         throw std::logic_error(
             options.require_enabled_owner
                 ? "GUI.Forms popup requires an enabled, visible attached owner"
                 : "GUI.Forms passive popup requires a visible attached owner");
     }
-    if (!popup || popup->window_ != nullptr || popup->parent() || !popup->is_alive()) {
+    if (!popup || (*popup).window_ != nullptr || (*popup).parent() || !(*popup).is_alive()) {
         throw std::logic_error("GUI.Forms popup must be a live detached root");
     }
     // Popups are window overlays, not children in the consumer's layout
@@ -322,37 +383,39 @@ PopupToken Window::open_popup(const Control::Ptr& owner,
     // overlay. Keep it as a separate retained root while still registering the
     // subtree with this Window for lifetime, focus, semantics, and dispatch.
     attach_subtree(popup, {});
-    auto attachment = std::make_shared<detail::PopupAttachment>(*this, owner, popup);
+    std::shared_ptr<gui_forms::detail::PopupAttachment> attachment = std::make_shared<detail::PopupAttachment>(*this, owner, popup);
     popups_.push_back(attachment);
-    owner->own_revocable(attachment);
+    (*owner).own_revocable(attachment);
     return PopupToken(std::move(attachment));
 }
 
 void Window::close_popup(detail::PopupAttachment& popup) noexcept {
-    const auto found = std::find_if(popups_.begin(), popups_.end(),
-        [&popup](const auto& candidate) { return candidate.get() == &popup; });
+    PopupList::iterator found = popups_.begin();
+    while (found != popups_.end() && (*found).get() != &popup) {
+        ++found;
+    }
     if (found == popups_.end()) {
         popup.revoke();
         return;
     }
-    const auto attachment = *found;
-    const Control::Ptr owner = attachment->owner();
-    const Control::Ptr overlay = attachment->popup();
-    attachment->revoke(false);
+    const std::shared_ptr<gui_forms::detail::PopupAttachment> attachment = *found;
+    const Control::Ptr owner = (*attachment).owner();
+    const Control::Ptr overlay = (*attachment).popup();
+    (*attachment).revoke(false);
     popups_.erase(found);
-    if (overlay && !overlay->parent() && overlay->window_ == this &&
+    if (overlay && !(*overlay).parent() && (*overlay).window_ == this &&
         overlay != root_ && !in_lifecycle_notification_) {
         try {
             detach_subtree(overlay);
         } catch (...) {
         }
     }
-    const auto publish_closed = [attachment] {
-        attachment->publish_closed();
-    };
-    if (owner && owner->is_alive() && owner->window_ == this) {
-        owner->publish_change(
-            static_cast<const void*>(&attachment->closed()), publish_closed);
+    const detail::BoundMemberFunction<
+        void (detail::PopupAttachment::*)()> publish_closed(
+            *attachment, &detail::PopupAttachment::publish_closed);
+    if (owner && (*owner).is_alive() && (*owner).window_ == this) {
+        (*owner).publish_change(
+            static_cast<const void*>(&(*attachment).closed()), publish_closed);
     } else {
         publish_closed();
     }
@@ -360,13 +423,13 @@ void Window::close_popup(detail::PopupAttachment& popup) noexcept {
 
 void Window::close_popups_for_subtree(const Control::Ptr& control) noexcept {
     std::vector<std::shared_ptr<detail::PopupAttachment>> closing;
-    for (const auto& popup : popups_) {
-        if (contains_control(control, popup->owner())) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (contains_control(control, (*popup).owner())) {
             closing.push_back(popup);
         }
     }
-    for (const auto& popup : closing) {
-        popup->disconnect();
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : closing) {
+        (*popup).disconnect();
     }
 }
 
@@ -380,8 +443,9 @@ void Window::verify_access(std::string_view operation) {
 }
 
 Control::Ptr Window::find(std::string_view stable_id) const {
-    const auto found = stable_ids_.find(std::string(stable_id));
-    return found == stable_ids_.end() ? Control::Ptr{} : found->second.lock();
+    const StableIdMap::const_iterator found =
+        stable_ids_.find(std::string(stable_id));
+    return found == stable_ids_.end() ? Control::Ptr{} : (*found).second.lock();
 }
 
 Control::Ptr Window::hit_test(Point position) {
@@ -391,13 +455,14 @@ Control::Ptr Window::hit_test(Point position) {
         ensure_layout(true);
         const std::uint64_t generation = semantic_generation_;
         Control::Ptr target;
-        std::vector<Control::Ptr> popup_roots;
+        ControlList popup_roots;
         popup_roots.reserve(popups_.size());
-        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
-        for (auto popup = popup_roots.rbegin(); popup != popup_roots.rend();
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) popup_roots.push_back((*popup).popup());
+        for (ControlList::reverse_iterator popup = popup_roots.rbegin();
+             popup != popup_roots.rend();
              ++popup) {
             if (const Control::Ptr& overlay = *popup;
-                overlay && overlay->is_alive() && overlay->window_ == this) {
+                overlay && (*overlay).is_alive() && (*overlay).window_ == this) {
                 target = hit_test_recursive(overlay, position);
                 if (target) break;
             }
@@ -412,7 +477,7 @@ Control::Ptr Window::hit_test(Point position) {
 
 bool Window::request_focus(const Control::Ptr& control) {
     require_ui_thread("focus mutation");
-    if (control && (!eligible(control) || !control->focusable_)) {
+    if (control && (!eligible(control) || !(*control).focusable_)) {
         return false;
     }
     if (control && !focus_allowed_by_active_scope(control)) {
@@ -427,10 +492,10 @@ bool Window::request_focus(const Control::Ptr& control) {
         ++validation_reentrant_requests_rejected_;
         return false;
     }
-    if (previous && (!control || control->causes_validation())) {
+    if (previous && (!control || (*control).causes_validation())) {
         AutoValidate mode = AutoValidate::enable_prevent_focus_change;
-        for (Control::Ptr current = previous; current; current = current->parent()) {
-            const AutoValidate authored = current->authored_auto_validate();
+        for (Control::Ptr current = previous; current; current = (*current).parent()) {
+            const AutoValidate authored = (*current).authored_auto_validate();
             if (authored != AutoValidate::inherit) {
                 mode = authored;
                 break;
@@ -447,45 +512,25 @@ bool Window::request_focus(const Control::Ptr& control) {
     }
     // Validation handlers may dispose, detach, hide, or disable either end.
     // Re-evaluate both endpoints before publishing any focus notification.
-    if (previous && (!previous->is_alive() || previous->attached_window() != this)) {
+    if (previous && (!(*previous).is_alive() || (*previous).attached_window() != this)) {
         previous.reset();
         focused_.reset();
     }
-    if (control && (!eligible(control) || !control->focusable_ ||
+    if (control && (!eligible(control) || !(*control).focusable_ ||
                     !focus_allowed_by_active_scope(control))) {
         return false;
     }
     if (previous) {
         focused_.reset();
-        previous->publish_change(
-            static_cast<const void*>(&previous->focus_observed_),
-            [this, previous] {
-                if (!previous->is_alive() || previous->window_ != this) return;
-                metrics_.record_callback_emitted();
-                previous->on_focus_changed(false);
-                if (previous->is_alive()) {
-                    previous->focus_observed_.emit(false);
-                }
-                if (previous->is_alive()) {
-                    previous->invalidate(invalidation::focus);
-                }
-            });
+        (*previous).publish_change(
+            static_cast<const void*>(&(*previous).focus_observed_),
+            FocusChangePublication{this, previous, false});
     }
-    if (control && eligible(control) && control->focusable_) {
+    if (control && eligible(control) && (*control).focusable_) {
         focused_ = control;
-        control->publish_change(
-            static_cast<const void*>(&control->focus_observed_),
-            [this, control] {
-                if (!eligible(control)) return;
-                metrics_.record_callback_emitted();
-                control->on_focus_changed(true);
-                if (control->is_alive()) control->focus_observed_.emit(true);
-                if (eligible(control)) {
-                    control->invalidate(invalidation::focus);
-                } else {
-                    focused_.reset();
-                }
-            });
+        (*control).publish_change(
+            static_cast<const void*>(&(*control).focus_observed_),
+            FocusChangePublication{this, control, true});
     }
     metrics_.record_focus_transition();
     return true;
@@ -493,18 +538,18 @@ bool Window::request_focus(const Control::Ptr& control) {
 
 void Window::set_accept_button(const Control::Ptr& control) {
     require_ui_thread("accept button mutation");
-    if (control && (control->attached_window() != this || !control->is_alive() ||
-                    !control->supports_dialog_command())) {
+    if (control && ((*control).attached_window() != this || !(*control).is_alive() ||
+                    !(*control).supports_dialog_command())) {
         throw std::invalid_argument(
             "GUI.Forms accept button must be a live dialog command in its Window");
     }
     Control::Ptr existing = accept_button_.lock();
     if (existing == control) return;
-    if (existing && existing->is_alive()) existing->notify_default(false);
+    if (existing && (*existing).is_alive()) (*existing).notify_default(false);
     try {
-        if (control) control->notify_default(true);
+        if (control) (*control).notify_default(true);
     } catch (...) {
-        if (existing && existing->is_alive()) existing->notify_default(true);
+        if (existing && (*existing).is_alive()) (*existing).notify_default(true);
         throw;
     }
     accept_button_ = control;
@@ -512,15 +557,15 @@ void Window::set_accept_button(const Control::Ptr& control) {
 
 void Window::set_cancel_button(const Control::Ptr& control) {
     require_ui_thread("cancel button mutation");
-    if (control && (control->attached_window() != this || !control->is_alive() ||
-                    !control->supports_dialog_command())) {
+    if (control && ((*control).attached_window() != this || !(*control).is_alive() ||
+                    !(*control).supports_dialog_command())) {
         throw std::invalid_argument(
             "GUI.Forms cancel button must be a live dialog command in its Window");
     }
     if (control) {
-        control->assign_cancel_dialog_result();
-        if (control->attached_window() != this || !control->is_alive() ||
-            !control->supports_dialog_command()) {
+        (*control).assign_cancel_dialog_result();
+        if ((*control).attached_window() != this || !(*control).is_alive() ||
+            !(*control).supports_dialog_command()) {
             throw std::logic_error(
                 "GUI.Forms cancel button became unavailable during assignment");
         }
@@ -556,31 +601,61 @@ void Window::set_dialog_result(DialogResult result) {
     dialog_result_changed_.emit(dialog_result_);
 }
 
+bool Window::tab_order_less(const Control::Ptr& left,
+                            const Control::Ptr& right) noexcept {
+    if (!left) return false;
+    if (!right) return true;
+    return (*left).tab_index() < (*right).tab_index();
+}
+
+void Window::collect_focus_candidates(const Control::Ptr& control,
+                                      ControlList& result,
+                                      bool focusable_only) const {
+    if (!control || !eligible(control)) return;
+    if (!focusable_only || ((*control).focusable_ && (*control).tab_stop_)) {
+        result.push_back(control);
+    }
+    ControlList children((*control).children_.begin(),
+                         (*control).children_.end());
+    std::stable_sort(children.begin(), children.end(), tab_order_less);
+    for (const Control::Ptr& child : children) {
+        collect_focus_candidates(child, result, focusable_only);
+    }
+}
+
+void Window::collect_mnemonic_candidates(const Control::Ptr& control,
+                                         const Control::Ptr& root,
+                                         char32_t character,
+                                         ControlList& result) const {
+    if (!control || !eligible(control) || !contains_control(root, control)) {
+        return;
+    }
+    if ((*control).mnemonic_matches(character)) {
+        result.push_back(control);
+    }
+    ControlList children((*control).children_.begin(),
+                         (*control).children_.end());
+    std::stable_sort(children.begin(), children.end(), tab_order_less);
+    for (const Control::Ptr& child : children) {
+        collect_mnemonic_candidates(child, root, character, result);
+    }
+}
+
 bool Window::move_focus_after(const Control::Ptr& origin) {
     require_ui_thread("mnemonic focus traversal");
-    if (!origin || origin->attached_window() != this) return false;
+    if (!origin || (*origin).attached_window() != this) return false;
     const Control::Ptr scope = active_focus_scope_root();
     const Control::Ptr traversal_root = scope ? scope : root_;
     if (!contains_control(traversal_root, origin)) return false;
 
-    std::vector<Control::Ptr> ordered;
-    std::function<void(const Control::Ptr&)> collect =
-        [&](const Control::Ptr& control) {
-            if (!control || !eligible(control)) return;
-            ordered.push_back(control);
-            std::vector<Control::Ptr> children(control->children().begin(),
-                                               control->children().end());
-            std::stable_sort(children.begin(), children.end(),
-                [](const Control::Ptr& left, const Control::Ptr& right) {
-                    return left->tab_index() < right->tab_index();
-                });
-            for (const Control::Ptr& child : children) collect(child);
-        };
-    collect(traversal_root);
-    const auto found = std::find(ordered.begin(), ordered.end(), origin);
+    ControlList ordered;
+    collect_focus_candidates(traversal_root, ordered, false);
+    const ControlList::iterator found =
+        std::find(ordered.begin(), ordered.end(), origin);
     if (found == ordered.end()) return false;
-    for (auto current = std::next(found); current != ordered.end(); ++current) {
-        if ((*current)->focusable() && (*current)->tab_stop() &&
+    for (ControlList::iterator current = std::next(found);
+         current != ordered.end(); ++current) {
+        if ((*(*current)).focusable() && (*(*current)).tab_stop() &&
             request_focus(*current)) return true;
     }
     return false;
@@ -592,14 +667,14 @@ bool Window::validate_command_activation(const Control::Ptr& destination) {
         !focus_allowed_by_active_scope(destination)) return false;
     const Control::Ptr previous = focused_.lock();
     if (!previous || previous == destination ||
-        !destination->causes_validation()) return true;
+        !(*destination).causes_validation()) return true;
     if (validating_) {
         ++validation_reentrant_requests_rejected_;
         return false;
     }
     AutoValidate mode = AutoValidate::enable_prevent_focus_change;
-    for (Control::Ptr current = previous; current; current = current->parent()) {
-        const AutoValidate authored = current->authored_auto_validate();
+    for (Control::Ptr current = previous; current; current = (*current).parent()) {
+        const AutoValidate authored = (*current).authored_auto_validate();
         if (authored != AutoValidate::inherit) {
             mode = authored;
             break;
@@ -616,27 +691,8 @@ bool Window::dispatch_mnemonic(char32_t character) {
     const Control::Ptr start = scope ? scope : root_;
     if (!start) return false;
 
-    std::vector<Control::Ptr> candidates;
-    std::function<void(const Control::Ptr&)> collect =
-        [&](const Control::Ptr& control) {
-            if (!control || !eligible(control) ||
-                !contains_control(start, control)) {
-                return;
-            }
-            if (control->mnemonic_matches(character)) {
-                candidates.push_back(control);
-            }
-            std::vector<Control::Ptr> children(control->children().begin(),
-                                               control->children().end());
-            std::stable_sort(children.begin(), children.end(),
-                [](const Control::Ptr& left, const Control::Ptr& right) {
-                    if (!left) return false;
-                    if (!right) return true;
-                    return left->tab_index() < right->tab_index();
-                });
-            for (const Control::Ptr& child : children) collect(child);
-        };
-    collect(start);
+    ControlList candidates;
+    collect_mnemonic_candidates(start, start, character, candidates);
     mnemonic_candidates_ += candidates.size();
     if (candidates.size() > 1U) ++mnemonic_collisions_;
     if (candidates.empty()) {
@@ -650,7 +706,8 @@ bool Window::dispatch_mnemonic(char32_t character) {
     std::size_t first{};
     if (candidates.size() > 1U && mnemonic_cursor_character_ == folded) {
         if (const Control::Ptr prior = mnemonic_cursor_.lock()) {
-            const auto found = std::find(candidates.begin(), candidates.end(), prior);
+            const ControlList::iterator found =
+                std::find(candidates.begin(), candidates.end(), prior);
             if (found != candidates.end()) {
                 first = (static_cast<std::size_t>(
                     std::distance(candidates.begin(), found)) + 1U) %
@@ -667,7 +724,7 @@ bool Window::dispatch_mnemonic(char32_t character) {
             !contains_control(start, candidate)) {
             continue;
         }
-        if (candidate->process_mnemonic_self(character)) {
+        if ((*candidate).process_mnemonic_self(character)) {
             mnemonic_cursor_ = candidate;
             mnemonic_cursor_character_ = folded;
             ++mnemonics_handled_;
@@ -686,7 +743,7 @@ bool Window::dispatch_dialog_button(bool accept) {
     if (!target || !eligible(target) || !focus_allowed_by_active_scope(target)) {
         return false;
     }
-    if (!target->perform_dialog_command()) {
+    if (!(*target).perform_dialog_command()) {
         ++dialog_command_rejections_;
         // A live target owned this dialog key even when its validation gate
         // rejected activation. Do not leak it to another mnemonic or host.
@@ -695,6 +752,27 @@ bool Window::dispatch_dialog_button(bool accept) {
     ++handled;
     metrics_.record_activation();
     return true;
+}
+
+bool Window::dispatch_dialog_key(const KeyEvent& event) {
+    if (event.action != KeyAction::down || event.repeat) return false;
+    const bool alt = has_modifier(event.modifiers, Modifier::alt);
+    const bool control = has_modifier(event.modifiers, Modifier::control);
+    const bool meta = has_modifier(event.modifiers, Modifier::meta);
+    if (alt && !control && !meta) {
+        const std::optional<char32_t> character =
+            physical_mnemonic(event.physical_key);
+        if (character) return dispatch_mnemonic(*character);
+    }
+    if (!alt && !control && !meta) {
+        if (event.physical_key == PhysicalKey::enter) {
+            return dispatch_dialog_button(true);
+        }
+        if (event.physical_key == PhysicalKey::escape) {
+            return dispatch_dialog_button(false);
+        }
+    }
+    return false;
 }
 
 bool Window::validate_control(const Control::Ptr& control,
@@ -712,7 +790,7 @@ bool Window::validate_control(const Control::Ptr& control,
     } reset{validating_};
     ++validation_attempts_;
     if (bulk) ++validation_bulk_controls_visited_;
-    const bool accepted = control->perform_validation(destination, bulk);
+    const bool accepted = (*control).perform_validation(destination, bulk);
     if (accepted) ++validation_succeeded_;
     else ++validation_cancelled_;
     return accepted;
@@ -726,7 +804,7 @@ bool Window::validate_children(const Control::Ptr& container,
         ++validation_reentrant_requests_rejected_;
         return false;
     }
-    constexpr auto known = static_cast<std::uint8_t>(
+    constexpr std::uint8_t known = static_cast<std::uint8_t>(
         ValidationConstraints::immediate_children |
         ValidationConstraints::selectable |
         ValidationConstraints::enabled |
@@ -743,53 +821,57 @@ bool Window::validate_children(const Control::Ptr& container,
     } reset{validating_};
 
     bool accepted = true;
-    std::function<void(const Control::Ptr&, bool)> visit =
-        [&](const Control::Ptr& parent, bool direct) {
-            const std::vector<Control::Ptr> children(parent->children().begin(),
-                                                     parent->children().end());
-            for (const Control::Ptr& child : children) {
-                if (!child || !child->is_alive() ||
-                    child->attached_window() != this ||
-                    child->parent() != parent) continue;
-                bool selected = true;
-                if (has_validation_constraint(
-                        constraints, ValidationConstraints::selectable)) {
-                    selected = child->focusable() &&
-                               child->has_style(ControlStyles::selectable);
-                }
-                if (has_validation_constraint(
-                        constraints, ValidationConstraints::enabled)) {
-                    selected = selected && child->effectively_enabled();
-                }
-                if (has_validation_constraint(
-                        constraints, ValidationConstraints::visible)) {
-                    selected = selected && child->effectively_visible();
-                }
-                if (has_validation_constraint(
-                        constraints, ValidationConstraints::tab_stop)) {
-                    selected = selected && child->tab_stop();
-                }
-                if (selected) {
-                    ++validation_attempts_;
-                    ++validation_bulk_controls_visited_;
-                    const bool valid = child->perform_validation(container.get(), true);
-                    if (valid) ++validation_succeeded_;
-                    else ++validation_cancelled_;
-                    accepted = valid && accepted;
-                }
-                if (!child->is_alive() || child->attached_window() != this ||
-                    child->parent() != parent) {
-                    continue;
-                }
-                if (!has_validation_constraint(
-                        constraints, ValidationConstraints::immediate_children)) {
-                    visit(child, false);
-                }
-            }
-            static_cast<void>(direct);
-        };
-    visit(container, true);
+    validate_children_recursive(
+        container, container, constraints, accepted);
     return accepted;
+}
+
+void Window::validate_children_recursive(
+    const Control::Ptr& parent, const Control::Ptr& container,
+    ValidationConstraints constraints, bool& accepted) {
+    const std::vector<Control::Ptr> children(
+        (*parent).children().begin(), (*parent).children().end());
+    for (const Control::Ptr& child : children) {
+        if (!child || !(*child).is_alive() ||
+            (*child).attached_window() != this ||
+            (*child).parent() != parent) continue;
+        bool selected = true;
+        if (has_validation_constraint(
+                constraints, ValidationConstraints::selectable)) {
+            selected = (*child).focusable() &&
+                       (*child).has_style(ControlStyles::selectable);
+        }
+        if (has_validation_constraint(
+                constraints, ValidationConstraints::enabled)) {
+            selected = selected && (*child).effectively_enabled();
+        }
+        if (has_validation_constraint(
+                constraints, ValidationConstraints::visible)) {
+            selected = selected && (*child).effectively_visible();
+        }
+        if (has_validation_constraint(
+                constraints, ValidationConstraints::tab_stop)) {
+            selected = selected && (*child).tab_stop();
+        }
+        if (selected) {
+            ++validation_attempts_;
+            ++validation_bulk_controls_visited_;
+            const bool valid =
+                (*child).perform_validation(container.get(), true);
+            if (valid) ++validation_succeeded_;
+            else ++validation_cancelled_;
+            accepted = valid && accepted;
+        }
+        if (!(*child).is_alive() || (*child).attached_window() != this ||
+            (*child).parent() != parent) {
+            continue;
+        }
+        if (!has_validation_constraint(
+                constraints, ValidationConstraints::immediate_children)) {
+            validate_children_recursive(
+                child, container, constraints, accepted);
+        }
+    }
 }
 
 ValidationSnapshot Window::validation_snapshot() const noexcept {
@@ -803,7 +885,7 @@ bool Window::validate_focus_transition(const Control::Ptr& previous,
                                        const Control::Ptr& destination,
                                        AutoValidate mode) {
     std::unordered_set<const Control*> destination_ancestors;
-    for (Control::Ptr current = destination; current; current = current->parent()) {
+    for (Control::Ptr current = destination; current; current = (*current).parent()) {
         destination_ancestors.insert(current.get());
     }
     validating_ = true;
@@ -814,10 +896,10 @@ bool Window::validate_focus_transition(const Control::Ptr& previous,
     bool accepted = true;
     for (Control::Ptr current = previous;
          current && !destination_ancestors.contains(current.get());
-         current = current->parent()) {
-        if (!current->is_alive() || current->attached_window() != this) break;
+         current = (*current).parent()) {
+        if (!(*current).is_alive() || (*current).attached_window() != this) break;
         ++validation_attempts_;
-        const bool valid = current->perform_validation(destination.get(), false);
+        const bool valid = (*current).perform_validation(destination.get(), false);
         if (valid) ++validation_succeeded_;
         else ++validation_cancelled_;
         accepted = valid && accepted;
@@ -834,13 +916,14 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
         throw std::logic_error(
             "GUI.Forms focus scope requires an eligible attached root");
     }
-    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+    for (FocusScopeList::reverse_iterator current = focus_scopes_.rbegin();
+         current != focus_scopes_.rend();
          ++current) {
-        if (!current->active) {
+        if (!(*current).active) {
             continue;
         }
-        if (current->options.contain_focus &&
-            !contains_control(current->root.lock(), root)) {
+        if ((*current).options.contain_focus &&
+            !contains_control((*current).root.lock(), root)) {
             throw std::logic_error(
                 "GUI.Forms nested focus scope must remain inside its containing scope");
         }
@@ -851,7 +934,7 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
     }
     if (preferred_focus &&
         (!contains_control(root, preferred_focus) || !eligible(preferred_focus) ||
-         !preferred_focus->focusable_)) {
+         !(*preferred_focus).focusable_)) {
         throw std::invalid_argument(
             "GUI.Forms preferred focus must be an eligible focusable scope descendant");
     }
@@ -863,8 +946,8 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
     }
     state.root = root;
     state.previous_focus = focused_;
-    state.stable_id = std::string(root->stable_id().value());
-    state.root_id = root->runtime_id();
+    state.stable_id = std::string((*root).stable_id().value());
+    state.root_id = (*root).runtime_id();
     state.options = options;
     focus_scopes_.push_back(state);
 
@@ -878,11 +961,13 @@ FocusScopeId Window::begin_focus_scope(const Control::Ptr& root,
     change.opened = true;
     focus_scope_changed_.emit(change);
 
-    const bool remains_active = std::any_of(
-        focus_scopes_.begin(), focus_scopes_.end(),
-        [id = state.id](const FocusScopeState& candidate) {
-            return candidate.id == id && candidate.active;
-        });
+    bool remains_active = false;
+    for (const FocusScopeState& candidate : focus_scopes_) {
+        if (candidate.id == state.id && candidate.active) {
+            remains_active = true;
+            break;
+        }
+    }
     if (!remains_active) {
         return state.id;
     }
@@ -905,19 +990,19 @@ bool Window::end_focus_scope(FocusScopeId scope,
                              FocusScopeCloseReason reason,
                              const Control::Ptr& notification_owner) {
     require_ui_thread("focus-scope exit");
-    const auto found = std::find_if(
-        focus_scopes_.begin(), focus_scopes_.end(),
-        [scope](const FocusScopeState& state) {
-            return state.id == scope && state.active;
-        });
+    FocusScopeList::iterator found = focus_scopes_.begin();
+    while (found != focus_scopes_.end() &&
+           ((*found).id != scope || !(*found).active)) {
+        ++found;
+    }
     if (found == focus_scopes_.end()) {
         return false;
     }
 
-    const FocusScopeId closed_id = found->id;
-    const RuntimeId closed_root_id = found->root_id;
-    const std::string closed_stable_id = found->stable_id;
-    found->active = false;
+    const FocusScopeId closed_id = (*found).id;
+    const RuntimeId closed_root_id = (*found).root_id;
+    const std::string closed_stable_id = (*found).stable_id;
+    (*found).active = false;
     const bool closes_top = std::next(found) == focus_scopes_.end();
 
     bool restored = false;
@@ -934,7 +1019,7 @@ bool Window::end_focus_scope(FocusScopeId scope,
         }
 
         if (restoration_requested) {
-            if (restoration && eligible(restoration) && restoration->focusable_ &&
+            if (restoration && eligible(restoration) && (*restoration).focusable_ &&
                 focus_allowed_by_active_scope(restoration)) {
                 restored = request_focus(restoration) &&
                            focused_.lock() == restoration;
@@ -959,19 +1044,16 @@ bool Window::end_focus_scope(FocusScopeId scope,
     change.depth = depth;
     change.close_reason = reason;
     change.restored_focus = restored;
-    if (notification_owner && notification_owner->is_alive() &&
-        notification_owner->window_ == this) {
+    if (notification_owner && (*notification_owner).is_alive() &&
+        (*notification_owner).window_ == this) {
         // Scope closure is an identity-bearing stream, not a scalar property.
         // Preserve every nested scope transition rather than coalescing all
         // Window scope notifications under one Event address.
-        const auto notification_key = std::make_shared<std::uint8_t>();
-        notification_owner->publish_change(
+        const std::shared_ptr<unsigned char> notification_key = std::make_shared<std::uint8_t>();
+        (*notification_owner).publish_change(
             static_cast<const void*>(notification_key.get()),
-            [this, notification_owner, notification_key, change] {
-                if (!notification_owner->is_alive() ||
-                    notification_owner->window_ != this) return;
-                focus_scope_changed_.emit(change);
-            });
+            FocusScopePublication{
+                this, notification_owner, notification_key, change});
     } else {
         focus_scope_changed_.emit(change);
     }
@@ -979,16 +1061,19 @@ bool Window::end_focus_scope(FocusScopeId scope,
 }
 
 std::size_t Window::focus_scope_depth() const noexcept {
-    return static_cast<std::size_t>(std::count_if(
-        focus_scopes_.begin(), focus_scopes_.end(),
-        [](const FocusScopeState& state) { return state.active; }));
+    std::size_t depth = 0U;
+    for (const FocusScopeState& state : focus_scopes_) {
+        depth += state.active ? 1U : 0U;
+    }
+    return depth;
 }
 
 Control::Ptr Window::active_focus_scope_root() const noexcept {
-    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+    for (FocusScopeList::const_reverse_iterator current = focus_scopes_.rbegin();
+         current != focus_scopes_.rend();
          ++current) {
-        if (current->active) {
-            return current->root.lock();
+        if ((*current).active) {
+            return (*current).root.lock();
         }
     }
     return {};
@@ -996,55 +1081,38 @@ Control::Ptr Window::active_focus_scope_root() const noexcept {
 
 bool Window::focus_allowed_by_active_scope(
     const Control::Ptr& control) const noexcept {
-    for (auto current = focus_scopes_.rbegin(); current != focus_scopes_.rend();
+    for (FocusScopeList::const_reverse_iterator current = focus_scopes_.rbegin();
+         current != focus_scopes_.rend();
          ++current) {
-        if (!current->active) {
+        if (!(*current).active) {
             continue;
         }
-        if (!current->options.contain_focus || !control) {
+        if (!(*current).options.contain_focus || !control) {
             return true;
         }
-        return contains_control(current->root.lock(), control);
+        return contains_control((*current).root.lock(), control);
     }
     return true;
 }
 
 std::vector<Control::Ptr> Window::focus_candidates(
     const Control::Ptr& scope_root) const {
-    std::vector<Control::Ptr> result;
-    std::function<void(const Control::Ptr&)> collect =
-        [&](const Control::Ptr& control) {
-            if (!control || !eligible(control)) {
-                return;
-            }
-            if (control->focusable_ && control->tab_stop_) {
-                result.push_back(control);
-            }
-            std::vector<Control::Ptr> ordered(control->children_.begin(),
-                                              control->children_.end());
-            std::stable_sort(ordered.begin(), ordered.end(),
-                             [](const Control::Ptr& left,
-                                const Control::Ptr& right) {
-                                 return left->tab_index_ < right->tab_index_;
-                             });
-            for (const Control::Ptr& child : ordered) {
-                collect(child);
-            }
-        };
-    collect(scope_root);
+    ControlList result;
+    collect_focus_candidates(scope_root, result, true);
     return result;
 }
 
 bool Window::move_focus(bool forward) {
     require_ui_thread("focus traversal");
     const Control::Ptr scope_root = active_focus_scope_root();
-    std::vector<Control::Ptr> candidates =
+    ControlList candidates =
         focus_candidates(scope_root ? scope_root : root_);
     if (candidates.empty()) {
         return false;
     }
     const Control::Ptr current = focused_.lock();
-    const auto found = std::find(candidates.begin(), candidates.end(), current);
+    const ControlList::iterator found =
+        std::find(candidates.begin(), candidates.end(), current);
     std::size_t index = 0;
     if (found == candidates.end()) {
         index = forward ? 0U : candidates.size() - 1U;
@@ -1092,18 +1160,14 @@ void Window::change_pointer_capture(const Control::Ptr& control,
     }
     PointerCaptureChange change;
     change.captured = static_cast<bool>(control);
-    change.control_id = control ? control->runtime_id() : RuntimeId{};
-    change.stable_id = control ? std::string(control->stable_id().value()) : std::string{};
+    change.control_id = control ? (*control).runtime_id() : RuntimeId{};
+    change.stable_id = control ? std::string((*control).stable_id().value()) : std::string{};
     change.pointer_id = control ? pointer_id : 0;
     const Control::Ptr publication_owner = control ? control : previous;
     if (publication_owner) {
-        publication_owner->publish_change(
+        (*publication_owner).publish_change(
             static_cast<const void*>(&pointer_capture_changed_),
-            [this, publication_owner, change] {
-                if (!publication_owner->is_alive() ||
-                    publication_owner->window_ != this) return;
-                pointer_capture_changed_.emit(change);
-            });
+            PointerCapturePublication{this, publication_owner, change});
     } else {
         pointer_capture_changed_.emit(change);
     }
@@ -1126,9 +1190,9 @@ bool Window::dispatch_pointer(PointerEvent event) {
                 leave.phase = EventPhase::target;
                 leave.handled = false;
                 metrics_.record_callback_emitted();
-                previous_hover->on_pointer(leave);
-                previous_hover->publish_change(
-                    previous_hover->pointer_observed_, leave);
+                (*previous_hover).on_pointer(leave);
+                (*previous_hover).publish_change(
+                    (*previous_hover).pointer_observed_, leave);
             }
             hovered_ = next_hover;
             if (next_hover && eligible(next_hover)) {
@@ -1138,8 +1202,8 @@ bool Window::dispatch_pointer(PointerEvent event) {
                 enter.phase = EventPhase::target;
                 enter.handled = false;
                 metrics_.record_callback_emitted();
-                next_hover->on_pointer(enter);
-                next_hover->publish_change(next_hover->pointer_observed_, enter);
+                (*next_hover).on_pointer(enter);
+                (*next_hover).publish_change((*next_hover).pointer_observed_, enter);
             }
         }
     }
@@ -1164,14 +1228,14 @@ bool Window::dispatch_pointer(PointerEvent event) {
         release_pointer();
     }
 
-    const auto route = route_to(target);
+    const std::vector<Control::Ptr> route = route_to(target);
     event.phase = EventPhase::preview;
-    for (const auto& control : route) {
+    for (const std::shared_ptr<gui_forms::Control>& control : route) {
         if (!eligible(control)) {
             continue;
         }
         metrics_.record_callback_emitted();
-        control->on_pointer_preview(event);
+        (*control).on_pointer_preview(event);
         if (event.handled) {
             return true;
         }
@@ -1183,7 +1247,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
 
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary) {
-        const bool accepts_press = !target->focusable_ || request_focus(target);
+        const bool accepts_press = !(*target).focusable_ || request_focus(target);
         if (!accepts_press) {
             // Prevent-mode validation rejects the input transaction that
             // attempted to enter this focusable target. In particular, a
@@ -1200,17 +1264,18 @@ bool Window::dispatch_pointer(PointerEvent event) {
     if (eligible(target)) {
         event.phase = EventPhase::target;
         metrics_.record_callback_emitted();
-        target->on_pointer(event);
-        target->publish_change(target->pointer_observed_, event);
+        (*target).on_pointer(event);
+        (*target).publish_change((*target).pointer_observed_, event);
     }
     if (!event.handled) {
         event.phase = EventPhase::bubble;
-        for (auto iterator = route.rbegin(); iterator != route.rend(); ++iterator) {
+        for (ControlList::const_reverse_iterator iterator = route.rbegin();
+             iterator != route.rend(); ++iterator) {
             if (*iterator == target || !eligible(*iterator)) {
                 continue;
             }
             metrics_.record_callback_emitted();
-            (*iterator)->on_pointer_bubble(event);
+            (*(*iterator)).on_pointer_bubble(event);
             if (event.handled) {
                 break;
             }
@@ -1222,7 +1287,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
         if (pressed_for_release && pressed_for_release == released_over &&
             eligible(pressed_for_release)) {
             metrics_.record_callback_emitted();
-            pressed_for_release->on_activate();
+            (*pressed_for_release).on_activate();
             metrics_.record_activation();
         }
     }
@@ -1240,41 +1305,21 @@ bool Window::dispatch_key(KeyEvent event) {
     const bool forward =
         (static_cast<std::uint8_t>(event.modifiers) &
          static_cast<std::uint8_t>(Modifier::shift)) == 0U;
-    const auto dispatch_dialog_key = [this, &event]() {
-        if (event.action != KeyAction::down || event.repeat) return false;
-        const bool alt = has_modifier(event.modifiers, Modifier::alt);
-        const bool control = has_modifier(event.modifiers, Modifier::control);
-        const bool meta = has_modifier(event.modifiers, Modifier::meta);
-        if (alt && !control && !meta) {
-            if (const auto character = physical_mnemonic(event.physical_key)) {
-                return dispatch_mnemonic(*character);
-            }
-        }
-        if (!alt && !control && !meta) {
-            if (event.physical_key == PhysicalKey::enter) {
-                return dispatch_dialog_button(true);
-            }
-            if (event.physical_key == PhysicalKey::escape) {
-                return dispatch_dialog_button(false);
-            }
-        }
-        return false;
-    };
     if (focus_scopes_.empty() && dispatch_accelerator(event, true)) return true;
     Control::Ptr target = focused_.lock();
     if (!target || !eligible(target)) {
         if (dispatch_accelerator(event, false)) return true;
-        if (dispatch_dialog_key()) return true;
+        if (dispatch_dialog_key(event)) return true;
         return traversal_key && move_focus(forward);
     }
-    const auto route = route_to(target);
+    const std::vector<Control::Ptr> route = route_to(target);
     event.phase = EventPhase::preview;
-    for (const auto& control : route) {
+    for (const std::shared_ptr<gui_forms::Control>& control : route) {
         if (!eligible(control)) {
             continue;
         }
         metrics_.record_callback_emitted();
-        control->on_key_preview(event);
+        (*control).on_key_preview(event);
         if (event.handled) {
             return true;
         }
@@ -1284,15 +1329,16 @@ bool Window::dispatch_key(KeyEvent event) {
     }
     event.phase = EventPhase::target;
     metrics_.record_callback_emitted();
-    target->on_key(event);
+    (*target).on_key(event);
     if (!event.handled) {
         event.phase = EventPhase::bubble;
-        for (auto iterator = route.rbegin(); iterator != route.rend(); ++iterator) {
+        for (ControlList::const_reverse_iterator iterator = route.rbegin();
+             iterator != route.rend(); ++iterator) {
             if (*iterator == target || !eligible(*iterator)) {
                 continue;
             }
             metrics_.record_callback_emitted();
-            (*iterator)->on_key_bubble(event);
+            (*(*iterator)).on_key_bubble(event);
             if (event.handled) {
                 break;
             }
@@ -1301,7 +1347,7 @@ bool Window::dispatch_key(KeyEvent event) {
     if (!event.handled && dispatch_accelerator(event, false)) {
         return true;
     }
-    if (!event.handled && dispatch_dialog_key()) return true;
+    if (!event.handled && dispatch_dialog_key(event)) return true;
     if (!event.handled && traversal_key) {
         return move_focus(forward);
     }
@@ -1319,7 +1365,7 @@ bool Window::dispatch_text(TextInputEvent event) {
         return false;
     }
     metrics_.record_callback_emitted();
-    target->on_text_input(event);
+    (*target).on_text_input(event);
     return event.handled;
 }
 
@@ -1334,26 +1380,26 @@ DeferredInputSnapshot Window::deferred_input_snapshot() const noexcept {
 }
 
 bool Window::defer_input(DeferredInput input) {
-    if (auto* pointer = std::get_if<PointerEvent>(&input);
-        pointer && pointer->action == PointerAction::move &&
+    if (gui_forms::PointerEvent* pointer = std::get_if<PointerEvent>(&input);
+        pointer && (*pointer).action == PointerAction::move &&
         !deferred_inputs_.empty()) {
-        if (auto* previous =
+        if (gui_forms::PointerEvent* previous =
                 std::get_if<PointerEvent>(&deferred_inputs_.back());
-            previous && previous->action == PointerAction::move &&
-            previous->pointer_id == pointer->pointer_id) {
+            previous && (*previous).action == PointerAction::move &&
+            (*previous).pointer_id == (*pointer).pointer_id) {
             *previous = std::move(*pointer);
             ++deferred_inputs_received_;
             ++deferred_input_moves_coalesced_;
             return true;
         }
     }
-    if (auto* drag = std::get_if<DragEvent>(&input);
-        drag && drag->action == DragAction::over &&
+    if (gui_forms::DragEvent* drag = std::get_if<DragEvent>(&input);
+        drag && (*drag).action == DragAction::over &&
         !deferred_inputs_.empty()) {
-        if (auto* previous =
+        if (gui_forms::DragEvent* previous =
                 std::get_if<DragEvent>(&deferred_inputs_.back());
-            previous && previous->action == DragAction::over &&
-            previous->session_id == drag->session_id) {
+            previous && (*previous).action == DragAction::over &&
+            (*previous).session_id == (*drag).session_id) {
             *previous = std::move(*drag);
             ++deferred_inputs_received_;
             ++deferred_drag_overs_coalesced_;
@@ -1376,8 +1422,9 @@ void Window::schedule_deferred_input_drain() noexcept {
     }
     deferred_input_drain_queued_ = true;
     try {
-        deferred_input_drain_operation_ =
-            begin_invoke([this] { drain_deferred_input(); });
+        const detail::BoundMemberFunction<void (Window::*)()> drain(
+            *this, &Window::drain_deferred_input);
+        deferred_input_drain_operation_ = begin_invoke(drain);
     } catch (...) {
         deferred_input_drain_queued_ = false;
         ++deferred_input_faults_;
@@ -1402,21 +1449,7 @@ void Window::drain_deferred_input() {
         DeferredInput input = std::move(deferred_inputs_.front());
         deferred_inputs_.pop_front();
         try {
-            std::visit([this](auto&& event) {
-                using Event = std::decay_t<decltype(event)>;
-                if constexpr (std::is_same_v<Event, PointerEvent>) {
-                    static_cast<void>(dispatch_pointer(std::move(event)));
-                } else if constexpr (std::is_same_v<Event, KeyEvent>) {
-                    static_cast<void>(dispatch_key(std::move(event)));
-                } else if constexpr (std::is_same_v<Event, TextInputEvent>) {
-                    static_cast<void>(dispatch_text(std::move(event)));
-                } else if constexpr (std::is_same_v<Event, DragEvent>) {
-                    static_cast<void>(dispatch_drag(std::move(event)));
-                } else {
-                    static_cast<void>(perform_semantic_action(
-                        event.stable_id, event.action, event.value));
-                }
-            }, std::move(input));
+            std::visit(DeferredInputVisitor{this}, std::move(input));
             ++deferred_inputs_delivered_;
         } catch (...) {
             ++deferred_input_faults_;
@@ -1439,9 +1472,14 @@ void Window::abandon_deferred_input() noexcept {
 
 void Window::abandon_deferred_drag() noexcept {
     const std::size_t before = deferred_inputs_.size();
-    std::erase_if(deferred_inputs_, [](const DeferredInput& input) {
-        return std::holds_alternative<DragEvent>(input);
-    });
+    std::deque<DeferredInput>::iterator input = deferred_inputs_.begin();
+    while (input != deferred_inputs_.end()) {
+        if (std::holds_alternative<DragEvent>(*input)) {
+            input = deferred_inputs_.erase(input);
+        } else {
+            ++input;
+        }
+    }
     deferred_inputs_abandoned_ += before - deferred_inputs_.size();
     if (deferred_inputs_.empty() && deferred_input_drain_queued_) {
         static_cast<void>(deferred_input_drain_operation_.cancel());
@@ -1451,8 +1489,8 @@ void Window::abandon_deferred_drag() noexcept {
 }
 
 Control::Ptr Window::drop_target_at(Point position) {
-    for (Control::Ptr target = hit_test(position); target; target = target->parent()) {
-        if (eligible(target) && target->allow_drop()) {
+    for (Control::Ptr target = hit_test(position); target; target = (*target).parent()) {
+        if (eligible(target) && (*target).allow_drop()) {
             return target;
         }
     }
@@ -1461,34 +1499,35 @@ Control::Ptr Window::drop_target_at(Point position) {
 
 DragDispatchResult Window::route_drag(const Control::Ptr& target, DragEvent event) {
     DragDispatchResult result;
-    if (!target || !eligible(target) || !target->allow_drop()) {
+    if (!target || !eligible(target) || !(*target).allow_drop()) {
         return result;
     }
-    const auto route = route_to(target);
+    const std::vector<Control::Ptr> route = route_to(target);
     event.phase = EventPhase::preview;
-    for (const auto& control : route) {
+    for (const std::shared_ptr<gui_forms::Control>& control : route) {
         if (!eligible(control)) {
             continue;
         }
         metrics_.record_callback_emitted();
-        control->on_drag_preview(event);
+        (*control).on_drag_preview(event);
         if (event.handled) {
             break;
         }
     }
-    if (!event.handled && eligible(target) && target->allow_drop()) {
+    if (!event.handled && eligible(target) && (*target).allow_drop()) {
         event.phase = EventPhase::target;
         metrics_.record_callback_emitted();
-        target->on_drag(event);
+        (*target).on_drag(event);
     }
     if (!event.handled) {
         event.phase = EventPhase::bubble;
-        for (auto iterator = route.rbegin(); iterator != route.rend(); ++iterator) {
+        for (ControlList::const_reverse_iterator iterator = route.rbegin();
+             iterator != route.rend(); ++iterator) {
             if (*iterator == target || !eligible(*iterator)) {
                 continue;
             }
             metrics_.record_callback_emitted();
-            (*iterator)->on_drag_bubble(event);
+            (*(*iterator)).on_drag_bubble(event);
             if (event.handled) {
                 break;
             }
@@ -1499,6 +1538,29 @@ DragDispatchResult Window::route_drag(const Control::Ptr& target, DragEvent even
         result.accepted_effect = event.accepted_effect;
     }
     return result;
+}
+
+void Window::merge_drag_route(DragDispatchResult& aggregate,
+                              const Control::Ptr& target,
+                              DragEvent event) {
+    const DragDispatchResult current = route_drag(target, std::move(event));
+    aggregate.handled = aggregate.handled || current.handled;
+    if (current.accepted_effect != DragEffect::none) {
+        aggregate.accepted_effect = current.accepted_effect;
+    }
+}
+
+void Window::leave_drag_target(const DragEvent& event,
+                               DragDispatchResult& aggregate) {
+    const Control::Ptr previous = drag_target_.lock();
+    if (previous) {
+        DragEvent leave = event;
+        leave.action = DragAction::leave;
+        leave.accepted_effect = DragEffect::none;
+        leave.handled = false;
+        merge_drag_route(aggregate, previous, std::move(leave));
+    }
+    drag_target_.reset();
 }
 
 DragDispatchResult Window::dispatch_drag(DragEvent event) {
@@ -1519,29 +1581,10 @@ DragDispatchResult Window::dispatch_drag(DragEvent event) {
     metrics_.record_input();
 
     DragDispatchResult aggregate;
-    const auto route_and_merge = [this, &aggregate](const Control::Ptr& target,
-                                                     DragEvent routed) {
-        const DragDispatchResult current = route_drag(target, std::move(routed));
-        aggregate.handled = aggregate.handled || current.handled;
-        if (current.accepted_effect != DragEffect::none) {
-            aggregate.accepted_effect = current.accepted_effect;
-        }
-    };
-    const auto leave_current = [this, &event, &route_and_merge]() {
-        Control::Ptr previous = drag_target_.lock();
-        if (previous) {
-            DragEvent leave = event;
-            leave.action = DragAction::leave;
-            leave.accepted_effect = DragEffect::none;
-            leave.handled = false;
-            route_and_merge(previous, std::move(leave));
-        }
-        drag_target_.reset();
-    };
 
     if (event.action == DragAction::leave) {
         if (drag_session_id_ == event.session_id) {
-            leave_current();
+            leave_drag_target(event, aggregate);
             drag_session_id_ = 0;
             drag_last_accepted_effect_ = DragEffect::none;
         }
@@ -1549,7 +1592,7 @@ DragDispatchResult Window::dispatch_drag(DragEvent event) {
     }
 
     if (drag_session_id_ != 0 && drag_session_id_ != event.session_id) {
-        leave_current();
+        leave_drag_target(event, aggregate);
         drag_session_id_ = 0;
         drag_last_accepted_effect_ = DragEffect::none;
     }
@@ -1560,14 +1603,14 @@ DragDispatchResult Window::dispatch_drag(DragEvent event) {
     Control::Ptr candidate = drop_target_at(event.position);
     Control::Ptr previous = drag_target_.lock();
     if (candidate != previous) {
-        leave_current();
+        leave_drag_target(event, aggregate);
         if (candidate) {
             drag_target_ = candidate;
             DragEvent enter = event;
             enter.action = DragAction::enter;
             enter.accepted_effect = DragEffect::none;
             enter.handled = false;
-            route_and_merge(candidate, std::move(enter));
+            merge_drag_route(aggregate, candidate, std::move(enter));
         }
     }
 
@@ -1575,11 +1618,11 @@ DragDispatchResult Window::dispatch_drag(DragEvent event) {
     if (action == DragAction::over && candidate) {
         event.accepted_effect = DragEffect::none;
         event.handled = false;
-        route_and_merge(candidate, std::move(event));
+        merge_drag_route(aggregate, candidate, std::move(event));
     } else if (action == DragAction::drop && candidate) {
         event.accepted_effect = DragEffect::none;
         event.handled = false;
-        route_and_merge(candidate, std::move(event));
+        merge_drag_route(aggregate, candidate, std::move(event));
         drag_target_.reset();
         drag_session_id_ = 0;
     } else if (action == DragAction::drop) {
@@ -1601,45 +1644,64 @@ void Window::cancel_drag() noexcept {
     abandon_deferred_drag();
 }
 
+void Window::attach_subtree_state(const Control::Ptr& control,
+                                  const Control::WeakPtr& parent,
+                                  ControlList& attached) {
+    (*control).window_ = this;
+    {
+        std::scoped_lock lock((*control).dispatcher_mutex_);
+        (*control).dispatcher_state_ = dispatcher_state_;
+    }
+    (*control).parent_ = parent;
+    (*control).lifecycle_notification_ = true;
+    attached.push_back(control);
+    for (const Control::Ptr& child : (*control).children_) {
+        attach_subtree_state(child, control, attached);
+    }
+}
+
+void Window::detach_subtree_state(const Control::Ptr& control,
+                                  ControlList& detached) {
+    (*control).lifecycle_notification_ = true;
+    detached.push_back(control);
+    (*control).on_detaching_from_window(*this);
+    (*control).window_ = nullptr;
+    {
+        std::scoped_lock lock((*control).dispatcher_mutex_);
+        (*control).dispatcher_state_.reset();
+    }
+    for (const Control::Ptr& child : (*control).children_) {
+        detach_subtree_state(child, detached);
+    }
+}
+
 void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr& parent) {
     require_ui_thread("visual-tree attachment");
     register_subtree(control);
-    std::vector<Control::Ptr> controls;
-    std::function<void(const Control::Ptr&, const Control::WeakPtr&)> attach =
-        [&](const Control::Ptr& current, const Control::WeakPtr& current_parent) {
-            current->window_ = this;
-            {
-                std::scoped_lock lock(current->dispatcher_mutex_);
-                current->dispatcher_state_ = dispatcher_state_;
-            }
-            current->parent_ = current_parent;
-            current->lifecycle_notification_ = true;
-            controls.push_back(current);
-            for (const auto& child : current->children_) {
-                attach(child, current);
-            }
-        };
-    attach(control, parent);
-    std::vector<Control::Ptr> notified;
+    ControlList controls;
+    attach_subtree_state(control, parent, controls);
+    ControlList notified;
     in_lifecycle_notification_ = true;
     try {
         for (const Control::Ptr& current : controls) {
             notified.push_back(current);
-            current->on_attached_to_window();
+            (*current).on_attached_to_window();
         }
     } catch (...) {
-        for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
-            (*current)->window_ = nullptr;
+        for (ControlList::reverse_iterator current = controls.rbegin();
+             current != controls.rend(); ++current) {
+            (*(*current)).window_ = nullptr;
             {
-                std::scoped_lock lock((*current)->dispatcher_mutex_);
-                (*current)->dispatcher_state_.reset();
+                std::scoped_lock lock((*(*current)).dispatcher_mutex_);
+                (*(*current)).dispatcher_state_.reset();
             }
         }
-        for (auto current = notified.rbegin(); current != notified.rend(); ++current) {
-            (*current)->on_detached_from_window();
+        for (ControlList::reverse_iterator current = notified.rbegin();
+             current != notified.rend(); ++current) {
+            (*(*current)).on_detached_from_window();
         }
         for (const Control::Ptr& current : controls) {
-            current->lifecycle_notification_ = false;
+            (*current).lifecycle_notification_ = false;
         }
         in_lifecycle_notification_ = false;
         unregister_subtree(control);
@@ -1647,10 +1709,10 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
         throw;
     }
     for (const Control::Ptr& current : controls) {
-        current->on_attachment_committed();
+        (*current).on_attachment_committed();
     }
     for (const Control::Ptr& current : controls) {
-        current->lifecycle_notification_ = false;
+        (*current).lifecycle_notification_ = false;
     }
     in_lifecycle_notification_ = false;
     metrics_.set_population(stable_ids_.size(), stable_ids_.size());
@@ -1664,31 +1726,19 @@ void Window::detach_subtree(const Control::Ptr& control) {
     close_popups_for_subtree(control);
     close_focus_scopes_for_subtree(control);
     revoke_interaction_for_subtree(control, true);
-    if (control->window_ != this) {
+    if ((*control).window_ != this) {
         return;
     }
     const Rect old_bounds = absolute_bounds_of(*control);
     add_subtree_damage(control);
     unregister_subtree(control);
-    std::vector<Control::Ptr> controls;
+    ControlList controls;
     in_lifecycle_notification_ = true;
-    std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
-        current->lifecycle_notification_ = true;
-        controls.push_back(current);
-        current->on_detaching_from_window(*this);
-        current->window_ = nullptr;
-        {
-            std::scoped_lock lock(current->dispatcher_mutex_);
-            current->dispatcher_state_.reset();
-        }
-        for (const auto& child : current->children_) {
-            detach(child);
-        }
-    };
-    detach(control);
-    for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
-        (*current)->on_detached_from_window();
-        (*current)->lifecycle_notification_ = false;
+    detach_subtree_state(control, controls);
+    for (ControlList::reverse_iterator current = controls.rbegin();
+         current != controls.rend(); ++current) {
+        (*(*current)).on_detached_from_window();
+        (*(*current)).lifecycle_notification_ = false;
     }
     in_lifecycle_notification_ = false;
     touch_paint();
@@ -1705,48 +1755,37 @@ void Window::dispose_subtree(const Control::Ptr& control) noexcept {
     if (control == root_) {
         abandon_deferred_input();
     }
-    const std::uint64_t disposal_count = control->subtree_size();
+    const std::uint64_t disposal_count = (*control).subtree_size();
     revoke_focus_scopes_for_subtree(control);
     revoke_interaction_for_subtree(control, false);
     const Rect old_bounds = absolute_bounds_of(*control);
     add_subtree_damage(control);
     unregister_subtree(control);
-    std::vector<Control::Ptr> controls;
+    ControlList controls;
     in_lifecycle_notification_ = true;
-    std::function<void(const Control::Ptr&)> detach = [&](const Control::Ptr& current) {
-        current->lifecycle_notification_ = true;
-        controls.push_back(current);
-        current->on_detaching_from_window(*this);
-        current->window_ = nullptr;
-        {
-            std::scoped_lock lock(current->dispatcher_mutex_);
-            current->dispatcher_state_.reset();
-        }
-        for (const auto& child : current->children_) {
-            detach(child);
-        }
-    };
-    detach(control);
-    for (auto current = controls.rbegin(); current != controls.rend(); ++current) {
-        (*current)->on_detached_from_window();
-        (*current)->lifecycle_notification_ = false;
+    detach_subtree_state(control, controls);
+    for (ControlList::reverse_iterator current = controls.rbegin();
+         current != controls.rend(); ++current) {
+        (*(*current)).on_detached_from_window();
+        (*(*current)).lifecycle_notification_ = false;
     }
     in_lifecycle_notification_ = false;
-    if (auto visual_parent = control->parent_.lock()) {
-        const auto found = std::find(visual_parent->children_.begin(),
-                                    visual_parent->children_.end(), control);
-        if (found != visual_parent->children_.end()) {
-            visual_parent->children_.erase(found);
+    if (std::shared_ptr<gui_forms::Control> visual_parent = (*control).parent_.lock()) {
+        const Control::ChildList::iterator found =
+            std::find((*visual_parent).children_.begin(),
+                      (*visual_parent).children_.end(), control);
+        if (found != (*visual_parent).children_.end()) {
+            (*visual_parent).children_.erase(found);
         }
         // Explicit child disposal is also a structural mutation of its live
         // parent. Retire the parent's retained layout/paint chunk now; merely
         // setting the Window-level dirty booleans leaves recursive layout with
         // no dirty node to visit and composites cannot reconcile their model.
-        if (visual_parent->is_alive()) {
+        if ((*visual_parent).is_alive()) {
             mark_dirty(*visual_parent, invalidation::visual_tree);
         }
     }
-    control->parent_.reset();
+    (*control).parent_.reset();
     touch_paint();
     paint_dirty_ = true;
     layout_dirty_ = true;
@@ -1765,8 +1804,8 @@ void Window::clear_dialog_targets_for_subtree(
     if (!control) return;
     if (Control::Ptr accept = accept_button_.lock();
         contains_control(control, accept)) {
-        if (accept->is_alive()) {
-            try { accept->notify_default(false); } catch (...) {}
+        if ((*accept).is_alive()) {
+            try { (*accept).notify_default(false); } catch (...) {}
         }
         accept_button_.reset();
     }
@@ -1780,20 +1819,10 @@ void Window::revoke_interaction_for_subtree(const Control::Ptr& control,
         focused_.reset();
         metrics_.record_focus_transition();
         metrics_.record_focus_revocation();
-        if (notify_focus && focused && focused->is_alive()) {
-            focused->publish_change(
-                static_cast<const void*>(&focused->focus_observed_),
-                [this, focused] {
-                    if (!focused->is_alive() || focused->window_ != this) return;
-                    metrics_.record_callback_emitted();
-                    focused->on_focus_changed(false);
-                    if (focused->is_alive()) {
-                        focused->focus_observed_.emit(false);
-                    }
-                    if (focused->is_alive()) {
-                        focused->invalidate(invalidation::focus);
-                    }
-                });
+        if (notify_focus && focused && (*focused).is_alive()) {
+            (*focused).publish_change(
+                static_cast<const void*>(&(*focused).focus_observed_),
+                FocusChangePublication{this, focused, false});
         }
     }
     if (contains_control(control, captured_.lock())) {
@@ -1828,16 +1857,17 @@ void Window::close_focus_scopes_for_subtree(const Control::Ptr& control) {
 void Window::revoke_focus_scopes_for_subtree(
     const Control::Ptr& control) noexcept {
     std::size_t closed = 0;
-    focus_scopes_.erase(
-        std::remove_if(
-            focus_scopes_.begin(), focus_scopes_.end(),
-            [&](const FocusScopeState& state) {
-                const bool remove = state.active &&
-                    contains_control(control, state.root.lock());
-                closed += remove ? 1U : 0U;
-                return remove;
-            }),
-        focus_scopes_.end());
+    FocusScopeList::iterator state = focus_scopes_.begin();
+    while (state != focus_scopes_.end()) {
+        const bool remove = (*state).active &&
+            contains_control(control, (*state).root.lock());
+        if (remove) {
+            ++closed;
+            state = focus_scopes_.erase(state);
+        } else {
+            ++state;
+        }
+    }
     while (closed-- > 0U) {
         metrics_.record_focus_scope_closed(false, focus_scope_depth());
     }
@@ -1870,40 +1900,40 @@ void Window::publish_control_availability(Control& control) {
     const ControlAvailabilityChange change{
         control.runtime_id(), std::string(control.stable_id().value()),
         control.effectively_visible(), control.effectively_enabled()};
-    const auto retained = control.shared_from_this();
+    const std::shared_ptr<gui_forms::Control> retained = control.shared_from_this();
     control.publish_change(
         static_cast<const void*>(&control_availability_changed_),
-        [this, retained, change] {
-            if (!retained->is_alive() || retained->window_ != this) return;
-            control_availability_changed_.emit(change);
-        });
+        ControlAvailabilityPublication{this, retained, change});
 }
 
-void Window::register_subtree(const Control::Ptr& control) {
-    std::vector<Control::Ptr> controls;
-    std::unordered_set<std::string> local_ids;
-    std::function<void(const Control::Ptr&)> collect = [&](const Control::Ptr& current) {
-        if (!current->is_alive()) {
+void Window::collect_subtree_registration(
+    const Control::Ptr& control, ControlList& controls,
+    std::unordered_set<std::string>& local_ids) {
+        if (!(*control).is_alive()) {
             throw std::logic_error("GUI.Forms cannot attach a disposed control");
         }
-        const std::string id(current->stable_id_.value());
+        const std::string id((*control).stable_id_.value());
         if (!local_ids.insert(id).second || stable_ids_.contains(id)) {
             throw std::logic_error("GUI.Forms duplicate stable ID: " + id);
         }
-        controls.push_back(current);
-        for (const auto& child : current->children_) {
-            collect(child);
+        controls.push_back(control);
+        for (const Control::Ptr& child : (*control).children_) {
+            collect_subtree_registration(child, controls, local_ids);
         }
-    };
-    collect(control);
-    for (const auto& current : controls) {
-        stable_ids_.emplace(std::string(current->stable_id_.value()), current);
+}
+
+void Window::register_subtree(const Control::Ptr& control) {
+    ControlList controls;
+    std::unordered_set<std::string> local_ids;
+    collect_subtree_registration(control, controls, local_ids);
+    for (const std::shared_ptr<gui_forms::Control>& current : controls) {
+        stable_ids_.emplace(std::string((*current).stable_id_.value()), current);
     }
 }
 
 void Window::unregister_subtree(const Control::Ptr& control) {
-    stable_ids_.erase(std::string(control->stable_id_.value()));
-    for (const auto& child : control->children_) {
+    stable_ids_.erase(std::string((*control).stable_id_.value()));
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         unregister_subtree(child);
     }
 }
@@ -1933,17 +1963,19 @@ void Window::mark_dirty(Control& control, Dirty requested_dirty) {
             }
         }
         note_suspended_layout_request(control);
-        for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
-            ancestor->dirty_ |= Dirty::measure | Dirty::arrange;
-            ancestor->subtree_dirty_ |= Dirty::measure | Dirty::arrange;
+        for (Control::Ptr ancestor = control.parent(); ancestor;
+             ancestor = (*ancestor).parent()) {
+            (*ancestor).dirty_ |= Dirty::measure | Dirty::arrange;
+            (*ancestor).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
         }
         layout_dirty_ = true;
         if (in_layout_) {
             second_layout_pass_requested_ = true;
         }
     }
-    for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
-        ancestor->subtree_dirty_ |= requested_dirty;
+    for (Control::Ptr ancestor = control.parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
+        (*ancestor).subtree_dirty_ |= requested_dirty;
     }
     if (has_dirty(requested_dirty, Dirty::hit_test)) {
         hit_test_dirty_ = true;
@@ -1977,8 +2009,9 @@ void Window::mark_paint_dirty(Control& control, Rect local_damage) {
 
     control.dirty_ |= Dirty::paint;
     control.subtree_dirty_ |= Dirty::paint;
-    for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
-        ancestor->subtree_dirty_ |= Dirty::paint;
+    for (Control::Ptr ancestor = control.parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
+        (*ancestor).subtree_dirty_ |= Dirty::paint;
     }
     metrics_.record_mutation();
     touch_paint();
@@ -1998,9 +2031,9 @@ void Window::mark_child_layout_slot(Control& control) {
     control.dirty_ |= effects;
     note_suspended_layout_request(control);
     control.subtree_dirty_ |= effects;
-    for (auto ancestor = control.parent(); ancestor;
-         ancestor = ancestor->parent()) {
-        ancestor->subtree_dirty_ |= effects;
+    for (Control::Ptr ancestor = control.parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
+        (*ancestor).subtree_dirty_ |= effects;
     }
     layout_dirty_ = true;
     hit_test_dirty_ = true;
@@ -2028,10 +2061,10 @@ SemanticSnapshot Window::semantic_snapshot() {
         const Control::Ptr focused = focused_.lock();
         std::vector<Control::Ptr> roots{root_};
         roots.reserve(1U + popups_.size());
-        for (const auto& popup : popups_) roots.push_back(popup->popup());
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) roots.push_back((*popup).popup());
         for (const Control::Ptr& root : roots) {
-            if (!root || !root->is_alive() || root->window_ != this ||
-                root->parent()) {
+            if (!root || !(*root).is_alive() || (*root).window_ != this ||
+                (*root).parent()) {
                 continue;
             }
             append_semantic_nodes(root, nullptr, this, focused, snapshot.roots,
@@ -2060,10 +2093,11 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         if (dispatch_semantic_child_action(root_, stable_id, action, value)) {
             return true;
         }
-        std::vector<Control::Ptr> popup_roots;
+        ControlList popup_roots;
         popup_roots.reserve(popups_.size());
-        for (const auto& popup : popups_) popup_roots.push_back(popup->popup());
-        for (auto popup = popup_roots.rbegin(); popup != popup_roots.rend();
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) popup_roots.push_back((*popup).popup());
+        for (ControlList::reverse_iterator popup = popup_roots.rbegin();
+             popup != popup_roots.rend();
              ++popup) {
             if (dispatch_semantic_child_action(
                     *popup, stable_id, action, value)) return true;
@@ -2072,7 +2106,34 @@ bool Window::perform_semantic_action(std::string_view stable_id,
     }
     if (!eligible(control)) return false;
     if (action == SemanticAction::focus) return request_focus(control);
-    return control->on_semantic_action(action, value);
+    return (*control).on_semantic_action(action, value);
+}
+
+void Window::apply_subtree_dirty(Control& control, Dirty requested_dirty,
+                                 double& requested_damage_area) {
+    control.dirty_ |= requested_dirty;
+    control.subtree_dirty_ |= requested_dirty;
+    if (has_dirty(requested_dirty, Dirty::layout) &&
+        control.layout_suspend_depth_ != 0U) {
+        control.layout_deferred_ = true;
+        ++control.layout_requested_revision_;
+        if (control.layout_requested_revision_ == 0U) {
+            ++control.layout_requested_revision_;
+        }
+    }
+    if (has_dirty(requested_dirty, Dirty::paint)) {
+        Rect bounds = paint_damage_bounds_of(control);
+        if (bounds.empty()) {
+            bounds = control.requested_bounds_;
+        }
+        // Structural invalidation recomposes every plane so vacated pixels
+        // cannot survive beneath a transparent or detached control.
+        add_damage_all_planes(bounds);
+        requested_damage_area += bounds.area();
+    }
+    for (const Control::Ptr& child : control.children_) {
+        apply_subtree_dirty(*child, requested_dirty, requested_damage_area);
+    }
 }
 
 void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
@@ -2081,43 +2142,17 @@ void Window::mark_subtree_dirty(Control& control, Dirty requested_dirty) {
         requested_dirty |= Dirty::arrange;
     }
     double requested_damage_area = 0.0;
-    std::function<void(Control&)> apply = [&](Control& current) {
-        current.dirty_ |= requested_dirty;
-        current.subtree_dirty_ |= requested_dirty;
-        if (has_dirty(requested_dirty, Dirty::layout) &&
-            current.layout_suspend_depth_ != 0U) {
-            current.layout_deferred_ = true;
-            ++current.layout_requested_revision_;
-            if (current.layout_requested_revision_ == 0U) {
-                ++current.layout_requested_revision_;
-            }
-        }
-        if (has_dirty(requested_dirty, Dirty::paint)) {
-            Rect bounds = paint_damage_bounds_of(current);
-            if (bounds.empty()) {
-                bounds = current.requested_bounds_;
-            }
-            // Subtree invalidation is structural (visibility, attachment, or a
-            // visual-tree/layout replacement). Recompose every plane so pixels
-            // formerly occupied by a transparent control are restored from the
-            // backplane instead of surviving as stale fragments.
-            add_damage_all_planes(bounds);
-            requested_damage_area += bounds.area();
-        }
-        for (const auto& child : current.children_) {
-            apply(*child);
-        }
-    };
-    apply(control);
-    for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
-        ancestor->subtree_dirty_ |= requested_dirty;
+    apply_subtree_dirty(control, requested_dirty, requested_damage_area);
+    for (Control::Ptr ancestor = control.parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
+        (*ancestor).subtree_dirty_ |= requested_dirty;
         if (has_dirty(requested_dirty, Dirty::layout)) {
-            ancestor->dirty_ |= Dirty::measure | Dirty::arrange;
-            if (ancestor->layout_suspend_depth_ != 0U) {
-                ancestor->layout_deferred_ = true;
-                ++ancestor->layout_requested_revision_;
-                if (ancestor->layout_requested_revision_ == 0U) {
-                    ++ancestor->layout_requested_revision_;
+            (*ancestor).dirty_ |= Dirty::measure | Dirty::arrange;
+            if ((*ancestor).layout_suspend_depth_ != 0U) {
+                (*ancestor).layout_deferred_ = true;
+                ++(*ancestor).layout_requested_revision_;
+                if ((*ancestor).layout_requested_revision_ == 0U) {
+                    ++(*ancestor).layout_requested_revision_;
                 }
             }
         }
@@ -2186,9 +2221,13 @@ void Window::request_paint_wake() noexcept {
 }
 
 void Window::acknowledge_paint_wake_if_damage_drained() noexcept {
-    const bool damage_remains = std::any_of(
-        plane_damage_.begin(), plane_damage_.end(),
-        [](const DamageRegion& damage) { return !damage.empty(); });
+    bool damage_remains = false;
+    for (const DamageRegion& damage : plane_damage_) {
+        if (!damage.empty()) {
+            damage_remains = true;
+            break;
+        }
+    }
     if (!damage_remains) paint_wake_pending_ = false;
 }
 
@@ -2224,14 +2263,14 @@ void Window::update_paint_lease_state() noexcept {
 
 void Window::add_subtree_damage(const Control::Ptr& control) {
     add_damage_all_planes(paint_damage_bounds_of(*control));
-    for (const auto& child : control->children_) {
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         add_subtree_damage(child);
     }
 }
 
 void Window::ensure_layout(bool read_barrier) {
     require_ui_thread("layout");
-    if (!root_->is_alive()) {
+    if (!(*root_).is_alive()) {
         layout_dirty_ = false;
         hit_test_dirty_ = false;
         return;
@@ -2247,14 +2286,7 @@ void Window::ensure_layout(bool read_barrier) {
         return;
     }
 
-    const auto any_runnable_layout = [this]() {
-        if (has_runnable_layout_dirty(root_)) return true;
-        return std::any_of(popups_.begin(), popups_.end(),
-                           [this](const auto& popup) {
-            return has_runnable_layout_dirty(popup->popup());
-        });
-    };
-    if (!any_runnable_layout()) return;
+    if (!has_any_runnable_layout_dirty()) return;
 
     metrics_.record_flush(read_barrier);
     in_layout_ = true;
@@ -2265,8 +2297,8 @@ void Window::ensure_layout(bool read_barrier) {
             std::uint64_t measure_visited = 0;
             std::uint64_t measured = 0;
             measure_dirty_recursive(root_, client_size_, measure_visited, measured);
-            for (const auto& popup : popups_) {
-                if (const Control::Ptr overlay = popup->popup()) {
+            for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+                if (const Control::Ptr overlay = (*popup).popup()) {
                     measure_dirty_recursive(overlay, client_size_, measure_visited,
                                             measured);
                 }
@@ -2278,37 +2310,33 @@ void Window::ensure_layout(bool read_barrier) {
             arrange_dirty_recursive(
                 root_, {0.0, 0.0, client_size_.width, client_size_.height},
                 arrange_visited, arranged);
-            for (const auto& popup : popups_) {
-                if (const Control::Ptr overlay = popup->popup()) {
-                    arrange_dirty_recursive(overlay, overlay->requested_bounds_,
+            for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+                if (const Control::Ptr overlay = (*popup).popup()) {
+                    arrange_dirty_recursive(overlay, (*overlay).requested_bounds_,
                                             arrange_visited, arranged);
                 }
             }
             metrics_.record_arrange(arrange_visited, arranged);
 
             static_cast<void>(recompute_subtree_dirty(root_));
-            for (const auto& popup : popups_) {
-                if (const Control::Ptr overlay = popup->popup()) {
+            for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+                if (const Control::Ptr overlay = (*popup).popup()) {
                     static_cast<void>(recompute_subtree_dirty(overlay));
                 }
             }
             commit_layout_requests_recursive(root_);
-            for (const auto& popup : popups_) {
-                commit_layout_requests_recursive(popup->popup());
+            for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+                commit_layout_requests_recursive((*popup).popup());
             }
             ++pass;
-        } while (any_runnable_layout() && pass < maximum_layout_passes);
+        } while (has_any_runnable_layout_dirty() &&
+                 pass < maximum_layout_passes);
 
-        const bool popup_layout_dirty = std::any_of(
-            popups_.begin(), popups_.end(), [](const auto& popup) {
-                const Control::Ptr overlay = popup->popup();
-                return overlay &&
-                    has_dirty(overlay->subtree_dirty_, Dirty::layout);
-            });
-        if (any_runnable_layout()) {
+        const bool popup_layout_dirty = has_popup_layout_dirty();
+        if (has_any_runnable_layout_dirty()) {
             metrics_.record_pass_limit_hit();
         }
-        layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
+        layout_dirty_ = has_dirty((*root_).subtree_dirty_, Dirty::layout) ||
                         popup_layout_dirty;
         hit_test_dirty_ = layout_dirty_;
         in_layout_ = false;
@@ -2316,17 +2344,13 @@ void Window::ensure_layout(bool read_barrier) {
         // A user layout callback may fail. Preserve dirty state for an
         // explicit later retry and always release the re-entry guard.
         static_cast<void>(recompute_subtree_dirty(root_));
-        for (const auto& popup : popups_) {
-            if (const Control::Ptr overlay = popup->popup()) {
+        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+            if (const Control::Ptr overlay = (*popup).popup()) {
                 static_cast<void>(recompute_subtree_dirty(overlay));
             }
         }
-        layout_dirty_ = has_dirty(root_->subtree_dirty_, Dirty::layout) ||
-            std::any_of(popups_.begin(), popups_.end(), [](const auto& popup) {
-                const Control::Ptr overlay = popup->popup();
-                return overlay &&
-                    has_dirty(overlay->subtree_dirty_, Dirty::layout);
-            });
+        layout_dirty_ = has_dirty((*root_).subtree_dirty_, Dirty::layout) ||
+                        has_popup_layout_dirty();
         hit_test_dirty_ = layout_dirty_;
         second_layout_pass_requested_ = false;
         in_layout_ = false;
@@ -2337,7 +2361,7 @@ void Window::ensure_layout(bool read_barrier) {
 
 std::vector<Control::Ptr> Window::route_to(const Control::Ptr& target) const {
     std::vector<Control::Ptr> route;
-    for (auto current = target; current; current = current->parent()) {
+    for (Control::Ptr current = target; current; current = (*current).parent()) {
         route.push_back(current);
     }
     std::reverse(route.begin(), route.end());
@@ -2346,17 +2370,17 @@ std::vector<Control::Ptr> Window::route_to(const Control::Ptr& target) const {
 
 Control::Ptr Window::hit_test_recursive(const Control::Ptr& control,
                                         Point window_position) const {
-    if (!eligible(control) || control->window_ != this) {
+    if (!eligible(control) || (*control).window_ != this) {
         return {};
     }
-    Control* const retained_parent = control->parent_.lock().get();
+    Control* const retained_parent = (*control).parent_.lock().get();
     const Rect bounds = absolute_bounds_of(*control);
     if (!bounds.contains(window_position)) {
         return {};
     }
-    const Rect local_child_viewport = control->child_viewport_rectangle();
-    if (!control->is_alive() || control->window_ != this ||
-        control->parent_.lock().get() != retained_parent) {
+    const Rect local_child_viewport = (*control).child_viewport_rectangle();
+    if (!(*control).is_alive() || (*control).window_ != this ||
+        (*control).parent_.lock().get() != retained_parent) {
         return {};
     }
     const Rect child_viewport{bounds.x + local_child_viewport.x,
@@ -2364,24 +2388,25 @@ Control::Ptr Window::hit_test_recursive(const Control::Ptr& control,
                               local_child_viewport.width,
                               local_child_viewport.height};
     if (child_viewport.contains(window_position)) {
-        const std::vector<Control::Ptr> children = control->children_;
-        for (auto child = children.rbegin(); child != children.rend(); ++child) {
-            if (!*child || !(*child)->is_alive() ||
-                (*child)->parent_.lock().get() != control.get() ||
-                (*child)->window_ != this) {
+        const ControlList children = (*control).children_;
+        for (ControlList::const_reverse_iterator child = children.rbegin();
+             child != children.rend(); ++child) {
+            if (!*child || !(*(*child)).is_alive() ||
+                (*(*child)).parent_.lock().get() != control.get() ||
+                (*(*child)).window_ != this) {
                 continue;
             }
-            if (auto target = hit_test_recursive(*child, window_position)) {
-                if (!target->is_alive() || target->window_ != this) continue;
+            if (Control::Ptr target = hit_test_recursive(*child, window_position)) {
+                if (!(*target).is_alive() || (*target).window_ != this) continue;
                 return target;
             }
         }
     }
     const Point local{window_position.x - bounds.x, window_position.y - bounds.y};
-    const bool hit = !control->hit_test_transparent_ &&
-                     control->hit_test_local(local);
-    return hit && eligible(control) && control->window_ == this &&
-            control->parent_.lock().get() == retained_parent
+    const bool hit = !(*control).hit_test_transparent_ &&
+                     (*control).hit_test_local(local);
+    return hit && eligible(control) && (*control).window_ == this &&
+            (*control).parent_.lock().get() == retained_parent
         ? control : Control::Ptr{};
 }
 
@@ -2389,42 +2414,42 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
                                      Size available,
                                      std::uint64_t& visited_nodes,
                                      std::uint64_t& callbacks) {
-    if (!control || control->layout_suspend_depth_ != 0U ||
-        !has_dirty(control->subtree_dirty_, Dirty::measure)) {
+    if (!control || (*control).layout_suspend_depth_ != 0U ||
+        !has_dirty((*control).subtree_dirty_, Dirty::measure)) {
         return;
     }
     ++visited_nodes;
-    if (!control->is_alive() || !control->visible_) {
+    if (!(*control).is_alive() || !(*control).visible_) {
         clear_layout_dirty_subtree(control);
         return;
     }
 
     const Size child_available{
-        control->requested_bounds_.width > 0.0 ? control->requested_bounds_.width
+        (*control).requested_bounds_.width > 0.0 ? (*control).requested_bounds_.width
                                                : available.width,
-        control->requested_bounds_.height > 0.0 ? control->requested_bounds_.height
+        (*control).requested_bounds_.height > 0.0 ? (*control).requested_bounds_.height
                                                 : available.height};
-    const std::vector<Control::Ptr> retained = control->children_;
-    for (const auto& child : retained) {
-        if (!child || !child->is_alive() ||
-            child->parent_.lock().get() != control.get() ||
-            child->window_ != this) {
+    const std::vector<Control::Ptr> retained = (*control).children_;
+    for (const std::shared_ptr<gui_forms::Control>& child : retained) {
+        if (!child || !(*child).is_alive() ||
+            (*child).parent_.lock().get() != control.get() ||
+            (*child).window_ != this) {
             continue;
         }
         measure_dirty_recursive(child, child_available, visited_nodes, callbacks);
     }
-    if (!control->is_alive() || control->window_ != this) return;
-    if (has_dirty(control->dirty_, Dirty::measure)) {
-        control->clear_dirty(Dirty::measure);
+    if (!(*control).is_alive() || (*control).window_ != this) return;
+    if (has_dirty((*control).dirty_, Dirty::measure)) {
+        (*control).clear_dirty(Dirty::measure);
         try {
-            static_cast<void>(control->measure(available));
+            static_cast<void>((*control).measure(available));
         } catch (...) {
-            control->dirty_ |= Dirty::measure | Dirty::arrange;
-            control->subtree_dirty_ |= Dirty::measure | Dirty::arrange;
+            (*control).dirty_ |= Dirty::measure | Dirty::arrange;
+            (*control).subtree_dirty_ |= Dirty::measure | Dirty::arrange;
             throw;
         }
         ++callbacks;
-        if (!control->is_alive() || control->window_ != this) return;
+        if (!(*control).is_alive() || (*control).window_ != this) return;
     }
 }
 
@@ -2432,31 +2457,31 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
                                      Rect final_bounds,
                                      std::uint64_t& visited_nodes,
                                      std::uint64_t& callbacks) {
-    if (!control || control->layout_suspend_depth_ != 0U ||
-        !has_dirty(control->subtree_dirty_, Dirty::arrange)) {
+    if (!control || (*control).layout_suspend_depth_ != 0U ||
+        !has_dirty((*control).subtree_dirty_, Dirty::arrange)) {
         return;
     }
     ++visited_nodes;
-    if (!control->is_alive() || !control->visible_) {
+    if (!(*control).is_alive() || !(*control).visible_) {
         clear_layout_dirty_subtree(control);
         return;
     }
 
-    if (has_dirty(control->dirty_, Dirty::arrange)) {
+    if (has_dirty((*control).dirty_, Dirty::arrange)) {
         const Rect old_bounds = visual_bounds_of(
-            *control, control->last_painted_visual_outsets_);
-        control->clear_dirty(Dirty::arrange | Dirty::hit_test);
+            *control, (*control).last_painted_visual_outsets_);
+        (*control).clear_dirty(Dirty::arrange | Dirty::hit_test);
         try {
-            control->arrange(final_bounds);
+            (*control).arrange(final_bounds);
         } catch (...) {
-            control->dirty_ |= Dirty::arrange | Dirty::hit_test;
-            control->subtree_dirty_ |= Dirty::arrange | Dirty::hit_test;
+            (*control).dirty_ |= Dirty::arrange | Dirty::hit_test;
+            (*control).subtree_dirty_ |= Dirty::arrange | Dirty::hit_test;
             throw;
         }
         ++callbacks;
-        if (!control->is_alive() || control->window_ != this) return;
+        if (!(*control).is_alive() || (*control).window_ != this) return;
         const Rect new_bounds = visual_bounds_of(*control,
-                                                  control->visual_outsets());
+                                                  (*control).visual_outsets());
         if (old_bounds != new_bounds) {
             // Arrangement changes expose content below the moved control. The
             // compositor uses one target across ordered paint planes, so both
@@ -2465,85 +2490,103 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
             add_damage_all_planes(new_bounds);
             touch_paint();
             paint_dirty_ = true;
-            control->publish_change(control->arranged_bounds_changed_,
+            (*control).publish_change((*control).arranged_bounds_changed_,
                                     new_bounds);
         }
     }
-    const std::vector<Control::Ptr> retained = control->children_;
-    for (const auto& child : retained) {
-        if (!child || !child->is_alive() ||
-            child->parent_.lock().get() != control.get() ||
-            child->window_ != this) {
+    const std::vector<Control::Ptr> retained = (*control).children_;
+    for (const std::shared_ptr<gui_forms::Control>& child : retained) {
+        if (!child || !(*child).is_alive() ||
+            (*child).parent_.lock().get() != control.get() ||
+            (*child).window_ != this) {
             continue;
         }
         arrange_dirty_recursive(
-            child, child->layout_slot_.value_or(child->requested_bounds_),
+            child, (*child).layout_slot_.value_or((*child).requested_bounds_),
             visited_nodes, callbacks);
     }
 }
 
 bool Window::has_runnable_layout_dirty(
     const Control::Ptr& control) const noexcept {
-    if (!control || control->layout_suspend_depth_ != 0U ||
-        !has_dirty(control->subtree_dirty_, Dirty::layout)) {
+    if (!control || (*control).layout_suspend_depth_ != 0U ||
+        !has_dirty((*control).subtree_dirty_, Dirty::layout)) {
         return false;
     }
-    if (has_dirty(control->dirty_, Dirty::layout)) return true;
-    return std::any_of(control->children_.begin(), control->children_.end(),
-                       [this](const Control::Ptr& child) {
-        return has_runnable_layout_dirty(child);
-    });
+    if (has_dirty((*control).dirty_, Dirty::layout)) return true;
+    for (const Control::Ptr& child : (*control).children_) {
+        if (has_runnable_layout_dirty(child)) return true;
+    }
+    return false;
+}
+
+bool Window::has_any_runnable_layout_dirty() const noexcept {
+    if (has_runnable_layout_dirty(root_)) return true;
+    for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
+        if (has_runnable_layout_dirty((*popup).popup())) return true;
+    }
+    return false;
+}
+
+bool Window::has_popup_layout_dirty() const noexcept {
+    for (const std::shared_ptr<detail::PopupAttachment>& popup : popups_) {
+        const Control::Ptr overlay = (*popup).popup();
+        if (overlay && has_dirty((*overlay).subtree_dirty_, Dirty::layout)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Window::note_suspended_layout_request(Control& control) noexcept {
     for (Control* current = &control; current != nullptr;) {
-        if (current->layout_suspend_depth_ != 0U) {
-            current->layout_deferred_ = true;
-            ++current->layout_requested_revision_;
-            if (current->layout_requested_revision_ == 0U) {
-                ++current->layout_requested_revision_;
+        if ((*current).layout_suspend_depth_ != 0U) {
+            (*current).layout_deferred_ = true;
+            ++(*current).layout_requested_revision_;
+            if ((*current).layout_requested_revision_ == 0U) {
+                ++(*current).layout_requested_revision_;
             }
         }
-        const Control::Ptr parent = current->parent_.lock();
+        const Control::Ptr parent = (*current).parent_.lock();
         current = parent.get();
     }
 }
 
 void Window::commit_layout_requests_recursive(
     const Control::Ptr& control) noexcept {
-    if (!control || control->layout_suspend_depth_ != 0U) return;
-    for (const auto& child : control->children_) {
+    if (!control || (*control).layout_suspend_depth_ != 0U) return;
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         commit_layout_requests_recursive(child);
     }
-    if (!has_dirty(control->subtree_dirty_, Dirty::layout) &&
-        control->layout_deferred_) {
-        control->layout_committed_revision_ =
-            control->layout_requested_revision_;
-        control->layout_deferred_ = false;
+    if (!has_dirty((*control).subtree_dirty_, Dirty::layout) &&
+        (*control).layout_deferred_) {
+        (*control).layout_committed_revision_ =
+            (*control).layout_requested_revision_;
+        (*control).layout_deferred_ = false;
     }
 }
 
 Dirty Window::recompute_subtree_dirty(const Control::Ptr& control) noexcept {
-    Dirty summary = control->dirty_;
-    for (const auto& child : control->children_) {
+    Dirty summary = (*control).dirty_;
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         summary |= recompute_subtree_dirty(child);
     }
-    control->subtree_dirty_ = summary;
+    (*control).subtree_dirty_ = summary;
     return summary;
 }
 
 void Window::clear_layout_dirty_subtree(const Control::Ptr& control) noexcept {
-    control->clear_dirty(Dirty::layout | Dirty::hit_test);
-    control->clear_subtree_dirty(Dirty::layout | Dirty::hit_test);
-    for (const auto& child : control->children_) {
+    (*control).clear_dirty(Dirty::layout | Dirty::hit_test);
+    (*control).clear_subtree_dirty(Dirty::layout | Dirty::hit_test);
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         clear_layout_dirty_subtree(child);
     }
 }
 
 void Window::clear_paint_dirty_subtree(const Control::Ptr& control) noexcept {
-    control->clear_dirty(Dirty::paint);
-    control->clear_subtree_dirty(Dirty::paint);
-    for (const auto& child : control->children_) {
+    (*control).clear_dirty(Dirty::paint);
+    (*control).clear_subtree_dirty(Dirty::paint);
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         clear_paint_dirty_subtree(child);
     }
 }
@@ -2559,22 +2602,22 @@ void Window::paint_recursive(const Control::Ptr& control,
                              std::uint64_t& chunks_reused,
                              std::uint64_t& commands_replayed) {
     ++visited_nodes;
-    if (!control->is_alive() || control->window_ != this || !control->visible_) {
+    if (!(*control).is_alive() || (*control).window_ != this || !(*control).visible_) {
         clear_paint_dirty_subtree(control);
         return;
     }
-    Control* const retained_parent = control->parent_.lock().get();
+    Control* const retained_parent = (*control).parent_.lock().get();
     const Rect bounds = absolute_bounds_of(*control);
-    const Insets current_outsets = control->visual_outsets();
-    if (!control->is_alive() || control->window_ != this ||
-        control->parent_.lock().get() != retained_parent) {
+    const Insets current_outsets = (*control).visual_outsets();
+    if (!(*control).is_alive() || (*control).window_ != this ||
+        (*control).parent_.lock().get() != retained_parent) {
         return;
     }
     const Rect visual_bounds = visual_bounds_of(*control, current_outsets);
     const Rect paint_intersection = Rect::intersection(visual_bounds, window_damage);
-    const Rect local_child_viewport = control->child_viewport_rectangle();
-    if (!control->is_alive() || control->window_ != this ||
-        control->parent_.lock().get() != retained_parent) {
+    const Rect local_child_viewport = (*control).child_viewport_rectangle();
+    if (!(*control).is_alive() || (*control).window_ != this ||
+        (*control).parent_.lock().get() != retained_parent) {
         return;
     }
     const Rect child_viewport{bounds.x + local_child_viewport.x,
@@ -2587,26 +2630,26 @@ void Window::paint_recursive(const Control::Ptr& control,
         return;
     }
 
-    if (control->paint_plane_ == plane && !paint_intersection.empty()) {
+    if ((*control).paint_plane_ == plane && !paint_intersection.empty()) {
         const Rect logical_bounds{0.0, 0.0, bounds.width, bounds.height};
-        const bool invalidated = has_dirty(control->dirty_, Dirty::paint);
-        const bool rebuild = invalidated || !control->display_chunk_ ||
-                             control->display_chunk_->plane() != plane ||
-                             control->display_chunk_->logical_bounds() != logical_bounds;
+        const bool invalidated = has_dirty((*control).dirty_, Dirty::paint);
+        const bool rebuild = invalidated || !(*control).display_chunk_ ||
+                             (*(*control).display_chunk_).plane() != plane ||
+                             (*(*control).display_chunk_).logical_bounds() != logical_bounds;
         if (rebuild) {
-            control->clear_dirty(Dirty::paint);
+            (*control).clear_dirty(Dirty::paint);
             detail::RecordingPainter recorder;
-            control->on_paint(recorder, logical_bounds);
-            if (!control->is_alive() || control->window_ != this ||
-                control->parent_.lock().get() != retained_parent) {
+            (*control).on_paint(recorder, logical_bounds);
+            if (!(*control).is_alive() || (*control).window_ != this ||
+                (*control).parent_.lock().get() != retained_parent) {
                 return;
             }
-            control->on_paint_overlay(recorder, logical_bounds);
-            if (!control->is_alive() || control->window_ != this ||
-                control->parent_.lock().get() != retained_parent) {
+            (*control).on_paint_overlay(recorder, logical_bounds);
+            if (!(*control).is_alive() || (*control).window_ != this ||
+                (*control).parent_.lock().get() != retained_parent) {
                 return;
             }
-            control->display_chunk_ = recorder.finish(++display_generation_, plane,
+            (*control).display_chunk_ = recorder.finish(++display_generation_, plane,
                                                       logical_bounds);
             ++chunks_rebuilt;
             consumed_invalidations += invalidated ? 1U : 0U;
@@ -2622,18 +2665,18 @@ void Window::paint_recursive(const Control::Ptr& control,
                                 paint_intersection.height};
         painter.clip_rect(local_damage);
         commands_replayed +=
-        detail::replay_display_chunk(*control->display_chunk_, painter);
+        detail::replay_display_chunk(*(*control).display_chunk_, painter);
         painter.restore();
-        control->last_painted_visual_outsets_ = current_outsets;
+        (*control).last_painted_visual_outsets_ = current_outsets;
         ++painted_controls;
     }
 
     if (!child_intersection.empty()) {
-        const std::vector<Control::Ptr> children = control->children_;
-        for (const auto& child : children) {
-            if (!child || !child->is_alive() ||
-                child->parent_.lock().get() != control.get() ||
-                child->window_ != this) {
+        const std::vector<Control::Ptr> children = (*control).children_;
+        for (const std::shared_ptr<gui_forms::Control>& child : children) {
+            if (!child || !(*child).is_alive() ||
+                (*child).parent_.lock().get() != control.get() ||
+                (*child).window_ != this) {
                 continue;
             }
             paint_recursive(child, painter, child_intersection, plane, visited_nodes,
@@ -2642,22 +2685,22 @@ void Window::paint_recursive(const Control::Ptr& control,
         }
     }
 
-    if (!control->is_alive() || control->window_ != this ||
-        control->parent_.lock().get() != retained_parent) {
+    if (!(*control).is_alive() || (*control).window_ != this ||
+        (*control).parent_.lock().get() != retained_parent) {
         return;
     }
 
-    Dirty paint_summary = control->dirty_ & Dirty::paint;
-    for (const auto& child : control->children_) {
-        paint_summary |= child->subtree_dirty_ & Dirty::paint;
+    Dirty paint_summary = (*control).dirty_ & Dirty::paint;
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
+        paint_summary |= (*child).subtree_dirty_ & Dirty::paint;
     }
-    control->subtree_dirty_ = without_dirty(control->subtree_dirty_, Dirty::paint) |
+    (*control).subtree_dirty_ = without_dirty((*control).subtree_dirty_, Dirty::paint) |
                               paint_summary;
 }
 
 std::uint64_t Window::display_cache_entries(const Control::Ptr& control) const noexcept {
-    std::uint64_t entries = control->display_chunk_ ? 1U : 0U;
-    for (const auto& child : control->children_) {
+    std::uint64_t entries = (*control).display_chunk_ ? 1U : 0U;
+    for (const std::shared_ptr<gui_forms::Control>& child : (*control).children_) {
         entries += display_cache_entries(child);
     }
     return entries;
@@ -2665,8 +2708,8 @@ std::uint64_t Window::display_cache_entries(const Control::Ptr& control) const n
 
 void Window::update_display_cache_metrics() noexcept {
     std::uint64_t entries = root_ ? display_cache_entries(root_) : 0U;
-    for (const auto& popup : popups_) {
-        if (const Control::Ptr overlay = popup->popup()) {
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (const Control::Ptr overlay = (*popup).popup()) {
             entries += display_cache_entries(overlay);
         }
     }
@@ -2674,30 +2717,39 @@ void Window::update_display_cache_metrics() noexcept {
 }
 
 void Window::compact_frame_requests() noexcept {
-    for (const auto& request : frame_requests_) {
-        if (request->kind == detail::FrameRequestKind::ui_timer) {
+    for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
+        if ((*request).kind == detail::FrameRequestKind::ui_timer) {
             continue;
         }
-        const auto target = request->target.lock();
-        if (!target || !target->is_alive() || target->window_ != this) {
-            request->disconnect();
+        const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
+        if (!target || !(*target).is_alive() || (*target).window_ != this) {
+            (*request).disconnect();
         }
     }
-    std::erase_if(frame_requests_, [](const auto& request) {
-        return !request->connected();
-    });
+    FrameRequestList::iterator request = frame_requests_.begin();
+    while (request != frame_requests_.end()) {
+        if (!(*(*request)).connected()) {
+            request = frame_requests_.erase(request);
+        } else {
+            ++request;
+        }
+    }
 }
 
 std::size_t Window::active_surface_count() const noexcept {
-    return static_cast<std::size_t>(std::count_if(
-        frame_requests_.begin(), frame_requests_.end(), [this](const auto& request) {
-            if (!request->connected() ||
-                request->kind != detail::FrameRequestKind::active_surface) {
-                return false;
-            }
-            const auto target = request->target.lock();
-            return target && target->is_alive() && target->window_ == this;
-        }));
+    std::size_t count = 0U;
+    for (const std::shared_ptr<detail::ScheduledFrameRequest>& request :
+         frame_requests_) {
+        if (!(*request).connected() ||
+            (*request).kind != detail::FrameRequestKind::active_surface) {
+            continue;
+        }
+        const Control::Ptr target = (*request).target.lock();
+        if (target && (*target).is_alive() && (*target).window_ == this) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 void Window::update_frame_schedule_metrics() noexcept {
@@ -2706,19 +2758,19 @@ void Window::update_frame_schedule_metrics() noexcept {
 
 Rect Window::absolute_bounds_of(const Control& control) const {
     Rect result = control.arranged_bounds_;
-    for (auto ancestor = control.parent(); ancestor; ancestor = ancestor->parent()) {
-        result.x += ancestor->arranged_bounds_.x;
-        result.y += ancestor->arranged_bounds_.y;
+    for (Control::Ptr ancestor = control.parent(); ancestor;
+         ancestor = (*ancestor).parent()) {
+        result.x += (*ancestor).arranged_bounds_.x;
+        result.y += (*ancestor).arranged_bounds_.y;
     }
     return result;
 }
 
 Rect Window::visual_bounds_of(const Control& control, Insets outsets) const {
-    const auto bounded = [](double value) noexcept {
-        return std::isfinite(value) ? std::clamp(value, 0.0, 16384.0) : 0.0;
-    };
-    outsets = {bounded(outsets.left), bounded(outsets.top),
-               bounded(outsets.right), bounded(outsets.bottom)};
+    outsets = {bounded_visual_outset(outsets.left),
+               bounded_visual_outset(outsets.top),
+               bounded_visual_outset(outsets.right),
+               bounded_visual_outset(outsets.bottom)};
     const Rect bounds = absolute_bounds_of(control);
     return {bounds.x - outsets.left, bounds.y - outsets.top,
             bounds.width + outsets.left + outsets.right,
@@ -2732,7 +2784,7 @@ Rect Window::paint_damage_bounds_of(const Control& control) const {
 }
 
 bool Window::eligible(const Control::Ptr& control) const noexcept {
-    return control && control->window_ == this && control->eligible_for_input();
+    return control && (*control).window_ == this && (*control).eligible_for_input();
 }
 
 void Window::require_ui_thread(std::string_view operation) {

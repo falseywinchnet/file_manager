@@ -26,7 +26,8 @@ public:
     [[nodiscard]] Control::Ptr create(std::string_view type, StableId stable_id) const;
 
 private:
-    std::unordered_map<std::string, Creator> creators_;
+    using CreatorMap = std::unordered_map<std::string, Creator>;
+    CreatorMap creators_;
 };
 
 [[nodiscard]] Control::Ptr build_static_tree(const StaticNode& node,

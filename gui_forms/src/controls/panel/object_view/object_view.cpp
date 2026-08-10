@@ -68,7 +68,8 @@ void ObjectView::set_items(std::vector<ObjectViewItem> items) {
 }
 
 std::optional<std::size_t> ObjectView::item_index(std::string_view id) const noexcept {
-    const auto found = std::find_if(items_.begin(), items_.end(),
+    const std::vector<ObjectViewItem>::const_iterator found =
+        std::find_if(items_.begin(), items_.end(),
         [id](const ObjectViewItem& item) { return item.stable_id == id; });
     return found == items_.end() ? std::optional<std::size_t>{}
                                 : std::optional<std::size_t>{static_cast<std::size_t>(
@@ -78,7 +79,7 @@ std::optional<std::size_t> ObjectView::item_index(std::string_view id) const noe
 void ObjectView::set_view_mode(ObjectViewMode mode) {
     require_mutable();
     if (view_mode_ == mode) return;
-    const auto selected = item_index(selected_id_);
+    const std::optional<std::size_t> selected = item_index(selected_id_);
     view_mode_ = mode;
     top_row_ = 0U;
     if (selected) ensure_visible(*selected);
@@ -128,7 +129,7 @@ void ObjectView::select_all() {
     }
     const std::string primary = ids.empty() ? std::string{} : ids.front();
     apply_selection(std::move(ids), primary, primary, true);
-    if (const auto index = item_index(primary)) ensure_visible(*index);
+    if (const std::optional<std::size_t> index = item_index(primary)) ensure_visible(*index);
 }
 
 void ObjectView::set_selection_mode(ObjectSelectionMode mode) {
@@ -269,17 +270,17 @@ void ObjectView::set_font(FontSpec font) {
 
 void ObjectView::set_image_list(std::shared_ptr<ImageList> image_list) {
     require_mutable();
-    if (image_list && !image_list->is_alive()) {
+    if (image_list && !(*image_list).is_alive()) {
         throw std::invalid_argument("ObjectView requires a live ImageList");
     }
-    if (image_list && window() && !image_list->belongs_to(*window())) {
+    if (image_list && window() && !(*image_list).belongs_to(*window())) {
         throw std::invalid_argument("ObjectView and ImageList must belong to one Window");
     }
     if (image_list_ == image_list) return;
     image_list_changed_.disconnect();
     image_list_ = std::move(image_list);
     if (image_list_) {
-        image_list_changed_ = image_list_->changed().subscribe(
+        image_list_changed_ = (*image_list_).changed().subscribe(
             *this, [this](const ImageListChange&) {
                 if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
             });
@@ -289,7 +290,7 @@ void ObjectView::set_image_list(std::shared_ptr<ImageList> image_list) {
 
 void ObjectView::on_attached_to_window() {
     Panel::on_attached_to_window();
-    if (image_list_ && !image_list_->belongs_to(*window())) {
+    if (image_list_ && !(*image_list_).belongs_to(*window())) {
         throw std::logic_error("ObjectView cannot attach to a different ImageList Window");
     }
 }
@@ -376,7 +377,8 @@ void ObjectView::select_index(std::size_t index, bool activate,
         apply_selection(range_selection(index, toggle), target, anchor, true);
     } else if (toggle) {
         std::vector<std::string> ids = selected_ids_;
-        const auto found = std::find(ids.begin(), ids.end(), target);
+        const std::vector<std::string>::iterator found =
+            std::find(ids.begin(), ids.end(), target);
         if (found == ids.end()) ids.push_back(target);
         else ids.erase(found);
         const std::string primary = std::find(ids.begin(), ids.end(), target) != ids.end()
@@ -392,7 +394,7 @@ void ObjectView::select_index(std::size_t index, bool activate,
 
 void ObjectView::arrange(Rect final_bounds) {
     Panel::arrange(final_bounds);
-    if (const auto focused = item_index(focused_id_)) ensure_visible(*focused);
+    if (const std::optional<std::size_t> focused = item_index(focused_id_)) ensure_visible(*focused);
 }
 
 void ObjectView::paint_glyph(Painter& painter, Rect b, ObjectGlyph glyph,
@@ -462,7 +464,7 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                                cell.width - 2.0, cell.height - 2.0}, style().face_light);
         }
         const auto paint_item_image = [&](Rect destination_bounds) {
-            if (!image_list_ || !image_list_->is_alive() || item.image_key.empty()) {
+            if (!image_list_ || !(*image_list_).is_alive() || item.image_key.empty()) {
                 return false;
             }
             const ImageVisualState state = !item.enabled
@@ -470,8 +472,8 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                 : selected ? ImageVisualState::selected
                 : hovered_index_ == index ? ImageVisualState::hot
                                           : ImageVisualState::normal;
-            const ImageListResolution resolved = image_list_->resolve(
-                item.image_key, state, window() ? window()->scale() : 1.0);
+            const ImageListResolution resolved = (*image_list_).resolve(
+                item.image_key, state, window() ? (*window()).scale() : 1.0);
             if (!resolved) return false;
             const Rect destination = fit_image_rect(destination_bounds,
                                                     resolved.source_size);
@@ -536,7 +538,7 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
 void ObjectView::on_pointer(PointerEvent& event) {
     if (!eligible_for_input()) return;
     if (event.action == PointerAction::move) {
-        const auto next = index_at(event.position);
+        const std::optional<std::size_t> next = index_at(event.position);
         if (next != hovered_index_) { hovered_index_ = next; invalidate(Dirty::paint); }
         return;
     }
@@ -555,7 +557,7 @@ void ObjectView::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::down &&
         (event.button == PointerButton::primary ||
          event.button == PointerButton::secondary)) {
-        if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+        if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
         pressed_index_ = index_at(event.position);
         pressed_click_count_ = event.click_count;
         pressed_button_ = event.button;
@@ -579,7 +581,7 @@ void ObjectView::on_pointer(PointerEvent& event) {
         // it clears selection and has no item target.
         event.handled = true;
     } else if (event.action == PointerAction::up) {
-        const auto index = index_at(event.position);
+        const std::optional<std::size_t> index = index_at(event.position);
         if (index && pressed_index_ == index && event.button == pressed_button_) {
             if (pressed_button_ == PointerButton::secondary) {
                 context_requested_.emit({items_[*index].stable_id, event.position});
@@ -606,7 +608,7 @@ void ObjectView::on_pointer(PointerEvent& event) {
 
 void ObjectView::on_key(KeyEvent& event) {
     if (!focused_ || !enabled() || event.action != KeyAction::down || items_.empty()) return;
-    auto current = item_index(focused_id_);
+    std::optional<std::size_t> current = item_index(focused_id_);
     if (!current) current = item_index(selected_id_);
     std::size_t index = current.value_or(0U);
     const bool toggle_modifier = has_modifier(event.modifiers, Modifier::control) ||
@@ -653,7 +655,8 @@ void ObjectView::on_key(KeyEvent& event) {
 }
 
 void ObjectView::type_select(std::string_view text) {
-    const auto now = std::chrono::steady_clock::now();
+    const std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
     if (now - last_type_time_ > type_timeout) type_prefix_.clear();
     last_type_time_ = now;
     type_prefix_ += fold_ascii(text);
@@ -729,12 +732,12 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
 bool ObjectView::on_semantic_child_action(std::string_view id,
                                           SemanticAction action,
                                           std::string_view) {
-    const auto index = item_index(id);
+    const std::optional<std::size_t> index = item_index(id);
     if (!index || (action != SemanticAction::focus &&
                    action != SemanticAction::select &&
                    action != SemanticAction::press &&
                    action != SemanticAction::show_menu)) return false;
-    if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+    if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     if (action == SemanticAction::show_menu) {
         if (!is_selected(id)) select_index(*index, false);
         else focus_index(*index);

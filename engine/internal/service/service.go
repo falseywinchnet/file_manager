@@ -23,7 +23,7 @@ type Service struct {
 	guard            *sandbox.Guard
 	store            *catalog.Store
 	scanner          metadataScanner
-	lifecycle        serviceLifecycle
+	lifecycle        *serviceLifecycle
 	admin            sync.Mutex
 	durable          *generation.Store
 	durableDirectory string

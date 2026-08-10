@@ -40,15 +40,15 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
                 "String", BindingValueKind::text, std::move(values))};
         },
         [this](const BindingValue& value) {
-            const auto* collection =
+            const gui_forms::PropertyCollectionValue* collection =
                 std::get_if<PropertyCollectionValue>(&value);
             if (!collection || !*collection ||
-                collection->item_kind() != BindingValueKind::text) {
+                (*collection).item_kind() != BindingValueKind::text) {
                 throw std::invalid_argument(
                     "ComboBox.Items requires a homogeneous text collection");
             }
             std::vector<std::string> items;
-            const auto values = property_collection_items(*collection);
+            const std::span<const BindingValue> values = property_collection_items(*collection);
             items.reserve(values.size());
             for (const BindingValue& item : values) {
                 items.push_back(std::get<std::string>(item));
@@ -70,7 +70,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
                 : std::int64_t{-1}};
         },
         [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(
+            const std::optional<BindingValue> converted = convert_binding_value(
                 value, BindingValueKind::signed_integer);
             if (!converted) {
                 throw std::invalid_argument(
@@ -98,13 +98,14 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
          BindingValue{std::string{}}, Dirty::paint | Dirty::semantics},
         [this] { return BindingValue{std::string(selected_text())}; },
         [this](const BindingValue& value) {
-            const auto converted = convert_binding_value(
+            const std::optional<BindingValue> converted = convert_binding_value(
                 value, BindingValueKind::text);
             if (!converted) {
                 throw std::invalid_argument("ComboBox.Text binding requires text");
             }
             const std::string& text = std::get<std::string>(*converted);
-            const auto found = std::find(items_.begin(), items_.end(), text);
+            const std::vector<std::string>::iterator found =
+                std::find(items_.begin(), items_.end(), text);
             set_selected_index(found == items_.end()
                 ? std::optional<std::size_t>{}
                 : std::optional<std::size_t>{static_cast<std::size_t>(
@@ -133,7 +134,7 @@ void ComboBox::set_items(std::vector<std::string> items) {
         publish_change(selected_index_changed_, selected_index_);
         if (!is_alive()) return;
     }
-    if (popup_list_) popup_list_->set_items(items_);
+    if (popup_list_) (*popup_list_).set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     publish_change(items_changed_);
 }
@@ -144,7 +145,7 @@ void ComboBox::add_item(std::string item) {
         throw std::invalid_argument("ComboBox item must be valid UTF-8");
     }
     items_.push_back(std::move(item));
-    if (popup_list_) popup_list_->set_items(items_);
+    if (popup_list_) (*popup_list_).set_items(items_);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
     publish_change(items_changed_);
 }
@@ -157,8 +158,8 @@ void ComboBox::set_selected_index(std::optional<std::size_t> index) {
     if (selected_index_ == index) return;
     selected_index_ = index;
     if (popup_list_) {
-        if (index) popup_list_->select_index(*index);
-        else popup_list_->clear_selection();
+        if (index) (*popup_list_).select_index(*index);
+        else (*popup_list_).clear_selection();
     }
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(selected_index_changed_, selected_index_);
@@ -211,7 +212,7 @@ void ComboBox::set_font(FontSpec font) {
     }
     if (font_ == font) return;
     font_ = font;
-    if (popup_list_) popup_list_->set_font(font);
+    if (popup_list_) (*popup_list_).set_font(font);
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
@@ -224,10 +225,10 @@ void ComboBox::set_dropped_down(bool dropped_down) {
 
 void ComboBox::open_drop_down() {
     if (dropped_down_ || !attached() || window() == nullptr || items_.empty()) return;
-    const Control::Ptr owner = window()->root();
+    const Control::Ptr owner = (*window()).root();
     if (!owner) return;
     const Rect combo = absolute_bounds();
-    const Size client = window()->client_size();
+    const Size client = (*window()).client_size();
     const std::size_t rows = std::min(maximum_drop_down_items_, items_.size());
     const double popup_height = static_cast<double>(rows) *
         26.0 * effective_text_scale() + 4.0;
@@ -240,44 +241,44 @@ void ComboBox::open_drop_down() {
         ? combo.y + combo.height : std::max(0.0, combo.y - popup_height);
 
     const std::string prefix(stable_id().value());
-    auto layer = make_control<DropDownLayer>(StableId(prefix + ".popup.layer"));
-    layer->set_requested_bounds({0.0, 0.0, client.width, client.height});
-    auto list = make_control<ListBox>(StableId(prefix + ".popup.list"));
-    list->set_paint_plane(PaintPlane::overlay);
-    list->set_items(items_);
-    list->set_font(font_);
-    list->set_requested_bounds(
+    std::shared_ptr<gui_forms::DropDownLayer> layer = make_control<DropDownLayer>(StableId(prefix + ".popup.layer"));
+    (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
+    std::shared_ptr<gui_forms::ListBox> list = make_control<ListBox>(StableId(prefix + ".popup.list"));
+    (*list).set_paint_plane(PaintPlane::overlay);
+    (*list).set_items(items_);
+    (*list).set_font(font_);
+    (*list).set_requested_bounds(
         {popup_x, popup_y, popup_width, popup_height});
     if (selected_index_) {
-        list->select_index(*selected_index_);
+        (*list).select_index(*selected_index_);
     }
-    layer->add_child(list);
-    PopupToken popup_token = window()->open_popup(shared_from_this(), layer);
+    (*layer).add_child(list);
+    PopupToken popup_token = (*window()).open_popup(shared_from_this(), layer);
 
     popup_layer_ = layer;
     popup_list_ = list;
     popup_token_ = std::move(popup_token);
     const std::weak_ptr<ComboBox> weak =
         std::static_pointer_cast<ComboBox>(shared_from_this());
-    popup_selection_ = list->selection_changed().subscribe(
+    popup_selection_ = (*list).selection_changed().subscribe(
         *this, [weak](const ListSelectionChange& change) {
-            if (const auto combo = weak.lock(); change.active_index) {
-                combo->set_selected_index(change.active_index);
+            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock(); change.active_index) {
+                (*combo).set_selected_index(change.active_index);
             }
         });
-    popup_activation_ = list->item_activated().subscribe(
+    popup_activation_ = (*list).item_activated().subscribe(
         *this, [weak](std::size_t index) {
-            if (const auto combo = weak.lock()) combo->commit_popup_selection(index);
+            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).commit_popup_selection(index);
         });
-    popup_dismissal_ = layer->dismissed().subscribe(*this, [weak] {
-        if (const auto combo = weak.lock()) combo->close_drop_down();
+    popup_dismissal_ = (*layer).dismissed().subscribe(*this, [weak] {
+        if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).close_drop_down();
     });
     if (Event<>* closed = popup_token_.closed_event()) {
-        popup_revocation_ = closed->subscribe(*this, [weak] {
-            if (const auto combo = weak.lock()) combo->on_popup_revoked();
+        popup_revocation_ = (*closed).subscribe(*this, [weak] {
+            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).on_popup_revoked();
         });
     }
-    popup_scope_ = window()->begin_focus_scope(layer, list).value;
+    popup_scope_ = (*window()).begin_focus_scope(layer, list).value;
     dropped_down_ = true;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(drop_down_changed_, true);
@@ -290,7 +291,7 @@ void ComboBox::close_drop_down() {
     popup_activation_.disconnect();
     popup_dismissal_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(FocusScopeId{popup_scope_}));
+        static_cast<void>((*window()).end_focus_scope(FocusScopeId{popup_scope_}));
     }
     popup_scope_ = 0U;
     popup_token_.disconnect();
@@ -311,7 +312,7 @@ void ComboBox::on_popup_revoked() {
     popup_dismissal_.disconnect();
     popup_revocation_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(FocusScopeId{popup_scope_},
+        static_cast<void>((*window()).end_focus_scope(FocusScopeId{popup_scope_},
                                                      FocusScopeCloseReason::owner_unavailable));
     }
     popup_scope_ = 0U;
@@ -355,7 +356,7 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
     painter.draw_line({bounds.width - button_width, 1.0},
                       {bounds.width - button_width, bounds.height - 1.0},
                       themed ? (button_recipe.material.border
-                                    ? button_recipe.material.border->color
+                                    ? (*button_recipe.material.border).color
                                     : button_recipe.glyph)
                              : style().border,
                       1.0);

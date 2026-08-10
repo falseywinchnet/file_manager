@@ -16,8 +16,11 @@ struct ImageAttributesSnapshot final {
     struct ColorRemap final {
         Color old_color;
         Color new_color;
-        friend constexpr bool operator==(const ColorRemap&,
-                                         const ColorRemap&) = default;
+        friend constexpr bool operator==(const ColorRemap& left,
+                                         const ColorRemap& right) noexcept {
+            return left.old_color == right.old_color &&
+                   left.new_color == right.new_color;
+        }
     };
     std::vector<ColorRemap> remap_table;
 };

@@ -47,8 +47,10 @@ void TreeView::set_items(std::vector<TreeViewItem> items) {
 }
 
 std::optional<std::size_t> TreeView::item_index(std::string_view id) const noexcept {
-    const auto found = std::find_if(items_.begin(), items_.end(),
-        [id](const TreeViewItem& item) { return item.stable_id == id; });
+    std::vector<TreeViewItem>::const_iterator found = items_.begin();
+    while (found != items_.end() && (*found).stable_id != id) {
+        ++found;
+    }
     return found == items_.end() ? std::optional<std::size_t>{}
                                 : std::optional<std::size_t>{static_cast<std::size_t>(
                                       std::distance(items_.begin(), found))};
@@ -69,20 +71,20 @@ void TreeView::set_selected_id(std::string_view id) {
 }
 
 bool TreeView::expanded(std::string_view id) const {
-    const auto index = item_index(id);
+    const std::optional<std::size_t> index = item_index(id);
     if (!index) throw std::out_of_range("TreeView expansion ID is not in the model");
     return items_[*index].expanded;
 }
 
 void TreeView::set_expanded(std::string_view id, bool value) {
     require_mutable();
-    const auto index = item_index(id);
+    const std::optional<std::size_t> index = item_index(id);
     if (!index) throw std::out_of_range("TreeView expansion ID is not in the model");
     TreeViewItem& item = items_[*index];
     if (!item.expandable || item.expanded == value) return;
     bool selected_descendant{};
     if (!value) {
-        if (const auto selected = item_index(selected_id_);
+        if (const std::optional<std::size_t> selected = item_index(selected_id_);
             selected && *selected > *index && items_[*selected].depth > item.depth) {
             selected_descendant = true;
         }
@@ -144,27 +146,30 @@ void TreeView::set_font(FontSpec font) {
 
 void TreeView::set_image_list(std::shared_ptr<ImageList> image_list) {
     require_mutable();
-    if (image_list && !image_list->is_alive()) {
+    if (image_list && !(*image_list).is_alive()) {
         throw std::invalid_argument("TreeView requires a live ImageList");
     }
-    if (image_list && window() && !image_list->belongs_to(*window())) {
+    if (image_list && window() && !(*image_list).belongs_to(*window())) {
         throw std::invalid_argument("TreeView and ImageList must belong to one Window");
     }
     if (image_list_ == image_list) return;
     image_list_changed_.disconnect();
     image_list_ = std::move(image_list);
     if (image_list_) {
-        image_list_changed_ = image_list_->changed().subscribe(
-            *this, [this](const ImageListChange&) {
-                if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
-            });
+        image_list_changed_ = (*image_list_).changed().subscribe(
+            *this, Delegate<const ImageListChange&>::bind<
+                TreeView, &TreeView::on_image_list_changed>(*this));
     }
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void TreeView::on_image_list_changed(const ImageListChange&) {
+    if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
+}
+
 void TreeView::on_attached_to_window() {
     Panel::on_attached_to_window();
-    if (image_list_ && !image_list_->belongs_to(*window())) {
+    if (image_list_ && !(*image_list_).belongs_to(*window())) {
         throw std::logic_error("TreeView cannot attach to a different ImageList Window");
     }
 }
@@ -221,8 +226,9 @@ void TreeView::select_visible_row(std::size_t row, bool activate) {
 
 void TreeView::arrange(Rect final_bounds) {
     Panel::arrange(final_bounds);
-    if (const auto active = item_index(active_id_)) {
-        const auto row = std::find(visible_.begin(), visible_.end(), *active);
+    if (const std::optional<std::size_t> active = item_index(active_id_)) {
+        const std::vector<std::size_t>::iterator row =
+            std::find(visible_.begin(), visible_.end(), *active);
         if (row != visible_.end()) ensure_visible(static_cast<std::size_t>(
             std::distance(visible_.begin(), row)));
     }
@@ -265,16 +271,16 @@ void TreeView::on_paint(Painter& painter, Rect damage) {
         const Color text = !item.enabled ? style().disabled_text
             : selected && focused_ ? style().highlight : style().text;
         double content_x = indent + 14.0;
-        if (image_list_ && image_list_->is_alive() && !item.image_key.empty()) {
+        if (image_list_ && (*image_list_).is_alive() && !item.image_key.empty()) {
             const ImageVisualState state = !item.enabled
                 ? ImageVisualState::disabled
                 : selected ? ImageVisualState::selected
                 : hovered_row_ == row ? ImageVisualState::hot
                                       : ImageVisualState::normal;
-            const double scale = window() ? window()->scale() : 1.0;
+            const double scale = window() ? (*window()).scale() : 1.0;
             const ImageListResolution resolved =
-                image_list_->resolve(item.image_key, state, scale);
-            const Size logical = image_list_->image_size();
+                (*image_list_).resolve(item.image_key, state, scale);
+            const Size logical = (*image_list_).image_size();
             const double slot_height = std::min(logical.height,
                                                 std::max(0.0, row_height - 4.0));
             const double slot_width = logical.height > 0.0
@@ -307,7 +313,7 @@ void TreeView::on_paint(Painter& painter, Rect damage) {
 void TreeView::on_pointer(PointerEvent& event) {
     if (!eligible_for_input()) return;
     if (event.action == PointerAction::move) {
-        const auto row = visible_row_at(event.position);
+        const std::optional<std::size_t> row = visible_row_at(event.position);
         if (row != hovered_row_) { hovered_row_ = row; invalidate(Dirty::paint); }
         return;
     }
@@ -327,7 +333,7 @@ void TreeView::on_pointer(PointerEvent& event) {
         return;
     }
     if (event.action == PointerAction::down && event.button == PointerButton::primary) {
-        if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+        if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
         pressed_row_ = visible_row_at(event.position);
         pressed_click_count_ = event.click_count;
         pressed_expander_ = false;
@@ -346,7 +352,7 @@ void TreeView::on_pointer(PointerEvent& event) {
         event.handled = true;
     } else if (event.action == PointerAction::up &&
                event.button == PointerButton::primary) {
-        const auto row = visible_row_at(event.position);
+        const std::optional<std::size_t> row = visible_row_at(event.position);
         if (row && pressed_row_ == row && !pressed_expander_) {
             select_visible_row(*row, pressed_click_count_ >= 2U);
         }
@@ -358,8 +364,8 @@ void TreeView::on_pointer(PointerEvent& event) {
 
 void TreeView::on_key(KeyEvent& event) {
     if (!focused_ || !enabled() || event.action != KeyAction::down || visible_.empty()) return;
-    auto active_index_value = item_index(active_id_);
-    auto active_row_iterator = active_index_value
+    std::optional<std::size_t> active_index_value = item_index(active_id_);
+    std::vector<std::size_t>::iterator active_row_iterator = active_index_value
         ? std::find(visible_.begin(), visible_.end(), *active_index_value)
         : visible_.end();
     std::size_t row = active_row_iterator == visible_.end() ? 0U
@@ -392,14 +398,16 @@ void TreeView::on_key(KeyEvent& event) {
 }
 
 void TreeView::type_select(std::string_view text) {
-    const auto now = std::chrono::steady_clock::now();
+    const std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
     if (now - last_type_time_ > type_timeout) type_prefix_.clear();
     last_type_time_ = now;
     type_prefix_ += fold_ascii(text);
     if (visible_.empty()) return;
     std::size_t start{};
-    if (const auto active = item_index(active_id_)) {
-        const auto found = std::find(visible_.begin(), visible_.end(), *active);
+    if (const std::optional<std::size_t> active = item_index(active_id_)) {
+        const std::vector<std::size_t>::iterator found =
+            std::find(visible_.begin(), visible_.end(), *active);
         if (found != visible_.end()) start = (static_cast<std::size_t>(
             std::distance(visible_.begin(), found)) + 1U) % visible_.size();
     }
@@ -472,9 +480,10 @@ std::vector<SemanticNode> TreeView::semantic_virtual_children() const {
 bool TreeView::on_semantic_child_action(std::string_view id,
                                         SemanticAction action,
                                         std::string_view) {
-    const auto index = item_index(id);
+    const std::optional<std::size_t> index = item_index(id);
     if (!index) return false;
-    const auto row = std::find(visible_.begin(), visible_.end(), *index);
+    const std::vector<std::size_t>::iterator row =
+        std::find(visible_.begin(), visible_.end(), *index);
     if (row == visible_.end()) return false;
     if (action == SemanticAction::expand || action == SemanticAction::collapse) {
         set_expanded(id, action == SemanticAction::expand);
@@ -482,7 +491,7 @@ bool TreeView::on_semantic_child_action(std::string_view id,
     }
     if (action != SemanticAction::focus && action != SemanticAction::select &&
         action != SemanticAction::press) return false;
-    if (window()) static_cast<void>(window()->request_focus(shared_from_this()));
+    if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
     select_visible_row(static_cast<std::size_t>(std::distance(visible_.begin(), row)),
                        action == SemanticAction::press);
     return true;

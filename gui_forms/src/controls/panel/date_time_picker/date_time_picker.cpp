@@ -1,4 +1,5 @@
 #include "gui_forms/controls/panel/date_time_picker/date_time_picker.hpp"
+#include "gui_forms/detail/weak_member_callback.hpp"
 
 #include "calendar_popup/calendar_popup.hpp"
 #include "calendar_popup_layer/calendar_popup_layer.hpp"
@@ -289,7 +290,7 @@ void DateTimePicker::step_days(int days) {
 void DateTimePicker::open_drop_down() {
     if (dropped_down_ || show_up_down_ || !attached() || window() == nullptr) return;
     const Control::Ptr owner = shared_from_this();
-    const Size client = window()->client_size();
+    const Size client = (*window()).client_size();
     const Rect picker = absolute_bounds();
     const double width = 286.0 * effective_text_scale();
     const double height = 260.0 * effective_text_scale();
@@ -302,36 +303,39 @@ void DateTimePicker::open_drop_down() {
     const double y = below + height <= client.height ? below
         : std::max(0.0, picker.y - height);
     const std::string prefix(stable_id().value());
-    auto layer = make_control<CalendarPopupLayer>(StableId(prefix + ".popup.layer"));
-    layer->set_requested_bounds({0.0, 0.0, client.width, client.height});
-    auto calendar = make_control<CalendarPopup>(
+    std::shared_ptr<gui_forms::CalendarPopupLayer> layer = make_control<CalendarPopupLayer>(StableId(prefix + ".popup.layer"));
+    (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
+    std::shared_ptr<gui_forms::CalendarPopup> calendar = make_control<CalendarPopup>(
         StableId(prefix + ".popup.calendar"), value_, minimum_, maximum_,
         format_provider_, style_);
-    calendar->set_requested_bounds({x, y, width, height});
-    layer->add_child(calendar);
-    PopupToken token = window()->open_popup(owner, layer);
+    (*calendar).set_requested_bounds({x, y, width, height});
+    (*layer).add_child(calendar);
+    PopupToken token = (*window()).open_popup(owner, layer);
 
     popup_layer_ = layer;
     popup_calendar_ = calendar;
     popup_token_ = std::move(token);
     const std::weak_ptr<DateTimePicker> weak =
         std::static_pointer_cast<DateTimePicker>(shared_from_this());
-    popup_commit_ = calendar->committed().subscribe(
-        *this, [weak](DateTimeValue date) {
-            if (const auto picker = weak.lock()) picker->commit_popup_value(date);
-        });
-    popup_cancel_ = calendar->cancelled().subscribe(*this, [weak] {
-        if (const auto picker = weak.lock()) picker->close_drop_down();
-    });
-    popup_dismiss_ = layer->dismissed().subscribe(*this, [weak] {
-        if (const auto picker = weak.lock()) picker->close_drop_down();
-    });
+    popup_commit_ = (*calendar).committed().subscribe(
+        *this,
+        detail::WeakMemberCallback<void (DateTimePicker::*)(DateTimeValue)>(
+            weak, &DateTimePicker::commit_popup_value));
+    popup_cancel_ = (*calendar).cancelled().subscribe(
+        *this,
+        detail::WeakMemberCallback<void (DateTimePicker::*)()>(
+            weak, &DateTimePicker::close_drop_down));
+    popup_dismiss_ = (*layer).dismissed().subscribe(
+        *this,
+        detail::WeakMemberCallback<void (DateTimePicker::*)()>(
+            weak, &DateTimePicker::close_drop_down));
     if (Event<>* closed = popup_token_.closed_event()) {
-        popup_revocation_ = closed->subscribe(*this, [weak] {
-            if (const auto picker = weak.lock()) picker->on_popup_revoked();
-        });
+        popup_revocation_ = (*closed).subscribe(
+            *this,
+            detail::WeakMemberCallback<void (DateTimePicker::*)()>(
+                weak, &DateTimePicker::on_popup_revoked));
     }
-    popup_scope_ = window()->begin_focus_scope(layer, calendar).value;
+    popup_scope_ = (*window()).begin_focus_scope(layer, calendar).value;
     dropped_down_ = true;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(drop_down_changed_, true);
@@ -344,7 +348,7 @@ void DateTimePicker::close_drop_down() {
     popup_cancel_.disconnect();
     popup_dismiss_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(FocusScopeId{popup_scope_}));
+        static_cast<void>((*window()).end_focus_scope(FocusScopeId{popup_scope_}));
     }
     popup_scope_ = 0U;
     popup_token_.disconnect();
@@ -365,7 +369,7 @@ void DateTimePicker::on_popup_revoked() {
     popup_dismiss_.disconnect();
     popup_revocation_.disconnect();
     if (window() != nullptr && popup_scope_ != 0U) {
-        static_cast<void>(window()->end_focus_scope(
+        static_cast<void>((*window()).end_focus_scope(
             FocusScopeId{popup_scope_}, FocusScopeCloseReason::owner_unavailable));
     }
     popup_scope_ = 0U;

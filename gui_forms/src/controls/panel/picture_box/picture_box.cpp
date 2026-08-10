@@ -1,5 +1,7 @@
 #include "gui_forms/controls/panel/picture_box/picture_box.hpp"
 #include "../../basic/basic_control_rendering.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
@@ -23,16 +25,16 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
     image.invalidation_effects = Dirty::measure | Dirty::paint | Dirty::semantics;
     define_bindable_property({
         std::move(image),
-        [this] { return BindingValue{image_}; },
-        [this](const BindingValue& value) {
-            set_image(std::get<ImageId>(value));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return image_changed_.subscribe(owner,
-                [changed = std::move(changed)](ImageId) { changed(); });
-        },
-        [this] { clear_image(); },
-        [this] { return image_.value != 0U; }});
+        detail::BindingMemberGetter<PictureBox, ImageId>(
+            *this, &PictureBox::image_),
+        detail::DirectPropertySetter<PictureBox, ImageId>(
+            *this, &PictureBox::set_image),
+        detail::EventChangeConnector<ImageId>(image_changed_),
+        detail::BoundMemberFunction<void (PictureBox::*)()>(
+            *this, &PictureBox::clear_image),
+        detail::BoundMemberFunction<
+            bool (PictureBox::*)() const noexcept>(
+                *this, &PictureBox::should_serialize_image)});
 
     PropertyDescriptor size_mode;
     size_mode.name = "SizeMode";
@@ -47,11 +49,12 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
     size_mode.enumeration = picture_box_size_mode_enum();
     define_bindable_property({
         std::move(size_mode),
-        [this] { return picture_box_size_mode_value(size_mode_); },
-        [this](const BindingValue& value) {
-            set_size_mode(static_cast<PictureBoxSizeMode>(
-                std::get<PropertyEnumValue>(value).value));
-        }, {}, {}, {}});
+        detail::BoundMemberFunction<BindingValue (PictureBox::*)() const>(
+            *this, &PictureBox::size_mode_property_value),
+        detail::BoundMemberFunction<
+            void (PictureBox::*)(const BindingValue&)>(
+                *this, &PictureBox::set_size_mode_property_value),
+        {}, {}, {}});
 
     PropertyDescriptor opacity;
     opacity.name = "ImageOpacity";
@@ -63,10 +66,23 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
     opacity.bindable = false;
     define_bindable_property({
         std::move(opacity),
-        [this] { return BindingValue{image_opacity_}; },
-        [this](const BindingValue& value) {
-            set_image_opacity(std::get<double>(value));
-        }, {}, {}, {}});
+        detail::BindingMemberGetter<PictureBox, double>(
+            *this, &PictureBox::image_opacity_),
+        detail::DirectPropertySetter<PictureBox, double>(
+            *this, &PictureBox::set_image_opacity), {}, {}, {}});
+}
+
+bool PictureBox::should_serialize_image() const noexcept {
+    return image_.value != 0U;
+}
+
+BindingValue PictureBox::size_mode_property_value() const {
+    return picture_box_size_mode_value(size_mode_);
+}
+
+void PictureBox::set_size_mode_property_value(const BindingValue& value) {
+    set_size_mode(static_cast<PictureBoxSizeMode>(
+        std::get<PropertyEnumValue>(value).value));
 }
 
 void PictureBox::set_image(ImageId image) {
@@ -85,19 +101,19 @@ void PictureBox::clear_image() {
 
 bool PictureBox::has_valid_image() const noexcept {
     return window() != nullptr && image_.value != 0U &&
-           window()->image_resources().find(image_).has_value();
+           (*window()).image_resources().find(image_).has_value();
 }
 
 Size PictureBox::image_size() const noexcept {
     if (window() == nullptr || image_.value == 0U) {
         return {};
     }
-    const auto resource = window()->image_resources().find(image_);
+    const std::optional<ImageResourceView> resource = (*window()).image_resources().find(image_);
     if (!resource) {
         return {};
     }
-    return {static_cast<double>(resource->metadata.width),
-            static_cast<double>(resource->metadata.height)};
+    return {static_cast<double>((*resource).metadata.width),
+            static_cast<double>((*resource).metadata.height)};
 }
 
 void PictureBox::set_size_mode(PictureBoxSizeMode mode) {

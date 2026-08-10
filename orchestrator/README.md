@@ -139,11 +139,18 @@ The crate's declared minimum Rust version is 1.87. The lockfile is
 authoritative for dependency reproduction. Build products stay under ignored
 component-local trees.
 
+The internal `AtomicBatchPool` is an available synchronous compute primitive,
+not the blocking local-session host and not a plugin authority. Its hardened
+C11/C++20 sibling is independently consumable from
+`third_party/threadpool_atomic_fast`; both implementations share the safety
+argument under `formal/` and the M4 benchmark workload.
+
 ```sh
 rustup run stable cargo fmt --manifest-path orchestrator/Cargo.toml -- --check
 rustup run stable cargo test --manifest-path orchestrator/Cargo.toml --locked
 rustup run stable cargo clippy --manifest-path orchestrator/Cargo.toml --all-targets --all-features --locked -- -D warnings
 rustup run stable cargo run --manifest-path orchestrator/Cargo.toml --locked -- status
+rustup run stable cargo run --manifest-path orchestrator/Cargo.toml --release --bin orchestrator-worker-bench -- 10
 ```
 
 The navigable, dependency-free source/service reference lives at
