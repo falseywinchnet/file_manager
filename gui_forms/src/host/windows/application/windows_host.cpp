@@ -2,6 +2,7 @@
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
 
@@ -48,19 +49,20 @@ constexpr UINT managed_dispatch_message = WM_APP + 0x41U;
 constexpr UINT render_dispatch_message = WM_APP + 0x42U;
 constexpr std::size_t maximum_automation_command = 4096;
 
+bool environment_flag(const char* name) noexcept {
+    const char* value = std::getenv(name);
+    return value != nullptr && std::strcmp(value, "1") == 0;
+}
+
 bool trace_win32_input() noexcept {
-    static const bool enabled = [] {
-        const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_INPUT");
-        return value != nullptr && std::strcmp(value, "1") == 0;
-    }();
+    static const bool enabled =
+        environment_flag("GUI_FORMS_TRACE_WIN32_INPUT");
     return enabled;
 }
 
 bool trace_win32_text() noexcept {
-    static const bool enabled = [] {
-        const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_TEXT");
-        return value != nullptr && std::strcmp(value, "1") == 0;
-    }();
+    static const bool enabled =
+        environment_flag("GUI_FORMS_TRACE_WIN32_TEXT");
     return enabled;
 }
 
@@ -387,17 +389,22 @@ bool apply_system_cursor(CursorKind kind) noexcept {
     return applied;
 }
 
+using GetDpiForMonitorFunction =
+    HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+
+GetDpiForMonitorFunction load_get_dpi_for_monitor() noexcept {
+    HMODULE library = LoadLibraryW(L"Shcore.dll");
+    if (library == nullptr) return nullptr;
+    const FARPROC symbol = GetProcAddress(library, "GetDpiForMonitor");
+    GetDpiForMonitorFunction function{};
+    static_assert(sizeof(function) == sizeof(symbol));
+    std::memcpy(&function, &symbol, sizeof(function));
+    return function;
+}
+
 double native_monitor_scale(HMONITOR monitor) noexcept {
-    using GetDpiForMonitorFn = HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
-    static const GetDpiForMonitorFn get_dpi_for_monitor = [] {
-        HMODULE library = LoadLibraryW(L"Shcore.dll");
-        if (library == nullptr) return static_cast<GetDpiForMonitorFn>(nullptr);
-        const FARPROC symbol = GetProcAddress(library, "GetDpiForMonitor");
-        GetDpiForMonitorFn function{};
-        static_assert(sizeof(function) == sizeof(symbol));
-        std::memcpy(&function, &symbol, sizeof(function));
-        return function;
-    }();
+    static const GetDpiForMonitorFunction get_dpi_for_monitor =
+        load_get_dpi_for_monitor();
     UINT x = 96U;
     UINT y = 96U;
     if (get_dpi_for_monitor == nullptr ||
@@ -417,10 +424,11 @@ struct TooltipPopup final {
 
 LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
                                           WPARAM wparam, LPARAM lparam) {
-    auto* state = reinterpret_cast<TooltipPopup*>(
+    TooltipPopup* state = reinterpret_cast<TooltipPopup*>(
         GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
-        const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+        const CREATESTRUCTW* create =
+            reinterpret_cast<const CREATESTRUCTW*>(lparam);
         state = static_cast<TooltipPopup*>((*create).lpCreateParams);
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
         (*state).window = window;
@@ -524,7 +532,8 @@ Function load_function(HMODULE module, const char* name) noexcept {
 double query_scale(HWND window) noexcept {
     using GetDpiForWindowFunction = UINT(WINAPI*)(HWND);
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
-        const auto function = load_function<GetDpiForWindowFunction>(
+        const GetDpiForWindowFunction function =
+            load_function<GetDpiForWindowFunction>(
             user32, "GetDpiForWindow");
         if (function != nullptr) return std::max(1.0, function(window) / 96.0);
     }
@@ -538,16 +547,25 @@ void enable_best_dpi_awareness() noexcept {
     using SetContextFunction = BOOL(WINAPI*)(HANDLE);
     using SetAwareFunction = BOOL(WINAPI*)();
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
-        const auto set_context = load_function<SetContextFunction>(
+        const SetContextFunction set_context =
+            load_function<SetContextFunction>(
             user32, "SetProcessDpiAwarenessContext");
         if (set_context != nullptr && set_context(reinterpret_cast<HANDLE>(-4))) return;
-        const auto set_aware = load_function<SetAwareFunction>(
+        const SetAwareFunction set_aware = load_function<SetAwareFunction>(
             user32, "SetProcessDPIAware");
         if (set_aware != nullptr) static_cast<void>(set_aware());
     }
 }
 
 class DibPainter final : public Painter {
+    struct DecodedImage final {
+        std::uint64_t content_hash{};
+        std::uint32_t width{};
+        std::uint32_t height{};
+        std::vector<std::uint32_t> pixels;
+    };
+    using ImageMap = std::unordered_map<std::uint64_t, DecodedImage>;
+
 public:
     DibPainter() = default;
     ~DibPainter() override { reset(); }
@@ -605,7 +623,7 @@ public:
             active.insert(id.value);
             const std::optional<ImageResourceView> resource = registry.find(id);
             if (!resource) { synchronized = false; continue; }
-            const auto existing = images_.find(id.value);
+            const ImageMap::iterator existing = images_.find(id.value);
             if (existing != images_.end() &&
                 (*existing).second.content_hash == (*resource).content_hash) continue;
             DecodedImage decoded;
@@ -649,7 +667,8 @@ public:
             }
             images_.insert_or_assign(id.value, std::move(decoded));
         }
-        for (auto iterator = images_.begin(); iterator != images_.end();) {
+        for (ImageMap::iterator iterator = images_.begin();
+             iterator != images_.end();) {
             iterator = active.contains((*iterator).first) ? std::next(iterator)
                                                         : images_.erase(iterator);
         }
@@ -980,7 +999,7 @@ public:
     }
 
     void draw_image(ImageId image, Rect destination, double opacity) override {
-        const auto found = images_.find(image.value);
+        const ImageMap::iterator found = images_.find(image.value);
         if (found == images_.end()) return;
         draw_image_region(
             image,
@@ -1064,7 +1083,7 @@ public:
 
     void draw_image_region(ImageId image, Rect source_rect, Rect destination,
                            double opacity) override {
-        const auto found = images_.find(image.value);
+        const ImageMap::iterator found = images_.find(image.value);
         const PixelRect area = pixel_rect(destination);
         if (found == images_.end() || area.empty() || source_rect.empty() ||
             !source_rect.finite() || !destination.finite() ||
@@ -1096,16 +1115,10 @@ public:
                 const std::uint32_t source_pixel =
                     source.pixels[static_cast<std::size_t>(source_y) * source.width + source_x];
                 const unsigned source_alpha = ((source_pixel >> 24U) & 0xffU) * global_alpha / 255U;
-                const unsigned inverse = 255U - source_alpha;
                 const std::uint32_t destination_pixel = destination_row[x];
-                const auto channel = [&](unsigned shift) {
-                    const unsigned premultiplied = ((source_pixel >> shift) & 0xffU) * global_alpha / 255U;
-                    const unsigned destination_channel = (destination_pixel >> shift) & 0xffU;
-                    return std::min(255U, premultiplied +
-                        (destination_channel * inverse + 127U) / 255U);
-                };
-                destination_row[x] = channel(0) | (channel(8) << 8U) |
-                                     (channel(16) << 16U) | 0xff000000U;
+                destination_row[x] = blend_image_pixel(
+                    source_pixel, destination_pixel, global_alpha,
+                    source_alpha);
             }
         }
     }
@@ -1114,7 +1127,7 @@ public:
         ImageId image, Size source_pixel_size, Rect destination,
         Size logical_tile_size, ImagePatternWrap wrap,
         double opacity) override {
-        const auto found = images_.find(image.value);
+        const ImageMap::iterator found = images_.find(image.value);
         const PixelRect area = pixel_rect(destination);
         if (found == images_.end() || area.empty() ||
             wrap != ImagePatternWrap::tile || !destination.finite() ||
@@ -1152,18 +1165,10 @@ public:
                                       source.width + source_x];
                 const unsigned source_alpha =
                     ((source_pixel >> 24U) & 0xffU) * global_alpha / 255U;
-                const unsigned inverse = 255U - source_alpha;
                 const std::uint32_t destination_pixel = destination_row[x];
-                const auto channel = [&](unsigned shift) {
-                    const unsigned premultiplied =
-                        ((source_pixel >> shift) & 0xffU) * global_alpha / 255U;
-                    const unsigned destination_channel =
-                        (destination_pixel >> shift) & 0xffU;
-                    return std::min(255U, premultiplied +
-                        (destination_channel * inverse + 127U) / 255U);
-                };
-                destination_row[x] = channel(0) | (channel(8) << 8U) |
-                                     (channel(16) << 16U) | 0xff000000U;
+                destination_row[x] = blend_image_pixel(
+                    source_pixel, destination_pixel, global_alpha,
+                    source_alpha);
             }
         }
     }
@@ -1182,12 +1187,6 @@ private:
     struct GdiTextRun {
         std::wstring family;
         std::wstring text;
-    };
-    struct DecodedImage {
-        std::uint64_t content_hash{};
-        std::uint32_t width{};
-        std::uint32_t height{};
-        std::vector<std::uint32_t> pixels;
     };
     struct PixelRect {
         int left{}; int top{}; int right{}; int bottom{};
@@ -1241,6 +1240,35 @@ private:
         const unsigned r = (color.red * alpha + dr * inverse + 127U) / 255U;
         destination = b | (g << 8U) | (r << 16U) | 0xff000000U;
     }
+    [[nodiscard]] static unsigned composite_image_channel(
+        std::uint32_t source, std::uint32_t destination,
+        unsigned global_alpha, unsigned inverse, unsigned shift) noexcept {
+        const unsigned premultiplied =
+            ((source >> shift) & 0xffU) * global_alpha / 255U;
+        const unsigned destination_channel = (destination >> shift) & 0xffU;
+        return std::min(
+            255U,
+            premultiplied +
+                (destination_channel * inverse + 127U) / 255U);
+    }
+    [[nodiscard]] static std::uint32_t blend_image_pixel(
+        std::uint32_t source, std::uint32_t destination,
+        unsigned global_alpha, unsigned source_alpha) noexcept {
+        const unsigned inverse = 255U - source_alpha;
+        const unsigned blue = composite_image_channel(
+            source, destination, global_alpha, inverse, 0U);
+        const unsigned green = composite_image_channel(
+            source, destination, global_alpha, inverse, 8U);
+        const unsigned red = composite_image_channel(
+            source, destination, global_alpha, inverse, 16U);
+        return blue | (green << 8U) | (red << 16U) | 0xff000000U;
+    }
+    [[nodiscard]] static std::uint8_t interpolate_channel(
+        std::uint8_t left, std::uint8_t right, double amount) noexcept {
+        return static_cast<std::uint8_t>(std::lround(
+            static_cast<double>(left) +
+            (static_cast<double>(right) - left) * amount));
+    }
     [[nodiscard]] static Color gradient_color(
         std::span<const GradientStop> stops, double amount) noexcept {
         amount = std::clamp(amount, 0.0, 1.0);
@@ -1251,16 +1279,15 @@ private:
                 const double width = second.offset - first.offset;
                 const double local = width <= 0.0 ? 1.0
                     : (amount - first.offset) / width;
-                const auto channel = [local](std::uint8_t left,
-                                             std::uint8_t right) {
-                    return static_cast<std::uint8_t>(std::lround(
-                        static_cast<double>(left) +
-                        (static_cast<double>(right) - left) * local));
-                };
-                return Color::rgba(channel(first.color.red, second.color.red),
-                                   channel(first.color.green, second.color.green),
-                                   channel(first.color.blue, second.color.blue),
-                                   channel(first.color.alpha, second.color.alpha));
+                return Color::rgba(
+                    interpolate_channel(
+                        first.color.red, second.color.red, local),
+                    interpolate_channel(
+                        first.color.green, second.color.green, local),
+                    interpolate_channel(
+                        first.color.blue, second.color.blue, local),
+                    interpolate_channel(
+                        first.color.alpha, second.color.alpha, local));
             }
         }
         return stops.back().color;
@@ -1643,7 +1670,7 @@ private:
     Size logical_size_{};
     double scale_{1.0};
     std::vector<State> states_;
-    std::unordered_map<std::uint64_t, DecodedImage> images_;
+    ImageMap images_;
     const ImageRegistry* image_registry_{};
     std::uint64_t image_revision_{std::numeric_limits<std::uint64_t>::max()};
     bool images_synchronized_{true};
@@ -1700,29 +1727,39 @@ public:
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
-        (*model_).set_dispatch_wake_handler([this] {
-            if (hwnd_ != nullptr) {
-                PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
-            }
-        });
-        (*model_).set_paint_wake_handler([this] {
-            request_render_wake();
-        });
+        (*model_).set_dispatch_wake_handler(
+            gui_forms::detail::BoundMemberFunction<
+                void (WindowsHostState::*)() noexcept>(
+                    *this, &WindowsHostState::post_managed_dispatch));
+        (*model_).set_paint_wake_handler(
+            gui_forms::detail::BoundMemberFunction<
+                void (WindowsHostState::*)() noexcept>(
+                    *this, &WindowsHostState::request_render_wake));
         if (options_.host_ready) {
             options_.host_ready(
-                [this] { PostMessageW(hwnd_, managed_dispatch_message, 0, 0); },
-                [this] { PostMessageW(hwnd_, WM_CLOSE, 0, 0); },
-                [this](const HostDialogRequest& request) {
-                    return services_.show_dialog(request);
-                },
-                [this](const HostTooltipRequest& request) {
-                    return show_tooltip(request);
-                },
-                [this] { hide_tooltip(); },
-                [this] { return services_.read_clipboard_text(); },
-                [this](std::string_view text) {
-                    return services_.write_clipboard_text(text);
-                });
+                gui_forms::detail::BoundMemberFunction<
+                    void (WindowsHostState::*)() noexcept>(
+                        *this, &WindowsHostState::post_managed_dispatch),
+                gui_forms::detail::BoundMemberFunction<
+                    void (WindowsHostState::*)() noexcept>(
+                        *this, &WindowsHostState::post_close),
+                gui_forms::detail::BoundMemberFunction<
+                    HostDialogResult (HostServices::*)(
+                        const HostDialogRequest&)>(
+                            services_, &HostServices::show_dialog),
+                gui_forms::detail::BoundMemberFunction<
+                    HostServiceStatus (WindowsHostState::*)(
+                        const HostTooltipRequest&)>(
+                            *this, &WindowsHostState::show_tooltip),
+                gui_forms::detail::BoundMemberFunction<
+                    void (WindowsHostState::*)() noexcept>(
+                        *this, &WindowsHostState::hide_tooltip),
+                gui_forms::detail::BoundMemberFunction<
+                    HostClipboardTextResult (HostServices::*)()>(
+                        services_, &HostServices::read_clipboard_text),
+                gui_forms::detail::BoundMemberFunction<
+                    HostServiceStatus (HostServices::*)(std::string_view)>(
+                        services_, &HostServices::write_clipboard_text));
         }
         // One FIFO initialization turn runs before presentation. Work posted by
         // those callbacks stays deferred to the ordinary next host turn.
@@ -1945,6 +1982,16 @@ public:
     }
 
 private:
+    void post_managed_dispatch() noexcept {
+        if (hwnd_ != nullptr) {
+            PostMessageW(hwnd_, managed_dispatch_message, 0, 0);
+        }
+    }
+
+    void post_close() noexcept {
+        if (hwnd_ != nullptr) PostMessageW(hwnd_, WM_CLOSE, 0, 0);
+    }
+
     template <class Payload>
     HostDispatchResult dispatch(Payload payload) {
         HostEvent event;
@@ -1952,28 +1999,6 @@ private:
         event.timestamp_nanoseconds = now_nanoseconds();
         event.payload = std::move(payload);
         return session_.dispatch(std::move(event));
-    }
-
-    HostDialogResult show_dialog(const HostDialogRequest& request) {
-        (*model_).release_pointer();
-        synchronize_capture();
-        hide_tooltip();
-        return std::visit([this, &request](const auto& payload) -> HostDialogResult {
-            using Payload = std::decay_t<decltype(payload)>;
-            if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
-                return native_open_dialog(hwnd_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
-                return native_save_dialog(hwnd_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
-                return native_folder_dialog(hwnd_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostColorDialogRequest>) {
-                return {{HostServiceError::unsupported}, request.request_id,
-                        HostColorDialogResult{}};
-            } else {
-                return {{HostServiceError::unsupported}, request.request_id,
-                        HostMessageDialogResult{}};
-            }
-        }, request.payload);
     }
 
     HostServiceStatus show_tooltip(const HostTooltipRequest& request) {
@@ -2040,64 +2065,6 @@ private:
         return {};
     }
 
-    HostClipboardTextResult read_clipboard_text() {
-        HostClipboardTextResult result;
-        result.generation = static_cast<std::uint64_t>(GetClipboardSequenceNumber());
-        if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return result;
-        if (!OpenClipboard(hwnd_)) {
-            result.status.error = HostServiceError::backend_failure;
-            return result;
-        }
-        HANDLE data = GetClipboardData(CF_UNICODETEXT);
-        const wchar_t* locked = data == nullptr
-            ? nullptr : static_cast<const wchar_t*>(GlobalLock(data));
-        if (locked == nullptr) {
-            CloseClipboard();
-            result.status.error = HostServiceError::backend_failure;
-            return result;
-        }
-        result.text_utf8 = utf8_from_wide(locked);
-        result.has_text = true;
-        GlobalUnlock(data);
-        CloseClipboard();
-        return result;
-    }
-
-    HostServiceStatus write_clipboard_text(std::string_view text) {
-        if (text.size() > HostServices::maximum_clipboard_text_bytes) {
-            return {HostServiceError::too_large};
-        }
-        const std::wstring wide = wide_from_utf8(text);
-        if (!text.empty() && wide.empty()) return {HostServiceError::invalid_utf8};
-        if (!OpenClipboard(hwnd_)) return {HostServiceError::backend_failure};
-        if (!EmptyClipboard()) {
-            CloseClipboard();
-            return {HostServiceError::backend_failure};
-        }
-        const std::size_t bytes = (wide.size() + 1U) * sizeof(wchar_t);
-        HGLOBAL storage = GlobalAlloc(GMEM_MOVEABLE, bytes);
-        if (storage == nullptr) {
-            CloseClipboard();
-            return {HostServiceError::backend_failure};
-        }
-        void* destination = GlobalLock(storage);
-        if (destination == nullptr) {
-            GlobalFree(storage);
-            CloseClipboard();
-            return {HostServiceError::backend_failure};
-        }
-        std::memcpy(destination, wide.c_str(), bytes);
-        GlobalUnlock(storage);
-        if (SetClipboardData(CF_UNICODETEXT, storage) == nullptr) {
-            GlobalFree(storage);
-            CloseClipboard();
-            return {HostServiceError::backend_failure};
-        }
-        // Ownership transfers to the system after SetClipboardData succeeds.
-        CloseClipboard();
-        return {};
-    }
-
     void hide_tooltip() noexcept {
         if (tooltip_.window != nullptr && IsWindow(tooltip_.window)) {
             DestroyWindow(tooltip_.window);
@@ -2154,8 +2121,9 @@ private:
         }
         KillTimer(hwnd_, scheduler_timer);
         if (const std::optional<FrameTime> wake = (*model_).next_wake()) {
-            const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                *wake - FrameClock::now()).count();
+            const std::chrono::milliseconds::rep milliseconds =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    *wake - FrameClock::now()).count();
             SetTimer(hwnd_, scheduler_timer,
                      static_cast<UINT>(std::clamp<std::int64_t>(milliseconds, 1, 60'000)), nullptr);
         }
@@ -2186,7 +2154,8 @@ private:
 
     void present_live_surface_updates() {
         ++live_presentation_drains_;
-        const auto started = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point started =
+            std::chrono::steady_clock::now();
         std::vector<LiveSurfacePresentation> updates =
             (*model_).take_live_surface_presentations();
         live_updates_sampled_ += updates.size();
@@ -2219,7 +2188,8 @@ private:
     void paint() {
         PAINTSTRUCT paint_state{};
         HDC dc = BeginPaint(hwnd_, &paint_state);
-        const auto started = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point started =
+            std::chrono::steady_clock::now();
         if (pending_damage_.empty()) {
             pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
                                  (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
@@ -2231,8 +2201,9 @@ private:
             (*model_).paint(raster_, pending_damage_.bounds());
         const bool presented = receipt && raster_.present(dc, paint_state.rcPaint);
         EndPaint(hwnd_, &paint_state);
-        const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now() - started);
+        const std::chrono::nanoseconds elapsed =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started);
         if (presented &&
             (*model_).notify_presented(*receipt,
                                      static_cast<std::uint64_t>(elapsed.count()))) {
@@ -2255,7 +2226,7 @@ private:
         event.click_count = message == WM_LBUTTONDBLCLK ||
             message == WM_RBUTTONDBLCLK || message == WM_MBUTTONDBLCLK ? 2U : 1U;
         if (trace_win32_input()) {
-            const auto target = (*model_).hit_test(event.position);
+            const Control::Ptr target = (*model_).hit_test(event.position);
             const std::string_view target_id = target ? (*target).stable_id().value() : std::string_view{"<none>"};
             std::fprintf(stderr,
                          "win32-input=pointer|message:%u|action:%u|x:%.2f|y:%.2f|target:%.*s|active:%d|focus:%d|capture:%d\n",
@@ -2317,7 +2288,7 @@ private:
     }
 
     bool update_cursor(Point position) const {
-        const auto target = (*model_).hit_test(position);
+        const Control::Ptr target = (*model_).hit_test(position);
         const CursorKind cursor = target ? (*target).effective_cursor() : CursorKind::arrow;
         // The class cursor is authoritative for the ordinary pointer. Let
         // DefWindowProc complete WM_SETCURSOR for that case instead of writing
@@ -2555,12 +2526,12 @@ private:
                 return FALSE;
             }
             const Rect bounds = (*control).absolute_bounds();
-            const auto point_at = [&](double local_x, double local_y) {
-                return Point{bounds.x + std::clamp(local_x, 0.0, bounds.width),
-                             bounds.y + std::clamp(local_y, 0.0, bounds.height)};
-            };
-            const Point start = point_at(start_x, start_y);
-            const Point end = point_at(end_x, end_y);
+            const Point start{
+                bounds.x + std::clamp(start_x, 0.0, bounds.width),
+                bounds.y + std::clamp(start_y, 0.0, bounds.height)};
+            const Point end{
+                bounds.x + std::clamp(end_x, 0.0, bounds.width),
+                bounds.y + std::clamp(end_y, 0.0, bounds.height)};
             bool handled = dispatch(PointerEvent{
                 PointerAction::down, PointerButton::primary, start, {},
                 Modifier::none, 1}).handled;
@@ -2598,7 +2569,7 @@ private:
             std::fflush(stdout);
             const Rect bounds = (*control).absolute_bounds();
             const Point center{bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0};
-            const auto hit = (*model_).hit_test(center);
+            const Control::Ptr hit = (*model_).hit_test(center);
             std::fprintf(stdout,
                          "{\"automation\":\"click-target\",\"id\":\"%s\",\"resolved\":\"%s\",\"hit\":\"%s\",\"x\":%.3f,\"y\":%.3f}\n",
                          id.c_str(), (*control).stable_id().value().data(),
@@ -2651,7 +2622,7 @@ private:
         const DWORD count = GetModuleFileNameW(nullptr, executable, MAX_PATH);
         if (count == 0 || count >= MAX_PATH) return {};
         std::wstring directory(executable, count);
-        const auto slash = directory.find_last_of(L"\\/");
+        const std::wstring::size_type slash = directory.find_last_of(L"\\/");
         directory.resize(slash == std::wstring::npos ? 0 : slash + 1);
         return directory;
     }
@@ -2698,9 +2669,11 @@ private:
 };
 
 LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
-    auto* state = reinterpret_cast<WindowsHostState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+    WindowsHostState* state = reinterpret_cast<WindowsHostState*>(
+        GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
-        const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+        const CREATESTRUCTW* create =
+            reinterpret_cast<const CREATESTRUCTW*>(lparam);
         state = static_cast<WindowsHostState*>((*create).lpCreateParams);
         SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
         (*state).bind_window(window);
@@ -2797,7 +2770,8 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
         // Input and managed callbacks receive a bounded turn, not an
         // unbounded queue drain. Presentation therefore has a maximum queue
         // latency even while pointer or plugin traffic remains continuous.
-        const auto batch_started = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point batch_started =
+            std::chrono::steady_clock::now();
         for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
             if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
@@ -2881,13 +2855,12 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             WindowsApplicationWindow& entry = windows[index];
             HWND owner{};
             if (!entry.owner_id.empty()) {
-                const auto owner_entry = std::find_if(
-                    windows.begin(), windows.end(),
-                    [&](const WindowsApplicationWindow& candidate) {
-                        return candidate.stable_id == entry.owner_id;
-                    });
-                const std::size_t owner_index = static_cast<std::size_t>(
-                    std::distance(windows.begin(), owner_entry));
+                std::size_t owner_index = 0U;
+                while (owner_index < windows.size() &&
+                       windows[owner_index].stable_id != entry.owner_id) {
+                    ++owner_index;
+                }
+                if (owner_index == windows.size()) return 2;
                 owner = handles[owner_index];
                 if (owner == nullptr) continue;
             }
@@ -2895,8 +2868,9 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             WindowsHostOptions host_options = entry.options;
             host_options.quit_thread_on_close =
                 entry.owner_id.empty() && !entry.tool_window;
-            auto state = std::make_unique<WindowsHostState>(
-                std::move(entry.model), std::move(host_options));
+            std::unique_ptr<WindowsHostState> state =
+                std::make_unique<WindowsHostState>(
+                    std::move(entry.model), std::move(host_options));
             const DWORD style = entry.options.popup_window
                 ? (WS_POPUP | WS_BORDER) : WS_OVERLAPPEDWINDOW;
             const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
@@ -2954,7 +2928,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
     while (!quit) {
         std::vector<HANDLE> clocks;
         clocks.reserve(states.size());
-        for (const auto& state : states) {
+        for (const std::unique_ptr<WindowsHostState>& state : states) {
             if ((*state).live_frame_clock() != nullptr) {
                 clocks.push_back((*state).live_frame_clock());
             }
@@ -2970,7 +2944,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
         if (wait >= WAIT_OBJECT_0 &&
             wait < WAIT_OBJECT_0 + clocks.size()) {
             const HANDLE ready = clocks[wait - WAIT_OBJECT_0];
-            for (const auto& state : states) {
+            for (const std::unique_ptr<WindowsHostState>& state : states) {
                 if ((*state).live_frame_clock() == ready) {
                     (*state).mark_live_frame_due();
                     break;
@@ -2978,7 +2952,8 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             }
         }
 
-        const auto batch_started = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point batch_started =
+            std::chrono::steady_clock::now();
         for (std::size_t drained = 0U; drained < 32U; ++drained) {
             MSG pending{};
             if (!PeekMessageW(&pending, nullptr, 0, 0, PM_REMOVE)) break;
@@ -2994,7 +2969,7 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
                 break;
             }
         }
-        for (const auto& state : states) {
+        for (const std::unique_ptr<WindowsHostState>& state : states) {
             const HANDLE clock = (*state).live_frame_clock();
             if (clock != nullptr &&
                 WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
@@ -3002,7 +2977,9 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             }
         }
         if (!quit) {
-            for (const auto& state : states) (*state).present_pending_frame();
+            for (const std::unique_ptr<WindowsHostState>& state : states) {
+                (*state).present_pending_frame();
+            }
         }
     }
     for (HWND window : handles) if (IsWindow(window)) DestroyWindow(window);

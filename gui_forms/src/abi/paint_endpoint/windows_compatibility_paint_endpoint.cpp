@@ -14,21 +14,28 @@
 
 namespace gui_forms::abi::detail {
 
+using CompatibilityEndpoint =
+    gui_forms::host::WindowsCompatibilityPaintEndpoint;
+using CompatibilityEndpointPtr = std::shared_ptr<CompatibilityEndpoint>;
+using CompatibilityEndpointMap =
+    std::unordered_map<std::uint64_t, CompatibilityEndpointPtr>;
+using CompatibilityBindingMap =
+    std::unordered_map<std::uint64_t, CompatibilityPaintBinding>;
+using CompatibilityWriteMap =
+    std::unordered_map<std::uint64_t, CompatibilityPaintWrite>;
+
 std::mutex compatibility_paint_endpoints_mutex;
-std::unordered_map<std::uint64_t,
-    std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>>
-    compatibility_paint_endpoints;
-std::unordered_map<std::uint64_t, CompatibilityPaintBinding>
-    compatibility_paint_bindings;
+CompatibilityEndpointMap compatibility_paint_endpoints;
+CompatibilityBindingMap compatibility_paint_bindings;
 std::uint64_t next_compatibility_paint_endpoint{1};
-std::unordered_map<std::uint64_t, CompatibilityPaintWrite>
-    compatibility_paint_writes;
+CompatibilityWriteMap compatibility_paint_writes;
 std::uint64_t next_compatibility_paint_write{1};
 
 std::shared_ptr<gui_forms::host::WindowsCompatibilityPaintEndpoint>
 compatibility_paint_endpoint(std::uint64_t token) {
     std::scoped_lock lock(compatibility_paint_endpoints_mutex);
-    const auto found = compatibility_paint_endpoints.find(token);
+    const CompatibilityEndpointMap::iterator found =
+        compatibility_paint_endpoints.find(token);
     return found == compatibility_paint_endpoints.end() ? nullptr : (*found).second;
 }
 
@@ -126,7 +133,8 @@ gf_result api_windows_paint_endpoint_configure(
     CompatibilityPaintBinding binding;
     {
         std::scoped_lock lock(compatibility_paint_endpoints_mutex);
-        const auto found = compatibility_paint_bindings.find(token);
+        const CompatibilityBindingMap::iterator found =
+            compatibility_paint_bindings.find(token);
         if (found != compatibility_paint_bindings.end()) binding = (*found).second;
     }
     if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = binding.target.lock()) {
@@ -211,14 +219,16 @@ gf_result api_windows_paint_endpoint_release(std::uint64_t token) {
     CompatibilityPaintBinding binding;
     {
         std::scoped_lock lock(compatibility_paint_endpoints_mutex);
-        const auto found = compatibility_paint_endpoints.find(token);
+        const CompatibilityEndpointMap::iterator found =
+            compatibility_paint_endpoints.find(token);
         if (found == compatibility_paint_endpoints.end()) {
             return fail(GF_ERROR_STALE_HANDLE,
                         "paint endpoint token is not active");
         }
         endpoint = std::move((*found).second);
         compatibility_paint_endpoints.erase(found);
-        const auto bound = compatibility_paint_bindings.find(token);
+        const CompatibilityBindingMap::iterator bound =
+            compatibility_paint_bindings.find(token);
         if (bound != compatibility_paint_bindings.end()) {
             binding = (*bound).second;
             compatibility_paint_bindings.erase(bound);
@@ -318,7 +328,8 @@ gf_result api_windows_paint_endpoint_end_write(
     CompatibilityPaintWrite operation;
     {
         std::scoped_lock lock(compatibility_paint_endpoints_mutex);
-        const auto found = compatibility_paint_writes.find(write_lease);
+        const CompatibilityWriteMap::iterator found =
+            compatibility_paint_writes.find(write_lease);
         if (found == compatibility_paint_writes.end()) {
             return fail(GF_ERROR_STALE_HANDLE,
                         "paint endpoint write lease is not active");

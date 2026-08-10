@@ -132,8 +132,8 @@ void test_fallback_preserves_attempt_order() {
   const FontFallbackRequest request{FontFaceId{7}, attempts, cluster, "en",
                                     open_type_tag('z', 'y', 'y', 'y')};
   const std::optional<FontFallbackMatch> match = fallback.resolve(request);
-  require(match && match->face == FontFaceId{99} &&
-              match->covered_scalars == cluster.size() &&
+  require(match && (*match).face == FontFaceId{99} &&
+              (*match).covered_scalars == cluster.size() &&
               fallback.observed_attempts == attempts,
           "fallback services must receive caller-declared attempt order and the "
           "complete grapheme cluster");

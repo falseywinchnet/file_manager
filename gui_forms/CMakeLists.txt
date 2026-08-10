@@ -1061,6 +1061,16 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_binary_search_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_binary_search_tests COMMAND gui_forms_binary_search_tests)
 
+    add_executable(gui_forms_sort_algorithm_tests tests/sort_algorithm_tests.cpp)
+    target_link_libraries(gui_forms_sort_algorithm_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_sort_algorithm_tests COMMAND gui_forms_sort_algorithm_tests)
+
+    add_executable(gui_forms_sort_lab tools/sort_lab.cpp)
+    target_link_libraries(gui_forms_sort_lab PRIVATE gui_forms_core)
+
+    add_executable(gui_forms_callback_lab tools/callback_lab.cpp)
+    target_link_libraries(gui_forms_callback_lab PRIVATE gui_forms_core)
+
     add_executable(gui_forms_delegate_event_tests tests/delegate_event_tests.cpp)
     target_link_libraries(gui_forms_delegate_event_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_delegate_event_tests COMMAND gui_forms_delegate_event_tests)

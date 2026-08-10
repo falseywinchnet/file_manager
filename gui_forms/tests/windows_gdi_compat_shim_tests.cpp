@@ -25,11 +25,60 @@ using ShimDeleteObject = BOOL(WINAPI*)(HGDIOBJ);
 
 template <typename Function>
 Function entry(HMODULE module, const char* name) {
-    const auto raw = GetProcAddress(module, name);
+    const FARPROC raw = GetProcAddress(module, name);
     Function result{};
     static_assert(sizeof(result) == sizeof(raw));
     std::memcpy(&result, &raw, sizeof(result));
     return result;
+}
+
+void run_resize_writer(std::atomic<bool>* start,
+                       std::atomic<bool>* writer_ok,
+                       ShimBitBlt bit_blt,
+                       HDC endpoint_dc,
+                       HDC producer) {
+    while (!(*start).load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+    for (int frame = 0; frame < 4000; ++frame) {
+        if (bit_blt(endpoint_dc, 0, 0, 24, 48, producer,
+                    frame % 100, frame % 100, SRCCOPY) == FALSE) {
+            (*writer_ok).store(false, std::memory_order_release);
+            return;
+        }
+    }
+}
+
+void run_release_writer(std::uintptr_t endpoint_dc,
+                        std::atomic<bool>* lease_acquired,
+                        std::atomic<bool>* allow_end,
+                        std::atomic<bool>* writer_ok) {
+    std::uint64_t write_lease{};
+    if (gf_windows_paint_endpoint_begin_write_v1(
+            endpoint_dc, &write_lease) != GF_OK) {
+        (*lease_acquired).store(true, std::memory_order_release);
+        return;
+    }
+    (*lease_acquired).store(true, std::memory_order_release);
+    while (!(*allow_end).load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+    (*writer_ok).store(
+        gf_windows_paint_endpoint_end_write_v1(write_lease, 0U) == GF_OK,
+        std::memory_order_release);
+}
+
+void run_endpoint_releaser(std::uint64_t endpoint,
+                           std::atomic<bool>* lease_acquired,
+                           std::atomic<bool>* release_started,
+                           std::atomic<bool>* release_ok) {
+    while (!(*lease_acquired).load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+    (*release_started).store(true, std::memory_order_release);
+    (*release_ok).store(
+        gf_windows_paint_endpoint_release_v1(endpoint) == GF_OK,
+        std::memory_order_release);
 }
 
 gf_string_view text(const char* value) {
@@ -39,17 +88,23 @@ gf_string_view text(const char* value) {
 bool run_lifetime(const gf_api_v0& api, HMODULE shim, int lifetime,
                   int width, int height, int resized_width,
                   int resized_height) {
-    const auto get_dc = entry<ShimGetDC>(shim, "GetDC");
-    const auto release_dc = entry<ShimReleaseDC>(shim, "ReleaseDC");
-    const auto bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
-    const auto create_bitmap = entry<ShimCreateCompatibleBitmap>(
+    const ShimGetDC get_dc = entry<ShimGetDC>(shim, "GetDC");
+    const ShimReleaseDC release_dc =
+        entry<ShimReleaseDC>(shim, "ReleaseDC");
+    const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
+    const ShimCreateCompatibleBitmap create_bitmap =
+        entry<ShimCreateCompatibleBitmap>(
         shim, "CreateCompatibleBitmap");
-    const auto create_dc = entry<ShimCreateCompatibleDC>(
+    const ShimCreateCompatibleDC create_dc = entry<ShimCreateCompatibleDC>(
         shim, "CreateCompatibleDC");
-    const auto select_object = entry<ShimSelectObject>(shim, "SelectObject");
-    const auto delete_object = entry<ShimDeleteObject>(shim, "DeleteObject");
-    const auto scroll_window = entry<ShimScrollWindowEx>(shim, "ScrollWindowEx");
-    const auto send_message = entry<ShimSendMessageW>(shim, "SendMessageW");
+    const ShimSelectObject select_object =
+        entry<ShimSelectObject>(shim, "SelectObject");
+    const ShimDeleteObject delete_object =
+        entry<ShimDeleteObject>(shim, "DeleteObject");
+    const ShimScrollWindowEx scroll_window =
+        entry<ShimScrollWindowEx>(shim, "ScrollWindowEx");
+    const ShimSendMessageW send_message =
+        entry<ShimSendMessageW>(shim, "SendMessageW");
     if (!get_dc || !release_dc || !bit_blt || !create_bitmap || !create_dc ||
         !select_object || !delete_object || !scroll_window || !send_message) {
         std::fprintf(stderr, "shim-gate=failure|stage:exports\n");
@@ -230,15 +285,19 @@ cleanup:
 }
 
 bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
-    const auto get_dc = entry<ShimGetDC>(shim, "GetDC");
-    const auto release_dc = entry<ShimReleaseDC>(shim, "ReleaseDC");
-    const auto bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
-    const auto create_bitmap = entry<ShimCreateCompatibleBitmap>(
+    const ShimGetDC get_dc = entry<ShimGetDC>(shim, "GetDC");
+    const ShimReleaseDC release_dc =
+        entry<ShimReleaseDC>(shim, "ReleaseDC");
+    const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
+    const ShimCreateCompatibleBitmap create_bitmap =
+        entry<ShimCreateCompatibleBitmap>(
         shim, "CreateCompatibleBitmap");
-    const auto create_dc = entry<ShimCreateCompatibleDC>(
+    const ShimCreateCompatibleDC create_dc = entry<ShimCreateCompatibleDC>(
         shim, "CreateCompatibleDC");
-    const auto select_object = entry<ShimSelectObject>(shim, "SelectObject");
-    const auto delete_object = entry<ShimDeleteObject>(shim, "DeleteObject");
+    const ShimSelectObject select_object =
+        entry<ShimSelectObject>(shim, "SelectObject");
+    const ShimDeleteObject delete_object =
+        entry<ShimDeleteObject>(shim, "DeleteObject");
     if (!get_dc || !release_dc || !bit_blt || !create_bitmap || !create_dc ||
         !select_object || !delete_object) return false;
 
@@ -272,18 +331,8 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
 
     std::atomic<bool> start{};
     std::atomic<bool> writer_ok{filled};
-    std::thread writer([&] {
-        while (!start.load(std::memory_order_acquire)) {
-            std::this_thread::yield();
-        }
-        for (int frame = 0; frame < 4000; ++frame) {
-            if (bit_blt(endpoint_dc, 0, 0, 24, 48, producer,
-                        frame % 100, frame % 100, SRCCOPY) == FALSE) {
-                writer_ok.store(false, std::memory_order_release);
-                return;
-            }
-        }
-    });
+    std::thread writer(&run_resize_writer, &start, &writer_ok, bit_blt,
+                       endpoint_dc, producer);
 
     constexpr std::array<std::array<std::uint32_t, 2>, 6> sizes{{
         {{150U, 150U}}, {{90U, 150U}}, {{30U, 150U}},
@@ -292,7 +341,8 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
     start.store(true, std::memory_order_release);
     bool configure_ok = true;
     for (int resize = 0; resize < 1200; ++resize) {
-        const auto size = sizes[static_cast<std::size_t>(resize) % sizes.size()];
+        const std::array<std::uint32_t, 2> size =
+            sizes[static_cast<std::size_t>(resize) % sizes.size()];
         if (gf_windows_paint_endpoint_configure_v1(
                 endpoint, size[0], size[1]) != GF_OK) {
             configure_ok = false;
@@ -317,10 +367,11 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
 }
 
 bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
-    const auto bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
-    const auto create_bitmap = entry<ShimCreateCompatibleBitmap>(
+    const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
+    const ShimCreateCompatibleBitmap create_bitmap =
+        entry<ShimCreateCompatibleBitmap>(
         shim, "CreateCompatibleBitmap");
-    const auto create_dc = entry<ShimCreateCompatibleDC>(
+    const ShimCreateCompatibleDC create_dc = entry<ShimCreateCompatibleDC>(
         shim, "CreateCompatibleDC");
     if (bit_blt == nullptr || create_bitmap == nullptr || create_dc == nullptr) {
         return false;
@@ -407,7 +458,7 @@ bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
         api.dispose(endpoint_control);
         return false;
     }
-    auto* pixels = static_cast<std::uint32_t*>(storage);
+    std::uint32_t* pixels = static_cast<std::uint32_t*>(storage);
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             const int storage_y = top_down ? y : height - 1 - y;
@@ -483,29 +534,10 @@ bool run_concurrent_release_gate(const gf_api_v0& api) {
     std::atomic<bool> release_started{};
     std::atomic<bool> writer_ok{};
     std::atomic<bool> release_ok{};
-    std::thread writer([&] {
-        std::uint64_t write_lease{};
-        if (gf_windows_paint_endpoint_begin_write_v1(
-                endpoint_dc, &write_lease) != GF_OK) {
-            lease_acquired.store(true, std::memory_order_release);
-            return;
-        }
-        lease_acquired.store(true, std::memory_order_release);
-        while (!allow_end.load(std::memory_order_acquire)) {
-            std::this_thread::yield();
-        }
-        writer_ok.store(gf_windows_paint_endpoint_end_write_v1(
-                            write_lease, 0U) == GF_OK,
-                        std::memory_order_release);
-    });
-    std::thread releaser([&] {
-        while (!lease_acquired.load(std::memory_order_acquire)) {
-            std::this_thread::yield();
-        }
-        release_started.store(true, std::memory_order_release);
-        release_ok.store(gf_windows_paint_endpoint_release_v1(endpoint) == GF_OK,
-                         std::memory_order_release);
-    });
+    std::thread writer(&run_release_writer, endpoint_dc, &lease_acquired,
+                       &allow_end, &writer_ok);
+    std::thread releaser(&run_endpoint_releaser, endpoint, &lease_acquired,
+                         &release_started, &release_ok);
     while (!release_started.load(std::memory_order_acquire)) {
         std::this_thread::yield();
     }
@@ -543,8 +575,9 @@ int main() {
         {{332, 324}}, {{303, 324}}, {{128, 64}},
     }};
     for (int lifetime = 0; lifetime < 500; ++lifetime) {
-        const auto size = sizes[static_cast<std::size_t>(lifetime) % sizes.size()];
-        const auto resized = sizes[
+        const std::array<int, 2> size =
+            sizes[static_cast<std::size_t>(lifetime) % sizes.size()];
+        const std::array<int, 2> resized = sizes[
             (static_cast<std::size_t>(lifetime) + 1U) % sizes.size()];
         if (!run_lifetime(api, shim, lifetime, size[0], size[1], resized[0],
                           resized[1])) {

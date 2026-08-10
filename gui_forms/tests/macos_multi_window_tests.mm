@@ -11,13 +11,92 @@
 
 namespace {
 
+using VoidHostCallback = std::function<void()>;
+using ShowDialogCallback = std::function<gui_forms::HostDialogResult(
+    const gui_forms::HostDialogRequest&)>;
+using ShowTooltipCallback = std::function<gui_forms::HostServiceStatus(
+    const gui_forms::HostTooltipRequest&)>;
+using ReadClipboardCallback =
+    std::function<gui_forms::HostClipboardTextResult()>;
+using WriteClipboardCallback =
+    std::function<gui_forms::HostServiceStatus(std::string_view)>;
+
 std::unique_ptr<gui_forms::Window> make_window(std::string stable_id) {
-    auto root = std::make_shared<gui_forms::Panel>(
+    std::shared_ptr<gui_forms::Panel> root = std::make_shared<gui_forms::Panel>(
         gui_forms::StableId(std::move(stable_id)));
-    root->set_requested_bounds({0.0, 0.0, 240.0, 140.0});
+    (*root).set_requested_bounds({0.0, 0.0, 240.0, 140.0});
     return std::make_unique<gui_forms::Window>(root,
                                                gui_forms::Size{240.0, 140.0});
 }
+
+class CountClosed final {
+public:
+    explicit CountClosed(std::uint64_t& count) noexcept : count_(count) {}
+
+    void operator()() const { ++count_; }
+
+private:
+    std::uint64_t& count_;
+};
+
+class CaptureCloseRequest final {
+public:
+    explicit CaptureCloseRequest(std::function<void()>& close_request) noexcept
+        : close_request_(close_request) {}
+
+    void operator()(
+        VoidHostCallback,
+        VoidHostCallback request_close,
+        ShowDialogCallback,
+        ShowTooltipCallback,
+        VoidHostCallback,
+        ReadClipboardCallback,
+        WriteClipboardCallback) const {
+        close_request_ = std::move(request_close);
+    }
+
+private:
+    std::function<void()>& close_request_;
+};
+
+class StoreCombinedSnapshot final {
+public:
+    explicit StoreCombinedSnapshot(std::string& snapshot) noexcept
+        : snapshot_(snapshot) {}
+
+    void operator()(std::string_view metrics, std::string_view host) const {
+        snapshot_ = std::string(metrics) + std::string(host);
+    }
+
+private:
+    std::string& snapshot_;
+};
+
+class CloseControllerThenProduct final {
+public:
+    explicit CloseControllerThenProduct(
+        const std::function<void()>& close_product) noexcept
+        : close_product_(close_product) {}
+
+    void operator()(
+        VoidHostCallback,
+        VoidHostCallback request_close,
+        ShowDialogCallback,
+        ShowTooltipCallback,
+        VoidHostCallback,
+        ReadClipboardCallback,
+        WriteClipboardCallback) const {
+        const std::function<void()> primary_close = close_product_;
+        request_close();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
+                       dispatch_get_main_queue(), ^{
+                           if (primary_close) primary_close();
+                       });
+    }
+
+private:
+    const std::function<void()>& close_product_;
+};
 
 } // namespace
 
@@ -38,15 +117,9 @@ int main() {
     product.options.title = "GUI.Forms Product Root";
     product.options.initial_size = {240.0, 140.0};
     product.options.minimum_size = {160.0, 100.0};
-    product.options.closed = [&] { ++product_closed; };
-    product.options.host_ready = [&](auto, auto request_close, auto, auto,
-                                     auto, auto, auto) {
-        close_product = std::move(request_close);
-    };
-    product.options.final_snapshot = [&](std::string_view metrics,
-                                         std::string_view host) {
-        product_snapshot = std::string(metrics) + std::string(host);
-    };
+    product.options.closed = CountClosed(product_closed);
+    product.options.host_ready = CaptureCloseRequest(close_product);
+    product.options.final_snapshot = StoreCombinedSnapshot(product_snapshot);
 
     MacApplicationWindow controller;
     controller.stable_id = "test.window.controller";
@@ -55,20 +128,10 @@ int main() {
     controller.options.title = "GUI.Forms Tool Root";
     controller.options.initial_size = {220.0, 130.0};
     controller.options.minimum_size = {160.0, 100.0};
-    controller.options.closed = [&] { ++controller_closed; };
-    controller.options.host_ready = [&](auto, auto request_close, auto, auto,
-                                        auto, auto, auto) {
-        const auto primary_close = close_product;
-        request_close();
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
-                       dispatch_get_main_queue(), ^{
-                           if (primary_close) primary_close();
-                       });
-    };
-    controller.options.final_snapshot = [&](std::string_view metrics,
-                                            std::string_view host) {
-        controller_snapshot = std::string(metrics) + std::string(host);
-    };
+    controller.options.closed = CountClosed(controller_closed);
+    controller.options.host_ready = CloseControllerThenProduct(close_product);
+    controller.options.final_snapshot =
+        StoreCombinedSnapshot(controller_snapshot);
     controller.tool_window = true;
 
     std::vector<MacApplicationWindow> windows;

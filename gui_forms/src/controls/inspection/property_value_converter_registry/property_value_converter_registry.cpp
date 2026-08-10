@@ -16,6 +16,65 @@ using detail::localize_number;
 using detail::property_service_name;
 using detail::require_conversion_context;
 
+namespace {
+
+std::string format_invariant_value(const BindingValue& value,
+                                   const PropertyDescriptor&) {
+    const bool* boolean = std::get_if<bool>(&value);
+    return boolean ? std::string(*boolean ? "True" : "False")
+                   : binding_value_to_string(value);
+}
+
+std::optional<BindingValue> parse_invariant_value(
+    std::string_view text, const BindingValue&,
+    const PropertyDescriptor& descriptor) {
+    return convert_property_value(BindingValue{std::string(text)}, descriptor);
+}
+
+std::string format_invariant_value_with_context(
+    const BindingValue& value, const PropertyDescriptor& descriptor,
+    const PropertyConversionContext& context) {
+    const bool* boolean = std::get_if<bool>(&value);
+    if (boolean) return std::string(*boolean ? "True" : "False");
+    std::string formatted = binding_value_to_string(value);
+    return descriptor.kind == BindingValueKind::signed_integer ||
+            descriptor.kind == BindingValueKind::unsigned_integer ||
+            descriptor.kind == BindingValueKind::number
+        ? localize_number(std::move(formatted), context)
+        : formatted;
+}
+
+std::optional<BindingValue> parse_invariant_value_with_context(
+    std::string_view text, const BindingValue&,
+    const PropertyDescriptor& descriptor,
+    const PropertyConversionContext& context) {
+    if (descriptor.kind == BindingValueKind::signed_integer ||
+        descriptor.kind == BindingValueKind::unsigned_integer ||
+        descriptor.kind == BindingValueKind::number) {
+        const std::optional<std::string> normalized =
+            invariant_number_text(text, context);
+        return normalized
+            ? convert_property_value(BindingValue{*normalized}, descriptor)
+            : std::optional<BindingValue>{};
+    }
+    return convert_property_value(BindingValue{std::string(text)}, descriptor);
+}
+
+std::string format_color_hex(const BindingValue& value,
+                             const PropertyDescriptor&) {
+    const Color* color = std::get_if<Color>(&value);
+    return color ? ColorValueEditor::format_value(*color) : std::string{};
+}
+
+std::optional<BindingValue> parse_color_hex(
+    std::string_view text, const BindingValue&, const PropertyDescriptor&) {
+    const std::optional<Color> color = ColorValueEditor::parse_value(text);
+    return color ? std::optional<BindingValue>{BindingValue{*color}}
+                 : std::optional<BindingValue>{};
+}
+
+} // namespace
+
 bool PropertyValueConverterRegistry::register_converter(
     std::string name, PropertyValueConverter converter) {
     const std::string canonical = property_service_name(name);
@@ -32,9 +91,14 @@ bool PropertyValueConverterRegistry::unregister_converter(
     const std::string canonical = property_service_name(name);
     const bool removed = converters_.erase(canonical) != 0U;
     if (removed) {
-        std::erase_if(kind_mappings_, [&canonical](const auto& item) {
-            return item.second == canonical;
-        });
+        KindMap::iterator item = kind_mappings_.begin();
+        while (item != kind_mappings_.end()) {
+            if ((*item).second == canonical) {
+                item = kind_mappings_.erase(item);
+            } else {
+                ++item;
+            }
+        }
     }
     return removed;
 }
@@ -129,47 +193,10 @@ std::shared_ptr<PropertyValueConverterRegistry>
 PropertyValueConverterRegistry::create_default() {
     std::shared_ptr<gui_forms::PropertyValueConverterRegistry> result = std::make_shared<PropertyValueConverterRegistry>();
     PropertyValueConverter invariant;
-    invariant.format = [](const BindingValue& value,
-                          const PropertyDescriptor&) {
-        if (const bool* boolean = std::get_if<bool>(&value)) {
-            return std::string(*boolean ? "True" : "False");
-        }
-        return binding_value_to_string(value);
-    };
-    invariant.parse = [](std::string_view text, const BindingValue&,
-                         const PropertyDescriptor& descriptor) {
-        return convert_property_value(BindingValue{std::string(text)},
-                                      descriptor);
-    };
-    invariant.format_with_context = [](
-        const BindingValue& value, const PropertyDescriptor& descriptor,
-        const PropertyConversionContext& context) {
-        if (const bool* boolean = std::get_if<bool>(&value)) {
-            return std::string(*boolean ? "True" : "False");
-        }
-        std::string formatted = binding_value_to_string(value);
-        return descriptor.kind == BindingValueKind::signed_integer ||
-                descriptor.kind == BindingValueKind::unsigned_integer ||
-                descriptor.kind == BindingValueKind::number
-            ? localize_number(std::move(formatted), context)
-            : formatted;
-    };
-    invariant.parse_with_context = [](
-        std::string_view text, const BindingValue&,
-        const PropertyDescriptor& descriptor,
-        const PropertyConversionContext& context)
-            -> std::optional<BindingValue> {
-        if (descriptor.kind == BindingValueKind::signed_integer ||
-            descriptor.kind == BindingValueKind::unsigned_integer ||
-            descriptor.kind == BindingValueKind::number) {
-            const std::optional<std::string> normalized = invariant_number_text(text, context);
-            return normalized
-                ? convert_property_value(BindingValue{*normalized}, descriptor)
-                : std::optional<BindingValue>{};
-        }
-        return convert_property_value(BindingValue{std::string(text)},
-                                      descriptor);
-    };
+    invariant.format = format_invariant_value;
+    invariant.parse = parse_invariant_value;
+    invariant.format_with_context = format_invariant_value_with_context;
+    invariant.parse_with_context = parse_invariant_value_with_context;
     static_cast<void>((*result).register_converter("invariant", invariant));
     for (const BindingValueKind kind : {
              BindingValueKind::boolean, BindingValueKind::signed_integer,
@@ -178,17 +205,8 @@ PropertyValueConverterRegistry::create_default() {
         (*result).map_kind(kind, "invariant");
     }
     PropertyValueConverter color_hex;
-    color_hex.format = [](const BindingValue& value,
-                          const PropertyDescriptor&) {
-        const gui_forms::Color* color = std::get_if<Color>(&value);
-        return color ? ColorValueEditor::format_value(*color) : std::string{};
-    };
-    color_hex.parse = [](std::string_view text, const BindingValue&,
-                         const PropertyDescriptor&) -> std::optional<BindingValue> {
-        const std::optional<Color> color = ColorValueEditor::parse_value(text);
-        return color ? std::optional<BindingValue>{BindingValue{*color}}
-                     : std::optional<BindingValue>{};
-    };
+    color_hex.format = format_color_hex;
+    color_hex.parse = parse_color_hex;
     static_cast<void>((*result).register_converter("color-hex", color_hex));
     (*result).map_kind(BindingValueKind::color, "color-hex");
     return result;

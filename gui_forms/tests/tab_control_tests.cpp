@@ -47,11 +47,26 @@ struct Fixture final {
     std::shared_ptr<Button> second_button;
 };
 
+class ObserveTabSelection final {
+public:
+    ObserveTabSelection(TabSelectionChange& observed, std::uint64_t& changes)
+        : observed_(observed), changes_(changes) {}
+
+    void operator()(const TabSelectionChange& change) const {
+        observed_ = change;
+        ++changes_;
+    }
+
+private:
+    TabSelectionChange& observed_;
+    std::uint64_t& changes_;
+};
+
 Fixture make_fixture() {
     Fixture value;
     value.tabs = make_control<TabControl>(StableId("tabs"));
-    value.tabs->set_accessible_name("Workspace tabs");
-    value.tabs->set_requested_bounds({0.0, 0.0, 480.0, 260.0});
+    (*value.tabs).set_accessible_name("Workspace tabs");
+    (*value.tabs).set_requested_bounds({0.0, 0.0, 480.0, 260.0});
     value.first = make_control<TabPage>(StableId("tabs.first"), "Overview");
     value.second = make_control<TabPage>(StableId("tabs.second"), "Details");
     value.third = make_control<TabPage>(StableId("tabs.third"), "Diagnostics");
@@ -59,17 +74,17 @@ Fixture make_fixture() {
                                                "First page action");
     value.second_button = make_control<Button>(StableId("tabs.second.button"),
                                                 "Second page action");
-    value.first_button->set_requested_bounds({20.0, 20.0, 160.0, 32.0});
-    value.second_button->set_requested_bounds({20.0, 20.0, 170.0, 32.0});
-    value.first->add_child(value.first_button);
-    value.second->add_child(value.second_button);
-    auto third_label = make_control<Label>(StableId("tabs.third.label"),
+    (*value.first_button).set_requested_bounds({20.0, 20.0, 160.0, 32.0});
+    (*value.second_button).set_requested_bounds({20.0, 20.0, 170.0, 32.0});
+    (*value.first).add_child(value.first_button);
+    (*value.second).add_child(value.second_button);
+    std::shared_ptr<gui_forms::Label> third_label = make_control<Label>(StableId("tabs.third.label"),
                                             "Third page content");
-    third_label->set_requested_bounds({20.0, 20.0, 180.0, 30.0});
-    value.third->add_child(third_label);
-    value.tabs->add_page(value.first);
-    value.tabs->add_page(value.second);
-    value.tabs->add_page(value.third);
+    (*third_label).set_requested_bounds({20.0, 20.0, 180.0, 30.0});
+    (*value.third).add_child(third_label);
+    (*value.tabs).add_page(value.first);
+    (*value.tabs).add_page(value.second);
+    (*value.tabs).add_page(value.third);
     return value;
 }
 
@@ -77,28 +92,26 @@ void test_page_ownership_layout_and_visibility() {
     Fixture fixture = make_fixture();
     Window window(fixture.tabs, {480.0, 260.0});
     window.perform_layout();
-    require(fixture.tabs->page_count() == 3U &&
-                fixture.tabs->selected_index() == 0U &&
-                fixture.first->visible() && !fixture.second->visible() &&
-                !fixture.third->visible(),
+    require((*fixture.tabs).page_count() == 3U &&
+                (*fixture.tabs).selected_index() == 0U &&
+                (*fixture.first).visible() && !(*fixture.second).visible() &&
+                !(*fixture.third).visible(),
             "TabControl must own pages and expose exactly one selected page");
-    require(fixture.tabs->display_bounds() == Rect{0.0, 29.0, 480.0, 231.0} &&
-                fixture.first->committed_arranged_bounds() ==
-                    fixture.tabs->display_bounds(),
+    require((*fixture.tabs).display_bounds() == Rect{0.0, 29.0, 480.0, 231.0} &&
+                (*fixture.first).committed_arranged_bounds() ==
+                    (*fixture.tabs).display_bounds(),
             "top-aligned TabControl must reserve a deterministic header strip");
 
     TabSelectionChange observed;
     std::uint64_t changes{};
-    auto token = fixture.tabs->selected_index_changed().subscribe(
-        [&observed, &changes](const TabSelectionChange& change) {
-            observed = change;
-            ++changes;
-        });
-    fixture.tabs->set_selected_index(1U);
+    SubscriptionToken token =
+        (*fixture.tabs).selected_index_changed().subscribe(
+            ObserveTabSelection(observed, changes));
+    (*fixture.tabs).set_selected_index(1U);
     window.perform_layout();
     require(changes == 1U && observed.old_index == 0U &&
-                observed.new_index == 1U && !fixture.first->visible() &&
-                fixture.second->visible(),
+                observed.new_index == 1U && !(*fixture.first).visible() &&
+                (*fixture.second).visible(),
             "TabControl selection must mutate visibility before one ordered event");
     require(window.hit_test({30.0, 70.0}) != fixture.first_button,
             "a hidden TabPage subtree must not remain hit-testable");
@@ -123,29 +136,29 @@ void test_keyboard_pointer_and_focus_restoration() {
     require(window.request_focus(fixture.first_button),
             "first page child must receive initial focus");
     KeyEvent next{KeyAction::down, PhysicalKey::tab, Modifier::control};
-    require(window.dispatch_key(next) && fixture.tabs->selected_index() == 1U &&
+    require(window.dispatch_key(next) && (*fixture.tabs).selected_index() == 1U &&
                 window.focused_control() == fixture.tabs,
             "Ctrl+Tab from page content must switch pages and retain safe focus");
     require(window.request_focus(fixture.second_button),
             "second page child must receive focus");
     KeyEvent previous{KeyAction::down, PhysicalKey::tab,
                       Modifier::control | Modifier::shift};
-    require(window.dispatch_key(previous) && fixture.tabs->selected_index() == 0U &&
+    require(window.dispatch_key(previous) && (*fixture.tabs).selected_index() == 0U &&
                 window.focused_control() == fixture.first_button,
             "Ctrl+Shift+Tab must restore the destination page's remembered focus");
 
-    const Rect third = fixture.tabs->tab_bounds(2U);
+    const Rect third = (*fixture.tabs).tab_bounds(2U);
     const Point click{third.x + third.width * 0.5, third.y + third.height * 0.5};
     require(window.dispatch_pointer(
                 {PointerAction::down, PointerButton::primary, click}) &&
-                fixture.tabs->selected_index() == 2U &&
+                (*fixture.tabs).selected_index() == 2U &&
                 window.focused_control() == fixture.tabs,
             "pointer header activation must select and focus the tab strip");
     KeyEvent left{KeyAction::down, PhysicalKey::left};
-    require(window.dispatch_key(left) && fixture.tabs->selected_index() == 1U,
+    require(window.dispatch_key(left) && (*fixture.tabs).selected_index() == 1U,
             "focused horizontal tabs must traverse with arrow keys");
     KeyEvent home{KeyAction::down, PhysicalKey::home};
-    require(window.dispatch_key(home) && fixture.tabs->selected_index() == 0U,
+    require(window.dispatch_key(home) && (*fixture.tabs).selected_index() == 0U,
             "focused tabs must support Home/End boundary traversal");
 }
 
@@ -159,16 +172,16 @@ void test_alignment_appearance_and_semantics() {
         {TabAlignment::left, {119.0, 0.0, 361.0, 260.0}},
         {TabAlignment::right, {0.0, 0.0, 361.0, 260.0}},
     }};
-    for (const auto& [alignment, expected] : alignments) {
-        fixture.tabs->set_alignment(alignment);
+    for (const std::pair<TabAlignment, Rect>& alignment_spec : alignments) {
+        (*fixture.tabs).set_alignment(alignment_spec.first);
         window.perform_layout();
-        require(fixture.tabs->display_bounds() == expected,
+        require((*fixture.tabs).display_bounds() == alignment_spec.second,
                 "TabControl alignment must reserve the correct content edge");
     }
     for (const TabAppearance appearance :
          {TabAppearance::normal, TabAppearance::buttons,
           TabAppearance::flat_buttons}) {
-        fixture.tabs->set_appearance(appearance);
+        (*fixture.tabs).set_appearance(appearance);
         RecordingPainter painter;
         window.paint(painter, {0.0, 0.0, 480.0, 260.0});
         require(painter.fills >= 5U && painter.strokes >= 5U,
@@ -183,27 +196,27 @@ void test_alignment_appearance_and_semantics() {
             "TabControl must publish a tab group and stable virtual tab identities");
     require(window.perform_semantic_action("tabs.third.tab",
                                            SemanticAction::select) &&
-                fixture.tabs->selected_index() == 2U,
+                (*fixture.tabs).selected_index() == 2U,
             "semantic tab selection must execute the same public selection path");
 }
 
 void test_page_removal_and_disposal_reconciliation() {
     Fixture fixture = make_fixture();
     Window window(fixture.tabs, {480.0, 260.0});
-    fixture.tabs->set_selected_index(1U);
-    const auto removed = fixture.tabs->remove_page(*fixture.second);
+    (*fixture.tabs).set_selected_index(1U);
+    const std::shared_ptr<TabPage> removed = (*fixture.tabs).remove_page(*fixture.second);
     window.perform_layout();
-    require(removed == fixture.second && !removed->attached() &&
-                fixture.tabs->page_count() == 2U &&
-                fixture.tabs->selected_tab() == fixture.third &&
-                fixture.tabs->selected_index() == 1U,
+    require(removed == fixture.second && !(*removed).attached() &&
+                (*fixture.tabs).page_count() == 2U &&
+                (*fixture.tabs).selected_tab() == fixture.third &&
+                (*fixture.tabs).selected_index() == 1U,
             "removing a selected page must choose its surviving successor");
 
-    fixture.third->dispose();
+    (*fixture.third).dispose();
     window.perform_layout();
-    require(fixture.tabs->page_count() == 1U &&
-                fixture.tabs->selected_tab() == fixture.first &&
-                fixture.tabs->selected_index() == 0U && fixture.first->visible(),
+    require((*fixture.tabs).page_count() == 1U &&
+                (*fixture.tabs).selected_tab() == fixture.first &&
+                (*fixture.tabs).selected_index() == 0U && (*fixture.first).visible(),
             "direct selected-page disposal must reconcile without stale ownership");
 }
 

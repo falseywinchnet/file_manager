@@ -18,7 +18,7 @@ void require(bool condition, const char* message) {
 
 const SemanticNode* find_role(const std::vector<SemanticNode>& nodes,
                               SemanticRole role) {
-    for (const auto& node : nodes) {
+    for (const gui_forms::SemanticNode& node : nodes) {
         if (node.role == role) return &node;
         if (const SemanticNode* found = find_role(node.children, role)) return found;
     }
@@ -28,7 +28,7 @@ const SemanticNode* find_role(const std::vector<SemanticNode>& nodes,
 std::size_t count_role(const std::vector<SemanticNode>& nodes,
                        SemanticRole role) {
     std::size_t count = 0U;
-    for (const auto& node : nodes) {
+    for (const gui_forms::SemanticNode& node : nodes) {
         count += node.role == role ? 1U : 0U;
         count += count_role(node.children, role);
     }
@@ -37,11 +37,11 @@ std::size_t count_role(const std::vector<SemanticNode>& nodes,
 
 struct Fixture final {
     Fixture() : window(root, {420.0, 240.0}) {
-        root->set_requested_bounds({0.0, 0.0, 420.0, 240.0});
-        button->set_requested_bounds({40.0, 45.0, 130.0, 34.0});
-        other->set_requested_bounds({220.0, 45.0, 130.0, 34.0});
-        root->add_child(button);
-        root->add_child(other);
+        (*root).set_requested_bounds({0.0, 0.0, 420.0, 240.0});
+        (*button).set_requested_bounds({40.0, 45.0, 130.0, 34.0});
+        (*other).set_requested_bounds({220.0, 45.0, 130.0, 34.0});
+        (*root).add_child(button);
+        (*root).add_child(other);
         window.perform_layout();
         static_cast<void>(window.take_damage());
     }
@@ -60,10 +60,24 @@ void hover(Fixture& fixture, Point point) {
 }
 
 void fire_next(Window& window) {
-    const auto wake = window.next_wake();
+    const std::optional<FrameTime> wake = window.next_wake();
     require(wake.has_value(), "test expected a scheduled UI deadline");
     static_cast<void>(window.poll_frame_schedule(*wake));
 }
+
+class CountTooltipVisibility final {
+public:
+    CountTooltipVisibility(int& shown, int& hidden)
+        : shown_(shown), hidden_(hidden) {}
+
+    void operator()(const ToolTipEvent& event) const {
+        event.shown ? ++shown_ : ++hidden_;
+    }
+
+private:
+    int& shown_;
+    int& hidden_;
+};
 
 void test_hover_delay_cancel_and_accessible_overlay() {
     Fixture fixture;
@@ -73,8 +87,8 @@ void test_hover_delay_cancel_and_accessible_overlay() {
     tips.set_tool_tip(fixture.button, "Opens the calibrated input selector");
     int shown = 0;
     int hidden = 0;
-    auto changes = tips.visibility_changed().subscribe(
-        [&](const ToolTipEvent& event) { event.shown ? ++shown : ++hidden; });
+    SubscriptionToken changes = tips.visibility_changed().subscribe(
+        CountTooltipVisibility(shown, hidden));
 
     hover(fixture, {60.0, 60.0});
     require(!tips.visible() && fixture.window.next_wake().has_value(),
@@ -89,7 +103,7 @@ void test_hover_delay_cancel_and_accessible_overlay() {
     const SemanticSnapshot snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* tooltip = find_role(snapshot.roots, SemanticRole::tool_tip);
     require(tips.visible() && shown == 1 && hidden == 0 && tooltip &&
-                tooltip->name == "Opens the calibrated input selector" &&
+                (*tooltip).name == "Opens the calibrated input selector" &&
                 fixture.window.hit_test({65.0, 60.0}) == fixture.button,
             "a due hover must open a named semantic, input-transparent overlay");
 
@@ -114,14 +128,14 @@ void test_focus_policy_autopop_and_moving_target() {
     const SemanticNode* before =
         find_role(before_snapshot.roots, SemanticRole::tool_tip);
     require(before && tips.visible(), "keyboard focus must follow the same delayed policy");
-    const Rect old_bounds = before->bounds;
+    const Rect old_bounds = (*before).bounds;
 
-    fixture.button->set_requested_bounds({250.0, 145.0, 130.0, 34.0});
+    (*fixture.button).set_requested_bounds({250.0, 145.0, 130.0, 34.0});
     fixture.window.perform_layout();
     const SemanticSnapshot after_snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* after =
         find_role(after_snapshot.roots, SemanticRole::tool_tip);
-    require(after && after->bounds != old_bounds && after->bounds.x >= 250.0,
+    require(after && (*after).bounds != old_bounds && (*after).bounds.x >= 250.0,
             "a visible tooltip must remain anchored when its target moves");
 
     fire_next(fixture.window);
@@ -174,7 +188,7 @@ void test_explicit_show_multiple_providers_and_owner_disposal() {
     require(count_role(snapshot.roots, SemanticRole::tool_tip) == 2U,
             "both provider overlays must remain in the retained semantic tree");
 
-    fixture.button->dispose();
+    (*fixture.button).dispose();
     require(!first.visible() && !second.visible() && !first.active_control() &&
                 !second.active_control(),
             "disposing a target must synchronously revoke every provider popup");
@@ -185,22 +199,22 @@ void test_explicit_show_multiple_providers_and_owner_disposal() {
 
 void test_mapping_removal_and_provider_disposal_are_quiescent() {
     Fixture fixture;
-    auto tips = std::make_unique<ToolTip>(fixture.window);
-    tips->set_initial_delay(20ms);
-    tips->set_tool_tip(fixture.button, "Disposable mapping");
+    std::unique_ptr<gui_forms::ToolTip> tips = std::make_unique<ToolTip>(fixture.window);
+    (*tips).set_initial_delay(20ms);
+    (*tips).set_tool_tip(fixture.button, "Disposable mapping");
     hover(fixture, {60.0, 60.0});
-    require(tips->remove_tool_tip(*fixture.button) && !fixture.window.next_wake(),
+    require((*tips).remove_tool_tip(*fixture.button) && !fixture.window.next_wake(),
             "removing a pending mapping must revoke its timer immediately");
-    tips->set_tool_tip(fixture.button, "Disposable provider");
-    tips->show(fixture.button, 0ms);
-    require(tips->visible(), "explicit persistent tooltip must open");
+    (*tips).set_tool_tip(fixture.button, "Disposable provider");
+    (*tips).show(fixture.button, 0ms);
+    require((*tips).visible(), "explicit persistent tooltip must open");
     fixture.window.perform_layout();
     const SemanticSnapshot explicit_snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* explicit_tip =
         find_role(explicit_snapshot.roots, SemanticRole::tool_tip);
-    require(explicit_tip && explicit_tip->bounds.x >= fixture.button->absolute_bounds().x,
+    require(explicit_tip && (*explicit_tip).bounds.x >= (*fixture.button).absolute_bounds().x,
             "programmatic ToolTip show must anchor to its target, not the client origin");
-    tips->dispose();
+    (*tips).dispose();
     require(!fixture.window.next_wake() &&
                 !find_role(fixture.window.semantic_snapshot().roots,
                            SemanticRole::tool_tip),
@@ -211,13 +225,13 @@ void test_show_always_supports_a_disabled_visible_owner() {
     Fixture fixture;
     ToolTip tips(fixture.window);
     tips.set_show_always(true);
-    fixture.button->set_enabled(false);
+    (*fixture.button).set_enabled(false);
     tips.set_tool_tip(fixture.button, "Why this command is unavailable");
     tips.show(fixture.button, 0ms);
     fixture.window.perform_layout();
     const SemanticSnapshot snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* tip = find_role(snapshot.roots, SemanticRole::tool_tip);
-    require(tips.visible() && tip && tip->name == "Why this command is unavailable",
+    require(tips.visible() && tip && (*tip).name == "Why this command is unavailable",
             "ShowAlways must allow passive help owned by a disabled visible control");
 }
 
@@ -241,7 +255,7 @@ void test_maximum_width_is_bounded_and_shapes_overlay() {
     fixture.window.perform_layout();
     const SemanticNode* tip = find_role(
         fixture.window.semantic_snapshot().roots, SemanticRole::tool_tip);
-    require(tip && tip->bounds.width <= 140.0,
+    require(tip && (*tip).bounds.width <= 140.0,
             "ToolTip bubble must honor maximum text width plus chrome");
 }
 

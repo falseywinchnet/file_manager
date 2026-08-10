@@ -23,20 +23,17 @@ using namespace gui_drawing;
 
 #define CHECK(expression) do { if (!(expression)) fail(#expression, __LINE__); } while (false)
 
-template <typename Exception, typename Operation>
-void check_throws(Operation&& operation, int line) {
-    try {
-        operation();
-    } catch (const Exception&) {
-        return;
-    } catch (...) {
-        fail("unexpected exception type", line);
-    }
-    fail("expected exception", line);
-}
-
-#define CHECK_THROWS(type, expression) \
-    check_throws<type>([&] { static_cast<void>(expression); }, __LINE__)
+#define CHECK_THROWS(type, expression) do {                                    \
+    bool drawing_expected_exception = false;                                   \
+    try {                                                                       \
+        static_cast<void>(expression);                                          \
+    } catch (const type&) {                                                     \
+        drawing_expected_exception = true;                                     \
+    } catch (...) {                                                             \
+        fail("unexpected exception type", __LINE__);                           \
+    }                                                                           \
+    if (!drawing_expected_exception) fail("expected exception", __LINE__);     \
+} while (false)
 
 class FixedMetrics final : public TextMetricsProvider {
 public:
@@ -46,6 +43,56 @@ public:
                 font.size * 1.25};
     }
 };
+
+bool color_channel_close(std::uint8_t first, std::uint8_t second) {
+    return std::abs(static_cast<int>(first) - static_cast<int>(second)) <= 1;
+}
+
+class SnapshotPenOffThread final {
+public:
+    SnapshotPenOffThread(Pen& pen, std::atomic_bool& rejected)
+        : pen_(pen), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            static_cast<void>(pen_.snapshot());
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+
+private:
+    Pen& pen_;
+    std::atomic_bool& rejected_;
+};
+
+class ReadBitmapOffThread final {
+public:
+    ReadBitmapOffThread(Bitmap& bitmap, std::atomic_bool& rejected)
+        : bitmap_(bitmap), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            static_cast<void>(bitmap_.get_pixel(0, 0));
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+
+private:
+    Bitmap& bitmap_;
+    std::atomic_bool& rejected_;
+};
+
+void write_blue_pixel(BitmapEditView& edit, std::int32_t x, std::int32_t y) {
+    std::byte* pixel = edit.writable_data +
+        static_cast<std::size_t>(y) * edit.row_bytes +
+        static_cast<std::size_t>(x) * 4U;
+    pixel[0] = std::byte{255};
+    pixel[1] = std::byte{0};
+    pixel[2] = std::byte{0};
+    pixel[3] = std::byte{255};
+}
 
 std::string record_reference_trace() {
     SolidBrush brush(Color::from_name("RED"));
@@ -58,7 +105,7 @@ std::string record_reference_trace() {
 
     GraphicsRecorder recorder;
     recorder.clear(Color::from_name("black"));
-    const auto token = recorder.save();
+    const GraphicsStateToken token = recorder.save();
     recorder.translate(10.0, 5.0);
     recorder.set_clip({0.0, 0.0, 100.0, 50.0});
     recorder.set_quality(SmoothingMode::anti_alias, InterpolationMode::bicubic,
@@ -131,20 +178,17 @@ void explicit_color_spaces_round_trip_and_report_gamut() {
             xyz_d65_to_linear_srgb(linear_srgb_to_xyz_d65(linear));
         const SrgbConversion xyz_result = linear_to_srgb(xyz_round_trip);
         CHECK(xyz_result.in_gamut);
-        const auto channel_close = [](std::uint8_t first, std::uint8_t second) {
-            return std::abs(static_cast<int>(first) - static_cast<int>(second)) <= 1;
-        };
-        CHECK(channel_close(xyz_result.color.red(), sample.red()));
-        CHECK(channel_close(xyz_result.color.green(), sample.green()));
-        CHECK(channel_close(xyz_result.color.blue(), sample.blue()));
-        CHECK(channel_close(xyz_result.color.alpha(), sample.alpha()));
+        CHECK(color_channel_close(xyz_result.color.red(), sample.red()));
+        CHECK(color_channel_close(xyz_result.color.green(), sample.green()));
+        CHECK(color_channel_close(xyz_result.color.blue(), sample.blue()));
+        CHECK(color_channel_close(xyz_result.color.alpha(), sample.alpha()));
 
         const SrgbConversion lab_result = linear_to_srgb(
             oklab_to_linear_srgb(linear_srgb_to_oklab(linear)));
         CHECK(lab_result.in_gamut);
-        CHECK(channel_close(lab_result.color.red(), sample.red()));
-        CHECK(channel_close(lab_result.color.green(), sample.green()));
-        CHECK(channel_close(lab_result.color.blue(), sample.blue()));
+        CHECK(color_channel_close(lab_result.color.red(), sample.red()));
+        CHECK(color_channel_close(lab_result.color.green(), sample.green()));
+        CHECK(color_channel_close(lab_result.color.blue(), sample.blue()));
     }
 
     const Oklch requested{0.72, 0.42, 40.0, 0.65};
@@ -192,7 +236,7 @@ void transforms_resources_and_metrics_obey_contracts() {
     recorder.set_clip({0.0, 0.0, 10.0, 10.0});
     CHECK(recorder.is_visible({9.99, 9.99}));
     CHECK(!recorder.is_visible({10.0, 10.0}));
-    const auto token = recorder.save();
+    const GraphicsStateToken token = recorder.save();
     recorder.restore(token);
     CHECK_THROWS(std::invalid_argument, recorder.restore(token));
 
@@ -206,13 +250,7 @@ void transforms_resources_and_metrics_obey_contracts() {
     CHECK_THROWS(std::logic_error, brush.color());
 
     std::atomic_bool rejected{false};
-    std::thread foreign([&] {
-        try {
-            static_cast<void>(pen.snapshot());
-        } catch (const std::logic_error&) {
-            rejected = true;
-        }
-    });
+    std::thread foreign(SnapshotPenOffThread(pen, rejected));
     foreign.join();
     CHECK(rejected.load());
 
@@ -232,9 +270,9 @@ void extended_vocabulary_snapshots_resources() {
     CHECK(path.is_visible({0.0, 0.0}));
     CHECK(!path.is_visible({100.0, 100.0}));
     CHECK(path.path_points().size() == 23U);
-    auto copied_path = path.clone();
-    copied_path->transform(Matrix::translation(4.0, 5.0));
-    CHECK(copied_path->bounds() == (RectF{3.0, 3.0, 29.0, 27.0}));
+    std::unique_ptr<GraphicsPath> copied_path = path.clone();
+    (*copied_path).transform(Matrix::translation(4.0, 5.0));
+    CHECK((*copied_path).bounds() == (RectF{3.0, 3.0, 29.0, 27.0}));
     GraphicsPath appended;
     appended.add_line({-10.0, -10.0}, {-5.0, -5.0});
     appended.add_path(*copied_path, true);
@@ -355,9 +393,9 @@ void curve_polygon_and_pie_paths_are_retained_and_bounded() {
     pie.add_pie({0, 0, 20, 20}, 0.0, 90.0);
     CHECK(pie.is_visible({13, 13}));
     CHECK(!pie.is_visible({3, 3}));
-    auto transformed = pie.clone();
-    transformed->transform(Matrix::translation(5, 7));
-    CHECK(transformed->bounds() == (RectF{5, 7, 20, 20}));
+    std::unique_ptr<GraphicsPath> transformed = pie.clone();
+    (*transformed).transform(Matrix::translation(5, 7));
+    CHECK((*transformed).bounds() == (RectF{5, 7, 20, 20}));
 }
 
 void bitmap_storage_and_leases_are_generation_safe() {
@@ -397,29 +435,31 @@ void bitmap_storage_and_leases_are_generation_safe() {
     bitmap.set_pixel(1, 0, Color::from_name("red"));
     bitmap.set_pixel(0, 1, Color::from_name("blue"));
     bitmap.set_pixel(1, 1, Color::from_name("white"));
-    auto clone = bitmap.clone({1, 0, 1, 2});
-    CHECK(clone->width() == 1U && clone->height() == 2U);
-    CHECK(clone->get_pixel(0, 0).argb() == Color::from_name("red").argb());
-    clone->make_transparent(Color::from_name("red"));
-    CHECK(clone->get_pixel(0, 0).alpha() == 0U);
+    std::unique_ptr<Bitmap> clone = bitmap.clone({1, 0, 1, 2});
+    CHECK((*clone).width() == 1U && (*clone).height() == 2U);
+    CHECK((*clone).get_pixel(0, 0).argb() == Color::from_name("red").argb());
+    (*clone).make_transparent(Color::from_name("red"));
+    CHECK((*clone).get_pixel(0, 0).alpha() == 0U);
 
-    auto thumbnail = bitmap.thumbnail(1, 1);
-    CHECK(thumbnail->get_pixel(0, 0).argb() == Color::from_name("lime").argb());
+    std::unique_ptr<Bitmap> thumbnail = bitmap.thumbnail(1, 1);
+    CHECK((*thumbnail).get_pixel(0, 0).argb() ==
+          Color::from_name("lime").argb());
 
     ImageAttributes attributes;
     std::array<double, 25> matrix{};
     matrix[0] = matrix[6] = matrix[12] = matrix[18] = matrix[24] = 1.0;
     matrix[18] = 0.5;
-    auto adjusted = bitmap.adjusted(attributes);
-    CHECK(adjusted->get_pixel(0, 1).argb() == Color::from_name("blue").argb());
+    std::unique_ptr<Bitmap> adjusted = bitmap.adjusted(attributes);
+    CHECK((*adjusted).get_pixel(0, 1).argb() ==
+          Color::from_name("blue").argb());
     attributes.set_color_matrix(matrix);
     const ImageAttributesSnapshot::ColorRemap remap[] = {
         {Color::from_name("blue"), Color::from_name("red")},
     };
     attributes.set_remap_table(remap);
     adjusted = bitmap.adjusted(attributes);
-    CHECK(adjusted->get_pixel(0, 1).alpha() == 128U);
-    CHECK(adjusted->get_pixel(0, 1).red() == 255U);
+    CHECK((*adjusted).get_pixel(0, 1).alpha() == 128U);
+    CHECK((*adjusted).get_pixel(0, 1).red() == 255U);
 
     GraphicsRecorder recorder;
     recorder.draw_image(bitmap, {0, 0, 2, 2}, {0, 0, 2, 2}, attributes);
@@ -440,9 +480,9 @@ void bitmap_storage_and_leases_are_generation_safe() {
     const PointF transformed_origin =
         texture_snapshot.transform.transform({0.0, 0.0});
     CHECK(transformed_origin.x == 6.0 && transformed_origin.y == 6.0);
-    auto copied_texture = texture.clone();
+    std::unique_ptr<TextureBrush> copied_texture = texture.clone();
     texture.reset_transform();
-    CHECK(copied_texture->snapshot().transform == texture_snapshot.transform);
+    CHECK((*copied_texture).snapshot().transform == texture_snapshot.transform);
     GraphicsRecorder texture_recorder;
     texture_recorder.fill_rectangle(*copied_texture, {0.0, 0.0, 12.0, 8.0});
     CHECK(texture_recorder.commands().front().brush.kind == BrushKind::texture);
@@ -454,13 +494,7 @@ void bitmap_storage_and_leases_are_generation_safe() {
     CHECK_THROWS(std::length_error, Bitmap(32768, 32768));
 
     std::atomic_bool rejected{false};
-    std::thread foreign([&] {
-        try {
-            static_cast<void>(bitmap.get_pixel(0, 0));
-        } catch (const std::logic_error&) {
-            rejected = true;
-        }
-    });
+    std::thread foreign(ReadBitmapOffThread(bitmap, rejected));
     foreign.join();
     CHECK(rejected.load());
 }
@@ -477,20 +511,11 @@ void bounded_bitmap_edits_publish_local_damage_and_cancel_atomically() {
     CHECK_THROWS(std::logic_error, bitmap.snapshot());
     CHECK_THROWS(std::logic_error, bitmap.unlock(edit.token));
 
-    const auto write_blue = [&](std::int32_t x, std::int32_t y) {
-        std::byte* pixel = edit.writable_data +
-            static_cast<std::size_t>(y) * edit.row_bytes +
-            static_cast<std::size_t>(x) * 4U;
-        pixel[0] = std::byte{255};
-        pixel[1] = std::byte{0};
-        pixel[2] = std::byte{0};
-        pixel[3] = std::byte{255};
-    };
-    write_blue(0, 0);
-    write_blue(1, 0);
-    write_blue(0, 1);
-    write_blue(1, 1);
-    write_blue(3, 2);
+    write_blue_pixel(edit, 0, 0);
+    write_blue_pixel(edit, 1, 0);
+    write_blue_pixel(edit, 0, 1);
+    write_blue_pixel(edit, 1, 1);
+    write_blue_pixel(edit, 3, 2);
     CHECK(bitmap.commit_edit(edit.token) == 2U);
     CHECK(bitmap.get_pixel(2, 1).argb() == Color::from_name("blue").argb());
     CHECK(before.pixels()[static_cast<std::size_t>(1) * before.row_bytes() +

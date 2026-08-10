@@ -148,6 +148,7 @@ protected:
     void on_detached_from_window() noexcept override;
 
 private:
+    struct HoverIntentCallback;
     struct ScrollAnchor final {
         std::string stable_id;
         std::size_t index{};
@@ -157,6 +158,14 @@ private:
 
     [[nodiscard]] std::optional<std::size_t> item_index(
         std::string_view stable_id) const noexcept;
+    void retain_identity(std::string& stable_id) const;
+    void insert_expanded_index(
+        std::vector<std::size_t>& indices,
+        std::string_view stable_id) const;
+    static void add_semantic_text_child(
+        SemanticNode& node, std::string suffix,
+        std::string name, std::string value,
+        SemanticRole role = SemanticRole::static_text);
     [[nodiscard]] std::vector<std::size_t> expanded_indices() const;
     [[nodiscard]] bool expanded_index(std::size_t index) const noexcept;
     [[nodiscard]] double scaled_compact_height() const noexcept;

@@ -219,8 +219,122 @@ DateTimeFormatProvider french_date_provider() {
     return provider;
 }
 
+template <typename RangeControlType>
+class WeakRangeValueMirror final {
+public:
+    explicit WeakRangeValueMirror(
+        std::weak_ptr<RangeControlType> target) noexcept
+        : target_(std::move(target)) {}
+
+    void operator()(double value) const
+    {
+        if (const std::shared_ptr<RangeControlType> target = target_.lock();
+            target && (*target).value() != value) {
+            (*target).set_value(value);
+        }
+    }
+
+private:
+    std::weak_ptr<RangeControlType> target_;
+};
+
+class WeakProgressValueSetter final {
+public:
+    explicit WeakProgressValueSetter(
+        std::weak_ptr<ProgressBar> progress) noexcept
+        : progress_(std::move(progress)) {}
+
+    void operator()(double value) const
+    {
+        if (const std::shared_ptr<ProgressBar> progress = progress_.lock()) {
+            (*progress).set_value(value);
+        }
+    }
+
+private:
+    std::weak_ptr<ProgressBar> progress_;
+};
+
+class DrawingEffectsPaint final {
+public:
+    void operator()(Painter& painter, Rect bounds, Rect) const
+    {
+        const double board_width = bounds.width;
+        const double board_height = bounds.height;
+        painter.fill_rect(bounds, Color::rgba(26, 39, 52));
+        painter.fill_rect({0.0, 0.0, board_width, 4.0}, accent);
+        painter.draw_text_utf8(
+            {18.0, 27.0}, "RETAINED PAINTER COMPOSITION",
+            {FontRole::control, 12.0, 700, false},
+            Color::rgba(230, 240, 247));
+        painter.draw_text_utf8(
+            {18.0, 48.0},
+            "save · clip · translate · fill · stroke · line · UTF-8",
+            {FontRole::content, 10.0, 400, false},
+            Color::rgba(164, 192, 211));
+        painter.save();
+        painter.clip_rect(
+            {18.0, 62.0, board_width - 36.0, board_height - 78.0});
+        painter.translate({18.0, 62.0});
+        const double width = board_width - 36.0;
+        for (std::size_t index = 0; index < 12U; ++index) {
+            const double x = static_cast<double>(index) * width / 11.0;
+            const Color color = index % 3U == 0U ? accent
+                : index % 3U == 1U ? green : orange;
+            painter.draw_line({0.0, 66.0}, {x, 0.0}, color, 1.5);
+        }
+        painter.fill_rect(
+            {8.0, 20.0, width * 0.30, 38.0}, Color::rgba(43, 82, 112));
+        painter.stroke_rect(
+            {8.5, 20.5, width * 0.30 - 1.0, 37.0},
+            Color::rgba(211, 228, 239), 1.0);
+        painter.fill_rect(
+            {width * 0.37, 12.0, width * 0.25, 54.0}, violet);
+        painter.stroke_rect(
+            {width * 0.37 + 0.5, 12.5, width * 0.25 - 1.0, 53.0},
+            Color::rgba(234, 220, 244), 1.0);
+        painter.fill_rect(
+            {width * 0.68, 28.0, width * 0.29, 22.0}, green);
+        painter.restore();
+    }
+};
+
 void add_control_spectrum(const std::shared_ptr<Surface>& page,
                           const std::shared_ptr<ShowcaseContext>& context) {
+    class SoundCueClick final {
+    public:
+        SoundCueClick(std::weak_ptr<CheckBox> enabled,
+                      HostSoundCue cue,
+                      std::shared_ptr<ShowcaseContext> context) noexcept
+            : enabled_(std::move(enabled)), cue_(cue), context_(std::move(context)) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            HostServices* services = source.attached_window() == nullptr
+                ? nullptr : (*source.attached_window()).host_services();
+            HostServiceStatus result{HostServiceError::unsupported};
+            if (services != nullptr) {
+                const std::chrono::steady_clock::duration now =
+                    std::chrono::steady_clock::now().time_since_epoch();
+                const std::chrono::nanoseconds::rep stamp =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+                const std::shared_ptr<CheckBox> enabled = enabled_.lock();
+                result = (*services).play_sound_cue(
+                    {cue_, enabled && (*enabled).checked() ? 0.72 : 0.0,
+                     static_cast<std::uint64_t>(stamp)});
+            }
+            (*(*context_).status).set_text(
+                std::string("Sound cue ") + host_sound_cue_name(cue_) +
+                " · " + host_service_error_name(result.error) +
+                " · visual meaning remains complete when muted");
+        }
+
+    private:
+        std::weak_ptr<CheckBox> enabled_;
+        HostSoundCue cue_{};
+        std::shared_ptr<ShowcaseContext> context_;
+    };
+
     (*page).add_at(label("showcase.controls.heading", "CONTROL SPECTRUM", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 500.0, 34.0});
     (*page).add_at(label("showcase.controls.lead",
@@ -336,27 +450,7 @@ void add_control_spectrum(const std::shared_ptr<Surface>& page,
         const HostSoundCue cue = cues[index].first;
         const std::weak_ptr<CheckBox> weak_enabled = sound_enabled;
         (*context).subscriptions.push_back((*cue_button).clicked().subscribe(
-            *typography, [weak_enabled, cue, context](ButtonBase& source) {
-                HostServices* services = source.attached_window() == nullptr
-                    ? nullptr : (*source.attached_window()).host_services();
-                HostServiceStatus result{HostServiceError::unsupported};
-                if (services != nullptr) {
-                    const std::chrono::steady_clock::duration now =
-                        std::chrono::steady_clock::now()
-                        .time_since_epoch();
-                    const std::chrono::nanoseconds::rep stamp =
-                        std::chrono::duration_cast<
-                        std::chrono::nanoseconds>(now).count();
-                    const std::shared_ptr<gui_forms::CheckBox> enabled = weak_enabled.lock();
-                    result = (*services).play_sound_cue(
-                        {cue, enabled && (*enabled).checked() ? 0.72 : 0.0,
-                         static_cast<std::uint64_t>(stamp)});
-                }
-                (*(*context).status).set_text(
-                    std::string("Sound cue ") + host_sound_cue_name(cue) +
-                    " · " + host_service_error_name(result.error) +
-                    " · visual meaning remains complete when muted");
-            }));
+            *typography, SoundCueClick(weak_enabled, cue, context)));
     }
 }
 
@@ -409,20 +503,11 @@ void add_ranges(const std::shared_ptr<Surface>& page,
     (*sliders).add_at(vertical_scroll, {874.0, 38.0, 18.0, 160.0});
     const std::weak_ptr<VScrollBar> weak_vertical_scroll = vertical_scroll;
     (*context).subscriptions.push_back((*horizontal_scroll).value_changed().subscribe(
-        *vertical_scroll, [weak_vertical_scroll](double value) {
-            if (const std::shared_ptr<gui_forms::VScrollBar> vertical = weak_vertical_scroll.lock();
-                vertical && (*vertical).value() != value) {
-                (*vertical).set_value(value);
-            }
-        }));
+        *vertical_scroll, WeakRangeValueMirror<VScrollBar>(weak_vertical_scroll)));
     const std::weak_ptr<HScrollBar> weak_horizontal_scroll = horizontal_scroll;
     (*context).subscriptions.push_back((*vertical_scroll).value_changed().subscribe(
-        *horizontal_scroll, [weak_horizontal_scroll](double value) {
-            if (const std::shared_ptr<gui_forms::HScrollBar> horizontal = weak_horizontal_scroll.lock();
-                horizontal && (*horizontal).value() != value) {
-                (*horizontal).set_value(value);
-            }
-        }));
+        *horizontal_scroll,
+        WeakRangeValueMirror<HScrollBar>(weak_horizontal_scroll)));
 
     std::shared_ptr<LayoutGroup> progress_group = group("showcase.ranges.progress",
                                 "ProgressBar · static, indeterminate, luminance, marching, laser",
@@ -463,13 +548,89 @@ void add_ranges(const std::shared_ptr<Surface>& page,
         }
         if (index < tracks.size()) {
             (*context).subscriptions.push_back((*tracks[index]).value_changed().subscribe(
-                *progress, [progress](double value) { (*progress).set_value(value); }));
+                *progress, WeakProgressValueSetter(progress)));
         }
     }
 }
 
 void add_containers(const std::shared_ptr<Surface>& page,
                     const std::shared_ptr<ShowcaseContext>& context) {
+    class CollapseNavigationClick final {
+    public:
+        CollapseNavigationClick(std::weak_ptr<SplitContainer> split,
+                                std::weak_ptr<Button> collapse) noexcept
+            : split_(std::move(split)), collapse_(std::move(collapse)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<SplitContainer> split = split_.lock();
+            const std::shared_ptr<Button> collapse = collapse_.lock();
+            if (!split || !collapse) return;
+            const bool next = !(*split).first_collapsed();
+            (*split).set_first_collapsed(next);
+            (*collapse).set_text(next ? "Restore navigation" : "Collapse navigation");
+        }
+
+    private:
+        std::weak_ptr<SplitContainer> split_;
+        std::weak_ptr<Button> collapse_;
+    };
+
+    class FocusSplitterClick final {
+    public:
+        explicit FocusSplitterClick(std::weak_ptr<SplitContainer> split) noexcept
+            : split_(std::move(split)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            if (const std::shared_ptr<SplitContainer> split = split_.lock()) {
+                static_cast<void>(
+                    (*split).request_active_control((*split).splitter_control()));
+            }
+        }
+
+    private:
+        std::weak_ptr<SplitContainer> split_;
+    };
+
+    class FocusContainerDescendantClick final {
+    public:
+        FocusContainerDescendantClick(
+            std::weak_ptr<ContainerControl> container,
+            std::weak_ptr<Button> focus) noexcept
+            : container_(std::move(container)), focus_(std::move(focus)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ContainerControl> container = container_.lock();
+            const std::shared_ptr<Button> focus = focus_.lock();
+            if (container && focus) {
+                static_cast<void>((*container).request_active_control(focus));
+            }
+        }
+
+    private:
+        std::weak_ptr<ContainerControl> container_;
+        std::weak_ptr<Button> focus_;
+    };
+
+    class UserControlLoaded final {
+    public:
+        explicit UserControlLoaded(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()() const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(
+                    "UserControl · Loaded fired once · attachment committed");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
     (*page).add_at(label("showcase.containers.heading", "CONTAINERS AND FOCUS", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 500.0, 34.0});
     (*page).add_at(label("showcase.containers.lead",
@@ -515,28 +676,14 @@ void add_containers(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<SplitContainer> weak_split = split;
     const std::weak_ptr<Button> weak_collapse = collapse;
     (*context).subscriptions.push_back((*collapse).clicked().subscribe(
-        *split, [weak_split, weak_collapse](ButtonBase&) {
-            const std::shared_ptr<gui_forms::SplitContainer> split = weak_split.lock();
-            const std::shared_ptr<gui_forms::Button> collapse = weak_collapse.lock();
-            if (!split || !collapse) {
-                return;
-            }
-            const bool next = !(*split).first_collapsed();
-            (*split).set_first_collapsed(next);
-            (*collapse).set_text(next ? "Restore navigation" : "Collapse navigation");
-        }));
+        *split, CollapseNavigationClick(weak_split, weak_collapse)));
     std::shared_ptr<gui_forms::Button> focus_button = make_control<Button>(StableId("showcase.containers.focus"),
                                              "Focus the splitter");
     (*focus_button).set_visual_style(ButtonVisualStyle::accent);
     (*focus_button).set_requested_bounds({228.0, 132.0, 170.0, 34.0});
     (*(*split).second_panel()).add_child(focus_button);
     (*context).subscriptions.push_back((*focus_button).clicked().subscribe(
-        *split, [weak_split](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::SplitContainer> split = weak_split.lock()) {
-                static_cast<void>(
-                    (*split).request_active_control((*split).splitter_control()));
-            }
-        }));
+        *split, FocusSplitterClick(weak_split)));
 
     std::shared_ptr<gui_forms::ContainerControl> base_container = make_control<ContainerControl>(
         StableId("showcase.containers.base"));
@@ -561,13 +708,8 @@ void add_containers(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<ContainerControl> weak_base = base_container;
     const std::weak_ptr<Button> weak_base_focus = base_focus;
     (*context).subscriptions.push_back((*base_focus).clicked().subscribe(
-        *base_container, [weak_base, weak_base_focus](ButtonBase&) {
-            const std::shared_ptr<gui_forms::ContainerControl> container = weak_base.lock();
-            const std::shared_ptr<gui_forms::Button> focus = weak_base_focus.lock();
-            if (container && focus) {
-                static_cast<void>((*container).request_active_control(focus));
-            }
-        }));
+        *base_container,
+        FocusContainerDescendantClick(weak_base, weak_base_focus)));
 
     std::shared_ptr<gui_forms::UserControl> user_control = make_control<UserControl>(
         StableId("showcase.containers.user"));
@@ -592,12 +734,7 @@ void add_containers(const std::shared_ptr<Surface>& page,
     (*user_face).add_child(user_action);
     const std::weak_ptr<Label> weak_user_status = user_status;
     (*context).subscriptions.push_back((*user_control).loaded().subscribe(
-        *user_control, [weak_user_status] {
-            if (const std::shared_ptr<gui_forms::Label> status = weak_user_status.lock()) {
-                (*status).set_text(
-                    "UserControl · Loaded fired once · attachment committed");
-            }
-        }));
+        *user_control, UserControlLoaded(weak_user_status)));
 }
 
 void add_layout_panels(const std::shared_ptr<Surface>& page,
@@ -748,6 +885,122 @@ void add_layout_panels(const std::shared_ptr<Surface>& page,
 
 void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
                          const std::shared_ptr<ShowcaseContext>& context) {
+    class ToggleDockEdgeClick final {
+    public:
+        ToggleDockEdgeClick(std::weak_ptr<Button> edge,
+                            std::weak_ptr<Button> toggle,
+                            std::weak_ptr<ShowcaseContext> context) noexcept
+            : edge_(std::move(edge)), toggle_(std::move(toggle)),
+              context_(std::move(context)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<Button> edge = edge_.lock();
+            const std::shared_ptr<Button> toggle = toggle_.lock();
+            if (!edge || !toggle) return;
+            (*edge).set_visible(!(*edge).visible());
+            (*toggle).set_text((*edge).visible() ? "Hide left edge"
+                                                 : "Restore left edge");
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).status).set_text(
+                    (*edge).visible()
+                        ? "Dock · left edge restored · fill contracted"
+                        : "Dock · hidden edge released · fill expanded");
+            }
+        }
+
+    private:
+        std::weak_ptr<Button> edge_;
+        std::weak_ptr<Button> toggle_;
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class SwapDockOrderClick final {
+    public:
+        SwapDockOrderClick(std::weak_ptr<Panel> canvas,
+                           std::weak_ptr<Button> first,
+                           std::weak_ptr<Button> second,
+                           std::weak_ptr<Button> swap,
+                           std::weak_ptr<ShowcaseContext> context,
+                           std::shared_ptr<bool> top_b_front) noexcept
+            : canvas_(std::move(canvas)), first_(std::move(first)),
+              second_(std::move(second)), swap_(std::move(swap)),
+              context_(std::move(context)), top_b_front_(std::move(top_b_front)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<Panel> canvas = canvas_.lock();
+            const std::shared_ptr<Button> first = first_.lock();
+            const std::shared_ptr<Button> second = second_.lock();
+            const std::shared_ptr<Button> swap = swap_.lock();
+            if (!canvas || !first || !second || !swap) return;
+            *top_b_front_ = !*top_b_front_;
+            const std::shared_ptr<Button>& old_first = *top_b_front_ ? first : second;
+            const std::shared_ptr<Button>& new_first = *top_b_front_ ? second : first;
+            const std::optional<std::size_t> destination =
+                (*canvas).child_index((*old_first).runtime_id());
+            if (!destination ||
+                !(*canvas).set_child_index((*new_first).runtime_id(), *destination)) {
+                return;
+            }
+            (*swap).set_text(*top_b_front_ ? "Move Top A behind Top B"
+                                           : "Move Top B behind Top A");
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).status).set_text(
+                    *top_b_front_ ? "Dock · Top B now consumes the edge first"
+                                  : "Dock · Top A now consumes the edge first");
+            }
+        }
+
+    private:
+        std::weak_ptr<Panel> canvas_;
+        std::weak_ptr<Button> first_;
+        std::weak_ptr<Button> second_;
+        std::weak_ptr<Button> swap_;
+        std::weak_ptr<ShowcaseContext> context_;
+        std::shared_ptr<bool> top_b_front_;
+    };
+
+    class ResizeAnchorSpecimenClick final {
+    public:
+        ResizeAnchorSpecimenClick(
+            std::weak_ptr<ScaledGroupBox> group,
+            std::weak_ptr<Panel> canvas,
+            std::weak_ptr<Button> resize,
+            std::weak_ptr<ShowcaseContext> context,
+            std::shared_ptr<bool> expanded) noexcept
+            : group_(std::move(group)), canvas_(std::move(canvas)),
+              resize_(std::move(resize)), context_(std::move(context)),
+              expanded_(std::move(expanded)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ScaledGroupBox> group = group_.lock();
+            const std::shared_ptr<Panel> canvas = canvas_.lock();
+            const std::shared_ptr<Button> resize = resize_.lock();
+            if (!group || !canvas || !resize) return;
+            *expanded_ = !*expanded_;
+            (*group).set_design_bounds(
+                *canvas, *expanded_ ? Rect{18.0, 38.0, 730.0, 190.0}
+                                    : Rect{18.0, 38.0, 600.0, 170.0});
+            (*resize).set_text(*expanded_ ? "Restore specimen"
+                                          : "Expand specimen");
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).status).set_text(
+                    *expanded_
+                        ? "Anchor · parent expanded · stretch/right/center updated"
+                        : "Anchor · parent restored from retained design slot");
+            }
+        }
+
+    private:
+        std::weak_ptr<ScaledGroupBox> group_;
+        std::weak_ptr<Panel> canvas_;
+        std::weak_ptr<Button> resize_;
+        std::weak_ptr<ShowcaseContext> context_;
+        std::shared_ptr<bool> expanded_;
+    };
+
     (*page).add_at(label("showcase.dock.heading", "DOCK AND ANCHOR", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
     (*page).add_at(label(
@@ -820,47 +1073,16 @@ void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<Button> weak_toggle = toggle_left;
     const std::weak_ptr<ShowcaseContext> weak_context = context;
     (*context).subscriptions.push_back((*toggle_left).clicked().subscribe(
-        *page, [weak_left, weak_toggle, weak_context](ButtonBase&) {
-            const std::shared_ptr<gui_forms::Button> left = weak_left.lock();
-            const std::shared_ptr<gui_forms::Button> toggle = weak_toggle.lock();
-            if (!left || !toggle) return;
-            (*left).set_visible(!(*left).visible());
-            (*toggle).set_text((*left).visible() ? "Hide left edge"
-                                             : "Restore left edge");
-            if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                (*(*context).status).set_text(
-                    (*left).visible()
-                        ? "Dock · left edge restored · fill contracted"
-                        : "Dock · hidden edge released · fill expanded");
-            }
-        }));
+        *page, ToggleDockEdgeClick(weak_left, weak_toggle, weak_context)));
     const std::weak_ptr<Panel> weak_dock_canvas = dock_canvas;
     const std::weak_ptr<Button> weak_top_first = top_first;
     const std::weak_ptr<Button> weak_top_second = top_second;
     const std::weak_ptr<Button> weak_swap = swap_top;
     std::shared_ptr<bool> top_b_front = std::make_shared<bool>(false);
     (*context).subscriptions.push_back((*swap_top).clicked().subscribe(
-        *page, [weak_dock_canvas, weak_top_first, weak_top_second, weak_swap,
-                weak_context, top_b_front](ButtonBase&) {
-            const std::shared_ptr<gui_forms::Panel> canvas = weak_dock_canvas.lock();
-            const std::shared_ptr<gui_forms::Button> first = weak_top_first.lock();
-            const std::shared_ptr<gui_forms::Button> second = weak_top_second.lock();
-            const std::shared_ptr<gui_forms::Button> swap = weak_swap.lock();
-            if (!canvas || !first || !second || !swap) return;
-            *top_b_front = !*top_b_front;
-            const std::optional<std::size_t> destination = (*canvas).child_index(
-                (*(*top_b_front ? first : second)).runtime_id());
-            if (!destination || !(*canvas).set_child_index(
-                    (*(*top_b_front ? second : first)).runtime_id(),
-                    *destination)) return;
-            (*swap).set_text(*top_b_front ? "Move Top A behind Top B"
-                                       : "Move Top B behind Top A");
-            if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                (*(*context).status).set_text(
-                    *top_b_front ? "Dock · Top B now consumes the edge first"
-                                 : "Dock · Top A now consumes the edge first");
-            }
-        }));
+        *page, SwapDockOrderClick(
+            weak_dock_canvas, weak_top_first, weak_top_second, weak_swap,
+            weak_context, top_b_front)));
 
     std::shared_ptr<LayoutGroup> anchor_group = group(
         "showcase.anchor.group",
@@ -914,29 +1136,48 @@ void add_dock_and_anchor(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<Button> weak_resize = resize;
     std::shared_ptr<bool> expanded = std::make_shared<bool>(false);
     (*context).subscriptions.push_back((*resize).clicked().subscribe(
-        *page, [weak_anchor_group, weak_anchor_canvas, weak_resize,
-                weak_context, expanded](ButtonBase&) {
-            const std::shared_ptr<gui_forms::ScaledGroupBox> group = weak_anchor_group.lock();
-            const std::shared_ptr<gui_forms::Panel> canvas = weak_anchor_canvas.lock();
-            const std::shared_ptr<gui_forms::Button> resize = weak_resize.lock();
-            if (!group || !canvas || !resize) return;
-            *expanded = !*expanded;
-            (*group).set_design_bounds(*canvas,
-                *expanded ? Rect{18.0, 38.0, 730.0, 190.0}
-                          : Rect{18.0, 38.0, 600.0, 170.0});
-            (*resize).set_text(*expanded ? "Restore specimen"
-                                      : "Expand specimen");
-            if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                (*(*context).status).set_text(
-                    *expanded
-                        ? "Anchor · parent expanded · stretch/right/center updated"
-                        : "Anchor · parent restored from retained design slot");
-            }
-        }));
+        *page, ResizeAnchorSpecimenClick(
+            weak_anchor_group, weak_anchor_canvas, weak_resize,
+            weak_context, expanded)));
 }
 
 void add_animation(const std::shared_ptr<Surface>& page,
                    const std::shared_ptr<ShowcaseContext>& context) {
+    class ToggleMotionPauseClick final {
+    public:
+        explicit ToggleMotionPauseClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context || !(*context).live_motion) return;
+            (*context).user_paused = !(*context).user_paused;
+            (*context).apply_motion_policy();
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class SetReducedMotion final {
+    public:
+        explicit SetReducedMotion(std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(bool enabled) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*context).reduced_motion = enabled;
+                (*context).apply_motion_policy();
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
     (*page).add_at(label("showcase.animation.heading", "ANIMATION LABORATORY", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 520.0, 34.0});
     (*page).add_at(label("showcase.animation.lead",
@@ -967,12 +1208,7 @@ void add_animation(const std::shared_ptr<Surface>& page,
     (*context).motion_pause = pause;
     const std::weak_ptr<ShowcaseContext> weak_context = context;
     (*context).subscriptions.push_back((*pause).clicked().subscribe(
-        *easing, [weak_context](ButtonBase&) {
-            const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-            if (!context || !(*context).live_motion) return;
-            (*context).user_paused = !(*context).user_paused;
-            (*context).apply_motion_policy();
-        }));
+        *easing, ToggleMotionPauseClick(weak_context)));
     std::shared_ptr<Label> copy = label("showcase.animation.policy",
                       "Animation is deadline-driven and quiescent when hidden or paused. No perpetual redraw loop.",
                       12.0, 400, ink);
@@ -982,16 +1218,231 @@ void add_animation(const std::shared_ptr<Surface>& page,
     (*reduced).set_indicator_style(ChoiceIndicatorStyle::toggle);
     (*controls).add_at(reduced, {24.0, 96.0, 310.0, 28.0});
     (*context).subscriptions.push_back((*reduced).checked_changed().subscribe(
-        *easing, [weak_context](bool enabled) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                (*context).reduced_motion = enabled;
-                (*context).apply_motion_policy();
-            }
-        }));
+        *easing, SetReducedMotion(weak_context)));
 }
 
 void add_states(const std::shared_ptr<Surface>& page,
                 const std::shared_ptr<ShowcaseContext>& context) {
+    class AppendDispatcherCharacter final {
+    public:
+        AppendDispatcherCharacter(
+            std::weak_ptr<ShowcaseContext> context,
+            char value) noexcept
+            : context_(std::move(context)), value_(value) {}
+
+        void operator()() const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*context).dispatcher_trace.push_back(value_);
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+        char value_{};
+    };
+
+    class CompleteDispatcherTurnTwo final {
+    public:
+        explicit CompleteDispatcherTurnTwo(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            const std::shared_ptr<ShowcaseContext> state = context_.lock();
+            if (!state) return;
+            (*state).dispatcher_trace.push_back('D');
+            const DispatcherSnapshot snapshot =
+                (*(*(*state).dispatcher_status).attached_window()).dispatcher_snapshot();
+            (*(*state).dispatcher_status).set_text(
+                "Turn 2 committed · order " + (*state).dispatcher_trace +
+                " · invoked " + std::to_string(snapshot.invoked) +
+                " · faults " + std::to_string(snapshot.faulted));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class PostNestedDispatcherTurn final {
+    public:
+        explicit PostNestedDispatcherTurn(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            (*context).dispatcher_trace.push_back('B');
+            (*context).dispatcher_operations.push_back(
+                (*(*context).dispatcher_status).begin_invoke(
+                    CompleteDispatcherTurnTwo(context_)));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class CompleteDispatcherTurnOne final {
+    public:
+        explicit CompleteDispatcherTurnOne(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*context).dispatcher_trace.push_back('C');
+                (*(*context).dispatcher_status).set_text(
+                    "Turn 1 committed · order " + (*context).dispatcher_trace +
+                    " · nested D remains posted");
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class PostDispatcherBatchClick final {
+    public:
+        explicit PostDispatcherBatchClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            ++(*context).dispatcher_batch;
+            (*context).dispatcher_trace.clear();
+            (*context).dispatcher_operations.clear();
+            (*(*context).dispatcher_status).set_text(
+                "Click returned · batch " +
+                std::to_string((*context).dispatcher_batch) + " is pending");
+            (*context).dispatcher_operations.push_back(source.begin_invoke(
+                AppendDispatcherCharacter(context_, 'A')));
+            (*context).dispatcher_operations.push_back(source.begin_invoke(
+                PostNestedDispatcherTurn(context_)));
+            (*context).dispatcher_operations.push_back(source.begin_invoke(
+                CompleteDispatcherTurnOne(context_)));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class UnexpectedCancelledDispatch final {
+    public:
+        explicit UnexpectedCancelledDispatch(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            if (const std::shared_ptr<ShowcaseContext> state = context_.lock()) {
+                (*(*state).dispatcher_status).set_text(
+                    "ERROR · cancelled callback executed");
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class CancelDispatcherClick final {
+    public:
+        explicit CancelDispatcherClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            (*context).dispatcher_operations.clear();
+            DispatchOperation operation = source.begin_invoke(
+                UnexpectedCancelledDispatch(context_));
+            const std::uint64_t sequence = operation.sequence();
+            const bool cancelled = operation.cancel();
+            (*context).dispatcher_operations.push_back(std::move(operation));
+            (*(*context).dispatcher_status).set_text(
+                "Cancelled posted operation #" + std::to_string(sequence) +
+                (cancelled ? " before dispatch" : " too late"));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class CompleteWorkerInvocation final {
+    public:
+        explicit CompleteWorkerInvocation(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            if (const std::shared_ptr<ShowcaseContext> state = context_.lock()) {
+                const DispatcherSnapshot snapshot =
+                    (*(*(*state).dispatcher_status).attached_window())
+                        .dispatcher_snapshot();
+                (*(*state).dispatcher_status).set_text(
+                    "Worker released after UI callback · marshalled " +
+                    std::to_string(snapshot.marshalled_invocations));
+                (*(*state).dispatcher_invoke).set_enabled(true);
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class DispatcherWorker final {
+    public:
+        explicit DispatcherWorker(std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            try {
+                (*(*context).dispatcher_status).invoke(
+                    CompleteWorkerInvocation(context_));
+            } catch (const DispatchCancelledError&) {
+                // Window shutdown is the terminal owner of this worker.
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class InvokeDispatcherFromWorkerClick final {
+    public:
+        explicit InvokeDispatcherFromWorkerClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context || !(*(*context).dispatcher_invoke).enabled()) return;
+            (*(*context).dispatcher_invoke).set_enabled(false);
+            (*(*context).dispatcher_status).set_text(
+                "Worker blocked · no nested pump · waiting for UI turn");
+            if ((*context).dispatcher_worker.joinable()) {
+                (*context).dispatcher_worker.join();
+            }
+            (*context).dispatcher_worker = std::thread(DispatcherWorker(context_));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
     (*page).add_at(label("showcase.states.heading", "STATES AND DIAGNOSTICS", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 560.0, 34.0});
     (*page).add_at(label("showcase.states.lead",
@@ -1077,109 +1528,109 @@ void add_states(const std::shared_ptr<Surface>& page,
 
     const std::weak_ptr<ShowcaseContext> weak_context = context;
     (*context).subscriptions.push_back((*post).clicked().subscribe(
-        *post, [weak_context](ButtonBase& source) {
-            const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-            if (!context) return;
-            ++(*context).dispatcher_batch;
-            (*context).dispatcher_trace.clear();
-            (*context).dispatcher_operations.clear();
-            (*(*context).dispatcher_status).set_text(
-                "Click returned · batch " +
-                std::to_string((*context).dispatcher_batch) + " is pending");
-            const auto append = [weak_context](char value) {
-                if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                    (*context).dispatcher_trace.push_back(value);
-                }
-            };
-            (*context).dispatcher_operations.push_back(source.begin_invoke(
-                [append] { append('A'); }));
-            (*context).dispatcher_operations.push_back(source.begin_invoke(
-                [weak_context, append] {
-                    append('B');
-                    if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                        (*context).dispatcher_operations.push_back(
-                            (*(*context).dispatcher_status).begin_invoke(
-                                [weak_context, append] {
-                                    append('D');
-                                    if (const std::shared_ptr<ShowcaseContext> state = weak_context.lock()) {
-                                        const DispatcherSnapshot snapshot =
-                                            (*(*(*state).dispatcher_status
-                                                ).attached_window()
-                                                ).dispatcher_snapshot();
-                                        (*(*state).dispatcher_status).set_text(
-                                            "Turn 2 committed · order " +
-                                            (*state).dispatcher_trace +
-                                            " · invoked " +
-                                            std::to_string(snapshot.invoked) +
-                                            " · faults " +
-                                            std::to_string(snapshot.faulted));
-                                    }
-                                }));
-                    }
-                }));
-            (*context).dispatcher_operations.push_back(source.begin_invoke(
-                [weak_context, append] {
-                    append('C');
-                    if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                        (*(*context).dispatcher_status).set_text(
-                            "Turn 1 committed · order " +
-                            (*context).dispatcher_trace +
-                            " · nested D remains posted");
-                    }
-                }));
-        }));
+        *post, PostDispatcherBatchClick(weak_context)));
     (*context).subscriptions.push_back((*cancel).clicked().subscribe(
-        *cancel, [weak_context](ButtonBase& source) {
-            const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-            if (!context) return;
-            (*context).dispatcher_operations.clear();
-            DispatchOperation operation = source.begin_invoke([weak_context] {
-                if (const std::shared_ptr<ShowcaseContext> state = weak_context.lock()) {
-                    (*(*state).dispatcher_status).set_text(
-                        "ERROR · cancelled callback executed");
-                }
-            });
-            const std::uint64_t sequence = operation.sequence();
-            const bool cancelled = operation.cancel();
-            (*context).dispatcher_operations.push_back(std::move(operation));
-            (*(*context).dispatcher_status).set_text(
-                "Cancelled posted operation #" + std::to_string(sequence) +
-                (cancelled ? " before dispatch" : " too late"));
-        }));
+        *cancel, CancelDispatcherClick(weak_context)));
     (*context).subscriptions.push_back((*invoke).clicked().subscribe(
-        *invoke, [weak_context](ButtonBase&) {
-            const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-            if (!context || !(*(*context).dispatcher_invoke).enabled()) return;
-            (*(*context).dispatcher_invoke).set_enabled(false);
-            (*(*context).dispatcher_status).set_text(
-                "Worker blocked · no nested pump · waiting for UI turn");
-            if ((*context).dispatcher_worker.joinable()) {
-                (*context).dispatcher_worker.join();
-            }
-            (*context).dispatcher_worker = std::thread([weak_context] {
-                const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-                if (!context) return;
-                try {
-                    (*(*context).dispatcher_status).invoke([weak_context] {
-                        if (const std::shared_ptr<ShowcaseContext> state = weak_context.lock()) {
-                            const DispatcherSnapshot snapshot =
-                                (*(*(*state).dispatcher_status).attached_window()
-                                    ).dispatcher_snapshot();
-                            (*(*state).dispatcher_status).set_text(
-                                "Worker released after UI callback · marshalled " +
-                                std::to_string(snapshot.marshalled_invocations));
-                            (*(*state).dispatcher_invoke).set_enabled(true);
-                        }
-                    });
-                } catch (const DispatchCancelledError&) {
-                    // Window shutdown is the terminal owner of this worker.
-                }
-            });
-        }));
+        *invoke, InvokeDispatcherFromWorkerClick(weak_context)));
 }
 
 void add_text_input(const std::shared_ptr<Surface>& page,
                     const std::shared_ptr<ShowcaseContext>& context) {
+    class TextStateUpdater final {
+    public:
+        TextStateUpdater(std::weak_ptr<TextBox> field,
+                         std::weak_ptr<Label> state) noexcept
+            : field_(std::move(field)), state_(std::move(state)) {}
+
+        void operator()(const std::string&) const { update(); }
+        void operator()(const TextSelection&) const { update(); }
+
+    private:
+        void update() const
+        {
+            const std::shared_ptr<TextBox> field = field_.lock();
+            const std::shared_ptr<Label> state = state_.lock();
+            if (!field || !state) return;
+            const TextSelection selection = (*field).selection();
+            (*state).set_text(
+                "Selection: " + std::to_string(selection.start().value()) +
+                ".." + std::to_string(selection.end().value()) +
+                " bytes · Undo: " + ((*field).can_undo() ? "ready" : "clean") +
+                " · Redo: " + ((*field).can_redo() ? "ready" : "clean"));
+        }
+
+        std::weak_ptr<TextBox> field_;
+        std::weak_ptr<Label> state_;
+    };
+
+    enum class TextCommand {
+        select_all,
+        replace,
+        undo,
+        redo,
+        copy,
+        cut,
+        paste,
+    };
+
+    class TextCommandClick final {
+    public:
+        TextCommandClick(std::weak_ptr<TextBox> field,
+                         std::weak_ptr<Label> clipboard_status,
+                         TextCommand command) noexcept
+            : field_(std::move(field)),
+              clipboard_status_(std::move(clipboard_status)),
+              command_(command) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<TextBox> field = field_.lock();
+            if (!field) return;
+            switch (command_) {
+            case TextCommand::select_all:
+                (*field).select_all();
+                return;
+            case TextCommand::replace:
+                static_cast<void>((*field).replace_selection("GUI.Forms"));
+                return;
+            case TextCommand::undo:
+                static_cast<void>((*field).undo());
+                return;
+            case TextCommand::redo:
+                static_cast<void>((*field).redo());
+                return;
+            case TextCommand::copy:
+                publish_clipboard_status(*field, "copy", (*field).copy());
+                return;
+            case TextCommand::cut:
+                publish_clipboard_status(*field, "cut", (*field).cut());
+                return;
+            case TextCommand::paste:
+                publish_clipboard_status(*field, "paste", (*field).paste());
+                return;
+            }
+        }
+
+    private:
+        void publish_clipboard_status(TextBox& field,
+                                      std::string_view command,
+                                      bool accepted) const
+        {
+            if (const std::shared_ptr<Label> status = clipboard_status_.lock()) {
+                (*status).set_text(
+                    std::string("Clipboard ") + std::string(command) +
+                    (accepted ? " · accepted" : " · unavailable or empty") +
+                    " · " + std::to_string(field.text().size()) +
+                    " UTF-8 bytes retained");
+            }
+        }
+
+        std::weak_ptr<TextBox> field_;
+        std::weak_ptr<Label> clipboard_status_;
+        TextCommand command_{};
+    };
+
     (*page).add_at(label("showcase.text.heading", "TEXT AND INPUT", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 500.0, 34.0});
     (*page).add_at(label("showcase.text.lead",
@@ -1226,22 +1677,10 @@ void add_text_input(const std::shared_ptr<Surface>& page,
     (*editing).add_at(state, {154.0, 250.0, 700.0, 26.0});
     const std::weak_ptr<TextBox> weak_primary = primary;
     const std::weak_ptr<Label> weak_state = state;
-    const auto update_state = [weak_primary, weak_state] {
-        const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock();
-        const std::shared_ptr<gui_forms::Label> state = weak_state.lock();
-        if (!field || !state) {
-            return;
-        }
-        const TextSelection selection = (*field).selection();
-        (*state).set_text("Selection: " + std::to_string(selection.start().value()) +
-                        ".." + std::to_string(selection.end().value()) +
-                        " bytes · Undo: " + ((*field).can_undo() ? "ready" : "clean") +
-                        " · Redo: " + ((*field).can_redo() ? "ready" : "clean"));
-    };
     (*context).subscriptions.push_back((*primary).text_changed().subscribe(
-        *state, [update_state](const std::string&) { update_state(); }));
+        *state, TextStateUpdater(weak_primary, weak_state)));
     (*context).subscriptions.push_back((*primary).selection_changed().subscribe(
-        *state, [update_state](const TextSelection&) { update_state(); }));
+        *state, TextStateUpdater(weak_primary, weak_state)));
 
     std::shared_ptr<LayoutGroup> commands = group("showcase.text.commands", "Programmatic editing surface",
                           {930.0, 216.0});
@@ -1263,55 +1702,28 @@ void add_text_input(const std::shared_ptr<Surface>& page,
         command_buttons[index] = button;
     }
     (*context).subscriptions.push_back((*command_buttons[0]).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock()) (*field).select_all();
-        }));
+        *primary, TextCommandClick(weak_primary, {}, TextCommand::select_all)));
     (*context).subscriptions.push_back((*command_buttons[1]).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock()) {
-                static_cast<void>((*field).replace_selection("GUI.Forms"));
-            }
-        }));
+        *primary, TextCommandClick(weak_primary, {}, TextCommand::replace)));
     (*context).subscriptions.push_back((*command_buttons[2]).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock()) static_cast<void>((*field).undo());
-        }));
+        *primary, TextCommandClick(weak_primary, {}, TextCommand::undo)));
     (*context).subscriptions.push_back((*command_buttons[3]).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock()) static_cast<void>((*field).redo());
-        }));
+        *primary, TextCommandClick(weak_primary, {}, TextCommand::redo)));
     std::shared_ptr<Label> clipboard_status = label(
         "showcase.text.clipboard.status",
         "Clipboard: select text, then use buttons or Cmd/Ctrl+C, X, V",
         11.0, 600, green);
     (*commands).add_at(clipboard_status, {24.0, 92.0, 830.0, 26.0});
     const std::weak_ptr<Label> weak_clipboard_status = clipboard_status;
-    const auto update_clipboard_status =
-        [weak_primary, weak_clipboard_status](std::string_view command,
-                                              bool accepted) {
-            if (const std::shared_ptr<gui_forms::Label> status = weak_clipboard_status.lock()) {
-                const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock();
-                (*status).set_text(std::string("Clipboard ") + std::string(command) +
-                    (accepted ? " · accepted" : " · unavailable or empty") +
-                    (field ? " · " + std::to_string((*field).text().size()) +
-                                 " UTF-8 bytes retained" : std::string{}));
-            }
-        };
     (*context).subscriptions.push_back((*command_buttons[4]).clicked().subscribe(
-        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock();
-            update_clipboard_status("copy", field && (*field).copy());
-        }));
+        *primary, TextCommandClick(
+            weak_primary, weak_clipboard_status, TextCommand::copy)));
     (*context).subscriptions.push_back((*command_buttons[5]).clicked().subscribe(
-        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock();
-            update_clipboard_status("cut", field && (*field).cut());
-        }));
+        *primary, TextCommandClick(
+            weak_primary, weak_clipboard_status, TextCommand::cut)));
     (*context).subscriptions.push_back((*command_buttons[6]).clicked().subscribe(
-        *primary, [weak_primary, update_clipboard_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::TextBox> field = weak_primary.lock();
-            update_clipboard_status("paste", field && (*field).paste());
-        }));
+        *primary, TextCommandClick(
+            weak_primary, weak_clipboard_status, TextCommand::paste)));
     std::shared_ptr<Label> guarantee = label("showcase.text.guarantee",
                            "TextBox + TextStore own editing. HostServices only transports bounded UTF-8 clipboard data; protected fields never export values.",
                            11.0, 600, shell_blue_dark);
@@ -1322,6 +1734,45 @@ void add_text_input(const std::shared_ptr<Surface>& page,
 
 void add_collections(const std::shared_ptr<Surface>& page,
                      const std::shared_ptr<ShowcaseContext>& context) {
+    class ProfileSelectionChanged final {
+    public:
+        ProfileSelectionChanged(std::weak_ptr<Label> status,
+                                std::weak_ptr<ComboBox> profile) noexcept
+            : status_(std::move(status)), profile_(std::move(profile)) {}
+
+        void operator()(std::optional<std::size_t>) const
+        {
+            const std::shared_ptr<Label> status = status_.lock();
+            const std::shared_ptr<ComboBox> profile = profile_.lock();
+            if (!status || !profile) return;
+            (*status).set_text(
+                "Profile committed: " + std::string((*profile).selected_text()) +
+                " · overlay detached · focus restored");
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+        std::weak_ptr<ComboBox> profile_;
+    };
+
+    class DensityPopupChanged final {
+    public:
+        explicit DensityPopupChanged(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()(bool open) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(open
+                    ? "Density popup: OPEN · contained ListBox focus scope"
+                    : "Density popup: CLOSED · owner focus restored");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
     (*page).add_at(label("showcase.collections.heading", "COLLECTIONS AND POPUPS", 22.0,
                        700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
     (*page).add_at(label("showcase.collections.lead",
@@ -1375,26 +1826,161 @@ void add_collections(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<Label> weak_status = status;
     const std::weak_ptr<ComboBox> weak_profile = profile;
     (*context).subscriptions.push_back((*profile).selected_index_changed().subscribe(
-        *status, [weak_status, weak_profile](std::optional<std::size_t>) {
-            if (const std::shared_ptr<gui_forms::Label> status = weak_status.lock(); status) {
-                const std::shared_ptr<gui_forms::ComboBox> profile = weak_profile.lock();
-                if (!profile) return;
-                (*status).set_text("Profile committed: " + std::string((*profile).selected_text()) +
-                                 " · overlay detached · focus restored");
-            }
-        }));
+        *status, ProfileSelectionChanged(weak_status, weak_profile)));
     (*context).subscriptions.push_back((*density).drop_down_changed().subscribe(
-        *status, [weak_status](bool open) {
-            if (const std::shared_ptr<gui_forms::Label> status = weak_status.lock()) {
-                (*status).set_text(open
-                    ? "Density popup: OPEN · contained ListBox focus scope"
-                    : "Density popup: CLOSED · owner focus restored");
-            }
-        }));
+        *status, DensityPopupChanged(weak_status)));
 }
 
 void add_values(const std::shared_ptr<Surface>& page,
                 const std::shared_ptr<ShowcaseContext>& context) {
+    enum class PropertySpecimenAction {
+        inspect_numeric,
+        inspect_items,
+        inspect_style,
+        add_item,
+    };
+
+    class PropertySpecimenClick final {
+    public:
+        PropertySpecimenClick(std::weak_ptr<PropertyGrid> grid,
+                              std::weak_ptr<NumericUpDown> numeric,
+                              std::weak_ptr<ComboBox> combo,
+                              std::weak_ptr<Label> status,
+                              PropertySpecimenAction action) noexcept
+            : grid_(std::move(grid)), numeric_(std::move(numeric)),
+              combo_(std::move(combo)), status_(std::move(status)),
+              action_(action) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<PropertyGrid> grid = grid_.lock();
+            if (!grid) return;
+            switch (action_) {
+            case PropertySpecimenAction::inspect_numeric:
+                inspect_numeric(*grid);
+                return;
+            case PropertySpecimenAction::inspect_items:
+                inspect_items(*grid);
+                return;
+            case PropertySpecimenAction::inspect_style:
+                inspect_style(*grid);
+                return;
+            case PropertySpecimenAction::add_item:
+                add_item(*grid);
+                return;
+            }
+        }
+
+    private:
+        void set_status(std::string text) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(std::move(text));
+            }
+        }
+
+        void inspect_numeric(PropertyGrid& grid) const
+        {
+            const std::shared_ptr<NumericUpDown> numeric = numeric_.lock();
+            if (!numeric) return;
+            grid.set_selected_object(numeric);
+            static_cast<void>(grid.set_property_expanded("Bounds", true));
+            set_status(
+                "PropertyGrid · retained NumericUpDown factory and typed commit");
+        }
+
+        void inspect_items(PropertyGrid& grid) const
+        {
+            const std::shared_ptr<ComboBox> combo = combo_.lock();
+            if (!combo) return;
+            grid.set_selected_object(combo);
+            static_cast<void>(grid.set_property_expanded("Items", true));
+            if (Window* window = grid.attached_window()) {
+                static_cast<void>((*window).request_focus(grid.editor("Items[0]")));
+            }
+            set_status(
+                "PropertyGrid · ComboBox.Items immutable collection expanded");
+        }
+
+        void inspect_style(PropertyGrid& grid) const
+        {
+            const std::shared_ptr<Label> status = status_.lock();
+            if (!status) return;
+            grid.set_selected_object(status);
+            static_cast<void>(grid.set_property_expanded("ForeColor", true));
+            (*status).set_text(
+                "PropertyGrid · flags popup and canonical color editor services");
+        }
+
+        void add_item(PropertyGrid& grid) const
+        {
+            const std::shared_ptr<ComboBox> combo = combo_.lock();
+            if (!combo) return;
+            if (grid.selected_object() != combo) grid.set_selected_object(combo);
+            static_cast<void>(grid.set_property_expanded("Items", true));
+            const bool added = grid.insert_collection_item(
+                "Items", (*combo).items().size(),
+                BindingValue{std::string("CW")});
+            if (added) {
+                if (Window* window = grid.attached_window()) {
+                    static_cast<void>((*window).request_focus(grid.editor(
+                        "Items[" +
+                        std::to_string((*combo).items().size() - 1U) + "]")));
+                }
+            }
+            set_status(added
+                ? "PropertyGrid · inserted CW through ComboBox.Items setter"
+                : "PropertyGrid · Items insertion rejected truthfully");
+        }
+
+        std::weak_ptr<PropertyGrid> grid_;
+        std::weak_ptr<NumericUpDown> numeric_;
+        std::weak_ptr<ComboBox> combo_;
+        std::weak_ptr<Label> status_;
+        PropertySpecimenAction action_{};
+    };
+
+    class NumericValueStatus final {
+    public:
+        NumericValueStatus(std::weak_ptr<Label> status,
+                           std::size_t index) noexcept
+            : status_(std::move(status)), index_(index) {}
+
+        void operator()(double value) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(
+                    "Numeric " + std::to_string(index_ + 1U) +
+                    " committed " + std::to_string(value) +
+                    " · event emitted after value and editor synchronization");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+        std::size_t index_{};
+    };
+
+    class PropertyValueStatus final {
+    public:
+        explicit PropertyValueStatus(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()(const PropertyGridValueChange& change) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(
+                    "PropertyGrid committed " + change.property_name +
+                    " · origin " +
+                    std::string(property_value_origin_name(change.origin)) +
+                    (change.reset ? " · reset" : ""));
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
     (*page).add_at(label("showcase.values.heading", "VALUES AND SPINNERS", 22.0, 700,
                        shell_blue_dark), {24.0, 18.0, 600.0, 34.0});
     (*page).add_at(label("showcase.values.lead",
@@ -1475,90 +2061,30 @@ void add_values(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<ComboBox> weak_items_target = items_target;
     const std::weak_ptr<Label> weak_inspection_status = status;
     (*context).subscriptions.push_back((*inspect_numeric).clicked().subscribe(
-        *status, [weak_inspector, weak_numeric, weak_inspection_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::PropertyGrid> grid = weak_inspector.lock();
-            const std::shared_ptr<gui_forms::NumericUpDown> numeric = weak_numeric.lock();
-            if (!grid || !numeric) return;
-            (*grid).set_selected_object(numeric);
-            static_cast<void>((*grid).set_property_expanded("Bounds", true));
-            if (const std::shared_ptr<gui_forms::Label> status = weak_inspection_status.lock()) {
-                (*status).set_text(
-                    "PropertyGrid · retained NumericUpDown factory and typed commit");
-            }
-        }));
+        *status, PropertySpecimenClick(
+            weak_inspector, weak_numeric, weak_items_target,
+            weak_inspection_status, PropertySpecimenAction::inspect_numeric)));
     (*context).subscriptions.push_back((*inspect_items).clicked().subscribe(
-        *status, [weak_inspector, weak_items_target,
-                  weak_inspection_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::PropertyGrid> grid = weak_inspector.lock();
-            const std::shared_ptr<gui_forms::ComboBox> combo = weak_items_target.lock();
-            if (!grid || !combo) return;
-            (*grid).set_selected_object(combo);
-            static_cast<void>((*grid).set_property_expanded("Items", true));
-            if (Window* window = (*grid).attached_window()) {
-                static_cast<void>((*window).request_focus((*grid).editor("Items[0]")));
-            }
-            if (const std::shared_ptr<gui_forms::Label> status = weak_inspection_status.lock()) {
-                (*status).set_text(
-                    "PropertyGrid · ComboBox.Items immutable collection expanded");
-            }
-        }));
+        *status, PropertySpecimenClick(
+            weak_inspector, weak_numeric, weak_items_target,
+            weak_inspection_status, PropertySpecimenAction::inspect_items)));
     (*context).subscriptions.push_back((*inspect_style).clicked().subscribe(
-        *status, [weak_inspector, weak_inspection_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::PropertyGrid> grid = weak_inspector.lock();
-            const std::shared_ptr<gui_forms::Label> status = weak_inspection_status.lock();
-            if (!grid || !status) return;
-            (*grid).set_selected_object(status);
-            static_cast<void>((*grid).set_property_expanded("ForeColor", true));
-            (*status).set_text(
-                "PropertyGrid · flags popup and canonical color editor services");
-        }));
+        *status, PropertySpecimenClick(
+            weak_inspector, weak_numeric, weak_items_target,
+            weak_inspection_status, PropertySpecimenAction::inspect_style)));
     (*context).subscriptions.push_back((*add_item).clicked().subscribe(
-        *status, [weak_inspector, weak_items_target,
-                  weak_inspection_status](ButtonBase&) {
-            const std::shared_ptr<gui_forms::PropertyGrid> grid = weak_inspector.lock();
-            const std::shared_ptr<gui_forms::ComboBox> combo = weak_items_target.lock();
-            if (!grid || !combo) return;
-            if ((*grid).selected_object() != combo) (*grid).set_selected_object(combo);
-            static_cast<void>((*grid).set_property_expanded("Items", true));
-            const bool added = (*grid).insert_collection_item(
-                "Items", (*combo).items().size(), BindingValue{std::string("CW")});
-            if (added) {
-                if (Window* window = (*grid).attached_window()) {
-                    static_cast<void>((*window).request_focus((*grid).editor(
-                        "Items[" +
-                        std::to_string((*combo).items().size() - 1U) + "]")));
-                }
-            }
-            if (const std::shared_ptr<gui_forms::Label> status = weak_inspection_status.lock()) {
-                (*status).set_text(added
-                    ? "PropertyGrid · inserted CW through ComboBox.Items setter"
-                    : "PropertyGrid · Items insertion rejected truthfully");
-            }
-        }));
+        *status, PropertySpecimenClick(
+            weak_inspector, weak_numeric, weak_items_target,
+            weak_inspection_status, PropertySpecimenAction::add_item)));
     for (std::size_t index = 0; index < values.size(); ++index) {
         const std::weak_ptr<Label> weak_status = status;
         (*context).subscriptions.push_back((*values[index]).value_changed().subscribe(
-            *status, [weak_status, index](double value) {
-                if (const std::shared_ptr<gui_forms::Label> status = weak_status.lock()) {
-                    (*status).set_text("Numeric " + std::to_string(index + 1U) +
-                                     " committed " + std::to_string(value) +
-                                     " · event emitted after value and editor synchronization");
-                }
-        }));
+            *status, NumericValueStatus(weak_status, index)));
     }
     const std::weak_ptr<Label> weak_property_status = status;
     (*context).subscriptions.push_back(
         (*inspector).property_value_changed().subscribe(
-            *status, [weak_property_status](
-                         const PropertyGridValueChange& change) {
-                if (const std::shared_ptr<gui_forms::Label> label = weak_property_status.lock()) {
-                    (*label).set_text(
-                        "PropertyGrid committed " + change.property_name +
-                        " · origin " +
-                        std::string(property_value_origin_name(change.origin)) +
-                        (change.reset ? " · reset" : ""));
-                }
-            }));
+            *status, PropertyValueStatus(weak_property_status)));
 
     std::shared_ptr<LayoutGroup> binding = group("showcase.values.binding",
                          "BindingSource · currency, edit, conversion, two-way controls",
@@ -1670,41 +2196,7 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
     (*board).set_accessible_name("Renderer-neutral drawing primitive composition");
     (*board).set_accessible_description(
         "Nested clipping, translation, fills, strokes, lines, and text");
-    (*board).set_paint_callback([](Painter& painter, Rect bounds, Rect) {
-        const double board_width = bounds.width;
-        const double board_height = bounds.height;
-        painter.fill_rect(bounds,
-                          Color::rgba(26, 39, 52));
-        painter.fill_rect({0.0, 0.0, board_width, 4.0}, accent);
-        painter.draw_text_utf8({18.0, 27.0}, "RETAINED PAINTER COMPOSITION",
-                               {FontRole::control, 12.0, 700, false},
-                               Color::rgba(230, 240, 247));
-        painter.draw_text_utf8(
-            {18.0, 48.0},
-            "save · clip · translate · fill · stroke · line · UTF-8",
-            {FontRole::content, 10.0, 400, false},
-            Color::rgba(164, 192, 211));
-        painter.save();
-        painter.clip_rect({18.0, 62.0, board_width - 36.0, board_height - 78.0});
-        painter.translate({18.0, 62.0});
-        const double width = board_width - 36.0;
-        for (std::size_t index = 0; index < 12U; ++index) {
-            const double x = static_cast<double>(index) * width / 11.0;
-            const Color color = index % 3U == 0U ? accent
-                : index % 3U == 1U ? green : orange;
-            painter.draw_line({0.0, 66.0}, {x, 0.0}, color, 1.5);
-        }
-        painter.fill_rect({8.0, 20.0, width * 0.30, 38.0},
-                          Color::rgba(43, 82, 112));
-        painter.stroke_rect({8.5, 20.5, width * 0.30 - 1.0, 37.0},
-                            Color::rgba(211, 228, 239), 1.0);
-        painter.fill_rect({width * 0.37, 12.0, width * 0.25, 54.0}, violet);
-        painter.stroke_rect({width * 0.37 + 0.5, 12.5,
-                             width * 0.25 - 1.0, 53.0},
-                            Color::rgba(234, 220, 244), 1.0);
-        painter.fill_rect({width * 0.68, 28.0, width * 0.29, 22.0}, green);
-        painter.restore();
-    });
+    (*board).set_paint_callback(DrawingEffectsPaint());
     (*primitives).add_at(board, {20.0, 38.0, 194.0, 158.0});
 
     std::shared_ptr<gui_drawing::Bitmap> raster_bitmap = std::make_shared<gui_drawing::Bitmap>(12U, 12U);
@@ -1751,6 +2243,28 @@ void add_images_and_drawing(const std::shared_ptr<Surface>& page,
 
 void add_tabs_and_pages(const std::shared_ptr<Surface>& page,
                         const std::shared_ptr<ShowcaseContext>& context) {
+    class PrimaryTabSelectionChanged final {
+    public:
+        PrimaryTabSelectionChanged(std::weak_ptr<Label> status,
+                                   std::weak_ptr<TabControl> tabs) noexcept
+            : status_(std::move(status)), tabs_(std::move(tabs)) {}
+
+        void operator()(const TabSelectionChange&) const
+        {
+            const std::shared_ptr<Label> status = status_.lock();
+            const std::shared_ptr<TabControl> tabs = tabs_.lock();
+            if (status && tabs && (*tabs).selected_tab()) {
+                (*status).set_text(
+                    (*(*tabs).selected_tab()).text() +
+                    " selected · focus and semantics reconciled");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+        std::weak_ptr<TabControl> tabs_;
+    };
+
     (*page).add_at(label("showcase.tabs.heading", "TABS AND RETAINED PAGES", 22.0,
                        700, shell_blue_dark), {24.0, 18.0, 680.0, 34.0});
     (*page).add_at(label("showcase.tabs.lead",
@@ -1833,14 +2347,7 @@ void add_tabs_and_pages(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<Label> weak_status = status;
     const std::weak_ptr<TabControl> weak_primary = primary;
     (*context).subscriptions.push_back((*primary).selected_index_changed().subscribe(
-        *status, [weak_status, weak_primary](const TabSelectionChange&) {
-            const std::shared_ptr<gui_forms::Label> status = weak_status.lock();
-            const std::shared_ptr<gui_forms::TabControl> tabs = weak_primary.lock();
-            if (status && tabs && (*tabs).selected_tab()) {
-                (*status).set_text((*(*tabs).selected_tab()).text() +
-                                 " selected · focus and semantics reconciled");
-            }
-        }));
+        *status, PrimaryTabSelectionChanged(weak_status, weak_primary)));
 
     std::shared_ptr<LayoutGroup> variants = group("showcase.tabs.variants",
                           "Alignment and appearance matrix", {930.0, 230.0});
@@ -1887,6 +2394,60 @@ void add_tabs_and_pages(const std::shared_ptr<Surface>& page,
 
 void add_checked_collections(const std::shared_ptr<Surface>& page,
                              const std::shared_ptr<ShowcaseContext>& context) {
+    class CheckedItemStatus final {
+    public:
+        explicit CheckedItemStatus(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()(std::size_t index, CheckState state) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(
+                    "Item " + std::to_string(index + 1U) + " committed " +
+                    (state == CheckState::checked ? "checked" :
+                     state == CheckState::indeterminate ? "mixed" :
+                     "unchecked") +
+                    " · selection unchanged");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
+    enum class CheckedListCommand {
+        check_all,
+        clear_all,
+        set_mixed,
+    };
+
+    class CheckedListCommandClick final {
+    public:
+        CheckedListCommandClick(std::weak_ptr<CheckedListBox> list,
+                                CheckedListCommand command) noexcept
+            : list_(std::move(list)), command_(command) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<CheckedListBox> list = list_.lock();
+            if (!list) return;
+            if (command_ == CheckedListCommand::set_mixed) {
+                if (!(*list).items().empty()) {
+                    (*list).set_item_check_state(3U, CheckState::indeterminate);
+                }
+                return;
+            }
+            const bool checked = command_ == CheckedListCommand::check_all;
+            for (std::size_t index = 0U; index < (*list).items().size(); ++index) {
+                (*list).set_item_checked(index, checked);
+            }
+        }
+
+    private:
+        std::weak_ptr<CheckedListBox> list_;
+        CheckedListCommand command_{};
+    };
+
     (*page).add_at(label("showcase.checked.heading", "CHECKED COLLECTIONS", 22.0,
                        700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
     (*page).add_at(label("showcase.checked.lead",
@@ -1961,38 +2522,16 @@ void add_checked_collections(const std::shared_ptr<Surface>& page,
     const std::weak_ptr<CheckedListBox> weak_immediate = immediate;
     const std::weak_ptr<Label> weak_status = status;
     (*context).subscriptions.push_back((*immediate).item_check_state_changed().subscribe(
-        *status, [weak_status](std::size_t index, CheckState state) {
-            if (const std::shared_ptr<gui_forms::Label> status = weak_status.lock()) {
-                (*status).set_text("Item " + std::to_string(index + 1U) +
-                                 " committed " +
-                                 (state == CheckState::checked ? "checked" :
-                                  state == CheckState::indeterminate ? "mixed" :
-                                  "unchecked") +
-                                 " · selection unchanged");
-            }
-        }));
+        *status, CheckedItemStatus(weak_status)));
     (*context).subscriptions.push_back((*check_all).clicked().subscribe(
-        *immediate, [weak_immediate](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::CheckedListBox> list = weak_immediate.lock()) {
-                for (std::size_t index = 0U; index < (*list).items().size(); ++index) {
-                    (*list).set_item_checked(index, true);
-                }
-            }
-        }));
+        *immediate, CheckedListCommandClick(
+            weak_immediate, CheckedListCommand::check_all)));
     (*context).subscriptions.push_back((*clear).clicked().subscribe(
-        *immediate, [weak_immediate](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::CheckedListBox> list = weak_immediate.lock()) {
-                for (std::size_t index = 0U; index < (*list).items().size(); ++index) {
-                    (*list).set_item_checked(index, false);
-                }
-            }
-        }));
+        *immediate, CheckedListCommandClick(
+            weak_immediate, CheckedListCommand::clear_all)));
     (*context).subscriptions.push_back((*mixed).clicked().subscribe(
-        *immediate, [weak_immediate](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::CheckedListBox> list = weak_immediate.lock(); list && !(*list).items().empty()) {
-                (*list).set_item_check_state(3U, CheckState::indeterminate);
-            }
-    }));
+        *immediate, CheckedListCommandClick(
+            weak_immediate, CheckedListCommand::set_mixed)));
 }
 
 void add_timing_and_tooltips(const std::shared_ptr<Surface>& page,
@@ -2111,6 +2650,98 @@ void add_timing_and_tooltips(const std::shared_ptr<Surface>& page,
 
 void add_dates_and_calendar(const std::shared_ptr<Surface>& page,
                             const std::shared_ptr<ShowcaseContext>& context) {
+    class DateValueStatus final {
+    public:
+        DateValueStatus(std::weak_ptr<DateTimePicker> picker,
+                        std::weak_ptr<Label> status) noexcept
+            : picker_(std::move(picker)), status_(std::move(status)) {}
+
+        void operator()(DateTimeValue) const
+        {
+            const std::shared_ptr<DateTimePicker> picker = picker_.lock();
+            const std::shared_ptr<Label> status = status_.lock();
+            if (picker && status) {
+                (*status).set_text(
+                    "Committed · " + (*picker).formatted_value() +
+                    " · retained focus restored");
+            }
+        }
+
+    private:
+        std::weak_ptr<DateTimePicker> picker_;
+        std::weak_ptr<Label> status_;
+    };
+
+    class DatePopupStatus final {
+    public:
+        explicit DatePopupStatus(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()(bool expanded) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(expanded
+                    ? "Calendar open · arrows navigate · Enter commits · Esc cancels"
+                    : "Calendar closed · popup and focus scope revoked");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
+    class OptionalDateStatus final {
+    public:
+        explicit OptionalDateStatus(std::weak_ptr<Label> status) noexcept
+            : status_(std::move(status)) {}
+
+        void operator()(bool checked) const
+        {
+            if (const std::shared_ptr<Label> status = status_.lock()) {
+                (*status).set_text(checked
+                    ? "Optional date enabled · value retained"
+                    : "Optional date unchecked · value retained but inactive");
+            }
+        }
+
+    private:
+        std::weak_ptr<Label> status_;
+    };
+
+    enum class DateCommand {
+        previous_day,
+        next_day,
+        open_calendar,
+    };
+
+    class DateCommandClick final {
+    public:
+        DateCommandClick(std::weak_ptr<DateTimePicker> picker,
+                         DateCommand command) noexcept
+            : picker_(std::move(picker)), command_(command) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<DateTimePicker> picker = picker_.lock();
+            if (!picker) return;
+            switch (command_) {
+            case DateCommand::previous_day:
+                (*picker).set_value(add_days((*picker).value(), -1));
+                return;
+            case DateCommand::next_day:
+                (*picker).set_value(add_days((*picker).value(), 1));
+                return;
+            case DateCommand::open_calendar:
+                (*picker).set_dropped_down(true);
+                return;
+            }
+        }
+
+    private:
+        std::weak_ptr<DateTimePicker> picker_;
+        DateCommand command_{};
+    };
+
     (*page).add_at(label("showcase.date.heading", "DATES AND CALENDAR", 22.0,
                        700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
     (*page).add_at(label(
@@ -2227,51 +2858,18 @@ void add_dates_and_calendar(const std::shared_ptr<Surface>& page,
 
     const std::weak_ptr<DateTimePicker> weak_primary = primary;
     const std::weak_ptr<Label> weak_status = status;
-    const auto publish_value = [weak_primary, weak_status](std::string_view verb) {
-        const std::shared_ptr<gui_forms::DateTimePicker> picker = weak_primary.lock();
-        const std::shared_ptr<gui_forms::Label> message = weak_status.lock();
-        if (picker && message) {
-            (*message).set_text(std::string(verb) + " · " +
-                              (*picker).formatted_value() +
-                              " · retained focus restored");
-        }
-    };
     (*context).subscriptions.push_back((*primary).value_changed().subscribe(
-        *status, [publish_value](DateTimeValue) { publish_value("Committed"); }));
+        *status, DateValueStatus(weak_primary, weak_status)));
     (*context).subscriptions.push_back((*primary).drop_down_changed().subscribe(
-        *status, [weak_status](bool expanded) {
-            if (const std::shared_ptr<gui_forms::Label> message = weak_status.lock()) {
-                (*message).set_text(expanded
-                    ? "Calendar open · arrows navigate · Enter commits · Esc cancels"
-                    : "Calendar closed · popup and focus scope revoked");
-            }
-        }));
+        *status, DatePopupStatus(weak_status)));
     (*context).subscriptions.push_back((*optional).checked_changed().subscribe(
-        *status, [weak_status](bool checked) {
-            if (const std::shared_ptr<gui_forms::Label> message = weak_status.lock()) {
-                (*message).set_text(checked
-                    ? "Optional date enabled · value retained"
-                    : "Optional date unchecked · value retained but inactive");
-            }
-        }));
+        *status, OptionalDateStatus(weak_status)));
     (*context).subscriptions.push_back((*previous).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::DateTimePicker> picker = weak_primary.lock()) {
-                (*picker).set_value(add_days((*picker).value(), -1));
-            }
-        }));
+        *primary, DateCommandClick(weak_primary, DateCommand::previous_day)));
     (*context).subscriptions.push_back((*next).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::DateTimePicker> picker = weak_primary.lock()) {
-                (*picker).set_value(add_days((*picker).value(), 1));
-            }
-        }));
+        *primary, DateCommandClick(weak_primary, DateCommand::next_day)));
     (*context).subscriptions.push_back((*open).clicked().subscribe(
-        *primary, [weak_primary](ButtonBase&) {
-            if (const std::shared_ptr<gui_forms::DateTimePicker> picker = weak_primary.lock()) {
-                (*picker).set_dropped_down(true);
-            }
-        }));
+        *primary, DateCommandClick(weak_primary, DateCommand::open_calendar)));
 }
 
 void add_dialogs_and_host_services(
@@ -2294,6 +2892,262 @@ void add_dialogs_and_host_services(
         HostMessageIcon icon;
         HostDialogChoice default_choice;
     };
+
+    class DialogResultPublisher final {
+    public:
+        explicit DialogResultPublisher(
+            std::shared_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(const HostDialogResult& result) const
+        {
+            if (!(*context_).host_services_status) return;
+            if (!result.status.accepted()) {
+                (*(*context_).host_services_status).set_text(
+                    std::string("Host rejected request · ") +
+                    host_service_error_name(result.status.error));
+                return;
+            }
+            std::visit(*this, result.payload);
+        }
+
+        void operator()(const HostMessageDialogResult& value) const
+        {
+            const std::string detail = std::string("Message ") +
+                host_dialog_outcome_name(value.outcome) + " · " +
+                host_dialog_choice_name(value.choice);
+            if (value.outcome == HostDialogOutcome::accepted) {
+                (*context_).last_dialog_acceptance = detail;
+            }
+            (*(*context_).host_services_status).set_text(
+                value.outcome == HostDialogOutcome::cancelled
+                    ? detail + " · preserved: " +
+                          (*context_).last_dialog_acceptance
+                    : detail);
+        }
+
+        void operator()(const HostPathDialogResult& value) const
+        {
+            if (value.outcome == HostDialogOutcome::accepted) {
+                (*context_).last_dialog_acceptance =
+                    std::to_string(value.paths.size()) + " path" +
+                    (value.paths.size() == 1U ? "" : "s") + " · " +
+                    value.paths.front();
+                (*(*context_).host_services_status).set_text(
+                    "Accepted · " + (*context_).last_dialog_acceptance);
+            } else {
+                publish_cancelled();
+            }
+        }
+
+        void operator()(const HostColorDialogResult& value) const
+        {
+            if (value.outcome == HostDialogOutcome::accepted) {
+                char encoded[16]{};
+                std::snprintf(encoded, sizeof(encoded), "#%08X", value.rgba);
+                (*context_).last_dialog_acceptance =
+                    std::string("color ") + encoded;
+                (*(*context_).host_services_status).set_text(
+                    "Accepted · " + (*context_).last_dialog_acceptance);
+            } else {
+                publish_cancelled();
+            }
+        }
+
+    private:
+        void publish_cancelled() const
+        {
+            (*(*context_).host_services_status).set_text(
+                "Cancelled · preserved: " +
+                (*context_).last_dialog_acceptance);
+        }
+
+        std::shared_ptr<ShowcaseContext> context_;
+    };
+
+    class DialogInvoker final {
+    public:
+        DialogInvoker(std::shared_ptr<ShowcaseContext> context,
+                      DialogResultPublisher publisher) noexcept
+            : context_(std::move(context)), publisher_(std::move(publisher)) {}
+
+        void invoke(ButtonBase& source,
+                    HostDialogRequestPayload payload) const
+        {
+            HostServices* services = source.attached_window() == nullptr
+                ? nullptr : (*source.attached_window()).host_services();
+            if (services == nullptr) {
+                HostDialogResult unavailable;
+                unavailable.status.error = HostServiceError::unsupported;
+                publisher_(unavailable);
+                return;
+            }
+            HostDialogRequest request;
+            request.request_id = (*context_).next_host_request_id++;
+            request.owner_id = std::string(source.stable_id().value());
+            request.payload = std::move(payload);
+            publisher_((*services).show_dialog(request));
+        }
+
+    private:
+        std::shared_ptr<ShowcaseContext> context_;
+        DialogResultPublisher publisher_;
+    };
+
+    class MessageDialogClick final {
+    public:
+        MessageDialogClick(DialogInvoker invoker, MessageCase value) noexcept
+            : invoker_(std::move(invoker)), value_(value) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            HostMessageDialogRequest request;
+            request.title = "GUI.Forms message contract";
+            request.message =
+                "This modal result travels through the portable HostServices boundary.";
+            request.buttons = value_.buttons;
+            request.icon = value_.icon;
+            request.default_choice = value_.default_choice;
+            invoker_.invoke(source, std::move(request));
+        }
+
+    private:
+        DialogInvoker invoker_;
+        MessageCase value_;
+    };
+
+    class PathDialogClick final {
+    public:
+        PathDialogClick(DialogInvoker invoker, std::size_t index) noexcept
+            : invoker_(std::move(invoker)), index_(index) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            if (index_ <= 1U) {
+                HostOpenFileDialogRequest request;
+                request.title = index_ == 0U
+                    ? "Open one fixture" : "Open fixture set";
+                request.filters = {{"Text and logs", {"txt", "log"}},
+                                   {"PNG images", {"png"}}};
+                request.allow_multiple = index_ == 1U;
+                invoker_.invoke(source, std::move(request));
+            } else if (index_ == 2U) {
+                HostSaveFileDialogRequest request;
+                request.title = "Save GUI.Forms evidence";
+                request.suggested_name = "gui-forms-evidence";
+                request.default_extension = "txt";
+                request.filters = {{"Text evidence", {"txt"}}};
+                request.confirm_overwrite = true;
+                invoker_.invoke(source, std::move(request));
+            } else if (index_ == 3U) {
+                invoker_.invoke(source, HostFolderDialogRequest{
+                    "Choose an evidence directory", {}});
+            } else {
+                invoker_.invoke(source, HostColorDialogRequest{
+                    "Choose an accent color", 0x2774B8FFU, false});
+            }
+        }
+
+    private:
+        DialogInvoker invoker_;
+        std::size_t index_{};
+    };
+
+    class PrimaryMonitorPredicate final {
+    public:
+        bool operator()(const HostMonitor& monitor) const noexcept
+        {
+            return monitor.primary;
+        }
+    };
+
+    class HostServiceClick final {
+    public:
+        HostServiceClick(std::shared_ptr<ShowcaseContext> context,
+                         std::size_t index) noexcept
+            : context_(std::move(context)), index_(index) {}
+
+        void operator()(ButtonBase& source) const
+        {
+            HostServices* services = source.attached_window() == nullptr
+                ? nullptr : (*source.attached_window()).host_services();
+            if (services == nullptr) {
+                (*(*context_).host_services_status).set_text(
+                    "Host service unavailable · portable control remains responsive");
+                return;
+            }
+            if (index_ == 0U) {
+                write_clipboard(*services);
+            } else if (index_ == 1U) {
+                read_clipboard(*services);
+            } else if (index_ == 2U) {
+                inspect_monitors(*services);
+            } else {
+                play_sound(*services);
+            }
+        }
+
+    private:
+        void write_clipboard(HostServices& services) const
+        {
+            const HostServiceStatus result = services.write_clipboard_text(
+                (*(*context_).clipboard_editor).text());
+            (*(*context_).host_services_status).set_text(
+                std::string("Clipboard write · ") +
+                host_service_error_name(result.error));
+        }
+
+        void read_clipboard(HostServices& services) const
+        {
+            const HostClipboardTextResult result = services.read_clipboard_text();
+            if (result.status.accepted() && result.has_text) {
+                (*(*context_).clipboard_editor).set_text(result.text_utf8);
+            }
+            (*(*context_).host_services_status).set_text(
+                std::string("Clipboard read · ") +
+                host_service_error_name(result.status.error) +
+                (result.has_text ? " · text restored" : " · empty"));
+        }
+
+        void inspect_monitors(HostServices& services) const
+        {
+            const HostMonitorResult result = services.query_monitors();
+            if (!result.status.accepted() || result.monitors.empty()) {
+                (*(*context_).host_services_status).set_text(
+                    std::string("Monitor query · ") +
+                    host_service_error_name(result.status.error));
+                return;
+            }
+            const std::vector<HostMonitor>::const_iterator primary =
+                std::find_if(result.monitors.begin(), result.monitors.end(),
+                             PrimaryMonitorPredicate());
+            const HostMonitor& monitor = primary == result.monitors.end()
+                ? result.monitors.front() : *primary;
+            (*(*context_).host_services_status).set_text(
+                "Monitors " + std::to_string(result.monitors.size()) +
+                " · primary " + monitor.id + " · scale " +
+                std::to_string(monitor.scale));
+        }
+
+        void play_sound(HostServices& services) const
+        {
+            const std::chrono::steady_clock::duration now =
+                std::chrono::steady_clock::now().time_since_epoch();
+            const std::chrono::nanoseconds::rep stamp =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+            const HostSoundCue cue = index_ == 3U
+                ? HostSoundCue::operation_complete : HostSoundCue::warning;
+            const HostServiceStatus result = services.play_sound_cue(
+                {cue, 0.72, static_cast<std::uint64_t>(stamp)});
+            (*(*context_).host_services_status).set_text(
+                std::string("Sound ") + host_sound_cue_name(cue) +
+                " · " + host_service_error_name(result.error));
+        }
+
+        std::shared_ptr<ShowcaseContext> context_;
+        std::size_t index_{};
+    };
+
     constexpr std::array<MessageCase, 4> message_cases{{
         {"Information · OK", HostMessageButtons::ok,
          HostMessageIcon::information, HostDialogChoice::ok},
@@ -2305,72 +3159,8 @@ void add_dialogs_and_host_services(
          HostMessageIcon::error, HostDialogChoice::retry},
     }};
 
-    const auto publish_dialog_result = [context](const HostDialogResult& result) {
-        if (!(*context).host_services_status) return;
-        if (!result.status.accepted()) {
-            (*(*context).host_services_status).set_text(
-                std::string("Host rejected request · ") +
-                host_service_error_name(result.status.error));
-            return;
-        }
-        std::visit([context](const auto& value) {
-            using Value = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<Value, HostMessageDialogResult>) {
-                const std::string detail = std::string("Message ") +
-                    host_dialog_outcome_name(value.outcome) + " · " +
-                    host_dialog_choice_name(value.choice);
-                if (value.outcome == HostDialogOutcome::accepted) {
-                    (*context).last_dialog_acceptance = detail;
-                }
-                (*(*context).host_services_status).set_text(
-                    value.outcome == HostDialogOutcome::cancelled
-                        ? detail + " · preserved: " + (*context).last_dialog_acceptance
-                        : detail);
-            } else if constexpr (std::is_same_v<Value, HostPathDialogResult>) {
-                if (value.outcome == HostDialogOutcome::accepted) {
-                    (*context).last_dialog_acceptance =
-                        std::to_string(value.paths.size()) + " path" +
-                        (value.paths.size() == 1U ? "" : "s") + " · " +
-                        value.paths.front();
-                    (*(*context).host_services_status).set_text(
-                        "Accepted · " + (*context).last_dialog_acceptance);
-                } else {
-                    (*(*context).host_services_status).set_text(
-                        "Cancelled · preserved: " + (*context).last_dialog_acceptance);
-                }
-            } else {
-                if (value.outcome == HostDialogOutcome::accepted) {
-                    char encoded[16]{};
-                    std::snprintf(encoded, sizeof(encoded), "#%08X", value.rgba);
-                    (*context).last_dialog_acceptance =
-                        std::string("color ") + encoded;
-                    (*(*context).host_services_status).set_text(
-                        "Accepted · " + (*context).last_dialog_acceptance);
-                } else {
-                    (*(*context).host_services_status).set_text(
-                        "Cancelled · preserved: " + (*context).last_dialog_acceptance);
-                }
-            }
-        }, result.payload);
-    };
-
-    const auto invoke_dialog = [context, publish_dialog_result](
-                                   ButtonBase& source,
-                                   HostDialogRequestPayload payload) {
-        HostServices* services = source.attached_window() == nullptr
-            ? nullptr : (*source.attached_window()).host_services();
-        if (services == nullptr) {
-            HostDialogResult unavailable;
-            unavailable.status.error = HostServiceError::unsupported;
-            publish_dialog_result(unavailable);
-            return;
-        }
-        HostDialogRequest request;
-        request.request_id = (*context).next_host_request_id++;
-        request.owner_id = std::string(source.stable_id().value());
-        request.payload = std::move(payload);
-        publish_dialog_result((*services).show_dialog(request));
-    };
+    const DialogResultPublisher publish_dialog_result(context);
+    const DialogInvoker invoke_dialog(context, publish_dialog_result);
 
     for (std::size_t index = 0U; index < message_cases.size(); ++index) {
         const MessageCase value = message_cases[index];
@@ -2382,15 +3172,7 @@ void add_dialogs_and_host_services(
         (*messages).add_at(button, {24.0 + static_cast<double>(index) * 220.0,
                                   44.0, 202.0, 42.0});
         (*context).subscriptions.push_back((*button).clicked().subscribe(
-            *messages, [invoke_dialog, value](ButtonBase& source) {
-                HostMessageDialogRequest request;
-                request.title = "GUI.Forms message contract";
-                request.message = "This modal result travels through the portable HostServices boundary.";
-                request.buttons = value.buttons;
-                request.icon = value.icon;
-                request.default_choice = value.default_choice;
-                invoke_dialog(source, std::move(request));
-            }));
+            *messages, MessageDialogClick(invoke_dialog, value)));
     }
 
     std::shared_ptr<LayoutGroup> paths = group("showcase.host.paths",
@@ -2408,30 +3190,7 @@ void add_dialogs_and_host_services(
         (*paths).add_at(button, {24.0 + static_cast<double>(index) * 176.0,
                               44.0, 158.0, 40.0});
         (*context).subscriptions.push_back((*button).clicked().subscribe(
-            *paths, [invoke_dialog, index](ButtonBase& source) {
-                if (index <= 1U) {
-                    HostOpenFileDialogRequest request;
-                    request.title = index == 0U ? "Open one fixture" : "Open fixture set";
-                    request.filters = {{"Text and logs", {"txt", "log"}},
-                                       {"PNG images", {"png"}}};
-                    request.allow_multiple = index == 1U;
-                    invoke_dialog(source, std::move(request));
-                } else if (index == 2U) {
-                    HostSaveFileDialogRequest request;
-                    request.title = "Save GUI.Forms evidence";
-                    request.suggested_name = "gui-forms-evidence";
-                    request.default_extension = "txt";
-                    request.filters = {{"Text evidence", {"txt"}}};
-                    request.confirm_overwrite = true;
-                    invoke_dialog(source, std::move(request));
-                } else if (index == 3U) {
-                    invoke_dialog(source, HostFolderDialogRequest{
-                        "Choose an evidence directory", {}});
-                } else {
-                    invoke_dialog(source, HostColorDialogRequest{
-                        "Choose an accent color", 0x2774B8FFU, false});
-                }
-            }));
+            *paths, PathDialogClick(invoke_dialog, index)));
     }
     (*paths).add_at(label("showcase.host.paths.note",
                         "Cancel never overwrites the last accepted path, choice, or color.",
@@ -2459,63 +3218,7 @@ void add_dialogs_and_host_services(
         (*services_group).add_at(button,
             {24.0 + static_cast<double>(index) * 176.0, 88.0, 158.0, 36.0});
         (*context).subscriptions.push_back((*button).clicked().subscribe(
-            *services_group, [context, index](ButtonBase& source) {
-                HostServices* services = source.attached_window() == nullptr
-                    ? nullptr : (*source.attached_window()).host_services();
-                if (services == nullptr) {
-                    (*(*context).host_services_status).set_text(
-                        "Host service unavailable · portable control remains responsive");
-                    return;
-                }
-                if (index == 0U) {
-                    const HostServiceStatus result = (*services).write_clipboard_text(
-                        (*(*context).clipboard_editor).text());
-                    (*(*context).host_services_status).set_text(
-                        std::string("Clipboard write · ") +
-                        host_service_error_name(result.error));
-                } else if (index == 1U) {
-                    const HostClipboardTextResult result =
-                        (*services).read_clipboard_text();
-                    if (result.status.accepted() && result.has_text) {
-                        (*(*context).clipboard_editor).set_text(result.text_utf8);
-                    }
-                    (*(*context).host_services_status).set_text(
-                        std::string("Clipboard read · ") +
-                        host_service_error_name(result.status.error) +
-                        (result.has_text ? " · text restored" : " · empty"));
-                } else if (index == 2U) {
-                    const HostMonitorResult result = (*services).query_monitors();
-                    if (!result.status.accepted() || result.monitors.empty()) {
-                        (*(*context).host_services_status).set_text(
-                            std::string("Monitor query · ") +
-                            host_service_error_name(result.status.error));
-                    } else {
-                        const std::vector<HostMonitor>::const_iterator primary =
-                            std::find_if(
-                            result.monitors.begin(), result.monitors.end(),
-                            [](const HostMonitor& monitor) { return monitor.primary; });
-                        const HostMonitor& monitor = primary == result.monitors.end()
-                            ? result.monitors.front() : *primary;
-                        (*(*context).host_services_status).set_text(
-                            "Monitors " + std::to_string(result.monitors.size()) +
-                            " · primary " + monitor.id + " · scale " +
-                            std::to_string(monitor.scale));
-                    }
-                } else {
-                    const std::chrono::steady_clock::duration now =
-                        std::chrono::steady_clock::now().time_since_epoch();
-                    const std::chrono::nanoseconds::rep stamp =
-                        std::chrono::duration_cast<
-                        std::chrono::nanoseconds>(now).count();
-                    const HostSoundCue cue = index == 3U
-                        ? HostSoundCue::operation_complete : HostSoundCue::warning;
-                    const HostServiceStatus result = (*services).play_sound_cue(
-                        {cue, 0.72, static_cast<std::uint64_t>(stamp)});
-                    (*(*context).host_services_status).set_text(
-                        std::string("Sound ") + host_sound_cue_name(cue) +
-                        " · " + host_service_error_name(result.error));
-                }
-            }));
+            *services_group, HostServiceClick(context, index)));
     }
     (*context).host_services_status = label(
         "showcase.host.status",
@@ -2530,6 +3233,42 @@ void add_dialogs_and_host_services(
 } // namespace
 
 ShowcaseTree build_showcase_tree() {
+    class NavigationClick final {
+    public:
+        NavigationClick(std::weak_ptr<ShowcaseContext> context,
+                        std::size_t index) noexcept
+            : context_(std::move(context)), index_(index) {}
+
+        void operator()(ButtonBase&) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*context).select_page(index_);
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+        std::size_t index_{};
+    };
+
+    class LiveMotionChanged final {
+    public:
+        explicit LiveMotionChanged(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(bool enabled) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            (*context).live_motion = enabled;
+            (*context).apply_motion_policy();
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
     std::shared_ptr<ShowcaseContext> context = std::make_shared<ShowcaseContext>();
     std::shared_ptr<gui_forms::ScaledPanel> root = make_control<ScaledPanel>(StableId("showcase.root"),
                                           Size{1280.0, 820.0});
@@ -2650,28 +3389,244 @@ ShowcaseTree build_showcase_tree() {
     for (std::size_t index = 0; index < (*context).navigation.size(); ++index) {
         const std::weak_ptr<ShowcaseContext> weak_context = context;
         (*context).subscriptions.push_back((*(*context).navigation[index]).clicked().subscribe(
-            *root, [weak_context, index](ButtonBase&) {
-                if (const std::shared_ptr<ShowcaseContext> context = weak_context.lock()) {
-                    (*context).select_page(index);
-                }
-            }));
+            *root, NavigationClick(weak_context, index)));
     }
     const std::weak_ptr<ShowcaseContext> weak_context = context;
     (*context).subscriptions.push_back((*live).checked_changed().subscribe(
-        *root, [weak_context](bool enabled) {
-            const std::shared_ptr<ShowcaseContext> context = weak_context.lock();
-            if (!context) {
-                return;
-            }
-            (*context).live_motion = enabled;
-            (*context).apply_motion_policy();
-        }));
+        *root, LiveMotionChanged(weak_context)));
     (*context).apply_motion_policy();
     (*context).select_page(0U);
     return {root};
 }
 
 void initialize_showcase_runtime(Window& window) {
+    class ValidateProfileName final {
+    public:
+        void operator()(BindingConvertEvent& event) const
+        {
+            const std::string* text = std::get_if<std::string>(&event.value);
+            if (text == nullptr || (*text).empty()) {
+                throw std::invalid_argument("Profile name may not be empty");
+            }
+        }
+    };
+
+    class BindingStatusUpdater final {
+    public:
+        explicit BindingStatusUpdater(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context || !(*context).binding_source ||
+                !(*context).binding_status) return;
+            const BindingSourceSnapshot snapshot =
+                (*(*context).binding_source).snapshot();
+            (*(*context).binding_status).set_text(
+                "Current " + std::to_string(snapshot.position + 1) + " / " +
+                std::to_string(snapshot.count) + " · " +
+                snapshot.current_stable_id +
+                " · text commits on validation · revision " +
+                std::to_string(snapshot.revision));
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    enum class BindingNavigation {
+        previous,
+        next,
+    };
+
+    class BindingNavigationClick final {
+    public:
+        BindingNavigationClick(std::weak_ptr<ShowcaseContext> context,
+                               BindingNavigation direction) noexcept
+            : context_(std::move(context)), direction_(direction) {}
+
+        void operator()(ButtonBase&) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                if (direction_ == BindingNavigation::previous) {
+                    static_cast<void>(
+                        (*(*context).binding_source).move_previous());
+                } else {
+                    static_cast<void>((*(*context).binding_source).move_next());
+                }
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+        BindingNavigation direction_{};
+    };
+
+    class ShowcaseHelpRequested final {
+    public:
+        explicit ShowcaseHelpRequested(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(HelpRequestEvent& request) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            (*(*context).status).set_text("Help · " + request.help_string);
+            request.handled = true;
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class ToggleProviderErrorClick final {
+    public:
+        explicit ToggleProviderErrorClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            if ((*(*context).error_provider).error(
+                    *(*context).provider_error_target).empty()) {
+                (*(*context).error_provider).set_error(
+                    (*context).provider_error_target,
+                    "Endpoint is intentionally marked invalid for provider dogfood.");
+                (*(*context).provider_error_toggle).set_text("Clear");
+            } else {
+                (*(*context).error_provider).set_error(
+                    (*context).provider_error_target, {});
+                (*(*context).provider_error_toggle).set_text("Restore");
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class ShowcaseTimerTick final {
+    public:
+        explicit ShowcaseTimerTick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()() const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            ++(*context).timer_ticks;
+            const double cycle =
+                static_cast<double>((*context).timer_ticks % 20U) / 19.0;
+            (*(*context).timer_progress).set_value(cycle * 100.0);
+            constexpr double travel = 98.0;
+            const double eased =
+                0.5 - std::cos(cycle * 6.283185307179586) * 0.5;
+            (*(*context).timer_motion).set_design_bounds(
+                *(*context).timer_motion_target,
+                {14.0 + travel * eased, 39.0, 168.0, 34.0});
+            (*(*context).timer_status).set_text(
+                "Running · tick " + std::to_string((*context).timer_ticks) +
+                " · " + std::to_string(static_cast<int>(
+                    (*(*context).ui_timer).interval().count())) +
+                " ms · UI thread");
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    class TimerIntervalChanged final {
+    public:
+        explicit TimerIntervalChanged(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(double value) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).ui_timer).set_interval(
+                    std::chrono::milliseconds(
+                        static_cast<int>(std::round(value))));
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
+    enum class TimerCommand {
+        start,
+        stop,
+    };
+
+    class TimerCommandClick final {
+    public:
+        TimerCommandClick(std::weak_ptr<ShowcaseContext> context,
+                          TimerCommand command) noexcept
+            : context_(std::move(context)), command_(command) {}
+
+        void operator()(ButtonBase&) const
+        {
+            const std::shared_ptr<ShowcaseContext> context = context_.lock();
+            if (!context) return;
+            if (command_ == TimerCommand::start) {
+                (*(*context).ui_timer).start();
+                (*(*context).timer_status).set_text(
+                    "Running · deadline armed on the UI queue");
+            } else {
+                (*(*context).ui_timer).stop();
+                (*(*context).timer_status).set_text(
+                    "Stopped · zero idle wakeups");
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+        TimerCommand command_{};
+    };
+
+    class ShowPersistentTooltipClick final {
+    public:
+        ShowPersistentTooltipClick(
+            std::weak_ptr<ShowcaseContext> context,
+            std::shared_ptr<Button> target) noexcept
+            : context_(std::move(context)), target_(std::move(target)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).tooltips).show(target_, 0ms);
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+        std::shared_ptr<Button> target_;
+    };
+
+    class ShowDisabledTooltipClick final {
+    public:
+        explicit ShowDisabledTooltipClick(
+            std::weak_ptr<ShowcaseContext> context) noexcept
+            : context_(std::move(context)) {}
+
+        void operator()(ButtonBase&) const
+        {
+            if (const std::shared_ptr<ShowcaseContext> context = context_.lock()) {
+                (*(*context).tooltips).show(
+                    (*context).tooltip_disabled_target, 0ms);
+            }
+        }
+
+    private:
+        std::weak_ptr<ShowcaseContext> context_;
+    };
+
     const std::shared_ptr<gui_forms::ScaledPanel> root = std::dynamic_pointer_cast<ScaledPanel>(window.root());
     if (!root) throw std::logic_error("showcase runtime requires its retained root");
     const std::shared_ptr<ShowcaseContext>* const retained_context =
@@ -2707,12 +3662,7 @@ void initialize_showcase_runtime(Window& window) {
     const std::shared_ptr<Binding> name_binding = (*(*context).binding_editor).data_bindings().add(
         "Text", (*context).binding_source, "name", validated_binding);
     (*context).subscriptions.push_back((*name_binding).parse().subscribe(
-        *window.root(), [](BindingConvertEvent& event) {
-            const std::string* text = std::get_if<std::string>(&event.value);
-            if (text == nullptr || (*text).empty()) {
-                throw std::invalid_argument("Profile name may not be empty");
-            }
-        }));
+        *window.root(), ValidateProfileName()));
     BindingOptions immediate_binding;
     immediate_binding.data_source_update_mode =
         DataSourceUpdateMode::on_property_changed;
@@ -2758,17 +3708,7 @@ void initialize_showcase_runtime(Window& window) {
     }
 
     const std::weak_ptr<ShowcaseContext> weak = context;
-    const auto update_binding_status = [weak] {
-        const std::shared_ptr<ShowcaseContext> context = weak.lock();
-        if (!context || !(*context).binding_source ||
-            !(*context).binding_status) return;
-        const BindingSourceSnapshot snapshot = (*(*context).binding_source).snapshot();
-        (*(*context).binding_status).set_text(
-            "Current " + std::to_string(snapshot.position + 1) + " / " +
-            std::to_string(snapshot.count) + " · " + snapshot.current_stable_id +
-            " · text commits on validation · revision " +
-            std::to_string(snapshot.revision));
-    };
+    const BindingStatusUpdater update_binding_status(weak);
     (*context).subscriptions.push_back(
         (*(*context).binding_source).current_changed().subscribe(
             *window.root(), update_binding_status));
@@ -2777,97 +3717,31 @@ void initialize_showcase_runtime(Window& window) {
             *window.root(), update_binding_status));
     (*context).subscriptions.push_back(
         (*(*context).binding_previous).clicked().subscribe(
-            *window.root(), [weak](ButtonBase&) {
-                if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                    static_cast<void>((*(*context).binding_source).move_previous());
-                }
-            }));
+            *window.root(), BindingNavigationClick(
+                weak, BindingNavigation::previous)));
     (*context).subscriptions.push_back(
         (*(*context).binding_next).clicked().subscribe(
-            *window.root(), [weak](ButtonBase&) {
-                if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                    static_cast<void>((*(*context).binding_source).move_next());
-                }
-            }));
+            *window.root(), BindingNavigationClick(
+                weak, BindingNavigation::next)));
     update_binding_status();
     (*context).subscriptions.push_back(
         (*(*context).help_provider).help_requested().subscribe(
-            *window.root(), [weak](HelpRequestEvent& request) {
-                const std::shared_ptr<ShowcaseContext> context = weak.lock();
-                if (!context) return;
-                (*(*context).status).set_text("Help · " + request.help_string);
-                request.handled = true;
-            }));
+            *window.root(), ShowcaseHelpRequested(weak)));
     (*context).subscriptions.push_back(
         (*(*context).provider_error_toggle).clicked().subscribe(
-            *window.root(), [weak](ButtonBase&) {
-                const std::shared_ptr<ShowcaseContext> context = weak.lock();
-                if (!context) return;
-                if ((*(*context).error_provider).error(
-                        *(*context).provider_error_target).empty()) {
-                    (*(*context).error_provider).set_error(
-                        (*context).provider_error_target,
-                        "Endpoint is intentionally marked invalid for provider dogfood.");
-                    (*(*context).provider_error_toggle).set_text("Clear");
-                } else {
-                    (*(*context).error_provider).set_error(
-                        (*context).provider_error_target, {});
-                    (*(*context).provider_error_toggle).set_text("Restore");
-                }
-            }));
+            *window.root(), ToggleProviderErrorClick(weak)));
     (*context).subscriptions.push_back((*(*context).ui_timer).tick().subscribe(
-        *window.root(), [weak] {
-            const std::shared_ptr<ShowcaseContext> context = weak.lock();
-            if (!context) return;
-            ++(*context).timer_ticks;
-            const double cycle = static_cast<double>((*context).timer_ticks % 20U) / 19.0;
-            (*(*context).timer_progress).set_value(cycle * 100.0);
-            constexpr double travel = 98.0;
-            const double eased =
-                0.5 - std::cos(cycle * 6.283185307179586) * 0.5;
-            (*(*context).timer_motion).set_design_bounds(
-                *(*context).timer_motion_target,
-                {14.0 + travel * eased, 39.0, 168.0, 34.0});
-            (*(*context).timer_status).set_text(
-                "Running · tick " + std::to_string((*context).timer_ticks) +
-                " · " + std::to_string(
-                    static_cast<int>((*(*context).ui_timer).interval().count())) +
-                " ms · UI thread");
-        }));
+        *window.root(), ShowcaseTimerTick(weak)));
     (*context).subscriptions.push_back((*(*context).timer_interval).value_changed().subscribe(
-        *window.root(), [weak](double value) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                (*(*context).ui_timer).set_interval(
-                    std::chrono::milliseconds(static_cast<int>(std::round(value))));
-            }
-        }));
+        *window.root(), TimerIntervalChanged(weak)));
     (*context).subscriptions.push_back((*(*context).timer_start).clicked().subscribe(
-        *window.root(), [weak](ButtonBase&) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                (*(*context).ui_timer).start();
-                (*(*context).timer_status).set_text(
-                    "Running · deadline armed on the UI queue");
-            }
-        }));
+        *window.root(), TimerCommandClick(weak, TimerCommand::start)));
     (*context).subscriptions.push_back((*(*context).timer_stop).clicked().subscribe(
-        *window.root(), [weak](ButtonBase&) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                (*(*context).ui_timer).stop();
-                (*(*context).timer_status).set_text("Stopped · zero idle wakeups");
-            }
-        }));
+        *window.root(), TimerCommandClick(weak, TimerCommand::stop)));
     (*context).subscriptions.push_back((*persistent).clicked().subscribe(
-        *window.root(), [weak, persistent](ButtonBase&) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                (*(*context).tooltips).show(persistent, 0ms);
-            }
-        }));
+        *window.root(), ShowPersistentTooltipClick(weak, persistent)));
     (*context).subscriptions.push_back((*(*context).tooltip_show_disabled).clicked().subscribe(
-        *window.root(), [weak](ButtonBase&) {
-            if (const std::shared_ptr<ShowcaseContext> context = weak.lock()) {
-                (*(*context).tooltips).show((*context).tooltip_disabled_target, 0ms);
-            }
-        }));
+        *window.root(), ShowDisabledTooltipClick(weak)));
     (*context).select_page((*context).selected_page);
 }
 

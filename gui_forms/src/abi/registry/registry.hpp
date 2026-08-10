@@ -79,6 +79,20 @@ struct RegistrySlot final {
     std::shared_ptr<SubscriptionRecord> subscription;
 };
 
+inline gf_scroll_axis_state abi_scroll_axis_state(
+    const gui_forms::ScrollAxisSnapshot& source) noexcept {
+    return {source.enabled ? 1U : 0U, source.visible ? 1U : 0U,
+            source.minimum, source.maximum, source.large_change,
+            source.small_change, source.value};
+}
+
+inline std::uint8_t disabled_color_channel(
+    std::uint8_t foreground, std::uint8_t background) noexcept {
+    return static_cast<std::uint8_t>(
+        (static_cast<unsigned>(foreground) * 45U +
+         static_cast<unsigned>(background) * 55U) / 100U);
+}
+
 class Registry final {
 public:
     gf_result create(std::uint32_t kind, gf_string_view stable_id, gf_handle* output) {
@@ -443,12 +457,6 @@ public:
             }
         }
         const gui_forms::ScrollSnapshot snapshot = (*scrollable).scroll_snapshot();
-        const auto axis = [](const gui_forms::ScrollAxisSnapshot& source) {
-            return gf_scroll_axis_state{
-                source.enabled ? 1U : 0U, source.visible ? 1U : 0U,
-                source.minimum, source.maximum, source.large_change,
-                source.small_change, source.value};
-        };
         const std::optional<gui_forms::ScrollEvent> last =
             (*scrollable).last_scroll_event();
         *state = {
@@ -463,7 +471,8 @@ public:
             {snapshot.viewport_rectangle.x, snapshot.viewport_rectangle.y,
              snapshot.viewport_rectangle.width,
              snapshot.viewport_rectangle.height},
-            axis(snapshot.horizontal), axis(snapshot.vertical),
+            abi_scroll_axis_state(snapshot.horizontal),
+            abi_scroll_axis_state(snapshot.vertical),
             (*scrollable).scroll_event_revision(),
             last ? static_cast<std::uint32_t>((*last).type) : 0U,
             last ? static_cast<std::uint32_t>((*last).orientation) : 0U,
@@ -987,16 +996,10 @@ public:
         }
         const gui_forms::Color foreground = color_from_argb(foreground_argb);
         const gui_forms::Color background = color_from_argb(background_argb);
-        const auto disabled_channel = [](std::uint8_t foreground_channel,
-                                         std::uint8_t background_channel) {
-            return static_cast<std::uint8_t>(
-                (static_cast<unsigned>(foreground_channel) * 45U +
-                 static_cast<unsigned>(background_channel) * 55U) / 100U);
-        };
         const Color disabled = gui_forms::Color::rgba(
-            disabled_channel(foreground.red, background.red),
-            disabled_channel(foreground.green, background.green),
-            disabled_channel(foreground.blue, background.blue),
+            disabled_color_channel(foreground.red, background.red),
+            disabled_color_channel(foreground.green, background.green),
+            disabled_color_channel(foreground.blue, background.blue),
             foreground.alpha);
         if (const std::shared_ptr<gui_forms::abi::detail::FieldControl> field = std::dynamic_pointer_cast<FieldControl>((*record).control)) {
             (*field).set_colors(foreground, background);
@@ -1707,8 +1710,7 @@ public:
             (*record).dispatches = 0;
             (*record).dispatch_turns = 0;
         }
-        auto reset = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
-            record.get(), [this, record](ControlRecord*) { finish_host(record); });
+        const HostFinishGuard reset{this, record};
 
         Rect requested = (*(*record).control).requested_bounds();
         Size client_size{requested.width > 0.0 ? requested.width : 960.0,
@@ -1739,45 +1741,14 @@ public:
             options.automation_enabled = true;
             options.close_after_launch_for_testing = auto_close;
             const std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<Control>>> automation_controls = named_controls_snapshot(record);
-            options.automation_resolve = [automation_controls](std::string_view name) {
-                const auto found = (*automation_controls).find(std::string(name));
-                return found == (*automation_controls).end()
-                    ? std::shared_ptr<Control>{} : (*found).second;
-            };
-            options.close_request = [this, handle](gui_forms::HostCloseRequest& request) {
-                request.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
-                                 GF_EVENT_CALLBACK_CANCEL;
-            };
-            options.host_ready = [this, record](
-                std::function<void()> wake,
-                std::function<void()> close,
-                std::function<gui_forms::HostDialogResult(
-                    const gui_forms::HostDialogRequest&)> dialog,
-                std::function<gui_forms::HostServiceStatus(
-                    const gui_forms::HostTooltipRequest&)> tooltip_show,
-                std::function<void()> tooltip_hide,
-                std::function<gui_forms::HostClipboardTextResult()> clipboard_read,
-                std::function<gui_forms::HostServiceStatus(
-                    std::string_view)> clipboard_write) {
-                publish_host(record, std::move(wake), std::move(close),
-                             std::move(dialog), std::move(tooltip_show),
-                             std::move(tooltip_hide), std::move(clipboard_read),
-                             std::move(clipboard_write));
-            };
-            options.dispatch_pending = [this, record, automation_controls] {
-                pump_pending(record);
-                refresh_named_controls(record, *automation_controls);
-            };
-            options.closed = [this, handle, record] {
-                mark_host_stopping(record);
-                static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
-            };
-            options.final_snapshot = [this, record](std::string_view metrics,
-                                                    std::string_view host) {
-                (*record).host_trace = "{\"window\":" + std::string(metrics) +
-                                     ",\"host\":" + std::string(host) +
-                                     ",\"managed\":" + managed_trace(record) + "}";
-            };
+            options.automation_resolve =
+                AutomationResolver{automation_controls};
+            options.close_request = CloseRequestCallback{this, handle};
+            options.host_ready = HostReadyCallback{this, record};
+            options.dispatch_pending = WindowsDispatchPendingCallback{
+                this, record, automation_controls};
+            options.closed = HostClosedCallback{this, handle, record};
+            options.final_snapshot = FinalSnapshotCallback{this, record};
             const int result = gui_forms::host::run_windows(std::move(model),
                                                              std::move(options));
             return result == 0 ? GF_OK :
@@ -1789,37 +1760,11 @@ public:
             options.minimum_size = {320.0, 200.0};
             options.print_metrics_on_close = false;
             options.close_after_launch_for_testing = auto_close;
-            options.close_request = [this, handle](gui_forms::HostCloseRequest& request) {
-                request.cancel = emit_v2(handle, GF_EVENT_FORM_CLOSING) ==
-                                 GF_EVENT_CALLBACK_CANCEL;
-            };
-            options.host_ready = [this, record](
-                std::function<void()> wake,
-                std::function<void()> close,
-                std::function<gui_forms::HostDialogResult(
-                    const gui_forms::HostDialogRequest&)> dialog,
-                std::function<gui_forms::HostServiceStatus(
-                    const gui_forms::HostTooltipRequest&)> tooltip_show,
-                std::function<void()> tooltip_hide,
-                std::function<gui_forms::HostClipboardTextResult()> clipboard_read,
-                std::function<gui_forms::HostServiceStatus(
-                    std::string_view)> clipboard_write) {
-                publish_host(record, std::move(wake), std::move(close),
-                             std::move(dialog), std::move(tooltip_show),
-                             std::move(tooltip_hide), std::move(clipboard_read),
-                             std::move(clipboard_write));
-            };
-            options.dispatch_pending = [this, record] { pump_pending(record); };
-            options.closed = [this, handle, record] {
-                mark_host_stopping(record);
-                static_cast<void>(emit_v2(handle, GF_EVENT_FORM_CLOSED));
-            };
-            options.final_snapshot = [this, record](std::string_view metrics,
-                                                    std::string_view host) {
-                (*record).host_trace = "{\"window\":" + std::string(metrics) +
-                                     ",\"host\":" + std::string(host) +
-                                     ",\"managed\":" + managed_trace(record) + "}";
-            };
+            options.close_request = CloseRequestCallback{this, handle};
+            options.host_ready = HostReadyCallback{this, record};
+            options.dispatch_pending = DispatchPendingCallback{this, record};
+            options.closed = HostClosedCallback{this, handle, record};
+            options.final_snapshot = FinalSnapshotCallback{this, record};
             const int result = gui_forms::host::run_macos(std::move(model),
                                                            std::move(options));
             return result == 0 ? GF_OK :
@@ -1975,11 +1920,12 @@ public:
                 }
             }
             for (const std::shared_ptr<gui_forms::abi::detail::ControlRecord>& subtree_record : subtree_records) {
-                const auto found = std::find_if(
-                    slots_.begin(), slots_.end(), [&](const RegistrySlot& candidate) {
-                        return candidate.kind == SlotKind::control &&
-                               candidate.control == subtree_record;
-                    });
+                std::vector<RegistrySlot>::iterator found = slots_.begin();
+                while (found != slots_.end() &&
+                       ((*found).kind != SlotKind::control ||
+                        (*found).control != subtree_record)) {
+                    ++found;
+                }
                 if (found != slots_.end()) {
                     const gf_handle subtree_handle{
                         static_cast<std::uint32_t>(
@@ -2174,16 +2120,7 @@ public:
                         "popup owner must be attached to a running window");
         }
         (*popup).popup_plane_overrides.clear();
-        const auto promote_nested_forms = [&](const auto& self,
-                                               const Control::Ptr& control) -> void {
-            if (std::dynamic_pointer_cast<FormControl>(control)) {
-                (*popup).popup_plane_overrides.emplace_back(control,
-                                                          (*control).paint_plane());
-                (*control).set_paint_plane(gui_forms::PaintPlane::control);
-            }
-            for (const Control::Ptr& child : (*control).children()) self(self, child);
-        };
-        promote_nested_forms(promote_nested_forms, (*popup).control);
+        promote_nested_popup_forms(popup, (*popup).control);
         try {
             (*popup).popup_token = (*window).open_popup((*owner).control, (*popup).control);
         } catch (...) {
@@ -2320,32 +2257,25 @@ public:
         if (event_kind == GF_EVENT_CLICKED) {
             std::shared_ptr<gui_forms::ButtonBase> button = std::dynamic_pointer_cast<gui_forms::ButtonBase>((*sender).control);
             (*record).native_subscription = (*button).clicked().subscribe(
-                [this, sender_handle](gui_forms::ButtonBase&) {
-                    static_cast<void>(emit_v2(sender_handle, GF_EVENT_CLICKED));
-                });
+                EmitV2Subscription<gui_forms::ButtonBase&>{
+                    this, sender_handle, GF_EVENT_CLICKED});
         } else if (event_kind == GF_EVENT_RANGE_VALUE_CHANGED) {
             (*record).native_subscription = (*range).value_changed().subscribe(
-                [this, sender_handle](double) {
-                    static_cast<void>(emit_v2(
-                        sender_handle, GF_EVENT_RANGE_VALUE_CHANGED));
-                });
+                EmitV2Subscription<double>{
+                    this, sender_handle, GF_EVENT_RANGE_VALUE_CHANGED});
         } else if (event_kind == GF_EVENT_RANGE_SCROLL) {
             (*record).native_subscription = (*range).scroll().subscribe(
-                [this, sender_handle](const gui_forms::RangeScrollEvent&) {
-                    static_cast<void>(emit_v2(sender_handle, GF_EVENT_RANGE_SCROLL));
-                });
+                EmitV2Subscription<const gui_forms::RangeScrollEvent&>{
+                    this, sender_handle, GF_EVENT_RANGE_SCROLL});
         } else if (event_kind == GF_EVENT_BOUNDS_CHANGED) {
             (*record).native_subscription =
                 (*(*sender).control).arranged_bounds_changed().subscribe(
-                    [this, sender_handle](const Rect&) {
-                        static_cast<void>(emit_v2(
-                            sender_handle, GF_EVENT_BOUNDS_CHANGED));
-                    });
+                    EmitV2Subscription<const Rect&>{
+                        this, sender_handle, GF_EVENT_BOUNDS_CHANGED});
         } else if (event_kind == GF_EVENT_SCROLL) {
             (*record).native_subscription = (*scrollable).scroll().subscribe(
-                [this, sender_handle](gui_forms::ScrollEvent&) {
-                    static_cast<void>(emit_v2(sender_handle, GF_EVENT_SCROLL));
-                });
+                EmitV2Subscription<gui_forms::ScrollEvent&>{
+                    this, sender_handle, GF_EVENT_SCROLL});
         }
         return GF_OK;
     }
@@ -2374,14 +2304,7 @@ public:
         (*record).ui_thread = (*sender).ui_thread;
         *output = allocate_locked(SlotKind::subscription, {}, record);
         (*sender).subscriptions.push_back(*output);
-        const auto connect = [record, sender_handle](const RasterPointerSample& sample) {
-                if (!(*record).connected || (*record).pointer_callback == nullptr) {
-                    return;
-                }
-                static_cast<void>((*record).pointer_callback(
-                    sender_handle, sample.event_kind, sample.x, sample.y,
-                    sample.wheel_delta, sample.button, (*record).context));
-            };
+        const RasterPointerForwarder connect{record, sender_handle};
         if (raster) {
             (*record).native_subscription = (*raster).pointer_input().subscribe(connect);
         } else if (field) {
@@ -2389,26 +2312,8 @@ public:
         } else {
             const std::weak_ptr<Control> weak_control = (*sender).control;
             (*record).native_subscription = (*(*sender).control).pointer_observed().subscribe(
-                [record, sender_handle, weak_control](const gui_forms::PointerEvent& event) {
-                    if (!(*record).connected || (*record).pointer_callback == nullptr) return;
-                    const std::shared_ptr<gui_forms::Control> control = weak_control.lock();
-                    if (!control) return;
-                    const Rect bounds = (*control).absolute_bounds();
-                    std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
-                    switch (event.action) {
-                    case gui_forms::PointerAction::down: kind = GF_EVENT_MOUSE_DOWN; break;
-                    case gui_forms::PointerAction::up: kind = GF_EVENT_MOUSE_UP; break;
-                    case gui_forms::PointerAction::wheel: kind = GF_EVENT_MOUSE_WHEEL; break;
-                    case gui_forms::PointerAction::enter: kind = GF_EVENT_MOUSE_ENTER; break;
-                    case gui_forms::PointerAction::leave: kind = GF_EVENT_MOUSE_LEAVE; break;
-                    case gui_forms::PointerAction::move: break;
-                    }
-                    static_cast<void>((*record).pointer_callback(
-                        sender_handle, kind, event.position.x - bounds.x,
-                        event.position.y - bounds.y,
-                        event.wheel_delta.y,
-                        static_cast<std::uint32_t>(event.button), (*record).context));
-                });
+                ControlPointerForwarder{
+                    record, sender_handle, weak_control});
         }
         return GF_OK;
     }
@@ -2439,12 +2344,7 @@ public:
         (*sender).subscriptions.push_back(*output);
         gui_forms::Event<const RasterKeySample &>& key_input = field ? (*field).key_input() : (*raster).key_input();
         (*record).native_subscription = key_input.subscribe(
-            [record, sender_handle](const RasterKeySample& sample) {
-                if (!(*record).connected || (*record).key_callback == nullptr) return;
-                static_cast<void>((*record).key_callback(
-                    sender_handle, sample.event_kind, sample.physical_key,
-                    sample.modifiers, sample.repeat ? 1U : 0U, (*record).context));
-            });
+            RasterKeyForwarder{record, sender_handle});
         return GF_OK;
     }
 
@@ -2474,22 +2374,7 @@ public:
         *output = allocate_locked(SlotKind::subscription, {}, record);
         (*sender).subscriptions.push_back(*output);
         (*record).native_subscription = (*form).key_preview().subscribe(
-            [this, record, sender_handle, sender](RasterKeySample& sample) {
-                if (!(*record).connected ||
-                    (*record).key_preview_callback == nullptr) return;
-                const std::uint32_t result = (*record).key_preview_callback(
-                    sender_handle, sample.event_kind, sample.physical_key,
-                    sample.modifiers, sample.repeat ? 1U : 0U,
-                    (*record).context);
-                if (result == GF_EVENT_CALLBACK_CANCEL) {
-                    sample.handled = true;
-                } else if (result == GF_EVENT_CALLBACK_FAULTED ||
-                           result > GF_EVENT_CALLBACK_FAULTED) {
-                    std::scoped_lock callback_lock(mutex_);
-                    const std::shared_ptr<ControlRecord> root = root_record_locked(sender);
-                    ++(*root).callback_faults;
-                }
-            });
+            KeyPreviewForwarder{this, record, sender_handle, sender});
         return GF_OK;
     }
 
@@ -2517,14 +2402,7 @@ public:
         *output = allocate_locked(SlotKind::subscription, {}, record);
         (*sender).subscriptions.push_back(*output);
         (*record).native_subscription = (*field).text_input().subscribe(
-            [record, sender_handle](const RasterTextSample& sample) {
-                if (!(*record).connected || (*record).text_callback == nullptr) return;
-                const gf_string_view text{sample.text.data(), sample.text.size()};
-                static_cast<void>((*record).text_callback(
-                    sender_handle, text, sample.composing ? 1U : 0U,
-                    sample.replacement_start, sample.replacement_length,
-                    (*record).context));
-            });
+            RasterTextForwarder{record, sender_handle});
         return GF_OK;
     }
 
@@ -2609,6 +2487,245 @@ public:
     }
 
 private:
+    struct HostFinishGuard final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> record;
+        ~HostFinishGuard() { (*registry).finish_host(record); }
+    };
+
+    struct ManagedCallbackGuard final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> root;
+        ~ManagedCallbackGuard() { (*registry).leave_managed_callback(root); }
+    };
+
+    struct DispatchGuard final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> root;
+        ~DispatchGuard() { (*registry).leave_dispatch(root); }
+    };
+
+    struct AutomationResolver final {
+        std::shared_ptr<std::unordered_map<
+            std::string, std::shared_ptr<Control>>> controls;
+
+        std::shared_ptr<Control> operator()(std::string_view name) const {
+            const std::unordered_map<
+                std::string, std::shared_ptr<Control>>::const_iterator found =
+                    (*controls).find(std::string(name));
+            return found == (*controls).end()
+                ? std::shared_ptr<Control>{} : (*found).second;
+        }
+    };
+
+    struct CloseRequestCallback final {
+        Registry* registry{};
+        gf_handle handle{};
+
+        void operator()(gui_forms::HostCloseRequest& request) const {
+            request.cancel = (*registry).emit_v2(
+                handle, GF_EVENT_FORM_CLOSING) == GF_EVENT_CALLBACK_CANCEL;
+        }
+    };
+
+    struct HostReadyCallback final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> record;
+
+        void operator()(
+            std::function<void()> wake,
+            std::function<void()> close,
+            std::function<gui_forms::HostDialogResult(
+                const gui_forms::HostDialogRequest&)> dialog,
+            std::function<gui_forms::HostServiceStatus(
+                const gui_forms::HostTooltipRequest&)> tooltip_show,
+            std::function<void()> tooltip_hide,
+            std::function<gui_forms::HostClipboardTextResult()> clipboard_read,
+            std::function<gui_forms::HostServiceStatus(
+                std::string_view)> clipboard_write) const {
+            (*registry).publish_host(
+                record, std::move(wake), std::move(close), std::move(dialog),
+                std::move(tooltip_show), std::move(tooltip_hide),
+                std::move(clipboard_read), std::move(clipboard_write));
+        }
+    };
+
+    struct WindowsDispatchPendingCallback final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> record;
+        std::shared_ptr<std::unordered_map<
+            std::string, std::shared_ptr<Control>>> automation_controls;
+
+        void operator()() const {
+            (*registry).pump_pending(record);
+            (*registry).refresh_named_controls(record, *automation_controls);
+        }
+    };
+
+    struct DispatchPendingCallback final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> record;
+
+        void operator()() const { (*registry).pump_pending(record); }
+    };
+
+    struct HostClosedCallback final {
+        Registry* registry{};
+        gf_handle handle{};
+        std::shared_ptr<ControlRecord> record;
+
+        void operator()() const {
+            (*registry).mark_host_stopping(record);
+            static_cast<void>((*registry).emit_v2(
+                handle, GF_EVENT_FORM_CLOSED));
+        }
+    };
+
+    struct FinalSnapshotCallback final {
+        Registry* registry{};
+        std::shared_ptr<ControlRecord> record;
+
+        void operator()(std::string_view metrics,
+                        std::string_view host) const {
+            (*record).host_trace =
+                "{\"window\":" + std::string(metrics) +
+                ",\"host\":" + std::string(host) +
+                ",\"managed\":" + (*registry).managed_trace(record) + "}";
+        }
+    };
+
+    template <typename EventArgument>
+    struct EmitV2Subscription final {
+        Registry* registry{};
+        gf_handle sender{};
+        std::uint32_t event_kind{};
+
+        void operator()(EventArgument) const {
+            static_cast<void>((*registry).emit_v2(sender, event_kind));
+        }
+    };
+
+    struct RasterPointerForwarder final {
+        std::shared_ptr<SubscriptionRecord> subscription;
+        gf_handle sender{};
+
+        void operator()(const RasterPointerSample& sample) const {
+            if (!(*subscription).connected ||
+                (*subscription).pointer_callback == nullptr) return;
+            static_cast<void>((*subscription).pointer_callback(
+                sender, sample.event_kind, sample.x, sample.y,
+                sample.wheel_delta, sample.button,
+                (*subscription).context));
+        }
+    };
+
+    struct ControlPointerForwarder final {
+        std::shared_ptr<SubscriptionRecord> subscription;
+        gf_handle sender{};
+        std::weak_ptr<Control> control;
+
+        void operator()(const gui_forms::PointerEvent& event) const {
+            if (!(*subscription).connected ||
+                (*subscription).pointer_callback == nullptr) return;
+            const std::shared_ptr<Control> retained = control.lock();
+            if (!retained) return;
+            const Rect bounds = (*retained).absolute_bounds();
+            std::uint32_t kind = GF_EVENT_MOUSE_MOVE;
+            switch (event.action) {
+            case gui_forms::PointerAction::down:
+                kind = GF_EVENT_MOUSE_DOWN;
+                break;
+            case gui_forms::PointerAction::up:
+                kind = GF_EVENT_MOUSE_UP;
+                break;
+            case gui_forms::PointerAction::wheel:
+                kind = GF_EVENT_MOUSE_WHEEL;
+                break;
+            case gui_forms::PointerAction::enter:
+                kind = GF_EVENT_MOUSE_ENTER;
+                break;
+            case gui_forms::PointerAction::leave:
+                kind = GF_EVENT_MOUSE_LEAVE;
+                break;
+            case gui_forms::PointerAction::move:
+                break;
+            }
+            static_cast<void>((*subscription).pointer_callback(
+                sender, kind, event.position.x - bounds.x,
+                event.position.y - bounds.y, event.wheel_delta.y,
+                static_cast<std::uint32_t>(event.button),
+                (*subscription).context));
+        }
+    };
+
+    struct RasterKeyForwarder final {
+        std::shared_ptr<SubscriptionRecord> subscription;
+        gf_handle sender{};
+
+        void operator()(const RasterKeySample& sample) const {
+            if (!(*subscription).connected ||
+                (*subscription).key_callback == nullptr) return;
+            static_cast<void>((*subscription).key_callback(
+                sender, sample.event_kind, sample.physical_key,
+                sample.modifiers, sample.repeat ? 1U : 0U,
+                (*subscription).context));
+        }
+    };
+
+    struct KeyPreviewForwarder final {
+        Registry* registry{};
+        std::shared_ptr<SubscriptionRecord> subscription;
+        gf_handle sender_handle{};
+        std::shared_ptr<ControlRecord> sender;
+
+        void operator()(RasterKeySample& sample) const {
+            if (!(*subscription).connected ||
+                (*subscription).key_preview_callback == nullptr) return;
+            const std::uint32_t result =
+                (*subscription).key_preview_callback(
+                    sender_handle, sample.event_kind, sample.physical_key,
+                    sample.modifiers, sample.repeat ? 1U : 0U,
+                    (*subscription).context);
+            if (result == GF_EVENT_CALLBACK_CANCEL) {
+                sample.handled = true;
+            } else if (result == GF_EVENT_CALLBACK_FAULTED ||
+                       result > GF_EVENT_CALLBACK_FAULTED) {
+                std::scoped_lock callback_lock((*registry).mutex_);
+                const std::shared_ptr<ControlRecord> root =
+                    (*registry).root_record_locked(sender);
+                ++(*root).callback_faults;
+            }
+        }
+    };
+
+    struct RasterTextForwarder final {
+        std::shared_ptr<SubscriptionRecord> subscription;
+        gf_handle sender{};
+
+        void operator()(const RasterTextSample& sample) const {
+            if (!(*subscription).connected ||
+                (*subscription).text_callback == nullptr) return;
+            const gf_string_view text{sample.text.data(), sample.text.size()};
+            static_cast<void>((*subscription).text_callback(
+                sender, text, sample.composing ? 1U : 0U,
+                sample.replacement_start, sample.replacement_length,
+                (*subscription).context));
+        }
+    };
+
+    static void promote_nested_popup_forms(
+        const std::shared_ptr<ControlRecord>& popup,
+        const Control::Ptr& control) {
+        if (std::dynamic_pointer_cast<FormControl>(control)) {
+            (*popup).popup_plane_overrides.emplace_back(
+                control, (*control).paint_plane());
+            (*control).set_paint_plane(gui_forms::PaintPlane::control);
+        }
+        for (const Control::Ptr& child : (*control).children()) {
+            promote_nested_popup_forms(popup, child);
+        }
+    }
+
     std::shared_ptr<ControlRecord> root_record_locked(
         const std::shared_ptr<ControlRecord>& record) {
         std::shared_ptr<Control> root = (*record).control;
@@ -2622,6 +2739,40 @@ private:
             }
         }
         return record;
+    }
+
+    void leave_managed_callback(
+        const std::shared_ptr<ControlRecord>& root) {
+        std::function<void()> wake;
+        {
+            std::scoped_lock lock(mutex_);
+            if ((*root).managed_callback_depth > 0U) {
+                --(*root).managed_callback_depth;
+            }
+            if ((*root).managed_callback_depth == 0U &&
+                !(*root).dispatch_queue.empty() &&
+                !(*root).dispatch_wake_pending && (*root).host_wake) {
+                (*root).dispatch_wake_pending = true;
+                wake = (*root).host_wake;
+            }
+        }
+        if (wake) wake();
+    }
+
+    void leave_dispatch(const std::shared_ptr<ControlRecord>& root) {
+        std::function<void()> wake;
+        {
+            std::scoped_lock lock(mutex_);
+            if ((*root).dispatch_depth > 0U) --(*root).dispatch_depth;
+            if ((*root).dispatch_depth == 0U &&
+                (*root).managed_callback_depth == 0U &&
+                !(*root).dispatch_queue.empty() &&
+                !(*root).dispatch_wake_pending && (*root).host_wake) {
+                (*root).dispatch_wake_pending = true;
+                wake = (*root).host_wake;
+            }
+        }
+        if (wake) wake();
     }
 
     std::uint32_t emit_v2(gf_handle sender_handle, std::uint32_t event_kind) {
@@ -2649,23 +2800,7 @@ private:
             std::scoped_lock lock(mutex_);
             ++(*root).managed_callback_depth;
         }
-        auto callback_guard = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
-            root.get(), [this, root](ControlRecord*) {
-                std::function<void()> wake;
-                {
-                    std::scoped_lock lock(mutex_);
-                    if ((*root).managed_callback_depth > 0U) {
-                        --(*root).managed_callback_depth;
-                    }
-                    if ((*root).managed_callback_depth == 0U &&
-                        !(*root).dispatch_queue.empty() &&
-                        !(*root).dispatch_wake_pending && (*root).host_wake) {
-                        (*root).dispatch_wake_pending = true;
-                        wake = (*root).host_wake;
-                    }
-                }
-                if (wake) wake();
-            });
+        const ManagedCallbackGuard callback_guard{this, root};
         std::uint32_t aggregate = GF_EVENT_CALLBACK_CONTINUE;
         for (const std::shared_ptr<gui_forms::abi::detail::SubscriptionRecord>& subscription : snapshot) {
             if (!(*subscription).connected) continue;
@@ -2691,22 +2826,7 @@ private:
             }
             ++(*root).dispatch_depth;
         }
-        auto dispatch_guard = std::unique_ptr<ControlRecord, std::function<void(ControlRecord*)>>(
-            root.get(), [this, root](ControlRecord*) {
-                std::function<void()> wake;
-                {
-                    std::scoped_lock lock(mutex_);
-                    if ((*root).dispatch_depth > 0U) --(*root).dispatch_depth;
-                    if ((*root).dispatch_depth == 0U &&
-                        (*root).managed_callback_depth == 0U &&
-                        !(*root).dispatch_queue.empty() &&
-                        !(*root).dispatch_wake_pending && (*root).host_wake) {
-                        (*root).dispatch_wake_pending = true;
-                        wake = (*root).host_wake;
-                    }
-                }
-                if (wake) wake();
-            });
+        const DispatchGuard dispatch_guard{this, root};
         std::deque<DispatchRecord> pending;
         {
             std::scoped_lock lock(mutex_);
@@ -2883,8 +3003,9 @@ private:
         // The retained vector is painter order, while public child index zero
         // is topmost. Automation follows public order so the selected target
         // stays stable when z-order and docking use their native semantics.
-        for (auto child = children.rbegin(); child != children.rend(); ++child) {
-            if (std::shared_ptr<gui_forms::ButtonBase> button = first_button(*child)) return button;
+        for (std::size_t index = children.size(); index > 0U; --index) {
+            if (std::shared_ptr<gui_forms::ButtonBase> button =
+                    first_button(children[index - 1U])) return button;
         }
         return {};
     }
@@ -2898,15 +3019,17 @@ private:
         }
         const std::span<const gui_forms::Control::Ptr> children =
             (*root).children();
-        for (auto child = children.rbegin(); child != children.rend(); ++child) {
-            if (std::shared_ptr<Control> target = first_pointer_control(*child)) return target;
+        for (std::size_t index = children.size(); index > 0U; --index) {
+            if (std::shared_ptr<Control> target =
+                    first_pointer_control(children[index - 1U])) return target;
         }
         return {};
     }
 
     std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<Control>>>
     named_controls_snapshot(const std::shared_ptr<ControlRecord>& root) {
-        auto result = std::make_shared<
+        std::shared_ptr<std::unordered_map<
+            std::string, std::shared_ptr<Control>>> result = std::make_shared<
             std::unordered_map<std::string, std::shared_ptr<Control>>>();
         refresh_named_controls(root, *result);
         return result;
@@ -2999,10 +3122,11 @@ private:
     gf_handle allocate_locked(SlotKind kind,
                               std::shared_ptr<ControlRecord> control,
                               std::shared_ptr<SubscriptionRecord> subscription) {
-        auto found = std::find_if(slots_.begin(), slots_.end(),
-                                  [](const RegistrySlot& slot) {
-                                      return slot.kind == SlotKind::empty;
-                                  });
+        std::vector<RegistrySlot>::iterator found = slots_.begin();
+        while (found != slots_.end() &&
+               (*found).kind != SlotKind::empty) {
+            ++found;
+        }
         if (found == slots_.end()) {
             slots_.push_back({});
             found = std::prev(slots_.end());

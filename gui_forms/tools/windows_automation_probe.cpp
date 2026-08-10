@@ -86,7 +86,8 @@ struct PaintEndpointOwnerSearch final {
 };
 
 BOOL CALLBACK attach_paint_endpoint_owner(HWND candidate, LPARAM context_value) {
-    auto& context = *reinterpret_cast<PaintEndpointOwnerSearch*>(context_value);
+    PaintEndpointOwnerSearch& context =
+        *reinterpret_cast<PaintEndpointOwnerSearch*>(context_value);
     wchar_t class_name[128]{};
     DWORD process_id{};
     GetWindowThreadProcessId(candidate, &process_id);
@@ -119,7 +120,8 @@ BOOL CALLBACK attach_paint_endpoint_owner(HWND candidate, LPARAM context_value) 
 }
 
 BOOL CALLBACK find_owned_dialog(HWND window, LPARAM context_value) {
-    auto& context = *reinterpret_cast<OwnedDialogSearch*>(context_value);
+    OwnedDialogSearch& context =
+        *reinterpret_cast<OwnedDialogSearch*>(context_value);
     if (!IsWindowVisible(window) || GetWindow(window, GW_OWNER) != context.owner) {
         return TRUE;
     }
@@ -198,7 +200,8 @@ BOOL CALLBACK sample_control_surface(HWND window, LPARAM context_value) {
     wchar_t class_name[128]{};
     if (GetClassNameW(window, class_name, 128) == 0 ||
         std::wcscmp(class_name, L"GUIForms.ControlSurface.v1") != 0) return TRUE;
-    auto& context = *reinterpret_cast<SurfaceStatistics*>(context_value);
+    SurfaceStatistics& context =
+        *reinterpret_cast<SurfaceStatistics*>(context_value);
     ++context.count;
     RECT client{};
     RECT screen{};
@@ -230,10 +233,12 @@ BOOL CALLBACK sample_control_surface(HWND window, LPARAM context_value) {
     unsigned samples = 0;
     unsigned different = 0;
     if (copied) {
-        const auto* pixels = static_cast<const unsigned char*>(captured_pixels);
+        const unsigned char* pixels =
+            static_cast<const unsigned char*>(captured_pixels);
         for (int row = 0; row < grid; ++row) {
             for (int column = 0; column < grid; ++column) {
-            const auto* pixel = pixels + (row * grid + column) * 4;
+            const unsigned char* pixel =
+                pixels + (row * grid + column) * 4;
             const unsigned b = pixel[0];
             const unsigned g = pixel[1];
             const unsigned r = pixel[2];
@@ -318,7 +323,7 @@ int main(int argc, char** argv) {
             char class_utf8[512]{};
             WideCharToMultiByte(CP_UTF8, 0, class_name, -1, class_utf8, 512,
                                 nullptr, nullptr);
-            const auto class_cursor = reinterpret_cast<HCURSOR>(
+            const HCURSOR class_cursor = reinterpret_cast<HCURSOR>(
                 GetClassLongPtrW(target, GCLP_HCURSOR));
             std::printf("cursor-window=%p depth=%u class=%s parent=%p owner=%p "
                         "visible=%d enabled=%d class-cursor=%p style=%llx exstyle=%llx\n",
@@ -486,7 +491,7 @@ int main(int argc, char** argv) {
         CURSORINFO info{};
         info.cbSize = sizeof(info);
         const bool inspected = GetCursorInfo(&info) != FALSE;
-        const auto class_cursor = reinterpret_cast<HCURSOR>(
+        const HCURSOR class_cursor = reinterpret_cast<HCURSOR>(
             GetClassLongPtrW(window, GCLP_HCURSOR));
         std::printf("cursor=%p class=%p showing=%d message=%llu moved=%d inspected=%d\n",
                     static_cast<void*>(info.hCursor),

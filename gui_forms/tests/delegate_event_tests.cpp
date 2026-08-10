@@ -102,6 +102,16 @@ public:
     void fail() { throw std::runtime_error("delegate callback failure"); }
 };
 
+class AddToTotal final {
+public:
+    explicit AddToTotal(int& total) : total_(total) {}
+
+    void operator()(int value) const { total_ += value; }
+
+private:
+    int& total_;
+};
+
 void test_delegate_representation_and_binding() {
     static_assert(std::is_trivially_copyable_v<Delegate<int>>);
     static_assert(sizeof(Delegate<int>) == 2U * sizeof(void*));
@@ -177,7 +187,7 @@ void test_legacy_callback_compatibility() {
     Event<int> event;
     int total = 0;
     const SubscriptionToken token = event.subscribe(
-        [&total](int value) { total += value; });
+        AddToTotal(total));
     event.emit(11);
     require(total == 11 && token.connected(),
             "the legacy std::function subscription overload must remain compatible");

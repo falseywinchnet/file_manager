@@ -1,5 +1,6 @@
 #include "gui_forms/gui_forms.hpp"
 #include "../src/core/damage/device_damage/device_damage.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -93,7 +94,7 @@ public:
     }
 
     void on_pointer(PointerEvent& event) override {
-        const PaintLeaseState state = window()->paint_lease_snapshot().state;
+        const PaintLeaseState state = (*window()).paint_lease_snapshot().state;
         callback_during_lease |= state == PaintLeaseState::rendering ||
             state == PaintLeaseState::rendering_dirty;
         ++pointer_calls;
@@ -102,7 +103,7 @@ public:
     }
 
     void on_key(KeyEvent& event) override {
-        const PaintLeaseState state = window()->paint_lease_snapshot().state;
+        const PaintLeaseState state = (*window()).paint_lease_snapshot().state;
         callback_during_lease |= state == PaintLeaseState::rendering ||
             state == PaintLeaseState::rendering_dirty;
         ++key_calls;
@@ -160,11 +161,11 @@ public:
     void on_paint(Painter& painter, Rect damage) override {
         ++paint_calls;
         if (request_nested_paint && paint_calls == 1U) {
-            window()->paint(painter, damage);
+            (*window()).paint(painter, damage);
         }
         if (invalidate_during_paint && paint_calls == 1U) {
             invalidate(invalidation::paint_only);
-            state_after_touch = window()->paint_lease_snapshot().state;
+            state_after_touch = (*window()).paint_lease_snapshot().state;
         }
         if (throw_during_paint && paint_calls == 1U) {
             throw std::runtime_error("candidate paint failed");
@@ -194,7 +195,7 @@ public:
                 move.pointer_id = 7U;
                 move.position = {20.0 + static_cast<double>(index) * 0.1, 20.0};
                 all_ingress_accepted =
-                    window()->dispatch_pointer(std::move(move)) &&
+                    (*window()).dispatch_pointer(std::move(move)) &&
                     all_ingress_accepted;
             }
             PointerEvent down;
@@ -203,35 +204,35 @@ public:
             down.pointer_id = 7U;
             down.position = {30.0, 20.0};
             all_ingress_accepted =
-                window()->dispatch_pointer(std::move(down)) &&
+                (*window()).dispatch_pointer(std::move(down)) &&
                 all_ingress_accepted;
             all_ingress_accepted =
-                window()->dispatch_key(
+                (*window()).dispatch_key(
                     {KeyAction::down, PhysicalKey::a}) &&
                 all_ingress_accepted;
             TextInputEvent text;
             text.text_utf8 = "a";
             all_ingress_accepted =
-                window()->dispatch_text(std::move(text)) &&
+                (*window()).dispatch_text(std::move(text)) &&
                 all_ingress_accepted;
-            during_lease = window()->deferred_input_snapshot();
+            during_lease = (*window()).deferred_input_snapshot();
         }
         if (inject_semantic_during_next_paint) {
             inject_semantic_during_next_paint = false;
-            semantic_retained = window()->perform_semantic_action(
+            semantic_retained = (*window()).perform_semantic_action(
                 stable_id().value(), SemanticAction::press);
-            during_lease = window()->deferred_input_snapshot();
+            during_lease = (*window()).deferred_input_snapshot();
         }
         if (dispose_during_next_paint) {
             dispose_during_next_paint = false;
             for (std::size_t index = 0U;
                  index < maximum_deferred_inputs + 1U; ++index) {
-                const bool accepted = window()->dispatch_key(
+                const bool accepted = (*window()).dispatch_key(
                     {KeyAction::down, PhysicalKey::a});
                 ingress_accepted += accepted ? 1U : 0U;
                 all_ingress_accepted = accepted && all_ingress_accepted;
             }
-            during_lease = window()->deferred_input_snapshot();
+            during_lease = (*window()).deferred_input_snapshot();
             in_application_paint = false;
             dispose();
             return;
@@ -302,27 +303,27 @@ public:
 
 struct TreeFixture {
     TreeFixture() {
-        root->set_requested_bounds({0.0, 0.0, 300.0, 180.0});
-        left->set_requested_bounds({0.0, 0.0, 140.0, 180.0});
-        right->set_requested_bounds({160.0, 0.0, 140.0, 180.0});
-        left_leaf->set_requested_bounds({10.0, 10.0, 40.0, 30.0});
-        left_sibling->set_requested_bounds({10.0, 60.0, 40.0, 30.0});
-        right_leaf->set_requested_bounds({10.0, 10.0, 40.0, 30.0});
-        left->add_child(left_leaf);
-        left->add_child(left_sibling);
-        right->add_child(right_leaf);
-        root->add_child(left);
-        root->add_child(right);
+        (*root).set_requested_bounds({0.0, 0.0, 300.0, 180.0});
+        (*left).set_requested_bounds({0.0, 0.0, 140.0, 180.0});
+        (*right).set_requested_bounds({160.0, 0.0, 140.0, 180.0});
+        (*left_leaf).set_requested_bounds({10.0, 10.0, 40.0, 30.0});
+        (*left_sibling).set_requested_bounds({10.0, 60.0, 40.0, 30.0});
+        (*right_leaf).set_requested_bounds({10.0, 10.0, 40.0, 30.0});
+        (*left).add_child(left_leaf);
+        (*left).add_child(left_sibling);
+        (*right).add_child(right_leaf);
+        (*root).add_child(left);
+        (*root).add_child(right);
         window = std::make_unique<Window>(root, Size{300.0, 180.0});
-        window->perform_layout();
+        (*window).perform_layout();
         paint_pending();
-        window->reset_activity_metrics();
+        (*window).reset_activity_metrics();
     }
 
     void paint_pending() {
-        DamageRegion damage = window->take_damage();
+        DamageRegion damage = (*window).take_damage();
         if (!damage.empty()) {
-            window->paint(painter, damage.bounds());
+            (*window).paint(painter, damage.bounds());
         }
     }
 
@@ -342,6 +343,66 @@ struct TreeFixture {
     NullPainter painter;
 };
 
+class ApplyReplayPressure final {
+public:
+    ApplyReplayPressure(ReplayPressureControl& root, Window& window,
+                        ReplayBoundaryPainter& painter)
+        : root_(root), window_(window), painter_(painter) {}
+
+    void operator()() const {
+        for (std::uint32_t revision = 1U; revision <= 100U; ++revision) {
+            root_.set_value(revision);
+        }
+        PointerEvent pointer;
+        pointer.action = PointerAction::down;
+        pointer.button = PointerButton::primary;
+        pointer.pointer_id = 31U;
+        pointer.position = {20.0, 20.0};
+        require(window_.dispatch_pointer(std::move(pointer)),
+                "synthetic pointer must be retained at the replay boundary");
+        for (std::size_t nested = 0U; nested < 8U; ++nested) {
+            require(!window_.paint(painter_).has_value(),
+                    "native-style replay reentry must not obtain a receipt");
+        }
+    }
+
+private:
+    ReplayPressureControl& root_;
+    Window& window_;
+    ReplayBoundaryPainter& painter_;
+};
+
+class ResizeDuringReplay final {
+public:
+    ResizeDuringReplay(ReplayPressureControl& root, Window& window)
+        : root_(root), window_(window) {}
+
+    void operator()() const {
+        root_.set_value(2U);
+        window_.resize({160.0, 100.0});
+    }
+
+private:
+    ReplayPressureControl& root_;
+    Window& window_;
+};
+
+class RetireDuringReplay final {
+public:
+    RetireDuringReplay(ReplayPressureControl& root, Window& window)
+        : root_(root), window_(window) {}
+
+    void operator()() const {
+        require(window_.dispatch_key({KeyAction::down, PhysicalKey::a}),
+                "retirement probe key must enter the bounded lease queue");
+        root_.dispose();
+    }
+
+private:
+    ReplayPressureControl& root_;
+    Window& window_;
+};
+
 void test_typed_effect_vocabulary() {
     require(has_dirty(invalidation::bounds, Dirty::measure) &&
                 has_dirty(invalidation::bounds, Dirty::arrange) &&
@@ -358,31 +419,31 @@ void test_typed_effect_vocabulary() {
 
 void test_affected_path_layout() {
     TreeFixture fixture;
-    const std::uint64_t right_measure = fixture.right->measure_calls;
-    const std::uint64_t right_arrange = fixture.right->arrange_calls;
-    const std::uint64_t sibling_measure = fixture.left_sibling->measure_calls;
-    const std::uint64_t sibling_arrange = fixture.left_sibling->arrange_calls;
+    const std::uint64_t right_measure = (*fixture.right).measure_calls;
+    const std::uint64_t right_arrange = (*fixture.right).arrange_calls;
+    const std::uint64_t sibling_measure = (*fixture.left_sibling).measure_calls;
+    const std::uint64_t sibling_arrange = (*fixture.left_sibling).arrange_calls;
 
-    fixture.left_leaf->set_requested_bounds({20.0, 15.0, 44.0, 32.0});
-    require(fixture.left_leaf->arranged_bounds() == Rect{20.0, 15.0, 44.0, 32.0},
+    (*fixture.left_leaf).set_requested_bounds({20.0, 15.0, 44.0, 32.0});
+    require((*fixture.left_leaf).arranged_bounds() == Rect{20.0, 15.0, 44.0, 32.0},
             "read barrier must commit the affected leaf geometry");
-    const MetricsSnapshot metrics = fixture.window->metrics_snapshot();
+    const MetricsSnapshot metrics = (*fixture.window).metrics_snapshot();
     require(metrics.controls_measured == 3 && metrics.controls_arranged == 3,
             "leaf bounds change must invoke layout only on root-to-leaf path");
     require(metrics.measure_nodes_visited == 3 && metrics.arrange_nodes_visited == 3,
             "layout visit metrics must match the affected path exactly");
-    require(fixture.right->measure_calls == right_measure &&
-                fixture.right->arrange_calls == right_arrange &&
-                fixture.left_sibling->measure_calls == sibling_measure &&
-                fixture.left_sibling->arrange_calls == sibling_arrange,
+    require((*fixture.right).measure_calls == right_measure &&
+                (*fixture.right).arrange_calls == right_arrange &&
+                (*fixture.left_sibling).measure_calls == sibling_measure &&
+                (*fixture.left_sibling).arrange_calls == sibling_arrange,
             "unaffected sibling subtrees must not receive layout callbacks");
 }
 
 void test_full_subtree_invalidation_is_explicit() {
     TreeFixture fixture;
-    fixture.window->resize({320.0, 190.0});
-    fixture.window->perform_layout();
-    const MetricsSnapshot metrics = fixture.window->metrics_snapshot();
+    (*fixture.window).resize({320.0, 190.0});
+    (*fixture.window).perform_layout();
+    const MetricsSnapshot metrics = (*fixture.window).metrics_snapshot();
     require(metrics.controls_measured == 6 && metrics.controls_arranged == 6,
             "window resize must explicitly invalidate the complete retained subtree");
     require(metrics.measure_nodes_visited == 6 && metrics.arrange_nodes_visited == 6,
@@ -390,32 +451,36 @@ void test_full_subtree_invalidation_is_explicit() {
 }
 
 void test_damage_take_commits_layout_generated_geometry_damage() {
-    auto root = make_control<CountingControl>(StableId("damage.layout.root"));
-    root->set_padding({10.0, 10.0, 10.0, 10.0});
-    auto fill = make_control<CountingControl>(StableId("damage.layout.fill"));
-    fill->set_requested_bounds({0.0, 0.0, 20.0, 20.0});
-    fill->set_dock(DockStyle::fill);
-    auto top = make_control<CountingControl>(StableId("damage.layout.top"));
-    top->set_requested_bounds({0.0, 0.0, 20.0, 24.0});
-    top->set_dock(DockStyle::top);
-    auto left = make_control<CountingControl>(StableId("damage.layout.left"));
-    left->set_requested_bounds({0.0, 0.0, 50.0, 20.0});
-    left->set_dock(DockStyle::left);
-    root->add_child(left);
-    root->add_child(top);
-    root->add_child(fill);
+    std::shared_ptr<CountingControl> root =
+        make_control<CountingControl>(StableId("damage.layout.root"));
+    (*root).set_padding({10.0, 10.0, 10.0, 10.0});
+    std::shared_ptr<CountingControl> fill =
+        make_control<CountingControl>(StableId("damage.layout.fill"));
+    (*fill).set_requested_bounds({0.0, 0.0, 20.0, 20.0});
+    (*fill).set_dock(DockStyle::fill);
+    std::shared_ptr<CountingControl> top =
+        make_control<CountingControl>(StableId("damage.layout.top"));
+    (*top).set_requested_bounds({0.0, 0.0, 20.0, 24.0});
+    (*top).set_dock(DockStyle::top);
+    std::shared_ptr<CountingControl> left =
+        make_control<CountingControl>(StableId("damage.layout.left"));
+    (*left).set_requested_bounds({0.0, 0.0, 50.0, 20.0});
+    (*left).set_dock(DockStyle::left);
+    (*root).add_child(left);
+    (*root).add_child(top);
+    (*root).add_child(fill);
     Window window(root, {300.0, 180.0});
     window.perform_layout();
     NullPainter painter;
     DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
-    const Rect old_top = top->arranged_bounds();
-    const Rect old_fill = fill->arranged_bounds();
+    const Rect old_top = (*top).arranged_bounds();
+    const Rect old_fill = (*fill).arranged_bounds();
 
-    left->set_visible(false);
+    (*left).set_visible(false);
     DamageRegion geometry_damage = window.take_damage();
-    const Rect new_top = top->arranged_bounds();
-    const Rect new_fill = fill->arranged_bounds();
+    const Rect new_top = (*top).arranged_bounds();
+    const Rect new_fill = (*fill).arranged_bounds();
     require(new_top.x < old_top.x && new_top.width > old_top.width &&
                 new_fill.x < old_fill.x && new_fill.width > old_fill.width,
             "taking host damage must commit sibling geometry released by hidden Dock");
@@ -431,8 +496,9 @@ void test_damage_take_commits_layout_generated_geometry_damage() {
 }
 
 void test_reentrant_layout_is_bounded() {
-    auto root = make_control<ReentrantLayoutControl>(StableId("typed.reentrant"));
-    root->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    std::shared_ptr<ReentrantLayoutControl> root =
+        make_control<ReentrantLayoutControl>(StableId("typed.reentrant"));
+    (*root).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
     Window window(root, {100.0, 80.0});
     window.reset_activity_metrics();
 
@@ -446,9 +512,9 @@ void test_reentrant_layout_is_bounded() {
 
 void test_paint_metrics_report_chunk_work() {
     TreeFixture fixture;
-    fixture.left_leaf->invalidate(invalidation::paint_only);
+    (*fixture.left_leaf).invalidate(invalidation::paint_only);
     fixture.paint_pending();
-    const MetricsSnapshot metrics = fixture.window->metrics_snapshot();
+    const MetricsSnapshot metrics = (*fixture.window).metrics_snapshot();
     require(metrics.measure_passes == 0 && metrics.arrange_passes == 0,
             "paint-only invalidation must not trigger layout");
     require(metrics.paint_invalidations_consumed == 1,
@@ -465,23 +531,23 @@ void test_paint_metrics_report_chunk_work() {
 void test_declared_mutation_guard() {
     TreeFixture fixture;
 #ifndef NDEBUG
-    const Dirty before = fixture.left_leaf->dirty();
+    const Dirty before = (*fixture.left_leaf).dirty();
 #endif
     bool rejected = false;
     try {
-        fixture.left_leaf->invalidate_declared(Dirty::none);
+        (*fixture.left_leaf).invalidate_declared(Dirty::none);
     } catch (const std::logic_error&) {
         rejected = true;
     }
-    const MetricsSnapshot metrics = fixture.window->metrics_snapshot();
+    const MetricsSnapshot metrics = (*fixture.window).metrics_snapshot();
     require(metrics.undeclared_mutations == 1,
             "undeclared mutation attempt must be a structured diagnostic");
 #ifndef NDEBUG
-    require(rejected && fixture.left_leaf->dirty() == before,
+    require(rejected && (*fixture.left_leaf).dirty() == before,
             "development build must reject undeclared mutation without changing dirtiness");
 #else
     require(!rejected &&
-                has_dirty(fixture.left_leaf->dirty(), invalidation::conservative_subtree),
+                has_dirty((*fixture.left_leaf).dirty(), invalidation::conservative_subtree),
             "production build must conservatively invalidate undeclared mutation subtree");
 #endif
 }
@@ -527,22 +593,23 @@ void test_device_damage_alignment_is_outward_and_scale_exact() {
 void test_idle_remains_quiescent_after_compacted_damage() {
     TreeFixture fixture;
     for (int index = 0; index < 20; ++index) {
-        fixture.left_leaf->invalidate(invalidation::paint_only);
+        (*fixture.left_leaf).invalidate(invalidation::paint_only);
     }
     fixture.paint_pending();
-    fixture.window->reset_activity_metrics();
-    require(!fixture.window->needs_frame() && !fixture.window->next_wake().has_value(),
+    (*fixture.window).reset_activity_metrics();
+    require(!(*fixture.window).needs_frame() && !(*fixture.window).next_wake().has_value(),
             "painted retained damage must return to frame-and-wake quiescence");
-    const MetricsSnapshot idle = fixture.window->metrics_snapshot();
+    const MetricsSnapshot idle = (*fixture.window).metrics_snapshot();
     require(idle.measure_passes == 0 && idle.arrange_passes == 0 &&
                 idle.paint_passes == 0 && idle.paint_invalidations_consumed == 0,
             "idle snapshot must report no latent layout or paint work");
 }
 
 void test_exclusive_paint_lease_defers_reentry_and_tracks_release() {
-    auto root = make_control<TransactionPaintControl>(StableId("paint.lease"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->request_nested_paint = true;
+    std::shared_ptr<TransactionPaintControl> root =
+        make_control<TransactionPaintControl>(StableId("paint.lease"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).request_nested_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion damage = window.take_damage();
@@ -553,7 +620,7 @@ void test_exclusive_paint_lease_defers_reentry_and_tracks_release() {
                 snapshot.reentrant_requests_deferred == 1U &&
                 snapshot.state == PaintLeaseState::dirty_queued && window.needs_frame(),
             "a nested paint request must defer one later pass without recursive callbacks");
-    require(root->paint_calls == 1U,
+    require((*root).paint_calls == 1U,
             "exclusive paint lease must invoke application paint only once");
 
     const DamageRegion deferred = window.take_damage();
@@ -570,15 +637,16 @@ void test_exclusive_paint_lease_defers_reentry_and_tracks_release() {
 }
 
 void test_paint_touch_during_render_survives_current_lease() {
-    auto root = make_control<TransactionPaintControl>(StableId("paint.touch"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->invalidate_during_paint = true;
+    std::shared_ptr<TransactionPaintControl> root =
+        make_control<TransactionPaintControl>(StableId("paint.touch"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).invalidate_during_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion damage = window.take_damage();
     window.paint(painter, damage.bounds());
     const PaintLeaseSnapshot snapshot = window.paint_lease_snapshot();
-    require(root->state_after_touch == PaintLeaseState::rendering_dirty &&
+    require((*root).state_after_touch == PaintLeaseState::rendering_dirty &&
                 snapshot.dirty_after_render &&
                 snapshot.state == PaintLeaseState::dirty_queued &&
                 snapshot.content_revision > snapshot.rendered_revision &&
@@ -587,9 +655,10 @@ void test_paint_touch_during_render_survives_current_lease() {
 }
 
 void test_failed_candidate_preserves_damage_and_never_replays_partial_commands() {
-    auto root = make_control<TransactionPaintControl>(StableId("paint.failure"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->throw_during_paint = true;
+    std::shared_ptr<TransactionPaintControl> root =
+        make_control<TransactionPaintControl>(StableId("paint.failure"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).throw_during_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
@@ -613,22 +682,22 @@ void test_failed_candidate_preserves_damage_and_never_replays_partial_commands()
 }
 
 void test_retained_input_waits_for_lease_and_compacts_move_pressure() {
-    auto root =
+    std::shared_ptr<DeferredInputPaintControl> root =
         make_control<DeferredInputPaintControl>(StableId("paint.input"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->set_focusable(true);
-    root->inject_pressure_during_next_paint = true;
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).set_focusable(true);
+    (*root).inject_pressure_during_next_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
 
     const DeferredInputSnapshot pending = window.deferred_input_snapshot();
-    require(root->all_ingress_accepted && root->delivered.empty() &&
-                !root->callback_during_paint &&
-                root->during_lease.deferred == 103U &&
-                root->during_lease.coalesced_moves == 99U &&
-                root->during_lease.pending == 4U &&
+    require((*root).all_ingress_accepted && (*root).delivered.empty() &&
+                !(*root).callback_during_paint &&
+                (*root).during_lease.deferred == 103U &&
+                (*root).during_lease.coalesced_moves == 99U &&
+                (*root).during_lease.pending == 4U &&
                 pending.pending == 4U && pending.drain_queued &&
                 window.dispatcher_snapshot().pending == 1U,
             "paint-time input must compact obsolete moves and post one bounded drain");
@@ -636,11 +705,11 @@ void test_retained_input_waits_for_lease_and_compacts_move_pressure() {
     const DispatchDrainResult drain = window.drain_posted_work();
     const DeferredInputSnapshot delivered = window.deferred_input_snapshot();
     require(drain.invoked == 1U && drain.remaining == 0U &&
-                root->delivered ==
+                (*root).delivered ==
                     std::vector<std::string>{"enter", "move", "down", "key", "text"} &&
-                !root->callback_during_paint &&
-                root->last_move.x > 29.89 && root->last_move.x < 29.91 &&
-                root->last_move.y == 20.0 &&
+                !(*root).callback_during_paint &&
+                (*root).last_move.x > 29.89 && (*root).last_move.x < 29.91 &&
+                (*root).last_move.y == 20.0 &&
                 delivered.pending == 0U && delivered.delivered == 4U &&
                 delivered.drains == 1U && !delivered.drain_queued &&
                 delivered.rejected_capacity == 0U &&
@@ -649,30 +718,30 @@ void test_retained_input_waits_for_lease_and_compacts_move_pressure() {
 
     const DamageRegion follow_up = window.take_damage();
     window.paint(painter, follow_up.bounds());
-    require(root->paint_calls == 2U &&
+    require((*root).paint_calls == 2U &&
                 window.deferred_input_snapshot().pending == 0U &&
                 window.dispatcher_snapshot().pending == 0U,
             "input mutation must produce one ordinary later paint without a catch-up queue");
 }
 
 void test_retained_input_is_abandoned_when_paint_owner_retires() {
-    auto root =
+    std::shared_ptr<DeferredInputPaintControl> root =
         make_control<DeferredInputPaintControl>(StableId("paint.input.dispose"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->set_focusable(true);
-    root->dispose_during_next_paint = true;
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).set_focusable(true);
+    (*root).dispose_during_next_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
 
     const DeferredInputSnapshot snapshot = window.deferred_input_snapshot();
-    require(!root->is_alive() &&
-                root->ingress_accepted == maximum_deferred_inputs &&
-                !root->all_ingress_accepted &&
-                root->during_lease.pending == maximum_deferred_inputs &&
-                root->during_lease.rejected_capacity == 1U &&
-                root->delivered.empty() && snapshot.pending == 0U &&
+    require(!(*root).is_alive() &&
+                (*root).ingress_accepted == maximum_deferred_inputs &&
+                !(*root).all_ingress_accepted &&
+                (*root).during_lease.pending == maximum_deferred_inputs &&
+                (*root).during_lease.rejected_capacity == 1U &&
+                (*root).delivered.empty() && snapshot.pending == 0U &&
                 snapshot.abandoned == maximum_deferred_inputs &&
                 snapshot.rejected_capacity == 1U && !snapshot.drain_queued &&
                 window.dispatcher_snapshot().pending == 0U &&
@@ -681,12 +750,12 @@ void test_retained_input_is_abandoned_when_paint_owner_retires() {
 }
 
 void test_retained_input_fault_does_not_drop_later_events() {
-    auto root =
+    std::shared_ptr<DeferredInputPaintControl> root =
         make_control<DeferredInputPaintControl>(StableId("paint.input.fault"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->set_focusable(true);
-    root->inject_pressure_during_next_paint = true;
-    root->throw_on_key = true;
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).set_focusable(true);
+    (*root).inject_pressure_during_next_paint = true;
+    (*root).throw_on_key = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
@@ -695,7 +764,7 @@ void test_retained_input_fault_does_not_drop_later_events() {
     const DispatchDrainResult drain = window.drain_posted_work();
     const DeferredInputSnapshot snapshot = window.deferred_input_snapshot();
     require(drain.faulted == 1U && drain.remaining == 0U &&
-                root->delivered ==
+                (*root).delivered ==
                     std::vector<std::string>{"enter", "move", "down", "key", "text"} &&
                 snapshot.pending == 0U && snapshot.delivered == 3U &&
                 snapshot.faults == 1U && snapshot.drains == 1U &&
@@ -704,69 +773,56 @@ void test_retained_input_fault_does_not_drop_later_events() {
 }
 
 void test_semantic_action_waits_for_paint_lease_release() {
-    auto root =
+    std::shared_ptr<DeferredInputPaintControl> root =
         make_control<DeferredInputPaintControl>(StableId("paint.semantic"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->inject_semantic_during_next_paint = true;
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).inject_semantic_during_next_paint = true;
     Window window(root, {120.0, 80.0});
     NullPainter painter;
     const DamageRegion initial = window.take_damage();
     window.paint(painter, initial.bounds());
 
     const DeferredInputSnapshot pending = window.deferred_input_snapshot();
-    require(root->semantic_retained && root->semantic_actions == 0U &&
-                !root->callback_during_paint &&
-                root->during_lease.pending == 1U &&
+    require((*root).semantic_retained && (*root).semantic_actions == 0U &&
+                !(*root).callback_during_paint &&
+                (*root).during_lease.pending == 1U &&
                 pending.pending == 1U && pending.drain_queued,
             "semantic action must retain its stable identity without entering paint");
     const DispatchDrainResult drain = window.drain_posted_work();
     require(drain.invoked == 1U && drain.remaining == 0U &&
-                root->semantic_actions == 1U &&
-                !root->callback_during_paint &&
+                (*root).semantic_actions == 1U &&
+                !(*root).callback_during_paint &&
                 window.deferred_input_snapshot().pending == 0U &&
                 window.needs_frame(),
             "semantic action must resolve once after release and use ordinary invalidation");
     const DamageRegion follow_up = window.take_damage();
     window.paint(painter, follow_up.bounds());
-    require(root->paint_calls == 2U &&
+    require((*root).paint_calls == 2U &&
                 window.dispatcher_snapshot().pending == 0U,
             "semantic mutation must produce one later paint without residual work");
 }
 
 void test_slow_replay_pressure_coalesces_to_latest_state_and_exact_receipt() {
-    auto root = make_control<ReplayPressureControl>(StableId("paint.pressure"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    root->set_focusable(true);
+    std::shared_ptr<ReplayPressureControl> root =
+        make_control<ReplayPressureControl>(StableId("paint.pressure"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*root).set_focusable(true);
     Window window(root, {120.0, 80.0});
     std::uint64_t wake_calls{};
-    window.set_paint_wake_handler([&] { ++wake_calls; });
+    window.set_paint_wake_handler(
+        test_support::IncrementCounter<std::uint64_t>(wake_calls));
     const DamageRegion initial = window.take_damage();
     const std::uint64_t wake_calls_before_pressure = wake_calls;
 
     ReplayBoundaryPainter slow;
-    slow.on_first_command = [&] {
-        for (std::uint32_t revision = 1U; revision <= 100U; ++revision) {
-            root->set_value(revision);
-        }
-        PointerEvent pointer;
-        pointer.action = PointerAction::down;
-        pointer.button = PointerButton::primary;
-        pointer.pointer_id = 31U;
-        pointer.position = {20.0, 20.0};
-        require(window.dispatch_pointer(std::move(pointer)),
-                "synthetic pointer must be retained at the replay boundary");
-        for (std::size_t nested = 0U; nested < 8U; ++nested) {
-            require(!window.paint(slow).has_value(),
-                    "native-style replay reentry must not obtain a receipt");
-        }
-    };
+    slow.on_first_command = ApplyReplayPressure(*root, window, slow);
     const std::optional<PaintReceipt> first =
         window.paint(slow, initial.bounds());
     const PaintLeaseSnapshot pressured = window.paint_lease_snapshot();
     const DeferredInputSnapshot pending_input = window.deferred_input_snapshot();
-    require(first.has_value() && root->last_painted_value == 0U &&
-                pressured.content_revision > first->rendered_revision &&
-                pressured.rendered_revision == first->rendered_revision &&
+    require(first.has_value() && (*root).last_painted_value == 0U &&
+                pressured.content_revision > (*first).rendered_revision &&
+                pressured.rendered_revision == (*first).rendered_revision &&
                 pressured.leases_started == 1U &&
                 pressured.leases_completed == 1U &&
                 pressured.reentrant_requests_deferred == 8U &&
@@ -774,20 +830,20 @@ void test_slow_replay_pressure_coalesces_to_latest_state_and_exact_receipt() {
                 wake_calls == wake_calls_before_pressure + 1U &&
                 pressured.render_wakes_coalesced >= 99U &&
                 pending_input.pending == 1U && pending_input.drain_queued &&
-                root->pointer_calls == 0U && !root->callback_during_lease,
+                (*root).pointer_calls == 0U && !(*root).callback_during_lease,
             "slow replay pressure must retain one coherent old receipt, one wake, and one deferred input drain");
 
     const DispatchDrainResult input_drain = window.drain_posted_work();
     require(input_drain.invoked == 1U && input_drain.remaining == 0U &&
-                root->pointer_calls == 1U && !root->callback_during_lease,
+                (*root).pointer_calls == 1U && !(*root).callback_during_lease,
             "replay-boundary input must deliver once only after lease release");
 
     const DamageRegion latest_damage = window.take_damage();
     NullPainter latest_painter;
     const std::optional<PaintReceipt> latest =
         window.paint(latest_painter, latest_damage.bounds());
-    require(latest.has_value() && root->last_painted_value == 100U &&
-                latest->rendered_revision ==
+    require(latest.has_value() && (*root).last_painted_value == 100U &&
+                (*latest).rendered_revision ==
                     window.paint_lease_snapshot().content_revision,
             "one follow-up must render the latest state without intermediate jobs");
     require(window.notify_presented(*latest, 50U) &&
@@ -804,79 +860,79 @@ void test_slow_replay_pressure_coalesces_to_latest_state_and_exact_receipt() {
 }
 
 void test_resize_during_backend_replay_withholds_stale_receipt() {
-    auto root = make_control<ReplayPressureControl>(StableId("paint.epoch"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    std::shared_ptr<ReplayPressureControl> root =
+        make_control<ReplayPressureControl>(StableId("paint.epoch"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     Window window(root, {120.0, 80.0});
     NullPainter initial_painter;
     const DamageRegion initial_damage = window.take_damage();
-    const auto initial = window.paint(initial_painter, initial_damage.bounds());
+    const std::optional<PaintReceipt> initial = window.paint(initial_painter, initial_damage.bounds());
     require(initial.has_value() && window.notify_presented(*initial),
             "baseline surface must present before the stale-epoch probe");
 
-    root->set_value(1U);
+    (*root).set_value(1U);
     const DamageRegion damage = window.take_damage();
     ReplayBoundaryPainter resizing;
-    resizing.on_first_command = [&] {
-        root->set_value(2U);
-        window.resize({160.0, 100.0});
-    };
-    const auto stale = window.paint(resizing, damage.bounds());
+    resizing.on_first_command = ResizeDuringReplay(*root, window);
+    const std::optional<PaintReceipt> stale = window.paint(resizing, damage.bounds());
     const PaintLeaseSnapshot abandoned = window.paint_lease_snapshot();
     require(!stale.has_value() && abandoned.leases_abandoned == 1U &&
-                abandoned.presented_revision == initial->rendered_revision &&
-                abandoned.surface_epoch != initial->surface_epoch &&
+                abandoned.presented_revision == (*initial).rendered_revision &&
+                abandoned.surface_epoch != (*initial).surface_epoch &&
                 !window.notify_presented(*initial),
             "a resize entered by backend replay must withhold the stale receipt and preserve the last presentation revision");
 
     const DamageRegion replacement_damage = window.take_damage();
     NullPainter replacement_painter;
-    const auto replacement =
+    const std::optional<PaintReceipt> replacement =
         window.paint(replacement_painter, replacement_damage.bounds());
-    require(replacement.has_value() && root->last_painted_value == 2U &&
-                replacement->surface_epoch == abandoned.surface_epoch &&
+    require(replacement.has_value() && (*root).last_painted_value == 2U &&
+                (*replacement).surface_epoch == abandoned.surface_epoch &&
                 window.notify_presented(*replacement) && !window.needs_frame(),
             "the replacement epoch must render and release only the latest state");
 }
 
 void test_occluded_mutation_storm_has_one_exposure_wake() {
-    auto root = make_control<ReplayPressureControl>(StableId("paint.occlusion"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    std::shared_ptr<ReplayPressureControl> root =
+        make_control<ReplayPressureControl>(StableId("paint.occlusion"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     Window window(root, {120.0, 80.0});
     NullPainter painter;
-    const auto initial = window.paint(painter, window.take_damage().bounds());
+    const std::optional<PaintReceipt> initial = window.paint(painter, window.take_damage().bounds());
     require(initial.has_value() && window.notify_presented(*initial),
             "occlusion probe requires a clean baseline surface");
     std::uint64_t wakes{};
-    window.set_paint_wake_handler([&] { ++wakes; });
+    window.set_paint_wake_handler(
+        test_support::IncrementCounter<std::uint64_t>(wakes));
     const FrameTime transition = FrameClock::now();
     window.set_occluded(true, transition);
     for (std::uint32_t revision = 1U; revision <= 100U; ++revision) {
-        root->set_value(revision);
+        (*root).set_value(revision);
     }
-    const std::uint64_t paint_calls_before = root->paint_calls;
+    const std::uint64_t paint_calls_before = (*root).paint_calls;
     require(window.occluded() && wakes == 0U && window.needs_frame() &&
                 window.paint_lease_snapshot().state ==
                     PaintLeaseState::occluded_dirty &&
                 !window.paint(painter).has_value() &&
-                root->paint_calls == paint_calls_before,
+                (*root).paint_calls == paint_calls_before,
             "occlusion must merge a mutation storm without waking or painting");
 
     window.set_occluded(false, transition + std::chrono::milliseconds(10));
     require(wakes == 1U &&
                 window.paint_lease_snapshot().render_wake_queued,
             "exposure must request exactly one latest-state render");
-    const auto exposed = window.paint(painter, window.take_damage().bounds());
-    require(exposed.has_value() && root->last_painted_value == 100U &&
-                root->paint_calls == paint_calls_before + 1U &&
+    const std::optional<PaintReceipt> exposed = window.paint(painter, window.take_damage().bounds());
+    require(exposed.has_value() && (*root).last_painted_value == 100U &&
+                (*root).paint_calls == paint_calls_before + 1U &&
                 window.notify_presented(*exposed) && !window.needs_frame() &&
                 !window.paint_lease_snapshot().render_wake_queued,
             "exposure must render one latest revision and return idle");
 }
 
 void test_backend_replay_fault_and_retirement_never_issue_receipt() {
-    auto fault_root =
+    std::shared_ptr<ReplayPressureControl> fault_root =
         make_control<ReplayPressureControl>(StableId("paint.backend-fault"));
-    fault_root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*fault_root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     Window fault_window(fault_root, {120.0, 80.0});
     const DamageRegion fault_damage = fault_window.take_damage();
     ReplayBoundaryPainter faulting;
@@ -892,51 +948,47 @@ void test_backend_replay_fault_and_retirement_never_issue_receipt() {
                 fault_window.needs_frame(),
             "a backend replay fault must abandon without a complete revision");
     NullPainter retry_painter;
-    const auto retry =
+    const std::optional<PaintReceipt> retry =
         fault_window.paint(retry_painter, fault_window.take_damage().bounds());
     require(retry.has_value() && fault_window.notify_presented(*retry),
             "a later clean replay must replace the failed candidate");
 
-    auto retiring_root =
+    std::shared_ptr<ReplayPressureControl> retiring_root =
         make_control<ReplayPressureControl>(StableId("paint.backend-retire"));
-    retiring_root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*retiring_root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
     Window retiring_window(retiring_root, {120.0, 80.0});
     const DamageRegion retiring_damage = retiring_window.take_damage();
     ReplayBoundaryPainter retiring;
-    retiring.on_first_command = [&] {
-        require(retiring_window.dispatch_key(
-                    {KeyAction::down, PhysicalKey::a}),
-                "retirement probe key must enter the bounded lease queue");
-        retiring_root->dispose();
-    };
-    const auto retired =
+    retiring.on_first_command =
+        RetireDuringReplay(*retiring_root, retiring_window);
+    const std::optional<PaintReceipt> retired =
         retiring_window.paint(retiring, retiring_damage.bounds());
     const DeferredInputSnapshot retired_input =
         retiring_window.deferred_input_snapshot();
-    require(!retired.has_value() && !retiring_root->is_alive() &&
+    require(!retired.has_value() && !(*retiring_root).is_alive() &&
                 retired_input.pending == 0U && retired_input.abandoned == 1U &&
-                retiring_root->key_calls == 0U &&
+                (*retiring_root).key_calls == 0U &&
                 retiring_window.paint_lease_snapshot().leases_abandoned == 1U,
             "backend-boundary retirement must withhold presentation and abandon queued input");
 }
 
 void test_buffering_styles_are_retained_compatibility_facts() {
-    auto control = make_control<Control>(StableId("styles.buffering"));
-    require(!control->double_buffered() &&
-                control->has_style(ControlStyles::all_painting_in_one_pass),
+    std::shared_ptr<gui_forms::Control> control = make_control<Control>(StableId("styles.buffering"));
+    require(!(*control).double_buffered() &&
+                (*control).has_style(ControlStyles::all_painting_in_one_pass),
             "coherent baseline and historical buffering request must be independent");
-    control->set_double_buffered(true);
-    require(control->double_buffered() &&
-                control->has_style(ControlStyles::double_buffer) &&
-                control->has_style(ControlStyles::optimized_double_buffer),
+    (*control).set_double_buffered(true);
+    require((*control).double_buffered() &&
+                (*control).has_style(ControlStyles::double_buffer) &&
+                (*control).has_style(ControlStyles::optimized_double_buffer),
             "DoubleBuffered must retain both compatible buffering bits");
-    control->set_style(ControlStyles::resize_redraw, true);
+    (*control).set_style(ControlStyles::resize_redraw, true);
     Window window(control, {40.0, 30.0});
-    require(control->double_buffered() &&
-                control->has_style(ControlStyles::resize_redraw),
+    require((*control).double_buffered() &&
+                (*control).has_style(ControlStyles::resize_redraw),
             "control styles must survive attachment and handle-equivalent lifetime");
-    control->set_double_buffered(false);
-    require(!control->double_buffered(),
+    (*control).set_double_buffered(false);
+    require(!(*control).double_buffered(),
             "clearing a compatibility request must not alter baseline paint safety");
 }
 

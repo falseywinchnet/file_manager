@@ -45,6 +45,25 @@ std::uint64_t checksum(const ImageSnapshot& image) {
     return value;
 }
 
+class ExecuteSkiaOffThread final {
+public:
+    ExecuteSkiaOffThread(SkiaExecutor& executor,
+                         const GraphicsRecorder& recorder, Bitmap& target,
+                         std::atomic<RasterError>& result)
+        : executor_(executor), recorder_(recorder), target_(target),
+          result_(result) {}
+
+    void operator()() const {
+        result_ = executor_.execute(recorder_, target_).error;
+    }
+
+private:
+    SkiaExecutor& executor_;
+    const GraphicsRecorder& recorder_;
+    Bitmap& target_;
+    std::atomic<RasterError>& result_;
+};
+
 void command_execution_and_png_round_trip() {
     SkiaExecutor executor;
     const std::vector<std::byte> font = read_file(GUI_DRAWING_TEST_FONT);
@@ -88,8 +107,9 @@ void command_execution_and_png_round_trip() {
     CHECK(repeated == png);
 
     DecodeResult decoded = executor.decode_png(png);
-    CHECK(decoded && decoded.bitmap->width() == 64U && decoded.bitmap->height() == 48U);
-    CHECK(checksum(decoded.bitmap->snapshot()) == first_checksum);
+    CHECK(decoded && (*decoded.bitmap).width() == 64U &&
+          (*decoded.bitmap).height() == 48U);
+    CHECK(checksum((*decoded.bitmap).snapshot()) == first_checksum);
 
     std::vector<std::byte> malformed = png;
     malformed[0] = std::byte{0};
@@ -146,9 +166,8 @@ void image_attributes_clip_and_snapshot_execution() {
     CHECK(checksum(target.snapshot()) == before_failed_checksum);
 
     std::atomic<RasterError> foreign_error{RasterError::none};
-    std::thread foreign([&] {
-        foreign_error = executor.execute(recorder, target).error;
-    });
+    std::thread foreign(ExecuteSkiaOffThread(
+        executor, recorder, target, foreign_error));
     foreign.join();
     CHECK(foreign_error.load() == RasterError::wrong_thread);
 }
@@ -196,8 +215,9 @@ void transparent_png_channels_are_premultiplied() {
     }
     SkiaExecutor executor;
     DecodeResult decoded = executor.decode_png(bytes);
-    CHECK(decoded && decoded.bitmap->width() == 1U && decoded.bitmap->height() == 1U);
-    const ImageSnapshot snapshot = decoded.bitmap->snapshot();
+    CHECK(decoded && (*decoded.bitmap).width() == 1U &&
+          (*decoded.bitmap).height() == 1U);
+    const ImageSnapshot snapshot = (*decoded.bitmap).snapshot();
     CHECK(snapshot.pixels().size() == 4U);
     CHECK(snapshot.pixels()[0] == std::byte{0} &&
           snapshot.pixels()[1] == std::byte{0} &&

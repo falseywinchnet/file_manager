@@ -87,7 +87,7 @@ Function forms_entry(const char* name) noexcept {
 }
 
 bool endpoint_dc(HWND window, HDC* output) noexcept {
-    static const auto entry = forms_entry<GetEndpointDc>(
+    static const GetEndpointDc entry = forms_entry<GetEndpointDc>(
         "gf_windows_paint_endpoint_get_dc_v1");
     if (entry == nullptr || output == nullptr) return false;
     std::uintptr_t value{};
@@ -99,7 +99,7 @@ bool endpoint_dc(HWND window, HDC* output) noexcept {
 }
 
 bool release_endpoint_dc(HWND window, HDC dc) noexcept {
-    static const auto entry = forms_entry<ReleaseEndpointDc>(
+    static const ReleaseEndpointDc entry = forms_entry<ReleaseEndpointDc>(
         "gf_windows_paint_endpoint_release_dc_v1");
     return entry != nullptr &&
         entry(reinterpret_cast<std::uintptr_t>(window),
@@ -108,7 +108,7 @@ bool release_endpoint_dc(HWND window, HDC dc) noexcept {
 
 void publish_endpoint_dc(HDC dc) noexcept {
     if (cached_dc_kind(dc) == DcKind::ordinary) return;
-    static const auto entry = forms_entry<PublishEndpointDc>(
+    static const PublishEndpointDc entry = forms_entry<PublishEndpointDc>(
         "gf_windows_paint_endpoint_publish_dc_v1");
     if (entry != nullptr) {
         static_cast<void>(entry(reinterpret_cast<std::uintptr_t>(dc)));
@@ -118,7 +118,7 @@ void publish_endpoint_dc(HDC dc) noexcept {
 bool begin_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
     const DcKind kind = cached_dc_kind(dc);
     if (kind == DcKind::ordinary) return false;
-    static const auto entry = forms_entry<BeginEndpointWrite>(
+    static const BeginEndpointWrite entry = forms_entry<BeginEndpointWrite>(
         "gf_windows_paint_endpoint_begin_write_v1");
     const bool acquired = entry != nullptr && lease != nullptr &&
         entry(reinterpret_cast<std::uintptr_t>(dc), lease) == 0 &&
@@ -130,7 +130,7 @@ bool begin_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
 }
 
 void end_endpoint_write(std::uint64_t lease, bool publish) noexcept {
-    static const auto entry = forms_entry<EndEndpointWrite>(
+    static const EndEndpointWrite entry = forms_entry<EndEndpointWrite>(
         "gf_windows_paint_endpoint_end_write_v1");
     if (entry != nullptr && lease != 0U) {
         static_cast<void>(entry(lease, publish ? 1U : 0U));
@@ -149,7 +149,7 @@ bool default_text_mapping(HDC dc) noexcept {
 
 bool selected_dib32(HDC dc, HBITMAP* bitmap, DIBSECTION* section) noexcept {
     if (dc == nullptr || bitmap == nullptr || section == nullptr) return false;
-    const auto selected = reinterpret_cast<HBITMAP>(
+    const HBITMAP selected = reinterpret_cast<HBITMAP>(
         GetCurrentObject(dc, OBJ_BITMAP));
     if (selected == nullptr) return false;
     DIBSECTION candidate{};
@@ -364,7 +364,7 @@ extern "C" BOOL WINAPI gf_compat_GetClientRect(HWND window, RECT* bounds) {
     HDC endpoint{};
     if (endpoint_dc(window, &endpoint)) {
         if (bounds == nullptr) return FALSE;
-        const auto bitmap = reinterpret_cast<HBITMAP>(
+        const HBITMAP bitmap = reinterpret_cast<HBITMAP>(
             GetCurrentObject(endpoint, OBJ_BITMAP));
         BITMAP details{};
         if (bitmap == nullptr ||

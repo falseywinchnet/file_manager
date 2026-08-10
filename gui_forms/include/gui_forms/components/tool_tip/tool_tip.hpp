@@ -77,6 +77,10 @@ protected:
 
 private:
     struct Entry;
+    struct TargetPointerObserver;
+    struct TargetFocusObserver;
+    struct TargetBoundsObserver;
+    struct PopupRevocationObserver;
     using EntryMap =
         std::unordered_map<std::uint64_t, std::unique_ptr<Entry>>;
     enum class PendingAction : std::uint8_t { none, show, auto_hide };

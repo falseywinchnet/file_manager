@@ -44,6 +44,120 @@ struct PropertyList::Impl final {
     using RowList = std::vector<RowState>;
     using GroupList = std::vector<PropertyGroupSpec>;
 
+    struct TextValueChanged final {
+        Impl* implementation{};
+        std::string row_id;
+        void operator()(const std::string& value) const {
+            if ((*implementation).synchronizing) return;
+            RowState* row = (*implementation).find_row(row_id);
+            if (row == nullptr) return;
+            PropertyRowSpec& model = (*implementation).spec(*row);
+            const std::string previous = model.value;
+            model.value = value;
+            (*implementation).owner.publish_change(
+                (*implementation).owner.value_changed_,
+                PropertyValueChange{row_id, previous, model.value, false});
+        }
+    };
+
+    struct TextCommitted final {
+        Impl* implementation{};
+        std::string row_id;
+        void operator()(const std::string& value) const {
+            RowState* row = (*implementation).find_row(row_id);
+            if (row == nullptr) return;
+            PropertyRowSpec& model = (*implementation).spec(*row);
+            const std::string previous = (*row).committed_value;
+            (*row).committed_value = value;
+            model.value = value;
+            if (model.required && value.empty()) {
+                model.validation_message = model.name + " is required";
+            }
+            (*implementation).recompute_geometry();
+            (*implementation).owner.value_committed_.emit(
+                {row_id, previous, value, true});
+            (*implementation).owner.invalidate(
+                Dirty::measure | Dirty::layout | Dirty::paint |
+                Dirty::semantics);
+        }
+    };
+
+    struct TextCancelled final {
+        Impl* implementation{};
+        std::string row_id;
+        void operator()() const {
+            RowState* row = (*implementation).find_row(row_id);
+            if (row == nullptr) return;
+            (*implementation).synchronizing = true;
+            const std::shared_ptr<TextBox> editor =
+                std::dynamic_pointer_cast<TextBox>((*row).editor);
+            if (editor) (*editor).set_text((*row).committed_value);
+            (*implementation).spec(*row).value = (*row).committed_value;
+            (*implementation).synchronizing = false;
+            (*implementation).owner.invalidate(
+                Dirty::paint | Dirty::semantics);
+        }
+    };
+
+    struct ChoiceChanged final {
+        Impl* implementation{};
+        std::string row_id;
+        std::weak_ptr<ComboBox> choice;
+        void operator()(std::optional<std::size_t>) const {
+            if ((*implementation).synchronizing) return;
+            RowState* row = (*implementation).find_row(row_id);
+            const std::shared_ptr<ComboBox> editor = choice.lock();
+            if (row == nullptr || !editor) return;
+            PropertyRowSpec& model = (*implementation).spec(*row);
+            const std::string previous = (*row).committed_value;
+            model.value = std::string((*editor).selected_text());
+            (*row).committed_value = model.value;
+            const PropertyValueChange change{
+                row_id, previous, model.value, true};
+            (*implementation).owner.publish_change(
+                (*implementation).owner.value_changed_, change);
+            (*implementation).owner.value_committed_.emit(change);
+        }
+    };
+
+    struct CheckChanged final {
+        Impl* implementation{};
+        std::string row_id;
+        std::weak_ptr<CheckBox> check;
+        void operator()(bool checked) const {
+            if ((*implementation).synchronizing) return;
+            RowState* row = (*implementation).find_row(row_id);
+            const std::shared_ptr<CheckBox> editor = check.lock();
+            if (row == nullptr || !editor) return;
+            PropertyRowSpec& model = (*implementation).spec(*row);
+            const std::string previous = (*row).committed_value;
+            model.value = checked ? "True" : "False";
+            (*row).committed_value = model.value;
+            (*editor).set_text(model.value);
+            const PropertyValueChange change{
+                row_id, previous, model.value, true};
+            (*implementation).owner.publish_change(
+                (*implementation).owner.value_changed_, change);
+            (*implementation).owner.value_committed_.emit(change);
+        }
+    };
+
+    struct EnsureVisible final {
+        Impl* implementation{};
+        std::string row_id;
+        void operator()(bool focused) const {
+            if (focused) (*implementation).ensure_visible(row_id);
+        }
+    };
+
+    struct ResetClicked final {
+        Impl* implementation{};
+        std::string row_id;
+        void operator()(ButtonBase&) const {
+            (*implementation).owner.reset_requested_.emit({row_id});
+        }
+    };
+
     explicit Impl(PropertyList& public_owner) : owner(public_owner) {}
 
     [[nodiscard]] double scale() const noexcept {
@@ -58,15 +172,16 @@ struct PropertyList::Impl final {
     }
 
     RowState* find_row(std::string_view id) noexcept {
-        const RowList::iterator found = std::find_if(rows.begin(), rows.end(),
-            [this, id](const RowState& row) { return spec(row).stable_id == id; });
-        return found == rows.end() ? nullptr : &*found;
+        for (RowState& row : rows) {
+            if (spec(row).stable_id == id) return &row;
+        }
+        return nullptr;
     }
     const RowState* find_row(std::string_view id) const noexcept {
-        const RowList::const_iterator found =
-            std::find_if(rows.begin(), rows.end(),
-            [this, id](const RowState& row) { return spec(row).stable_id == id; });
-        return found == rows.end() ? nullptr : &*found;
+        for (const RowState& row : rows) {
+            if (spec(row).stable_id == id) return &row;
+        }
+        return nullptr;
     }
 
     [[nodiscard]] bool row_visible(const RowState& state) const noexcept {
@@ -169,100 +284,32 @@ struct PropertyList::Impl final {
         const std::string row_id = spec(state).stable_id;
         if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
             state.value_subscription = (*text).text_changed().subscribe(
-                owner, [this, row_id](const std::string& value) {
-                    if (synchronizing) return;
-                    RowState* row = find_row(row_id);
-                    if (!row) return;
-                    PropertyRowSpec& model = spec(*row);
-                    const std::string previous = model.value;
-                    model.value = value;
-                    owner.publish_change(owner.value_changed_,
-                        PropertyValueChange{
-                            row_id, previous, model.value, false});
-                });
+                owner, TextValueChanged{this, row_id});
             state.commit_subscription = (*text).committed().subscribe(
-                owner, [this, row_id](const std::string& value) {
-                    RowState* row = find_row(row_id);
-                    if (!row) return;
-                    PropertyRowSpec& model = spec(*row);
-                    const std::string previous = (*row).committed_value;
-                    (*row).committed_value = value;
-                    model.value = value;
-                    if (model.required && value.empty()) {
-                        model.validation_message = model.name + " is required";
-                    }
-                    recompute_geometry();
-                    owner.value_committed_.emit(
-                        {row_id, previous, value, true});
-                    owner.invalidate(Dirty::measure | Dirty::layout | Dirty::paint |
-                                     Dirty::semantics);
-                });
+                owner, TextCommitted{this, row_id});
             state.cancel_subscription = (*text).cancelled().subscribe(
-                owner, [this, row_id] {
-                    RowState* row = find_row(row_id);
-                    if (!row) return;
-                    synchronizing = true;
-                    if (const std::shared_ptr<gui_forms::TextBox> editor =
-                            std::dynamic_pointer_cast<TextBox>((*row).editor)) {
-                        (*editor).set_text((*row).committed_value);
-                    }
-                    spec(*row).value = (*row).committed_value;
-                    synchronizing = false;
-                    owner.invalidate(Dirty::paint | Dirty::semantics);
-                });
+                owner, TextCancelled{this, row_id});
         } else if (const std::shared_ptr<gui_forms::ComboBox> choice =
                        std::dynamic_pointer_cast<ComboBox>(state.editor)) {
             state.value_subscription = (*choice).selected_index_changed().subscribe(
-                owner, [this, row_id, weak_choice = std::weak_ptr<ComboBox>(choice)](
-                    std::optional<std::size_t>) {
-                    if (synchronizing) return;
-                    RowState* row = find_row(row_id);
-                    const std::shared_ptr<gui_forms::ComboBox> editor = weak_choice.lock();
-                    if (!row || !editor) return;
-                    PropertyRowSpec& model = spec(*row);
-                    const std::string previous = (*row).committed_value;
-                    model.value = std::string((*editor).selected_text());
-                    (*row).committed_value = model.value;
-                    PropertyValueChange change{row_id, previous, model.value, true};
-                    owner.publish_change(owner.value_changed_, change);
-                    owner.value_committed_.emit(change);
-                });
+                owner, ChoiceChanged{
+                    this, row_id, std::weak_ptr<ComboBox>(choice)});
         } else if (const std::shared_ptr<gui_forms::CheckBox> check =
                        std::dynamic_pointer_cast<CheckBox>(state.editor)) {
             state.value_subscription = (*check).checked_changed().subscribe(
-                owner, [this, row_id,
-                        weak_check = std::weak_ptr<CheckBox>(check)](bool checked) {
-                    if (synchronizing) return;
-                    RowState* row = find_row(row_id);
-                    const std::shared_ptr<gui_forms::CheckBox> editor = weak_check.lock();
-                    if (!row || !editor) return;
-                    PropertyRowSpec& model = spec(*row);
-                    const std::string previous = (*row).committed_value;
-                    model.value = checked ? "True" : "False";
-                    (*row).committed_value = model.value;
-                    (*editor).set_text(model.value);
-                    PropertyValueChange change{
-                        row_id, previous, model.value, true};
-                    owner.publish_change(owner.value_changed_, change);
-                    owner.value_committed_.emit(change);
-                });
+                owner, CheckChanged{
+                    this, row_id, std::weak_ptr<CheckBox>(check)});
         }
         if (state.editor) {
             state.focus_subscription = (*state.editor).focus_observed().subscribe(
-                owner, [this, row_id](bool focused) {
-                    if (focused) ensure_visible(row_id);
-                });
+                owner, EnsureVisible{this, row_id});
         }
         if (state.reset_button) {
             state.reset_subscription = (*state.reset_button).clicked().subscribe(
-                owner, [this, row_id](ButtonBase&) {
-                    owner.reset_requested_.emit({row_id});
-                });
+                owner, ResetClicked{this, row_id});
             state.reset_focus_subscription =
                 (*state.reset_button).focus_observed().subscribe(
-                owner, [this, row_id](bool focused) {
-                    if (focused) ensure_visible(row_id);
-                });
+                owner, EnsureVisible{this, row_id});
         }
     }
 
@@ -626,9 +673,10 @@ bool PropertyList::set_reset_enabled(std::string_view row_id, bool enabled) {
 
 bool PropertyList::set_group_expanded(std::string_view id, bool expanded) {
     require_mutable();
-    const Impl::GroupList::iterator found =
-        std::find_if((*impl_).groups.begin(), (*impl_).groups.end(),
-        [id](const PropertyGroupSpec& group) { return group.stable_id == id; });
+    Impl::GroupList::iterator found = (*impl_).groups.begin();
+    while (found != (*impl_).groups.end() && (*found).stable_id != id) {
+        ++found;
+    }
     if (found == (*impl_).groups.end()) return false;
     if ((*found).expanded == expanded) return true;
     (*found).expanded = expanded;
@@ -704,10 +752,7 @@ bool PropertyList::replace_editor(std::string_view id, Control::Ptr editor) {
     (*row).editor = editor;
     model.editor = PropertyEditorKind::custom;
     (*row).focus_subscription = (*editor).focus_observed().subscribe(
-        *this, [implementation = impl_.get(), row_id = std::string(id)](
-                   bool focused) {
-            if (focused) (*implementation).ensure_visible(row_id);
-        });
+        *this, Impl::EnsureVisible{impl_.get(), std::string(id)});
     if (previous && (*previous).parent().get() == this) {
         Control::Ptr removed = remove_child((*previous).runtime_id());
         if (removed && (*removed).is_alive()) (*removed).dispose();
@@ -1015,9 +1060,10 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
 bool PropertyList::on_semantic_child_action(std::string_view id,
                                             SemanticAction action,
                                             std::string_view) {
-    const Impl::GroupList::iterator found =
-        std::find_if((*impl_).groups.begin(), (*impl_).groups.end(),
-        [id](const PropertyGroupSpec& group) { return group.stable_id == id; });
+    Impl::GroupList::iterator found = (*impl_).groups.begin();
+    while (found != (*impl_).groups.end() && (*found).stable_id != id) {
+        ++found;
+    }
     if (found != (*impl_).groups.end()) {
         if (action == SemanticAction::focus) {
             if (window()) {

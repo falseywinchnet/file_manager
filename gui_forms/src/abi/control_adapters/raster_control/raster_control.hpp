@@ -237,6 +237,50 @@ private:
         std::atomic<bool> queued{};
     };
 
+    struct DeferredLiveSurfacePaint final {
+        std::weak_ptr<RasterControl> target;
+        std::weak_ptr<LiveWakeState> state;
+
+        void operator()() const {
+            RasterControl::present_live_surface(target, state);
+        }
+    };
+
+    struct LiveSurfaceWakeCallback final {
+        std::weak_ptr<RasterControl> target;
+        std::weak_ptr<LiveWakeState> state;
+
+        void operator()() const noexcept {
+            RasterControl::queue_live_surface_paint(target, state);
+        }
+    };
+
+    static void present_live_surface(
+        const std::weak_ptr<RasterControl>& weak_target,
+        const std::weak_ptr<LiveWakeState>& weak_state) {
+        const std::shared_ptr<LiveWakeState> state = weak_state.lock();
+        if (!state ||
+            !(*state).connected.load(std::memory_order_acquire)) {
+            return;
+        }
+        const std::shared_ptr<RasterControl> target = weak_target.lock();
+        if (target) {
+            if (Window* owner = (*target).window();
+                owner != nullptr &&
+                (*owner).queue_live_surface_presentation(
+                    target, (*target).live_surface_)) {
+                // The host consumes the newest immutable generation as a
+                // compositor layer. Rearm publication now; no retained paint
+                // transaction is outstanding.
+                (*state).queued.store(false, std::memory_order_release);
+                return;
+            }
+            (*target).invalidate(gui_forms::invalidation::paint_only);
+        }
+        // Do not rearm here. The retained paint transaction owns release after
+        // it samples the newest complete candidate.
+    }
+
     static void queue_live_surface_paint(
         const std::weak_ptr<RasterControl>& weak_target,
         const std::weak_ptr<LiveWakeState>& weak_state) noexcept {
@@ -252,30 +296,7 @@ private:
         }
         try {
             static_cast<void>((*target).begin_invoke(
-                [weak_target, weak_state] {
-                    const std::shared_ptr<gui_forms::abi::detail::RasterControl::LiveWakeState> queued_state = weak_state.lock();
-                    if (!queued_state || !(*queued_state).connected.load(
-                                             std::memory_order_acquire)) {
-                        return;
-                    }
-                    if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> queued_target = weak_target.lock()) {
-                        if (Window* owner = (*queued_target).window();
-                            owner != nullptr &&
-                            (*owner).queue_live_surface_presentation(
-                                queued_target, (*queued_target).live_surface_)) {
-                            // The host consumes the newest immutable generation
-                            // as a compositor layer. Rearm publication now;
-                            // no retained paint transaction is outstanding.
-                            (*queued_state).queued.store(
-                                false, std::memory_order_release);
-                            return;
-                        }
-                        (*queued_target).invalidate(
-                            gui_forms::invalidation::paint_only);
-                    }
-                    // Do not rearm here. The retained paint transaction owns
-                    // release after it samples the newest complete candidate.
-                }));
+                DeferredLiveSurfacePaint{weak_target, weak_state}));
         } catch (...) {
             (*state).queued.store(false, std::memory_order_release);
         }
@@ -298,9 +319,8 @@ private:
         const std::weak_ptr<RasterControl> weak_target =
             self;
         live_wake_ = (*live_surface_).connect_presentation_wake(
-            [weak_target, weak_state = std::weak_ptr<LiveWakeState>(wake_state)] {
-                queue_live_surface_paint(weak_target, weak_state);
-            });
+            LiveSurfaceWakeCallback{
+                weak_target, std::weak_ptr<LiveWakeState>(wake_state)});
     }
 
     void disconnect_live_surface_wake() noexcept {
@@ -328,4 +348,3 @@ private:
 };
 
 } // namespace gui_forms::abi::detail
-

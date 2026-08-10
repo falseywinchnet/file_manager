@@ -34,6 +34,14 @@ std::uint64_t next_lease{1U};
 
 BITMAPINFO bitmap_info(std::uint32_t width, std::uint32_t height);
 
+std::uint8_t composite_channel(std::uint8_t foreground,
+                               std::uint8_t backdrop,
+                               std::uint8_t alpha) {
+    return static_cast<std::uint8_t>(
+        foreground +
+        (static_cast<unsigned>(backdrop) * (255U - alpha) + 127U) / 255U);
+}
+
 struct CompatibilityUser32 final {
     using GetDc = HDC (WINAPI*)(HWND);
     using ReleaseDc = int (WINAPI*)(HWND, HDC);
@@ -48,13 +56,13 @@ struct CompatibilityUser32 final {
         module = GetModuleHandleW(L"gui_forms_win32_compat.dll");
         if (module == nullptr) module = LoadLibraryW(L"gui_forms_win32_compat.dll");
         if (module == nullptr) return;
-        if (const auto value = GetProcAddress(module, "GetDC")) {
+        if (const FARPROC value = GetProcAddress(module, "GetDC")) {
             get_dc = reinterpret_cast<GetDc>(value);
         }
-        if (const auto value = GetProcAddress(module, "ReleaseDC")) {
+        if (const FARPROC value = GetProcAddress(module, "ReleaseDC")) {
             release_dc = reinterpret_cast<ReleaseDc>(value);
         }
-        if (const auto value = GetProcAddress(module, "GetClientRect")) {
+        if (const FARPROC value = GetProcAddress(module, "GetClientRect")) {
             get_client_rect = reinterpret_cast<GetClientBounds>(value);
         }
     }
@@ -158,22 +166,18 @@ gd_result export_hbitmap(Bitmap& bitmap, Color background, std::uintptr_t& outpu
     const std::span<const std::byte> source = snapshot.pixels();
     std::uint8_t* destination = static_cast<std::uint8_t*>(pixels);
     for (std::size_t offset = 0; offset < source.size(); offset += 4U) {
-        const auto channel = [&](std::size_t index) {
-            return std::to_integer<std::uint8_t>(source[offset + index]);
-        };
         const bool bgra = snapshot.pixel_format == PixelFormat::bgra32_premultiplied;
-        const std::uint8_t blue = channel(bgra ? 0U : 2U);
-        const std::uint8_t green = channel(1U);
-        const std::uint8_t red = channel(bgra ? 2U : 0U);
-        const std::uint8_t alpha = channel(3U);
-        const auto composite = [alpha](std::uint8_t foreground,
-                                        std::uint8_t backdrop) {
-            return static_cast<std::uint8_t>(foreground +
-                (static_cast<unsigned>(backdrop) * (255U - alpha) + 127U) / 255U);
-        };
-        destination[offset] = composite(blue, bb);
-        destination[offset + 1U] = composite(green, bg);
-        destination[offset + 2U] = composite(red, br);
+        const std::uint8_t blue = std::to_integer<std::uint8_t>(
+            source[offset + (bgra ? 0U : 2U)]);
+        const std::uint8_t green =
+            std::to_integer<std::uint8_t>(source[offset + 1U]);
+        const std::uint8_t red = std::to_integer<std::uint8_t>(
+            source[offset + (bgra ? 2U : 0U)]);
+        const std::uint8_t alpha =
+            std::to_integer<std::uint8_t>(source[offset + 3U]);
+        destination[offset] = composite_channel(blue, bb, alpha);
+        destination[offset + 1U] = composite_channel(green, bg, alpha);
+        destination[offset + 2U] = composite_channel(red, br, alpha);
         destination[offset + 3U] = 255U;
     }
     output = reinterpret_cast<std::uintptr_t>(native);
@@ -191,8 +195,8 @@ gd_result import_hbitmap(std::uintptr_t source, std::unique_ptr<Bitmap>& output)
     const std::uint32_t height = static_cast<std::uint32_t>(
         details.bmHeight < 0 ? -static_cast<std::int64_t>(details.bmHeight) :
                                details.bmHeight);
-    auto bitmap = std::make_unique<Bitmap>(width, height,
-                                           PixelFormat::bgra32_premultiplied);
+    std::unique_ptr<Bitmap> bitmap = std::make_unique<Bitmap>(
+        width, height, PixelFormat::bgra32_premultiplied);
     BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
     BITMAPINFO info = bitmap_info(width, height);
     HDC device = GetDC(nullptr);
@@ -218,7 +222,7 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
                           CapturedSurface& output) {
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(source) : nullptr;
-    auto& compatibility = compatibility_user32();
+    CompatibilityUser32& compatibility = compatibility_user32();
     HDC device = window_surface ? compatibility.get_dc(window) :
                                   reinterpret_cast<HDC>(source);
     if (device == nullptr) throw std::invalid_argument("surface has no device context");
@@ -271,8 +275,8 @@ gd_result capture_surface(std::uintptr_t source, std::uint32_t kind,
     SelectObject(memory, previous);
     DeleteDC(memory);
     DeleteObject(dib);
-    auto bitmap = std::make_unique<Bitmap>(width, height,
-                                           PixelFormat::bgra32_premultiplied);
+    std::unique_ptr<Bitmap> bitmap = std::make_unique<Bitmap>(
+        width, height, PixelFormat::bgra32_premultiplied);
     BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);
     std::memcpy(lock.writable_data, captured.data(), captured.size());
     for (std::uint32_t y = 0; y < height; ++y) {
@@ -291,7 +295,7 @@ gd_result refresh_surface(std::uintptr_t source, std::uint32_t kind,
                           Bitmap& bitmap, RectF& output_bounds) {
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(source) : nullptr;
-    auto& compatibility = compatibility_user32();
+    CompatibilityUser32& compatibility = compatibility_user32();
     HDC source_device = window_surface ? compatibility.get_dc(window) :
                                          reinterpret_cast<HDC>(source);
     if (source_device == nullptr) {
@@ -363,7 +367,7 @@ gd_result publish_retained_surface(std::uintptr_t destination,
     if (forms == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
     using Submit = int (__cdecl*)(std::uintptr_t, std::uint32_t, std::uint32_t,
                                   std::uint64_t, const void*);
-    const auto submit = reinterpret_cast<Submit>(GetProcAddress(
+    const Submit submit = reinterpret_cast<Submit>(GetProcAddress(
         forms, "gf_windows_paint_endpoint_submit_bgra_v1"));
     if (submit == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
     const ImageSnapshot snapshot = bitmap.snapshot();
@@ -388,7 +392,7 @@ gd_result present_surface(std::uintptr_t destination, std::uint32_t kind,
     }
     const bool window_surface = kind == GD_NATIVE_SURFACE_HWND;
     const HWND window = window_surface ? reinterpret_cast<HWND>(destination) : nullptr;
-    auto& compatibility = compatibility_user32();
+    CompatibilityUser32& compatibility = compatibility_user32();
     HDC device = window_surface ? compatibility.get_dc(window) :
                                   reinterpret_cast<HDC>(destination);
     if (device == nullptr) throw std::invalid_argument("surface has no device context");
@@ -454,7 +458,8 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
     HdcLease lease;
     {
         std::scoped_lock lock(lease_mutex);
-        const auto found = leases.find(lease_token);
+        const std::unordered_map<std::uint64_t, HdcLease>::iterator found =
+            leases.find(lease_token);
         if (found == leases.end()) throw std::invalid_argument("HDC lease token is stale");
         if ((*found).second.bitmap != &bitmap) {
             throw std::invalid_argument("HDC lease belongs to a different bitmap");
@@ -487,9 +492,10 @@ gd_result release_hdc(Bitmap& bitmap, std::uint64_t lease_token) {
 
 bool has_hdc_lease(Bitmap& bitmap) {
     std::scoped_lock lock(lease_mutex);
-    return std::any_of(leases.begin(), leases.end(), [&](const auto& entry) {
-        return entry.second.bitmap == &bitmap;
-    });
+    for (const std::pair<const std::uint64_t, HdcLease>& entry : leases) {
+        if (entry.second.bitmap == &bitmap) return true;
+    }
+    return false;
 }
 
 } // namespace gui_drawing::abi::platform

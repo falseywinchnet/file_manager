@@ -50,6 +50,7 @@ struct MasterDetailPresentationChange final {
 // browsers, settings panes, inspectors, and navigation stacks share one law.
 class MasterDetailView final : public ContainerControl {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     explicit MasterDetailView(StableId stable_id);
     void initialize_control_tree();
 

@@ -58,6 +58,16 @@ struct PngMetadata final {
 struct PngValidationResult final {
     ImageResourceError error{ImageResourceError::none};
     PngMetadata metadata{};
+
+    [[nodiscard]] static constexpr PngValidationResult failure(
+        ImageResourceError failure_error) noexcept {
+        return PngValidationResult{failure_error, {}};
+    }
+    [[nodiscard]] static constexpr PngValidationResult success(
+        PngMetadata validated_metadata) noexcept {
+        return PngValidationResult{
+            ImageResourceError::none, validated_metadata};
+    }
     [[nodiscard]] explicit operator bool() const noexcept {
         return error == ImageResourceError::none;
     }
@@ -70,6 +80,15 @@ struct PngValidationResult final {
 struct ImageLoadResult final {
     ImageId image{};
     ImageResourceError error{ImageResourceError::none};
+
+    [[nodiscard]] static constexpr ImageLoadResult failure(
+        ImageResourceError failure_error) noexcept {
+        return ImageLoadResult{{}, failure_error};
+    }
+    [[nodiscard]] static constexpr ImageLoadResult success(
+        ImageId loaded_image) noexcept {
+        return ImageLoadResult{loaded_image, ImageResourceError::none};
+    }
     [[nodiscard]] explicit operator bool() const noexcept {
         return error == ImageResourceError::none && image.value != 0;
     }

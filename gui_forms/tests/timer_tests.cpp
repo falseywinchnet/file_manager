@@ -1,4 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -20,7 +21,7 @@ void require(bool condition, const char* message) {
 
 struct Fixture final {
     Fixture() : window(root, {160.0, 90.0}) {
-        root->set_requested_bounds({0.0, 0.0, 160.0, 90.0});
+        (*root).set_requested_bounds({0.0, 0.0, 160.0, 90.0});
         window.perform_layout();
         static_cast<void>(window.take_damage());
     }
@@ -29,11 +30,53 @@ struct Fixture final {
     Window window;
 };
 
+class RestartControllerAndDisposeVictim final {
+public:
+    RestartControllerAndDisposeVictim(Timer& controller, Timer& victim,
+                                      int& controller_ticks,
+                                      FrameTime restart_deadline)
+        : controller_(controller), victim_(victim),
+          controller_ticks_(controller_ticks),
+          restart_deadline_(restart_deadline) {}
+
+    void operator()() const {
+        ++controller_ticks_;
+        victim_.dispose();
+        controller_.stop();
+        controller_.start_at(restart_deadline_);
+    }
+
+private:
+    Timer& controller_;
+    Timer& victim_;
+    int& controller_ticks_;
+    FrameTime restart_deadline_;
+};
+
+class StopTimerOffThread final {
+public:
+    StopTimerOffThread(Timer& timer, std::atomic<bool>& rejected)
+        : timer_(timer), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            timer_.stop();
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+
+private:
+    Timer& timer_;
+    std::atomic<bool>& rejected_;
+};
+
 void test_disabled_timer_is_idle_and_exact() {
     Fixture fixture;
     Timer timer(fixture.window, 10ms);
     int ticks = 0;
-    auto subscription = timer.tick().subscribe([&] { ++ticks; });
+    SubscriptionToken subscription = timer.tick().subscribe(
+        test_support::IncrementCounter<int>(ticks));
     require(!timer.enabled() && !fixture.window.next_wake(),
             "a newly constructed Timer must not keep the UI loop awake");
 
@@ -58,8 +101,10 @@ void test_registration_order_and_late_coalescing() {
     Timer first(fixture.window, 10ms);
     Timer second(fixture.window, 10ms);
     std::vector<int> order;
-    auto first_subscription = first.tick().subscribe([&] { order.push_back(1); });
-    auto second_subscription = second.tick().subscribe([&] { order.push_back(2); });
+    SubscriptionToken first_subscription = first.tick().subscribe(
+        test_support::PushConstant<std::vector<int>, int>(order, 1));
+    SubscriptionToken second_subscription = second.tick().subscribe(
+        test_support::PushConstant<std::vector<int>, int>(order, 2));
     const FrameTime base{};
     first.start_at(base + 10ms);
     second.start_at(base + 10ms);
@@ -78,13 +123,11 @@ void test_callback_stop_restart_and_disposal_are_snapshot_safe() {
     int controller_ticks = 0;
     int victim_ticks = 0;
     const FrameTime base{};
-    auto controller_subscription = controller.tick().subscribe([&] {
-        ++controller_ticks;
-        victim.dispose();
-        controller.stop();
-        controller.start_at(base + 100ms);
-    });
-    auto victim_subscription = victim.tick().subscribe([&] { ++victim_ticks; });
+    SubscriptionToken controller_subscription = controller.tick().subscribe(
+        RestartControllerAndDisposeVictim(
+            controller, victim, controller_ticks, base + 100ms));
+    SubscriptionToken victim_subscription = victim.tick().subscribe(
+        test_support::IncrementCounter<int>(victim_ticks));
     controller.start_at(base + 10ms);
     victim.start_at(base + 10ms);
 
@@ -101,7 +144,8 @@ void test_occlusion_does_not_suspend_component_time() {
     Fixture fixture;
     Timer timer(fixture.window, 25ms);
     int ticks = 0;
-    auto subscription = timer.tick().subscribe([&] { ++ticks; });
+    SubscriptionToken subscription = timer.tick().subscribe(
+        test_support::IncrementCounter<int>(ticks));
     const FrameTime base{};
     timer.start_at(base + 25ms);
     fixture.window.set_occluded(true, base);
@@ -114,21 +158,16 @@ void test_occlusion_does_not_suspend_component_time() {
 }
 
 void test_window_shutdown_revokes_timer_and_thread_is_enforced() {
-    auto root = make_control<Control>(StableId("timer.shutdown.root"));
-    auto window = std::make_unique<Window>(root, Size{80.0, 40.0});
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("timer.shutdown.root"));
+    std::unique_ptr<gui_forms::Window> window = std::make_unique<Window>(root, Size{80.0, 40.0});
     Timer timer(*window, 10ms);
     int ticks = 0;
-    auto subscription = timer.tick().subscribe([&] { ++ticks; });
+    SubscriptionToken subscription = timer.tick().subscribe(
+        test_support::IncrementCounter<int>(ticks));
     timer.start_at(FrameTime{} + 10ms);
 
     std::atomic<bool> rejected{false};
-    std::thread foreign([&] {
-        try {
-            timer.stop();
-        } catch (const std::logic_error&) {
-            rejected = true;
-        }
-    });
+    std::thread foreign(StopTimerOffThread(timer, rejected));
     foreign.join();
     require(rejected && timer.enabled(),
             "Timer mutation from a foreign thread must be rejected without state change");

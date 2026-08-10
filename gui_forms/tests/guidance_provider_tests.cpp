@@ -1,4 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <array>
 #include <chrono>
@@ -31,13 +32,13 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
 
 struct Fixture final {
     Fixture() : window(root, {480.0, 260.0}) {
-        root->set_requested_bounds({0.0, 0.0, 480.0, 260.0});
-        panel->set_requested_bounds({30.0, 30.0, 360.0, 170.0});
-        target->set_requested_bounds({25.0, 35.0, 160.0, 32.0});
-        child->set_requested_bounds({25.0, 90.0, 160.0, 32.0});
-        panel->add_child(target);
-        panel->add_child(child);
-        root->add_child(panel);
+        (*root).set_requested_bounds({0.0, 0.0, 480.0, 260.0});
+        (*panel).set_requested_bounds({30.0, 30.0, 360.0, 170.0});
+        (*target).set_requested_bounds({25.0, 35.0, 160.0, 32.0});
+        (*child).set_requested_bounds({25.0, 90.0, 160.0, 32.0});
+        (*panel).add_child(target);
+        (*panel).add_child(child);
+        (*root).add_child(panel);
         window.perform_layout();
         static_cast<void>(window.take_damage());
     }
@@ -52,10 +53,58 @@ struct Fixture final {
 };
 
 void poll_next(Window& window) {
-    const auto wake = window.next_wake();
+    const std::optional<FrameTime> wake = window.next_wake();
     require(wake.has_value(), "expected a scheduled provider frame");
     static_cast<void>(window.poll_frame_schedule(*wake));
 }
+
+class ObserveLocalHelpRequest final {
+public:
+    explicit ObserveLocalHelpRequest(std::vector<std::string>& order)
+        : order_(order) {}
+
+    void operator()(HelpRequestEvent& request) const {
+        order_.push_back("control");
+        require(request.keyboard_initiated &&
+                    request.target_stable_id == "guidance.panel",
+                "F1 must route to the nearest mapped focus ancestor");
+    }
+
+private:
+    std::vector<std::string>& order_;
+};
+
+class ObserveProviderHelpRequest final {
+public:
+    explicit ObserveProviderHelpRequest(std::vector<std::string>& order)
+        : order_(order) {}
+
+    void operator()(HelpRequestEvent& request) const {
+        order_.push_back("provider");
+        require(request.help_namespace == "malkuth://local-help" &&
+                    request.keyword == "network.endpoint" &&
+                    request.navigator == HelpNavigator::keyword_index,
+                "provider requests must retain namespace, keyword, and navigation intent");
+        request.handled = true;
+    }
+
+private:
+    std::vector<std::string>& order_;
+};
+
+class HandleLocalHelpRequest final {
+public:
+    explicit HandleLocalHelpRequest(std::vector<std::string>& order)
+        : order_(order) {}
+
+    void operator()(HelpRequestEvent& request) const {
+        order_.push_back("handled-control");
+        request.handled = true;
+    }
+
+private:
+    std::vector<std::string>& order_;
+};
 
 void test_error_semantics_geometry_rtl_and_lifetime() {
     Fixture fixture;
@@ -82,7 +131,7 @@ void test_error_semantics_geometry_rtl_and_lifetime() {
     require(errors.has_errors() && first.live_errors == 1U &&
                 first.presented_icons == 1U && first.icons.size() == 1U,
             "an error must retain one presented adornment");
-    const Rect target_bounds = fixture.target->absolute_bounds();
+    const Rect target_bounds = (*fixture.target).absolute_bounds();
     require(first.icons.front().bounds.x >= target_bounds.right(),
             "the default middle-right error glyph must sit beyond the target edge");
 
@@ -116,8 +165,8 @@ void test_error_semantics_geometry_rtl_and_lifetime() {
     const SemanticSnapshot semantic_snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* target = find_node(
         semantic_snapshot.roots, "guidance.target");
-    require(target && has_semantic_state(target->states, SemanticState::invalid) &&
-                target->description.find("Error: Server address is not reachable") !=
+    require(target && has_semantic_state((*target).states, SemanticState::invalid) &&
+                (*target).description.find("Error: Server address is not reachable") !=
                     std::string::npos,
             "provider errors must enrich every control subclass at final semantic projection");
 
@@ -138,24 +187,24 @@ void test_error_semantics_geometry_rtl_and_lifetime() {
     require(rejected_icon_size,
             "ErrorProvider must reject unusably small icon geometry");
     int direction_changes = 0;
-    auto direction = errors.right_to_left_changed().subscribe(
-        [&](bool value) { if (value) ++direction_changes; });
+    SubscriptionToken direction = errors.right_to_left_changed().subscribe(
+        test_support::IncrementWhenTrue<int>(direction_changes));
     errors.set_right_to_left(true);
     ErrorProviderSnapshot mirrored = errors.snapshot();
     require(mirrored.icons.front().bounds.x >= target_bounds.right() &&
                 direction_changes == 1,
             "provider RTL must mirror horizontal icon alignment deterministically");
 
-    fixture.target->set_requested_bounds({190.0, 105.0, 130.0, 32.0});
+    (*fixture.target).set_requested_bounds({190.0, 105.0, 130.0, 32.0});
     fixture.window.perform_layout();
     const ErrorProviderSnapshot moved = errors.snapshot();
     require(moved.icons.front().bounds != mirrored.icons.front().bounds,
             "error adornments must follow committed retained layout changes");
 
-    fixture.panel->set_visible(false);
+    (*fixture.panel).set_visible(false);
     require(errors.snapshot().presented_icons == 0U,
             "hiding an ancestor must synchronously revoke descendant adornments");
-    fixture.panel->set_visible(true);
+    (*fixture.panel).set_visible(true);
     fixture.window.perform_layout();
     require(errors.snapshot().presented_icons == 1U,
             "restoring an ancestor must rebuild descendant adornments without reauthoring errors");
@@ -164,7 +213,7 @@ void test_error_semantics_geometry_rtl_and_lifetime() {
     const SemanticSnapshot cleared_snapshot = fixture.window.semantic_snapshot();
     target = find_node(cleared_snapshot.roots, "guidance.target");
     require(!errors.has_errors() && target &&
-                !has_semantic_state(target->states, SemanticState::invalid),
+                !has_semantic_state((*target).states, SemanticState::invalid),
             "clearing the provider must remove both visuals and invalid semantics");
 }
 
@@ -226,22 +275,10 @@ void test_help_routes_f1_locally_then_to_provider_without_external_policy() {
             "fixture child must accept keyboard focus");
 
     std::vector<std::string> order;
-    auto local = fixture.panel->help_requested().subscribe(
-        [&](HelpRequestEvent& request) {
-            order.push_back("control");
-            require(request.keyboard_initiated &&
-                        request.target_stable_id == "guidance.panel",
-                    "F1 must route to the nearest mapped focus ancestor");
-        });
-    auto provider = help.help_requested().subscribe(
-        [&](HelpRequestEvent& request) {
-            order.push_back("provider");
-            require(request.help_namespace == "malkuth://local-help" &&
-                        request.keyword == "network.endpoint" &&
-                        request.navigator == HelpNavigator::keyword_index,
-                    "provider requests must retain namespace, keyword, and navigation intent");
-            request.handled = true;
-        });
+    SubscriptionToken local = (*fixture.panel).help_requested().subscribe(
+        ObserveLocalHelpRequest(order));
+    SubscriptionToken provider = help.help_requested().subscribe(
+        ObserveProviderHelpRequest(order));
 
     const bool handled = fixture.window.dispatch_key(
         {KeyAction::down, PhysicalKey::f1, Modifier::none});
@@ -254,7 +291,7 @@ void test_help_routes_f1_locally_then_to_provider_without_external_policy() {
     const SemanticSnapshot help_semantics = fixture.window.semantic_snapshot();
     const SemanticNode* panel = find_node(
         help_semantics.roots, "guidance.panel");
-    require(panel && panel->description.find(
+    require(panel && (*panel).description.find(
                 "Choose a reachable local service endpoint.") !=
                 std::string::npos,
             "authored help must enrich native semantic output");
@@ -271,13 +308,11 @@ void test_help_routes_f1_locally_then_to_provider_without_external_policy() {
     local.disconnect();
     provider.disconnect();
     int provider_calls = 0;
-    auto local_handler = fixture.panel->help_requested().subscribe(
-        [&](HelpRequestEvent& request) {
-            order.push_back("handled-control");
-            request.handled = true;
-        });
-    auto provider_handler = help.help_requested().subscribe(
-        [&](HelpRequestEvent&) { ++provider_calls; });
+    SubscriptionToken local_handler =
+        (*fixture.panel).help_requested().subscribe(
+            HandleLocalHelpRequest(order));
+    SubscriptionToken provider_handler = help.help_requested().subscribe(
+        test_support::IncrementCounter<int, HelpRequestEvent&>(provider_calls));
     require(fixture.window.dispatch_key(
                 {KeyAction::down, PhysicalKey::f1, Modifier::none}) &&
                 provider_calls == 0,
@@ -286,32 +321,32 @@ void test_help_routes_f1_locally_then_to_provider_without_external_policy() {
 
 void test_multiple_providers_and_disposal_cleanup() {
     Fixture fixture;
-    auto first = std::make_unique<ErrorProvider>(fixture.window);
-    auto second = std::make_unique<ErrorProvider>(fixture.window);
-    first->set_blink_style(ErrorBlinkStyle::never_blink);
-    second->set_blink_style(ErrorBlinkStyle::never_blink);
-    first->set_error(fixture.target, "First validation channel");
-    second->set_error(fixture.target, "Second validation channel");
+    std::unique_ptr<gui_forms::ErrorProvider> first = std::make_unique<ErrorProvider>(fixture.window);
+    std::unique_ptr<gui_forms::ErrorProvider> second = std::make_unique<ErrorProvider>(fixture.window);
+    (*first).set_blink_style(ErrorBlinkStyle::never_blink);
+    (*second).set_blink_style(ErrorBlinkStyle::never_blink);
+    (*first).set_error(fixture.target, "First validation channel");
+    (*second).set_error(fixture.target, "Second validation channel");
     const SemanticSnapshot both_snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* both = find_node(
         both_snapshot.roots, "guidance.target");
-    require(both && both->description.find("First validation channel") <
-                         both->description.find("Second validation channel"),
+    require(both && (*both).description.find("First validation channel") <
+                         (*both).description.find("Second validation channel"),
             "multiple providers must project in stable provider-identity order");
 
-    first->dispose();
+    (*first).dispose();
     const SemanticSnapshot remaining_snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* remaining = find_node(
         remaining_snapshot.roots, "guidance.target");
     require(remaining &&
-                remaining->description.find("First validation channel") ==
+                (*remaining).description.find("First validation channel") ==
                     std::string::npos &&
-                remaining->description.find("Second validation channel") !=
+                (*remaining).description.find("Second validation channel") !=
                     std::string::npos,
             "disposing one provider must remove only its own extension state");
 
-    fixture.target->dispose();
-    require(second->snapshot().presented_icons == 0U &&
+    (*fixture.target).dispose();
+    require((*second).snapshot().presented_icons == 0U &&
                 !fixture.window.next_wake(),
             "target disposal must revoke provider popup and frame work synchronously");
 }

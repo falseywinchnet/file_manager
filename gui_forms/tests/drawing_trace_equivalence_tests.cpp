@@ -23,6 +23,57 @@ gd_string_view c_view(std::string_view value) {
     return {value.data(), static_cast<std::uint64_t>(value.size())};
 }
 
+class QueryObjectKindOffThread final {
+public:
+    QueryObjectKindOffThread(const gd_api_v0& api, gd_handle object,
+                             gd_result& result)
+        : api_(api), object_(object), result_(result) {}
+
+    void operator()() const {
+        std::uint32_t kind{};
+        result_ = api_.object_kind(object_, &kind);
+    }
+
+private:
+    const gd_api_v0& api_;
+    gd_handle object_;
+    gd_result& result_;
+};
+
+class SetRecorderQualityOffThread final {
+public:
+    SetRecorderQualityOffThread(const gd_api_v0& api, gd_handle recorder,
+                                gd_result& result)
+        : api_(api), recorder_(recorder), result_(result) {}
+
+    void operator()() const {
+        result_ = api_.recorder_set_quality(recorder_, 4, 5, 4, 0, 2);
+    }
+
+private:
+    const gd_api_v0& api_;
+    gd_handle recorder_;
+    gd_result& result_;
+};
+
+class FillRecorderOffThread final {
+public:
+    FillRecorderOffThread(const gd_api_v0& api, gd_handle recorder,
+                          gd_handle brush, gd_result& result)
+        : api_(api), recorder_(recorder), brush_(brush), result_(result) {}
+
+    void operator()() const {
+        result_ = api_.recorder_fill_rectangle(
+            recorder_, brush_, {0, 0, 4, 4});
+    }
+
+private:
+    const gd_api_v0& api_;
+    gd_handle recorder_;
+    gd_handle brush_;
+    gd_result& result_;
+};
+
 std::string via_cpp() {
     using namespace gui_drawing;
     SolidBrush brush(Color::from_argb(UINT32_C(0xffff0000)));
@@ -34,7 +85,7 @@ std::string via_cpp() {
     format.set_trimming(StringTrimming::ellipsis_character);
     GraphicsRecorder recorder;
     recorder.clear(Color::from_argb(UINT32_C(0xff000000)));
-    const auto token = recorder.save();
+    const GraphicsStateToken token = recorder.save();
     recorder.translate(10, 5);
     recorder.set_clip({0, 0, 100, 50});
     recorder.set_quality(SmoothingMode::anti_alias, InterpolationMode::bicubic,
@@ -101,20 +152,15 @@ int main() {
     gd_handle brush{};
     CHECK(api.solid_brush_create({UINT32_C(0xffffffff), 0}, &brush) == GD_OK);
     gd_result foreign_result = GD_OK;
-    std::thread foreign([&] {
-        std::uint32_t kind{};
-        foreign_result = api.object_kind(brush, &kind);
-    });
+    std::thread foreign(QueryObjectKindOffThread(api, brush, foreign_result));
     foreign.join();
     CHECK(foreign_result == GD_ERROR_WRONG_THREAD);
     CHECK(api.release(brush) == GD_OK);
 
     gd_handle handed_off_recorder{};
     CHECK(api.recorder_create(&handed_off_recorder) == GD_OK);
-    std::thread recorder_worker([&] {
-        foreign_result = api.recorder_set_quality(
-            handed_off_recorder, 4, 5, 4, 0, 2);
-    });
+    std::thread recorder_worker(SetRecorderQualityOffThread(
+        api, handed_off_recorder, foreign_result));
     recorder_worker.join();
     CHECK(foreign_result == GD_OK);
     // A later call deterministically hands the recorder back to this thread.
@@ -126,10 +172,8 @@ int main() {
     gd_handle shared_brush{};
     CHECK(api.solid_brush_create({UINT32_C(0xff00ff00), 0}, &shared_brush) == GD_OK);
     CHECK(api.recorder_create(&handed_off_recorder) == GD_OK);
-    std::thread resource_worker([&] {
-        foreign_result = api.recorder_fill_rectangle(
-            handed_off_recorder, shared_brush, {0, 0, 4, 4});
-    });
+    std::thread resource_worker(FillRecorderOffThread(
+        api, handed_off_recorder, shared_brush, foreign_result));
     resource_worker.join();
     CHECK(foreign_result == GD_OK);
     CHECK(api.release(handed_off_recorder) == GD_OK);

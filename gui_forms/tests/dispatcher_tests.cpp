@@ -1,11 +1,15 @@
 #include "gui_forms/gui_forms.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
 #include "headless_host.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -14,6 +18,7 @@
 namespace {
 
 using namespace gui_forms;
+namespace callbacks = gui_forms::test_support;
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -54,13 +59,9 @@ public:
     void on_pointer(PointerEvent& event) override {
         if (!recording || event.action != PointerAction::down) return;
         trace_.push_back("input");
-        const auto weak = weak_from_this();
-        static_cast<void>(begin_invoke([weak, this] {
-            trace_.push_back("dispatch");
-            if (const auto control = weak.lock()) {
-                control->set_requested_bounds({0.0, 0.0, 319.0, 179.0});
-            }
-        }));
+        static_cast<void>(begin_invoke(detail::BoundMemberFunction<
+            void (DispatchPhaseProbe::*)()>(
+                *this, &DispatchPhaseProbe::apply_posted_pointer_mutation)));
         event.handled = true;
     }
 
@@ -71,13 +72,22 @@ public:
     bool recording{};
 
 private:
+    void apply_posted_pointer_mutation() {
+        trace_.push_back("dispatch");
+        const std::weak_ptr<Control> weak = weak_from_this();
+        const std::shared_ptr<Control> control = weak.lock();
+        if (control) {
+            (*control).set_requested_bounds({0.0, 0.0, 319.0, 179.0});
+        }
+    }
+
     std::vector<std::string>& trace_;
 };
 
 template <typename Predicate>
 void require_eventually(Predicate predicate, const char* message) {
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::seconds(2);
+    const std::chrono::steady_clock::time_point deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(2);
     while (!predicate()) {
         if (std::chrono::steady_clock::now() >= deadline) {
             throw std::runtime_error(message);
@@ -86,20 +96,315 @@ void require_eventually(Predicate predicate, const char* message) {
     }
 }
 
+class PostNestedTrace final {
+public:
+    PostNestedTrace(Window& window, std::string& trace,
+                    DispatchOperation& nested) noexcept
+        : window_(window), trace_(trace), nested_(nested) {}
+
+    void operator()() const {
+        trace_ += 'A';
+        nested_ = window_.begin_invoke(
+            callbacks::AppendLiteral<>(trace_, "D"));
+    }
+
+private:
+    Window& window_;
+    std::string& trace_;
+    DispatchOperation& nested_;
+};
+
+class RecordUiThread final {
+public:
+    RecordUiThread(std::atomic<bool>& result,
+                   std::thread::id ui_thread) noexcept
+        : result_(result), ui_thread_(ui_thread) {}
+
+    void operator()() const {
+        result_.store(std::this_thread::get_id() == ui_thread_,
+                      std::memory_order_release);
+    }
+
+private:
+    std::atomic<bool>& result_;
+    std::thread::id ui_thread_;
+};
+
+class CrossThreadPost final {
+public:
+    CrossThreadPost(Window& window, const Control::Ptr& root,
+                    std::atomic<bool>& saw_affinity,
+                    std::atomic<bool>& callback_on_ui,
+                    DispatchOperation& operation,
+                    std::thread::id ui_thread) noexcept
+        : window_(window), root_(root), saw_affinity_(saw_affinity),
+          callback_on_ui_(callback_on_ui), operation_(operation),
+          ui_thread_(ui_thread) {}
+
+    void operator()() const {
+        saw_affinity_.store(window_.invoke_required() &&
+                                (*root_).invoke_required(),
+                            std::memory_order_release);
+        operation_ = (*root_).begin_invoke(
+            RecordUiThread(callback_on_ui_, ui_thread_));
+    }
+
+private:
+    Window& window_;
+    const Control::Ptr& root_;
+    std::atomic<bool>& saw_affinity_;
+    std::atomic<bool>& callback_on_ui_;
+    DispatchOperation& operation_;
+    std::thread::id ui_thread_;
+};
+
+class RecordMarshalledCall final {
+public:
+    RecordMarshalledCall(std::string& trace, std::atomic<bool>& on_ui,
+                         std::thread::id ui_thread) noexcept
+        : trace_(trace), on_ui_(on_ui), ui_thread_(ui_thread) {}
+
+    void operator()() const {
+        trace_ += 'C';
+        on_ui_.store(std::this_thread::get_id() == ui_thread_,
+                     std::memory_order_release);
+    }
+
+private:
+    std::string& trace_;
+    std::atomic<bool>& on_ui_;
+    std::thread::id ui_thread_;
+};
+
+class MarshalledInvokeWorker final {
+public:
+    MarshalledInvokeWorker(const Control::Ptr& child, std::string& trace,
+                           std::atomic<bool>& on_ui,
+                           std::atomic<bool>& returned,
+                           std::thread::id ui_thread) noexcept
+        : child_(child), trace_(trace), on_ui_(on_ui), returned_(returned),
+          ui_thread_(ui_thread) {}
+
+    void operator()() const {
+        (*child_).invoke(RecordMarshalledCall(trace_, on_ui_, ui_thread_));
+        returned_.store(true, std::memory_order_release);
+    }
+
+private:
+    const Control::Ptr& child_;
+    std::string& trace_;
+    std::atomic<bool>& on_ui_;
+    std::atomic<bool>& returned_;
+    std::thread::id ui_thread_;
+};
+
+class HeadlessWakeAndPending final {
+public:
+    HeadlessWakeAndPending(host::HeadlessHost& host, Window& window) noexcept
+        : host_(host), window_(window) {}
+    bool operator()() const {
+        return host_.dispatcher_wake_pending() &&
+               window_.dispatcher_snapshot().pending == 1U;
+    }
+
+private:
+    host::HeadlessHost& host_;
+    Window& window_;
+};
+
+class OnePendingDispatch final {
+public:
+    explicit OnePendingDispatch(Window& window) noexcept : window_(window) {}
+    bool operator()() const {
+        return window_.dispatcher_snapshot().pending == 1U;
+    }
+
+private:
+    Window& window_;
+};
+
+void do_nothing() {}
+
+void throw_dispatcher_fixture() {
+    throw std::runtime_error("dispatcher fixture fault");
+}
+
+void throw_inline_fault() {
+    throw std::runtime_error("inline fault");
+}
+
+void throw_worker_fault() {
+    throw std::runtime_error("worker fault");
+}
+
+class FaultedInvokeWorker final {
+public:
+    FaultedInvokeWorker(Window& window, std::string& message) noexcept
+        : window_(window), message_(message) {}
+
+    void operator()() const {
+        try {
+            window_.invoke(throw_worker_fault);
+        } catch (const std::runtime_error& error) {
+            message_ = error.what();
+        }
+    }
+
+private:
+    Window& window_;
+    std::string& message_;
+};
+
+class OwnerInvokeWaiter final {
+public:
+    OwnerInvokeWaiter(const Control::Ptr& child,
+                      std::atomic<bool>& cancelled) noexcept
+        : child_(child), cancelled_(cancelled) {}
+
+    void operator()() const {
+        try {
+            (*child_).invoke(do_nothing);
+        } catch (const DispatchCancelledError&) {
+            cancelled_.store(true, std::memory_order_release);
+        }
+    }
+
+private:
+    const Control::Ptr& child_;
+    std::atomic<bool>& cancelled_;
+};
+
+class UnhostedInvokeWorker final {
+public:
+    UnhostedInvokeWorker(Window& window,
+                         std::atomic<bool>& rejected) noexcept
+        : window_(window), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            window_.invoke(do_nothing);
+        } catch (const std::logic_error&) {
+            rejected_.store(true, std::memory_order_release);
+        }
+    }
+
+private:
+    Window& window_;
+    std::atomic<bool>& rejected_;
+};
+
+class ShutdownInvokeWaiter final {
+public:
+    ShutdownInvokeWaiter(Window& window,
+                         std::atomic<bool>& cancelled) noexcept
+        : window_(window), cancelled_(cancelled) {}
+
+    void operator()() const {
+        try {
+            window_.invoke(do_nothing);
+        } catch (const DispatchCancelledError&) {
+            cancelled_.store(true, std::memory_order_release);
+        }
+    }
+
+private:
+    Window& window_;
+    std::atomic<bool>& cancelled_;
+};
+
+struct DispatchRecord final {
+    std::uint64_t sequence{};
+    std::size_t producer{};
+    std::size_t index{};
+};
+
+class RecordDispatchedItem final {
+public:
+    RecordDispatchedItem(std::vector<DispatchRecord>& observed,
+                         std::shared_ptr<DispatchRecord> record) noexcept
+        : observed_(observed), record_(std::move(record)) {}
+
+    void operator()() const { observed_.push_back(*record_); }
+
+private:
+    std::vector<DispatchRecord>& observed_;
+    std::shared_ptr<DispatchRecord> record_;
+};
+
+class DispatchProducer final {
+public:
+    DispatchProducer(Window& window, std::mutex& records_mutex,
+                     std::vector<DispatchRecord>& expected,
+                     std::vector<DispatchRecord>& observed,
+                     std::size_t producer,
+                     std::size_t callback_count) noexcept
+        : window_(window), records_mutex_(records_mutex), expected_(expected),
+          observed_(observed), producer_(producer),
+          callback_count_(callback_count) {}
+
+    void operator()() const {
+        for (std::size_t index = 0U; index < callback_count_; ++index) {
+            std::shared_ptr<DispatchRecord> record =
+                std::make_shared<DispatchRecord>(
+                    DispatchRecord{0U, producer_, index});
+            DispatchOperation operation = window_.begin_invoke(
+                RecordDispatchedItem(observed_, record));
+            (*record).sequence = operation.sequence();
+            std::scoped_lock<std::mutex> lock(records_mutex_);
+            expected_.push_back(*record);
+        }
+    }
+
+private:
+    Window& window_;
+    std::mutex& records_mutex_;
+    std::vector<DispatchRecord>& expected_;
+    std::vector<DispatchRecord>& observed_;
+    std::size_t producer_;
+    std::size_t callback_count_;
+};
+
+class DispatchRecordSequenceLess final {
+public:
+    bool operator()(const DispatchRecord& left,
+                    const DispatchRecord& right) const noexcept {
+        return left.sequence < right.sequence;
+    }
+};
+
+class TimerPostsDispatch final {
+public:
+    TimerPostsDispatch(std::vector<std::string>& trace,
+                       const std::shared_ptr<DispatchPhaseProbe>& root) noexcept
+        : trace_(trace), root_(root) {}
+
+    void operator()() const {
+        trace_.push_back("timer");
+        static_cast<void>((*root_).begin_invoke(
+            callbacks::PushConstant<std::vector<std::string>, std::string>(
+                trace_, "timer-dispatch")));
+    }
+
+private:
+    std::vector<std::string>& trace_;
+    const std::shared_ptr<DispatchPhaseProbe>& root_;
+};
+
 void test_fifo_snapshot_and_nested_deferral() {
-    auto root = make_control<Control>(StableId("dispatcher.root"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.root"));
     Window window(root, {320.0, 180.0});
     std::uint64_t wake_count = 0U;
-    window.set_dispatch_wake_handler([&wake_count] { ++wake_count; });
+    window.set_dispatch_wake_handler(
+        callbacks::IncrementCounter<std::uint64_t>(wake_count));
 
     std::string trace;
     DispatchOperation nested;
-    DispatchOperation first = window.begin_invoke([&] {
-        trace += 'A';
-        nested = window.begin_invoke([&] { trace += 'D'; });
-    });
-    DispatchOperation second = window.begin_invoke([&] { trace += 'B'; });
-    DispatchOperation third = window.begin_invoke([&] { trace += 'C'; });
+    DispatchOperation first =
+        window.begin_invoke(PostNestedTrace(window, trace, nested));
+    DispatchOperation second = window.begin_invoke(
+        callbacks::AppendLiteral<>(trace, "B"));
+    DispatchOperation third = window.begin_invoke(
+        callbacks::AppendLiteral<>(trace, "C"));
     require(trace.empty() && wake_count == 1U,
             "BeginInvoke must remain posted and coalesce one host wake");
     const DispatcherSnapshot queued = window.dispatcher_snapshot();
@@ -123,24 +428,25 @@ void test_fifo_snapshot_and_nested_deferral() {
 }
 
 void test_cancellation_owner_lifetime_and_fault_isolation() {
-    auto root = make_control<Control>(StableId("dispatcher.owner.root"));
-    auto child = make_control<Control>(StableId("dispatcher.owner.child"));
-    root->add_child(child);
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.owner.root"));
+    std::shared_ptr<gui_forms::Control> child = make_control<Control>(StableId("dispatcher.owner.child"));
+    (*root).add_child(child);
     Window window(root, {320.0, 180.0});
 
     std::uint64_t callbacks = 0U;
-    DispatchOperation explicit_cancel = window.begin_invoke([&] { ++callbacks; });
+    DispatchOperation explicit_cancel = window.begin_invoke(
+        callbacks::IncrementCounter<std::uint64_t>(callbacks));
     require(explicit_cancel.cancel() && !explicit_cancel.cancel(),
             "posted cancellation must be explicit and idempotent");
-    DispatchOperation owner_cancel = child->begin_invoke([&] { ++callbacks; });
-    const Control::Ptr detached = root->remove_child(child->runtime_id());
-    require(detached == child && !child->attached() && !child->invoke_required(),
+    DispatchOperation owner_cancel = (*child).begin_invoke(
+        callbacks::IncrementCounter<std::uint64_t>(callbacks));
+    const Control::Ptr detached = (*root).remove_child((*child).runtime_id());
+    require(detached == child && !(*child).attached() && !(*child).invoke_required(),
             "detached controls must lose dispatcher affinity atomically");
 
-    DispatchOperation fault = window.begin_invoke([] {
-        throw std::runtime_error("dispatcher fixture fault");
-    });
-    DispatchOperation survivor = window.begin_invoke([&] { ++callbacks; });
+    DispatchOperation fault = window.begin_invoke(throw_dispatcher_fixture);
+    DispatchOperation survivor = window.begin_invoke(
+        callbacks::IncrementCounter<std::uint64_t>(callbacks));
     const DispatchDrainResult result = window.drain_posted_work();
     require(callbacks == 1U && result.invoked == 1U && result.cancelled == 2U &&
                 result.faulted == 1U &&
@@ -153,7 +459,7 @@ void test_cancellation_owner_lifetime_and_fault_isolation() {
 
     bool detached_rejected = false;
     try {
-        static_cast<void>(child->begin_invoke([] {}));
+        static_cast<void>((*child).begin_invoke(do_nothing));
     } catch (const std::logic_error&) {
         detached_rejected = true;
     }
@@ -162,22 +468,16 @@ void test_cancellation_owner_lifetime_and_fault_isolation() {
 }
 
 void test_cross_thread_post_and_headless_pump() {
-    auto root = make_control<Control>(StableId("dispatcher.thread.root"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.thread.root"));
     Window window(root, {320.0, 180.0});
     host::HeadlessHost host(window);
     std::atomic<bool> worker_saw_affinity{false};
     std::atomic<bool> callback_on_ui{false};
     DispatchOperation operation;
     const std::thread::id ui_thread = std::this_thread::get_id();
-    std::thread worker([&] {
-        worker_saw_affinity.store(window.invoke_required() &&
-                                      root->invoke_required(),
-                                  std::memory_order_release);
-        operation = root->begin_invoke([&] {
-            callback_on_ui.store(std::this_thread::get_id() == ui_thread,
-                                 std::memory_order_release);
-        });
-    });
+    std::thread worker(CrossThreadPost(
+        window, root, worker_saw_affinity, callback_on_ui, operation,
+        ui_thread));
     worker.join();
     require(worker_saw_affinity.load(std::memory_order_acquire) &&
                 operation.pending() &&
@@ -191,18 +491,18 @@ void test_cross_thread_post_and_headless_pump() {
 }
 
 void test_synchronous_invoke_inline_marshal_fault_and_owner_cancel() {
-    auto root = make_control<Control>(StableId("dispatcher.invoke.root"));
-    auto child = make_control<Control>(StableId("dispatcher.invoke.child"));
-    root->add_child(child);
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.invoke.root"));
+    std::shared_ptr<gui_forms::Control> child = make_control<Control>(StableId("dispatcher.invoke.child"));
+    (*root).add_child(child);
     Window window(root, {320.0, 180.0});
     host::HeadlessHost host(window);
 
     std::string trace;
-    window.invoke([&] { trace += 'A'; });
-    child->invoke([&] { trace += 'B'; });
+    window.invoke(callbacks::AppendLiteral<>(trace, "A"));
+    (*child).invoke(callbacks::AppendLiteral<>(trace, "B"));
     bool inline_fault = false;
     try {
-        window.invoke([] { throw std::runtime_error("inline fault"); });
+        window.invoke(throw_inline_fault);
     } catch (const std::runtime_error& error) {
         inline_fault = std::string(error.what()) == "inline fault";
     }
@@ -213,19 +513,10 @@ void test_synchronous_invoke_inline_marshal_fault_and_owner_cancel() {
     std::atomic<bool> marshalled_returned{false};
     std::atomic<bool> marshalled_on_ui{false};
     const std::thread::id ui_thread = std::this_thread::get_id();
-    std::thread marshalled([&] {
-        child->invoke([&] {
-            trace += 'C';
-            marshalled_on_ui.store(std::this_thread::get_id() == ui_thread,
-                                   std::memory_order_release);
-        });
-        marshalled_returned.store(true, std::memory_order_release);
-    });
+    std::thread marshalled(MarshalledInvokeWorker(
+        child, trace, marshalled_on_ui, marshalled_returned, ui_thread));
     require_eventually(
-        [&] {
-            return host.dispatcher_wake_pending() &&
-                   window.dispatcher_snapshot().pending == 1U;
-        },
+        HeadlessWakeAndPending(host, window),
         "worker Invoke did not publish a bounded headless wake");
     require(!marshalled_returned.load(std::memory_order_acquire),
             "worker Invoke must block without pumping a nested loop");
@@ -237,15 +528,9 @@ void test_synchronous_invoke_inline_marshal_fault_and_owner_cancel() {
             "headless host must release worker Invoke only after UI execution");
 
     std::string worker_fault;
-    std::thread faulted([&] {
-        try {
-            window.invoke([] { throw std::runtime_error("worker fault"); });
-        } catch (const std::runtime_error& error) {
-            worker_fault = error.what();
-        }
-    });
+    std::thread faulted(FaultedInvokeWorker(window, worker_fault));
     require_eventually(
-        [&] { return window.dispatcher_snapshot().pending == 1U; },
+        OnePendingDispatch(window),
         "faulting worker Invoke was not queued");
     const DispatchDrainResult fault_turn = host.pump_dispatcher();
     faulted.join();
@@ -253,17 +538,11 @@ void test_synchronous_invoke_inline_marshal_fault_and_owner_cancel() {
             "worker Invoke must rethrow the original callback exception on its caller");
 
     std::atomic<bool> owner_cancelled{false};
-    std::thread owner_waiter([&] {
-        try {
-            child->invoke([] {});
-        } catch (const DispatchCancelledError&) {
-            owner_cancelled.store(true, std::memory_order_release);
-        }
-    });
+    std::thread owner_waiter(OwnerInvokeWaiter(child, owner_cancelled));
     require_eventually(
-        [&] { return window.dispatcher_snapshot().pending == 1U; },
+        OnePendingDispatch(window),
         "owned worker Invoke was not queued");
-    const Control::Ptr detached = root->remove_child(child->runtime_id());
+    const Control::Ptr detached = (*root).remove_child((*child).runtime_id());
     const DispatchDrainResult cancelled_turn = host.pump_dispatcher();
     owner_waiter.join();
     const DispatcherSnapshot snapshot = window.dispatcher_snapshot();
@@ -276,35 +555,24 @@ void test_synchronous_invoke_inline_marshal_fault_and_owner_cancel() {
 }
 
 void test_synchronous_invoke_host_and_shutdown_guards() {
-    auto unhosted_root = make_control<Control>(
+    std::shared_ptr<gui_forms::Control> unhosted_root = make_control<Control>(
         StableId("dispatcher.invoke.unhosted"));
     Window unhosted(unhosted_root, {200.0, 100.0});
     std::atomic<bool> unhosted_rejected{false};
-    std::thread no_host([&] {
-        try {
-            unhosted.invoke([] {});
-        } catch (const std::logic_error&) {
-            unhosted_rejected.store(true, std::memory_order_release);
-        }
-    });
+    std::thread no_host(
+        UnhostedInvokeWorker(unhosted, unhosted_rejected));
     no_host.join();
     require(unhosted_rejected.load(std::memory_order_acquire) &&
                 unhosted.dispatcher_snapshot().pending == 0U,
             "worker Invoke without a running host must reject instead of deadlocking");
 
-    auto root = make_control<Control>(StableId("dispatcher.invoke.shutdown"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.invoke.shutdown"));
     Window window(root, {200.0, 100.0});
     host::HeadlessHost host(window);
     std::atomic<bool> shutdown_cancelled{false};
-    std::thread waiter([&] {
-        try {
-            window.invoke([] {});
-        } catch (const DispatchCancelledError&) {
-            shutdown_cancelled.store(true, std::memory_order_release);
-        }
-    });
+    std::thread waiter(ShutdownInvokeWaiter(window, shutdown_cancelled));
     require_eventually(
-        [&] { return window.dispatcher_snapshot().pending == 1U; },
+        OnePendingDispatch(window),
         "shutdown fixture worker Invoke was not queued");
     bool removal_rejected = false;
     try {
@@ -321,43 +589,26 @@ void test_synchronous_invoke_host_and_shutdown_guards() {
 }
 
 void test_concurrent_producer_fifo_and_turn_bound() {
-    auto root = make_control<Control>(StableId("dispatcher.stress.root"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.stress.root"));
     Window window(root, {320.0, 180.0});
-    struct Record final {
-        std::uint64_t sequence{};
-        std::size_t producer{};
-        std::size_t index{};
-    };
     constexpr std::size_t producer_count = 8U;
     constexpr std::size_t callbacks_per_producer = 129U;
     constexpr std::size_t callback_count =
         producer_count * callbacks_per_producer;
     std::mutex records_mutex;
-    std::vector<Record> expected;
+    std::vector<DispatchRecord> expected;
     expected.reserve(callback_count);
-    std::vector<Record> observed;
+    std::vector<DispatchRecord> observed;
     observed.reserve(callback_count);
     std::vector<std::thread> producers;
     producers.reserve(producer_count);
     for (std::size_t producer = 0U; producer < producer_count; ++producer) {
-        producers.emplace_back([&, producer] {
-            for (std::size_t index = 0U; index < callbacks_per_producer; ++index) {
-                auto record = std::make_shared<Record>(
-                    Record{0U, producer, index});
-                DispatchOperation operation = window.begin_invoke([&, record] {
-                    observed.push_back(*record);
-                });
-                record->sequence = operation.sequence();
-                std::scoped_lock lock(records_mutex);
-                expected.push_back(*record);
-            }
-        });
+        producers.emplace_back(DispatchProducer(
+            window, records_mutex, expected, observed, producer,
+            callbacks_per_producer));
     }
-    for (auto& producer : producers) producer.join();
-    std::sort(expected.begin(), expected.end(), [](const Record& left,
-                                                   const Record& right) {
-        return left.sequence < right.sequence;
-    });
+    for (std::thread& producer : producers) producer.join();
+    std::sort(expected.begin(), expected.end(), DispatchRecordSequenceLess());
     require(expected.size() == callback_count &&
                 window.dispatcher_snapshot().pending == callback_count,
             "all concurrent producers must publish one bounded global FIFO");
@@ -381,7 +632,7 @@ void test_concurrent_producer_fifo_and_turn_bound() {
     for (std::size_t producer = 0U; producer < producer_count; ++producer) {
         std::size_t prior = 0U;
         bool seen = false;
-        for (const Record& record : observed) {
+        for (const DispatchRecord& record : observed) {
             if (record.producer != producer) continue;
             require(!seen || record.index == prior + 1U,
                     "each producer's program order must survive interleaving");
@@ -393,16 +644,17 @@ void test_concurrent_producer_fifo_and_turn_bound() {
 
 void test_dispatch_order_against_input_timer_layout_and_paint() {
     std::vector<std::string> trace;
-    auto root = make_control<DispatchPhaseProbe>(
+    std::shared_ptr<DispatchPhaseProbe> root =
+        make_control<DispatchPhaseProbe>(
         StableId("dispatcher.phase.root"), trace);
-    root->set_focusable(true);
+    (*root).set_focusable(true);
     Window window(root, {320.0, 180.0});
     host::HeadlessHost host(window);
     NullPainter painter;
     window.flush();
     window.paint(painter);
     trace.clear();
-    root->recording = true;
+    (*root).recording = true;
 
     require(window.dispatch_pointer(
                 {PointerAction::down, PointerButton::primary, {20.0, 20.0}}) &&
@@ -422,12 +674,8 @@ void test_dispatch_order_against_input_timer_layout_and_paint() {
 
     trace.clear();
     Timer timer(window, std::chrono::milliseconds(1));
-    SubscriptionToken tick = timer.tick().subscribe(timer, [&] {
-        trace.push_back("timer");
-        static_cast<void>(root->begin_invoke([&] {
-            trace.push_back("timer-dispatch");
-        }));
-    });
+    SubscriptionToken tick =
+        timer.tick().subscribe(timer, TimerPostsDispatch(trace, root));
     const FrameTime due = FrameClock::now() + std::chrono::milliseconds(1);
     timer.start_at(due);
     const FramePollResult timer_turn = window.poll_frame_schedule(due);
@@ -456,16 +704,16 @@ void test_dispatch_order_against_input_timer_layout_and_paint() {
 }
 
 void test_bounds_and_shutdown_revocation() {
-    auto root = make_control<Control>(StableId("dispatcher.bound.root"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.bound.root"));
     Window window(root, {320.0, 180.0});
     std::vector<DispatchOperation> operations;
     operations.reserve(maximum_posted_callbacks);
     for (std::size_t index = 0U; index < maximum_posted_callbacks; ++index) {
-        operations.push_back(window.begin_invoke([] {}));
+        operations.push_back(window.begin_invoke(do_nothing));
     }
     bool bound_rejected = false;
     try {
-        static_cast<void>(window.begin_invoke([] {}));
+        static_cast<void>(window.begin_invoke(do_nothing));
     } catch (const std::length_error&) {
         bound_rejected = true;
     }
@@ -482,7 +730,7 @@ void test_bounds_and_shutdown_revocation() {
             "shutdown must synchronously revoke every pending operation");
     bool shutdown_rejected = false;
     try {
-        static_cast<void>(window.begin_invoke([] {}));
+        static_cast<void>(window.begin_invoke(do_nothing));
     } catch (const std::logic_error&) {
         shutdown_rejected = true;
     }

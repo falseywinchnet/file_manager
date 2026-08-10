@@ -11,6 +11,7 @@ namespace gui_forms {
 
 class ColorValueEditor final : public Panel {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     explicit ColorValueEditor(StableId stable_id, Color value = {});
     void initialize_control_tree();
 
@@ -39,6 +40,8 @@ protected:
     void on_dispose() noexcept override;
 
 private:
+    static std::optional<std::uint8_t> parse_nibble(char value) noexcept;
+    void commit_text(const std::string& text);
     void commit(std::string_view text);
     void cancel();
 

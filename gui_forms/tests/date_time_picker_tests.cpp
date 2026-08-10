@@ -1,4 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -30,10 +31,10 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
 
 struct Fixture final {
     Fixture() : window(root, {520.0, 390.0}) {
-        picker->set_requested_bounds({24.0, 32.0, 270.0, 29.0});
-        picker->set_accessible_name("Appointment date");
-        picker->set_value({2026, 8U, 5U, 14U, 7U, 9U, 125U});
-        root->add_child(picker);
+        (*picker).set_requested_bounds({24.0, 32.0, 270.0, 29.0});
+        (*picker).set_accessible_name("Appointment date");
+        (*picker).set_value({2026, 8U, 5U, 14U, 7U, 9U, 125U});
+        (*root).add_child(picker);
         window.perform_layout();
         require(window.request_focus(picker), "date fixture must focus the picker");
     }
@@ -42,6 +43,51 @@ struct Fixture final {
     std::shared_ptr<DateTimePicker> picker =
         make_control<DateTimePicker>(StableId("date.picker"));
     Window window;
+};
+
+class RecordCheckedState final {
+public:
+    explicit RecordCheckedState(std::vector<std::string>& order)
+        : order_(order) {}
+
+    void operator()(bool checked) const {
+        order_.push_back(checked ? "checked" : "unchecked");
+    }
+
+private:
+    std::vector<std::string>& order_;
+};
+
+class RecordDropDownState final {
+public:
+    explicit RecordDropDownState(std::vector<std::string>& events)
+        : events_(events) {}
+
+    void operator()(bool open) const {
+        events_.push_back(open ? "open" : "close");
+    }
+
+private:
+    std::vector<std::string>& events_;
+};
+
+class SetPickerValueOffThread final {
+public:
+    SetPickerValueOffThread(DateTimePicker& picker,
+                            std::atomic<bool>& rejected)
+        : picker_(picker), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            picker_.set_value({2027, 1U, 1U});
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+
+private:
+    DateTimePicker& picker_;
+    std::atomic<bool>& rejected_;
 };
 
 void test_civil_arithmetic_and_validation() {
@@ -102,50 +148,52 @@ void test_formats_provider_and_transactional_validation() {
 void test_range_events_checkbox_and_spinner() {
     Fixture fixture;
     std::vector<std::string> order;
-    auto checked = fixture.picker->checked_changed().subscribe(
-        [&](bool value) { order.push_back(value ? "checked" : "unchecked"); });
-    auto value = fixture.picker->value_changed().subscribe(
-        [&](DateTimeValue) { order.push_back("value"); });
-    fixture.picker->set_show_check_box(true);
-    fixture.picker->set_checked(false);
-    require(!fixture.picker->checked() && order == std::vector<std::string>{"unchecked"},
+    SubscriptionToken checked = (*fixture.picker).checked_changed().subscribe(
+        RecordCheckedState(order));
+    SubscriptionToken value = (*fixture.picker).value_changed().subscribe(
+        test_support::PushConstant<std::vector<std::string>, std::string,
+                                   DateTimeValue>(order, "value"));
+    (*fixture.picker).set_show_check_box(true);
+    (*fixture.picker).set_checked(false);
+    require(!(*fixture.picker).checked() && order == std::vector<std::string>{"unchecked"},
             "nullable display state must publish one checked change");
     require(fixture.window.dispatch_key(
-                {KeyAction::down, PhysicalKey::up}) && fixture.picker->checked() &&
-                fixture.picker->value().day == 6U &&
+                {KeyAction::down, PhysicalKey::up}) && (*fixture.picker).checked() &&
+                (*fixture.picker).value().day == 6U &&
                 order == std::vector<std::string>{"unchecked", "checked", "value"},
             "keyboard stepping must re-enable an unchecked value before changing it");
 
-    fixture.picker->set_show_up_down(true);
+    (*fixture.picker).set_show_up_down(true);
     require(!fixture.window.perform_semantic_action(
                 "date.picker", SemanticAction::expand) &&
-                !fixture.picker->dropped_down(),
+                !(*fixture.picker).dropped_down(),
             "up-down mode must not claim a calendar expansion action");
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::left}) &&
-                fixture.picker->value().day == 5U,
+                (*fixture.picker).value().day == 5U,
             "spinner keyboard directions must use the common stepping contract");
 
-    fixture.picker->set_range({2026, 8U, 5U}, {2026, 8U, 7U, 23U, 59U, 59U, 999U});
-    fixture.picker->set_value({2026, 8U, 7U});
+    (*fixture.picker).set_range({2026, 8U, 5U}, {2026, 8U, 7U, 23U, 59U, 59U, 999U});
+    (*fixture.picker).set_value({2026, 8U, 7U});
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::up}) &&
-                fixture.picker->value() == DateTimeValue{2026, 8U, 7U},
+                (*fixture.picker).value() == DateTimeValue{2026, 8U, 7U},
             "stepping at the range edge must clamp without a spurious value event");
 }
 
 void test_popup_keyboard_commit_cancel_and_outside_dismissal() {
     Fixture fixture;
-    fixture.picker->set_drop_down_alignment(DateTimeDropDownAlignment::right);
+    (*fixture.picker).set_drop_down_alignment(DateTimeDropDownAlignment::right);
     std::vector<std::string> events;
-    auto values = fixture.picker->value_changed().subscribe(
-        [&](DateTimeValue) { events.push_back("value"); });
-    auto popup = fixture.picker->drop_down_changed().subscribe(
-        [&](bool open) { events.push_back(open ? "open" : "close"); });
+    SubscriptionToken values = (*fixture.picker).value_changed().subscribe(
+        test_support::PushConstant<std::vector<std::string>, std::string,
+                                   DateTimeValue>(events, "value"));
+    SubscriptionToken popup = (*fixture.picker).drop_down_changed().subscribe(
+        RecordDropDownState(events));
 
     require(fixture.window.perform_semantic_action(
                 "date.picker", SemanticAction::expand) &&
-                fixture.picker->dropped_down() &&
+                (*fixture.picker).dropped_down() &&
                 fixture.window.focus_scope_depth() == 1U &&
-                fixture.window.focused_control()->stable_id().value() ==
+                (*fixture.window.focused_control()).stable_id().value() ==
                     "date.picker.popup.calendar",
             "expansion must open a retained calendar and contain keyboard focus");
     const SemanticSnapshot open = fixture.window.semantic_snapshot();
@@ -153,39 +201,39 @@ void test_popup_keyboard_commit_cancel_and_outside_dismissal() {
         find_node(open.roots, "date.picker.popup.calendar");
     const SemanticNode* selected =
         find_node(open.roots, "date.picker.popup.calendar.day.2026-08-05");
-    require(calendar && calendar->role == SemanticRole::calendar &&
-                calendar->bounds.x == 8.0 && selected &&
-                selected->role == SemanticRole::date_cell &&
-                has_semantic_state(selected->states, SemanticState::selected),
+    require(calendar && (*calendar).role == SemanticRole::calendar &&
+                (*calendar).bounds.x == 8.0 && selected &&
+                (*selected).role == SemanticRole::date_cell &&
+                has_semantic_state((*selected).states, SemanticState::selected),
             "calendar popup must honor right alignment and expose stable virtual date cells and selection state");
     bool invalid_alignment{};
     try {
-        fixture.picker->set_drop_down_alignment(
+        (*fixture.picker).set_drop_down_alignment(
             static_cast<DateTimeDropDownAlignment>(99));
     } catch (const std::invalid_argument&) {
         invalid_alignment = true;
     }
     require(invalid_alignment &&
-                fixture.picker->drop_down_alignment() ==
+                (*fixture.picker).drop_down_alignment() ==
                     DateTimeDropDownAlignment::right,
             "DateTimePicker popup alignment must reject invalid vocabulary transactionally");
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
                 fixture.window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                fixture.picker->value().day == 6U && !fixture.picker->dropped_down() &&
+                (*fixture.picker).value().day == 6U && !(*fixture.picker).dropped_down() &&
                 fixture.window.focus_scope_depth() == 0U &&
                 events == std::vector<std::string>{"open", "value", "close"},
             "arrow plus Enter must commit once, close once, and restore focus in order");
 
-    fixture.picker->set_dropped_down(true);
+    (*fixture.picker).set_dropped_down(true);
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
                 fixture.window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
-                fixture.picker->value().day == 6U && !fixture.picker->dropped_down(),
+                (*fixture.picker).value().day == 6U && !(*fixture.picker).dropped_down(),
             "Escape must discard popup-local selection and close the focus scope");
 
-    fixture.picker->set_dropped_down(true);
+    (*fixture.picker).set_dropped_down(true);
     require(fixture.window.dispatch_pointer(
                 {PointerAction::down, PointerButton::primary, {490.0, 360.0}}) &&
-                !fixture.picker->dropped_down() &&
+                !(*fixture.picker).dropped_down() &&
                 !find_node(fixture.window.semantic_snapshot().roots,
                            "date.picker.popup.calendar"),
             "outside press must dismiss the retained popup and its semantic subtree");
@@ -195,54 +243,54 @@ void test_semantic_date_cell_commit_and_iso_set_value() {
     Fixture fixture;
     require(fixture.window.perform_semantic_action(
                 "date.picker", SemanticAction::set_value, "2026-12-24") &&
-                fixture.picker->value() ==
+                (*fixture.picker).value() ==
                     DateTimeValue{2026, 12U, 24U, 14U, 7U, 9U, 125U},
             "semantic ISO date input must preserve the existing clock component");
     require(!fixture.window.perform_semantic_action(
                 "date.picker", SemanticAction::set_value, "2026-02-30"),
             "semantic ISO input must reject invalid civil dates");
-    fixture.picker->set_value({2026, 8U, 5U});
-    fixture.picker->set_dropped_down(true);
+    (*fixture.picker).set_value({2026, 8U, 5U});
+    (*fixture.picker).set_dropped_down(true);
     require(fixture.window.perform_semantic_action(
                 "date.picker.popup.calendar.day.2026-08-20",
                 SemanticAction::press) &&
-                fixture.picker->value() == DateTimeValue{2026, 8U, 20U} &&
-                !fixture.picker->dropped_down(),
+                (*fixture.picker).value() == DateTimeValue{2026, 8U, 20U} &&
+                !(*fixture.picker).dropped_down(),
             "semantic date-cell press must execute the same commit-and-close path");
 }
 
 void test_optional_semantic_toggle_and_value_activation() {
     Fixture fixture;
-    fixture.picker->set_show_check_box(true);
-    fixture.picker->set_checked(false);
-    const SemanticDescriptor unchecked = fixture.picker->semantic_descriptor();
+    (*fixture.picker).set_show_check_box(true);
+    (*fixture.picker).set_checked(false);
+    const SemanticDescriptor unchecked = (*fixture.picker).semantic_descriptor();
     require(std::find(unchecked.actions.begin(), unchecked.actions.end(),
                       SemanticAction::press) != unchecked.actions.end() &&
                 !has_semantic_state(unchecked.states, SemanticState::checked),
             "optional picker semantics must expose an unchecked toggle action");
     require(fixture.window.perform_semantic_action(
-                "date.picker", SemanticAction::press) && fixture.picker->checked(),
+                "date.picker", SemanticAction::press) && (*fixture.picker).checked(),
             "semantic press must toggle the same optional state as its check hit region");
-    fixture.picker->set_checked(false);
+    (*fixture.picker).set_checked(false);
     require(fixture.window.perform_semantic_action(
                 "date.picker", SemanticAction::set_value, "2026-08-09") &&
-                fixture.picker->checked() && fixture.picker->value().day == 9U,
+                (*fixture.picker).checked() && (*fixture.picker).value().day == 9U,
             "semantic date assignment must activate an unchecked optional value");
 }
 
 void test_semantic_month_navigation_and_range_capability() {
     Fixture fixture;
-    fixture.picker->set_dropped_down(true);
+    (*fixture.picker).set_dropped_down(true);
     SemanticSnapshot snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* previous =
         find_node(snapshot.roots, "date.picker.popup.calendar.previous_month");
     const SemanticNode* next =
         find_node(snapshot.roots, "date.picker.popup.calendar.next_month");
     require(previous && next &&
-                has_semantic_state(previous->states, SemanticState::enabled) &&
-                has_semantic_state(next->states, SemanticState::enabled) &&
-                std::find(next->actions.begin(), next->actions.end(),
-                          SemanticAction::press) != next->actions.end(),
+                has_semantic_state((*previous).states, SemanticState::enabled) &&
+                has_semantic_state((*next).states, SemanticState::enabled) &&
+                std::find((*next).actions.begin(), (*next).actions.end(),
+                          SemanticAction::press) != (*next).actions.end(),
             "calendar header navigation must be exposed as enabled semantic buttons");
     require(fixture.window.perform_semantic_action(
                 "date.picker.popup.calendar.next_month", SemanticAction::press),
@@ -250,28 +298,28 @@ void test_semantic_month_navigation_and_range_capability() {
     snapshot = fixture.window.semantic_snapshot();
     const SemanticNode* calendar =
         find_node(snapshot.roots, "date.picker.popup.calendar");
-    require(calendar && calendar->name == "September 2026" &&
-                calendar->value == "Saturday, September 5, 2026" &&
-                fixture.picker->value() ==
+    require(calendar && (*calendar).name == "September 2026" &&
+                (*calendar).value == "Saturday, September 5, 2026" &&
+                (*fixture.picker).value() ==
                     DateTimeValue{2026, 8U, 5U, 14U, 7U, 9U, 125U},
             "month navigation must remain popup-local until an explicit commit");
     require(fixture.window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
-                !fixture.picker->dropped_down() &&
-                fixture.picker->value().month == 8U,
+                !(*fixture.picker).dropped_down() &&
+                (*fixture.picker).value().month == 8U,
             "cancelling after semantic month navigation must restore the owner value");
 
-    fixture.picker->set_range({2026, 8U, 1U},
+    (*fixture.picker).set_range({2026, 8U, 1U},
                               {2026, 8U, 31U, 23U, 59U, 59U, 999U});
-    fixture.picker->set_dropped_down(true);
+    (*fixture.picker).set_dropped_down(true);
     snapshot = fixture.window.semantic_snapshot();
     previous = find_node(snapshot.roots,
                          "date.picker.popup.calendar.previous_month");
     next = find_node(snapshot.roots,
                      "date.picker.popup.calendar.next_month");
     require(previous && next &&
-                !has_semantic_state(previous->states, SemanticState::enabled) &&
-                !has_semantic_state(next->states, SemanticState::enabled) &&
-                previous->actions.empty() && next->actions.empty() &&
+                !has_semantic_state((*previous).states, SemanticState::enabled) &&
+                !has_semantic_state((*next).states, SemanticState::enabled) &&
+                (*previous).actions.empty() && (*next).actions.empty() &&
                 !fixture.window.perform_semantic_action(
                     "date.picker.popup.calendar.previous_month",
                     SemanticAction::press) &&
@@ -283,33 +331,27 @@ void test_semantic_month_navigation_and_range_capability() {
 
 void test_owner_cleanup_and_ui_thread_enforcement() {
     Fixture fixture;
-    fixture.picker->set_dropped_down(true);
-    fixture.picker->set_visible(false);
-    require(!fixture.picker->dropped_down() &&
+    (*fixture.picker).set_dropped_down(true);
+    (*fixture.picker).set_visible(false);
+    require(!(*fixture.picker).dropped_down() &&
                 fixture.window.focus_scope_depth() == 0U,
             "hiding the popup owner must synchronously revoke popup and focus scope");
 
-    fixture.picker->set_visible(true);
-    fixture.picker->set_dropped_down(true);
-    fixture.picker->dispose();
+    (*fixture.picker).set_visible(true);
+    (*fixture.picker).set_dropped_down(true);
+    (*fixture.picker).dispose();
     require(fixture.window.focus_scope_depth() == 0U &&
                 !fixture.window.find("date.picker.popup.calendar"),
             "owner disposal must leave no retained calendar or focus scope");
 
-    auto root = make_control<Panel>(StableId("date.thread.root"));
-    auto picker = make_control<DateTimePicker>(StableId("date.thread.picker"));
-    root->add_child(picker);
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("date.thread.root"));
+    std::shared_ptr<gui_forms::DateTimePicker> picker = make_control<DateTimePicker>(StableId("date.thread.picker"));
+    (*root).add_child(picker);
     Window window(root, {200.0, 80.0});
     std::atomic<bool> rejected{false};
-    std::thread foreign([&] {
-        try {
-            picker->set_value({2027, 1U, 1U});
-        } catch (const std::logic_error&) {
-            rejected = true;
-        }
-    });
+    std::thread foreign(SetPickerValueOffThread(*picker, rejected));
     foreign.join();
-    require(rejected && picker->value() == DateTimeValue{2000, 1U, 1U},
+    require(rejected && (*picker).value() == DateTimeValue{2000, 1U, 1U},
             "attached picker mutation must reject a foreign UI thread atomically");
 }
 

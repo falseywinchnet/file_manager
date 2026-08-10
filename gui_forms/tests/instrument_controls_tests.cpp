@@ -16,6 +16,77 @@ void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
 
+class AppendModuleToggle final {
+public:
+    explicit AppendModuleToggle(std::string& trace) : trace_(trace) {}
+
+    void operator()(const InstrumentModuleToggle& change) const {
+        trace_ += change.module_id + (change.enabled ? "=on;" : "=off;");
+    }
+
+private:
+    std::string& trace_;
+};
+
+class AppendFieldCommit final {
+public:
+    explicit AppendFieldCommit(std::string& trace) : trace_(trace) {}
+
+    void operator()(const InstrumentFieldChange& change) const {
+        trace_ += change.module_id + "." + change.field_id + "=" +
+            change.current_value + ";";
+    }
+
+private:
+    std::string& trace_;
+};
+
+class MoveRequestedModule final {
+public:
+    explicit MoveRequestedModule(InstrumentRack& rack) : rack_(rack) {}
+
+    void operator()(const InstrumentModuleMoveRequest& request) const {
+        std::vector<InstrumentModuleSpec> modules = rack_.modules();
+        InstrumentModuleSpec moving = modules[request.previous_index];
+        modules.erase(modules.begin() +
+                      static_cast<std::ptrdiff_t>(request.previous_index));
+        modules.insert(modules.begin() +
+                       static_cast<std::ptrdiff_t>(request.requested_index),
+                       std::move(moving));
+        rack_.set_modules(std::move(modules));
+    }
+
+private:
+    InstrumentRack& rack_;
+};
+
+class ModuleHasStableId final {
+public:
+    explicit ModuleHasStableId(std::string_view stable_id)
+        : stable_id_(stable_id) {}
+
+    bool operator()(const InstrumentModuleSpec& module) const {
+        return module.stable_id == stable_id_;
+    }
+
+private:
+    std::string_view stable_id_;
+};
+
+class RemoveRequestedModule final {
+public:
+    explicit RemoveRequestedModule(InstrumentRack& rack) : rack_(rack) {}
+
+    void operator()(const InstrumentModuleRequest& request) const {
+        std::vector<InstrumentModuleSpec> modules = rack_.modules();
+        std::erase_if(modules, ModuleHasStableId(request.module_id));
+        rack_.set_modules(std::move(modules));
+    }
+
+private:
+    InstrumentRack& rack_;
+};
+
 const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
                                   std::string_view id) {
     for (const SemanticNode& node : nodes) {
@@ -67,43 +138,43 @@ std::vector<InstrumentModuleSpec> default_modules() {
 }
 
 std::shared_ptr<InstrumentRack> make_rack() {
-    auto rack = make_control<InstrumentRack>(StableId("criteria.rack"));
-    rack->set_modules(default_modules());
-    auto actions = make_control<Panel>(StableId("criteria.actions"));
-    actions->set_accessible_name("Criteria actions");
-    auto add = make_control<Button>(StableId("criteria.add"), "+ module");
-    add->set_requested_bounds({4.0, 5.0, 92.0, 28.0});
-    auto apply = make_control<Button>(StableId("criteria.apply"), "Apply 1");
-    apply->set_default_button(true);
-    apply->set_visual_style(ButtonVisualStyle::accent);
-    apply->set_requested_bounds({100.0, 5.0, 70.0, 28.0});
-    actions->add_child(add);
-    actions->add_child(apply);
-    rack->set_action_content(actions, 170.0);
+    std::shared_ptr<gui_forms::InstrumentRack> rack = make_control<InstrumentRack>(StableId("criteria.rack"));
+    (*rack).set_modules(default_modules());
+    std::shared_ptr<gui_forms::Panel> actions = make_control<Panel>(StableId("criteria.actions"));
+    (*actions).set_accessible_name("Criteria actions");
+    std::shared_ptr<gui_forms::Button> add = make_control<Button>(StableId("criteria.add"), "+ module");
+    (*add).set_requested_bounds({4.0, 5.0, 92.0, 28.0});
+    std::shared_ptr<gui_forms::Button> apply = make_control<Button>(StableId("criteria.apply"), "Apply 1");
+    (*apply).set_default_button(true);
+    (*apply).set_visual_style(ButtonVisualStyle::accent);
+    (*apply).set_requested_bounds({100.0, 5.0, 70.0, 28.0});
+    (*actions).add_child(add);
+    (*actions).add_child(apply);
+    (*rack).set_action_content(actions, 170.0);
     return rack;
 }
 
 void test_real_fields_stable_reconciliation_and_semantics() {
-    auto rack = make_rack();
-    const Control::Ptr original_kind = rack->field_editor("criteria.kind", "property");
-    const Control::Ptr content_value = rack->field_editor("criteria.content", "value");
+    std::shared_ptr<InstrumentRack> rack = make_rack();
+    const Control::Ptr original_kind = (*rack).field_editor("criteria.kind", "property");
+    const Control::Ptr content_value = (*rack).field_editor("criteria.content", "value");
     require(std::dynamic_pointer_cast<ComboBox>(original_kind) != nullptr &&
                 std::dynamic_pointer_cast<TextBox>(content_value) != nullptr,
             "InstrumentRack must own genuine choice and text field controls");
     Window window(rack, {900.0, 110.0});
     window.perform_layout();
-    const auto kind_bounds = rack->module_bounds("criteria.kind");
-    const auto content_bounds = rack->module_bounds("criteria.content");
-    require(kind_bounds && content_bounds && kind_bounds->width == 210.0 &&
-                content_bounds->x == 430.0 &&
-                rack->content_height() == 66.0,
+    const std::optional<Rect> kind_bounds = (*rack).module_bounds("criteria.kind");
+    const std::optional<Rect> content_bounds = (*rack).module_bounds("criteria.content");
+    require(kind_bounds && content_bounds && (*kind_bounds).width == 210.0 &&
+                (*content_bounds).x == 430.0 &&
+                (*rack).content_height() == 66.0,
             "reference rack must keep three 210px modules and one flexible action instrument on one line");
 
-    auto replacement = default_modules();
+    std::vector<InstrumentModuleSpec> replacement = default_modules();
     replacement[1].status_text = "live · inexpensive · generation 87";
-    rack->set_modules(replacement);
+    (*rack).set_modules(replacement);
     window.perform_layout();
-    require(rack->field_editor("criteria.kind", "property") == original_kind,
+    require((*rack).field_editor("criteria.kind", "property") == original_kind,
             "stable module/field identities must retain editor instances across model replacement");
 
     const SemanticSnapshot semantics = window.semantic_snapshot();
@@ -112,136 +183,117 @@ void test_real_fields_stable_reconciliation_and_semantics() {
     const SemanticNode* state = find_semantic(semantics.roots,
                                                "criteria.content.state");
     const SemanticNode* apply = find_semantic(semantics.roots, "criteria.apply");
-    require(group && group->role == SemanticRole::group &&
-                group->value == "3 modules" && staged && state && apply &&
-                state->name == "Application state" &&
-                state->description.find("staged") != std::string::npos,
+    require(group && (*group).role == SemanticRole::group &&
+                (*group).value == "3 modules" && staged && state && apply &&
+                (*state).name == "Application state" &&
+                (*state).description.find("staged") != std::string::npos,
             "rack/module/status/action semantics must expose staged meaning without relying on color");
 }
 
 void test_field_toggle_validation_move_and_focus_safe_remove() {
-    auto rack = make_rack();
+    std::shared_ptr<InstrumentRack> rack = make_rack();
     Window window(rack, {900.0, 110.0});
     window.perform_layout();
     std::string trace;
-    auto toggled = rack->module_toggled().subscribe(
-        [&trace](const InstrumentModuleToggle& change) {
-            trace += change.module_id + (change.enabled ? "=on;" : "=off;");
-        });
-    auto committed = rack->field_committed().subscribe(
-        [&trace](const InstrumentFieldChange& change) {
-            trace += change.module_id + "." + change.field_id + "=" +
-                     change.current_value + ";";
-        });
+    SubscriptionToken toggled = (*rack).module_toggled().subscribe(
+        AppendModuleToggle(trace));
+    SubscriptionToken committed = (*rack).field_committed().subscribe(
+        AppendFieldCommit(trace));
     require(window.perform_semantic_action("criteria.kind.enable",
                                            SemanticAction::press) &&
                 trace == "criteria.kind=off;",
             "module enable semantics must emit one typed toggle transition");
 
-    const auto kind_value = std::dynamic_pointer_cast<ComboBox>(
-        rack->field_editor("criteria.kind", "value"));
-    kind_value->set_selected_index(1U);
+    const std::shared_ptr<gui_forms::ComboBox> kind_value = std::dynamic_pointer_cast<ComboBox>(
+        (*rack).field_editor("criteria.kind", "value"));
+    (*kind_value).set_selected_index(1U);
     require(trace.ends_with("criteria.kind.value=Documents;"),
             "choice fields must commit through the rack's typed field event");
 
-    const auto content_value = std::dynamic_pointer_cast<TextBox>(
-        rack->field_editor("criteria.content", "value"));
+    const std::shared_ptr<gui_forms::TextBox> content_value = std::dynamic_pointer_cast<TextBox>(
+        (*rack).field_editor("criteria.content", "value"));
     require(window.request_focus(content_value),
             "text criterion must accept keyboard focus");
-    content_value->set_text("");
+    (*content_value).set_text("");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                rack->modules()[2].state == InstrumentModuleState::invalid &&
-                rack->modules()[2].fields[2].validation_message ==
+                (*rack).modules()[2].state == InstrumentModuleState::invalid &&
+                (*rack).modules()[2].fields[2].validation_message ==
                     "Value is required",
             "required text commit must publish persistent non-color validation");
 
-    const Control::Ptr retained_kind = rack->field_editor("criteria.kind", "property");
+    const Control::Ptr retained_kind = (*rack).field_editor("criteria.kind", "property");
     require(window.perform_semantic_action("criteria.kind.enable",
                                            SemanticAction::press),
             "reorder setup must re-enable the live module");
-    auto moved = rack->move_requested().subscribe(
-        [&rack](const InstrumentModuleMoveRequest& request) {
-            auto modules = rack->modules();
-            InstrumentModuleSpec moving = modules[request.previous_index];
-            modules.erase(modules.begin() +
-                          static_cast<std::ptrdiff_t>(request.previous_index));
-            modules.insert(modules.begin() +
-                           static_cast<std::ptrdiff_t>(request.requested_index),
-                           std::move(moving));
-            rack->set_modules(std::move(modules));
-        });
+    SubscriptionToken moved = (*rack).move_requested().subscribe(
+        MoveRequestedModule(*rack));
     require(window.request_focus(retained_kind) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::right,
                                      Modifier::alt}) &&
-                rack->modules()[1].stable_id == "criteria.kind" &&
-                rack->field_editor("criteria.kind", "property") == retained_kind,
+                (*rack).modules()[1].stable_id == "criteria.kind" &&
+                (*rack).field_editor("criteria.kind", "property") == retained_kind,
             "Alt+Right must request a stable-identity reorder without recreating the editor");
 
-    auto removed = rack->remove_requested().subscribe(
-        [&rack](const InstrumentModuleRequest& request) {
-            auto modules = rack->modules();
-            std::erase_if(modules, [&](const InstrumentModuleSpec& module) {
-                return module.stable_id == request.module_id;
-            });
-            rack->set_modules(std::move(modules));
-        });
+    SubscriptionToken removed = (*rack).remove_requested().subscribe(
+        RemoveRequestedModule(*rack));
     const Control::Ptr remove_button = window.find("criteria.kind.remove");
     require(window.request_focus(remove_button) &&
                 window.perform_semantic_action("criteria.kind.remove",
                                                SemanticAction::press) &&
-                rack->modules().size() == 2U &&
+                (*rack).modules().size() == 2U &&
                 window.focused_control() &&
-                window.focused_control()->stable_id().value() ==
+                (*window.focused_control()).stable_id().value() ==
                     "criteria.content.enable",
             "removing the focused module must transfer focus to the next retained module");
 }
 
 void test_responsive_wrap_compact_stack_and_scroll() {
-    auto rack = make_rack();
+    std::shared_ptr<InstrumentRack> rack = make_rack();
     Window window(rack, {520.0, 150.0});
     window.perform_layout();
-    const auto first = rack->module_bounds("criteria.kind");
-    const auto third = rack->module_bounds("criteria.content");
-    require(first && third && third->y > first->y &&
-                rack->content_height() > 66.0,
+    const std::optional<Rect> first = (*rack).module_bounds("criteria.kind");
+    const std::optional<Rect> third = (*rack).module_bounds("criteria.content");
+    require(first && third && (*third).y > (*first).y &&
+                (*rack).content_height() > 66.0,
             "narrow rack must wrap retained modules by authored order");
 
     window.resize({170.0, 90.0});
     window.perform_layout();
-    const auto compact = rack->module_bounds("criteria.kind");
-    const auto property = rack->field_editor("criteria.kind", "property");
-    const auto value = rack->field_editor("criteria.kind", "value");
-    require(compact && compact->width == 170.0 &&
-                value->absolute_bounds().y > property->absolute_bounds().y &&
-                rack->content_height() > 300.0,
+    const std::optional<Rect> compact = (*rack).module_bounds("criteria.kind");
+    const Control::Ptr property =
+        (*rack).field_editor("criteria.kind", "property");
+    const Control::Ptr value = (*rack).field_editor("criteria.kind", "value");
+    require(compact && (*compact).width == 170.0 &&
+                (*value).absolute_bounds().y > (*property).absolute_bounds().y &&
+                (*rack).content_height() > 300.0,
             "severe width must stack fields inside each instrument instead of crushing three columns");
-    rack->set_scroll_offset(10000.0);
-    require(rack->scroll_offset() > 0.0 &&
-                rack->scroll_offset() <= rack->content_height() - 90.0,
+    (*rack).set_scroll_offset(10000.0);
+    require((*rack).scroll_offset() > 0.0 &&
+                (*rack).scroll_offset() <= (*rack).content_height() - 90.0,
             "the rack's one bounded scroll plane must keep wrapped modules reachable");
 
     window.set_text_scale(2.25);
     window.resize({520.0, 180.0});
     window.perform_layout();
-    require(rack->content_height() > 300.0,
+    require((*rack).content_height() > 300.0,
             "large text must remeasure and wrap modules instead of clipping field controls");
 }
 
 void test_model_validation() {
-    auto rack = make_control<InstrumentRack>(StableId("criteria.invalid"));
-    auto duplicate = default_modules();
+    std::shared_ptr<gui_forms::InstrumentRack> rack = make_control<InstrumentRack>(StableId("criteria.invalid"));
+    std::vector<InstrumentModuleSpec> duplicate = default_modules();
     duplicate[1].stable_id = duplicate[0].stable_id;
     bool duplicate_rejected{};
     bool empty_choice_rejected{};
     try {
-        rack->set_modules(duplicate);
+        (*rack).set_modules(duplicate);
     } catch (const std::invalid_argument&) {
         duplicate_rejected = true;
     }
-    auto empty_choice = default_modules();
+    std::vector<InstrumentModuleSpec> empty_choice = default_modules();
     empty_choice[0].fields[0].choices.clear();
     try {
-        rack->set_modules(empty_choice);
+        (*rack).set_modules(empty_choice);
     } catch (const std::invalid_argument&) {
         empty_choice_rejected = true;
     }

@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp"
 
 #include "../collection_control_utilities.hpp"
+#include "gui_forms/detail/algorithm/sort.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -14,6 +15,19 @@
 namespace gui_forms {
 
 using namespace collection_detail;
+
+struct CorrespondenceView::HoverIntentCallback final {
+    std::weak_ptr<CorrespondenceView> view;
+    std::string intended;
+
+    void operator()(FrameTime) const {
+        const std::shared_ptr<CorrespondenceView> retained = view.lock();
+        if (!retained) return;
+        (*retained).hover_timer_.disconnect();
+        (*retained).apply_hover_expansion(intended);
+    }
+};
+
 CorrespondenceView::CorrespondenceView(StableId stable_id)
     : Panel(std::move(stable_id)) {
     set_paint_plane(PaintPlane::control);
@@ -24,13 +38,10 @@ CorrespondenceView::CorrespondenceView(StableId stable_id)
 
 std::optional<std::size_t> CorrespondenceView::item_index(
     std::string_view id) const noexcept {
-    const std::vector<CorrespondenceItem>::const_iterator found =
-        std::find_if(items_.begin(), items_.end(),
-        [id](const CorrespondenceItem& item) { return item.stable_id == id; });
-    return found == items_.end() ? std::optional<std::size_t>{}
-                                : std::optional<std::size_t>{
-                                      static_cast<std::size_t>(
-                                          std::distance(items_.begin(), found))};
+    for (std::size_t index = 0U; index < items_.size(); ++index) {
+        if (items_[index].stable_id == id) return index;
+    }
+    return {};
 }
 
 void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
@@ -41,17 +52,26 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
         const std::string_view fields[]{item.secondary_text, item.metadata,
             item.excerpt, item.metric, item.information_heading,
             item.information_detail};
-        if (std::any_of(std::begin(fields), std::end(fields),
-                [](std::string_view value) { return !validate_utf8(value).valid(); }) ||
-            std::any_of(item.information_tags.begin(), item.information_tags.end(),
-                [](const std::string& value) {
-                    return value.empty() || !validate_utf8(value).valid();
-                }) ||
-            std::any_of(item.emphasis_terms.begin(), item.emphasis_terms.end(),
-                [](const std::string& value) {
-                    return value.empty() || !validate_utf8(value).valid();
-                }) ||
-            !identities.insert(item.stable_id).second) {
+        bool valid = true;
+        for (std::string_view value : fields) {
+            if (!validate_utf8(value).valid()) {
+                valid = false;
+                break;
+            }
+        }
+        for (const std::string& value : item.information_tags) {
+            if (value.empty() || !validate_utf8(value).valid()) {
+                valid = false;
+                break;
+            }
+        }
+        for (const std::string& value : item.emphasis_terms) {
+            if (value.empty() || !validate_utf8(value).valid()) {
+                valid = false;
+                break;
+            }
+        }
+        if (!valid || !identities.insert(item.stable_id).second) {
             throw std::invalid_argument(
                 "CorrespondenceView requires unique IDs and valid UTF-8 fields");
         }
@@ -63,12 +83,9 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
     const CorrespondencePinChange pin_change{
         pinned_id_, item_index(pinned_id_) ? pinned_id_ : std::string{}};
     items_ = std::move(items);
-    const auto retain = [this](std::string& id) {
-        if (!id.empty() && !item_index(id)) id.clear();
-    };
-    retain(selected_id_);
-    retain(focused_id_);
-    retain(pinned_id_);
+    retain_identity(selected_id_);
+    retain_identity(focused_id_);
+    retain_identity(pinned_id_);
     hovered_id_.clear();
     hover_expanded_id_.clear();
     pending_hover_id_.clear();
@@ -85,6 +102,10 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
         publish_change(pin_changed_, CorrespondencePinChange{
             pin_change.previous_id, pinned_id_});
     }
+}
+
+void CorrespondenceView::retain_identity(std::string& id) const {
+    if (!id.empty() && !item_index(id)) id.clear();
 }
 
 void CorrespondenceView::set_selected_id(std::string_view stable_id) {
@@ -223,18 +244,23 @@ void CorrespondenceView::set_font(FontSpec font) {
 std::vector<std::size_t> CorrespondenceView::expanded_indices() const {
     std::vector<std::size_t> indices;
     indices.reserve(3U);
-    const auto insert = [this, &indices](std::string_view id) {
-        if (const std::optional<std::size_t> index = item_index(id);
-            index && std::find(indices.begin(), indices.end(), *index) ==
-                         indices.end()) {
-            indices.push_back(*index);
-        }
-    };
-    insert(pinned_id_);
-    insert(hover_expanded_id_);
-    if (focused_) insert(focused_id_);
-    std::sort(indices.begin(), indices.end());
+    insert_expanded_index(indices, pinned_id_);
+    insert_expanded_index(indices, hover_expanded_id_);
+    if (focused_) insert_expanded_index(indices, focused_id_);
+    // The collection is structurally bounded to the pinned, hover, and focus
+    // roles. Stable insertion states that three-element contract directly and
+    // avoids general-sort setup; SORT_LAB_M4_RESULTS.csv retains the control.
+    detail::stable_insertion_sort(std::span<std::size_t>(indices));
     return indices;
+}
+
+void CorrespondenceView::insert_expanded_index(
+    std::vector<std::size_t>& indices, std::string_view id) const {
+    const std::optional<std::size_t> index = item_index(id);
+    if (index && std::find(indices.begin(), indices.end(), *index) ==
+                     indices.end()) {
+        indices.push_back(*index);
+    }
 }
 
 bool CorrespondenceView::expanded_index(std::size_t index) const noexcept {
@@ -261,9 +287,10 @@ double CorrespondenceView::row_top(std::size_t index) const noexcept {
     const double compact = scaled_compact_height();
     const double delta = scaled_expanded_height() - compact;
     const std::vector<std::size_t> expanded = expanded_indices();
-    const std::size_t before = static_cast<std::size_t>(std::count_if(
-        expanded.begin(), expanded.end(),
-        [index](std::size_t value) { return value < index; }));
+    std::size_t before = 0U;
+    for (std::size_t value : expanded) {
+        if (value < index) ++before;
+    }
     return static_cast<double>(index) * compact +
            static_cast<double>(before) * delta;
 }
@@ -426,12 +453,7 @@ void CorrespondenceView::schedule_hover_intent(std::size_t index) {
     hover_timer_ = (*window()).schedule_ui_timer(
         *this, std::chrono::hours(24),
         FrameClock::now() + hover_intent_delay_,
-        [weak, intended](FrameTime) {
-            if (const std::shared_ptr<gui_forms::CorrespondenceView> view = weak.lock()) {
-                (*view).hover_timer_.disconnect();
-                (*view).apply_hover_expansion(intended);
-            }
-        });
+        HoverIntentCallback{weak, intended});
 }
 
 void CorrespondenceView::apply_hover_expansion(std::string stable_id) {
@@ -790,6 +812,20 @@ SemanticDescriptor CorrespondenceView::semantic_descriptor() const {
     return descriptor;
 }
 
+void CorrespondenceView::add_semantic_text_child(
+    SemanticNode& node, std::string suffix,
+    std::string name, std::string value, SemanticRole role) {
+    SemanticNode child;
+    child.stable_id = node.stable_id + std::move(suffix);
+    child.runtime_id = virtual_runtime_id(child.stable_id);
+    child.role = role;
+    child.name = std::move(name);
+    child.value = std::move(value);
+    child.bounds = node.bounds;
+    child.states = SemanticState::visible;
+    node.children.push_back(std::move(child));
+}
+
 std::vector<SemanticNode>
 CorrespondenceView::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
@@ -842,31 +878,20 @@ CorrespondenceView::semantic_virtual_children() const {
         activate.actions = {SemanticAction::press};
         node.children.push_back(std::move(activate));
         if (is_expanded) {
-            const auto text_child = [&node](std::string suffix,
-                                            std::string name,
-                                            std::string value,
-                                            SemanticRole role =
-                                                SemanticRole::static_text) {
-                SemanticNode child;
-                child.stable_id = node.stable_id + std::move(suffix);
-                child.runtime_id = virtual_runtime_id(child.stable_id);
-                child.role = role;
-                child.name = std::move(name);
-                child.value = std::move(value);
-                child.bounds = node.bounds;
-                child.states = SemanticState::visible;
-                node.children.push_back(std::move(child));
-            };
-            text_child(".percentage", "Match evidence", item.metric);
-            text_child(".metadata", "Why matched", item.metadata);
-            text_child(".excerpt", "Matched excerpt", item.excerpt);
+            add_semantic_text_child(
+                node, ".percentage", "Match evidence", item.metric);
+            add_semantic_text_child(
+                node, ".metadata", "Why matched", item.metadata);
+            add_semantic_text_child(
+                node, ".excerpt", "Matched excerpt", item.excerpt);
             std::string information = item.information_detail;
             for (const std::string& tag : item.information_tags) {
                 if (!information.empty()) information += " · ";
                 information += tag;
             }
-            text_child(".plugins", item.information_heading,
-                       std::move(information), SemanticRole::group);
+            add_semantic_text_child(
+                node, ".plugins", item.information_heading,
+                std::move(information), SemanticRole::group);
         }
         nodes.push_back(std::move(node));
     }

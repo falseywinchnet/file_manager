@@ -21,6 +21,9 @@ class Control;
 class Binding;
 class BindingSource;
 struct BindingCompleteEvent;
+struct BindingListChange;
+struct ControlAvailabilityChange;
+struct PresentationSettings;
 class ToolTip;
 class Window;
 
@@ -138,6 +141,7 @@ protected:
 
 private:
     struct Entry;
+    struct TargetBoundsObserver;
     using EntryMap =
         std::unordered_map<std::uint64_t, std::unique_ptr<Entry>>;
     using BindingErrorMap = std::unordered_map<
@@ -154,6 +158,14 @@ private:
     void position_visual(Entry& entry);
     [[nodiscard]] Rect icon_bounds(const Entry& entry) const noexcept;
     void erase_if_empty(std::uint64_t runtime_id);
+    void control_availability_changed(const ControlAvailabilityChange&);
+    void presentation_settings_changed(const PresentationSettings&);
+    void root_bounds_changed(Rect);
+    void source_list_changed(const BindingListChange&);
+    void source_current_changed();
+    void source_disposed() noexcept;
+    static void append_unique_error(
+        std::vector<std::string>& values, std::string value);
     void clear_bound_errors() noexcept;
     void binding_completed(BindingCompleteEvent& event);
 

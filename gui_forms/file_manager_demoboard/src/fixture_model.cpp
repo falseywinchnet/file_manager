@@ -174,43 +174,47 @@ const FixtureCatalogue& FixtureCatalogue::instance() {
     return catalogue;
 }
 
+static bool replace_path_prefix(std::string& path,
+                         std::string_view prefix,
+                         std::string_view replacement) {
+    if (!path.starts_with(prefix)) return false;
+    path.replace(0, prefix.size(), replacement);
+    return true;
+}
+
+static void expand_path_prefix(std::string& path,
+                        std::string_view prefix,
+                        std::string_view replacement) {
+    if (path.starts_with(prefix)) path.replace(0, prefix.size(), replacement);
+}
+
 FixturePathResolution FixtureCatalogue::resolve_path(
     std::string_view input) const {
     std::string expanded(input);
-    const auto replace_prefix = [&expanded](std::string_view prefix,
-                                            std::string_view replacement) {
-        if (!expanded.starts_with(prefix)) return false;
-        expanded.replace(0, prefix.size(), replacement);
-        return true;
-    };
     if (expanded.starts_with("$UNKNOWN") || expanded.starts_with("${UNKNOWN}")) {
         return {false, expanded, {},
                 "Unknown variable $UNKNOWN · use ~, $HOME, or $PROJECTS"};
     }
-    static_cast<void>(replace_prefix("${PROJECTS}",
-                                      "/Users/quentin/Work/Projects"));
-    static_cast<void>(replace_prefix("$PROJECTS",
-                                      "/Users/quentin/Work/Projects"));
-    static_cast<void>(replace_prefix("${HOME}", "/Users/quentin"));
-    static_cast<void>(replace_prefix("$HOME", "/Users/quentin"));
-    static_cast<void>(replace_prefix("~", "/Users/quentin"));
+    static_cast<void>(replace_path_prefix(
+        expanded, "${PROJECTS}", "/Users/quentin/Work/Projects"));
+    static_cast<void>(replace_path_prefix(
+        expanded, "$PROJECTS", "/Users/quentin/Work/Projects"));
+    static_cast<void>(replace_path_prefix(expanded, "${HOME}", "/Users/quentin"));
+    static_cast<void>(replace_path_prefix(expanded, "$HOME", "/Users/quentin"));
+    static_cast<void>(replace_path_prefix(expanded, "~", "/Users/quentin"));
     while (expanded.size() > 1U && expanded.back() == '/') expanded.pop_back();
 
-    const auto match = [&expanded](const FixturePath& path) {
-        return path.path == expanded;
-    };
     if (current_path_stack_.path == expanded) {
         return {true, expanded, current_path_stack_.id,
                 "Resolved current fixture location"};
     }
-    if (const auto found = std::find_if(recent_paths_.begin(),
-                                        recent_paths_.end(), match);
-        found != recent_paths_.end()) {
-        return {true, expanded, found->id,
-                found->available ? "Resolved fixture location"
+    for (const FixturePath& path : recent_paths_) {
+        if (path.path != expanded) continue;
+        return {true, expanded, path.id,
+                path.available ? "Resolved fixture location"
                                  : "Resolved stored path · source volume offline"};
     }
-    for (const auto& completion : path_completions_) {
+    for (const FixturePathCompletion& completion : path_completions_) {
         std::string path = completion.path;
         while (path.size() > 1U && path.back() == '/') path.pop_back();
         if (path == expanded) {
@@ -228,18 +232,14 @@ std::vector<FixturePathCompletion> FixtureCatalogue::complete_path(
     std::string prefix = expanded.expanded_path;
     if (!expanded.valid) {
         prefix.assign(input);
-        const auto expand_prefix = [&prefix](std::string_view token,
-                                             std::string_view replacement) {
-            if (prefix.starts_with(token)) prefix.replace(0, token.size(), replacement);
-        };
-        expand_prefix("${PROJECTS}", "/Users/quentin/Work/Projects");
-        expand_prefix("$PROJECTS", "/Users/quentin/Work/Projects");
-        expand_prefix("${HOME}", "/Users/quentin");
-        expand_prefix("$HOME", "/Users/quentin");
-        expand_prefix("~", "/Users/quentin");
+        expand_path_prefix(prefix, "${PROJECTS}", "/Users/quentin/Work/Projects");
+        expand_path_prefix(prefix, "$PROJECTS", "/Users/quentin/Work/Projects");
+        expand_path_prefix(prefix, "${HOME}", "/Users/quentin");
+        expand_path_prefix(prefix, "$HOME", "/Users/quentin");
+        expand_path_prefix(prefix, "~", "/Users/quentin");
     }
     std::vector<FixturePathCompletion> matches;
-    for (const auto& completion : path_completions_) {
+    for (const FixturePathCompletion& completion : path_completions_) {
         if (completion.path.starts_with(prefix)) matches.push_back(completion);
     }
     return matches;

@@ -118,6 +118,11 @@ std::string utf8_string(id value) {
     return bytes == nullptr ? std::string{} : std::string(bytes);
 }
 
+std::uint32_t color_component_byte(CGFloat component) {
+    return static_cast<std::uint32_t>(
+        std::lround(std::clamp(component, 0.0, 1.0) * 255.0));
+}
+
 NSURL* native_directory_url(const std::string& path) {
     NSString* value = native_string(path);
     return value.length == 0 ? nil : [NSURL fileURLWithPath:value isDirectory:YES];
@@ -284,9 +289,9 @@ protected:
     }
 
     HostDialogResult show_dialog_impl(const HostDialogRequest& request) override {
-        return std::visit([this, &request](const auto& payload) -> HostDialogResult {
-            using Payload = std::decay_t<decltype(payload)>;
-            if constexpr (std::is_same_v<Payload, HostMessageDialogRequest>) {
+        if (const HostMessageDialogRequest* payload_pointer =
+                std::get_if<HostMessageDialogRequest>(&request.payload)) {
+                const HostMessageDialogRequest& payload = *payload_pointer;
                 NSAlert* alert = [[NSAlert alloc] init];
                 alert.messageText = native_string(payload.title);
                 alert.informativeText = native_string(payload.message);
@@ -372,7 +377,10 @@ protected:
                         : HostDialogOutcome::accepted;
                 }
                 return {{}, request.request_id, value};
-            } else if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
+        }
+        if (const HostOpenFileDialogRequest* payload_pointer =
+                std::get_if<HostOpenFileDialogRequest>(&request.payload)) {
+                const HostOpenFileDialogRequest& payload = *payload_pointer;
                 NSOpenPanel* panel = [NSOpenPanel openPanel];
                 panel.title = native_string(payload.title);
                 panel.directoryURL = native_directory_url(payload.initial_directory);
@@ -387,7 +395,10 @@ protected:
                 schedule_test_panel_cancel(panel, cancel_dialogs_for_testing_);
                 return {{}, request.request_id,
                         native_path_result([panel runModal], panel.URLs)};
-            } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
+        }
+        if (const HostSaveFileDialogRequest* payload_pointer =
+                std::get_if<HostSaveFileDialogRequest>(&request.payload)) {
+                const HostSaveFileDialogRequest& payload = *payload_pointer;
                 NSSavePanel* panel = [NSSavePanel savePanel];
                 panel.title = native_string(payload.title);
                 panel.directoryURL = native_directory_url(payload.initial_directory);
@@ -405,7 +416,10 @@ protected:
                 const NSModalResponse response = [panel runModal];
                 NSArray<NSURL*>* urls = panel.URL == nil ? @[] : @[panel.URL];
                 return {{}, request.request_id, native_path_result(response, urls)};
-            } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
+        }
+        if (const HostFolderDialogRequest* payload_pointer =
+                std::get_if<HostFolderDialogRequest>(&request.payload)) {
+                const HostFolderDialogRequest& payload = *payload_pointer;
                 NSOpenPanel* panel = [NSOpenPanel openPanel];
                 panel.title = native_string(payload.title);
                 panel.directoryURL = native_directory_url(payload.initial_directory);
@@ -415,7 +429,10 @@ protected:
                 schedule_test_panel_cancel(panel, cancel_dialogs_for_testing_);
                 return {{}, request.request_id,
                         native_path_result([panel runModal], panel.URLs)};
-            } else if constexpr (std::is_same_v<Payload, HostColorDialogRequest>) {
+        }
+        if (const HostColorDialogRequest* payload_pointer =
+                std::get_if<HostColorDialogRequest>(&request.payload)) {
+                const HostColorDialogRequest& payload = *payload_pointer;
                 NSAlert* alert = [[NSAlert alloc] init];
                 alert.messageText = native_string(payload.title);
                 NSColorWell* well = [[NSColorWell alloc]
@@ -434,21 +451,18 @@ protected:
                 HostColorDialogResult value;
                 if (response == NSAlertFirstButtonReturn) {
                     NSColor* color = [well.color colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
-                    const auto byte = [](CGFloat component) {
-                        return static_cast<std::uint32_t>(
-                            std::lround(std::clamp(component, 0.0, 1.0) * 255.0));
-                    };
                     value.outcome = HostDialogOutcome::accepted;
-                    value.rgba = (byte(color.redComponent) << 24U) |
-                                 (byte(color.greenComponent) << 16U) |
-                                 (byte(color.blueComponent) << 8U) |
-                                 byte(payload.allow_alpha ? color.alphaComponent : 1.0);
+                    value.rgba =
+                        (color_component_byte(color.redComponent) << 24U) |
+                        (color_component_byte(color.greenComponent) << 16U) |
+                        (color_component_byte(color.blueComponent) << 8U) |
+                        color_component_byte(
+                            payload.allow_alpha ? color.alphaComponent : 1.0);
                 }
                 return {{}, request.request_id, value};
-            }
-            return {{HostServiceError::unsupported}, request.request_id,
-                    HostMessageDialogResult{}};
-        }, request.payload);
+        }
+        return {{HostServiceError::unsupported}, request.request_id,
+                HostMessageDialogResult{}};
     }
 
     HostServiceStatus play_sound_cue_impl(

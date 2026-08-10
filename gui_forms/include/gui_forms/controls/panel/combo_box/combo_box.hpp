@@ -67,6 +67,17 @@ protected:
     void on_detached_from_window() noexcept override;
 
 private:
+    [[nodiscard]] BindingValue items_property_value() const;
+    void set_items_property(const BindingValue& value);
+    void reset_items_property();
+    [[nodiscard]] bool should_serialize_items_property() const noexcept;
+    [[nodiscard]] BindingValue selected_index_property_value() const;
+    void set_selected_index_property(const BindingValue& value);
+    [[nodiscard]] BindingValue text_property_value() const;
+    void set_text_property(const BindingValue& value);
+    void reset_text_property();
+    [[nodiscard]] bool should_serialize_text_property() const noexcept;
+    void popup_selection_changed(const ListSelectionChange& change);
     void open_drop_down();
     void close_drop_down();
     void commit_popup_selection(std::size_t index);

@@ -28,6 +28,49 @@ struct ToolTip::Entry final {
     SubscriptionToken bounds;
 };
 
+struct ToolTip::TargetPointerObserver final {
+    ToolTip* tool_tip{};
+    std::weak_ptr<Control> target;
+
+    void operator()(const PointerEvent& event) const {
+        const std::shared_ptr<Control> retained = target.lock();
+        if (retained) (*tool_tip).target_pointer(retained, event);
+    }
+};
+
+struct ToolTip::TargetFocusObserver final {
+    ToolTip* tool_tip{};
+    std::weak_ptr<Control> target;
+
+    void operator()(bool focused) const {
+        const std::shared_ptr<Control> retained = target.lock();
+        if (retained) (*tool_tip).target_focus(retained, focused);
+    }
+};
+
+struct ToolTip::TargetBoundsObserver final {
+    ToolTip* tool_tip{};
+    std::weak_ptr<Control> target;
+
+    void operator()(Rect) const {
+        const std::shared_ptr<Control> retained = target.lock();
+        if (retained) (*tool_tip).target_moved(retained);
+    }
+};
+
+struct ToolTip::PopupRevocationObserver final {
+    ToolTip* tool_tip{};
+    std::weak_ptr<detail::WindowLifetime> window_lifetime;
+
+    void operator()() const {
+        const std::shared_ptr<detail::WindowLifetime> lifetime =
+            window_lifetime.lock();
+        if (lifetime && (*lifetime).window != nullptr) {
+            (*tool_tip).popup_revoked();
+        }
+    }
+};
+
 class ToolTip::PopupHolder final {
 public:
     explicit PopupHolder(PopupToken value) : token(std::move(value)) {}
@@ -38,7 +81,8 @@ ToolTip::ToolTip(Window& window)
     : window_lifetime_(window.lifetime_), timer_(std::make_unique<Timer>(window)),
       provider_id_(next_provider_id.fetch_add(1U)) {
     window.verify_access("ToolTip construction");
-    timer_subscription_ = (*timer_).tick().subscribe(*this, [this] { timer_tick(); });
+    timer_subscription_ = (*timer_).tick().subscribe(
+        *this, Delegate<>::bind<ToolTip, &ToolTip::timer_tick>(*this));
 }
 
 ToolTip::~ToolTip() {
@@ -108,17 +152,11 @@ void ToolTip::set_tool_tip(const std::shared_ptr<Control>& target,
     (*entry).text = std::move(text);
     const std::weak_ptr<Control> weak_target = target;
     (*entry).pointer = (*target).pointer_observed().subscribe(
-        *this, [this, weak_target](const PointerEvent& event) {
-            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_pointer(control, event);
-        });
+        *this, TargetPointerObserver{this, weak_target});
     (*entry).focus = (*target).focus_observed().subscribe(
-        *this, [this, weak_target](bool focused) {
-            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_focus(control, focused);
-        });
+        *this, TargetFocusObserver{this, weak_target});
     (*entry).bounds = (*target).arranged_bounds_changed().subscribe(
-        *this, [this, weak_target](Rect) {
-            if (const std::shared_ptr<gui_forms::Control> control = weak_target.lock()) target_moved(control);
-        });
+        *this, TargetBoundsObserver{this, weak_target});
     entries_.emplace((*target).runtime_id().value, std::move(entry));
 }
 
@@ -308,11 +346,8 @@ void ToolTip::show_now(const std::shared_ptr<Control>& target,
     popup_ = std::make_unique<PopupHolder>(std::move(token));
     const std::weak_ptr<detail::WindowLifetime> weak_window = window_lifetime_;
     if (Event<>* closed = (*popup_).token.closed_event()) {
-        popup_subscription_ = (*closed).subscribe(*this, [this, weak_window] {
-            if (const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = weak_window.lock(); lifetime && (*lifetime).window) {
-                popup_revoked();
-            }
-        });
+        popup_subscription_ = (*closed).subscribe(
+            *this, PopupRevocationObserver{this, weak_window});
     }
     position_overlay();
     ToolTipEvent change{std::string((*target).stable_id().value()), (*entry).text,

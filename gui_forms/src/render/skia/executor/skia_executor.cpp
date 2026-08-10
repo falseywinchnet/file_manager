@@ -102,6 +102,16 @@ namespace {
         255U, (static_cast<unsigned>(channel) * 255U + alpha / 2U) / alpha));
 }
 
+void assign_raster_error(RasterError* output, RasterError value) noexcept {
+    if (output != nullptr) *output = value;
+}
+
+template <std::size_t Count>
+void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
+                      int extent, int x, int y, SkColor color) noexcept {
+    pixels[static_cast<std::size_t>(y * extent + x)] = color;
+}
+
 [[nodiscard]] std::vector<std::byte> remapped_pixels(
     const ImageSnapshot& image, const ImageAttributesSnapshot& attributes) {
     std::vector<std::byte> result(image.pixels().begin(), image.pixels().end());
@@ -118,10 +128,12 @@ namespace {
         const Color source = Color::from_argb(
             alpha, unpremultiply(red, alpha), unpremultiply(green, alpha),
             unpremultiply(blue, alpha));
-        const std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator
-            found = std::find_if(
-            attributes.remap_table.begin(), attributes.remap_table.end(),
-            [&](const auto& entry) { return entry.old_color.argb() == source.argb(); });
+        std::vector<ImageAttributesSnapshot::ColorRemap>::const_iterator found =
+            attributes.remap_table.begin();
+        while (found != attributes.remap_table.end() &&
+               (*found).old_color.argb() != source.argb()) {
+            ++found;
+        }
         if (found == attributes.remap_table.end()) continue;
         const Color replacement = (*found).new_color;
         const std::uint8_t out_alpha = replacement.alpha();
@@ -352,22 +364,32 @@ void configure_brush(SkPaint& paint, const BrushSnapshot& brush,
         constexpr int extent = 8;
         std::array<SkColor, extent * extent> pixels;
         pixels.fill(to_sk_color(brush.secondary));
-        const auto mark = [&](int x, int y) {
-            pixels[static_cast<std::size_t>(y * extent + x)] =
-                to_sk_color(brush.primary);
-        };
+        const SkColor hatch_color = to_sk_color(brush.primary);
         for (int coordinate = 0; coordinate < extent; ++coordinate) {
             switch (brush.hatch_style) {
-            case HatchStyle::horizontal: mark(coordinate, 3); break;
-            case HatchStyle::vertical: mark(3, coordinate); break;
+            case HatchStyle::horizontal:
+                mark_hatch_pixel(pixels, extent, coordinate, 3, hatch_color);
+                break;
+            case HatchStyle::vertical:
+                mark_hatch_pixel(pixels, extent, 3, coordinate, hatch_color);
+                break;
             case HatchStyle::forward_diagonal:
-                mark(coordinate, extent - 1 - coordinate); break;
-            case HatchStyle::backward_diagonal: mark(coordinate, coordinate); break;
+                mark_hatch_pixel(pixels, extent, coordinate,
+                                 extent - 1 - coordinate, hatch_color);
+                break;
+            case HatchStyle::backward_diagonal:
+                mark_hatch_pixel(pixels, extent, coordinate, coordinate,
+                                 hatch_color);
+                break;
             case HatchStyle::cross:
-                mark(coordinate, 3); mark(3, coordinate); break;
+                mark_hatch_pixel(pixels, extent, coordinate, 3, hatch_color);
+                mark_hatch_pixel(pixels, extent, 3, coordinate, hatch_color);
+                break;
             case HatchStyle::diagonal_cross:
-                mark(coordinate, coordinate);
-                mark(coordinate, extent - 1 - coordinate);
+                mark_hatch_pixel(pixels, extent, coordinate, coordinate,
+                                 hatch_color);
+                mark_hatch_pixel(pixels, extent, coordinate,
+                                 extent - 1 - coordinate, hatch_color);
                 break;
             }
         }
@@ -832,10 +854,10 @@ RasterResult SkiaExecutor::execute(const GraphicsRecorder& recorder,
 
 DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
                                       const PngCodecLimits& limits) {
-    if (!owner_thread()) return {.error = RasterError::wrong_thread};
-    if (encoded.empty()) return {.error = RasterError::decode_failed};
+    if (!owner_thread()) return DecodeResult::failure(RasterError::wrong_thread);
+    if (encoded.empty()) return DecodeResult::failure(RasterError::decode_failed);
     if (encoded.size() > limits.maximum_encoded_bytes) {
-        return {.error = RasterError::encoded_limit_exceeded};
+        return DecodeResult::failure(RasterError::encoded_limit_exceeded);
     }
     try {
         sk_sp<SkData> data = SkData::MakeWithCopy(encoded.data(), encoded.size());
@@ -843,7 +865,7 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
         std::unique_ptr<SkCodec> codec =
             SkPngDecoder::Decode(std::move(data), &codec_result);
         if (!codec || codec_result != SkCodec::kSuccess) {
-            return {.error = RasterError::decode_failed};
+            return DecodeResult::failure(RasterError::decode_failed);
         }
         const SkImageInfo source = (*codec).getInfo();
         if (source.width() <= 0 || source.height() <= 0 ||
@@ -851,7 +873,7 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
             static_cast<std::uint32_t>(source.height()) > limits.maximum_height ||
             static_cast<std::uint64_t>(source.width()) * source.height() >
                 limits.maximum_pixels) {
-            return {.error = RasterError::dimension_limit_exceeded};
+            return DecodeResult::failure(RasterError::dimension_limit_exceeded);
         }
         std::unique_ptr<gui_drawing::Bitmap> bitmap = std::make_unique<Bitmap>(
             static_cast<std::uint32_t>(source.width()),
@@ -863,7 +885,7 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
                                               lock.pixel_format);
         if ((*codec).getPixels(output, lock.writable_data, lock.row_bytes) !=
             SkCodec::kSuccess) {
-            return {.error = RasterError::decode_failed};
+            return DecodeResult::failure(RasterError::decode_failed);
         }
         // A few palette/tRNS PNGs are returned by SkCodec with straight RGB
         // channels even though the requested destination is tagged premultiplied.
@@ -897,21 +919,18 @@ DecodeResult SkiaExecutor::decode_png(std::span<const std::byte> encoded,
             }
         }
         unlock.release();
-        return {std::move(bitmap), RasterError::none};
+        return DecodeResult::success(std::move(bitmap));
     } catch (const std::length_error&) {
-        return {.error = RasterError::dimension_limit_exceeded};
+        return DecodeResult::failure(RasterError::dimension_limit_exceeded);
     } catch (...) {
-        return {.error = RasterError::internal_error};
+        return DecodeResult::failure(RasterError::internal_error);
     }
 }
 
 std::vector<std::byte> SkiaExecutor::encode_png(
     const Bitmap& bitmap, RasterError* error, const PngCodecLimits& limits) {
-    const auto set_error = [error](RasterError value) {
-        if (error != nullptr) *error = value;
-    };
     if (!owner_thread()) {
-        set_error(RasterError::wrong_thread);
+        assign_raster_error(error, RasterError::wrong_thread);
         return {};
     }
     try {
@@ -920,7 +939,7 @@ std::vector<std::byte> SkiaExecutor::encode_png(
             snapshot.height > limits.maximum_height ||
             static_cast<std::uint64_t>(snapshot.width) * snapshot.height >
                 limits.maximum_pixels) {
-            set_error(RasterError::dimension_limit_exceeded);
+            assign_raster_error(error, RasterError::dimension_limit_exceeded);
             return {};
         }
         const SkPixmap pixmap(image_info(snapshot.width, snapshot.height,
@@ -931,22 +950,22 @@ std::vector<std::byte> SkiaExecutor::encode_png(
         options.fZLibLevel = 6;
         sk_sp<SkData> encoded = SkPngEncoder::Encode(pixmap, options);
         if (!encoded || (*encoded).size() == 0U) {
-            set_error(RasterError::encode_failed);
+            assign_raster_error(error, RasterError::encode_failed);
             return {};
         }
         if ((*encoded).size() > limits.maximum_encoded_bytes) {
-            set_error(RasterError::encoded_limit_exceeded);
+            assign_raster_error(error, RasterError::encoded_limit_exceeded);
             return {};
         }
         std::vector<std::byte> result((*encoded).size());
         std::memcpy(result.data(), (*encoded).data(), (*encoded).size());
-        set_error(RasterError::none);
+        assign_raster_error(error, RasterError::none);
         return result;
     } catch (const std::logic_error&) {
-        set_error(RasterError::invalid_argument);
+        assign_raster_error(error, RasterError::invalid_argument);
         return {};
     } catch (...) {
-        set_error(RasterError::internal_error);
+        assign_raster_error(error, RasterError::internal_error);
         return {};
     }
 }

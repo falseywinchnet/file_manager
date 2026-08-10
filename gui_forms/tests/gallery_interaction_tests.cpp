@@ -56,8 +56,8 @@ public:
 
     [[nodiscard]] bool observed_role(std::string_view text,
                                      gui_forms::FontRole role) const {
-        for (const auto& [observed_text, observed_role] : text_roles) {
-            if (observed_text == text && observed_role == role) {
+        for (const std::pair<std::string, gui_forms::FontRole>& observed : text_roles) {
+            if (observed.first == text && observed.second == role) {
                 return true;
             }
         }
@@ -87,7 +87,7 @@ public:
 
 [[nodiscard]] gui_forms::Point center_of(const gui_forms::Control::Ptr& control)
 {
-    const gui_forms::Rect bounds = control->absolute_bounds();
+    const gui_forms::Rect bounds = (*control).absolute_bounds();
     return {bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
 }
 
@@ -97,12 +97,12 @@ void click(gui_forms::Window& window, std::string_view stable_id)
     expect(control != nullptr, "click target must resolve by stable ID");
     const gui_forms::Point point = center_of(control);
     const gui_forms::Control::Ptr hit = window.hit_test(point);
-    if (hit == nullptr || hit->stable_id().value() != stable_id) {
+    if (hit == nullptr || (*hit).stable_id().value() != stable_id) {
         std::cerr << "expected hit " << stable_id << ", got "
-                  << (hit == nullptr ? std::string_view("<none>") : hit->stable_id().value())
+                  << (hit == nullptr ? std::string_view("<none>") : (*hit).stable_id().value())
                   << '\n';
     }
-    expect(hit != nullptr && hit->stable_id().value() == stable_id,
+    expect(hit != nullptr && (*hit).stable_id().value() == stable_id,
            "click center must hit the retained target");
     expect(window.dispatch_pointer({gui_forms::PointerAction::down,
                                     gui_forms::PointerButton::primary,
@@ -162,54 +162,54 @@ int main()
     expect(gallery.state().slider_value == 42.0, "reset restores linked values");
 
     std::unique_ptr<gui_forms::Window> window = gui_forms::gallery::make_gallery();
-    expect(window->metrics_snapshot().control_count == gui_forms::gallery::dml::gallery_nodes.size(),
+    expect((*window).metrics_snapshot().control_count == gui_forms::gallery::dml::gallery_nodes.size(),
            "compiled DML population reaches the retained window");
-    expect(window->find("gallery.instrument") != nullptr,
+    expect((*window).find("gallery.instrument") != nullptr,
            "custom instrument resolves by stable ID");
-    expect(window->find("gallery.diagnostics") != nullptr,
+    expect((*window).find("gallery.diagnostics") != nullptr,
            "hidden diagnostics remain addressable by stable ID");
-    const auto lifecycle = std::dynamic_pointer_cast<gui_forms::UserControl>(
-        window->find("gallery.lifecycle-card"));
-    const auto lifecycle_status = std::dynamic_pointer_cast<gui_forms::Label>(
-        window->find("gallery.lifecycle-status"));
-    expect(lifecycle != nullptr && lifecycle->is_loaded() &&
-               lifecycle->attachment_count() == 1 && lifecycle_status != nullptr &&
-               lifecycle_status->text() == "Load 1 · attach 1 · init 1",
+    const std::shared_ptr<gui_forms::UserControl> lifecycle = std::dynamic_pointer_cast<gui_forms::UserControl>(
+        (*window).find("gallery.lifecycle-card"));
+    const std::shared_ptr<gui_forms::Label> lifecycle_status = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("gallery.lifecycle-status"));
+    expect(lifecycle != nullptr && (*lifecycle).is_loaded() &&
+               (*lifecycle).attachment_count() == 1 && lifecycle_status != nullptr &&
+               (*lifecycle_status).text() == "Load 1 · attach 1 · init 1",
            "Gallery visibly consumes composed UserControl load and initialization lifecycle");
-    expect(window->metrics_snapshot().active_surface_count == 1 &&
-               window->next_wake().has_value(),
+    expect((*window).metrics_snapshot().active_surface_count == 1 &&
+               (*window).next_wake().has_value(),
            "custom instrument declares exactly one scheduled active surface");
-    const gui_forms::ImageRegistrySnapshot images = window->image_resource_snapshot();
+    const gui_forms::ImageRegistrySnapshot images = (*window).image_resource_snapshot();
     expect(images.resource_count == 1 && images.encoded_bytes == 146 &&
                images.decoded_bytes == 16U * 16U * 4U,
            "Gallery status badge is owned and bounded by the core PNG registry");
-    expect(!window->find("gallery.diagnostics")->visible(),
+    expect(!(*(*window).find("gallery.diagnostics")).visible(),
            "diagnostics begin hidden");
     for (const gui_forms::gallery::dml::NodeSpec& node :
          gui_forms::gallery::dml::gallery_nodes) {
-        const gui_forms::Control::Ptr control = window->find(node.id);
-        if (control == nullptr || !control->effectively_visible()) {
+        const gui_forms::Control::Ptr control = (*window).find(node.id);
+        if (control == nullptr || !(*control).effectively_visible()) {
             continue;
         }
-        const gui_forms::Control::Ptr parent = control->parent();
+        const gui_forms::Control::Ptr parent = (*control).parent();
         if (parent != nullptr) {
-            if (!contains(parent->absolute_bounds(), control->absolute_bounds())) {
-                const gui_forms::Rect parent_bounds = parent->absolute_bounds();
-                const gui_forms::Rect child_bounds = control->absolute_bounds();
-                std::cerr << "containment parent=" << parent->stable_id().value()
-                          << " child=" << control->stable_id().value()
+            if (!contains((*parent).absolute_bounds(), (*control).absolute_bounds())) {
+                const gui_forms::Rect parent_bounds = (*parent).absolute_bounds();
+                const gui_forms::Rect child_bounds = (*control).absolute_bounds();
+                std::cerr << "containment parent=" << (*parent).stable_id().value()
+                          << " child=" << (*control).stable_id().value()
                           << " parent_bounds=" << parent_bounds.x << ',' << parent_bounds.y
                           << ',' << parent_bounds.width << ',' << parent_bounds.height
                           << " child_bounds=" << child_bounds.x << ',' << child_bounds.y
                           << ',' << child_bounds.width << ',' << child_bounds.height << '\n';
             }
-            expect(contains(parent->absolute_bounds(), control->absolute_bounds()),
+            expect(contains((*parent).absolute_bounds(), (*control).absolute_bounds()),
                    "every visible Gallery child must remain inside its parent edge");
         }
     }
 
     CountingPainter painter;
-    window->paint(painter, {0.0, 0.0, 900.0, 660.0});
+    (*window).paint(painter, {0.0, 0.0, 900.0, 660.0});
     expect(painter.saves == painter.restores, "painter state is balanced");
     expect(painter.fills > 10 && painter.lines > 10 && painter.texts > 10,
            "gallery paints classic surfaces, relief, and labels");
@@ -224,19 +224,19 @@ int main()
     expect(painter.observed_role("Edit this text", gui_forms::FontRole::content) &&
                painter.observed_role("Alpha channel", gui_forms::FontRole::content),
            "editable and collection field text must use the content typography role");
-    window->reset_activity_metrics();
+    (*window).reset_activity_metrics();
 
-    const auto checkbox = std::dynamic_pointer_cast<gui_forms::CheckBox>(
-        window->find("gallery.checkbox"));
-    expect(checkbox != nullptr && checkbox->checked(), "retained checkbox begins checked");
-    const std::uint64_t activations_before_checkbox = window->metrics_snapshot().activations;
+    const std::shared_ptr<gui_forms::CheckBox> checkbox = std::dynamic_pointer_cast<gui_forms::CheckBox>(
+        (*window).find("gallery.checkbox"));
+    expect(checkbox != nullptr && (*checkbox).checked(), "retained checkbox begins checked");
+    const std::uint64_t activations_before_checkbox = (*window).metrics_snapshot().activations;
     click(*window, "gallery.checkbox");
-    expect(!checkbox->checked(), "window dispatch toggles checkbox state");
-    expect(window->metrics_snapshot().activations == activations_before_checkbox + 1U,
+    expect(!(*checkbox).checked(), "window dispatch toggles checkbox state");
+    expect((*window).metrics_snapshot().activations == activations_before_checkbox + 1U,
            "matching press and release produces exactly one activation");
     CountingPainter partial_painter;
-    window->paint(partial_painter);
-    const gui_forms::MetricsSnapshot partial_metrics = window->metrics_snapshot();
+    (*window).paint(partial_painter);
+    const gui_forms::MetricsSnapshot partial_metrics = (*window).metrics_snapshot();
     expect(partial_metrics.partial_paints > 0U,
            "localized checkbox mutation produces a partial paint");
     expect(partial_metrics.display_chunks_rebuilt > 0U &&
@@ -250,55 +250,56 @@ int main()
                partial_metrics.paint_invalidations_consumed < partial_metrics.control_count,
            "localized checkbox mutation consumes fewer paint invalidations than the tree size");
 
-    const auto disabled = window->find("gallery.disabled-button");
-    const std::uint64_t activations_before_disabled = window->metrics_snapshot().activations;
+    const gui_forms::Control::Ptr disabled =
+        (*window).find("gallery.disabled-button");
+    const std::uint64_t activations_before_disabled = (*window).metrics_snapshot().activations;
     const gui_forms::Point disabled_point = center_of(disabled);
-    (void)window->dispatch_pointer({gui_forms::PointerAction::down,
+    (void)(*window).dispatch_pointer({gui_forms::PointerAction::down,
                                     gui_forms::PointerButton::primary,
                                     disabled_point});
-    (void)window->dispatch_pointer({gui_forms::PointerAction::up,
+    (void)(*window).dispatch_pointer({gui_forms::PointerAction::up,
                                     gui_forms::PointerButton::primary,
                                     disabled_point});
-    expect(window->focused_control() != disabled, "disabled control cannot receive focus");
-    expect(window->metrics_snapshot().activations == activations_before_disabled,
+    expect((*window).focused_control() != disabled, "disabled control cannot receive focus");
+    expect((*window).metrics_snapshot().activations == activations_before_disabled,
            "disabled control cannot activate");
 
     click(*window, "gallery.text-input");
-    expect(window->dispatch_text({" retained", false, -1, 0, false}),
+    expect((*window).dispatch_text({" retained", false, -1, 0, false}),
            "focused text input accepts committed UTF-8 text");
-    const auto text_input = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
-        window->find("gallery.text-input"));
-    expect(text_input->display_text() == "Edit this text retained",
+    const std::shared_ptr<gui_forms::gallery::GalleryControl> text_input = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
+        (*window).find("gallery.text-input"));
+    expect((*text_input).display_text() == "Edit this text retained",
            "text edit survives event dispatch in application state");
 
-    const auto slider = std::dynamic_pointer_cast<gui_forms::TrackBar>(
-        window->find("gallery.slider"));
-    const auto progress = std::dynamic_pointer_cast<gui_forms::ProgressBar>(
-        window->find("gallery.progress"));
-    const auto instrument = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
-        window->find("gallery.instrument"));
-    const gui_forms::Rect slider_bounds = slider->absolute_bounds();
+    const std::shared_ptr<gui_forms::TrackBar> slider = std::dynamic_pointer_cast<gui_forms::TrackBar>(
+        (*window).find("gallery.slider"));
+    const std::shared_ptr<gui_forms::ProgressBar> progress = std::dynamic_pointer_cast<gui_forms::ProgressBar>(
+        (*window).find("gallery.progress"));
+    const std::shared_ptr<gui_forms::gallery::GalleryControl> instrument = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
+        (*window).find("gallery.instrument"));
+    const gui_forms::Rect slider_bounds = (*slider).absolute_bounds();
     const gui_forms::Point near_end {slider_bounds.x + slider_bounds.width - 11.0,
                                      slider_bounds.y + slider_bounds.height * 0.5};
-    expect(window->dispatch_pointer({gui_forms::PointerAction::down,
+    expect((*window).dispatch_pointer({gui_forms::PointerAction::down,
                                      gui_forms::PointerButton::primary,
                                      near_end}),
            "slider handles pointer down");
-    expect(window->dispatch_pointer({gui_forms::PointerAction::up,
+    expect((*window).dispatch_pointer({gui_forms::PointerAction::up,
                                      gui_forms::PointerButton::primary,
                                      near_end}),
            "slider handles pointer up");
-    expect(slider->value() > 98.0, "slider maps pointer position to bounded value");
-    expect(progress->value() == slider->value(), "progress remains bound to slider");
-    expect(instrument->value() == slider->value() / 100.0,
+    expect((*slider).value() > 98.0, "slider maps pointer position to bounded value");
+    expect((*progress).value() == (*slider).value(), "progress remains bound to slider");
+    expect((*instrument).value() == (*slider).value() / 100.0,
            "custom instrument remains bound to slider");
 
     click(*window, "gallery.collection.gamma");
-    const auto gamma = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
-        window->find("gallery.collection.gamma"));
-    const auto alpha = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
-        window->find("gallery.collection.alpha"));
-    expect(gamma->selected() && !alpha->selected(),
+    const std::shared_ptr<gui_forms::gallery::GalleryControl> gamma = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
+        (*window).find("gallery.collection.gamma"));
+    const std::shared_ptr<gui_forms::gallery::GalleryControl> alpha = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
+        (*window).find("gallery.collection.alpha"));
+    expect((*gamma).selected() && !(*alpha).selected(),
            "retained list row selection is exclusive");
 
     gui_forms::DragEvent drag;
@@ -307,30 +308,32 @@ int main()
     drag.position = center_of(gamma);
     drag.allowed_effects = gui_forms::DragEffect::copy;
     drag.items = {gui_forms::DragFileListData{{"/captures/live.iq"}}};
-    expect(window->dispatch_drag(drag).accepted_effect == gui_forms::DragEffect::copy,
+    expect((*window).dispatch_drag(drag).accepted_effect == gui_forms::DragEffect::copy,
            "Gallery collection advertises a retained copy drop target");
     drag.action = gui_forms::DragAction::drop;
-    expect(window->dispatch_drag(std::move(drag)).handled,
+    expect((*window).dispatch_drag(std::move(drag)).handled,
            "Gallery collection handles a typed file drop");
-    const auto status = std::dynamic_pointer_cast<gui_forms::Label>(
-        window->find("gallery.command.status"));
-    expect(status->text() == "Drop received · 1 file · 0 text · 0 data",
+    const std::shared_ptr<gui_forms::Label> status = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("gallery.command.status"));
+    expect((*status).text() == "Drop received · 1 file · 0 text · 0 data",
            "Gallery exposes the accepted typed drop without platform payloads");
 
     click(*window, "gallery.command.diagnostics");
-    expect(window->find("gallery.diagnostics")->visible(),
+    expect((*(*window).find("gallery.diagnostics")).visible(),
            "diagnostics command reveals structured metrics panel");
-    const auto diagnostic = std::dynamic_pointer_cast<gui_forms::Label>(
-        window->find("gallery.diagnostics.input"));
-    expect(diagnostic->text().find("input ") == 0,
+    const std::shared_ptr<gui_forms::Label> diagnostic = std::dynamic_pointer_cast<gui_forms::Label>(
+        (*window).find("gallery.diagnostics.input"));
+    expect((*diagnostic).text().find("input ") == 0,
            "on-screen diagnostics consume the core MetricsSnapshot");
 
-    auto clip_root = gui_forms::make_control<OverflowPaintProbe>(
+    std::shared_ptr<OverflowPaintProbe> clip_root =
+        gui_forms::make_control<OverflowPaintProbe>(
         gui_forms::StableId("clip.root"));
-    auto clip_child = gui_forms::make_control<OverflowPaintProbe>(
+    std::shared_ptr<OverflowPaintProbe> clip_child =
+        gui_forms::make_control<OverflowPaintProbe>(
         gui_forms::StableId("clip.child"));
-    clip_child->set_requested_bounds({40.0, 40.0, 30.0, 30.0});
-    clip_root->add_child(clip_child);
+    (*clip_child).set_requested_bounds({40.0, 40.0, 30.0, 30.0});
+    (*clip_root).add_child(clip_child);
     gui_forms::Window clip_window(clip_root, {50.0, 50.0});
     clip_window.perform_layout();
     CountingPainter clip_painter;

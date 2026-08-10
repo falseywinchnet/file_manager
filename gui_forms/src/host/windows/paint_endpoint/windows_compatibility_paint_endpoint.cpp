@@ -41,8 +41,9 @@ CompatibilityPaintMetrics compatibility_paint_metrics;
 void record_compatibility_copy_duration(std::uint64_t duration) noexcept {
     compatibility_paint_metrics.copy_duration_nanoseconds.fetch_add(
         duration, std::memory_order_relaxed);
-    auto worst = compatibility_paint_metrics.worst_copy_duration_nanoseconds.load(
-        std::memory_order_relaxed);
+    std::uint64_t worst =
+        compatibility_paint_metrics.worst_copy_duration_nanoseconds.load(
+            std::memory_order_relaxed);
     while (duration > worst &&
            !compatibility_paint_metrics.worst_copy_duration_nanoseconds.
                compare_exchange_weak(worst, duration,
@@ -117,7 +118,8 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         compatibility_handle = allocate_compatibility_handle();
         if (compatibility_handle == 0U) return false;
         try {
-            publisher_thread = std::thread([this] { publisher_loop(); });
+            publisher_thread =
+                std::thread(&Implementation::publisher_loop, this);
         } catch (...) {
             return false;
         }
@@ -178,9 +180,10 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
 
     bool publish_locked() noexcept {
         if (released || pixels == nullptr || !surface) return false;
-        const auto started = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::time_point started =
+            std::chrono::steady_clock::now();
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = (*surface).try_acquire_write(false);
+        LiveSurfaceWriteLease lease = (*surface).try_acquire_write(false);
         if (!lease) return false;
         std::span<std::byte> destination = lease.pixels();
         if (destination.size() !=
@@ -237,7 +240,8 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
             pending.pixels[index] = std::byte{0xff};
         }
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = (*pending.target).try_acquire_write(false);
+        LiveSurfaceWriteLease lease =
+            (*pending.target).try_acquire_write(false);
         if (!lease || lease.width() != pending.width ||
             lease.height() != pending.height ||
             lease.pixels().size() != pending.pixels.size()) {
@@ -269,13 +273,14 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         std::unique_lock lock(state_mutex);
         PendingFrame pending;
         for (;;) {
-            publish_wake.wait(lock, [this] {
-                return publisher_stop || publish_requested;
-            });
+            while (!publisher_stop && !publish_requested) {
+                publish_wake.wait(lock);
+            }
             if (publisher_stop) return;
 
             publish_requested = false;
-            const auto started = std::chrono::steady_clock::now();
+            const std::chrono::steady_clock::time_point started =
+                std::chrono::steady_clock::now();
             const bool captured = capture_pending_locked(pending);
 
             // The endpoint DIB is the producer-owned mutable object. Only its
@@ -363,7 +368,7 @@ struct WindowsCompatibilityPaintEndpoint::Implementation final {
         if (released || pixels == nullptr || submitted_width != width ||
             submitted_height != height) return false;
         std::scoped_lock publish_lock(surface_publish_mutex);
-        auto lease = (*surface).try_acquire_write(false);
+        LiveSurfaceWriteLease lease = (*surface).try_acquire_write(false);
         if (!lease) return false;
         const std::size_t packed_row = static_cast<std::size_t>(width) * 4U;
         for (std::uint32_t row = 0; row < height; ++row) {
@@ -481,7 +486,8 @@ WindowsCompatibilityPaintEndpoint::~WindowsCompatibilityPaintEndpoint() {
 std::shared_ptr<WindowsCompatibilityPaintEndpoint>
 WindowsCompatibilityPaintEndpoint::acquire(
     std::uint32_t width, std::uint32_t height) {
-    auto implementation = std::make_unique<Implementation>();
+    std::unique_ptr<Implementation> implementation =
+        std::make_unique<Implementation>();
     if (!(*implementation).create(width, height)) return {};
     return std::shared_ptr<WindowsCompatibilityPaintEndpoint>(
         new WindowsCompatibilityPaintEndpoint(std::move(implementation)));
@@ -582,4 +588,3 @@ void WindowsCompatibilityPaintEndpoint::release() noexcept {
 
 
 } // namespace gui_forms::host
-

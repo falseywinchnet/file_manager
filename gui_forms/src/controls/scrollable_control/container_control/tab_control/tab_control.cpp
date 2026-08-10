@@ -86,20 +86,23 @@ void TabControl::add_page(std::shared_ptr<TabPage> page) {
 std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
     require_mutable();
     const std::vector<std::shared_ptr<TabPage>> live_before = pages();
-    const std::vector<std::shared_ptr<TabPage>>::const_iterator found =
-        std::find_if(
-        live_before.begin(), live_before.end(),
-        [&page](const auto& candidate) { return candidate.get() == &page; });
-    if (found == live_before.end()) return {};
-    const std::size_t removed_index =
-        static_cast<std::size_t>(found - live_before.begin());
+    std::size_t removed_index = 0U;
+    while (removed_index < live_before.size() &&
+           live_before[removed_index].get() != &page) {
+        ++removed_index;
+    }
+    if (removed_index == live_before.size()) return {};
     const std::optional<std::size_t> old_selected = selected_index();
     const bool removing_selected = selected_page_.lock().get() == &page;
-    pages_.erase(std::remove_if(
-        pages_.begin(), pages_.end(), [&page](const std::weak_ptr<TabPage>& weak) {
-            const std::shared_ptr<gui_forms::TabPage> candidate = weak.lock();
-            return !candidate || candidate.get() == &page;
-        }), pages_.end());
+    std::vector<std::weak_ptr<TabPage>>::iterator candidate = pages_.begin();
+    while (candidate != pages_.end()) {
+        const std::shared_ptr<TabPage> retained = (*candidate).lock();
+        if (!retained || retained.get() == &page) {
+            candidate = pages_.erase(candidate);
+        } else {
+            ++candidate;
+        }
+    }
     const Control::Ptr removed = remove_child(page.runtime_id());
     if (!removed) return {};
 
@@ -274,11 +277,15 @@ Size TabControl::measure(Size available) {
 }
 
 void TabControl::reconcile_pages() {
-    pages_.erase(std::remove_if(
-        pages_.begin(), pages_.end(), [this](const std::weak_ptr<TabPage>& weak) {
-            const std::shared_ptr<gui_forms::TabPage> page = weak.lock();
-            return !page || !(*page).is_alive() || (*page).parent().get() != this;
-        }), pages_.end());
+    std::vector<std::weak_ptr<TabPage>>::iterator candidate = pages_.begin();
+    while (candidate != pages_.end()) {
+        const std::shared_ptr<TabPage> page = (*candidate).lock();
+        if (!page || !(*page).is_alive() || (*page).parent().get() != this) {
+            candidate = pages_.erase(candidate);
+        } else {
+            ++candidate;
+        }
+    }
     std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
     if (selected && (*selected).is_alive() && (*selected).parent().get() == this) return;
     selected_page_.reset();

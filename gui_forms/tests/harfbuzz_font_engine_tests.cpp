@@ -36,13 +36,20 @@ bool near(double left, double right, double tolerance) {
     return std::abs(left - right) <= tolerance;
 }
 
+bool shaped_text_uses_face(const ShapedText& shaped, FontFaceId id) {
+    for (const ShapedFontRun& run : shaped.runs) {
+        if (run.face == id) return true;
+    }
+    return false;
+}
+
 void test_owned_registration_style_selection_and_ligatures() {
     HarfBuzzFontEngine engine;
     std::vector<std::byte> regular = read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
     std::vector<std::byte> bold = read_file(GUI_FORMS_TEST_CARLITO_BOLD);
-    const auto regular_id = engine.register_typeface(
+    const std::optional<FontFaceId> regular_id = engine.register_typeface(
         FontRole::content, 400, false, regular);
-    const auto bold_id = engine.register_typeface(
+    const std::optional<FontFaceId> bold_id = engine.register_typeface(
         FontRole::content, 700, false, bold);
     require(regular_id && bold_id && *regular_id != *bold_id &&
                 engine.face_count() == 2U,
@@ -68,9 +75,9 @@ void test_cluster_fallback_is_bounded_and_absolute() {
         read_file(GUI_FORMS_TEST_RAPIDS_REGULAR);
     const std::vector<std::byte> carlito =
         read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
-    const auto primary = engine.register_typeface(
+    const std::optional<FontFaceId> primary = engine.register_typeface(
         FontRole::control, 400, false, rapids);
-    const auto fallback = engine.register_typeface(
+    const std::optional<FontFaceId> fallback = engine.register_typeface(
         FontRole::control, 400, false, carlito);
     require(primary && fallback, "fallback fixture faces must register");
 
@@ -103,11 +110,11 @@ void test_control_navigation_symbols_stay_in_rapids() {
     const std::vector<std::byte> carlito = read_file(
         GUI_FORMS_TEST_CARLITO_REGULAR);
     HarfBuzzFontEngine engine;
-    const auto regular = engine.register_typeface(
+    const std::optional<FontFaceId> regular = engine.register_typeface(
         FontRole::control, 400, false, rapids_regular);
-    const auto bold = engine.register_typeface(
+    const std::optional<FontFaceId> bold = engine.register_typeface(
         FontRole::control, 700, false, rapids_bold);
-    const auto body = engine.register_typeface(
+    const std::optional<FontFaceId> body = engine.register_typeface(
         FontRole::content, 400, false, carlito);
     require(regular && bold && body,
             "house control/body faces must register for navigation shaping");
@@ -162,9 +169,9 @@ void test_shared_cjk_and_emoji_fallback_across_roles() {
                 engine.register_typeface(FontRole::content, 400, false, carlito) &&
                 engine.register_typeface(FontRole::monospace, 400, false, cousine),
             "each public font role must have an explicit primary face");
-    const auto cjk = engine.register_fallback_typeface(
+    const std::optional<FontFaceId> cjk = engine.register_fallback_typeface(
         400, false, noto_cjk);
-    const auto emoji = engine.register_fallback_typeface(
+    const std::optional<FontFaceId> emoji = engine.register_fallback_typeface(
         400, false, noto_emoji);
     require(cjk && emoji && engine.face_count() == 5U,
             "shared fallback faces must register once rather than once per role");
@@ -174,19 +181,18 @@ void test_shared_cjk_and_emoji_fallback_across_roles() {
         const std::string sample = "A日本語🚀Z";
         const ShapedText shaped = engine.shape(
             sample, {role, 15.0, 400, false});
-        const auto uses = [&shaped](FontFaceId id) {
-            return std::any_of(shaped.runs.begin(), shaped.runs.end(),
-                [id](const ShapedFontRun& run) { return run.face == id; });
-        };
         const bool complete = !shaped.missing_primary_face &&
-            shaped.missing_clusters == 0U && uses(*cjk) && uses(*emoji) &&
+            shaped.missing_clusters == 0U &&
+            shaped_text_uses_face(shaped, *cjk) &&
+            shaped_text_uses_face(shaped, *emoji) &&
             shaped.width > 0.0;
         if (!complete) {
             std::cerr << "fallback diagnostic role=" << static_cast<int>(role)
                       << " missing=" << shaped.missing_clusters
                       << " runs=" << shaped.runs.size()
-                      << " cjk=" << uses(*cjk)
-                      << " emoji=" << uses(*emoji) << " faces=";
+                      << " cjk=" << shaped_text_uses_face(shaped, *cjk)
+                      << " emoji=" << shaped_text_uses_face(shaped, *emoji)
+                      << " faces=";
             for (const ShapedFontRun& run : shaped.runs) {
                 std::cerr << run.face.value << ',';
             }

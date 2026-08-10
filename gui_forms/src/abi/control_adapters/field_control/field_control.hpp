@@ -5,6 +5,14 @@
 
 namespace gui_forms::abi::detail {
 
+[[nodiscard]] inline std::uint8_t field_disabled_channel(
+    std::uint8_t foreground_channel,
+    std::uint8_t background_channel) noexcept {
+    return static_cast<std::uint8_t>(
+        (static_cast<unsigned>(foreground_channel) * 45U +
+         static_cast<unsigned>(background_channel) * 55U) / 100U);
+}
+
 // ABI-facing fields retain the platform-neutral text editor state. The managed
 // compatibility facade projects WinForms properties and events, while this
 // object owns Unicode mutation, directional selection, history, glyph geometry,
@@ -40,17 +48,11 @@ public:
 
     void set_colors(gui_forms::Color foreground, gui_forms::Color background) {
         require_mutable();
-        const auto disabled_channel = [](std::uint8_t foreground_channel,
-                                         std::uint8_t background_channel) {
-            return static_cast<std::uint8_t>(
-                (static_cast<unsigned>(foreground_channel) * 45U +
-                 static_cast<unsigned>(background_channel) * 55U) / 100U);
-        };
         style_.text = foreground;
         style_.disabled_text = gui_forms::Color::rgba(
-            disabled_channel(foreground.red, background.red),
-            disabled_channel(foreground.green, background.green),
-            disabled_channel(foreground.blue, background.blue),
+            field_disabled_channel(foreground.red, background.red),
+            field_disabled_channel(foreground.green, background.green),
+            field_disabled_channel(foreground.blue, background.blue),
             foreground.alpha);
         set_background(background);
         invalidate(gui_forms::Dirty::paint | gui_forms::Dirty::semantics);
@@ -221,11 +223,6 @@ public:
                 std::string_view(text_).substr(0, static_cast<std::size_t>(offset)),
                 font).width);
         }
-        const auto boundary_x = [&](std::uint64_t offset) {
-            const std::size_t index = text_store_.grapheme_index(
-                gui_forms::Utf8Offset(offset)).value();
-            return layout_positions_[std::min(index, layout_positions_.size() - 1U)];
-        };
         const double viewport_width = std::max(0.0, text_right - text_left_);
         const double caret_content_x = boundary_x(caret_);
         if (caret_content_x < horizontal_offset_) {
@@ -371,6 +368,13 @@ private:
         std::uint64_t anchor{};
         std::uint64_t caret{};
     };
+
+    [[nodiscard]] double boundary_x(std::uint64_t offset) const noexcept {
+        const std::size_t index = text_store_.grapheme_index(
+            gui_forms::Utf8Offset(offset)).value();
+        return layout_positions_[
+            std::min(index, layout_positions_.size() - 1U)];
+    }
 
     [[nodiscard]] FieldSnapshot snapshot() const {
         return {text_, anchor_, caret_};

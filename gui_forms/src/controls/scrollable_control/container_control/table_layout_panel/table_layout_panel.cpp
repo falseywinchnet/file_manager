@@ -26,6 +26,94 @@ struct TrackResolution final {
     double desired{};
 };
 
+struct TableOccupancyGrid final {
+    std::vector<std::vector<bool>> occupied;
+    std::size_t columns{};
+    std::size_t rows{};
+
+    TableOccupancyGrid(std::size_t column_count, std::size_t row_count)
+        : occupied(row_count, std::vector<bool>(column_count, false)),
+          columns(column_count), rows(row_count) {}
+
+    void resize(std::size_t new_columns, std::size_t new_rows) {
+        if (new_columns != columns) {
+            for (std::vector<bool>& row : occupied) {
+                row.resize(new_columns, false);
+            }
+            columns = new_columns;
+        }
+        if (new_rows != rows) {
+            occupied.resize(new_rows, std::vector<bool>(columns, false));
+            rows = new_rows;
+        }
+    }
+
+    [[nodiscard]] bool region_free(
+        std::size_t column, std::size_t row,
+        std::size_t column_span, std::size_t row_span) const {
+        if (column + column_span > columns || row + row_span > rows) {
+            return false;
+        }
+        for (std::size_t y = row; y < row + row_span; ++y) {
+            for (std::size_t x = column; x < column + column_span; ++x) {
+                if (occupied[y][x]) return false;
+            }
+        }
+        return true;
+    }
+
+    void occupy(std::size_t column, std::size_t row,
+                std::size_t column_span, std::size_t row_span) {
+        for (std::size_t y = row; y < row + row_span; ++y) {
+            for (std::size_t x = column; x < column + column_span; ++x) {
+                occupied[y][x] = true;
+            }
+        }
+    }
+
+    [[nodiscard]] bool grow_to_fit(
+        TableLayoutCellPosition position,
+        std::size_t column_span, std::size_t row_span,
+        TableLayoutGrowStyle grow_style) {
+        const std::size_t required_columns = position.column + column_span;
+        const std::size_t required_rows = position.row + row_span;
+        if (required_columns > maximum_layout_tracks ||
+            required_rows > maximum_layout_tracks) return false;
+        if (required_columns > columns) {
+            if (grow_style != TableLayoutGrowStyle::add_columns) return false;
+            resize(required_columns, rows);
+        }
+        if (required_rows > rows) {
+            if (grow_style != TableLayoutGrowStyle::add_rows) return false;
+            resize(columns, required_rows);
+        }
+        return true;
+    }
+};
+
+void draw_table_grid(Painter& painter,
+                     std::span<const double> column_widths,
+                     std::span<const double> row_heights,
+                     Insets inset, double width, double height,
+                     Color color, double offset) {
+    double x = inset.left;
+    painter.draw_line({x + offset, inset.top},
+                      {x + offset, inset.top + height}, color, 1.0);
+    for (double extent : column_widths) {
+        x += extent;
+        painter.draw_line({x + offset, inset.top},
+                          {x + offset, inset.top + height}, color, 1.0);
+    }
+    double y = inset.top;
+    painter.draw_line({inset.left, y + offset},
+                      {inset.left + width, y + offset}, color, 1.0);
+    for (double extent : row_heights) {
+        y += extent;
+        painter.draw_line({inset.left, y + offset},
+                          {inset.left + width, y + offset}, color, 1.0);
+    }
+}
+
 [[nodiscard]] TrackResolution resolve_table_tracks(
     std::span<const TableLayoutStyle> styles,
     std::vector<double> minimum,
@@ -254,12 +342,22 @@ void TableLayoutPanel::reconcile_metadata() {
             live.insert((*child).runtime_id().value);
         }
     }
-    std::erase_if(metadata_, [&live](const auto& entry) {
-        return !live.contains(entry.first);
-    });
-    std::erase_if(resolved_cells_, [&live](const auto& entry) {
-        return !live.contains(entry.first);
-    });
+    MetadataMap::iterator metadata = metadata_.begin();
+    while (metadata != metadata_.end()) {
+        if (!live.contains((*metadata).first)) {
+            metadata = metadata_.erase(metadata);
+        } else {
+            ++metadata;
+        }
+    }
+    ResolvedCellMap::iterator resolved = resolved_cells_.begin();
+    while (resolved != resolved_cells_.end()) {
+        if (!live.contains((*resolved).first)) {
+            resolved = resolved_cells_.erase(resolved);
+        } else {
+            ++resolved;
+        }
+    }
 }
 
 Size TableLayoutPanel::layout_children(Size available, bool assign) {
@@ -267,41 +365,7 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     const Insets inset = padding();
     const Size inner{std::max(0.0, available.width - horizontal_extent(inset)),
                      std::max(0.0, available.height - vertical_extent(inset))};
-    std::size_t columns = column_count_;
-    std::size_t rows = row_count_;
-    std::vector<std::vector<bool>> occupied(rows,
-                                            std::vector<bool>(columns, false));
-    const auto resize_grid = [&occupied, &rows, &columns](std::size_t new_columns,
-                                                          std::size_t new_rows) {
-        if (new_columns != columns) {
-            for (std::vector<bool>& row : occupied) row.resize(new_columns, false);
-            columns = new_columns;
-        }
-        if (new_rows != rows) {
-            occupied.resize(new_rows, std::vector<bool>(columns, false));
-            rows = new_rows;
-        }
-    };
-    const auto region_free = [&occupied, &rows, &columns](
-        std::size_t column, std::size_t row,
-        std::size_t column_span, std::size_t row_span) {
-        if (column + column_span > columns || row + row_span > rows) return false;
-        for (std::size_t y = row; y < row + row_span; ++y) {
-            for (std::size_t x = column; x < column + column_span; ++x) {
-                if (occupied[y][x]) return false;
-            }
-        }
-        return true;
-    };
-    const auto occupy = [&occupied](std::size_t column, std::size_t row,
-                                     std::size_t column_span,
-                                     std::size_t row_span) {
-        for (std::size_t y = row; y < row + row_span; ++y) {
-            for (std::size_t x = column; x < column + column_span; ++x) {
-                occupied[y][x] = true;
-            }
-        }
-    };
+    TableOccupancyGrid grid(column_count_, row_count_);
 
     struct Item final {
         Control::Ptr control;
@@ -317,24 +381,6 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     resolved_cells_.clear();
     layout_overflowed_ = false;
 
-    const auto grow_to_fit = [&](TableLayoutCellPosition position,
-                                 std::size_t column_span,
-                                 std::size_t row_span) {
-        const std::size_t required_columns = position.column + column_span;
-        const std::size_t required_rows = position.row + row_span;
-        if (required_columns > maximum_layout_tracks ||
-            required_rows > maximum_layout_tracks) return false;
-        if (required_columns > columns) {
-            if (grow_style_ != TableLayoutGrowStyle::add_columns) return false;
-            resize_grid(required_columns, rows);
-        }
-        if (required_rows > rows) {
-            if (grow_style_ != TableLayoutGrowStyle::add_rows) return false;
-            resize_grid(columns, required_rows);
-        }
-        return true;
-    };
-
     const std::vector<Control::Ptr> retained = snapshot_layout_children();
     for (const Control::Ptr& child : retained) {
         if (!is_current_layout_child(child) || !(*child).visible()) continue;
@@ -344,17 +390,20 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             continue;
         }
         const TableLayoutCellPosition position = *(*metadata).position;
-        if (!grow_to_fit(position, (*metadata).column_span, (*metadata).row_span)) {
+        if (!grid.grow_to_fit(
+                position, (*metadata).column_span,
+                (*metadata).row_span, grow_style_)) {
             overflow.push_back(child);
             continue;
         }
-        if (!region_free(position.column, position.row, (*metadata).column_span,
-                         (*metadata).row_span)) {
+        if (!grid.region_free(
+                position.column, position.row, (*metadata).column_span,
+                (*metadata).row_span)) {
             overflow.push_back(child);
             continue;
         }
-        occupy(position.column, position.row, (*metadata).column_span,
-               (*metadata).row_span);
+        grid.occupy(position.column, position.row, (*metadata).column_span,
+                    (*metadata).row_span);
         resolved.push_back({child, position, (*metadata).column_span,
                             (*metadata).row_span, {}, (*child).margin()});
     }
@@ -364,19 +413,26 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
         const std::size_t column_span = metadata == nullptr
             ? 1U : (*metadata).column_span;
         const std::size_t row_span = metadata == nullptr ? 1U : (*metadata).row_span;
-        if ((column_span > columns &&
+        if ((column_span > grid.columns &&
              grow_style_ != TableLayoutGrowStyle::add_columns) ||
-            (row_span > rows && grow_style_ != TableLayoutGrowStyle::add_rows)) {
+            (row_span > grid.rows &&
+             grow_style_ != TableLayoutGrowStyle::add_rows)) {
             overflow.push_back(child);
             continue;
         }
-        if (column_span > columns) resize_grid(column_span, rows);
-        if (row_span > rows) resize_grid(columns, row_span);
+        if (column_span > grid.columns) {
+            grid.resize(column_span, grid.rows);
+        }
+        if (row_span > grid.rows) {
+            grid.resize(grid.columns, row_span);
+        }
         std::optional<TableLayoutCellPosition> position;
         while (!position) {
-            for (std::size_t row = 0U; row < rows && !position; ++row) {
-                for (std::size_t column = 0U; column < columns; ++column) {
-                    if (region_free(column, row, column_span, row_span)) {
+            for (std::size_t row = 0U; row < grid.rows && !position; ++row) {
+                for (std::size_t column = 0U;
+                     column < grid.columns; ++column) {
+                    if (grid.region_free(
+                            column, row, column_span, row_span)) {
                         position = TableLayoutCellPosition{column, row};
                         break;
                     }
@@ -384,11 +440,11 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             }
             if (position) break;
             if (grow_style_ == TableLayoutGrowStyle::add_rows &&
-                rows < maximum_layout_tracks) {
-                resize_grid(columns, rows + 1U);
+                grid.rows < maximum_layout_tracks) {
+                grid.resize(grid.columns, grid.rows + 1U);
             } else if (grow_style_ == TableLayoutGrowStyle::add_columns &&
-                       columns < maximum_layout_tracks) {
-                resize_grid(columns + 1U, rows);
+                       grid.columns < maximum_layout_tracks) {
+                grid.resize(grid.columns + 1U, grid.rows);
             } else {
                 break;
             }
@@ -397,17 +453,18 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             overflow.push_back(child);
             continue;
         }
-        occupy((*position).column, (*position).row, column_span, row_span);
+        grid.occupy((*position).column, (*position).row,
+                    column_span, row_span);
         resolved.push_back({child, *position, column_span, row_span, {},
                             (*child).margin()});
     }
 
     std::vector<TableLayoutStyle> column_styles = column_styles_;
     std::vector<TableLayoutStyle> row_styles = row_styles_;
-    column_styles.resize(columns);
-    row_styles.resize(rows);
-    std::vector<double> column_minimum(columns, 0.0);
-    std::vector<double> row_minimum(rows, 0.0);
+    column_styles.resize(grid.columns);
+    row_styles.resize(grid.rows);
+    std::vector<double> column_minimum(grid.columns, 0.0);
+    std::vector<double> row_minimum(grid.rows, 0.0);
     std::vector<TrackSpanDemand> column_spans;
     std::vector<TrackSpanDemand> row_spans;
     for (Item& item : resolved) {
@@ -454,8 +511,8 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
         column_widths_ = horizontal.actual;
         row_heights_ = vertical.actual;
     }
-    std::vector<double> column_offsets(columns + 1U, 0.0);
-    std::vector<double> row_offsets(rows + 1U, 0.0);
+    std::vector<double> column_offsets(grid.columns + 1U, 0.0);
+    std::vector<double> row_offsets(grid.rows + 1U, 0.0);
     std::partial_sum(horizontal.actual.begin(), horizontal.actual.end(),
                      column_offsets.begin() + 1);
     std::partial_sum(vertical.actual.begin(), vertical.actual.end(),
@@ -584,32 +641,19 @@ void TableLayoutPanel::on_paint(Painter& painter, Rect) {
                                          column_widths_.end(), 0.0);
     const double height = std::accumulate(row_heights_.begin(),
                                           row_heights_.end(), 0.0);
-    const auto draw_grid = [&](Color color, double offset) {
-        double x = inset.left;
-        painter.draw_line({x + offset, inset.top},
-                          {x + offset, inset.top + height}, color, 1.0);
-        for (double extent : column_widths_) {
-            x += extent;
-            painter.draw_line({x + offset, inset.top},
-                              {x + offset, inset.top + height}, color, 1.0);
-        }
-        double y = inset.top;
-        painter.draw_line({inset.left, y + offset},
-                          {inset.left + width, y + offset}, color, 1.0);
-        for (double extent : row_heights_) {
-            y += extent;
-            painter.draw_line({inset.left, y + offset},
-                              {inset.left + width, y + offset}, color, 1.0);
-        }
-    };
     if (cell_border_style_ == TableCellBorderStyle::single) {
-        draw_grid(style.border, 0.0);
+        draw_table_grid(painter, column_widths_, row_heights_, inset,
+                        width, height, style.border, 0.0);
     } else if (cell_border_style_ == TableCellBorderStyle::inset) {
-        draw_grid(style.dark_border, 0.0);
-        draw_grid(style.highlight, 1.0);
+        draw_table_grid(painter, column_widths_, row_heights_, inset,
+                        width, height, style.dark_border, 0.0);
+        draw_table_grid(painter, column_widths_, row_heights_, inset,
+                        width, height, style.highlight, 1.0);
     } else {
-        draw_grid(style.highlight, 0.0);
-        draw_grid(style.dark_border, 1.0);
+        draw_table_grid(painter, column_widths_, row_heights_, inset,
+                        width, height, style.highlight, 0.0);
+        draw_table_grid(painter, column_widths_, row_heights_, inset,
+                        width, height, style.dark_border, 1.0);
     }
 }
 

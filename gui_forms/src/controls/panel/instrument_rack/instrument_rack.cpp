@@ -86,6 +86,13 @@ bool contains_control(const Control::Ptr& root, const Control::Ptr& candidate) {
     return false;
 }
 
+[[nodiscard]] bool same_instrument_field_shape(
+    const InstrumentFieldSpec& left,
+    const InstrumentFieldSpec& right) noexcept {
+    return left.stable_id == right.stable_id &&
+           left.editor == right.editor;
+}
+
 } // namespace
 
 using detail::RackModulePanel;
@@ -116,37 +123,105 @@ struct InstrumentRack::Impl final {
     };
     using ModuleList = std::vector<ModuleState>;
 
+    struct EnsureModuleVisible final {
+        Impl* implementation{};
+        std::string module_id;
+        void operator()(bool focused) const {
+            if (focused) (*implementation).ensure_visible(module_id);
+        }
+    };
+
+    struct ChoiceFieldChanged final {
+        Impl* implementation{};
+        std::string module_id;
+        std::string field_id;
+        std::weak_ptr<ComboBox> control;
+        void operator()(std::optional<std::size_t>) const {
+            (*implementation).choice_field_changed(
+                module_id, field_id, control);
+        }
+    };
+
+    struct TextFieldChanged final {
+        Impl* implementation{};
+        std::string module_id;
+        std::string field_id;
+        void operator()(const std::string& value) const {
+            (*implementation).text_field_changed(module_id, field_id, value);
+        }
+    };
+
+    struct TextFieldCommitted final {
+        Impl* implementation{};
+        std::string module_id;
+        std::string field_id;
+        void operator()(const std::string& value) const {
+            (*implementation).text_field_committed(module_id, field_id, value);
+        }
+    };
+
+    struct TextFieldCancelled final {
+        Impl* implementation{};
+        std::string module_id;
+        std::string field_id;
+        std::weak_ptr<TextBox> control;
+        void operator()() const {
+            (*implementation).text_field_cancelled(
+                module_id, field_id, control);
+        }
+    };
+
+    struct MoveRequest final {
+        Impl* implementation{};
+        std::string module_id;
+        void operator()(bool forward) const {
+            (*implementation).emit_move(module_id, forward);
+        }
+    };
+
+    struct ModuleToggled final {
+        Impl* implementation{};
+        std::string module_id;
+        void operator()(bool enabled) const {
+            (*implementation).module_toggled(module_id, enabled);
+        }
+    };
+
+    struct RemoveClicked final {
+        Impl* implementation{};
+        std::string module_id;
+        void operator()(ButtonBase&) const {
+            (*implementation).owner.remove_requested_.emit({module_id});
+        }
+    };
+
     explicit Impl(InstrumentRack& public_owner) : owner(public_owner) {}
 
     ModuleState* find_module(std::string_view id) noexcept {
-        const ModuleList::iterator found =
-            std::find_if(states.begin(), states.end(),
-            [id](const ModuleState& state) { return state.spec.stable_id == id; });
-        return found == states.end() ? nullptr : &*found;
+        for (ModuleState& state : states) {
+            if (state.spec.stable_id == id) return &state;
+        }
+        return nullptr;
     }
     const ModuleState* find_module(std::string_view id) const noexcept {
-        const ModuleList::const_iterator found =
-            std::find_if(states.begin(), states.end(),
-            [id](const ModuleState& state) { return state.spec.stable_id == id; });
-        return found == states.end() ? nullptr : &*found;
+        for (const ModuleState& state : states) {
+            if (state.spec.stable_id == id) return &state;
+        }
+        return nullptr;
     }
     std::optional<std::size_t> module_index(std::string_view id) const noexcept {
-        const ModuleList::const_iterator found =
-            std::find_if(states.begin(), states.end(),
-            [id](const ModuleState& state) { return state.spec.stable_id == id; });
-        if (found == states.end()) return {};
-        return static_cast<std::size_t>(std::distance(states.begin(), found));
+        for (std::size_t index = 0U; index < states.size(); ++index) {
+            if (states[index].spec.stable_id == id) return index;
+        }
+        return {};
     }
 
     InstrumentFieldSpec* find_field(ModuleState& module,
                                     std::string_view id) noexcept {
-        const std::vector<InstrumentFieldSpec>::iterator found =
-            std::find_if(module.spec.fields.begin(),
-                                        module.spec.fields.end(),
-            [id](const InstrumentFieldSpec& field) {
-                return field.stable_id == id;
-            });
-        return found == module.spec.fields.end() ? nullptr : &*found;
+        for (InstrumentFieldSpec& field : module.spec.fields) {
+            if (field.stable_id == id) return &field;
+        }
+        return nullptr;
     }
 
     void emit_move(std::string_view module_id, bool forward) {
@@ -179,9 +254,130 @@ struct InstrumentRack::Impl final {
                        SubscriptionToken& token) {
         const std::string module_id = module.spec.stable_id;
         token = (*control).focus_observed().subscribe(
-            owner, [this, module_id](bool focused) {
-                if (focused) ensure_visible(module_id);
-            });
+            owner, EnsureModuleVisible{this, module_id});
+    }
+
+    void choice_field_changed(
+        std::string_view module_id, std::string_view field_id,
+        const std::weak_ptr<ComboBox>& weak_control) {
+        if (synchronizing) return;
+        ModuleState* module = find_module(module_id);
+        const std::shared_ptr<ComboBox> control = weak_control.lock();
+        if (module == nullptr || !control) return;
+        InstrumentFieldSpec* field = find_field(*module, field_id);
+        if (field == nullptr) return;
+        FieldState& state = (*module).fields[static_cast<std::size_t>(
+            field - (*module).spec.fields.data())];
+        const std::string previous = state.committed_value;
+        (*field).value = std::string((*control).selected_text());
+        state.committed_value = (*field).value;
+        for (InstrumentModuleSpec& public_module : public_modules) {
+            if (public_module.stable_id != module_id) continue;
+            for (InstrumentFieldSpec& public_field : public_module.fields) {
+                if (public_field.stable_id == field_id) {
+                    public_field.value = (*field).value;
+                }
+            }
+        }
+        const InstrumentFieldChange change{
+            std::string(module_id), std::string(field_id), previous,
+            (*field).value, true};
+        owner.publish_change(owner.field_changed_, change);
+        owner.field_committed_.emit(change);
+    }
+
+    void text_field_changed(std::string_view module_id,
+                            std::string_view field_id,
+                            const std::string& value) {
+        if (synchronizing) return;
+        ModuleState* module = find_module(module_id);
+        if (module == nullptr) return;
+        InstrumentFieldSpec* field = find_field(*module, field_id);
+        if (field == nullptr) return;
+        const std::string previous = (*field).value;
+        (*field).value = value;
+        for (InstrumentModuleSpec& public_module : public_modules) {
+            if (public_module.stable_id != module_id) continue;
+            for (InstrumentFieldSpec& public_field : public_module.fields) {
+                if (public_field.stable_id == field_id) {
+                    public_field.value = value;
+                }
+            }
+        }
+        owner.publish_change(owner.field_changed_, InstrumentFieldChange{
+            std::string(module_id), std::string(field_id), previous,
+            value, false});
+    }
+
+    void text_field_committed(std::string_view module_id,
+                              std::string_view field_id,
+                              const std::string& value) {
+        ModuleState* module = find_module(module_id);
+        if (module == nullptr) return;
+        InstrumentFieldSpec* field = find_field(*module, field_id);
+        if (field == nullptr) return;
+        FieldState& state = (*module).fields[static_cast<std::size_t>(
+            field - (*module).spec.fields.data())];
+        const std::string previous = state.committed_value;
+        state.committed_value = value;
+        (*field).value = value;
+        if ((*field).required && value.empty()) {
+            (*field).validation_message = (*field).name + " is required";
+            (*module).spec.state = InstrumentModuleState::invalid;
+        }
+        for (InstrumentModuleSpec& public_module : public_modules) {
+            if (public_module.stable_id != module_id) continue;
+            public_module.state = (*module).spec.state;
+            for (InstrumentFieldSpec& public_field : public_module.fields) {
+                if (public_field.stable_id == field_id) {
+                    public_field.value = value;
+                    public_field.validation_message =
+                        (*field).validation_message;
+                }
+            }
+        }
+        update_module_presentation(*module);
+        owner.field_committed_.emit({
+            std::string(module_id), std::string(field_id), previous,
+            value, true});
+    }
+
+    void text_field_cancelled(
+        std::string_view module_id, std::string_view field_id,
+        const std::weak_ptr<TextBox>& weak_control) {
+        ModuleState* module = find_module(module_id);
+        const std::shared_ptr<TextBox> control = weak_control.lock();
+        if (module == nullptr || !control) return;
+        InstrumentFieldSpec* field = find_field(*module, field_id);
+        if (field == nullptr) return;
+        FieldState& state = (*module).fields[static_cast<std::size_t>(
+            field - (*module).spec.fields.data())];
+        synchronizing = true;
+        (*control).set_text(state.committed_value);
+        (*field).value = state.committed_value;
+        for (InstrumentModuleSpec& public_module : public_modules) {
+            if (public_module.stable_id != module_id) continue;
+            for (InstrumentFieldSpec& public_field : public_module.fields) {
+                if (public_field.stable_id == field_id) {
+                    public_field.value = state.committed_value;
+                }
+            }
+        }
+        synchronizing = false;
+    }
+
+    void module_toggled(std::string_view module_id, bool enabled) {
+        if (synchronizing) return;
+        ModuleState* module = find_module(module_id);
+        if (module == nullptr) return;
+        (*module).spec.enabled = enabled;
+        update_module_presentation(*module);
+        for (InstrumentModuleSpec& public_module : public_modules) {
+            if (public_module.stable_id == module_id) {
+                public_module.enabled = enabled;
+            }
+        }
+        owner.module_toggled_.emit({std::string(module_id), enabled});
     }
 
     Control::Ptr create_field_editor(ModuleState& module,
@@ -223,112 +419,18 @@ struct InstrumentRack::Impl final {
         state.kind = module.spec.fields[field_index].editor;
         if (const std::shared_ptr<gui_forms::ComboBox> choice = std::dynamic_pointer_cast<ComboBox>(state.editor)) {
             state.changed = (*choice).selected_index_changed().subscribe(
-                owner, [this, module_id, field_id,
-                        weak = std::weak_ptr<ComboBox>(choice)](
-                    std::optional<std::size_t>) {
-                    if (synchronizing) return;
-                    ModuleState* module = find_module(module_id);
-                    const std::shared_ptr<gui_forms::ComboBox> control = weak.lock();
-                    if (!module || !control) return;
-                    InstrumentFieldSpec* field = find_field(*module, field_id);
-                    if (!field) return;
-                    FieldState& state = (*module).fields[static_cast<std::size_t>(
-                        field - (*module).spec.fields.data())];
-                    const std::string previous = state.committed_value;
-                    (*field).value = std::string((*control).selected_text());
-                    state.committed_value = (*field).value;
-                    for (InstrumentModuleSpec& public_module : public_modules) {
-                        if (public_module.stable_id != module_id) continue;
-                        for (InstrumentFieldSpec& public_field :
-                             public_module.fields) {
-                            if (public_field.stable_id == field_id) {
-                                public_field.value = (*field).value;
-                            }
-                        }
-                    }
-                    InstrumentFieldChange change{module_id, field_id, previous,
-                                                 (*field).value, true};
-                    owner.publish_change(owner.field_changed_, change);
-                    owner.field_committed_.emit(change);
-                });
+                owner, ChoiceFieldChanged{
+                    this, module_id, field_id,
+                    std::weak_ptr<ComboBox>(choice)});
         } else if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
             state.changed = (*text).text_changed().subscribe(
-                owner, [this, module_id, field_id](const std::string& value) {
-                    if (synchronizing) return;
-                    ModuleState* module = find_module(module_id);
-                    if (!module) return;
-                    InstrumentFieldSpec* field = find_field(*module, field_id);
-                    if (!field) return;
-                    const std::string previous = (*field).value;
-                    (*field).value = value;
-                    for (InstrumentModuleSpec& public_module : public_modules) {
-                        if (public_module.stable_id != module_id) continue;
-                        for (InstrumentFieldSpec& public_field :
-                             public_module.fields) {
-                            if (public_field.stable_id == field_id) {
-                                public_field.value = value;
-                            }
-                        }
-                    }
-                    owner.publish_change(owner.field_changed_,
-                        InstrumentFieldChange{
-                            module_id, field_id, previous, value, false});
-                });
+                owner, TextFieldChanged{this, module_id, field_id});
             state.committed = (*text).committed().subscribe(
-                owner, [this, module_id, field_id](const std::string& value) {
-                    ModuleState* module = find_module(module_id);
-                    if (!module) return;
-                    InstrumentFieldSpec* field = find_field(*module, field_id);
-                    if (!field) return;
-                    FieldState& state = (*module).fields[static_cast<std::size_t>(
-                        field - (*module).spec.fields.data())];
-                    const std::string previous = state.committed_value;
-                    state.committed_value = value;
-                    (*field).value = value;
-                    if ((*field).required && value.empty()) {
-                        (*field).validation_message = (*field).name + " is required";
-                        (*module).spec.state = InstrumentModuleState::invalid;
-                    }
-                    for (InstrumentModuleSpec& public_module : public_modules) {
-                        if (public_module.stable_id != module_id) continue;
-                        public_module.state = (*module).spec.state;
-                        for (InstrumentFieldSpec& public_field :
-                             public_module.fields) {
-                            if (public_field.stable_id == field_id) {
-                                public_field.value = value;
-                                public_field.validation_message =
-                                    (*field).validation_message;
-                            }
-                        }
-                    }
-                    update_module_presentation(*module);
-                    owner.field_committed_.emit(
-                        {module_id, field_id, previous, value, true});
-                });
+                owner, TextFieldCommitted{this, module_id, field_id});
             state.cancelled = (*text).cancelled().subscribe(
-                owner, [this, module_id, field_id,
-                        weak = std::weak_ptr<TextBox>(text)] {
-                    ModuleState* module = find_module(module_id);
-                    const std::shared_ptr<gui_forms::TextBox> control = weak.lock();
-                    if (!module || !control) return;
-                    InstrumentFieldSpec* field = find_field(*module, field_id);
-                    if (!field) return;
-                    FieldState& state = (*module).fields[static_cast<std::size_t>(
-                        field - (*module).spec.fields.data())];
-                    synchronizing = true;
-                    (*control).set_text(state.committed_value);
-                    (*field).value = state.committed_value;
-                    for (InstrumentModuleSpec& public_module : public_modules) {
-                        if (public_module.stable_id != module_id) continue;
-                        for (InstrumentFieldSpec& public_field :
-                             public_module.fields) {
-                            if (public_field.stable_id == field_id) {
-                                public_field.value = state.committed_value;
-                            }
-                        }
-                    }
-                    synchronizing = false;
-                });
+                owner, TextFieldCancelled{
+                    this, module_id, field_id,
+                    std::weak_ptr<TextBox>(text)});
         }
         connect_focus(module, state.editor, state.focused);
     }
@@ -340,9 +442,7 @@ struct InstrumentRack::Impl final {
             StableId(module.spec.stable_id));
         (*module.panel).set_accessible_name(module.spec.name);
         const std::string module_id = module.spec.stable_id;
-        (*module.panel).move_request = [this, module_id](bool forward) {
-            emit_move(module_id, forward);
-        };
+        (*module.panel).move_request = MoveRequest{this, module_id};
         module.enable = make_control<CheckBox>(
             StableId(module.spec.stable_id + ".enable"));
         (*module.enable).set_accessible_name("Enable " + module.spec.name);
@@ -377,23 +477,9 @@ struct InstrumentRack::Impl final {
         }
         owner.add_child(module.panel);
         module.toggled = (*module.enable).checked_changed().subscribe(
-            owner, [this, module_id](bool enabled) {
-                if (synchronizing) return;
-                ModuleState* module = find_module(module_id);
-                if (!module) return;
-                (*module).spec.enabled = enabled;
-                update_module_presentation(*module);
-                for (InstrumentModuleSpec& public_module : public_modules) {
-                    if (public_module.stable_id == module_id) {
-                        public_module.enabled = enabled;
-                    }
-                }
-                owner.module_toggled_.emit({module_id, enabled});
-            });
+            owner, ModuleToggled{this, module_id});
         module.remove_clicked = (*module.remove).clicked().subscribe(
-            owner, [this, module_id](ButtonBase&) {
-                owner.remove_requested_.emit({module_id});
-            });
+            owner, RemoveClicked{this, module_id});
         connect_focus(module, module.enable, module.enable_focused);
         connect_focus(module, module.remove, module.remove_focused);
         for (std::size_t index = 0; index < module.fields.size(); ++index) {
@@ -448,11 +534,7 @@ struct InstrumentRack::Impl final {
                 incoming.fields.size() &&
             std::equal(state.spec.fields.begin(), state.spec.fields.end(),
                        incoming.fields.begin(),
-                [](const InstrumentFieldSpec& left,
-                   const InstrumentFieldSpec& right) {
-                    return left.stable_id == right.stable_id &&
-                           left.editor == right.editor;
-                });
+                       same_instrument_field_shape);
         if (!field_shape_matches) {
             const Rect old_bounds = state.bounds;
             Control::Ptr removed = owner.remove_child((*state.panel).runtime_id());
@@ -506,6 +588,19 @@ struct InstrumentRack::Impl final {
         Rect bounds{};
     };
 
+    struct LineCursor final {
+        double x{};
+        double y{};
+        double height{};
+        double gap{};
+
+        void new_line() noexcept {
+            x = 0.0;
+            y += height + (height > 0.0 ? gap : 0.0);
+            height = 0.0;
+        }
+    };
+
     std::vector<Slot> compute_slots(double available_width) const {
         const double s = scale();
         const Insets inset = owner.padding();
@@ -516,14 +611,7 @@ struct InstrumentRack::Impl final {
         const double action_min = std::min(action_minimum_width * s,
                                            std::max(1.0, width));
         std::vector<Slot> slots;
-        double x{};
-        double y{};
-        double line_height{};
-        const auto new_line = [&] {
-            x = 0.0;
-            y += line_height + (line_height > 0.0 ? gap : 0.0);
-            line_height = 0.0;
-        };
+        LineCursor line{0.0, 0.0, 0.0, gap};
         for (const ModuleState& const_state : states) {
             ModuleState& state = const_cast<ModuleState&>(const_state);
             const double slot_width = std::min(preferred_module,
@@ -534,23 +622,32 @@ struct InstrumentRack::Impl final {
                            (static_cast<double>(state.spec.fields.size()) * 28.0 +
                             22.0) * s)
                 : module_height * s;
-            if (x > 0.0 && x + slot_width > width + 0.001) new_line();
+            if (line.x > 0.0 &&
+                line.x + slot_width > width + 0.001) {
+                line.new_line();
+            }
             slots.push_back({&state, {},
-                {inset.left + x, inset.top + y, slot_width, slot_height}});
-            x += slot_width + gap;
-            line_height = std::max(line_height, slot_height);
+                {inset.left + line.x, inset.top + line.y,
+                 slot_width, slot_height}});
+            line.x += slot_width + gap;
+            line.height = std::max(line.height, slot_height);
         }
         if (action_content) {
-            if (x > 0.0 && x + action_min > width + 0.001) new_line();
+            if (line.x > 0.0 &&
+                line.x + action_min > width + 0.001) {
+                line.new_line();
+            }
             const double remaining = std::max(action_min,
-                width - (x > 0.0 ? x : 0.0));
+                width - (line.x > 0.0 ? line.x : 0.0));
             const double action_width = std::min(width, remaining);
             const double action_height = module_height * s;
             slots.push_back({nullptr, action_content,
-                {inset.left + x, inset.top + y, action_width, action_height}});
-            line_height = std::max(line_height, action_height);
+                {inset.left + line.x, inset.top + line.y,
+                 action_width, action_height}});
+            line.height = std::max(line.height, action_height);
         }
-        computed_content_height = inset.top + y + line_height + inset.bottom;
+        computed_content_height =
+            inset.top + line.y + line.height + inset.bottom;
         return slots;
     }
 
@@ -650,11 +747,14 @@ void InstrumentRack::set_modules(std::vector<InstrumentModuleSpec> modules) {
     if (Window* window = attached_window()) focused = (*window).focused_control();
     if (focused) {
         for (std::size_t index = 0; index < (*impl_).states.size(); ++index) {
-            const bool survives = std::any_of(modules.begin(), modules.end(),
-                [&](const InstrumentModuleSpec& incoming) {
-                    return incoming.stable_id ==
-                           (*impl_).states[index].spec.stable_id;
-                });
+            bool survives = false;
+            for (const InstrumentModuleSpec& incoming : modules) {
+                if (incoming.stable_id ==
+                    (*impl_).states[index].spec.stable_id) {
+                    survives = true;
+                    break;
+                }
+            }
             if (!survives && contains_control((*impl_).states[index].panel, focused)) {
                 removed_focus_index = index;
                 break;
@@ -665,11 +765,11 @@ void InstrumentRack::set_modules(std::vector<InstrumentModuleSpec> modules) {
     std::vector<Impl::ModuleState> next;
     next.reserve(modules.size());
     for (InstrumentModuleSpec& module : modules) {
-        const Impl::ModuleList::iterator found =
-            std::find_if((*impl_).states.begin(), (*impl_).states.end(),
-            [&](const Impl::ModuleState& state) {
-                return state.spec.stable_id == module.stable_id;
-            });
+        Impl::ModuleList::iterator found = (*impl_).states.begin();
+        while (found != (*impl_).states.end() &&
+               (*found).spec.stable_id != module.stable_id) {
+            ++found;
+        }
         if (found == (*impl_).states.end()) {
             next.push_back((*impl_).make_module(std::move(module)));
         } else {

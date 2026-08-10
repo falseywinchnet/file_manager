@@ -2,6 +2,9 @@
 
 #include "drop_down_layer.hpp"
 #include "../input_control_utilities.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
+#include "gui_forms/detail/property_binding_adapters.hpp"
+#include "gui_forms/detail/weak_member_callback.hpp"
 #include "gui_forms/text.hpp"
 
 #include <algorithm>
@@ -30,94 +33,149 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
     items_descriptor.serialization_visibility =
         PropertySerializationVisibility::content;
     items_descriptor.bindable = false;
-    define_bindable_property({
-        std::move(items_descriptor),
-        [this] {
-            std::vector<BindingValue> values;
-            values.reserve(items_.size());
-            for (const std::string& item : items_) values.emplace_back(item);
-            return BindingValue{make_property_collection(
-                "String", BindingValueKind::text, std::move(values))};
-        },
-        [this](const BindingValue& value) {
-            const gui_forms::PropertyCollectionValue* collection =
-                std::get_if<PropertyCollectionValue>(&value);
-            if (!collection || !*collection ||
-                (*collection).item_kind() != BindingValueKind::text) {
-                throw std::invalid_argument(
-                    "ComboBox.Items requires a homogeneous text collection");
-            }
-            std::vector<std::string> items;
-            const std::span<const BindingValue> values = property_collection_items(*collection);
-            items.reserve(values.size());
-            for (const BindingValue& item : values) {
-                items.push_back(std::get<std::string>(item));
-            }
-            set_items(std::move(items));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return items_changed_.subscribe(owner, std::move(changed));
-        },
-        [this] { set_items({}); },
-        [this] { return !items_.empty(); }});
-    define_bindable_property({
-        {"SelectedIndex", BindingValueKind::signed_integer, "Behavior",
-         "Zero-based selected item index, or -1 when no item is selected.",
-         BindingValue{std::int64_t{-1}}, Dirty::paint | Dirty::semantics},
-        [this] {
-            return BindingValue{selected_index_
-                ? static_cast<std::int64_t>(*selected_index_)
-                : std::int64_t{-1}};
-        },
-        [this](const BindingValue& value) {
-            const std::optional<BindingValue> converted = convert_binding_value(
-                value, BindingValueKind::signed_integer);
-            if (!converted) {
-                throw std::invalid_argument(
-                    "ComboBox.SelectedIndex binding requires an integer");
-            }
-            const std::int64_t index = std::get<std::int64_t>(*converted);
-            if (index == -1) {
-                set_selected_index(std::nullopt);
-                return;
-            }
-            if (index < 0) {
-                throw std::out_of_range(
-                    "ComboBox.SelectedIndex binding must be -1 or non-negative");
-            }
-            set_selected_index(static_cast<std::size_t>(index));
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return selected_index_changed_.subscribe(owner,
-                [changed = std::move(changed)](
-                    std::optional<std::size_t>) { changed(); });
-        }, {}, {}});
-    define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
-         "Text of the selected item, or empty when no item is selected.",
-         BindingValue{std::string{}}, Dirty::paint | Dirty::semantics},
-        [this] { return BindingValue{std::string(selected_text())}; },
-        [this](const BindingValue& value) {
-            const std::optional<BindingValue> converted = convert_binding_value(
-                value, BindingValueKind::text);
-            if (!converted) {
-                throw std::invalid_argument("ComboBox.Text binding requires text");
-            }
-            const std::string& text = std::get<std::string>(*converted);
-            const std::vector<std::string>::iterator found =
-                std::find(items_.begin(), items_.end(), text);
-            set_selected_index(found == items_.end()
-                ? std::optional<std::size_t>{}
-                : std::optional<std::size_t>{static_cast<std::size_t>(
-                      std::distance(items_.begin(), found))});
-        },
-        [this](Component& owner, std::function<void()> changed) {
-            return selected_index_changed_.subscribe(owner,
-                [changed = std::move(changed)](
-                    std::optional<std::size_t>) { changed(); });
-        },
-        [this] { set_selected_index(std::nullopt); },
-        [this] { return selected_index_.has_value(); }});
+    gui_forms::PropertyRegistration items_registration;
+    items_registration.descriptor = std::move(items_descriptor);
+    items_registration.get = detail::BoundMemberFunction<
+        BindingValue (ComboBox::*)() const>(
+            *this, &ComboBox::items_property_value);
+    items_registration.set = detail::BoundMemberFunction<
+        void (ComboBox::*)(const BindingValue&)>(
+            *this, &ComboBox::set_items_property);
+    items_registration.connect_changed =
+        detail::EventChangeConnector<>(items_changed_);
+    items_registration.reset = detail::BoundMemberFunction<
+        void (ComboBox::*)()>(*this, &ComboBox::reset_items_property);
+    items_registration.should_serialize = detail::BoundMemberFunction<
+        bool (ComboBox::*)() const noexcept>(
+            *this, &ComboBox::should_serialize_items_property);
+    define_bindable_property(std::move(items_registration));
+
+    gui_forms::PropertyRegistration index_registration;
+    index_registration.descriptor = {
+        "SelectedIndex", BindingValueKind::signed_integer, "Behavior",
+        "Zero-based selected item index, or -1 when no item is selected.",
+        BindingValue{std::int64_t{-1}}, Dirty::paint | Dirty::semantics};
+    index_registration.get = detail::BoundMemberFunction<
+        BindingValue (ComboBox::*)() const>(
+            *this, &ComboBox::selected_index_property_value);
+    index_registration.set = detail::BoundMemberFunction<
+        void (ComboBox::*)(const BindingValue&)>(
+            *this, &ComboBox::set_selected_index_property);
+    index_registration.connect_changed =
+        detail::EventChangeConnector<std::optional<std::size_t>>(
+            selected_index_changed_);
+    define_bindable_property(std::move(index_registration));
+
+    gui_forms::PropertyRegistration text_registration;
+    text_registration.descriptor = {
+        "Text", BindingValueKind::text, "Appearance",
+        "Text of the selected item, or empty when no item is selected.",
+        BindingValue{std::string{}}, Dirty::paint | Dirty::semantics};
+    text_registration.get = detail::BoundMemberFunction<
+        BindingValue (ComboBox::*)() const>(
+            *this, &ComboBox::text_property_value);
+    text_registration.set = detail::BoundMemberFunction<
+        void (ComboBox::*)(const BindingValue&)>(
+            *this, &ComboBox::set_text_property);
+    text_registration.connect_changed =
+        detail::EventChangeConnector<std::optional<std::size_t>>(
+            selected_index_changed_);
+    text_registration.reset = detail::BoundMemberFunction<
+        void (ComboBox::*)()>(*this, &ComboBox::reset_text_property);
+    text_registration.should_serialize = detail::BoundMemberFunction<
+        bool (ComboBox::*)() const noexcept>(
+            *this, &ComboBox::should_serialize_text_property);
+    define_bindable_property(std::move(text_registration));
+}
+
+BindingValue ComboBox::items_property_value() const {
+    std::vector<BindingValue> values;
+    values.reserve(items_.size());
+    for (const std::string& item : items_) values.emplace_back(item);
+    return BindingValue{make_property_collection(
+        "String", BindingValueKind::text, std::move(values))};
+}
+
+void ComboBox::set_items_property(const BindingValue& value) {
+    const PropertyCollectionValue* collection =
+        std::get_if<PropertyCollectionValue>(&value);
+    if (collection == nullptr || !*collection ||
+        (*collection).item_kind() != BindingValueKind::text) {
+        throw std::invalid_argument(
+            "ComboBox.Items requires a homogeneous text collection");
+    }
+    std::vector<std::string> items;
+    const std::span<const BindingValue> values =
+        property_collection_items(*collection);
+    items.reserve(values.size());
+    for (const BindingValue& item : values) {
+        items.push_back(std::get<std::string>(item));
+    }
+    set_items(std::move(items));
+}
+
+void ComboBox::reset_items_property() {
+    set_items({});
+}
+
+bool ComboBox::should_serialize_items_property() const noexcept {
+    return !items_.empty();
+}
+
+BindingValue ComboBox::selected_index_property_value() const {
+    return BindingValue{selected_index_
+        ? static_cast<std::int64_t>(*selected_index_)
+        : std::int64_t{-1}};
+}
+
+void ComboBox::set_selected_index_property(const BindingValue& value) {
+    const std::optional<BindingValue> converted = convert_binding_value(
+        value, BindingValueKind::signed_integer);
+    if (!converted) {
+        throw std::invalid_argument(
+            "ComboBox.SelectedIndex binding requires an integer");
+    }
+    const std::int64_t index = std::get<std::int64_t>(*converted);
+    if (index == -1) {
+        set_selected_index(std::nullopt);
+        return;
+    }
+    if (index < 0) {
+        throw std::out_of_range(
+            "ComboBox.SelectedIndex binding must be -1 or non-negative");
+    }
+    set_selected_index(static_cast<std::size_t>(index));
+}
+
+BindingValue ComboBox::text_property_value() const {
+    return BindingValue{std::string(selected_text())};
+}
+
+void ComboBox::set_text_property(const BindingValue& value) {
+    const std::optional<BindingValue> converted = convert_binding_value(
+        value, BindingValueKind::text);
+    if (!converted) {
+        throw std::invalid_argument("ComboBox.Text binding requires text");
+    }
+    const std::string& text = std::get<std::string>(*converted);
+    const std::vector<std::string>::iterator found =
+        std::find(items_.begin(), items_.end(), text);
+    set_selected_index(found == items_.end()
+        ? std::optional<std::size_t>{}
+        : std::optional<std::size_t>{static_cast<std::size_t>(
+              std::distance(items_.begin(), found))});
+}
+
+void ComboBox::reset_text_property() {
+    set_selected_index(std::nullopt);
+}
+
+bool ComboBox::should_serialize_text_property() const noexcept {
+    return selected_index_.has_value();
+}
+
+void ComboBox::popup_selection_changed(const ListSelectionChange& change) {
+    if (change.active_index) set_selected_index(change.active_index);
 }
 
 void ComboBox::set_items(std::vector<std::string> items) {
@@ -261,22 +319,20 @@ void ComboBox::open_drop_down() {
     const std::weak_ptr<ComboBox> weak =
         std::static_pointer_cast<ComboBox>(shared_from_this());
     popup_selection_ = (*list).selection_changed().subscribe(
-        *this, [weak](const ListSelectionChange& change) {
-            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock(); change.active_index) {
-                (*combo).set_selected_index(change.active_index);
-            }
-        });
+        *this, detail::WeakMemberCallback<
+            void (ComboBox::*)(const ListSelectionChange&)>(
+                weak, &ComboBox::popup_selection_changed));
     popup_activation_ = (*list).item_activated().subscribe(
-        *this, [weak](std::size_t index) {
-            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).commit_popup_selection(index);
-        });
-    popup_dismissal_ = (*layer).dismissed().subscribe(*this, [weak] {
-        if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).close_drop_down();
-    });
+        *this, detail::WeakMemberCallback<
+            void (ComboBox::*)(std::size_t)>(
+                weak, &ComboBox::commit_popup_selection));
+    popup_dismissal_ = (*layer).dismissed().subscribe(
+        *this, detail::WeakMemberCallback<void (ComboBox::*)()>(
+            weak, &ComboBox::close_drop_down));
     if (Event<>* closed = popup_token_.closed_event()) {
-        popup_revocation_ = (*closed).subscribe(*this, [weak] {
-            if (const std::shared_ptr<gui_forms::ComboBox> combo = weak.lock()) (*combo).on_popup_revoked();
-        });
+        popup_revocation_ = (*closed).subscribe(
+            *this, detail::WeakMemberCallback<void (ComboBox::*)()>(
+                weak, &ComboBox::on_popup_revoked));
     }
     popup_scope_ = (*window()).begin_focus_scope(layer, list).value;
     dropped_down_ = true;

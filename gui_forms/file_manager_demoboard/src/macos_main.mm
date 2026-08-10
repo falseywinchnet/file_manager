@@ -6,7 +6,7 @@
 #include <string_view>
 
 int main(int argc, const char* argv[]) {
-    auto product_model = file_manager_demoboard::make_product_window();
+    std::unique_ptr<gui_forms::Window> product_model = file_manager_demoboard::make_product_window();
     bool product_only = false;
     for (int index = 1; index < argc; ++index) {
         constexpr std::string_view prefix = "--capture-state=";

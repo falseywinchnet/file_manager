@@ -59,6 +59,94 @@ struct PropertyGrid::Impl final {
     using ValueMap = std::map<std::string, BindingValue>;
     using InstalledEditorMap = std::map<std::string, InstalledEditor>;
 
+    struct DescriptorLess final {
+        PropertySort sort{PropertySort::categorized};
+        bool operator()(const PropertyDescriptor& left,
+                        const PropertyDescriptor& right) const {
+            if (sort == PropertySort::alphabetical) {
+                return canonical_binding_name(left.name) <
+                       canonical_binding_name(right.name);
+            }
+            const std::string left_category =
+                canonical_binding_name(left.category);
+            const std::string right_category =
+                canonical_binding_name(right.category);
+            if (left_category != right_category) {
+                return left_category < right_category;
+            }
+            return canonical_binding_name(left.name) <
+                   canonical_binding_name(right.name);
+        }
+    };
+
+    struct PropertyRefresh final {
+        Impl* implementation{};
+        std::string canonical;
+        void operator()() const {
+            if (!(*implementation).committing) {
+                (*implementation).refresh_one(canonical, true);
+            }
+        }
+    };
+
+    struct CustomEditorCommit final {
+        Impl* implementation{};
+        Control::WeakPtr owner_lifetime;
+        std::string path;
+        void operator()(BindingValue proposed) const {
+            const Control::Ptr retained = owner_lifetime.lock();
+            if (!retained || !(*retained).is_alive()) return;
+            static_cast<void>((*implementation).set_value(
+                path, std::move(proposed), false));
+        }
+    };
+
+    struct CustomEditorFailure final {
+        Impl* implementation{};
+        Control::WeakPtr owner_lifetime;
+        std::string path;
+        void operator()(const PropertyEditorInputError& error) const {
+            const Control::Ptr retained = owner_lifetime.lock();
+            if (!retained || !(*retained).is_alive()) return;
+            (*implementation).report_error(
+                path, error.attempted_value, error.message);
+        }
+    };
+
+    struct ListCommit final {
+        Impl* implementation{};
+        void operator()(const PropertyValueChange& change) const {
+            (*implementation).commit_row(change);
+        }
+    };
+
+    struct ListExpansion final {
+        Impl* implementation{};
+        void operator()(const PropertyRowExpansionChange& change) const {
+            const StringMap::iterator property =
+                (*implementation).row_to_property.find(change.row_id);
+            if (property == (*implementation).row_to_property.end()) return;
+            const std::string canonical =
+                canonical_binding_name((*property).second);
+            if (change.expanded) {
+                (*implementation).expanded_properties.insert(canonical);
+            } else {
+                (*implementation).expanded_properties.erase(canonical);
+            }
+        }
+    };
+
+    struct ListReset final {
+        Impl* implementation{};
+        void operator()(const PropertyResetRequest& request) const {
+            const StringMap::iterator property =
+                (*implementation).row_to_property.find(request.row_id);
+            if (property == (*implementation).row_to_property.end()) return;
+            static_cast<void>((*implementation).set_value(
+                (*property).second, BindingValue{}, true));
+        }
+    };
+
     [[nodiscard]] static bool expandable_value(const BindingValue& value) {
         if (!compound_fields(binding_value_kind(value)).empty()) return true;
         if (const gui_forms::PropertyObjectValue* object = std::get_if<PropertyObjectValue>(&value)) {
@@ -94,13 +182,15 @@ struct PropertyGrid::Impl final {
                 const gui_forms::PropertyObjectValue* object = std::get_if<PropertyObjectValue>(&value);
                 if (!object || !*object) return {};
                 const std::string wanted = canonical_binding_name(segment.name);
-                const std::span<const PropertyObjectMember>::iterator member =
-                    std::find_if(
-                    (*object).members().begin(), (*object).members().end(),
-                    [&wanted](const PropertyObjectMember& candidate) {
-                        return canonical_binding_name(candidate.name) == wanted;
-                    });
-                if (member == (*object).members().end()) return {};
+                const PropertyObjectMember* member = nullptr;
+                for (const PropertyObjectMember& candidate :
+                     (*object).members()) {
+                    if (canonical_binding_name(candidate.name) == wanted) {
+                        member = &candidate;
+                        break;
+                    }
+                }
+                if (member == nullptr) return {};
                 value = (*member).value;
                 continue;
             }
@@ -133,12 +223,11 @@ struct PropertyGrid::Impl final {
             std::vector<PropertyObjectMember> members(
                 (*object).members().begin(), (*object).members().end());
             const std::string wanted = canonical_binding_name(segment.name);
-            const std::vector<PropertyObjectMember>::iterator member =
-                std::find_if(
-                members.begin(), members.end(),
-                [&wanted](const PropertyObjectMember& candidate) {
-                    return canonical_binding_name(candidate.name) == wanted;
-                });
+            std::vector<PropertyObjectMember>::iterator member = members.begin();
+            while (member != members.end() &&
+                   canonical_binding_name((*member).name) != wanted) {
+                ++member;
+            }
             if (member == members.end() || !(*member).writable) return {};
             const std::optional<BindingValue> child = replace_at((*member).value, remainder, replacement);
             if (!child) return {};
@@ -535,23 +624,7 @@ struct PropertyGrid::Impl final {
             if (!common) continue;
             visible.push_back(std::move(descriptor));
         }
-        std::sort(visible.begin(), visible.end(),
-            [this](const PropertyDescriptor& left,
-                   const PropertyDescriptor& right) {
-                if (sort == PropertySort::alphabetical) {
-                    return canonical_binding_name(left.name) <
-                           canonical_binding_name(right.name);
-                }
-                const std::string left_category =
-                    canonical_binding_name(left.category);
-                const std::string right_category =
-                    canonical_binding_name(right.category);
-                if (left_category != right_category) {
-                    return left_category < right_category;
-                }
-                return canonical_binding_name(left.name) <
-                       canonical_binding_name(right.name);
-            });
+        std::sort(visible.begin(), visible.end(), DescriptorLess{sort});
 
         std::map<std::string, PropertyGroupSpec> categorized;
         PropertyGroupSpec alphabetical;
@@ -617,9 +690,7 @@ struct PropertyGrid::Impl final {
             const PropertyDescriptor& descriptor = descriptor_entry.second;
             if (!descriptor.change_notifications) continue;
             SubscriptionToken subscription = (*object).subscribe_property_changed(
-                descriptor.name, owner, [this, canonical] {
-                    if (!committing) refresh_one(canonical, true);
-                });
+                descriptor.name, owner, PropertyRefresh{this, canonical});
             if (subscription.connected()) {
                 property_subscriptions.push_back(std::move(subscription));
             }
@@ -650,14 +721,8 @@ struct PropertyGrid::Impl final {
                 if (!binding) continue;
                 const Control::WeakPtr owner_lifetime = owner.weak_from_this();
                 SubscriptionToken committed = (*binding).connect_committed(
-                    owner, [this, owner_lifetime,
-                            path = request.property_path](
-                               BindingValue proposed) {
-                        const Control::Ptr retained = owner_lifetime.lock();
-                        if (!retained || !(*retained).is_alive()) return;
-                        static_cast<void>(set_value(path, std::move(proposed),
-                                                    false));
-                    });
+                    owner, CustomEditorCommit{
+                        this, owner_lifetime, request.property_path});
                 if (!committed.connected()) {
                     throw std::invalid_argument(
                         "Property editor factory returned no commit subscription");
@@ -665,14 +730,8 @@ struct PropertyGrid::Impl final {
                 SubscriptionToken failure;
                 if ((*binding).connect_failed) {
                     failure = (*binding).connect_failed(
-                        owner, [this, owner_lifetime,
-                                path = request.property_path](
-                                   const PropertyEditorInputError& error) {
-                            const Control::Ptr retained = owner_lifetime.lock();
-                            if (!retained || !(*retained).is_alive()) return;
-                            report_error(path, error.attempted_value,
-                                         error.message);
-                        });
+                        owner, CustomEditorFailure{
+                            this, owner_lifetime, request.property_path});
                     if (!failure.connected()) {
                         throw std::invalid_argument(
                             "Property editor factory returned no failure subscription");
@@ -1117,34 +1176,11 @@ void PropertyGrid::initialize_control_tree() {
     (*(*impl_).list).set_label_width(112.0);
     add_child((*impl_).list);
     (*impl_).list_commit = (*(*impl_).list).value_committed().subscribe(
-        *this, [implementation = impl_.get()](const PropertyValueChange& change) {
-            (*implementation).commit_row(change);
-        });
+        *this, Impl::ListCommit{impl_.get()});
     (*impl_).list_expansion = (*(*impl_).list).row_expansion_changed().subscribe(
-        *this, [implementation = impl_.get()](
-                   const PropertyRowExpansionChange& change) {
-            const Impl::StringMap::iterator property =
-                (*implementation).row_to_property.find(
-                change.row_id);
-            if (property == (*implementation).row_to_property.end()) return;
-            const std::string canonical = canonical_binding_name(
-                (*property).second);
-            if (change.expanded) {
-                (*implementation).expanded_properties.insert(canonical);
-            } else {
-                (*implementation).expanded_properties.erase(canonical);
-            }
-        });
+        *this, Impl::ListExpansion{impl_.get()});
     (*impl_).list_reset = (*(*impl_).list).reset_requested().subscribe(
-        *this, [implementation = impl_.get()](
-                   const PropertyResetRequest& request) {
-            const Impl::StringMap::iterator property =
-                (*implementation).row_to_property.find(
-                request.row_id);
-            if (property == (*implementation).row_to_property.end()) return;
-            static_cast<void>((*implementation).set_value(
-                (*property).second, BindingValue{}, true));
-        });
+        *this, Impl::ListReset{impl_.get()});
 }
 
 Control::Ptr PropertyGrid::selected_object() const noexcept {

@@ -68,12 +68,10 @@ void ObjectView::set_items(std::vector<ObjectViewItem> items) {
 }
 
 std::optional<std::size_t> ObjectView::item_index(std::string_view id) const noexcept {
-    const std::vector<ObjectViewItem>::const_iterator found =
-        std::find_if(items_.begin(), items_.end(),
-        [id](const ObjectViewItem& item) { return item.stable_id == id; });
-    return found == items_.end() ? std::optional<std::size_t>{}
-                                : std::optional<std::size_t>{static_cast<std::size_t>(
-                                      std::distance(items_.begin(), found))};
+    for (std::size_t index = 0U; index < items_.size(); ++index) {
+        if (items_[index].stable_id == id) return index;
+    }
+    return {};
 }
 
 void ObjectView::set_view_mode(ObjectViewMode mode) {
@@ -281,11 +279,38 @@ void ObjectView::set_image_list(std::shared_ptr<ImageList> image_list) {
     image_list_ = std::move(image_list);
     if (image_list_) {
         image_list_changed_ = (*image_list_).changed().subscribe(
-            *this, [this](const ImageListChange&) {
-                if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
-            });
+            *this, Delegate<const ImageListChange&>::bind<
+                ObjectView, &ObjectView::image_list_content_changed>(*this));
     }
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void ObjectView::image_list_content_changed(const ImageListChange&) {
+    if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
+}
+
+bool ObjectView::paint_item_image(
+    Painter& painter, const ObjectViewItem& item,
+    std::size_t index, bool selected, Rect destination_bounds) {
+    if (!image_list_ || !(*image_list_).is_alive() || item.image_key.empty()) {
+        return false;
+    }
+    const ImageVisualState state = !item.enabled
+        ? ImageVisualState::disabled
+        : selected ? ImageVisualState::selected
+        : hovered_index_ == index ? ImageVisualState::hot
+                                  : ImageVisualState::normal;
+    const ImageListResolution resolved = (*image_list_).resolve(
+        item.image_key, state, window() ? (*window()).scale() : 1.0);
+    if (!resolved) return false;
+    const Rect destination = fit_image_rect(
+        destination_bounds, resolved.source_size);
+    painter.draw_image(
+        resolved.image, destination,
+        !item.enabled &&
+                resolved.resolved_state != ImageVisualState::disabled
+            ? 0.45 : 1.0);
+    return true;
 }
 
 void ObjectView::on_attached_to_window() {
@@ -463,32 +488,12 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
             painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
                                cell.width - 2.0, cell.height - 2.0}, style().face_light);
         }
-        const auto paint_item_image = [&](Rect destination_bounds) {
-            if (!image_list_ || !(*image_list_).is_alive() || item.image_key.empty()) {
-                return false;
-            }
-            const ImageVisualState state = !item.enabled
-                ? ImageVisualState::disabled
-                : selected ? ImageVisualState::selected
-                : hovered_index_ == index ? ImageVisualState::hot
-                                          : ImageVisualState::normal;
-            const ImageListResolution resolved = (*image_list_).resolve(
-                item.image_key, state, window() ? (*window()).scale() : 1.0);
-            if (!resolved) return false;
-            const Rect destination = fit_image_rect(destination_bounds,
-                                                    resolved.source_size);
-            painter.draw_image(
-                resolved.image, destination,
-                !item.enabled &&
-                        resolved.resolved_state != ImageVisualState::disabled
-                    ? 0.45 : 1.0);
-            return true;
-        };
         if (view_mode_ == ObjectViewMode::icons) {
             const double glyph_width = std::min(46.0, cell.width - 18.0);
             const Rect glyph_bounds{cell.x + (cell.width - glyph_width) * .5,
                                     cell.y + 4.0, glyph_width, 43.0};
-            if (!paint_item_image(glyph_bounds)) {
+            if (!paint_item_image(
+                    painter, item, index, selected, glyph_bounds)) {
                 paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
             }
             const Size measured = painter.measure_text_utf8(item.name, font);
@@ -509,7 +514,8 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
         } else {
             const Rect glyph_bounds{cell.x + 6.0, cell.y + 3.0, 24.0,
                                     std::max(18.0, cell.height - 6.0)};
-            if (!paint_item_image(glyph_bounds)) {
+            if (!paint_item_image(
+                    painter, item, index, selected, glyph_bounds)) {
                 paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
             }
             painter.draw_text_utf8({cell.x + 38.0, cell.y + cell.height * .5 + 4.0},

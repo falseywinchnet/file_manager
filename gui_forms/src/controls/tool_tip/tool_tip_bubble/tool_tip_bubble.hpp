@@ -6,6 +6,7 @@ namespace gui_forms {
 
 class ToolTipBubble final : public Panel {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     ToolTipBubble(StableId stable_id, std::string text);
 
     void initialize_control_tree();

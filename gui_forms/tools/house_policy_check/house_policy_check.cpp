@@ -50,6 +50,11 @@ llvm::cl::opt<std::string> policy_mode(
     llvm::cl::desc("Policy mode: inventory or closure"),
     llvm::cl::cat(policy_category));
 
+llvm::cl::opt<std::string> source_scope(
+    "source-scope", llvm::cl::init("production"),
+    llvm::cl::desc("Source scope: production or first-party"),
+    llvm::cl::cat(policy_category));
+
 llvm::cl::opt<bool> quiet(
     "quiet", llvm::cl::init(false),
     llvm::cl::desc("Suppress individual text diagnostics"),
@@ -98,6 +103,23 @@ struct AutoTypeRewrite final {
     if (left.line != right.line) return left.line < right.line;
     if (left.column != right.column) return left.column < right.column;
     return left.construct_kind < right.construct_kind;
+}
+
+[[nodiscard]] bool pointer_rewrite_less(
+    const PointerArrowRewrite& left,
+    const PointerArrowRewrite& right) noexcept {
+    if (left.path != right.path) return left.path < right.path;
+    if (left.base_offset != right.base_offset) {
+        return left.base_offset < right.base_offset;
+    }
+    return left.operator_offset < right.operator_offset;
+}
+
+[[nodiscard]] bool auto_type_rewrite_less(
+    const AutoTypeRewrite& left,
+    const AutoTypeRewrite& right) noexcept {
+    if (left.path != right.path) return left.path < right.path;
+    return left.token_offset < right.token_offset;
 }
 
 [[nodiscard]] std::string normalized_path(llvm::StringRef input) {
@@ -169,14 +191,14 @@ public:
             "explicit_dereference_member_access");
         if (pointer_rewrite_output.empty()) return;
         if (expression.isImplicitAccess()) return;
-        if (expression.getBase()->getType()->isObjCObjectPointerType()) return;
+        if ((*(*expression.getBase()).getType()).isObjCObjectPointerType()) return;
 
         const clang::SourceLocation base_location =
-            source_manager_.getSpellingLoc(expression.getBase()->getBeginLoc());
+            source_manager_.getSpellingLoc((*expression.getBase()).getBeginLoc());
         const clang::SourceLocation operator_location =
             source_manager_.getSpellingLoc(expression.getOperatorLoc());
         if (!base_location.isValid() || !operator_location.isValid() ||
-            expression.getBase()->getBeginLoc().isMacroID() ||
+            (*expression.getBase()).getBeginLoc().isMacroID() ||
             expression.getOperatorLoc().isMacroID()) {
             return;
         }
@@ -215,11 +237,11 @@ public:
         clang::AutoTypeLoc location, clang::QualType semantic_type = {},
         clang::SourceLocation declarator_location = {}) {
         const clang::AutoType* type = location.getTypePtr();
-        const llvm::StringRef kind = type->isDecltypeAuto()
+        const llvm::StringRef kind = (*type).isDecltypeAuto()
             ? llvm::StringRef("decltype_auto") : llvm::StringRef("auto_type");
         add(kind, location.getBeginLoc(), location,
             "spell_explicit_named_type");
-        if (auto_rewrite_output.empty() || type->isDecltypeAuto()) return;
+        if (auto_rewrite_output.empty() || (*type).isDecltypeAuto()) return;
 
         const clang::SourceLocation spelling =
             source_manager_.getSpellingLoc(location.getBeginLoc());
@@ -233,9 +255,9 @@ public:
         if (token_text != "auto") return;
 
         clang::QualType deduced = semantic_type.isNull()
-            ? type->getDeducedType() : semantic_type;
-        while (!deduced.isNull() && deduced->isReferenceType()) {
-            deduced = deduced->getPointeeType();
+            ? (*type).getDeducedType() : semantic_type;
+        while (!deduced.isNull() && (*deduced).isReferenceType()) {
+            deduced = (*deduced).getPointeeType();
         }
         const clang::SourceLocation declarator_spelling =
             source_manager_.getSpellingLoc(declarator_location);
@@ -253,11 +275,11 @@ public:
                     auto_offset + 4U, declarator_offset);
                 for (const char character : declarator_prefix) {
                     if (character != '*') continue;
-                    if (deduced.isNull() || !deduced->isPointerType()) {
+                    if (deduced.isNull() || !(*deduced).isPointerType()) {
                         deduced = clang::QualType();
                         break;
                     }
-                    deduced = deduced->getPointeeType();
+                    deduced = (*deduced).getPointeeType();
                 }
             }
         }
@@ -270,7 +292,7 @@ public:
         std::string replacement;
         bool safe = false;
         std::string reason;
-        if (deduced.isNull() || deduced->isDependentType()) {
+        if (deduced.isNull() || (*deduced).isDependentType()) {
             reason = "dependent_or_undeduced";
         } else {
             clang::PrintingPolicy policy(context_.getPrintingPolicy());
@@ -391,7 +413,7 @@ public:
         const std::map<std::string, std::size_t>::iterator existing =
             auto_rewrite_indices_.find(key);
         if (existing != auto_rewrite_indices_.end()) {
-            AutoTypeRewrite& prior = auto_rewrites_[existing->second];
+            AutoTypeRewrite& prior = auto_rewrites_[(*existing).second];
             if (prior.replacement != replacement) {
                 prior.safe = false;
                 prior.reason = "translation_unit_type_conflict";
@@ -420,7 +442,8 @@ private:
     [[nodiscard]] bool is_normative_path(const std::string& path) const {
         const llvm::StringRef value(path);
         if (!value.starts_with(normalized_root_ + "/")) return false;
-        if (!contains_component(value, "/include/") &&
+        if (source_scope == "production" &&
+            !contains_component(value, "/include/") &&
             !contains_component(value, "/src/")) {
             return false;
         }
@@ -440,8 +463,8 @@ private:
             bool advanced = false;
             for (const clang::DynTypedNode& parent : parents) {
                 const clang::NamedDecl* named = parent.get<clang::NamedDecl>();
-                if (named != nullptr && !named->isImplicit()) {
-                    const std::string qualified = named->getQualifiedNameAsString();
+                if (named != nullptr && !(*named).isImplicit()) {
+                    const std::string qualified = (*named).getQualifiedNameAsString();
                     if (nearest_named.empty()) nearest_named = qualified;
                     if (llvm::isa<clang::FunctionDecl>(named)) return qualified;
                 }
@@ -470,7 +493,14 @@ private:
                 return true;
             }
         }
-        return enclosing == "gui_forms::showcase::initialize_showcase_runtime";
+        return enclosing == "gui_forms::showcase::initialize_showcase_runtime" ||
+               enclosing == "file_manager_demoboard::set_product_surface" ||
+               enclosing ==
+                   "(anonymous namespace)::test_public_drawing_metrics_and_control_tag" ||
+               enclosing ==
+                   "(anonymous namespace)::test_error_semantics_geometry_rtl_and_lifetime" ||
+               enclosing ==
+                   "(anonymous namespace)::test_help_routes_f1_locally_then_to_provider_without_external_policy";
     }
 
     clang::ASTContext& context_;
@@ -509,33 +539,33 @@ public:
 
     bool VisitVarDecl(clang::VarDecl* declaration) {
         const clang::TypeSourceInfo* source_info =
-            declaration->getTypeSourceInfo();
+            (*declaration).getTypeSourceInfo();
         if (source_info == nullptr) return true;
-        for (clang::TypeLoc current = source_info->getTypeLoc();
+        for (clang::TypeLoc current = (*source_info).getTypeLoc();
              !current.isNull(); current = current.getNextTypeLoc()) {
             const clang::AutoTypeLoc automatic = current.getAs<clang::AutoTypeLoc>();
             if (automatic.isNull()) continue;
-            collector_.add_auto_type(automatic, declaration->getType(),
-                                     declaration->getLocation());
+            collector_.add_auto_type(automatic, (*declaration).getType(),
+                                     (*declaration).getLocation());
             break;
         }
         return true;
     }
 
     bool VisitLambdaExpr(clang::LambdaExpr* expression) {
-        collector_.add("lambda", expression->getBeginLoc(), *expression,
+        collector_.add("lambda", (*expression).getBeginLoc(), *expression,
                        "named_function_or_functor");
         return true;
     }
 
     bool VisitDecompositionDecl(clang::DecompositionDecl* declaration) {
-        collector_.add("structured_binding", declaration->getLocation(),
+        collector_.add("structured_binding", (*declaration).getLocation(),
                        *declaration, "explicit_named_bindings");
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr* expression) {
-        if (expression->isArrow()) {
+        if ((*expression).isArrow()) {
             collector_.add_pointer_arrow(*expression);
         }
         return true;
@@ -543,22 +573,22 @@ public:
 
     bool VisitCXXDependentScopeMemberExpr(
         clang::CXXDependentScopeMemberExpr* expression) {
-        if (expression->isArrow()) {
+        if ((*expression).isArrow()) {
             collector_.add_pointer_arrow(*expression);
         }
         return true;
     }
 
     bool VisitFunctionDecl(clang::FunctionDecl* declaration) {
-        if (declaration->isImplicit()) return true;
+        if ((*declaration).isImplicit()) return true;
         const clang::TypeSourceInfo* source_info =
-            declaration->getTypeSourceInfo();
+            (*declaration).getTypeSourceInfo();
         if (source_info != nullptr) {
             const clang::SourceLocation function_location =
-                declaration->getLocation();
+                (*declaration).getLocation();
             const unsigned function_offset = function_location.isValid()
                 ? context_source_offset(function_location) : 0U;
-            for (clang::TypeLoc current = source_info->getTypeLoc();
+            for (clang::TypeLoc current = (*source_info).getTypeLoc();
                  !current.isNull(); current = current.getNextTypeLoc()) {
                 const clang::AutoTypeLoc automatic =
                     current.getAs<clang::AutoTypeLoc>();
@@ -567,26 +597,26 @@ public:
                     context_source_offset(automatic.getBeginLoc());
                 if (function_offset != 0U && auto_offset < function_offset) {
                     collector_.add_auto_type(
-                        automatic, declaration->getReturnType(),
+                        automatic, (*declaration).getReturnType(),
                         function_location);
                 }
                 break;
             }
         }
         const clang::FunctionProtoType* prototype =
-            declaration->getType()->getAs<clang::FunctionProtoType>();
-        if (prototype != nullptr && prototype->hasTrailingReturn()) {
-            collector_.add("trailing_return", declaration->getLocation(),
+            (*(*declaration).getType()).getAs<clang::FunctionProtoType>();
+        if (prototype != nullptr && (*prototype).hasTrailingReturn()) {
+            collector_.add("trailing_return", (*declaration).getLocation(),
                            *declaration, "leading_explicit_return_type");
         }
-        if (declaration->isConsteval()) {
-            collector_.add("consteval", declaration->getLocation(), *declaration,
+        if ((*declaration).isConsteval()) {
+            collector_.add("consteval", (*declaration).getLocation(), *declaration,
                            "retain_explicit_compile_time_execution", "admitted",
                            "O-002-consteval");
         }
-        if (declaration->isDefaulted() && declaration->isOverloadedOperator()) {
+        if ((*declaration).isDefaulted() && (*declaration).isOverloadedOperator()) {
             const clang::OverloadedOperatorKind operator_kind =
-                declaration->getOverloadedOperator();
+                (*declaration).getOverloadedOperator();
             if (operator_kind == clang::OO_EqualEqual ||
                 operator_kind == clang::OO_ExclaimEqual ||
                 operator_kind == clang::OO_Less ||
@@ -594,7 +624,7 @@ public:
                 operator_kind == clang::OO_Greater ||
                 operator_kind == clang::OO_GreaterEqual ||
                 operator_kind == clang::OO_Spaceship) {
-                collector_.add("defaulted_comparison", declaration->getLocation(),
+                collector_.add("defaulted_comparison", (*declaration).getLocation(),
                                *declaration, "explicit_needed_comparison");
             }
         }
@@ -602,8 +632,8 @@ public:
     }
 
     bool VisitIfStmt(clang::IfStmt* statement) {
-        if (statement->isConstexpr()) {
-            collector_.add("if_constexpr", statement->getIfLoc(), *statement,
+        if ((*statement).isConstexpr()) {
+            collector_.add("if_constexpr", (*statement).getIfLoc(), *statement,
                            "retain_named_template_folding", "admitted",
                            "O-004-if-constexpr");
         }
@@ -611,7 +641,7 @@ public:
     }
 
     bool VisitRequiresExpr(clang::RequiresExpr* expression) {
-        collector_.add("requires_expression", expression->getRequiresKWLoc(),
+        collector_.add("requires_expression", (*expression).getRequiresKWLoc(),
                        *expression, "explicit_specialized_trait");
         return true;
     }
@@ -623,31 +653,31 @@ public:
     }
 
     bool VisitCoroutineBodyStmt(clang::CoroutineBodyStmt* statement) {
-        collector_.add("coroutine", statement->getBeginLoc(), *statement,
+        collector_.add("coroutine", (*statement).getBeginLoc(), *statement,
                        "explicit_state_machine");
         return true;
     }
 
     bool VisitCoawaitExpr(clang::CoawaitExpr* expression) {
-        collector_.add("co_await", expression->getBeginLoc(), *expression,
+        collector_.add("co_await", (*expression).getBeginLoc(), *expression,
                        "explicit_state_machine");
         return true;
     }
 
     bool VisitCoyieldExpr(clang::CoyieldExpr* expression) {
-        collector_.add("co_yield", expression->getBeginLoc(), *expression,
+        collector_.add("co_yield", (*expression).getBeginLoc(), *expression,
                        "explicit_state_machine");
         return true;
     }
 
     bool VisitCoreturnStmt(clang::CoreturnStmt* statement) {
-        collector_.add("co_return", statement->getBeginLoc(), *statement,
+        collector_.add("co_return", (*statement).getBeginLoc(), *statement,
                        "explicit_state_machine");
         return true;
     }
 
     bool VisitDesignatedInitExpr(clang::DesignatedInitExpr* expression) {
-        collector_.add("designated_initializer", expression->getBeginLoc(),
+        collector_.add("designated_initializer", (*expression).getBeginLoc(),
                        *expression, "plain_configuration_record_review",
                        "review", "O-007-classify-target");
         return true;
@@ -655,7 +685,7 @@ public:
 
     bool VisitConceptSpecializationExpr(
         clang::ConceptSpecializationExpr* expression) {
-        collector_.add("concept_specialization", expression->getBeginLoc(),
+        collector_.add("concept_specialization", (*expression).getBeginLoc(),
                        *expression, "explicit_template_constraint_review",
                        "review", "O-009-concrete-review");
         return true;
@@ -685,20 +715,20 @@ public:
     }
 
     bool VisitDeclRefExpr(clang::DeclRefExpr* expression) {
-        const clang::NamedDecl* declaration = expression->getFoundDecl();
+        const clang::NamedDecl* declaration = (*expression).getFoundDecl();
         if (declaration == nullptr) return true;
-        const std::string qualified = declaration->getQualifiedNameAsString();
+        const std::string qualified = (*declaration).getQualifiedNameAsString();
         const llvm::StringRef name(qualified);
         if (name.starts_with("std::any_cast")) {
-            collector_.add("std_any", expression->getLocation(), *expression,
+            collector_.add("std_any", (*expression).getLocation(), *expression,
                            "tag_only_or_explicit_type");
         }
         if (name.starts_with("std::ranges::")) {
-            collector_.add("std_ranges", expression->getLocation(), *expression,
+            collector_.add("std_ranges", (*expression).getLocation(), *expression,
                            "concrete_architect_review");
         }
         if (name == "std::has_single_bit") {
-            collector_.add("has_single_bit", expression->getLocation(),
+            collector_.add("has_single_bit", (*expression).getLocation(),
                            *expression, "retain_clear_bit_predicate", "admitted",
                            "O-008-has-single-bit");
         }
@@ -845,6 +875,7 @@ private:
     llvm::json::Object root;
     root["schema"] = "gui.forms.house-policy-findings/v1";
     root["mode"] = policy_mode;
+    root["sourceScope"] = source_scope;
     root["sourceRoot"] = normalized_path(source_root);
     root["findingCount"] = static_cast<std::int64_t>(findings.size());
     root["findings"] = std::move(records);
@@ -928,6 +959,10 @@ int main(int argc, const char** argv) {
         llvm::errs() << "unsupported --mode: " << policy_mode << '\n';
         return EXIT_FAILURE;
     }
+    if (source_scope != "production" && source_scope != "first-party") {
+        llvm::errs() << "unsupported --source-scope: " << source_scope << '\n';
+        return EXIT_FAILURE;
+    }
 
     std::vector<Finding> findings;
     std::set<std::string> keys;
@@ -935,8 +970,8 @@ int main(int argc, const char** argv) {
     std::set<std::string> pointer_rewrite_keys;
     std::vector<AutoTypeRewrite> auto_rewrites;
     std::map<std::string, std::size_t> auto_rewrite_indices;
-    clang::tooling::ClangTool tool(options->getCompilations(),
-                                   options->getSourcePathList());
+    clang::tooling::ClangTool tool((*options).getCompilations(),
+                                   (*options).getSourcePathList());
     PolicyActionFactory factory(findings, keys, pointer_rewrites,
                                 pointer_rewrite_keys, auto_rewrites,
                                 auto_rewrite_indices);
@@ -945,19 +980,9 @@ int main(int argc, const char** argv) {
 
     std::sort(findings.begin(), findings.end(), finding_less);
     std::sort(pointer_rewrites.begin(), pointer_rewrites.end(),
-              [](const PointerArrowRewrite& left,
-                 const PointerArrowRewrite& right) {
-                  if (left.path != right.path) return left.path < right.path;
-                  if (left.base_offset != right.base_offset) {
-                      return left.base_offset < right.base_offset;
-                  }
-                  return left.operator_offset < right.operator_offset;
-              });
+              pointer_rewrite_less);
     std::sort(auto_rewrites.begin(), auto_rewrites.end(),
-              [](const AutoTypeRewrite& left, const AutoTypeRewrite& right) {
-                  if (left.path != right.path) return left.path < right.path;
-                  return left.token_offset < right.token_offset;
-              });
+              auto_type_rewrite_less);
     if (!write_ledger(findings)) return EXIT_FAILURE;
     if (!write_pointer_rewrites(pointer_rewrites)) return EXIT_FAILURE;
     if (!write_auto_rewrites(auto_rewrites)) return EXIT_FAILURE;

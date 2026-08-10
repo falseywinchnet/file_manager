@@ -13,31 +13,8 @@ protected:
     HostMonitorResult query_monitors_impl() override {
         HostMonitorResult result;
         const BOOL enumerated = EnumDisplayMonitors(
-            nullptr, nullptr,
-            [](HMONITOR monitor, HDC, LPRECT, LPARAM context) -> BOOL {
-                std::vector<HostMonitor>& monitors = *reinterpret_cast<std::vector<HostMonitor>*>(context);
-                MONITORINFOEXW info{};
-                info.cbSize = sizeof(info);
-                if (!GetMonitorInfoW(monitor, &info)) return TRUE;
-                HostMonitor value;
-                value.id = utf8_from_wide(info.szDevice);
-                if (value.id.empty()) {
-                    value.id = "win32.monitor." + std::to_string(
-                        reinterpret_cast<std::uintptr_t>(monitor));
-                }
-                value.frame = {static_cast<double>(info.rcMonitor.left),
-                               static_cast<double>(info.rcMonitor.top),
-                               static_cast<double>(info.rcMonitor.right - info.rcMonitor.left),
-                               static_cast<double>(info.rcMonitor.bottom - info.rcMonitor.top)};
-                value.work_area = {static_cast<double>(info.rcWork.left),
-                                   static_cast<double>(info.rcWork.top),
-                                   static_cast<double>(info.rcWork.right - info.rcWork.left),
-                                   static_cast<double>(info.rcWork.bottom - info.rcWork.top)};
-                value.scale = native_monitor_scale(monitor);
-                value.primary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0U;
-                monitors.push_back(std::move(value));
-                return TRUE;
-            }, reinterpret_cast<LPARAM>(&result.monitors));
+            nullptr, nullptr, &WindowsHostServices::collect_monitor,
+            reinterpret_cast<LPARAM>(&result.monitors));
         if (!enumerated || result.monitors.empty()) {
             result.status.error = HostServiceError::backend_failure;
         }
@@ -119,21 +96,29 @@ protected:
     }
 
     HostDialogResult show_dialog_impl(const HostDialogRequest& request) override {
-        return std::visit([this, &request](const auto& payload) -> HostDialogResult {
-            using Payload = std::decay_t<decltype(payload)>;
-            if constexpr (std::is_same_v<Payload, HostMessageDialogRequest>) {
-                return native_message_dialog(owner_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostOpenFileDialogRequest>) {
-                return native_open_dialog(owner_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostSaveFileDialogRequest>) {
-                return native_save_dialog(owner_, request.request_id, payload);
-            } else if constexpr (std::is_same_v<Payload, HostFolderDialogRequest>) {
-                return native_folder_dialog(owner_, request.request_id, payload);
-            } else {
-                return native_color_dialog(owner_, request.request_id, payload,
-                                           custom_colors_);
-            }
-        }, request.payload);
+        if (std::holds_alternative<HostMessageDialogRequest>(request.payload)) {
+            return native_message_dialog(
+                owner_, request.request_id,
+                std::get<HostMessageDialogRequest>(request.payload));
+        }
+        if (std::holds_alternative<HostOpenFileDialogRequest>(request.payload)) {
+            return native_open_dialog(
+                owner_, request.request_id,
+                std::get<HostOpenFileDialogRequest>(request.payload));
+        }
+        if (std::holds_alternative<HostSaveFileDialogRequest>(request.payload)) {
+            return native_save_dialog(
+                owner_, request.request_id,
+                std::get<HostSaveFileDialogRequest>(request.payload));
+        }
+        if (std::holds_alternative<HostFolderDialogRequest>(request.payload)) {
+            return native_folder_dialog(
+                owner_, request.request_id,
+                std::get<HostFolderDialogRequest>(request.payload));
+        }
+        return native_color_dialog(
+            owner_, request.request_id,
+            std::get<HostColorDialogRequest>(request.payload), custom_colors_);
     }
 
     HostServiceStatus play_sound_cue_impl(
@@ -153,6 +138,35 @@ protected:
     void shutdown_impl() noexcept override { owner_ = nullptr; }
 
 private:
+    static BOOL CALLBACK collect_monitor(HMONITOR monitor, HDC, LPRECT,
+                                         LPARAM context) {
+        std::vector<HostMonitor>& monitors =
+            *reinterpret_cast<std::vector<HostMonitor>*>(context);
+        MONITORINFOEXW info{};
+        info.cbSize = sizeof(info);
+        if (!GetMonitorInfoW(monitor, &info)) return TRUE;
+        HostMonitor value;
+        value.id = utf8_from_wide(info.szDevice);
+        if (value.id.empty()) {
+            value.id = "win32.monitor." + std::to_string(
+                reinterpret_cast<std::uintptr_t>(monitor));
+        }
+        value.frame = {
+            static_cast<double>(info.rcMonitor.left),
+            static_cast<double>(info.rcMonitor.top),
+            static_cast<double>(info.rcMonitor.right - info.rcMonitor.left),
+            static_cast<double>(info.rcMonitor.bottom - info.rcMonitor.top)};
+        value.work_area = {
+            static_cast<double>(info.rcWork.left),
+            static_cast<double>(info.rcWork.top),
+            static_cast<double>(info.rcWork.right - info.rcWork.left),
+            static_cast<double>(info.rcWork.bottom - info.rcWork.top)};
+        value.scale = native_monitor_scale(monitor);
+        value.primary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0U;
+        monitors.push_back(std::move(value));
+        return TRUE;
+    }
+
     HWND owner_{};
     std::array<COLORREF, 16> custom_colors_{};
 };

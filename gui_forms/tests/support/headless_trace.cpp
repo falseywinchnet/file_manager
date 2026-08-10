@@ -96,6 +96,12 @@ private:
     FakeMonotonicClock& clock_;
 };
 
+std::shared_ptr<TraceControl> make_trace_control(
+    std::string id, TraceRecorder& trace, FakeMonotonicClock& clock) {
+    return make_control<TraceControl>(
+        StableId(std::move(id)), trace, clock);
+}
+
 } // namespace
 
 void TraceRecorder::record(std::string line) {
@@ -104,7 +110,7 @@ void TraceRecorder::record(std::string line) {
 
 std::string TraceRecorder::text() const {
     std::ostringstream output;
-    for (const auto& line : lines_) {
+    for (const std::string& line : lines_) {
         output << line << '\n';
     }
     return output.str();
@@ -113,22 +119,22 @@ std::string TraceRecorder::text() const {
 std::string canonical_lifecycle_trace() {
     FakeMonotonicClock clock;
     TraceRecorder trace;
-    auto make = [&](std::string id) {
-        return make_control<TraceControl>(StableId(std::move(id)), trace, clock);
-    };
-
-    auto root = make("trace.root");
-    auto left = make("trace.left");
-    auto right = make("trace.right");
-    auto target = make("trace.target");
-    root->set_requested_bounds({0.0, 0.0, 120.0, 80.0});
-    left->set_requested_bounds({0.0, 0.0, 55.0, 80.0});
-    right->set_requested_bounds({80.0, 0.0, 55.0, 80.0});
-    target->set_requested_bounds({5.0, 5.0, 30.0, 20.0});
-    target->set_focusable(true);
-    left->add_child(target);
-    root->add_child(left);
-    root->add_child(right);
+    std::shared_ptr<TraceControl> root =
+        make_trace_control("trace.root", trace, clock);
+    std::shared_ptr<TraceControl> left =
+        make_trace_control("trace.left", trace, clock);
+    std::shared_ptr<TraceControl> right =
+        make_trace_control("trace.right", trace, clock);
+    std::shared_ptr<TraceControl> target =
+        make_trace_control("trace.target", trace, clock);
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 80.0});
+    (*left).set_requested_bounds({0.0, 0.0, 55.0, 80.0});
+    (*right).set_requested_bounds({80.0, 0.0, 55.0, 80.0});
+    (*target).set_requested_bounds({5.0, 5.0, 30.0, 20.0});
+    (*target).set_focusable(true);
+    (*left).add_child(target);
+    (*root).add_child(left);
+    (*root).add_child(right);
 
     Window window(root, {120.0, 80.0});
     trace.record("create controls=" + std::to_string(window.metrics_snapshot().control_count));
@@ -152,15 +158,15 @@ std::string canonical_lifecycle_trace() {
     window.dispatch_text({"A"});
 
     clock.advance(10);
-    right->add_child(target);
-    target->set_requested_bounds({5.0, 5.0, 30.0, 20.0});
+    (*right).add_child(target);
+    (*target).set_requested_bounds({5.0, 5.0, 30.0, 20.0});
     window.perform_layout();
     trace.record("t=50 reparent id=trace.target parent=trace.right");
     window.request_focus(target);
 
     clock.advance(10);
     window.dispatch_pointer({PointerAction::down, PointerButton::primary, {90.0, 10.0}});
-    target->dispose();
+    (*target).dispose();
     trace.record("t=60 dispose id=trace.target state=disposed");
     window.dispatch_pointer({PointerAction::up, PointerButton::primary, {90.0, 10.0}});
 

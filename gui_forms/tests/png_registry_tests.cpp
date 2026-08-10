@@ -29,9 +29,30 @@ void require(bool condition, const char* message) {
 }
 
 std::vector<std::byte> valid_bytes() {
-    const auto bytes = std::as_bytes(std::span{one_pixel_png});
+    const std::span<const std::uint8_t, 70> source(one_pixel_png);
+    const std::span<const std::byte, 70> bytes = std::as_bytes(source);
     return {bytes.begin(), bytes.end()};
 }
+
+class LoadPngOffThread final {
+public:
+    LoadPngOffThread(Window& window, const std::vector<std::byte>& bytes,
+                     bool& rejected)
+        : window_(window), bytes_(bytes), rejected_(rejected) {}
+
+    void operator()() const {
+        try {
+            static_cast<void>(window_.load_png(bytes_));
+        } catch (const std::logic_error&) {
+            rejected_ = true;
+        }
+    }
+
+private:
+    Window& window_;
+    const std::vector<std::byte>& bytes_;
+    bool& rejected_;
+};
 
 std::uint32_t crc32(std::span<const std::byte> bytes) {
     std::uint32_t crc = 0xffffffffU;
@@ -223,14 +244,14 @@ void deterministic_mutation_oracle() {
     std::vector<ImageResourceError> first;
     std::vector<ImageResourceError> second;
     for (std::vector<ImageResourceError>* outcomes : {&first, &second}) {
-        outcomes->reserve(source.size());
+        (*outcomes).reserve(source.size());
         for (std::size_t index = 0; index < source.size(); ++index) {
             std::vector<std::byte> mutation = source;
             mutation[index] ^= std::byte{0x01};
             const ImageResourceError error = validate_png(mutation).error;
             require(!image_resource_error_name(error).empty(),
                     "parser returned an unnamed result");
-            outcomes->push_back(error);
+            (*outcomes).push_back(error);
         }
     }
     require(first == second, "PNG mutation oracle was nondeterministic");
@@ -249,13 +270,13 @@ void owned_pixel_surface_contract() {
     const ImageLoadResult loaded = registry.load_bgra32_premultiplied(
         2, 2, 12, padded);
     require(static_cast<bool>(loaded), "owned BGRA surface was rejected");
-    const auto resource = registry.find(loaded.image);
+    const std::optional<ImageResourceView> resource = registry.find(loaded.image);
     require(resource.has_value() &&
-                resource->encoding == ImageResourceEncoding::bgra32_premultiplied &&
-                resource->row_bytes == 8 && resource->encoded.size() == 16 &&
-                resource->metadata.decoded_byte_count == 16,
+                (*resource).encoding == ImageResourceEncoding::bgra32_premultiplied &&
+                (*resource).row_bytes == 8 && (*resource).encoded.size() == 16 &&
+                (*resource).metadata.decoded_byte_count == 16,
             "owned BGRA surface was not tightly normalized");
-    require(resource->encoded[8] == std::byte{255},
+    require((*resource).encoded[8] == std::byte{255},
             "owned BGRA surface retained source row padding");
     require(registry.load_bgra32_premultiplied(2, 2, 7, padded).error ==
                 ImageResourceError::dimension_limit_exceeded,
@@ -276,10 +297,10 @@ void owned_pixel_surface_contract() {
     require(patched && patched.image != replaced.image &&
                 !registry.find(replaced.image).has_value(),
             "bounded BGRA patch did not advance the resource generation");
-    const auto patched_view = registry.find(patched.image);
-    require(patched_view && patched_view->encoded[4] == std::byte{0} &&
-                patched_view->encoded[5] == std::byte{255} &&
-                patched_view->encoded[7] == std::byte{255},
+    const std::optional<ImageResourceView> patched_view = registry.find(patched.image);
+    require(patched_view && (*patched_view).encoded[4] == std::byte{0} &&
+                (*patched_view).encoded[5] == std::byte{255} &&
+                (*patched_view).encoded[7] == std::byte{255},
             "bounded BGRA patch did not update the selected pixel");
     require(registry.patch_bgra32_premultiplied(
                 patched.image, 2, 0, 1, 1, 4, green).error ==
@@ -290,17 +311,11 @@ void owned_pixel_surface_contract() {
 }
 
 void window_thread_boundary() {
-    auto root = make_control<Control>(StableId("resource.root"));
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("resource.root"));
     Window window(root, {32.0, 32.0});
     const std::vector<std::byte> bytes = valid_bytes();
     bool rejected = false;
-    std::thread worker([&] {
-        try {
-            static_cast<void>(window.load_png(bytes));
-        } catch (const std::logic_error&) {
-            rejected = true;
-        }
-    });
+    std::thread worker(LoadPngOffThread(window, bytes, rejected));
     worker.join();
     require(rejected &&
                 window.metrics_snapshot().rejected_wrong_thread_operations == 1,
@@ -308,11 +323,11 @@ void window_thread_boundary() {
 }
 
 void scoped_window_replacement_damage() {
-    auto root = make_control<Control>(StableId("resource.damage.root"));
-    auto consumer = make_control<Control>(StableId("resource.damage.consumer"));
-    root->set_requested_bounds({0.0, 0.0, 32.0, 32.0});
-    consumer->set_requested_bounds({5.0, 6.0, 10.0, 8.0});
-    root->add_child(consumer);
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("resource.damage.root"));
+    std::shared_ptr<gui_forms::Control> consumer = make_control<Control>(StableId("resource.damage.consumer"));
+    (*root).set_requested_bounds({0.0, 0.0, 32.0, 32.0});
+    (*consumer).set_requested_bounds({5.0, 6.0, 10.0, 8.0});
+    (*root).add_child(consumer);
     Window window(root, {32.0, 32.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());

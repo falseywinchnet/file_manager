@@ -122,7 +122,7 @@ struct Fixture final {
         : probe(make_control<InputProbe>(StableId("host.probe"))),
           window(probe, {100.0, 80.0}),
           host(window) {
-        probe->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+        (*probe).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
     }
 
     std::shared_ptr<InputProbe> probe;
@@ -149,6 +149,231 @@ HostDialogRequest message_request(std::uint64_t request_id,
         ? HostDialogChoice::yes : HostDialogChoice::ok;
     return {request_id, "gallery.window", std::move(message)};
 }
+
+class AppendCanonicalModalTrace final {
+public:
+    explicit AppendCanonicalModalTrace(std::string& trace) : trace_(trace) {}
+
+    void operator()(const HostModalTransition& transition) const {
+        trace_ += transition.entering ? "modal=enter" : "modal=leave";
+        trace_ += " request=" + std::to_string(transition.request_id);
+        trace_ += " depth=" + std::to_string(transition.depth) + '\n';
+    }
+
+private:
+    std::string& trace_;
+};
+
+HostDialogResult handle_canonical_dialog(
+    const HostDialogRequest& request, host::HeadlessHostServices& adapter) {
+    if (request.request_id == 70) {
+        static_cast<void>(adapter.show_dialog(message_request(71)));
+        return HostDialogResult{
+            {}, request.request_id,
+            HostMessageDialogResult{HostDialogOutcome::cancelled,
+                                    HostDialogChoice::cancel}};
+    }
+    return HostDialogResult{
+        {}, request.request_id,
+        HostMessageDialogResult{HostDialogOutcome::accepted,
+                                HostDialogChoice::ok}};
+}
+
+class PlaySoundCueOffThread final {
+public:
+    PlaySoundCueOffThread(host::HeadlessHostServices& services,
+                          HostServiceStatus& result, std::uint64_t timestamp)
+        : services_(services), result_(result), timestamp_(timestamp) {}
+
+    void operator()() const {
+        result_ = services_.play_sound_cue(
+            {HostSoundCue::error, 1.0, timestamp_});
+    }
+
+private:
+    host::HeadlessHostServices& services_;
+    HostServiceStatus& result_;
+    std::uint64_t timestamp_;
+};
+
+class ShowDialogOffThread final {
+public:
+    ShowDialogOffThread(host::HeadlessHostServices& services,
+                        HostDialogResult& result)
+        : services_(services), result_(result) {}
+
+    void operator()() const {
+        result_ = services_.show_dialog(message_request(15));
+    }
+
+private:
+    host::HeadlessHostServices& services_;
+    HostDialogResult& result_;
+};
+
+class AppendNestedModalTrace final {
+public:
+    explicit AppendNestedModalTrace(std::string& transitions)
+        : transitions_(transitions) {}
+
+    void operator()(const HostModalTransition& transition) const {
+        transitions_ += transition.entering ? "enter:" : "leave:";
+        transitions_ += std::to_string(transition.request_id) + ":" +
+            std::to_string(transition.depth) + '\n';
+    }
+
+private:
+    std::string& transitions_;
+};
+
+class NestedModalHandler final {
+public:
+    NestedModalHandler(Fixture& fixture, HostDialogResult& nested)
+        : fixture_(fixture), nested_(nested) {}
+
+    HostDialogResult operator()(const HostDialogRequest& request,
+                                host::HeadlessHostServices& adapter) const {
+        if (request.request_id == 100) {
+            require(adapter.snapshot().modal_depth == 1 &&
+                        fixture_.host.session().snapshot().modal_depth == 1 &&
+                        !fixture_.window.captured_control(),
+                    "modal entry must publish depth and release owner capture first");
+            PointerEvent blocked;
+            blocked.action = PointerAction::move;
+            blocked.position = {20.0, 20.0};
+            const std::uint64_t before = (*fixture_.probe).pointer_events;
+            const HostDispatchResult blocked_result =
+                fixture_.host.dispatch(blocked, 2);
+            require(blocked_result.accepted() && !blocked_result.handled &&
+                        (*fixture_.probe).pointer_events == before,
+                    "owner input must be sequenced but suppressed during a modal call");
+            nested_ = adapter.show_dialog(message_request(200));
+            const HostDialogResult duplicate = adapter.show_dialog(request);
+            require(duplicate.status.error == HostServiceError::invalid_argument,
+                    "an active dialog identity must not reenter itself");
+            return HostDialogResult{
+                {}, request.request_id,
+                HostMessageDialogResult{HostDialogOutcome::cancelled,
+                                        HostDialogChoice::cancel}};
+        }
+        return HostDialogResult{
+            {}, request.request_id,
+            HostMessageDialogResult{HostDialogOutcome::accepted,
+                                    HostDialogChoice::ok}};
+    }
+
+private:
+    Fixture& fixture_;
+    HostDialogResult& nested_;
+};
+
+class ModalLimitHandler final {
+public:
+    explicit ModalLimitHandler(HostServiceError& terminal_error)
+        : terminal_error_(terminal_error) {}
+
+    HostDialogResult operator()(const HostDialogRequest& request,
+                                host::HeadlessHostServices& adapter) const {
+        if (request.request_id <= HostServices::maximum_nested_modal_depth) {
+            const HostDialogResult child = adapter.show_dialog(
+                message_request(request.request_id + 1));
+            if (!child.status.accepted()) {
+                terminal_error_ = child.status.error;
+            }
+        }
+        return HostDialogResult{
+            {}, request.request_id,
+            HostMessageDialogResult{HostDialogOutcome::cancelled,
+                                    HostDialogChoice::cancel}};
+    }
+
+private:
+    HostServiceError& terminal_error_;
+};
+
+HostDialogResult shutdown_during_dialog(
+    const HostDialogRequest& request, host::HeadlessHostServices& adapter) {
+    adapter.shutdown();
+    return HostDialogResult{
+        {}, request.request_id,
+        HostMessageDialogResult{HostDialogOutcome::accepted,
+                                HostDialogChoice::ok}};
+}
+
+class QueryMonitorsOffThread final {
+public:
+    QueryMonitorsOffThread(HostServices& services, HostMonitorResult& result)
+        : services_(services), result_(result) {}
+
+    void operator()() const { result_ = services_.query_monitors(); }
+
+private:
+    HostServices& services_;
+    HostMonitorResult& result_;
+};
+
+class DispatchSessionOffThread final {
+public:
+    DispatchSessionOffThread(Fixture& fixture, HostDispatchResult& result)
+        : fixture_(fixture), result_(result) {}
+
+    void operator()() const {
+        HostEvent event{1, 1, HostActivationEvent{true}};
+        result_ = fixture_.host.session().dispatch(std::move(event));
+    }
+
+private:
+    Fixture& fixture_;
+    HostDispatchResult& result_;
+};
+
+void cancel_close(HostCloseRequest& request) { request.cancel = true; }
+
+class InjectPointerDuringPaint final {
+public:
+    explicit InjectPointerDuringPaint(host::HeadlessHost& host) : host_(host) {}
+
+    HostDispatchResult operator()() const {
+        PointerEvent down;
+        down.action = PointerAction::down;
+        down.button = PointerButton::primary;
+        down.position = {20.0, 20.0};
+        down.pointer_id = 9U;
+        return host_.dispatch(std::move(down), 2U);
+    }
+
+private:
+    host::HeadlessHost& host_;
+};
+
+class InjectCompactedDragOvers final {
+public:
+    InjectCompactedDragOvers(host::HeadlessHost& host, std::uint64_t& sequence,
+                             bool& every_deferred)
+        : host_(host), sequence_(sequence), every_deferred_(every_deferred) {}
+
+    HostDispatchResult operator()() const {
+        HostDispatchResult last;
+        for (std::uint32_t index = 0U; index < 32U; ++index) {
+            DragEvent over;
+            over.action = DragAction::over;
+            over.session_id = 77U;
+            over.position = {20.0 + static_cast<double>(index), 20.0};
+            over.allowed_effects = DragEffect::copy | DragEffect::move;
+            over.items.emplace_back(DragTextData{"lease-drag"});
+            last = host_.dispatch(std::move(over), sequence_++);
+            every_deferred_ = every_deferred_ && last.handled &&
+                last.input_deferred && !last.input_capacity_rejected &&
+                last.drag_effect == DragEffect::copy;
+        }
+        return last;
+    }
+
+private:
+    host::HeadlessHost& host_;
+    std::uint64_t& sequence_;
+    bool& every_deferred_;
+};
 
 std::string canonical_host_trace() {
     Fixture fixture;
@@ -214,7 +439,8 @@ std::string canonical_service_trace() {
     trace += host_service_error_name(read.status.error);
     trace += " generation=" + std::to_string(read.generation);
     trace += " text=" + read.text_utf8 + '\n';
-    auto& headless = static_cast<host::HeadlessHostServices&>(services);
+    host::HeadlessHostServices& headless =
+        static_cast<host::HeadlessHostServices&>(services);
     headless.queue_dialog_result(
         {{}, 40, HostMessageDialogResult{HostDialogOutcome::cancelled,
                                          HostDialogChoice::cancel}});
@@ -229,29 +455,12 @@ std::string canonical_service_trace() {
 
 std::string canonical_modal_trace() {
     Fixture fixture;
-    auto& services = static_cast<host::HeadlessHostServices&>(
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     std::string trace;
-    auto observation = services.modal_changed().subscribe(
-        [&trace](const HostModalTransition& transition) {
-            trace += transition.entering ? "modal=enter" : "modal=leave";
-            trace += " request=" + std::to_string(transition.request_id);
-            trace += " depth=" + std::to_string(transition.depth) + '\n';
-        });
-    services.set_dialog_handler(
-        [](const HostDialogRequest& request, host::HeadlessHostServices& adapter) {
-            if (request.request_id == 70) {
-                static_cast<void>(adapter.show_dialog(message_request(71)));
-                return HostDialogResult{
-                    {}, request.request_id,
-                    HostMessageDialogResult{HostDialogOutcome::cancelled,
-                                            HostDialogChoice::cancel}};
-            }
-            return HostDialogResult{
-                {}, request.request_id,
-                HostMessageDialogResult{HostDialogOutcome::accepted,
-                                        HostDialogChoice::ok}};
-        });
+    SubscriptionToken observation = services.modal_changed().subscribe(
+        AppendCanonicalModalTrace(trace));
+    services.set_dialog_handler(handle_canonical_dialog);
     static_cast<void>(services.show_dialog(message_request(70)));
     trace += services.dialog_trace();
     trace += "services=" + services.snapshot().to_json() + '\n';
@@ -290,19 +499,19 @@ void test_capabilities_and_normalized_dispatch() {
     pointer.button = PointerButton::primary;
     pointer.position = {10.0, 10.0};
     const HostDispatchResult pointer_result = fixture.host.dispatch(pointer, 2);
-    require(pointer_result.handled && fixture.probe->pointer_events == 1,
+    require(pointer_result.handled && (*fixture.probe).pointer_events == 1,
             "normalized pointer input must reach the retained target");
     require(fixture.window.focused_control() == fixture.probe,
             "pointer-down through the host protocol must preserve focus behavior");
 
     KeyEvent key;
     key.physical_key = 48;
-    require(fixture.host.dispatch(key, 3).handled && fixture.probe->key_events == 1,
+    require(fixture.host.dispatch(key, 3).handled && (*fixture.probe).key_events == 1,
             "normalized key input must reach the retained focus target");
     TextInputEvent text;
     text.text_utf8 = "é";
     require(fixture.host.dispatch(std::move(text), 4).handled &&
-                fixture.probe->last_text == "é",
+                (*fixture.probe).last_text == "é",
             "committed UTF-8 host text must retain bytes and handling result");
 }
 
@@ -311,7 +520,7 @@ void test_application_callback_fault_is_contained_at_host_boundary() {
     require(fixture.host.dispatch(
                 HostAttachEvent{{320.0, 180.0}, 1.0}, 1).accepted(),
             "callback-fault fixture must attach before input");
-    fixture.probe->throw_on_pointer = true;
+    (*fixture.probe).throw_on_pointer = true;
     PointerEvent pointer;
     pointer.action = PointerAction::down;
     pointer.button = PointerButton::primary;
@@ -325,7 +534,7 @@ void test_application_callback_fault_is_contained_at_host_boundary() {
                 !fixture.window.captured_control(),
             "throwing input callbacks must become an observable host fault and release capture");
 
-    fixture.probe->throw_on_pointer = false;
+    (*fixture.probe).throw_on_pointer = false;
     pointer.action = PointerAction::move;
     const HostDispatchResult recovered = fixture.host.dispatch(pointer, 3);
     require(recovered.accepted() && recovered.handled &&
@@ -340,7 +549,7 @@ void test_application_callback_fault_is_contained_at_host_boundary() {
 
 void test_semantic_sound_cues_are_bounded_and_deterministic() {
     Fixture fixture;
-    auto& services = static_cast<host::HeadlessHostServices&>(
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     require(fixture.window.host_services() == &services,
             "an active host session must expose its portable services to controls");
@@ -382,10 +591,8 @@ void test_semantic_sound_cues_are_bounded_and_deterministic() {
             "sound coalescing customization must enforce its declared bound");
 
     HostServiceStatus wrong_thread;
-    std::thread worker([&] {
-        wrong_thread = services.play_sound_cue(
-            {HostSoundCue::error, 1.0, start + 100'000'000U});
-    });
+    std::thread worker(PlaySoundCueOffThread(
+        services, wrong_thread, start + 100'000'000U));
     worker.join();
     require(wrong_thread.error == HostServiceError::wrong_thread,
             "sound cues must preserve host-service UI-thread enforcement");
@@ -393,7 +600,7 @@ void test_semantic_sound_cues_are_bounded_and_deterministic() {
 
 void test_typed_dialog_requests_and_results() {
     Fixture fixture;
-    auto& services = static_cast<host::HeadlessHostServices&>(
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
 
     services.queue_dialog_result(
@@ -457,9 +664,7 @@ void test_typed_dialog_requests_and_results() {
             "color result must retain portable RGBA bytes");
 
     HostDialogResult wrong_thread;
-    std::thread worker([&services, &wrong_thread] {
-        wrong_thread = services.show_dialog(message_request(15));
-    });
+    std::thread worker(ShowDialogOffThread(services, wrong_thread));
     worker.join();
     require(wrong_thread.status.error == HostServiceError::wrong_thread,
             "dialog calls must reject the wrong thread without entering modal state");
@@ -509,15 +714,15 @@ void test_typed_drag_destination_routing_and_bounds() {
     const HostDispatchResult drop = fixture.host.dispatch(
         drag_event(DragAction::drop, 90, {20.0, 10.0}), 3);
     require(drop.handled && drop.drag_effect == DragEffect::copy &&
-                fixture.probe->drag_actions ==
+                (*fixture.probe).drag_actions ==
                     std::vector<DragAction>{DragAction::enter, DragAction::over,
                                             DragAction::drop} &&
-                fixture.probe->last_drag_items.size() == 3 &&
-                std::get<DragTextData>(fixture.probe->last_drag_items[0]).text_utf8 ==
+                (*fixture.probe).last_drag_items.size() == 3 &&
+                std::get<DragTextData>((*fixture.probe).last_drag_items[0]).text_utf8 ==
                     "receiver Ω" &&
-                std::get<DragFileListData>(fixture.probe->last_drag_items[1])
+                std::get<DragFileListData>((*fixture.probe).last_drag_items[1])
                     .paths_utf8.size() == 2 &&
-                std::get<DragBinaryData>(fixture.probe->last_drag_items[2]).bytes.back() ==
+                std::get<DragBinaryData>((*fixture.probe).last_drag_items[2]).bytes.back() ==
                     0xff,
             "typed drop must preserve variant order, UTF-8, file lists, and opaque bytes");
     require(fixture.host.session().snapshot().drag_events == 3 &&
@@ -541,14 +746,16 @@ void test_typed_drag_destination_routing_and_bounds() {
                 HostDispatchError::invalid_payload,
             "aggregate drag payloads beyond 16 MiB must fail before callbacks");
 
-    auto root = make_control<Control>(StableId("drag.root"));
-    root->set_requested_bounds({0.0, 0.0, 100.0, 40.0});
-    auto left = make_control<InputProbe>(StableId("drag.left"));
-    auto right = make_control<InputProbe>(StableId("drag.right"));
-    left->set_requested_bounds({0.0, 0.0, 50.0, 40.0});
-    right->set_requested_bounds({50.0, 0.0, 50.0, 40.0});
-    root->add_child(left);
-    root->add_child(right);
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("drag.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 100.0, 40.0});
+    std::shared_ptr<InputProbe> left =
+        make_control<InputProbe>(StableId("drag.left"));
+    std::shared_ptr<InputProbe> right =
+        make_control<InputProbe>(StableId("drag.right"));
+    (*left).set_requested_bounds({0.0, 0.0, 50.0, 40.0});
+    (*right).set_requested_bounds({50.0, 0.0, 50.0, 40.0});
+    (*root).add_child(left);
+    (*root).add_child(right);
     Window transition_window(root, {100.0, 40.0});
     host::HeadlessHost transition_host(transition_window);
     require(transition_host.dispatch(HostAttachEvent{{100.0, 40.0}, 1.0}, 0)
@@ -558,16 +765,16 @@ void test_typed_drag_destination_routing_and_bounds() {
         drag_event(DragAction::enter, 93, {10.0, 10.0}), 1));
     static_cast<void>(transition_host.dispatch(
         drag_event(DragAction::over, 93, {60.0, 10.0}), 2));
-    require(left->drag_actions ==
+    require((*left).drag_actions ==
                 std::vector<DragAction>{DragAction::enter, DragAction::leave} &&
-                right->drag_actions ==
+                (*right).drag_actions ==
                 std::vector<DragAction>{DragAction::enter, DragAction::over},
             "target crossing must deterministically leave old, enter new, then deliver over");
-    right->set_enabled(false);
-    right->set_enabled(true);
+    (*right).set_enabled(false);
+    (*right).set_enabled(true);
     static_cast<void>(transition_host.dispatch(
         drag_event(DragAction::leave, 93, {60.0, 10.0}), 3));
-    require(right->drag_actions.size() == 2,
+    require((*right).drag_actions.size() == 2,
             "eligibility revocation must clear drag ownership without a stale callback");
 }
 
@@ -575,7 +782,7 @@ void test_nested_modal_order_owner_suppression_and_limit() {
     Fixture fixture;
     require(fixture.host.dispatch(HostAttachEvent{{100.0, 80.0}, 1.0}, 0).accepted(),
             "modal fixture must attach before host input");
-    auto& services = static_cast<host::HeadlessHostServices&>(
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(
         fixture.host.services());
     PointerEvent down;
     down.action = PointerAction::down;
@@ -587,44 +794,10 @@ void test_nested_modal_order_owner_suppression_and_limit() {
             "modal fixture must begin with focused captured owner input");
 
     std::string transitions;
-    auto observation = services.modal_changed().subscribe(
-        [&transitions](const HostModalTransition& transition) {
-            transitions += transition.entering ? "enter:" : "leave:";
-            transitions += std::to_string(transition.request_id) + ":" +
-                std::to_string(transition.depth) + '\n';
-        });
+    SubscriptionToken observation = services.modal_changed().subscribe(
+        AppendNestedModalTrace(transitions));
     HostDialogResult nested;
-    services.set_dialog_handler(
-        [&fixture, &nested](const HostDialogRequest& request,
-                           host::HeadlessHostServices& adapter) {
-            if (request.request_id == 100) {
-                require(adapter.snapshot().modal_depth == 1 &&
-                            fixture.host.session().snapshot().modal_depth == 1 &&
-                            !fixture.window.captured_control(),
-                        "modal entry must publish depth and release owner capture first");
-                PointerEvent blocked;
-                blocked.action = PointerAction::move;
-                blocked.position = {20.0, 20.0};
-                const std::uint64_t before = fixture.probe->pointer_events;
-                const HostDispatchResult blocked_result =
-                    fixture.host.dispatch(blocked, 2);
-                require(blocked_result.accepted() && !blocked_result.handled &&
-                            fixture.probe->pointer_events == before,
-                        "owner input must be sequenced but suppressed during a modal call");
-                nested = adapter.show_dialog(message_request(200));
-                const HostDialogResult duplicate = adapter.show_dialog(request);
-                require(duplicate.status.error == HostServiceError::invalid_argument,
-                        "an active dialog identity must not reenter itself");
-                return HostDialogResult{
-                    {}, request.request_id,
-                    HostMessageDialogResult{HostDialogOutcome::cancelled,
-                                            HostDialogChoice::cancel}};
-            }
-            return HostDialogResult{
-                {}, request.request_id,
-                HostMessageDialogResult{HostDialogOutcome::accepted,
-                                        HostDialogChoice::ok}};
-        });
+    services.set_dialog_handler(NestedModalHandler(fixture, nested));
     const HostDialogResult outer = services.show_dialog(message_request(100));
     require(outer.status.accepted() && nested.status.accepted() &&
                 transitions == "enter:100:1\nenter:200:2\nleave:200:1\nleave:100:0\n",
@@ -644,24 +817,10 @@ void test_nested_modal_order_owner_suppression_and_limit() {
     observation.disconnect();
 
     Fixture limit_fixture;
-    auto& limit_services = static_cast<host::HeadlessHostServices&>(
-        limit_fixture.host.services());
+    host::HeadlessHostServices& limit_services =
+        static_cast<host::HeadlessHostServices&>(limit_fixture.host.services());
     HostServiceError terminal_error = HostServiceError::none;
-    limit_services.set_dialog_handler(
-        [&terminal_error](const HostDialogRequest& request,
-                          host::HeadlessHostServices& adapter) {
-            if (request.request_id <= HostServices::maximum_nested_modal_depth) {
-                const HostDialogResult child = adapter.show_dialog(
-                    message_request(request.request_id + 1));
-                if (!child.status.accepted()) {
-                    terminal_error = child.status.error;
-                }
-            }
-            return HostDialogResult{
-                {}, request.request_id,
-                HostMessageDialogResult{HostDialogOutcome::cancelled,
-                                        HostDialogChoice::cancel}};
-        });
+    limit_services.set_dialog_handler(ModalLimitHandler(terminal_error));
     require(limit_services.show_dialog(message_request(1)).status.accepted() &&
                 terminal_error == HostServiceError::modal_limit &&
                 limit_services.snapshot().maximum_modal_depth ==
@@ -670,16 +829,9 @@ void test_nested_modal_order_owner_suppression_and_limit() {
             "nested modal depth must fail closed at the portable bound and unwind");
 
     Fixture shutdown_fixture;
-    auto& shutdown_services = static_cast<host::HeadlessHostServices&>(
-        shutdown_fixture.host.services());
-    shutdown_services.set_dialog_handler(
-        [](const HostDialogRequest& request, host::HeadlessHostServices& adapter) {
-            adapter.shutdown();
-            return HostDialogResult{
-                {}, request.request_id,
-                HostMessageDialogResult{HostDialogOutcome::accepted,
-                                        HostDialogChoice::ok}};
-        });
+    host::HeadlessHostServices& shutdown_services =
+        static_cast<host::HeadlessHostServices&>(shutdown_fixture.host.services());
+    shutdown_services.set_dialog_handler(shutdown_during_dialog);
     const HostDialogResult interrupted =
         shutdown_services.show_dialog(message_request(300));
     require(interrupted.status.error == HostServiceError::after_shutdown &&
@@ -726,16 +878,16 @@ void test_display_capture_and_occlusion_synchronization() {
     require(fixture.host.dispatch(down, 6).handled &&
                 fixture.host.services().snapshot().pointer_captured,
             "a second retained capture must synchronize before revocation");
-    fixture.probe->set_enabled(false);
+    (*fixture.probe).set_enabled(false);
     require(!fixture.window.captured_control() &&
                 !fixture.host.services().snapshot().pointer_captured &&
                 fixture.host.services().snapshot().pointer_capture_updates == 4 &&
                 fixture.window.metrics_snapshot().capture_revocations == 1,
             "eligibility revocation must release retained and host capture once");
-    fixture.probe->set_enabled(true);
+    (*fixture.probe).set_enabled(true);
 
     const FrameTime base{};
-    auto active = fixture.window.activate_surface(
+    FrameRequestToken active = fixture.window.activate_surface(
         fixture.probe, std::chrono::milliseconds(10),
         base + std::chrono::nanoseconds(10));
     require(fixture.host.dispatch(HostOcclusionEvent{true}, 7).accepted() &&
@@ -785,9 +937,7 @@ void test_environment_services_are_bounded_and_deterministic() {
             "clipboard must reject text beyond the declared host-service bound");
 
     HostMonitorResult wrong_thread;
-    std::thread worker([&services, &wrong_thread] {
-        wrong_thread = services.query_monitors();
-    });
+    std::thread worker(QueryMonitorsOffThread(services, wrong_thread));
     worker.join();
     require(wrong_thread.status.error == HostServiceError::wrong_thread,
             "host services must reject calls outside the owning UI thread");
@@ -814,10 +964,7 @@ void test_environment_services_are_bounded_and_deterministic() {
 void test_sequence_geometry_and_shutdown_guards() {
     Fixture fixture;
     HostDispatchResult wrong_thread;
-    std::thread worker([&fixture, &wrong_thread] {
-        HostEvent event{1, 1, HostActivationEvent{true}};
-        wrong_thread = fixture.host.session().dispatch(std::move(event));
-    });
+    std::thread worker(DispatchSessionOffThread(fixture, wrong_thread));
     worker.join();
     require(wrong_thread.error == HostDispatchError::wrong_thread,
             "host session must reject delivery outside its owning UI thread");
@@ -839,7 +986,7 @@ void test_sequence_geometry_and_shutdown_guards() {
                 HostDispatchError::invalid_geometry,
             "invalid host geometry must be rejected before mutating the window");
 
-    auto active = fixture.window.activate_surface(
+    FrameRequestToken active = fixture.window.activate_surface(
         fixture.probe, std::chrono::milliseconds(10),
         FrameTime{} + std::chrono::milliseconds(10));
     fixture.window.capture_pointer(fixture.probe, 11);
@@ -873,8 +1020,8 @@ void test_lifecycle_transition_guards() {
                 HostDispatchError::invalid_lifecycle,
             "duplicate attach must be rejected");
 
-    auto cancel = fixture.host.session().closing().subscribe(
-        [](HostCloseRequest& request) { request.cancel = true; });
+    SubscriptionToken cancel =
+        fixture.host.session().closing().subscribe(cancel_close);
     require(!fixture.host.dispatch(
                  HostCloseRequest{HostCloseReason::user, false}, 4).close_allowed &&
                 fixture.host.session().snapshot().phase == HostLifecyclePhase::attached,
@@ -917,8 +1064,8 @@ void test_lifecycle_transition_guards() {
 void test_close_cancellation_and_closed_cleanup() {
     Fixture fixture;
     static_cast<void>(fixture.host.dispatch(HostAttachEvent{{320.0, 180.0}, 1.0}, 1));
-    auto cancellation = fixture.host.session().closing().subscribe(
-        [](HostCloseRequest& request) { request.cancel = true; });
+    SubscriptionToken cancellation =
+        fixture.host.session().closing().subscribe(cancel_close);
     const HostDispatchResult cancelled = fixture.host.dispatch(
         HostCloseRequest{HostCloseReason::user, false}, 2);
     require(!cancelled.close_allowed,
@@ -929,7 +1076,7 @@ void test_close_cancellation_and_closed_cleanup() {
     require(allowed.close_allowed,
             "disconnecting close policy must restore default allow behavior");
 
-    auto active = fixture.window.activate_surface(
+    FrameRequestToken active = fixture.window.activate_surface(
         fixture.probe, std::chrono::milliseconds(10),
         FrameTime{} + std::chrono::milliseconds(10));
     static_cast<void>(fixture.host.dispatch(HostClosedEvent{HostCloseReason::user}, 4));
@@ -955,43 +1102,36 @@ void test_headless_host_observes_model_originated_paint_wakes() {
     require(fixture.host.consume_paint_wake(),
             "headless host must observe initial retained Window dirtiness");
     static_cast<void>(fixture.window.take_damage());
-    fixture.probe->invalidate(Dirty::paint);
+    (*fixture.probe).invalidate(Dirty::paint);
     require(fixture.host.paint_wake_pending() &&
                 fixture.host.consume_paint_wake(),
             "host paint wake must not depend on dispatching input through that Window");
 }
 
 void test_normalized_host_input_reports_paint_lease_deferral() {
-    auto probe =
+    std::shared_ptr<HostLeaseInputProbe> probe =
         make_control<HostLeaseInputProbe>(StableId("host.paint.input"));
-    probe->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    (*probe).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
     Window window(probe, {100.0, 80.0});
     host::HeadlessHost host(window);
     require(host.dispatch(
                 HostAttachEvent{{100.0, 80.0}, 1.0}, 1U).accepted(),
             "lease-input fixture must attach before normalized input");
 
-    probe->inject = [&host] {
-        PointerEvent down;
-        down.action = PointerAction::down;
-        down.button = PointerButton::primary;
-        down.position = {20.0, 20.0};
-        down.pointer_id = 9U;
-        return host.dispatch(std::move(down), 2U);
-    };
+    (*probe).inject = InjectPointerDuringPaint(host);
     HostLeasePainter painter;
     const DamageRegion damage = window.take_damage();
     window.paint(painter, damage.bounds());
 
-    require(probe->result.accepted() && probe->result.handled &&
-                probe->result.input_deferred &&
-                !probe->result.input_capacity_rejected &&
-                probe->pointer_events == 0U && !probe->callback_during_paint &&
+    require((*probe).result.accepted() && (*probe).result.handled &&
+                (*probe).result.input_deferred &&
+                !(*probe).result.input_capacity_rejected &&
+                (*probe).pointer_events == 0U && !(*probe).callback_during_paint &&
                 host.dispatcher_wake_pending(),
             "normalized host input must report accepted deferral without entering paint");
     const DispatchDrainResult drain = host.pump_dispatcher();
     require(drain.invoked == 1U && drain.remaining == 0U &&
-                probe->pointer_events == 1U && !probe->callback_during_paint &&
+                (*probe).pointer_events == 1U && !(*probe).callback_during_paint &&
                 host.trace().find("event=pointer accepted=1 handled=1 "
                                   "input_deferred=1 input_rejected=0") !=
                     std::string::npos,
@@ -999,9 +1139,9 @@ void test_normalized_host_input_reports_paint_lease_deferral() {
 }
 
 void test_drag_over_reuses_effect_and_compacts_while_painting() {
-    auto probe =
+    std::shared_ptr<HostLeaseInputProbe> probe =
         make_control<HostLeaseInputProbe>(StableId("host.paint.drag"));
-    probe->set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    (*probe).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
     Window window(probe, {100.0, 80.0});
     host::HeadlessHost host(window);
     require(host.dispatch(
@@ -1020,41 +1160,26 @@ void test_drag_over_reuses_effect_and_compacts_while_painting() {
                 negotiated.drag_effect == DragEffect::copy &&
                 !negotiated.input_deferred,
             "an ordinary drag-over must establish the session's last valid effect");
-    probe->drag_actions.clear();
-    probe->invalidate(invalidation::paint_only);
+    (*probe).drag_actions.clear();
+    (*probe).invalidate(invalidation::paint_only);
     std::uint64_t sequence = 3U;
     bool every_deferred = true;
-    probe->inject = [&] {
-        HostDispatchResult last;
-        for (std::uint32_t index = 0U; index < 32U; ++index) {
-            DragEvent over;
-            over.action = DragAction::over;
-            over.session_id = 77U;
-            over.position = {20.0 + static_cast<double>(index), 20.0};
-            over.allowed_effects = DragEffect::copy | DragEffect::move;
-            over.items.emplace_back(DragTextData{"lease-drag"});
-            last = host.dispatch(std::move(over), sequence++);
-            every_deferred =
-                every_deferred && last.handled && last.input_deferred &&
-                !last.input_capacity_rejected &&
-                last.drag_effect == DragEffect::copy;
-        }
-        return last;
-    };
+    (*probe).inject =
+        InjectCompactedDragOvers(host, sequence, every_deferred);
 
     HostLeasePainter painter;
     const DamageRegion damage = window.take_damage();
     window.paint(painter, damage.bounds());
     const DeferredInputSnapshot pending = window.deferred_input_snapshot();
-    require(every_deferred && probe->drag_actions.empty() &&
-                !probe->callback_during_paint && pending.pending == 1U &&
+    require(every_deferred && (*probe).drag_actions.empty() &&
+                !(*probe).callback_during_paint && pending.pending == 1U &&
                 pending.coalesced_drag_overs == 31U &&
                 pending.drain_queued,
             "paint-time drag-over must reuse the last effect and compact obsolete positions");
     const DispatchDrainResult drain = host.pump_dispatcher();
     require(drain.invoked == 1U && drain.remaining == 0U &&
-                probe->drag_actions == std::vector<DragAction>{DragAction::over} &&
-                !probe->callback_during_paint &&
+                (*probe).drag_actions == std::vector<DragAction>{DragAction::over} &&
+                !(*probe).callback_during_paint &&
                 window.deferred_input_snapshot().pending == 0U,
             "one latest drag-over must deliver outside paint on the posted host turn");
     window.cancel_drag();

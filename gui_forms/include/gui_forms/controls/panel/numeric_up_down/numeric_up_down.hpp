@@ -11,6 +11,7 @@ namespace gui_forms {
 
 class NumericUpDown final : public Panel {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     explicit NumericUpDown(StableId stable_id);
     void initialize_control_tree();
 

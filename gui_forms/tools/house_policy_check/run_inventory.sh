@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 5 ]; then
-    echo "usage: run_inventory.sh <main-build-directory> <json-output> [pointer-rewrite-output] [auto-rewrite-output] [native|mingw]" >&2
+if [ "$#" -lt 2 ] || [ "$#" -gt 6 ]; then
+    echo "usage: run_inventory.sh <main-build-directory> <json-output> [pointer-rewrite-output] [auto-rewrite-output] [native|mingw] [production|first-party]" >&2
     exit 2
 fi
 
@@ -13,6 +13,7 @@ json_path=$2
 pointer_rewrite_path=${3-}
 auto_rewrite_path=
 platform=native
+source_scope=${6-production}
 case ${4-} in
     native|mingw) platform=$4 ;;
     *)
@@ -32,6 +33,14 @@ case "$platform" in
     native|mingw) ;;
     *)
         echo "unsupported inventory platform: $platform" >&2
+        exit 2
+        ;;
+esac
+
+case "$source_scope" in
+    production|first-party) ;;
+    *)
+        echo "unsupported inventory source scope: $source_scope" >&2
         exit 2
         ;;
 esac
@@ -69,13 +78,20 @@ if [ "$platform" = mingw ]; then
     checker_database_directory=$sanitized_database_directory
 fi
 
-/usr/bin/jq -r --arg prefix "$gui_forms_root/src/" \
+if [ "$source_scope" = production ]; then
+    source_prefix="$gui_forms_root/src/"
+else
+    source_prefix="$gui_forms_root/"
+fi
+
+/usr/bin/jq -r --arg prefix "$source_prefix" \
     '.[] | select(.file | startswith($prefix)) | .file' "$database" |
     /usr/bin/sort -u > "$source_list"
 
 set --
 while IFS= read -r source_file; do
     case "$source_file" in
+        *.c) ;;
         */third_party/*|*/experiments/*|*/build/*|*/.build/*) ;;
         *) set -- "$@" "$source_file" ;;
     esac
@@ -91,6 +107,7 @@ fi
 if [ "$platform" = mingw ]; then
     "$checker" \
         --mode inventory \
+        --source-scope "$source_scope" \
         --quiet \
         --source-root "$gui_forms_root" \
         --json-output "$json_path" \
@@ -102,6 +119,7 @@ if [ "$platform" = mingw ]; then
 else
     "$checker" \
         --mode inventory \
+        --source-scope "$source_scope" \
         --quiet \
         --source-root "$gui_forms_root" \
         --json-output "$json_path" \

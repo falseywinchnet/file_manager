@@ -153,6 +153,10 @@ private:
     [[nodiscard]] std::vector<std::string> range_selection(
         std::size_t target_index, bool preserve_existing) const;
     void type_select(std::string_view text);
+    void image_list_content_changed(const ImageListChange&);
+    [[nodiscard]] bool paint_item_image(
+        Painter& painter, const ObjectViewItem& item,
+        std::size_t index, bool selected, Rect destination_bounds);
     void paint_glyph(Painter& painter, Rect bounds, ObjectGlyph glyph,
                      bool enabled) const;
 

@@ -31,6 +31,24 @@ struct ErrorProvider::Entry final {
     SubscriptionToken bounds_subscription;
 };
 
+struct ErrorProvider::TargetBoundsObserver final {
+    ErrorProvider* provider{};
+    std::weak_ptr<Control> target;
+
+    void operator()(Rect) const {
+        const std::shared_ptr<Control> retained = target.lock();
+        if (!retained) return;
+        Entry* entry = (*provider).find_entry(*retained);
+        if (entry != nullptr) (*provider).position_visual(*entry);
+    }
+};
+
+[[nodiscard]] bool error_snapshot_less(
+    const ErrorIconSnapshot& left,
+    const ErrorIconSnapshot& right) noexcept {
+    return left.target_stable_id < right.target_stable_id;
+}
+
 ErrorProvider::ErrorProvider(Window& window)
     : window_lifetime_(window.lifetime_), tool_tip_(std::make_unique<ToolTip>(window)),
       provider_id_(next_error_provider_id.fetch_add(1U)) {
@@ -39,28 +57,14 @@ ErrorProvider::ErrorProvider(Window& window)
     (*tool_tip_).set_show_on_focus(false);
     (*tool_tip_).set_show_always(true);
     availability_subscription_ = window.control_availability_changed().subscribe(
-        *this, [this](const ControlAvailabilityChange&) {
-            refresh_all_visuals(false);
-        });
+        *this, Delegate<const ControlAvailabilityChange&>::bind<
+            ErrorProvider, &ErrorProvider::control_availability_changed>(*this));
     presentation_subscription_ = window.presentation_changed().subscribe(
-        *this, [this](const PresentationSettings&) {
-            refresh_all_visuals(false);
-        });
+        *this, Delegate<const PresentationSettings&>::bind<
+            ErrorProvider, &ErrorProvider::presentation_settings_changed>(*this));
     root_bounds_subscription_ = (*window.root()).arranged_bounds_changed().subscribe(
-        *this, [this](Rect) {
-            if (Window* owner = bound_window()) {
-                for (std::pair<const std::uint64_t, std::unique_ptr<Entry>>&
-                         mapped_entry : entries_) {
-                    std::unique_ptr<Entry>& entry = mapped_entry.second;
-                    if ((*entry).layer) {
-                        (*(*entry).layer).set_requested_bounds(
-                            {0.0, 0.0, (*owner).client_size().width,
-                             (*owner).client_size().height});
-                    }
-                    position_visual(*entry);
-                }
-            }
-        });
+        *this, Delegate<Rect>::bind<
+            ErrorProvider, &ErrorProvider::root_bounds_changed>(*this));
 }
 
 ErrorProvider::~ErrorProvider() {
@@ -71,6 +75,31 @@ ErrorProvider::~ErrorProvider() {
             tool_tip_.reset();
             entries_.clear();
         }
+    }
+}
+
+void ErrorProvider::control_availability_changed(
+    const ControlAvailabilityChange&) {
+    refresh_all_visuals(false);
+}
+
+void ErrorProvider::presentation_settings_changed(
+    const PresentationSettings&) {
+    refresh_all_visuals(false);
+}
+
+void ErrorProvider::root_bounds_changed(Rect) {
+    Window* owner = bound_window();
+    if (owner == nullptr) return;
+    for (std::pair<const std::uint64_t, std::unique_ptr<Entry>>& mapped_entry :
+         entries_) {
+        std::unique_ptr<Entry>& entry = mapped_entry.second;
+        if ((*entry).layer) {
+            (*(*entry).layer).set_requested_bounds(
+                {0.0, 0.0, (*owner).client_size().width,
+                 (*owner).client_size().height});
+        }
+        position_visual(*entry);
     }
 }
 
@@ -120,11 +149,7 @@ ErrorProvider::Entry& ErrorProvider::require_entry(
     (*entry).target = target;
     const std::weak_ptr<Control> weak_target = target;
     (*entry).bounds_subscription = (*target).arranged_bounds_changed().subscribe(
-        *this, [this, weak_target](Rect) {
-            if (const std::shared_ptr<gui_forms::Control> current = weak_target.lock()) {
-                if (Entry* mapped = find_entry(*current)) position_visual(*mapped);
-            }
-        });
+        *this, TargetBoundsObserver{this, weak_target});
     Entry& result = *entry;
     entries_.emplace((*target).runtime_id().value, std::move(entry));
     return result;
@@ -171,13 +196,17 @@ void ErrorProvider::clear() {
 }
 
 bool ErrorProvider::has_errors() const noexcept {
-    return std::any_of(entries_.begin(), entries_.end(),
-                       [this](const auto& pair) {
+    Window* owner = bound_window();
+    for (const std::pair<const std::uint64_t, std::unique_ptr<Entry>>& pair :
+         entries_) {
         const Entry& entry = *pair.second;
         const std::shared_ptr<gui_forms::Control> target = entry.target.lock();
-        return !entry.error.empty() && target && (*target).is_alive() &&
-               (*target).attached_window() == bound_window();
-    });
+        if (!entry.error.empty() && target && (*target).is_alive() &&
+            (*target).attached_window() == owner) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ErrorProvider::set_icon_alignment(const std::shared_ptr<Control>& target,
@@ -299,33 +328,51 @@ void ErrorProvider::set_data_source(std::shared_ptr<BindingSource> source) {
     data_source_ = source;
     if (source) {
         source_list_subscription_ = (*source).list_changed().subscribe(
-            *this, [this](const BindingListChange&) { update_binding(); });
+            *this, Delegate<const BindingListChange&>::bind<
+                ErrorProvider, &ErrorProvider::source_list_changed>(*this));
         source_current_subscription_ = (*source).current_changed().subscribe(
-            *this, [this] {
-                binding_errors_.clear();
-                update_binding();
-            });
+            *this, Delegate<>::bind<
+                ErrorProvider, &ErrorProvider::source_current_changed>(*this));
         source_completion_subscription_ = (*source).binding_complete().subscribe(
-            *this, [this](BindingCompleteEvent& event) {
-                binding_completed(event);
-            });
+            *this, Delegate<BindingCompleteEvent&>::bind<
+                ErrorProvider, &ErrorProvider::binding_completed>(*this));
         source_disposed_subscription_ = (*source).disposed_event().subscribe(
-            *this, [this] {
-                try {
-                    source_list_subscription_.disconnect();
-                    source_current_subscription_.disconnect();
-                    source_completion_subscription_.disconnect();
-                    source_disposed_subscription_.disconnect();
-                    clear_bound_errors();
-                    binding_errors_.clear();
-                    data_source_.reset();
-                    data_source_changed_.emit();
-                } catch (...) {
-                }
-            });
+            *this, Delegate<>::bind<
+                ErrorProvider, &ErrorProvider::source_disposed>(*this));
     }
     data_source_changed_.emit();
     update_binding();
+}
+
+void ErrorProvider::source_list_changed(const BindingListChange&) {
+    update_binding();
+}
+
+void ErrorProvider::source_current_changed() {
+    binding_errors_.clear();
+    update_binding();
+}
+
+void ErrorProvider::source_disposed() noexcept {
+    try {
+        source_list_subscription_.disconnect();
+        source_current_subscription_.disconnect();
+        source_completion_subscription_.disconnect();
+        source_disposed_subscription_.disconnect();
+        clear_bound_errors();
+        binding_errors_.clear();
+        data_source_.reset();
+        data_source_changed_.emit();
+    } catch (...) {
+    }
+}
+
+void ErrorProvider::append_unique_error(
+    std::vector<std::string>& values, std::string value) {
+    if (!value.empty() &&
+        std::find(values.begin(), values.end(), value) == values.end()) {
+        values.push_back(std::move(value));
+    }
 }
 
 void ErrorProvider::set_data_member(std::string member) {
@@ -390,12 +437,6 @@ void ErrorProvider::update_binding() {
         std::vector<std::string> errors;
     };
     std::unordered_map<std::uint64_t, Aggregate> aggregates;
-    const auto append = [](std::vector<std::string>& values, std::string value) {
-        if (!value.empty() &&
-            std::find(values.begin(), values.end(), value) == values.end()) {
-            values.push_back(std::move(value));
-        }
-    };
     const std::vector<std::shared_ptr<Binding>> bindings = (*source).bindings();
     std::unordered_set<const Binding*> active_bindings;
     for (const std::shared_ptr<gui_forms::Binding>& binding : bindings) {
@@ -405,18 +446,18 @@ void ErrorProvider::update_binding() {
         if (!target || !can_extend(target)) continue;
         Aggregate& aggregate = aggregates[(*target).runtime_id().value];
         aggregate.target = target;
-        append(aggregate.errors, (*source).current_error({}));
+        append_unique_error(aggregate.errors, (*source).current_error({}));
         std::string field = (*binding).data_member();
         if (!data_member_.empty()) field = data_member_ + "." + field;
         std::string record_error = (*source).current_error(field);
         if (record_error.empty() && !data_member_.empty()) {
             record_error = (*source).current_error((*binding).data_member());
         }
-        append(aggregate.errors, std::move(record_error));
+        append_unique_error(aggregate.errors, std::move(record_error));
         if (const BindingErrorMap::iterator found =
                 binding_errors_.find(binding.get());
             found != binding_errors_.end()) {
-            append(aggregate.errors, (*found).second.second);
+            append_unique_error(aggregate.errors, (*found).second.second);
         }
     }
 
@@ -443,11 +484,16 @@ void ErrorProvider::update_binding() {
             set_error(target, {});
         }
     }
-    std::erase_if(binding_errors_, [&active_bindings](const auto& item) {
-        const std::shared_ptr<Control> target = item.second.first.lock();
-        return !target || !(*target).is_alive() ||
-               !active_bindings.contains(item.first);
-    });
+    BindingErrorMap::iterator error = binding_errors_.begin();
+    while (error != binding_errors_.end()) {
+        const std::shared_ptr<Control> target = (*error).second.first.lock();
+        if (!target || !(*target).is_alive() ||
+            !active_bindings.contains((*error).first)) {
+            error = binding_errors_.erase(error);
+        } else {
+            ++error;
+        }
+    }
 }
 
 void ErrorProvider::set_tag(std::any tag_value) {
@@ -589,10 +635,7 @@ ErrorProviderSnapshot ErrorProvider::snapshot() const {
             presented && (*(*entry).glyph).blink_active(),
             !presented || (*(*entry).glyph).phase_visible()});
     }
-    std::sort(result.icons.begin(), result.icons.end(),
-              [](const ErrorIconSnapshot& left, const ErrorIconSnapshot& right) {
-                  return left.target_stable_id < right.target_stable_id;
-              });
+    std::sort(result.icons.begin(), result.icons.end(), error_snapshot_less);
     return result;
 }
 

@@ -18,15 +18,19 @@ void require(bool condition, const char *message) {
   }
 }
 
-template <typename Exception, typename Function>
-void require_throws(Function &&function, const char *message) {
-  bool threw = false;
-  try {
-    function();
-  } catch (const Exception &) {
-    threw = true;
-  }
-  require(threw, message);
+#define REQUIRE_THROWS(type, message, ...) do {                                \
+  bool text_store_expected_exception = false;                                  \
+  try {                                                                         \
+    static_cast<void>(__VA_ARGS__);                                             \
+  } catch (const type &) {                                                      \
+    text_store_expected_exception = true;                                      \
+  }                                                                             \
+  require(text_store_expected_exception, message);                             \
+} while (false)
+
+std::uint32_t next_random(std::uint32_t &state) {
+  state = state * 1'664'525U + 1'013'904'223U;
+  return state;
 }
 
 void test_strict_utf8_validation() {
@@ -82,15 +86,15 @@ void test_typed_position_round_trips() {
                 store.utf8_offset(ScalarIndex(index)) == bytes[index],
             "valid UTF-8 and scalar positions must round-trip exactly");
   }
-  require_throws<std::invalid_argument>(
-      [&store] { static_cast<void>(store.utf8_offset(Utf16Offset(3))); },
-      "UTF-16 positions may not split a surrogate pair");
-  require_throws<std::invalid_argument>(
-      [&store] { static_cast<void>(store.scalar_index(Utf8Offset(2))); },
-      "UTF-8 positions may not split a scalar");
-  require_throws<std::out_of_range>(
-      [&store] { static_cast<void>(store.scalar_at(store.utf8_size())); },
-      "reading a scalar at end-of-text must be rejected");
+  REQUIRE_THROWS(std::invalid_argument,
+                 "UTF-16 positions may not split a surrogate pair",
+                 store.utf8_offset(Utf16Offset(3)));
+  REQUIRE_THROWS(std::invalid_argument,
+                 "UTF-8 positions may not split a scalar",
+                 store.scalar_index(Utf8Offset(2)));
+  REQUIRE_THROWS(std::out_of_range,
+                 "reading a scalar at end-of-text must be rejected",
+                 store.scalar_at(store.utf8_size()));
 
   require(store.scalar_at(Utf8Offset(3)) == U'\U0001f600' &&
               store.next_scalar_boundary(Utf8Offset(3)) == Utf8Offset(7) &&
@@ -124,14 +128,14 @@ void test_extended_grapheme_navigation() {
               store.grapheme_range(GraphemeIndex(1)) ==
                   Utf8Range{expected[1], expected[2]},
           "grapheme navigation must step over a complete emoji ZWJ sequence");
-  require_throws<std::invalid_argument>(
-      [&store] { static_cast<void>(store.grapheme_index(Utf8Offset(1))); },
-      "grapheme lookup must reject a scalar boundary inside a cluster");
-  require_throws<std::out_of_range>(
-      [&store] {
-        static_cast<void>(store.grapheme_range(store.grapheme_count()));
-      },
-      "end-of-text grapheme position may not be read as a cluster");
+  REQUIRE_THROWS(
+      std::invalid_argument,
+      "grapheme lookup must reject a scalar boundary inside a cluster",
+      store.grapheme_index(Utf8Offset(1)));
+  REQUIRE_THROWS(
+      std::out_of_range,
+      "end-of-text grapheme position may not be read as a cluster",
+      store.grapheme_range(store.grapheme_count()));
 }
 
 void test_atomic_mutation_and_limits() {
@@ -147,23 +151,17 @@ void test_atomic_mutation_and_limits() {
   const std::string before(store.utf8());
   const TextStoreSnapshot before_rejection = store.snapshot();
   const std::string invalid{"\xed\xa0\x80", 3};
-  require_throws<std::invalid_argument>(
-      [&store, &invalid] {
-        static_cast<void>(
-            store.replace({Utf8Offset(0), Utf8Offset(0)}, invalid));
-      },
-      "invalid replacement UTF-8 must be rejected");
-  require_throws<std::invalid_argument>(
-      [&store] {
-        static_cast<void>(store.replace({Utf8Offset(7), Utf8Offset(8)}, "x"));
-      },
-      "replacement ranges may not split a scalar");
-  require_throws<std::length_error>(
-      [&store] {
-        static_cast<void>(store.replace({Utf8Offset(0), Utf8Offset(0)},
-                                        std::string(65, 'x')));
-      },
-      "text byte limits must be enforced before mutation");
+  REQUIRE_THROWS(std::invalid_argument,
+                 "invalid replacement UTF-8 must be rejected",
+                 store.replace(Utf8Range{Utf8Offset(0), Utf8Offset(0)},
+                               invalid));
+  REQUIRE_THROWS(std::invalid_argument,
+                 "replacement ranges may not split a scalar",
+                 store.replace(Utf8Range{Utf8Offset(7), Utf8Offset(8)}, "x"));
+  REQUIRE_THROWS(std::length_error,
+                 "text byte limits must be enforced before mutation",
+                 store.replace(Utf8Range{Utf8Offset(0), Utf8Offset(0)},
+                               std::string(65, 'x')));
   const TextStoreSnapshot after_rejection = store.snapshot();
   require(store.utf8() == before &&
               after_rejection.revision == before_rejection.revision &&
@@ -239,14 +237,14 @@ void test_style_span_normalization_and_edit_transform() {
           "text replacement must preserve surrounding spans and explicitly "
           "style insertion");
 
-  const auto prior = store.snapshot();
+  const TextStoreSnapshot prior = store.snapshot();
   const std::vector<TextStyleSpan> overlapping = {
       {{Utf8Offset(0), Utf8Offset(3)}, strong},
       {{Utf8Offset(2), Utf8Offset(4)}, accent},
   };
-  require_throws<std::invalid_argument>(
-      [&store, &overlapping] { store.set_style_spans(overlapping); },
-      "overlapping style spans must be rejected");
+  REQUIRE_THROWS(std::invalid_argument,
+                 "overlapping style spans must be rejected",
+                 store.set_style_spans(overlapping));
   require(
       store.snapshot().revision == prior.revision &&
           store.snapshot().rejected_mutation_count ==
@@ -257,9 +255,9 @@ void test_style_span_normalization_and_edit_transform() {
   const std::vector<TextStyleSpan> split_scalar = {
       {{Utf8Offset(1), Utf8Offset(3)}, strong},
   };
-  require_throws<std::invalid_argument>(
-      [&unicode, &split_scalar] { unicode.set_style_spans(split_scalar); },
-      "style spans may not split a supplementary-plane scalar");
+  REQUIRE_THROWS(std::invalid_argument,
+                 "style spans may not split a supplementary-plane scalar",
+                 unicode.set_style_spans(split_scalar));
 }
 
 void test_deterministic_edit_corpus() {
@@ -276,25 +274,21 @@ void test_deterministic_edit_corpus() {
   TextStore store;
   std::vector<std::string> reference;
   std::uint32_t state = 0x6d346134U;
-  const auto next = [&state]() {
-    state = state * 1'664'525U + 1'013'904'223U;
-    return state;
-  };
 
   for (std::size_t iteration = 0; iteration < 2'000; ++iteration) {
-    std::size_t start = next() % (reference.size() + 1U);
-    std::size_t end = next() % (reference.size() + 1U);
+    std::size_t start = next_random(state) % (reference.size() + 1U);
+    std::size_t end = next_random(state) % (reference.size() + 1U);
     if (end < start) {
       std::swap(start, end);
     }
-    std::size_t insertion_count = next() % 4U;
+    std::size_t insertion_count = next_random(state) % 4U;
     if (reference.size() - (end - start) + insertion_count > 64U) {
       insertion_count = 0;
     }
     std::vector<std::string> insertion;
     std::string replacement;
     for (std::size_t item = 0; item < insertion_count; ++item) {
-      insertion.push_back(corpus[next() % corpus.size()]);
+      insertion.push_back(corpus[next_random(state) % corpus.size()]);
       replacement += insertion.back();
     }
 

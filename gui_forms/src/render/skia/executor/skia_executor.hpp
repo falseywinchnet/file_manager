@@ -8,6 +8,7 @@
 #include <span>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace gui_drawing::render {
@@ -37,6 +38,14 @@ struct RasterResult final {
 struct DecodeResult final {
     std::unique_ptr<Bitmap> bitmap;
     RasterError error{RasterError::none};
+
+    [[nodiscard]] static DecodeResult failure(RasterError failure_error) {
+        return DecodeResult{{}, failure_error};
+    }
+    [[nodiscard]] static DecodeResult success(
+        std::unique_ptr<Bitmap> decoded_bitmap) {
+        return DecodeResult{std::move(decoded_bitmap), RasterError::none};
+    }
 
     [[nodiscard]] explicit operator bool() const noexcept {
         return bitmap != nullptr && error == RasterError::none;

@@ -4,6 +4,207 @@
 
 namespace gui_forms::abi::detail {
 
+template <typename State>
+struct ForeignPropertyGetter final {
+    std::shared_ptr<State> state;
+    gui_forms::BindingValue operator()() const { return (*state).get(); }
+};
+
+template <typename State>
+struct ForeignPropertySetter final {
+    std::shared_ptr<State> state;
+    void operator()(const gui_forms::BindingValue& value) const {
+        (*state).set(value);
+        (*state).changed.emit();
+    }
+};
+
+template <typename State>
+struct ForeignPropertyChangeConnector final {
+    std::shared_ptr<State> state;
+    gui_forms::SubscriptionToken operator()(
+        gui_forms::Component& owner, std::function<void()> changed) const {
+        return (*state).changed.subscribe(owner, std::move(changed));
+    }
+};
+
+template <typename State>
+struct ForeignPropertyResetter final {
+    std::shared_ptr<State> state;
+    void operator()() const {
+        (*state).reset();
+        (*state).changed.emit();
+    }
+};
+
+template <typename State>
+struct ForeignPropertyShouldSerialize final {
+    std::shared_ptr<State> state;
+    bool operator()() const { return (*state).should_serialize(); }
+};
+
+template <typename State>
+struct ForeignPropertyOrigin final {
+    std::shared_ptr<State> state;
+    gui_forms::PropertyValueOrigin operator()() const {
+        return (*state).should_serialize()
+            ? gui_forms::PropertyValueOrigin::local
+            : gui_forms::PropertyValueOrigin::defaulted;
+    }
+};
+
+template <typename State>
+struct ForeignConverterFormatter final {
+    std::weak_ptr<State> state;
+    std::string operator()(
+        const gui_forms::BindingValue& value,
+        const gui_forms::PropertyDescriptor&) const {
+        const std::shared_ptr<State> retained = state.lock();
+        if (!retained) {
+            throw std::logic_error(
+                "foreign property converter outlived its proxy");
+        }
+        return (*retained).format(value);
+    }
+};
+
+template <typename State>
+struct ForeignConverterParser final {
+    std::weak_ptr<State> state;
+    std::optional<gui_forms::BindingValue> operator()(
+        std::string_view text, const gui_forms::BindingValue&,
+        const gui_forms::PropertyDescriptor&) const {
+        const std::shared_ptr<State> retained = state.lock();
+        if (!retained) {
+            throw std::logic_error(
+                "foreign property converter outlived its proxy");
+        }
+        return (*retained).parse(text);
+    }
+};
+
+template <typename State>
+struct ForeignEditorTextUpdater final {
+    std::weak_ptr<gui_forms::Button> button;
+    std::weak_ptr<State> state;
+
+    void operator()(const gui_forms::BindingValue& value) const {
+        const std::shared_ptr<gui_forms::Button> editor = button.lock();
+        const std::shared_ptr<State> retained = state.lock();
+        if (!editor || !retained) return;
+        std::string display = (*retained).format(value);
+        if (display.size() > 96U) {
+            display.resize(93U);
+            display += "...";
+        }
+        (*editor).set_text(display.empty()
+            ? std::string("Edit \xE2\x80\xA6")
+            : display + "  \xE2\x80\xA6");
+    }
+};
+
+template <typename State>
+struct ForeignEditorSynchronizer final {
+    std::shared_ptr<gui_forms::BindingValue> current;
+    ForeignEditorTextUpdater<State> update_text;
+
+    void operator()(const gui_forms::BindingValue& value) const {
+        *current = value;
+        update_text(value);
+    }
+};
+
+template <typename State>
+struct ForeignEditorCommitRelay final {
+    std::weak_ptr<State> state;
+    std::shared_ptr<gui_forms::BindingValue> current;
+    std::shared_ptr<gui_forms::Event<
+        const gui_forms::PropertyEditorInputError&>> failures;
+    std::function<void(gui_forms::BindingValue)> committed;
+
+    void operator()(gui_forms::ButtonBase&) const {
+        const std::shared_ptr<State> retained = state.lock();
+        if (!retained) return;
+        try {
+            committed((*retained).edit(*current));
+        } catch (const std::exception& error) {
+            const gui_forms::PropertyEditorInputError failure{
+                (*retained).format(*current), error.what()};
+            (*failures).emit(failure);
+        }
+    }
+};
+
+template <typename State>
+struct ForeignEditorCommitConnector final {
+    std::weak_ptr<gui_forms::Button> button;
+    std::weak_ptr<State> state;
+    std::shared_ptr<gui_forms::BindingValue> current;
+    std::shared_ptr<gui_forms::Event<
+        const gui_forms::PropertyEditorInputError&>> failures;
+
+    gui_forms::SubscriptionToken operator()(
+        gui_forms::Component& owner,
+        std::function<void(gui_forms::BindingValue)> committed) const {
+        const std::shared_ptr<gui_forms::Button> editor = button.lock();
+        if (!editor) return {};
+        return (*editor).clicked().subscribe(
+            owner, ForeignEditorCommitRelay<State>{
+                state, current, failures, std::move(committed)});
+    }
+};
+
+struct ForeignEditorFailureConnector final {
+    std::shared_ptr<gui_forms::Event<
+        const gui_forms::PropertyEditorInputError&>> failures;
+
+    gui_forms::SubscriptionToken operator()(
+        gui_forms::Component& owner,
+        std::function<void(
+            const gui_forms::PropertyEditorInputError&)> failed) const {
+        return (*failures).subscribe(owner, std::move(failed));
+    }
+};
+
+template <typename State>
+struct ForeignPropertyEditorFactory final {
+    std::weak_ptr<State> state;
+
+    std::optional<gui_forms::PropertyEditorBinding> operator()(
+        const gui_forms::PropertyEditorRequest& request) const {
+        const std::shared_ptr<State> retained = state.lock();
+        if (!retained) {
+            throw std::logic_error(
+                "foreign property editor outlived its proxy");
+        }
+        const std::shared_ptr<gui_forms::Button> button =
+            gui_forms::make_control<gui_forms::Button>(
+                StableId(request.stable_id));
+        const std::shared_ptr<gui_forms::BindingValue> current =
+            std::make_shared<gui_forms::BindingValue>(request.value);
+        const std::shared_ptr<gui_forms::Event<
+            const gui_forms::PropertyEditorInputError&>> failures =
+                std::make_shared<gui_forms::Event<
+                    const gui_forms::PropertyEditorInputError&>>();
+        const ForeignEditorTextUpdater<State> update_text{
+            std::weak_ptr<gui_forms::Button>(button), state};
+        update_text(*current);
+        (*button).set_accessible_name(request.property_path);
+        (*button).set_accessible_description(request.descriptor.description);
+        (*button).set_enabled(request.writable);
+
+        gui_forms::PropertyEditorBinding binding;
+        binding.control = button;
+        binding.synchronize = ForeignEditorSynchronizer<State>{
+            current, update_text};
+        binding.connect_committed = ForeignEditorCommitConnector<State>{
+            std::weak_ptr<gui_forms::Button>(button), state,
+            current, failures};
+        binding.connect_failed = ForeignEditorFailureConnector{failures};
+        return binding;
+    }
+};
+
 // A foreign object is represented to the native property engine as an
 // ordinary retained Control whose registrations happen to dispatch through a
 // bounded C callback table. The proxy is intentionally nonvisual and never
@@ -62,35 +263,22 @@ public:
         gui_forms::PropertyRegistration registration;
         registration.descriptor = (*state).descriptor;
         if (registration.descriptor.readable) {
-            registration.get = [state] { return (*state).get(); };
+            registration.get = ForeignPropertyGetter<PropertyState>{state};
         }
         if (registration.descriptor.writable) {
-            registration.set = [state](const gui_forms::BindingValue& value) {
-                (*state).set(value);
-                (*state).changed.emit();
-            };
+            registration.set = ForeignPropertySetter<PropertyState>{state};
         }
         if (registration.descriptor.change_notifications) {
-            registration.connect_changed = [state](
-                gui_forms::Component& owner, std::function<void()> changed) {
-                return (*state).changed.subscribe(owner, std::move(changed));
-            };
+            registration.connect_changed =
+                ForeignPropertyChangeConnector<PropertyState>{state};
         }
         if (registration.descriptor.resettable) {
-            registration.reset = [state] {
-                (*state).reset();
-                (*state).changed.emit();
-            };
+            registration.reset = ForeignPropertyResetter<PropertyState>{state};
         }
         if (callbacks.should_serialize != nullptr) {
-            registration.should_serialize = [state] {
-                return (*state).should_serialize();
-            };
-            registration.origin = [state] {
-                return (*state).should_serialize()
-                    ? gui_forms::PropertyValueOrigin::local
-                    : gui_forms::PropertyValueOrigin::defaulted;
-            };
+            registration.should_serialize =
+                ForeignPropertyShouldSerialize<PropertyState>{state};
+            registration.origin = ForeignPropertyOrigin<PropertyState>{state};
         }
         define_bindable_property(std::move(registration));
         properties_.emplace(canonical, std::move(state));
@@ -98,7 +286,8 @@ public:
 
     void notify_changed(std::string_view name) {
         require_mutable();
-        const auto found = properties_.find(
+        const std::map<std::string, std::shared_ptr<PropertyState>>::iterator
+            found = properties_.find(
             gui_forms::canonical_binding_name(name));
         if (found == properties_.end()) {
             throw std::invalid_argument(
@@ -118,27 +307,11 @@ public:
             }
             gui_forms::PropertyValueConverter converter;
             if ((*state).callbacks.format != nullptr) {
-                converter.format = [weak = std::weak_ptr<PropertyState>(state)](
-                    const gui_forms::BindingValue& value,
-                    const gui_forms::PropertyDescriptor&) {
-                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> current = weak.lock();
-                    if (!current) {
-                        throw std::logic_error(
-                            "foreign property converter outlived its proxy");
-                    }
-                    return (*current).format(value);
-                };
+                converter.format = ForeignConverterFormatter<PropertyState>{
+                    std::weak_ptr<PropertyState>(state)};
             }
-            converter.parse = [weak = std::weak_ptr<PropertyState>(state)](
-                std::string_view text, const gui_forms::BindingValue&,
-                const gui_forms::PropertyDescriptor&) {
-                const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> current = weak.lock();
-                if (!current) {
-                    throw std::logic_error(
-                        "foreign property converter outlived its proxy");
-                }
-                return (*current).parse(text);
-            };
+            converter.parse = ForeignConverterParser<PropertyState>{
+                std::weak_ptr<PropertyState>(state)};
             if (!target.register_converter(name, std::move(converter))) {
                 throw std::logic_error(
                     "foreign property converter identity collision");
@@ -157,79 +330,8 @@ public:
                 continue;
             }
             const bool registered = target.register_factory(
-                name, [weak = std::weak_ptr<PropertyState>(state)](
-                          const gui_forms::PropertyEditorRequest& request)
-                    -> std::optional<gui_forms::PropertyEditorBinding> {
-                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> retained = weak.lock();
-                    if (!retained) {
-                        throw std::logic_error(
-                            "foreign property editor outlived its proxy");
-                    }
-                    std::shared_ptr<gui_forms::Button> button = gui_forms::make_control<gui_forms::Button>(
-                        StableId(request.stable_id));
-                    auto current = std::make_shared<gui_forms::BindingValue>(
-                        request.value);
-                    std::shared_ptr<gui_forms::Event<const gui_forms::PropertyEditorInputError &>> failures = std::make_shared<
-                        gui_forms::Event<const gui_forms::PropertyEditorInputError&>>();
-                    const auto update_text = [weak_button =
-                            std::weak_ptr<gui_forms::Button>(button), weak](
-                            const gui_forms::BindingValue& value) {
-                        const std::shared_ptr<gui_forms::Button> editor = weak_button.lock();
-                        const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> state = weak.lock();
-                        if (!editor || !state) return;
-                        std::string display = (*state).format(value);
-                        if (display.size() > 96U) {
-                            display.resize(93U);
-                            display += "...";
-                        }
-                        (*editor).set_text(display.empty()
-                            ? std::string("Edit \xE2\x80\xA6")
-                            : display + "  \xE2\x80\xA6");
-                    };
-                    update_text(*current);
-                    (*button).set_accessible_name(request.property_path);
-                    (*button).set_accessible_description(
-                        request.descriptor.description);
-                    (*button).set_enabled(request.writable);
-
-                    gui_forms::PropertyEditorBinding binding;
-                    binding.control = button;
-                    binding.synchronize = [current, update_text](
-                        const gui_forms::BindingValue& value) {
-                        *current = value;
-                        update_text(value);
-                    };
-                    binding.connect_committed =
-                        [weak_button = std::weak_ptr<gui_forms::Button>(button),
-                         weak, current, failures](
-                            gui_forms::Component& owner,
-                            std::function<void(gui_forms::BindingValue)> committed) {
-                            const std::shared_ptr<gui_forms::Button> editor = weak_button.lock();
-                            if (!editor) return gui_forms::SubscriptionToken{};
-                            return (*editor).clicked().subscribe(
-                                owner, [weak, current, failures,
-                                        committed = std::move(committed)](
-                                           gui_forms::ButtonBase&) {
-                                    const std::shared_ptr<gui_forms::abi::detail::AbiPropertyObjectControl::PropertyState> state = weak.lock();
-                                    if (!state) return;
-                                    try {
-                                        committed((*state).edit(*current));
-                                    } catch (const std::exception& error) {
-                                        const gui_forms::PropertyEditorInputError failure{
-                                            (*state).format(*current), error.what()};
-                                        (*failures).emit(failure);
-                                    }
-                                });
-                        };
-                    binding.connect_failed =
-                        [failures](gui_forms::Component& owner,
-                                   std::function<void(
-                                       const gui_forms::PropertyEditorInputError&)>
-                                       failed) {
-                            return (*failures).subscribe(owner, std::move(failed));
-                        };
-                    return binding;
-                });
+                name, ForeignPropertyEditorFactory<PropertyState>{
+                    std::weak_ptr<PropertyState>(state)});
             if (!registered) {
                 throw std::logic_error(
                     "foreign property editor identity collision");
@@ -366,12 +468,12 @@ private:
         case GF_PROPERTY_ENUMERATION: {
             std::string name = std::move(text);
             if (name.empty() && descriptor.enumeration) {
-                const auto found = std::find_if(
-                    (*descriptor.enumeration).choices.begin(),
-                    (*descriptor.enumeration).choices.end(),
-                    [&](const gui_forms::PropertyEnumChoice& choice) {
-                        return choice.value == value.signed_value;
-                    });
+                std::vector<gui_forms::PropertyEnumChoice>::const_iterator found =
+                    (*descriptor.enumeration).choices.begin();
+                while (found != (*descriptor.enumeration).choices.end() &&
+                       (*found).value != value.signed_value) {
+                    ++found;
+                }
                 if (found != (*descriptor.enumeration).choices.end()) {
                     name = (*found).name;
                 }
@@ -387,9 +489,9 @@ private:
         }
     }
 
+    template <typename Invoke>
     static std::string callback_text(
-        const std::function<std::uint32_t(char*, std::uint64_t,
-                                          std::uint64_t*)>& invoke,
+        const Invoke& invoke,
         std::string_view operation) {
         std::vector<char> buffer(256U);
         for (std::size_t attempt = 0U; attempt < 2U; ++attempt) {
@@ -511,6 +613,60 @@ private:
     }
 
     struct PropertyState final {
+        struct GetterTextInvoke final {
+            const PropertyState* state{};
+            gf_property_value* value{};
+
+            std::uint32_t operator()(
+                char* buffer, std::uint64_t capacity,
+                std::uint64_t* required) const {
+                return (*state).callbacks.get(
+                    (*state).callbacks.context, value,
+                    buffer, capacity, required);
+            }
+        };
+
+        struct FormatterTextInvoke final {
+            const PropertyState* state{};
+            gf_property_value* value{};
+
+            std::uint32_t operator()(
+                char* buffer, std::uint64_t capacity,
+                std::uint64_t* required) const {
+                return (*state).callbacks.format(
+                    (*state).callbacks.context, value,
+                    buffer, capacity, required);
+            }
+        };
+
+        struct ParserTextInvoke final {
+            const PropertyState* state{};
+            gf_string_view input{};
+            gf_property_value* value{};
+
+            std::uint32_t operator()(
+                char* buffer, std::uint64_t capacity,
+                std::uint64_t* required) const {
+                return (*state).callbacks.parse(
+                    (*state).callbacks.context, input, value,
+                    buffer, capacity, required);
+            }
+        };
+
+        struct EditorTextInvoke final {
+            const PropertyState* state{};
+            gf_property_value* input{};
+            gf_property_value* output{};
+
+            std::uint32_t operator()(
+                char* buffer, std::uint64_t capacity,
+                std::uint64_t* required) const {
+                return (*state).callbacks.edit(
+                    (*state).callbacks.context, input, output,
+                    buffer, capacity, required);
+            }
+        };
+
         gui_forms::PropertyDescriptor descriptor;
         gf_property_callbacks_v1 callbacks{};
         gui_forms::Event<> changed;
@@ -518,11 +674,7 @@ private:
         [[nodiscard]] gui_forms::BindingValue get() const {
             gf_property_value value{};
             const std::string text = callback_text(
-                [&](char* buffer, std::uint64_t capacity,
-                    std::uint64_t* required) {
-                    return callbacks.get(callbacks.context, &value, buffer,
-                                         capacity, required);
-                }, "property getter");
+                GetterTextInvoke{this, &value}, "property getter");
             return from_abi(value, text, descriptor);
         }
 
@@ -561,11 +713,7 @@ private:
             const gui_forms::BindingValue& value) const {
             gf_property_value native = to_abi(value);
             return callback_text(
-                [&](char* buffer, std::uint64_t capacity,
-                    std::uint64_t* required) {
-                    return callbacks.format(callbacks.context, &native,
-                                            buffer, capacity, required);
-                }, "property formatter");
+                FormatterTextInvoke{this, &native}, "property formatter");
         }
 
         [[nodiscard]] std::optional<gui_forms::BindingValue> parse(
@@ -575,11 +723,7 @@ private:
             const gf_string_view input{text.data(), text.size()};
             try {
                 const std::string value_text = callback_text(
-                    [&](char* buffer, std::uint64_t capacity,
-                        std::uint64_t* required) {
-                        return callbacks.parse(callbacks.context, input, &value,
-                                               buffer, capacity, required);
-                    }, "property parser");
+                    ParserTextInvoke{this, input, &value}, "property parser");
                 return from_abi(value, value_text, descriptor);
             } catch (const std::invalid_argument&) {
                 return {};
@@ -597,11 +741,7 @@ private:
             gf_property_value input = to_abi(current);
             gf_property_value output{};
             const std::string value_text = callback_text(
-                [&](char* buffer, std::uint64_t capacity,
-                    std::uint64_t* required) {
-                    return callbacks.edit(callbacks.context, &input, &output,
-                                          buffer, capacity, required);
-                }, "property editor");
+                EditorTextInvoke{this, &input, &output}, "property editor");
             return from_abi(output, value_text, descriptor);
         }
     };

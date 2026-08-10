@@ -42,7 +42,7 @@ std::uint32_t pixel_at(const gui_forms::LiveSurfaceFrame& frame,
                        std::uint32_t x, std::uint32_t y) {
     const std::size_t offset = static_cast<std::size_t>(y) * frame.row_bytes() +
                                static_cast<std::size_t>(x) * 4U;
-    const auto pixels = frame.pixels();
+    const std::span<const std::byte> pixels = frame.pixels();
     assert(offset + 4U <= pixels.size());
     return static_cast<std::uint32_t>(pixels[offset]) |
            (static_cast<std::uint32_t>(pixels[offset + 1U]) << 8U) |
@@ -60,11 +60,12 @@ void paint_and_publish(
     assert(FillRect(producer.device, &bounds, brush) != 0);
     DeleteObject(brush);
 
-    const auto destination = reinterpret_cast<HDC>(endpoint->device_context());
+    const HDC destination =
+        reinterpret_cast<HDC>((*endpoint).device_context());
     assert(destination != nullptr);
     assert(BitBlt(destination, 0, 0, width, height, producer.device, 0, 0,
                   SRCCOPY) != 0);
-    assert(endpoint->publish_device_context(
+    assert((*endpoint).publish_device_context(
         reinterpret_cast<std::uintptr_t>(destination)));
 }
 
@@ -82,22 +83,25 @@ int main() {
     // control lifetime, a compatible memory DC/bitmap for the producer,
     // repeated BitBlt publication, resize, and reverse-order cleanup.
     for (int lifetime = 0; lifetime < 200; ++lifetime) {
-        const auto initial = sizes[static_cast<std::size_t>(lifetime) % sizes.size()];
-        auto endpoint = WindowsCompatibilityPaintEndpoint::acquire(
+        const std::array<int, 2> initial =
+            sizes[static_cast<std::size_t>(lifetime) % sizes.size()];
+        std::shared_ptr<WindowsCompatibilityPaintEndpoint> endpoint =
+            WindowsCompatibilityPaintEndpoint::acquire(
             static_cast<std::uint32_t>(initial[0]),
             static_cast<std::uint32_t>(initial[1]));
         assert(endpoint);
-        const auto compatibility_handle = endpoint->compatibility_handle();
+        const std::uintptr_t compatibility_handle =
+            (*endpoint).compatibility_handle();
         assert(compatibility_handle != 0U);
         // Direct retained surfaces must not allocate a native window. If this
         // assertion regresses, the endpoint can enter hit-testing/input state.
         assert(IsWindow(reinterpret_cast<HWND>(compatibility_handle)) == FALSE);
-        assert(endpoint->device_context() != 0U);
+        assert((*endpoint).device_context() != 0U);
 
-        const auto producer_size = sizes[
+        const std::array<int, 2> producer_size = sizes[
             (static_cast<std::size_t>(lifetime) + 3U) % sizes.size()];
         ProducerBitmap producer(
-            reinterpret_cast<HDC>(endpoint->device_context()),
+            reinterpret_cast<HDC>((*endpoint).device_context()),
             producer_size[0], producer_size[1]);
 
         for (int frame_number = 0; frame_number < 80; ++frame_number) {
@@ -109,7 +113,8 @@ int main() {
             const int height = (std::min)(initial[1], producer_size[1]);
             paint_and_publish(endpoint, producer, width, height, color);
 
-            auto frame = endpoint->live_surface()->acquire_latest();
+            gui_forms::LiveSurfaceFrame frame =
+                (*(*endpoint).live_surface()).acquire_latest();
             assert(frame);
             const std::uint32_t expected =
                 0xff000000U |
@@ -119,11 +124,11 @@ int main() {
             assert(pixel_at(frame, 0U, 0U) == expected);
         }
 
-        const auto resized = sizes[
+        const std::array<int, 2> resized = sizes[
             (static_cast<std::size_t>(lifetime) + 1U) % sizes.size()];
-        assert(endpoint->configure(static_cast<std::uint32_t>(resized[0]),
-                                   static_cast<std::uint32_t>(resized[1])));
-        endpoint->release();
+        assert((*endpoint).configure(static_cast<std::uint32_t>(resized[0]),
+                                     static_cast<std::uint32_t>(resized[1])));
+        (*endpoint).release();
         endpoint.reset();
     }
 }

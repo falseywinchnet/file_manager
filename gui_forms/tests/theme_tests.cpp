@@ -71,9 +71,33 @@ bool contains_color(const ThemePainter& painter, Color color) {
            painter.fills.end();
 }
 
+class ObserveCommittedTheme final {
+public:
+    explicit ObserveCommittedTheme(unsigned& changes) : changes_(changes) {}
+
+    void operator()(const Theme& theme) const {
+        require(theme.id() == "test-atomic",
+                "theme event must observe the committed replacement");
+        ++changes_;
+    }
+
+private:
+    unsigned& changes_;
+};
+
+void set_solid_recipe(ThemeDefinition& definition, ControlVisualRole role,
+                      ControlSurfaceState state, bool selected, Color color) {
+    ControlRoleRecipes& recipes =
+        definition.roles[static_cast<std::size_t>(role)];
+    ControlVisualRecipe& recipe =
+        (selected ? recipes.selected : recipes.ordinary)
+            [static_cast<std::size_t>(state)];
+    recipe.material.fills = {MaterialFillLayer::solid(color)};
+}
+
 void test_default_theme_has_complete_state_matrix() {
     const std::shared_ptr<const Theme> theme = default_theme();
-    require(theme && theme->id() == "windows-professional",
+    require(theme && (*theme).id() == "windows-professional",
             "default theme must have stable professional identity");
     for (std::size_t role = 0; role < control_visual_role_count; ++role) {
         for (std::size_t state = 0; state < control_surface_state_count; ++state) {
@@ -83,7 +107,7 @@ void test_default_theme_has_complete_state_matrix() {
                     context.surface = static_cast<ControlSurfaceState>(state);
                     context.selected = selected;
                     context.high_contrast = high_contrast;
-                    const ControlVisualRecipe& recipe = theme->resolve(
+                    const ControlVisualRecipe& recipe = (*theme).resolve(
                         static_cast<ControlVisualRole>(role), context);
                     require(valid_surface_material(recipe.material),
                             "every role/state combination must own a valid material");
@@ -94,10 +118,10 @@ void test_default_theme_has_complete_state_matrix() {
     ControlVisualContext normal;
     ControlVisualContext hot;
     hot.surface = ControlSurfaceState::hot;
-    require(first_fill(theme->resolve(ControlVisualRole::button, normal)) !=
-                first_fill(theme->resolve(ControlVisualRole::button, hot)),
+    require(first_fill((*theme).resolve(ControlVisualRole::button, normal)) !=
+                first_fill((*theme).resolve(ControlVisualRole::button, hot)),
             "button hot state must be visually distinct from normal");
-    const ThemeStructureTokens& structure = theme->structure();
+    const ThemeStructureTokens& structure = (*theme).structure();
     require(structure.spacing.micro <= structure.spacing.section &&
                 structure.geometry.splitter_width <=
                     structure.geometry.splitter_hit_width &&
@@ -134,17 +158,17 @@ void test_structural_tokens_are_validated_atomically() {
 }
 
 void test_window_theme_replacement_and_control_inheritance_are_atomic() {
-    auto root = make_control<Panel>(StableId("theme.root"));
-    auto child = make_control<Button>(StableId("theme.child"), "Apply");
-    child->set_requested_bounds({20.0, 20.0, 90.0, 28.0});
-    root->add_child(child);
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("theme.root"));
+    std::shared_ptr<gui_forms::Button> child = make_control<Button>(StableId("theme.child"), "Apply");
+    (*child).set_requested_bounds({20.0, 20.0, 90.0, 28.0});
+    (*root).add_child(child);
     Window window(root, {160.0, 80.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
 
     ThemeDefinition custom_definition = windows_professional_theme_definition();
     custom_definition.id = "test-atomic";
-    auto& custom_normal = custom_definition
+    ControlVisualRecipe& custom_normal = custom_definition
         .roles[static_cast<std::size_t>(ControlVisualRole::button)]
         .ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)];
     custom_normal.material.fills = {
@@ -153,24 +177,20 @@ void test_window_theme_replacement_and_control_inheritance_are_atomic() {
         Theme::create(std::move(custom_definition));
 
     unsigned changes{};
-    auto token = window.theme_changed().subscribe(
-        [&](const Theme& theme) {
-            require(theme.id() == "test-atomic",
-                    "theme event must observe the committed replacement");
-            ++changes;
-        });
+    SubscriptionToken token = window.theme_changed().subscribe(
+        ObserveCommittedTheme(changes));
     window.set_theme(custom);
     window.set_theme(custom);
-    require(changes == 1U && child->effective_theme().id() == "test-atomic" &&
+    require(changes == 1U && (*child).effective_theme().id() == "test-atomic" &&
                 !window.take_damage().empty(),
             "window replacement must be atomic, silent on identity, and inherited");
 
     const std::shared_ptr<const Theme> local = default_theme();
-    root->set_theme_override(local);
-    require(child->effective_theme().id() == "windows-professional",
+    (*root).set_theme_override(local);
+    require((*child).effective_theme().id() == "windows-professional",
             "ancestor override must be inherited by descendants");
-    root->clear_theme_override();
-    require(child->effective_theme().id() == "test-atomic",
+    (*root).clear_theme_override();
+    require((*child).effective_theme().id() == "test-atomic",
             "clearing override must restore window inheritance");
 
     bool rejected{};
@@ -184,11 +204,11 @@ void test_window_theme_replacement_and_control_inheritance_are_atomic() {
 }
 
 void test_button_routes_hover_and_status_through_theme_recipes() {
-    auto root = make_control<Panel>(StableId("theme.states.root"));
-    auto button = make_control<Button>(StableId("theme.states.button"), "Run");
-    button->set_requested_bounds({20.0, 20.0, 100.0, 30.0});
-    button->set_default_button(true);
-    root->add_child(button);
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("theme.states.root"));
+    std::shared_ptr<gui_forms::Button> button = make_control<Button>(StableId("theme.states.button"), "Run");
+    (*button).set_requested_bounds({20.0, 20.0, 100.0, 30.0});
+    (*button).set_default_button(true);
+    (*root).add_child(button);
     Window window(root, {160.0, 80.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
@@ -201,30 +221,30 @@ void test_button_routes_hover_and_status_through_theme_recipes() {
     move.action = PointerAction::move;
     move.position = {30.0, 30.0};
     static_cast<void>(window.dispatch_pointer(move));
-    require(button->hovered_visual(),
+    require((*button).hovered_visual(),
             "window hover routing must update themed button state");
     window.paint(painter, window.take_damage().bounds());
     require(painter.first_gradient != normal,
             "hover must select the hot theme recipe");
 
-    button->set_visual_status(ControlVisualStatus::invalid);
-    const ControlVisualContext invalid = button->visual_context(
+    (*button).set_visual_status(ControlVisualStatus::invalid);
+    const ControlVisualContext invalid = (*button).visual_context(
         true, false, false, false, true);
     require(invalid.surface == ControlSurfaceState::invalid,
             "invalid state must take precedence over hover");
-    button->set_enabled(false);
-    require(button->visual_context(true).surface == ControlSurfaceState::disabled,
+    (*button).set_enabled(false);
+    require((*button).visual_context(true).surface == ControlSurfaceState::disabled,
             "disabled state must take precedence over validation state");
-    button->set_enabled(true);
-    button->set_visual_status(ControlVisualStatus::normal);
+    (*button).set_enabled(true);
+    (*button).set_visual_status(ControlVisualStatus::normal);
     window.set_active(false);
-    require(button->visual_context().surface == ControlSurfaceState::deactivated,
+    require((*button).visual_context().surface == ControlSurfaceState::deactivated,
             "inactive windows must resolve deactivated recipes");
 
     PresentationSettings settings = window.presentation_settings();
     settings.high_contrast = true;
     window.set_presentation_settings(settings);
-    const ControlVisualContext high = button->visual_context();
+    const ControlVisualContext high = (*button).visual_context();
     require(high.high_contrast,
             "presentation accommodation must select high-contrast recipes");
 }
@@ -237,52 +257,42 @@ void test_editor_selection_menu_and_progress_roles_reach_stock_controls() {
     constexpr Color progress_fill = Color::rgba(107, 131, 157);
     ThemeDefinition definition = windows_professional_theme_definition();
     definition.id = "stock-role-routing";
-    const auto set_solid = [&definition](ControlVisualRole role,
-                                         ControlSurfaceState state,
-                                         bool selected, Color color) {
-        ControlRoleRecipes& recipes =
-            definition.roles[static_cast<std::size_t>(role)];
-        ControlVisualRecipe& recipe =
-            (selected ? recipes.selected : recipes.ordinary)
-                [static_cast<std::size_t>(state)];
-        recipe.material.fills = {MaterialFillLayer::solid(color)};
-    };
-    set_solid(ControlVisualRole::editor, ControlSurfaceState::normal,
-              false, editor_color);
-    set_solid(ControlVisualRole::selection, ControlSurfaceState::normal,
-              true, selection_color);
-    set_solid(ControlVisualRole::menu_item, ControlSurfaceState::hot,
-              false, menu_color);
-    set_solid(ControlVisualRole::progress, ControlSurfaceState::normal,
-              false, progress_track);
-    set_solid(ControlVisualRole::progress, ControlSurfaceState::normal,
-              true, progress_fill);
+    set_solid_recipe(definition, ControlVisualRole::editor,
+                     ControlSurfaceState::normal, false, editor_color);
+    set_solid_recipe(definition, ControlVisualRole::selection,
+                     ControlSurfaceState::normal, true, selection_color);
+    set_solid_recipe(definition, ControlVisualRole::menu_item,
+                     ControlSurfaceState::hot, false, menu_color);
+    set_solid_recipe(definition, ControlVisualRole::progress,
+                     ControlSurfaceState::normal, false, progress_track);
+    set_solid_recipe(definition, ControlVisualRole::progress,
+                     ControlSurfaceState::normal, true, progress_fill);
 
-    auto root = make_control<Panel>(StableId("theme.stock.root"));
-    auto editor = make_control<TextBox>(StableId("theme.stock.editor"), "alpha");
-    editor->set_requested_bounds({8.0, 8.0, 140.0, 28.0});
-    auto list = make_control<ListBox>(StableId("theme.stock.list"));
-    list->set_requested_bounds({8.0, 42.0, 140.0, 58.0});
-    list->set_items({"one", "two"});
-    list->select_index(0U);
-    auto combo = make_control<ComboBox>(StableId("theme.stock.combo"));
-    combo->set_requested_bounds({156.0, 8.0, 136.0, 28.0});
-    combo->set_items({"one", "two"});
-    combo->set_selected_index(0U);
-    auto progress = make_control<ProgressBar>(StableId("theme.stock.progress"));
-    progress->set_requested_bounds({156.0, 46.0, 136.0, 20.0});
-    progress->set_value(50.0);
-    progress->set_visual_style(ProgressBarVisualStyle::continuous);
-    auto menu = make_control<MenuStrip>(StableId("theme.stock.menu"));
-    menu->set_requested_bounds({8.0, 108.0, 284.0, 28.0});
-    auto menu_command = std::make_shared<Command>("theme.stock.open", "Open");
-    menu->set_items({{"file", "File",
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("theme.stock.root"));
+    std::shared_ptr<gui_forms::TextBox> editor = make_control<TextBox>(StableId("theme.stock.editor"), "alpha");
+    (*editor).set_requested_bounds({8.0, 8.0, 140.0, 28.0});
+    std::shared_ptr<gui_forms::ListBox> list = make_control<ListBox>(StableId("theme.stock.list"));
+    (*list).set_requested_bounds({8.0, 42.0, 140.0, 58.0});
+    (*list).set_items({"one", "two"});
+    (*list).select_index(0U);
+    std::shared_ptr<gui_forms::ComboBox> combo = make_control<ComboBox>(StableId("theme.stock.combo"));
+    (*combo).set_requested_bounds({156.0, 8.0, 136.0, 28.0});
+    (*combo).set_items({"one", "two"});
+    (*combo).set_selected_index(0U);
+    std::shared_ptr<gui_forms::ProgressBar> progress = make_control<ProgressBar>(StableId("theme.stock.progress"));
+    (*progress).set_requested_bounds({156.0, 46.0, 136.0, 20.0});
+    (*progress).set_value(50.0);
+    (*progress).set_visual_style(ProgressBarVisualStyle::continuous);
+    std::shared_ptr<gui_forms::MenuStrip> menu = make_control<MenuStrip>(StableId("theme.stock.menu"));
+    (*menu).set_requested_bounds({8.0, 108.0, 284.0, 28.0});
+    std::shared_ptr<gui_forms::Command> menu_command = std::make_shared<Command>("theme.stock.open", "Open");
+    (*menu).set_items({{"file", "File",
                       {{"open", MenuItemKind::command, menu_command, "Open", {}}}}});
-    root->add_child(editor);
-    root->add_child(list);
-    root->add_child(combo);
-    root->add_child(progress);
-    root->add_child(menu);
+    (*root).add_child(editor);
+    (*root).add_child(list);
+    (*root).add_child(combo);
+    (*root).add_child(progress);
+    (*root).add_child(menu);
     Window window(root, {300.0, 144.0});
     window.set_theme(Theme::create(std::move(definition)));
     window.perform_layout();

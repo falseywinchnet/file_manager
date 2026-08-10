@@ -1,4 +1,5 @@
 #include "gui_forms/controls/panel/color_value_editor/color_value_editor.hpp"
+#include "gui_forms/detail/weak_member_callback.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -24,12 +25,12 @@ void ColorValueEditor::initialize_control_tree() {
     const std::weak_ptr<ColorValueEditor> weak =
         std::static_pointer_cast<ColorValueEditor>(shared_from_this());
     committed_ = (*editor_).committed().subscribe(
-        *this, [weak](const std::string& text) {
-            if (const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock()) (*retained).commit(text);
-        });
-    cancelled_ = (*editor_).cancelled().subscribe(*this, [weak] {
-        if (const std::shared_ptr<gui_forms::ColorValueEditor> retained = weak.lock()) (*retained).cancel();
-    });
+        *this, detail::WeakMemberCallback<
+            void (ColorValueEditor::*)(const std::string&)>(
+                weak, &ColorValueEditor::commit_text));
+    cancelled_ = (*editor_).cancelled().subscribe(
+        *this, detail::WeakMemberCallback<void (ColorValueEditor::*)()>(
+            weak, &ColorValueEditor::cancel));
 }
 
 std::string ColorValueEditor::format_value(Color value) {
@@ -53,27 +54,35 @@ std::optional<Color> ColorValueEditor::parse_value(std::string_view text) {
     if ((text.size() != 7U && text.size() != 9U) || text.front() != '#') {
         return {};
     }
-    const auto nibble = [](char value) -> std::optional<std::uint8_t> {
-        if (value >= '0' && value <= '9') {
-            return static_cast<std::uint8_t>(value - '0');
-        }
-        if (value >= 'a' && value <= 'f') {
-            return static_cast<std::uint8_t>(value - 'a' + 10);
-        }
-        if (value >= 'A' && value <= 'F') {
-            return static_cast<std::uint8_t>(value - 'A' + 10);
-        }
-        return {};
-    };
     std::uint8_t channels[4]{0U, 0U, 0U, 255U};
     const std::size_t count = text.size() == 9U ? 4U : 3U;
     for (std::size_t index = 0U; index < count; ++index) {
-        const std::optional<std::uint8_t> high = nibble(text[1U + index * 2U]);
-        const std::optional<std::uint8_t> low = nibble(text[2U + index * 2U]);
+        const std::optional<std::uint8_t> high =
+            parse_nibble(text[1U + index * 2U]);
+        const std::optional<std::uint8_t> low =
+            parse_nibble(text[2U + index * 2U]);
         if (!high || !low) return {};
         channels[index] = static_cast<std::uint8_t>((*high << 4U) | *low);
     }
     return Color::rgba(channels[0], channels[1], channels[2], channels[3]);
+}
+
+std::optional<std::uint8_t> ColorValueEditor::parse_nibble(
+    char value) noexcept {
+    if (value >= '0' && value <= '9') {
+        return static_cast<std::uint8_t>(value - '0');
+    }
+    if (value >= 'a' && value <= 'f') {
+        return static_cast<std::uint8_t>(value - 'a' + 10);
+    }
+    if (value >= 'A' && value <= 'F') {
+        return static_cast<std::uint8_t>(value - 'A' + 10);
+    }
+    return {};
+}
+
+void ColorValueEditor::commit_text(const std::string& text) {
+    commit(text);
 }
 
 void ColorValueEditor::set_value(Color value) {

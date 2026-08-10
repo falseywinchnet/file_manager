@@ -733,6 +733,42 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     return element;
 }
 
+class DrainPostedWorkWake final {
+public:
+    explicit DrainPostedWorkWake(GUIFormsView* view) noexcept
+        : view_(view) {}
+
+    void operator()() const
+    {
+        __weak GUIFormsView* weakView = view_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            GUIFormsView* strongView = weakView;
+            if (strongView != nil) [strongView drainPostedWork];
+        });
+    }
+
+private:
+    __weak GUIFormsView* view_;
+};
+
+class CollectDamageWake final {
+public:
+    explicit CollectDamageWake(GUIFormsView* view) noexcept
+        : view_(view) {}
+
+    void operator()() const
+    {
+        __weak GUIFormsView* weakView = view_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            GUIFormsView* strongView = weakView;
+            if (strongView != nil) [strongView collectDamage];
+        });
+    }
+
+private:
+    __weak GUIFormsView* view_;
+};
+
 @implementation GUIFormsView
 
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model {
@@ -774,18 +810,8 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
         dispatch_resume(_wakeSource);
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
-        (*_model).set_dispatch_wake_handler([weakSelf] {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                GUIFormsView* strongSelf = weakSelf;
-                if (strongSelf != nil) [strongSelf drainPostedWork];
-            });
-        });
-        (*_model).set_paint_wake_handler([weakSelf] {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                GUIFormsView* strongSelf = weakSelf;
-                if (strongSelf != nil) [strongSelf collectDamage];
-            });
-        });
+        (*_model).set_dispatch_wake_handler(DrainPostedWorkWake(self));
+        (*_model).set_paint_wake_handler(CollectDamageWake(self));
         [self setWantsLayer:NO];
         [self registerForDraggedTypes:@[
             NSPasteboardTypeString, NSPasteboardTypeFileURL, @"public.data"]];
@@ -1773,6 +1799,120 @@ HostCapabilities macos_capabilities() {
                 HostCapability::sound_cues};
 }
 
+class DispatchAndCollectWake final {
+public:
+    DispatchAndCollectWake(
+        GUIFormsView* view,
+        std::function<void()> dispatch_pending) noexcept
+        : view_(view), dispatch_pending_(std::move(dispatch_pending)) {}
+
+    void operator()() const
+    {
+        GUIFormsView* view = view_;
+        const std::function<void()> dispatch_pending = dispatch_pending_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (dispatch_pending) dispatch_pending();
+            [view collectDamage];
+        });
+    }
+
+private:
+    GUIFormsView* view_;
+    std::function<void()> dispatch_pending_;
+};
+
+class RequestNativeClose final {
+public:
+    explicit RequestNativeClose(NSWindow* window) noexcept : window_(window) {}
+
+    void operator()() const
+    {
+        NSWindow* window = window_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [window performClose:nil];
+        });
+    }
+
+private:
+    NSWindow* window_;
+};
+
+class ShowNativeDialog final {
+public:
+    explicit ShowNativeDialog(GUIFormsView* view) noexcept : view_(view) {}
+
+    HostDialogResult operator()(const HostDialogRequest& request) const
+    {
+        return [view_ showHostDialog:request];
+    }
+
+private:
+    GUIFormsView* view_;
+};
+
+class ShowNativeTooltip final {
+public:
+    explicit ShowNativeTooltip(GUIFormsView* view) noexcept : view_(view) {}
+
+    HostServiceStatus operator()(const HostTooltipRequest& request) const
+    {
+        return [view_ showHostTooltip:request];
+    }
+
+private:
+    GUIFormsView* view_;
+};
+
+class HideNativeTooltip final {
+public:
+    explicit HideNativeTooltip(GUIFormsView* view) noexcept : view_(view) {}
+
+    void operator()() const { [view_ hideHostTooltip]; }
+
+private:
+    GUIFormsView* view_;
+};
+
+class ReadNativeClipboard final {
+public:
+    explicit ReadNativeClipboard(GUIFormsView* view) noexcept : view_(view) {}
+
+    HostClipboardTextResult operator()() const
+    {
+        return [view_ readHostClipboard];
+    }
+
+private:
+    GUIFormsView* view_;
+};
+
+class WriteNativeClipboard final {
+public:
+    explicit WriteNativeClipboard(GUIFormsView* view) noexcept : view_(view) {}
+
+    HostServiceStatus operator()(std::string_view text) const
+    {
+        return [view_ writeHostClipboard:text];
+    }
+
+private:
+    GUIFormsView* view_;
+};
+
+class StableWindowIdEquals final {
+public:
+    explicit StableWindowIdEquals(std::string_view stable_id) noexcept
+        : stable_id_(stable_id) {}
+
+    bool operator()(const MacApplicationWindow& candidate) const noexcept
+    {
+        return candidate.stable_id == stable_id_;
+    }
+
+private:
+    std::string_view stable_id_;
+};
+
 
 int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
     if (!model) {
@@ -1819,32 +1959,13 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         if (options.host_ready) {
             const std::function<void()> dispatchPending = options.dispatch_pending;
             options.host_ready(
-                [view, dispatchPending] {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (dispatchPending) dispatchPending();
-                        [view collectDamage];
-                    });
-                },
-                [nativeWindow] {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [nativeWindow performClose:nil];
-                    });
-                },
-                [view](const HostDialogRequest& request) {
-                    return [view showHostDialog:request];
-                },
-                [view](const HostTooltipRequest& request) {
-                    return [view showHostTooltip:request];
-                },
-                [view] {
-                    [view hideHostTooltip];
-                },
-                [view] {
-                    return [view readHostClipboard];
-                },
-                [view](std::string_view text) {
-                    return [view writeHostClipboard:text];
-                });
+                DispatchAndCollectWake(view, dispatchPending),
+                RequestNativeClose(nativeWindow),
+                ShowNativeDialog(view),
+                ShowNativeTooltip(view),
+                HideNativeTooltip(view),
+                ReadNativeClipboard(view),
+                WriteNativeClipboard(view));
         }
         // Match every host: one FIFO initialization turn runs after portable
         // attach/service publication and before first visible presentation.
@@ -1901,9 +2022,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             if (depth >= windows.size()) return 2;
             const std::vector<MacApplicationWindow>::iterator parent =
                 std::find_if(
-                windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
-                    return candidate.stable_id == owner;
-                });
+                    windows.begin(), windows.end(), StableWindowIdEquals(owner));
             owner = (*parent).owner_id;
         }
     }
@@ -1964,9 +2083,8 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             }
             const std::vector<MacApplicationWindow>::iterator owner =
                 std::find_if(
-                windows.begin(), windows.end(), [&](const MacApplicationWindow& candidate) {
-                    return candidate.stable_id == entry.owner_id;
-                });
+                    windows.begin(), windows.end(),
+                    StableWindowIdEquals(entry.owner_id));
             const std::size_t ownerIndex = static_cast<std::size_t>(
                 std::distance(windows.begin(), owner));
             NSWindow* ownerWindow = nativeWindows[ownerIndex];
@@ -2000,28 +2118,13 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 const std::function<void()> dispatchPending =
                     entry.options.dispatch_pending;
                 entry.options.host_ready(
-                    [view, dispatchPending] {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            if (dispatchPending) dispatchPending();
-                            [view collectDamage];
-                        });
-                    },
-                    [nativeWindow] {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [nativeWindow performClose:nil];
-                        });
-                    },
-                    [view](const HostDialogRequest& request) {
-                        return [view showHostDialog:request];
-                    },
-                    [view](const HostTooltipRequest& request) {
-                        return [view showHostTooltip:request];
-                    },
-                    [view] { [view hideHostTooltip]; },
-                    [view] { return [view readHostClipboard]; },
-                    [view](std::string_view text) {
-                        return [view writeHostClipboard:text];
-                    });
+                    DispatchAndCollectWake(view, dispatchPending),
+                    RequestNativeClose(nativeWindow),
+                    ShowNativeDialog(view),
+                    ShowNativeTooltip(view),
+                    HideNativeTooltip(view),
+                    ReadNativeClipboard(view),
+                    WriteNativeClipboard(view));
             }
             [view drainPostedWork];
             if (entry.options.dispatch_pending) entry.options.dispatch_pending();

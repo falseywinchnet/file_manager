@@ -158,6 +158,58 @@ void sunken_frame(Painter& painter, Rect rect, Color fill)
     return buffer;
 }
 
+void invalidate_gallery_control(Window& window, std::string_view id)
+{
+    if (const Control::Ptr control = window.find(id)) {
+        (*control).invalidate(Dirty::paint | Dirty::semantics);
+    }
+}
+
+void invalidate_gallery_controls(
+    Window& window,
+    std::initializer_list<std::string_view> identifiers)
+{
+    for (const std::string_view id : identifiers) {
+        invalidate_gallery_control(window, id);
+    }
+}
+
+void update_gallery_label(Window& window, std::string_view id, std::string text)
+{
+    if (std::shared_ptr<gui_forms::Label> label =
+            std::dynamic_pointer_cast<Label>(window.find(id))) {
+        (*label).set_text(std::move(text));
+    }
+}
+
+class DropDataCounter final {
+public:
+    DropDataCounter(std::size_t& files,
+                    std::size_t& text_items,
+                    std::size_t& binary_items) noexcept
+        : files_(&files), text_items_(&text_items), binary_items_(&binary_items) {}
+
+    void operator()(const DragFileListData& data) const noexcept
+    {
+        *files_ += data.paths_utf8.size();
+    }
+
+    void operator()(const DragTextData&) const noexcept
+    {
+        ++*text_items_;
+    }
+
+    void operator()(const DragBinaryData&) const noexcept
+    {
+        ++*binary_items_;
+    }
+
+private:
+    std::size_t* files_{};
+    std::size_t* text_items_{};
+    std::size_t* binary_items_{};
+};
+
 class GalleryButton final : public Button {
 public:
     GalleryButton(StableId id, const dml::NodeSpec& specification,
@@ -168,14 +220,19 @@ public:
         set_enabled((specification.flags & dml::enabled) != 0U);
         set_visible((specification.flags & dml::visible) != 0U);
         set_default_button((specification.flags & dml::default_action) != 0U);
-        click_ = clicked().subscribe([this](ButtonBase&) {
-            if ((*context_).model.activate(id_)) {
-                (*context_).synchronize(id_);
-            }
-        });
+        click_ = clicked().subscribe(
+            Delegate<ButtonBase&>::bind<GalleryButton,
+                &GalleryButton::on_clicked>(*this));
     }
 
 private:
+    void on_clicked(ButtonBase&)
+    {
+        if ((*context_).model.activate(id_)) {
+            (*context_).synchronize(id_);
+        }
+    }
+
     std::string id_;
     std::shared_ptr<GalleryContext> context_;
     SubscriptionToken click_;
@@ -196,20 +253,25 @@ public:
             set_three_state(true);
             set_check_state(CheckState::indeterminate);
         }
-        click_ = clicked().subscribe([this](ButtonBase&) {
-            if (id_ == "gallery.checkbox") {
-                static_cast<void>((*context_).model.activate(id_));
-            } else {
-                const char* state = check_state() == CheckState::checked
-                    ? "checked" : check_state() == CheckState::indeterminate
-                        ? "indeterminate" : "unchecked";
-                (*context_).drop_status = std::string("Three-state option · ") + state;
-            }
-            (*context_).synchronize(id_);
-        });
+        click_ = clicked().subscribe(
+            Delegate<ButtonBase&>::bind<GalleryCheckBox,
+                &GalleryCheckBox::on_clicked>(*this));
     }
 
 private:
+    void on_clicked(ButtonBase&)
+    {
+        if (id_ == "gallery.checkbox") {
+            static_cast<void>((*context_).model.activate(id_));
+        } else {
+            const char* state = check_state() == CheckState::checked
+                ? "checked" : check_state() == CheckState::indeterminate
+                    ? "indeterminate" : "unchecked";
+            (*context_).drop_status = std::string("Three-state option · ") + state;
+        }
+        (*context_).synchronize(id_);
+    }
+
     std::string id_;
     std::shared_ptr<GalleryContext> context_;
     SubscriptionToken click_;
@@ -228,13 +290,18 @@ public:
         set_checked(id_ == "gallery.radio.classic"
             ? (*context_).model.state().style_mode == StyleMode::classic_relief
             : (*context_).model.state().style_mode == StyleMode::quiet_relief);
-        click_ = clicked().subscribe([this](ButtonBase&) {
-            static_cast<void>((*context_).model.activate(id_));
-            (*context_).synchronize(id_);
-        });
+        click_ = clicked().subscribe(
+            Delegate<ButtonBase&>::bind<GalleryRadioButton,
+                &GalleryRadioButton::on_clicked>(*this));
     }
 
 private:
+    void on_clicked(ButtonBase&)
+    {
+        static_cast<void>((*context_).model.activate(id_));
+        (*context_).synchronize(id_);
+    }
+
     std::string id_;
     std::shared_ptr<GalleryContext> context_;
     SubscriptionToken click_;
@@ -247,14 +314,19 @@ public:
         : LinkLabel(std::move(id), std::string(specification.text)),
           context_(std::move(context))
     {
-        click_ = clicked().subscribe([this](ButtonBase&) {
-            (*context_).drop_status =
-                "Reusable LinkLabel · retained activation · no external navigation";
-            (*context_).synchronize("gallery.link");
-        });
+        click_ = clicked().subscribe(
+            Delegate<ButtonBase&>::bind<GalleryLinkLabel,
+                &GalleryLinkLabel::on_clicked>(*this));
     }
 
 private:
+    void on_clicked(ButtonBase&)
+    {
+        (*context_).drop_status =
+            "Reusable LinkLabel · retained activation · no external navigation";
+        (*context_).synchronize("gallery.link");
+    }
+
     std::shared_ptr<GalleryContext> context_;
     SubscriptionToken click_;
 };
@@ -271,14 +343,19 @@ public:
         set_value((*context_).model.state().slider_value);
         set_small_change(1.0);
         set_large_change(10.0);
-        value_changed_ = value_changed().subscribe([this](double next) {
-            if ((*context_).model.set_slider_value(next)) {
-                (*context_).synchronize(id_);
-            }
-        });
+        value_changed_ = value_changed().subscribe(
+            Delegate<double>::bind<GalleryTrackBar,
+                &GalleryTrackBar::on_value_changed>(*this));
     }
 
 private:
+    void on_value_changed(double next)
+    {
+        if ((*context_).model.set_slider_value(next)) {
+            (*context_).synchronize(id_);
+        }
+    }
+
     std::string id_;
     std::shared_ptr<GalleryContext> context_;
     SubscriptionToken value_changed_;
@@ -324,15 +401,11 @@ public:
         : UserControl(std::move(id))
     {
         initialized_ = initialization_completed().subscribe(
-            [this](Dirty, bool) { ++initialization_batches_; });
-        load_ = loaded().subscribe([this] {
-            begin_init();
-            invalidate(Dirty::style | Dirty::paint);
-            begin_init();
-            invalidate(Dirty::semantics | Dirty::accessibility);
-            end_init();
-            end_init();
-        });
+            Delegate<Dirty, bool>::bind<GalleryLifecycleCard,
+                &GalleryLifecycleCard::on_initialization_completed>(*this));
+        load_ = loaded().subscribe(
+            Delegate<>::bind<GalleryLifecycleCard,
+                &GalleryLifecycleCard::on_loaded>(*this));
     }
 
     void arrange(Rect final_bounds) override
@@ -376,6 +449,21 @@ protected:
     }
 
 private:
+    void on_initialization_completed(Dirty, bool)
+    {
+        ++initialization_batches_;
+    }
+
+    void on_loaded()
+    {
+        begin_init();
+        invalidate(Dirty::style | Dirty::paint);
+        begin_init();
+        invalidate(Dirty::semantics | Dirty::accessibility);
+        end_init();
+        end_init();
+    }
+
     SubscriptionToken initialized_;
     SubscriptionToken load_;
     std::uint64_t initialization_batches_{};
@@ -389,50 +477,45 @@ void GalleryContext::synchronize(std::string_view cause)
         return;
     }
     UpdateScope scope = (*window).begin_update();
-    const auto invalidate = [this](std::string_view id) {
-        if (const Control::Ptr control = (*window).find(id)) {
-            (*control).invalidate(Dirty::paint | Dirty::semantics);
-        }
-    };
-    const auto invalidate_set = [&invalidate](std::initializer_list<std::string_view> ids) {
-        for (const std::string_view id : ids) {
-            invalidate(id);
-        }
-    };
 
     if (cause == "gallery.command.reset") {
         drop_status.clear();
         for (const dml::NodeSpec& node : dml::gallery_nodes) {
-            invalidate(node.id);
+            invalidate_gallery_control(*window, node.id);
         }
         (*(*window).find("gallery.diagnostics")).set_visible(model.state().diagnostics_visible);
     } else if (cause == "gallery.command.diagnostics") {
         (*(*window).find("gallery.diagnostics")).set_visible(model.state().diagnostics_visible);
-        invalidate(cause);
+        invalidate_gallery_control(*window, cause);
     } else if (cause == "gallery.slider") {
-        invalidate_set({"gallery.slider", "gallery.progress", "gallery.value-label",
-                        "gallery.instrument"});
+        invalidate_gallery_controls(*window,
+            {"gallery.slider", "gallery.progress", "gallery.value-label",
+             "gallery.instrument"});
     } else if (cause == "gallery.radio.classic" || cause == "gallery.radio.quiet") {
-        invalidate_set({"gallery.radio.classic", "gallery.radio.quiet", "gallery.default-button",
-                        "gallery.slider"});
+        invalidate_gallery_controls(*window,
+            {"gallery.radio.classic", "gallery.radio.quiet", "gallery.default-button",
+             "gallery.slider"});
     } else if (cause.starts_with("gallery.category.")) {
-        invalidate_set({"gallery.category.basics", "gallery.category.values",
-                        "gallery.category.collections", "gallery.category.instrument"});
+        invalidate_gallery_controls(*window,
+            {"gallery.category.basics", "gallery.category.values",
+             "gallery.category.collections", "gallery.category.instrument"});
     } else if (cause.starts_with("gallery.collection.")) {
-        invalidate_set({"gallery.collection.alpha", "gallery.collection.beta",
-                        "gallery.collection.gamma", "gallery.collection.delta"});
+        invalidate_gallery_controls(*window,
+            {"gallery.collection.alpha", "gallery.collection.beta",
+             "gallery.collection.gamma", "gallery.collection.delta"});
     } else {
-        invalidate(cause);
+        invalidate_gallery_control(*window, cause);
     }
 
     // Diagnostics are live instrumentation, not a snapshot captured when the
     // panel opens. Keep their damage localized to the metric rows while
     // ensuring every retained interaction is observable on the next frame.
     if (model.state().diagnostics_visible) {
-        invalidate_set({"gallery.diagnostics.renderer", "gallery.diagnostics.controls",
-                        "gallery.diagnostics.layout", "gallery.diagnostics.paint",
-                        "gallery.diagnostics.input", "gallery.diagnostics.flush",
-                        "gallery.diagnostics.present"});
+        invalidate_gallery_controls(*window,
+            {"gallery.diagnostics.renderer", "gallery.diagnostics.controls",
+             "gallery.diagnostics.layout", "gallery.diagnostics.paint",
+             "gallery.diagnostics.input", "gallery.diagnostics.flush",
+             "gallery.diagnostics.present"});
     }
 
     const bool quiet = model.state().style_mode == StyleMode::quiet_relief;
@@ -475,19 +558,15 @@ void GalleryContext::synchronize(std::string_view cause)
             (*window).find("gallery.progress"))) {
         (*progress).set_value(model.state().progress_value);
     }
-    const auto update_label = [this](std::string_view id, std::string text) {
-        if (std::shared_ptr<gui_forms::Label> label = std::dynamic_pointer_cast<Label>((*window).find(id))) {
-            (*label).set_text(std::move(text));
-        }
-    };
-    update_label("gallery.command.status", drop_status.empty()
+    update_gallery_label(*window, "gallery.command.status", drop_status.empty()
         ? "Portable core · Host 0.4 · reusable controls" : drop_status);
-    update_label("gallery.value-label", format_percent(model.state().progress_value));
+    update_gallery_label(*window, "gallery.value-label",
+                         format_percent(model.state().progress_value));
     for (const dml::NodeSpec& node : dml::gallery_nodes) {
         if (node.id.starts_with("gallery.diagnostics.")) {
             const std::string metric = metric_text(node.id, (*window).metrics_snapshot());
             if (!metric.empty()) {
-                update_label(node.id, metric);
+                update_gallery_label(*window, node.id, metric);
             }
         }
     }
@@ -823,16 +902,7 @@ void GalleryControl::on_drag(DragEvent& event)
         std::size_t text_items = 0;
         std::size_t binary_items = 0;
         for (const DragDataItem& item : event.items) {
-            std::visit([&](const auto& data) {
-                using Data = std::decay_t<decltype(data)>;
-                if constexpr (std::is_same_v<Data, DragFileListData>) {
-                    files += data.paths_utf8.size();
-                } else if constexpr (std::is_same_v<Data, DragTextData>) {
-                    ++text_items;
-                } else if constexpr (std::is_same_v<Data, DragBinaryData>) {
-                    ++binary_items;
-                }
-            }, item);
+            std::visit(DropDataCounter(files, text_items, binary_items), item);
         }
         char status[128]{};
         std::snprintf(status, sizeof(status),

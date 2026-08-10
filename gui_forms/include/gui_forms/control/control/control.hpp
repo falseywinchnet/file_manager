@@ -47,15 +47,6 @@ namespace detail {
 class DisplayChunk;
 struct DispatcherState;
 
-template <typename ControlType, typename = void>
-struct HasControlTreeInitializer final : std::false_type {};
-
-template <typename ControlType>
-struct HasControlTreeInitializer<
-    ControlType,
-    std::void_t<decltype(std::declval<ControlType&>().initialize_control_tree())>>
-    final : std::true_type {};
-
 template <typename EventType, typename... Values>
 class DeferredEventPublication final {
 public:
@@ -321,6 +312,9 @@ class Control : public Component, public std::enable_shared_from_this<Control> {
 public:
     using Ptr = std::shared_ptr<Control>;
     using WeakPtr = std::weak_ptr<Control>;
+    // Compound controls opt in explicitly by hiding this constant with true.
+    // make_control never infers lifecycle behavior from method presence.
+    static constexpr bool initialize_tree_after_construction = false;
 
     explicit Control(StableId stable_id);
     ~Control() override;
@@ -1026,7 +1020,7 @@ template <typename ControlType, typename... Arguments>
     // their constructor because Control::add_child intentionally requires a
     // live shared owner for cycle checks. A type may opt into this bounded
     // post-construction step; ordinary leaf controls pay no runtime cost.
-    if constexpr (detail::HasControlTreeInitializer<ControlType>::value) {
+    if constexpr (ControlType::initialize_tree_after_construction) {
         (*control).initialize_control_tree();
     }
     return control;

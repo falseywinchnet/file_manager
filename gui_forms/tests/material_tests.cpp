@@ -1,4 +1,5 @@
 #include "gui_forms/gui_forms.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -152,24 +153,25 @@ SurfaceMaterial specimen_material() {
 }
 
 void test_material_validation_is_atomic() {
-    auto panel = make_control<MaterialPanel>(StableId("material.atomic"));
+    std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.atomic"));
     const SurfaceMaterial valid = specimen_material();
     unsigned changes{};
-    auto token = panel->material_changed().subscribe(
-        [&](const SurfaceMaterial&) { ++changes; });
-    panel->set_material(valid);
-    panel->set_material(valid);
+    SubscriptionToken token = (*panel).material_changed().subscribe(
+        test_support::IncrementCounter<unsigned,
+                                       const SurfaceMaterial&>(changes));
+    (*panel).set_material(valid);
+    (*panel).set_material(valid);
     require(changes == 1U, "identical material assignment must be silent");
 
     SurfaceMaterial invalid = valid;
     invalid.fills[0].stops[1].offset = 0.0;
     bool rejected{};
     try {
-        panel->set_material(std::move(invalid));
+        (*panel).set_material(std::move(invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && panel->material() == valid && changes == 1U,
+    require(rejected && (*panel).material() == valid && changes == 1U,
             "invalid material must be rejected without partial mutation");
 
     invalid = valid;
@@ -177,18 +179,18 @@ void test_material_validation_is_atomic() {
         static_cast<GradientSpreadMode>(0xffU);
     rejected = false;
     try {
-        panel->set_material(std::move(invalid));
+        (*panel).set_material(std::move(invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && panel->material() == valid && changes == 1U,
+    require(rejected && (*panel).material() == valid && changes == 1U,
             "unknown gradient spread must be rejected atomically");
 }
 
 void test_retained_replay_preserves_material_operations() {
-    auto panel = make_control<MaterialPanel>(StableId("material.replay"));
-    panel->set_requested_bounds({0.0, 0.0, 200.0, 100.0});
-    panel->set_material(specimen_material());
+    std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.replay"));
+    (*panel).set_requested_bounds({0.0, 0.0, 200.0, 100.0});
+    (*panel).set_material(specimen_material());
     Window window(panel, {200.0, 100.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
@@ -212,19 +214,19 @@ void test_retained_replay_preserves_material_operations() {
     require(painter.last_spread == GradientSpreadMode::pad,
             "retained material must preserve its explicit gradient spread");
 
-    const auto before = panel->display_chunk_info();
-    panel->set_material(SurfaceMaterial{});
+    const std::optional<DisplayChunkInfo> before = (*panel).display_chunk_info();
+    (*panel).set_material(SurfaceMaterial{});
     const DamageRegion damage = window.take_damage();
     require(before && !damage.empty(),
             "material mutation must invalidate its retained display chunk");
     window.paint(painter, damage.bounds());
-    require(panel->display_chunk_info()->generation > before->generation,
+    require((*(*panel).display_chunk_info()).generation > (*before).generation,
             "material mutation must rebuild rather than reuse stale pixels");
 }
 
 void test_repeating_material_survives_record_and_replay() {
-    auto panel = make_control<MaterialPanel>(StableId("material.repeat"));
-    panel->set_requested_bounds({0.0, 0.0, 96.0, 48.0});
+    std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.repeat"));
+    (*panel).set_requested_bounds({0.0, 0.0, 96.0, 48.0});
     SurfaceMaterial texture;
     texture.fills = {MaterialFillLayer::repeating_linear(
         {0.0, 0.0}, {8.0, 8.0},
@@ -232,7 +234,7 @@ void test_repeating_material_survives_record_and_replay() {
          {0.48, Color::rgba(20, 30, 40)},
          {0.52, Color::rgba(65, 80, 92)},
          {1.0, Color::rgba(65, 80, 92)}})};
-    panel->set_material(texture);
+    (*panel).set_material(texture);
     Window window(panel, {96.0, 48.0});
     window.perform_layout();
 
@@ -247,8 +249,8 @@ void test_repeating_material_survives_record_and_replay() {
 }
 
 void test_image_materials_retain_crop_tile_and_nine_patch() {
-    auto panel = make_control<MaterialPanel>(StableId("material.images"));
-    panel->set_requested_bounds({0.0, 0.0, 30.0, 20.0});
+    std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.images"));
+    (*panel).set_requested_bounds({0.0, 0.0, 30.0, 20.0});
     Window window(panel, {30.0, 20.0});
     const std::vector<std::byte> patch_pixels(12U * 12U * 4U,
                                                std::byte{0xff});
@@ -258,7 +260,7 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
     SurfaceMaterial material;
     material.fills = {MaterialFillLayer::nine_patch(
         patch.image, {12.0, 12.0}, {3.0, 3.0, 3.0, 3.0}, 1.5, 0.75)};
-    panel->set_material(material);
+    (*panel).set_material(material);
     window.perform_layout();
 
     RichPainter painter;
@@ -280,8 +282,8 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
     require(static_cast<bool>(tile), "tile fixture must load");
     material.fills = {MaterialFillLayer::tiled_image(
         tile.image, {4.0, 4.0}, 1.0)};
-    panel->set_requested_bounds({0.0, 0.0, 10.0, 6.0});
-    panel->set_material(material);
+    (*panel).set_requested_bounds({0.0, 0.0, 10.0, 6.0});
+    (*panel).set_material(material);
     window.resize({10.0, 6.0});
     window.perform_layout();
     painter.image_regions.clear();
@@ -299,11 +301,11 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
     invalid.fills.front().image_slice = {3.0, 0.0, 3.0, 0.0};
     bool rejected{};
     try {
-        panel->set_material(std::move(invalid));
+        (*panel).set_material(std::move(invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && panel->material() == material,
+    require(rejected && (*panel).material() == material,
             "non-nine-patch slice metadata must be rejected atomically");
 
     invalid = material;
@@ -311,11 +313,11 @@ void test_image_materials_retain_crop_tile_and_nine_patch() {
         ImageId{UINT64_C(0xffffffffffffffff)}, {4.0, 4.0});
     rejected = false;
     try {
-        panel->set_material(std::move(invalid));
+        (*panel).set_material(std::move(invalid));
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && panel->material() == material,
+    require(rejected && (*panel).material() == material,
             "an attached MaterialPanel must reject missing or stale-size image IDs");
 }
 
@@ -343,22 +345,22 @@ void test_minimal_painter_fallbacks_are_bounded() {
 }
 
 void test_shadow_outsets_participate_in_damage() {
-    auto root = make_control<Panel>(StableId("material.damage.root"));
-    root->set_requested_bounds({0.0, 0.0, 120.0, 100.0});
-    auto panel = make_control<MaterialPanel>(StableId("material.damage.panel"));
-    panel->set_requested_bounds({30.0, 25.0, 40.0, 30.0});
+    std::shared_ptr<gui_forms::Panel> root = make_control<Panel>(StableId("material.damage.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 120.0, 100.0});
+    std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.damage.panel"));
+    (*panel).set_requested_bounds({30.0, 25.0, 40.0, 30.0});
     SurfaceMaterial shadowed;
     shadowed.shadows = {{{4.0, 5.0}, 3.0, 1.0,
                          Color::rgba(0, 0, 0, 100)}};
-    panel->set_material(shadowed);
-    root->add_child(panel);
+    (*panel).set_material(shadowed);
+    (*root).add_child(panel);
     Window window(root, {120.0, 100.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
     RichPainter painter;
     window.paint(painter, {0.0, 0.0, 120.0, 100.0});
 
-    const Insets outsets = panel->visual_outsets();
+    const Insets outsets = (*panel).visual_outsets();
     require(outsets == Insets{6.0, 5.0, 14.0, 15.0},
             "material shadow must publish conservative visual outsets");
     require(painter.shadows == 1U && painter.last_clip.x <= -6.0 &&
@@ -366,7 +368,7 @@ void test_shadow_outsets_participate_in_damage() {
                 painter.last_clip.width >= 60.0 &&
                 painter.last_clip.height >= 50.0,
             "retained replay must not clip a decoration to arranged bounds");
-    panel->set_material(SurfaceMaterial{});
+    (*panel).set_material(SurfaceMaterial{});
     const Rect damage = window.take_damage().bounds();
     require(damage.x <= 24.0 && damage.y <= 20.0 &&
                 damage.x + damage.width >= 84.0 &&

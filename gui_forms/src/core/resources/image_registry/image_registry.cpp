@@ -148,17 +148,17 @@ std::string_view image_resource_error_name(ImageResourceError error) noexcept {
 PngValidationResult validate_png(std::span<const std::byte> encoded,
                                  const ImageRegistryLimits& limits) noexcept {
     if (encoded.empty()) {
-        return {.error = ImageResourceError::empty_input};
+        return PngValidationResult::failure(ImageResourceError::empty_input);
     }
     if (encoded.size() > limits.maximum_encoded_bytes_per_image) {
-        return {.error = ImageResourceError::encoded_limit_exceeded};
+        return PngValidationResult::failure(ImageResourceError::encoded_limit_exceeded);
     }
     if (encoded.size() < png_signature.size()) {
-        return {.error = ImageResourceError::invalid_signature};
+        return PngValidationResult::failure(ImageResourceError::invalid_signature);
     }
     for (std::size_t index = 0; index < png_signature.size(); ++index) {
         if (std::to_integer<std::uint8_t>(encoded[index]) != png_signature[index]) {
-            return {.error = ImageResourceError::invalid_signature};
+            return PngValidationResult::failure(ImageResourceError::invalid_signature);
         }
     }
 
@@ -178,26 +178,26 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
 
     while (offset < encoded.size()) {
         if (++chunk_count > limits.maximum_chunks_per_image) {
-            return {.error = ImageResourceError::chunk_limit_exceeded};
+            return PngValidationResult::failure(ImageResourceError::chunk_limit_exceeded);
         }
         if (encoded.size() - offset < 12U) {
-            return {.error = ImageResourceError::truncated_chunk};
+            return PngValidationResult::failure(ImageResourceError::truncated_chunk);
         }
         const std::uint32_t length = read_u32(encoded.data() + offset);
         const std::size_t remaining = encoded.size() - offset;
         if (length > 0x7fffffffU ||
             static_cast<std::uint64_t>(length) + 12ULL > remaining) {
-            return {.error = ImageResourceError::truncated_chunk};
+            return PngValidationResult::failure(ImageResourceError::truncated_chunk);
         }
 
         const std::byte* const type_bytes = encoded.data() + offset + 4U;
         for (std::size_t index = 0; index < 4; ++index) {
             if (!ascii_letter(std::to_integer<std::uint8_t>(type_bytes[index]))) {
-                return {.error = ImageResourceError::invalid_chunk_type};
+                return PngValidationResult::failure(ImageResourceError::invalid_chunk_type);
             }
         }
         if ((std::to_integer<std::uint8_t>(type_bytes[2]) & 0x20U) != 0U) {
-            return {.error = ImageResourceError::invalid_chunk_type};
+            return PngValidationResult::failure(ImageResourceError::invalid_chunk_type);
         }
         const std::uint32_t type = read_u32(type_bytes);
         const std::span<const std::byte> crc_input(
@@ -205,12 +205,12 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
         const std::uint32_t expected_crc =
             read_u32(encoded.data() + offset + 8U + length);
         if (crc32(crc_input) != expected_crc) {
-            return {.error = ImageResourceError::crc_mismatch};
+            return PngValidationResult::failure(ImageResourceError::crc_mismatch);
         }
         const std::span<const std::byte> data(encoded.data() + offset + 8U, length);
 
         if (!saw_ihdr && type != ihdr) {
-            return {.error = ImageResourceError::ihdr_not_first};
+            return PngValidationResult::failure(ImageResourceError::ihdr_not_first);
         }
         if (saw_idat && type != idat) {
             idat_ended = true;
@@ -218,10 +218,10 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
 
         if (type == ihdr) {
             if (saw_ihdr) {
-                return {.error = ImageResourceError::duplicate_ihdr};
+                return PngValidationResult::failure(ImageResourceError::duplicate_ihdr);
             }
             if (length != 13U) {
-                return {.error = ImageResourceError::invalid_ihdr};
+                return PngValidationResult::failure(ImageResourceError::invalid_ihdr);
             }
             metadata.width = read_u32(data.data());
             metadata.height = read_u32(data.data() + 4U);
@@ -232,10 +232,10 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
             const std::uint8_t interlace = std::to_integer<std::uint8_t>(data[12]);
             if (metadata.width == 0 || metadata.height == 0 || compression != 0 ||
                 filter != 0 || interlace > 1) {
-                return {.error = ImageResourceError::invalid_ihdr};
+                return PngValidationResult::failure(ImageResourceError::invalid_ihdr);
             }
             if (!valid_depth(color, metadata.bit_depth)) {
-                return {.error = ImageResourceError::unsupported_color_format};
+                return PngValidationResult::failure(ImageResourceError::unsupported_color_format);
             }
             const std::uint64_t pixel_count =
                 static_cast<std::uint64_t>(metadata.width) * metadata.height;
@@ -243,14 +243,14 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
                 metadata.height > limits.maximum_height ||
                 pixel_count > limits.maximum_pixels ||
                 pixel_count > std::numeric_limits<std::uint64_t>::max() / 4ULL) {
-                return {.error = ImageResourceError::dimension_limit_exceeded};
+                return PngValidationResult::failure(ImageResourceError::dimension_limit_exceeded);
             }
             const std::uint64_t row_bits = static_cast<std::uint64_t>(metadata.width) *
                                            channel_count(color) * metadata.bit_depth;
             metadata.source_row_bytes = (row_bits + 7ULL) / 8ULL;
             metadata.decoded_byte_count = pixel_count * 4ULL;
             if (metadata.decoded_byte_count > limits.maximum_decoded_bytes_per_image) {
-                return {.error = ImageResourceError::dimension_limit_exceeded};
+                return PngValidationResult::failure(ImageResourceError::dimension_limit_exceeded);
             }
             metadata.color_type = static_cast<PngColorType>(color);
             metadata.interlaced = interlace != 0;
@@ -259,41 +259,41 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
             const std::uint8_t color = static_cast<std::uint8_t>(metadata.color_type);
             if (saw_plte || saw_idat || length == 0 || length > 768U || length % 3U != 0 ||
                 color == 0 || color == 4) {
-                return {.error = ImageResourceError::invalid_palette};
+                return PngValidationResult::failure(ImageResourceError::invalid_palette);
             }
             palette_entries = length / 3U;
             if (color == 3 && palette_entries > (1U << metadata.bit_depth)) {
-                return {.error = ImageResourceError::invalid_palette};
+                return PngValidationResult::failure(ImageResourceError::invalid_palette);
             }
             saw_plte = true;
         } else if (type == idat) {
             if (idat_ended) {
-                return {.error = ImageResourceError::noncontiguous_idat};
+                return PngValidationResult::failure(ImageResourceError::noncontiguous_idat);
             }
             if (metadata.color_type == PngColorType::indexed && !saw_plte) {
-                return {.error = ImageResourceError::invalid_palette};
+                return PngValidationResult::failure(ImageResourceError::invalid_palette);
             }
             saw_idat = true;
             idat_bytes += length;
         } else if (type == iend) {
             if (length != 0) {
-                return {.error = ImageResourceError::missing_iend};
+                return PngValidationResult::failure(ImageResourceError::missing_iend);
             }
             if (!saw_idat || idat_bytes == 0) {
-                return {.error = ImageResourceError::missing_idat};
+                return PngValidationResult::failure(ImageResourceError::missing_idat);
             }
             offset += 12U;
             if (offset != encoded.size()) {
-                return {.error = ImageResourceError::trailing_data};
+                return PngValidationResult::failure(ImageResourceError::trailing_data);
             }
-            return {.metadata = metadata};
+            return PngValidationResult::success(metadata);
         } else if (type == iccp) {
             // Compressed ICC profiles are an independent decompression boundary.
             // This proving slice fixes decoded output to sRGB and rejects them.
-            return {.error = ImageResourceError::unsupported_color_profile};
+            return PngValidationResult::failure(ImageResourceError::unsupported_color_profile);
         } else if (type == trns) {
             if (saw_trns || saw_idat) {
-                return {.error = ImageResourceError::invalid_transparency};
+                return PngValidationResult::failure(ImageResourceError::invalid_transparency);
             }
             const PngColorType color = metadata.color_type;
             const bool valid =
@@ -302,34 +302,35 @@ PngValidationResult validate_png(std::span<const std::byte> encoded,
                 (color == PngColorType::indexed && saw_plte && length > 0 &&
                  length <= palette_entries);
             if (!valid) {
-                return {.error = ImageResourceError::invalid_transparency};
+                return PngValidationResult::failure(ImageResourceError::invalid_transparency);
             }
             saw_trns = true;
         } else if (type == srgb) {
             if (saw_srgb || saw_plte || saw_idat || length != 1U ||
                 std::to_integer<std::uint8_t>(data[0]) > 3U) {
-                return {.error = ImageResourceError::invalid_color_metadata};
+                return PngValidationResult::failure(ImageResourceError::invalid_color_metadata);
             }
             saw_srgb = true;
         } else if (type == gama) {
             if (saw_gama || saw_plte || saw_idat || length != 4U ||
                 read_u32(data.data()) == 0U) {
-                return {.error = ImageResourceError::invalid_color_metadata};
+                return PngValidationResult::failure(ImageResourceError::invalid_color_metadata);
             }
             saw_gama = true;
         } else if (type == chrm) {
             if (saw_chrm || saw_plte || saw_idat || length != 32U) {
-                return {.error = ImageResourceError::invalid_color_metadata};
+                return PngValidationResult::failure(ImageResourceError::invalid_color_metadata);
             }
             saw_chrm = true;
         } else if ((std::to_integer<std::uint8_t>(type_bytes[0]) & 0x20U) == 0U) {
-            return {.error = ImageResourceError::unknown_critical_chunk};
+            return PngValidationResult::failure(ImageResourceError::unknown_critical_chunk);
         }
 
         offset += static_cast<std::size_t>(length) + 12U;
     }
-    return {.error = saw_idat ? ImageResourceError::missing_iend
-                              : ImageResourceError::missing_idat};
+    return PngValidationResult::failure(
+        saw_idat ? ImageResourceError::missing_iend
+                 : ImageResourceError::missing_idat);
 }
 
 struct ImageRegistry::Slot final {
@@ -368,15 +369,15 @@ ImageResourceError ImageRegistry::registry_quota_error(
 ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
     const PngValidationResult validated = validate_png(encoded, limits_);
     if (!validated) {
-        return {.error = validated.error};
+        return ImageLoadResult::failure(validated.error);
     }
     if (resource_count_ >= limits_.maximum_resources) {
-        return {.error = ImageResourceError::resource_count_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::resource_count_exceeded);
     }
     if (const ImageResourceError quota = registry_quota_error(
             encoded.size(), validated.metadata.decoded_byte_count);
         quota != ImageResourceError::none) {
-        return {.error = quota};
+        return ImageLoadResult::failure(quota);
     }
     try {
         return store_new(ImageResourceEncoding::png,
@@ -384,7 +385,7 @@ ImageLoadResult ImageRegistry::load_png(std::span<const std::byte> encoded) {
                          validated.metadata, validated.metadata.source_row_bytes,
                          hash_bytes(encoded));
     } catch (const std::bad_alloc&) {
-        return {.error = ImageResourceError::allocation_failed};
+        return ImageLoadResult::failure(ImageResourceError::allocation_failed);
     }
 }
 
@@ -400,7 +401,7 @@ ImageLoadResult ImageRegistry::store_new(ImageResourceEncoding encoding,
         }
     }
     if (slot_index >= slot_mask) {
-        return {.error = ImageResourceError::resource_count_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::resource_count_exceeded);
     }
     if (slot_index == slots_.size()) {
         slots_.emplace_back();
@@ -418,7 +419,7 @@ ImageLoadResult ImageRegistry::store_new(ImageResourceEncoding encoding,
     encoded_bytes_ += slot.encoded.size();
     decoded_bytes_ += slot.metadata.decoded_byte_count;
     ++revision_;
-    return {.image = make_image_id(slot_index, slot.generation)};
+    return ImageLoadResult::success(make_image_id(slot_index, slot.generation));
 }
 
 ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
@@ -431,19 +432,19 @@ ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
         row_bytes > std::numeric_limits<std::size_t>::max() ||
         height > std::numeric_limits<std::size_t>::max() / row_bytes ||
         pixels.size() != static_cast<std::size_t>(row_bytes) * height) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
     const std::uint64_t decoded_bytes = tight_row_bytes * height;
     if (decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     if (resource_count_ >= limits_.maximum_resources) {
-        return {.error = ImageResourceError::resource_count_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::resource_count_exceeded);
     }
     if (const ImageResourceError quota = registry_quota_error(decoded_bytes, decoded_bytes);
         quota != ImageResourceError::none) {
-        return {.error = quota};
+        return ImageLoadResult::failure(quota);
     }
     try {
         std::vector<std::byte> tight(static_cast<std::size_t>(decoded_bytes));
@@ -459,7 +460,7 @@ ImageLoadResult ImageRegistry::load_bgra32_premultiplied(
         return store_new(ImageResourceEncoding::bgra32_premultiplied,
                          std::move(tight), metadata, tight_row_bytes, hash);
     } catch (const std::bad_alloc&) {
-        return {.error = ImageResourceError::allocation_failed};
+        return ImageLoadResult::failure(ImageResourceError::allocation_failed);
     }
 }
 
@@ -468,28 +469,28 @@ ImageLoadResult ImageRegistry::replace_png(ImageId image,
     std::size_t slot_index = 0;
     std::uint64_t generation = 0;
     if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     Slot& slot = slots_[slot_index];
     if (!slot.occupied || slot.generation != generation) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     const PngValidationResult validated = validate_png(encoded, limits_);
     if (!validated) {
-        return {.error = validated.error};
+        return ImageLoadResult::failure(validated.error);
     }
     if (const ImageResourceError quota = registry_quota_error(
             encoded.size(), validated.metadata.decoded_byte_count,
             slot.encoded.size(), slot.metadata.decoded_byte_count);
         quota != ImageResourceError::none) {
-        return {.error = quota};
+        return ImageLoadResult::failure(quota);
     }
 
     std::vector<std::byte> replacement;
     try {
         replacement.assign(encoded.begin(), encoded.end());
     } catch (const std::bad_alloc&) {
-        return {.error = ImageResourceError::allocation_failed};
+        return ImageLoadResult::failure(ImageResourceError::allocation_failed);
     }
     encoded_bytes_ -= slot.encoded.size();
     decoded_bytes_ -= slot.metadata.decoded_byte_count;
@@ -502,7 +503,7 @@ ImageLoadResult ImageRegistry::replace_png(ImageId image,
     encoded_bytes_ += slot.encoded.size();
     decoded_bytes_ += slot.metadata.decoded_byte_count;
     ++revision_;
-    return {.image = make_image_id(slot_index, slot.generation)};
+    return ImageLoadResult::success(make_image_id(slot_index, slot.generation));
 }
 
 ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
@@ -511,11 +512,11 @@ ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
     std::size_t slot_index = 0;
     std::uint64_t generation = 0;
     if (!split_image_id(image, slot_index, generation) || slot_index >= slots_.size()) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     Slot& slot = slots_[slot_index];
     if (!slot.occupied || slot.generation != generation) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     if (width == 0 || height == 0 || width > limits_.maximum_width ||
         height > limits_.maximum_height ||
@@ -524,18 +525,18 @@ ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
         row_bytes > std::numeric_limits<std::size_t>::max() ||
         height > std::numeric_limits<std::size_t>::max() / row_bytes ||
         pixels.size() != static_cast<std::size_t>(row_bytes) * height) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
     const std::uint64_t decoded_bytes = tight_row_bytes * height;
     if (decoded_bytes > limits_.maximum_decoded_bytes_per_image) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     if (const ImageResourceError quota = registry_quota_error(
             decoded_bytes, decoded_bytes, slot.encoded.size(),
             slot.metadata.decoded_byte_count);
         quota != ImageResourceError::none) {
-        return {.error = quota};
+        return ImageLoadResult::failure(quota);
     }
     try {
         std::vector<std::byte> tight(static_cast<std::size_t>(decoded_bytes));
@@ -557,9 +558,9 @@ ImageLoadResult ImageRegistry::replace_bgra32_premultiplied(
         encoded_bytes_ += slot.encoded.size();
         decoded_bytes_ += decoded_bytes;
         ++revision_;
-        return {.image = make_image_id(slot_index, slot.generation)};
+        return ImageLoadResult::success(make_image_id(slot_index, slot.generation));
     } catch (const std::bad_alloc&) {
-        return {.error = ImageResourceError::allocation_failed};
+        return ImageLoadResult::failure(ImageResourceError::allocation_failed);
     }
 }
 
@@ -570,15 +571,15 @@ ImageLoadResult ImageRegistry::update_bgra32_premultiplied(
     std::uint64_t generation = 0;
     if (!split_image_id(image, slot_index, generation) ||
         slot_index >= slots_.size()) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     Slot& slot = slots_[slot_index];
     if (!slot.occupied || slot.generation != generation) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     if (slot.encoding != ImageResourceEncoding::bgra32_premultiplied ||
         width != slot.metadata.width || height != slot.metadata.height) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     const std::uint64_t tight_row_bytes = static_cast<std::uint64_t>(width) * 4U;
     if (row_bytes < tight_row_bytes ||
@@ -586,7 +587,7 @@ ImageLoadResult ImageRegistry::update_bgra32_premultiplied(
         height > std::numeric_limits<std::size_t>::max() / row_bytes ||
         pixels.size() != static_cast<std::size_t>(row_bytes) * height ||
         slot.encoded.size() != static_cast<std::size_t>(tight_row_bytes) * height) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     for (std::uint32_t row = 0; row < height; ++row) {
         std::copy_n(pixels.data() + static_cast<std::size_t>(row_bytes) * row,
@@ -597,7 +598,7 @@ ImageLoadResult ImageRegistry::update_bgra32_premultiplied(
             std::numeric_limits<std::uint64_t>::max()
         ? 1U : slot.content_hash + 1U;
     ++revision_;
-    return {.image = image};
+    return ImageLoadResult::success(image);
 }
 
 ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
@@ -608,14 +609,14 @@ ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
     std::uint64_t generation = 0;
     if (!split_image_id(image, slot_index, generation) ||
         slot_index >= slots_.size()) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     Slot& slot = slots_[slot_index];
     if (!slot.occupied || slot.generation != generation) {
-        return {.error = ImageResourceError::stale_image_id};
+        return ImageLoadResult::failure(ImageResourceError::stale_image_id);
     }
     if (slot.encoding != ImageResourceEncoding::bgra32_premultiplied) {
-        return {.error = ImageResourceError::unsupported_color_format};
+        return ImageLoadResult::failure(ImageResourceError::unsupported_color_format);
     }
     const std::uint64_t right = static_cast<std::uint64_t>(x) + width;
     const std::uint64_t bottom = static_cast<std::uint64_t>(y) + height;
@@ -623,14 +624,14 @@ ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
     if (width == 0U || height == 0U || right > slot.metadata.width ||
         bottom > slot.metadata.height || source_row_bytes < patch_row_bytes ||
         source_row_bytes > std::numeric_limits<std::size_t>::max()) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
     const std::uint64_t required =
         static_cast<std::uint64_t>(height - 1U) * source_row_bytes +
         patch_row_bytes;
     if (required > std::numeric_limits<std::size_t>::max() ||
         pixels.size() < static_cast<std::size_t>(required)) {
-        return {.error = ImageResourceError::dimension_limit_exceeded};
+        return ImageLoadResult::failure(ImageResourceError::dimension_limit_exceeded);
     }
 
     const std::size_t destination_origin =
@@ -650,7 +651,7 @@ ImageLoadResult ImageRegistry::patch_bgra32_premultiplied(
         ((static_cast<std::uint64_t>(slot.metadata.width) << 32U) |
          slot.metadata.height);
     ++revision_;
-    return {.image = make_image_id(slot_index, slot.generation)};
+    return ImageLoadResult::success(make_image_id(slot_index, slot.generation));
 }
 
 bool ImageRegistry::remove(ImageId image) noexcept {

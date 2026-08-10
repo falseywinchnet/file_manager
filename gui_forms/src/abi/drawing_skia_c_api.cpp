@@ -122,6 +122,21 @@ std::wstring wide_from_utf8(std::string_view value) {
     return result;
 }
 
+std::string utf8_from_wide(std::wstring_view value) {
+    if (value.empty()) return {};
+    const int size = WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
+        nullptr, 0, nullptr, nullptr);
+    std::string converted(
+        static_cast<std::size_t>(std::max(0, size)), '\0');
+    if (size > 0) {
+        WideCharToMultiByte(
+            CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
+            converted.data(), size, nullptr, nullptr);
+    }
+    return converted;
+}
+
 std::vector<std::byte> registered_font_bytes(std::wstring_view family,
                                              std::uint32_t style) {
     HKEY key{};
@@ -219,16 +234,7 @@ void ensure_platform_font(std::string_view family, std::uint32_t style) {
     }
     if (const char* trace = std::getenv("GUI_DRAWING_TRACE_FONTS");
         trace != nullptr && std::strcmp(trace, "1") == 0) {
-        const std::string selected_utf8 = selected.empty() ? std::string{} : [&] {
-            const int size = WideCharToMultiByte(CP_UTF8, 0, selected.data(),
-                                                  static_cast<int>(selected.size()),
-                                                  nullptr, 0, nullptr, nullptr);
-            std::string converted(static_cast<std::size_t>(std::max(0, size)), '\0');
-            if (size > 0) WideCharToMultiByte(CP_UTF8, 0, selected.data(),
-                static_cast<int>(selected.size()), converted.data(), size,
-                nullptr, nullptr);
-            return converted;
-        }();
+        const std::string selected_utf8 = utf8_from_wide(selected);
         std::fprintf(stderr,
                      "gui-drawing-font=request:%.*s|style:%u|source:%s|selected:%s|bytes:%zu|registered:%s\n",
                      static_cast<int>(family.size()), family.data(), style & 3U,

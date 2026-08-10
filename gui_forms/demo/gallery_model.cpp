@@ -33,7 +33,7 @@ const GalleryState& GalleryModel::state() const noexcept
 bool GalleryModel::activate(std::string_view stable_id)
 {
     const dml::NodeSpec* const node = dml::find(stable_id);
-    if (node == nullptr || (node->flags & dml::enabled) == 0U) {
+    if (node == nullptr || ((*node).flags & dml::enabled) == 0U) {
         return false;
     }
 

@@ -44,6 +44,7 @@ struct ReviewRecord final {
 // subclassing or replacing ReviewCard's state projection.
 class ReviewCard final : public Card {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     explicit ReviewCard(StableId stable_id);
     void initialize_control_tree();
 

@@ -41,6 +41,7 @@ struct SplitChangeEvent final {
 
 class SplitContainer final : public ContainerControl {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
     explicit SplitContainer(StableId stable_id);
     void initialize_control_tree();
 
