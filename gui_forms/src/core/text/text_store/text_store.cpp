@@ -68,6 +68,28 @@ struct Utf8OffsetBeforeStyleSpan final {
   return current - removed + inserted;
 }
 
+[[nodiscard]] bool style_span_less(const TextStyleSpan& left,
+                                   const TextStyleSpan& right) noexcept {
+  if (left.range.start != right.range.start) {
+    return left.range.start < right.range.start;
+  }
+  if (left.range.end != right.range.end) {
+    return left.range.end < right.range.end;
+  }
+  return left.style < right.style;
+}
+
+[[nodiscard]] bool utf8_boundary(std::string_view text,
+                                 Utf8Offset position) noexcept {
+  return position.value() == text.size() ||
+         !continuation(static_cast<std::uint8_t>(text[position.value()]));
+}
+
+[[nodiscard]] std::size_t shifted_offset(bool grows, std::size_t magnitude,
+                                         std::size_t value) noexcept {
+  return grows ? value + magnitude : value - magnitude;
+}
+
 } // namespace
 
 struct TextStore::Metadata final {
@@ -519,16 +541,7 @@ TextStore::normalize_style_spans(std::span<const TextStyleSpan> spans,
     throw std::length_error("GUI.Forms style-span input exceeds its limit");
   }
   std::vector<TextStyleSpan> result(spans.begin(), spans.end());
-  std::sort(result.begin(), result.end(),
-            [](const TextStyleSpan &left, const TextStyleSpan &right) {
-              if (left.range.start != right.range.start) {
-                return left.range.start < right.range.start;
-              }
-              if (left.range.end != right.range.end) {
-                return left.range.end < right.range.end;
-              }
-              return left.style < right.style;
-            });
+  std::sort(result.begin(), result.end(), style_span_less);
 
   std::vector<TextStyleSpan> normalized;
   normalized.reserve(result.size());
@@ -539,12 +552,8 @@ TextStore::normalize_style_spans(std::span<const TextStyleSpan> spans,
     if (span.range.end.value() > candidate_text.size()) {
       throw std::out_of_range("GUI.Forms style span exceeds text length");
     }
-    const auto boundary = [&candidate_text](Utf8Offset position) {
-      return position.value() == candidate_text.size() ||
-             !continuation(
-                 static_cast<std::uint8_t>(candidate_text[position.value()]));
-    };
-    if (!boundary(span.range.start) || !boundary(span.range.end)) {
+    if (!utf8_boundary(candidate_text, span.range.start) ||
+        !utf8_boundary(candidate_text, span.range.end)) {
       throw std::invalid_argument("GUI.Forms style span splits a UTF-8 scalar");
     }
     if (!normalized.empty() && span.range.start < normalized.back().range.end) {
@@ -571,10 +580,6 @@ TextStore::transform_style_spans(Utf8Range removed, std::size_t inserted_bytes,
   const bool grows = inserted_bytes >= removed_bytes;
   const std::size_t magnitude =
       grows ? inserted_bytes - removed_bytes : removed_bytes - inserted_bytes;
-  const auto shifted = [grows, magnitude](std::size_t value) {
-    return grows ? value + magnitude : value - magnitude;
-  };
-
   std::vector<TextStyleSpan> result;
   result.reserve(style_spans_.size() +
                  (inserted_style && inserted_bytes > 0 ? 1U : 0U));
@@ -582,8 +587,10 @@ TextStore::transform_style_spans(Utf8Range removed, std::size_t inserted_bytes,
     if (span.range.end.value() <= start) {
       result.push_back(span);
     } else if (span.range.start.value() >= end) {
-      result.push_back({{Utf8Offset(shifted(span.range.start.value())),
-                         Utf8Offset(shifted(span.range.end.value()))},
+      result.push_back({{Utf8Offset(shifted_offset(
+                             grows, magnitude, span.range.start.value())),
+                         Utf8Offset(shifted_offset(
+                             grows, magnitude, span.range.end.value()))},
                         span.style});
     } else {
       if (span.range.start.value() < start) {
@@ -591,7 +598,8 @@ TextStore::transform_style_spans(Utf8Range removed, std::size_t inserted_bytes,
       }
       if (span.range.end.value() > end) {
         result.push_back({{Utf8Offset(start + inserted_bytes),
-                           Utf8Offset(shifted(span.range.end.value()))},
+                           Utf8Offset(shifted_offset(
+                               grows, magnitude, span.range.end.value()))},
                           span.style});
       }
     }

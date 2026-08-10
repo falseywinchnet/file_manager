@@ -1,4 +1,5 @@
 #include "headless_host.hpp"
+#include "gui_forms/detail/bound_member_function.hpp"
 
 #include <sstream>
 
@@ -6,44 +7,56 @@ namespace gui_forms::host {
 HeadlessHost::HeadlessHost(Window& window)
     : window_(&window), services_(),
       session_(window, headless_capabilities(), &services_) {
-    window.set_dispatch_wake_handler([this] {
-        dispatcher_wake_pending_.store(true, std::memory_order_release);
-    });
-    window.set_paint_wake_handler([this] {
-        paint_wake_pending_.store(true, std::memory_order_release);
-    });
+    window.set_dispatch_wake_handler(
+        detail::BoundMemberFunction<void (HeadlessHost::*)() noexcept>(
+            *this, &HeadlessHost::request_dispatcher_wake));
+    window.set_paint_wake_handler(
+        detail::BoundMemberFunction<void (HeadlessHost::*)() noexcept>(
+            *this, &HeadlessHost::request_paint_wake));
     observation_ = session_.observed().subscribe(
-        [this](const HostEvent& event, const HostDispatchResult& result) {
-            const HostSessionSnapshot snapshot = session_.snapshot();
-            const HostServicesSnapshot services = services_.snapshot();
-            std::ostringstream line;
-            line << "seq=" << event.sequence
-                 << " time_ns=" << event.timestamp_nanoseconds
-                 << " event=" << host_event_name(event.payload)
-                 << " accepted=" << (result.accepted() ? 1 : 0)
-                 << " handled=" << (result.handled ? 1 : 0)
-                 << " input_deferred=" << (result.input_deferred ? 1 : 0)
-                 << " input_rejected="
-                 << (result.input_capacity_rejected ? 1 : 0)
-                 << " drag_effect=" << drag_effect_name(result.drag_effect)
-                 << " close_allowed=" << (result.close_allowed ? 1 : 0)
-                 << " error=" << host_dispatch_error_name(result.error)
-                 << " phase=" << host_lifecycle_phase_name(snapshot.phase)
-                 << " attached=" << (snapshot.attached ? 1 : 0)
-                 << " active=" << (snapshot.active ? 1 : 0)
-                 << " occluded=" << (snapshot.occluded ? 1 : 0)
-                 << " display_changes=" << snapshot.display_changes
-                 << " monitors=" << snapshot.monitor_count
-                 << " captured=" << (services.pointer_captured ? 1 : 0)
-                 << " pointer_id=" << services.captured_pointer_id
-                 << " modal_depth=" << snapshot.modal_depth
-                 << " modal_suppressed=" << snapshot.modal_input_suppressions
-                 << " drag_events=" << snapshot.drag_events
-                 << " drag_drops=" << snapshot.drag_drops
-                 << " closed=" << (snapshot.closed ? 1 : 0)
-                 << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
-            trace_ += line.str();
-        });
+        Delegate<const HostEvent&, const HostDispatchResult&>::bind<
+            HeadlessHost, &HeadlessHost::observe_dispatch>(*this));
+}
+
+void HeadlessHost::request_dispatcher_wake() noexcept {
+    dispatcher_wake_pending_.store(true, std::memory_order_release);
+}
+
+void HeadlessHost::request_paint_wake() noexcept {
+    paint_wake_pending_.store(true, std::memory_order_release);
+}
+
+void HeadlessHost::observe_dispatch(
+    const HostEvent& event, const HostDispatchResult& result) {
+    const HostSessionSnapshot snapshot = session_.snapshot();
+    const HostServicesSnapshot services = services_.snapshot();
+    std::ostringstream line;
+    line << "seq=" << event.sequence
+         << " time_ns=" << event.timestamp_nanoseconds
+         << " event=" << host_event_name(event.payload)
+         << " accepted=" << (result.accepted() ? 1 : 0)
+         << " handled=" << (result.handled ? 1 : 0)
+         << " input_deferred=" << (result.input_deferred ? 1 : 0)
+         << " input_rejected="
+         << (result.input_capacity_rejected ? 1 : 0)
+         << " drag_effect=" << drag_effect_name(result.drag_effect)
+         << " close_allowed=" << (result.close_allowed ? 1 : 0)
+         << " error=" << host_dispatch_error_name(result.error)
+         << " phase=" << host_lifecycle_phase_name(snapshot.phase)
+         << " attached=" << (snapshot.attached ? 1 : 0)
+         << " active=" << (snapshot.active ? 1 : 0)
+         << " occluded=" << (snapshot.occluded ? 1 : 0)
+         << " display_changes=" << snapshot.display_changes
+         << " monitors=" << snapshot.monitor_count
+         << " captured=" << (services.pointer_captured ? 1 : 0)
+         << " pointer_id=" << services.captured_pointer_id
+         << " modal_depth=" << snapshot.modal_depth
+         << " modal_suppressed=" << snapshot.modal_input_suppressions
+         << " drag_events=" << snapshot.drag_events
+         << " drag_drops=" << snapshot.drag_drops
+         << " closed=" << (snapshot.closed ? 1 : 0)
+         << " shutdown=" << (snapshot.shutdown ? 1 : 0) << '\n';
+    trace_ += line.str();
 }
 
 HeadlessHost::~HeadlessHost() {

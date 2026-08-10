@@ -38,6 +38,11 @@ public:
     [[nodiscard]] const std::string& trace() const noexcept { return trace_; }
 
 private:
+    void request_dispatcher_wake() noexcept;
+    void request_paint_wake() noexcept;
+    void observe_dispatch(const HostEvent& event,
+                          const HostDispatchResult& result);
+
     Window* window_{};
     std::atomic<bool> dispatcher_wake_pending_{};
     std::atomic<bool> paint_wake_pending_{};
