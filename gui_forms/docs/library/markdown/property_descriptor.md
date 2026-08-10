@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 010 inert property descriptor review; focused M4 inspection tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyDescriptor`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:201`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:145`
 - Definition: `inline/header-only`
 
 PropertyDescriptor exposes renderer/language-neutral schema, serialization, mutability, invalidation, enum, standard-value, converter, and editor metadata without executable callbacks.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

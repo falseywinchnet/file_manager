@@ -4,7 +4,7 @@
 - Kind: **class / visual retained control**
 - Hierarchy: `Panel → ColorValueEditor`
 - Declaration: `include/gui_forms/controls/panel/color_value_editor/color_value_editor.hpp:12`
-- Definition: `src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp, src/controls/panel/color_value_editor/color_value_editor.cpp`
+- Definition: `src/controls/panel/color_value_editor/color_value_editor.cpp`
 
 ColorValueEditor is a retained compound editor that delegates selection, keyboard, clipboard, commit, and cancellation to a real TextBox while adding a checker-backed color swatch, canonical #RRGGBBAA conversion, bounded swatch width, typed change events, and exact invalid-edit feedback.
 
@@ -140,7 +140,7 @@ Projects group role, canonical value, description, descendant inclusion, and inv
 void on_dispose() noexcept override
 ```
 
-Public ColorValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ColorValueEditor's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `commit` (private)
 
@@ -148,7 +148,7 @@ Public ColorValueEditor operation. Its exact signature is inventoried here; foll
 void commit(std::string_view text)
 ```
 
-Public ColorValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ColorValueEditor's commit operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `cancel` (private)
 
@@ -156,4 +156,4 @@ Public ColorValueEditor operation. Its exact signature is inventoried here; foll
 void cancel()
 ```
 
-Public ColorValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ColorValueEditor's cancel operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

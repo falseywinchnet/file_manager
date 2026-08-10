@@ -132,7 +132,7 @@ Projects a named flow surface as a group while leaving unnamed structural layout
 [[nodiscard]] Size layout_children(Size available, bool assign)
 ```
 
-Public FlowLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlowLayoutPanel's layout children operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `reconcile_flow_breaks` (private)
 
@@ -140,4 +140,4 @@ Public FlowLayoutPanel operation. Its exact signature is inventoried here; follo
 void reconcile_flow_breaks()
 ```
 
-Public FlowLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlowLayoutPanel's reconcile flow breaks operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

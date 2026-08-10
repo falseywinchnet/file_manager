@@ -1,16 +1,16 @@
 # MacHostServiceOptions
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 host-service review**
 - Kind: **struct**
 - Hierarchy: `MacHostServiceOptions`
 - Declaration: `include/gui_forms/platform/macos_host.hpp:36`
 - Definition: `inline/header-only`
 
-MacHostServiceOptions is a struct declared in include/gui_forms/platform/macos_host.hpp.
+MacHostServiceOptions injects bounded dialog, tooltip, clipboard, and semantic-sound services into an AppKit session.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

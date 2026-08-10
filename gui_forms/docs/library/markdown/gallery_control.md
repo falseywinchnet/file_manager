@@ -1,16 +1,16 @@
 # GalleryControl
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit**
 - Kind: **class / visual retained control**
 - Hierarchy: `Control → GalleryControl`
-- Declaration: `src/controls/gallery_controls.hpp:24`
+- Declaration: `src/controls/gallery/control/gallery_control.hpp:12`
 - Definition: `src/controls/gallery_controls.cpp`
 
-GalleryControl is a visual retained control declared in src/controls/gallery_controls.hpp.
+GalleryControl is a source-private demoboard adapter that renders and exercises distinct control kinds without enlarging the public control surface.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![GalleryControl](../captures/basic_controls_overview.png)
 
 ## Declared methods
 
@@ -68,7 +68,7 @@ Consumes normalized routed pointer input and updates retained interaction state.
 void on_text_input(TextInputEvent& event) override
 ```
 
-Public GalleryControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes GalleryControl's on text input operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_drag` (public)
 
@@ -76,7 +76,7 @@ Public GalleryControl operation. Its exact signature is inventoried here; follow
 void on_drag(DragEvent& event) override
 ```
 
-Public GalleryControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes GalleryControl's on drag operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_focus_changed` (public)
 
@@ -132,4 +132,4 @@ Reports the current display text value without mutation.
 void arrange_children(Size size)
 ```
 
-Public GalleryControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes GalleryControl's arrange children operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

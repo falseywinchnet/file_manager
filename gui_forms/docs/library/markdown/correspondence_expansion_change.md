@@ -1,16 +1,16 @@
 # CorrespondenceExpansionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 correspondence event review**
 - Kind: **struct**
 - Hierarchy: `CorrespondenceExpansionChange`
 - Declaration: `include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp:60`
 - Definition: `inline/header-only`
 
-CorrespondenceExpansionChange is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp.
+CorrespondenceExpansionChange reports the exact hierarchical row and resulting expanded state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

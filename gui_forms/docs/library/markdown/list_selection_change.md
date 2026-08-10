@@ -1,16 +1,16 @@
 # ListSelectionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 list-selection event review**
 - Kind: **struct**
 - Hierarchy: `ListSelectionChange`
 - Declaration: `include/gui_forms/controls/panel/list_box/list_box.hpp:20`
 - Definition: `inline/header-only`
 
-ListSelectionChange is a struct declared in include/gui_forms/controls/panel/list_box/list_box.hpp.
+ListSelectionChange reports previous/current indices plus the exact selected-index snapshot after one mutation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

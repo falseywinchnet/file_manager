@@ -1,16 +1,16 @@
 # MasterDetailPresentationChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 master-detail event review**
 - Kind: **struct**
 - Hierarchy: `MasterDetailPresentationChange`
 - Declaration: `include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp:31`
 - Definition: `inline/header-only`
 
-MasterDetailPresentationChange is a struct declared in include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp.
+MasterDetailPresentationChange reports previous/current compact or expanded presentation and active pane.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

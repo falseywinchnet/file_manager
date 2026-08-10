@@ -3,7 +3,7 @@
 - Status: **OBSERVED: bundle 007 token/attachment split; M4 build and focused tests pass**
 - Kind: **class**
 - Hierarchy: `AcceleratorToken`
-- Declaration: `include/gui_forms/window/window.hpp:105`
+- Declaration: `include/gui_forms/window/window.hpp:107`
 - Definition: `src/core/window/accelerator/accelerator_token.cpp`
 
 AcceleratorToken is the move-only revocation handle for one Window accelerator registration whose lifetime is also bounded by its Component owner.

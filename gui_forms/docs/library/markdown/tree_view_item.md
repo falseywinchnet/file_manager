@@ -1,16 +1,16 @@
 # TreeViewItem
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 tree value review**
 - Kind: **struct**
 - Hierarchy: `TreeViewItem`
 - Declaration: `include/gui_forms/controls/panel/tree_view/tree_view.hpp:17`
 - Definition: `inline/header-only`
 
-TreeViewItem is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp.
+TreeViewItem owns stable identity, text, icon/status metadata, expansion capability/state, and nested children for one tree node.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

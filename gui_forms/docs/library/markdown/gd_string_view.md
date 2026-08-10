@@ -1,16 +1,16 @@
 # gd_string_view
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drawing C ABI record review**
 - Kind: **struct**
 - Hierarchy: `gd_string_view`
 - Declaration: `include/gui_forms/drawing_c_api.h:32`
 - Definition: `inline/header-only`
 
-gd_string_view is a struct declared in include/gui_forms/drawing_c_api.h.
+gd_string_view is a non-owning bounded drawing-ABI string view with explicit validation before copying.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

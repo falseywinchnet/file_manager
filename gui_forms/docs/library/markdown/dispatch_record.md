@@ -1,16 +1,16 @@
 # DispatchRecord
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI dispatch review; native ABI tests and complete M4 MinGW build pass**
 - Kind: **struct**
 - Hierarchy: `DispatchRecord`
 - Declaration: `src/abi/registry/registry.hpp:30`
 - Definition: `inline/header-only`
 
-DispatchRecord is a struct declared in src/abi/registry/registry.hpp.
+DispatchRecord owns one queued C callback plus caller context until Window dispatch executes or retirement cancels it.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

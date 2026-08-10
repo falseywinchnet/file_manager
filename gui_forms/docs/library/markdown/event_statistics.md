@@ -1,16 +1,16 @@
 # EventStatistics
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 revocable-event review**
 - Kind: **struct**
 - Hierarchy: `EventStatistics`
-- Declaration: `include/gui_forms/event.hpp:49`
+- Declaration: `include/gui_forms/event/event/event.hpp:49`
 - Definition: `inline/header-only`
 
-EventStatistics is a struct declared in include/gui_forms/event.hpp.
+EventStatistics records connected, disconnected, and emitted-callback totals for deterministic lifecycle testing.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

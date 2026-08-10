@@ -1,16 +1,16 @@
 # Registry
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 010 private ABI registry state-machine split; native C11/C++/export tests and complete M4 MinGW build pass**
 - Kind: **class**
 - Hierarchy: `Registry`
 - Declaration: `src/abi/registry/registry.hpp:82`
 - Definition: `inline/header-only`
 
-Registry is a class declared in src/abi/registry/registry.hpp.
+Registry is the single compatibility ABI authority for generational handles, thread affinity, control trees, subscriptions, host sessions, queued callbacks, transient services, property proxies, and deterministic retirement.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 gf_result create(std::uint32_t kind, gf_string_view stable_id, gf_handle* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates a control kind and stable UTF-8 identity, constructs the matching native adapter, records owner affinity, and allocates a generational handle.
 
 ### `set_string` (public)
 
@@ -28,7 +28,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_string(gf_handle handle, gf_string_view input, bool is_text)
 ```
 
-Synchronously updates the retained string property. Validation, typed invalidation, and notifications are defined by the implementation.
+Resolves one admitted string property, validates UTF-8, and commits it on the owner thread.
 
 ### `get_string` (public)
 
@@ -36,7 +36,7 @@ Synchronously updates the retained string property. Validation, typed invalidati
 gf_result get_string(gf_handle handle, char* buffer, std::uint64_t capacity, std::uint64_t* required_size, bool is_text)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies one admitted string property through the ABI size-query/buffer contract.
 
 ### `set_enabled` (public)
 
@@ -44,7 +44,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_enabled(gf_handle handle, std::uint32_t enabled)
 ```
 
-Synchronously updates the retained enabled property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits retained enabled state through an owner-thread handle lookup.
 
 ### `get_enabled` (public)
 
@@ -52,7 +52,7 @@ Synchronously updates the retained enabled property. Validation, typed invalidat
 gf_result get_enabled(gf_handle handle, std::uint32_t* enabled)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns retained enabled state through a validated output pointer.
 
 ### `set_cursor` (public)
 
@@ -60,7 +60,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_cursor(gf_handle handle, std::uint32_t cursor_kind)
 ```
 
-Synchronously updates the retained cursor property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps the closed ABI cursor vocabulary to native cursor state.
 
 ### `get_cursor` (public)
 
@@ -68,7 +68,7 @@ Synchronously updates the retained cursor property. Validation, typed invalidati
 gf_result get_cursor(gf_handle handle, std::uint32_t* cursor_kind)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects native cursor state back to the ABI vocabulary.
 
 ### `set_auto_scroll_offset` (public)
 
@@ -76,7 +76,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_auto_scroll_offset(gf_handle handle, gf_point offset)
 ```
 
-Synchronously updates the retained auto scroll offset property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits scroll rendering offset on a scrollable adapter.
 
 ### `set_auto_scroll` (public)
 
@@ -84,7 +84,7 @@ Synchronously updates the retained auto scroll offset property. Validation, type
 gf_result set_auto_scroll(gf_handle handle, std::uint32_t enabled)
 ```
 
-Synchronously updates the retained auto scroll property. Validation, typed invalidation, and notifications are defined by the implementation.
+Enables or disables retained auto-scroll policy.
 
 ### `set_auto_scroll_margin` (public)
 
@@ -92,7 +92,7 @@ Synchronously updates the retained auto scroll property. Validation, typed inval
 gf_result set_auto_scroll_margin(gf_handle handle, gf_size margin)
 ```
 
-Synchronously updates the retained auto scroll margin property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits auto-scroll margins.
 
 ### `set_auto_scroll_min_size` (public)
 
@@ -100,7 +100,7 @@ Synchronously updates the retained auto scroll margin property. Validation, type
 gf_result set_auto_scroll_min_size(gf_handle handle, gf_size size)
 ```
 
-Synchronously updates the retained auto scroll min size property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits virtual content minimum size.
 
 ### `set_auto_scroll_position` (public)
 
@@ -108,7 +108,7 @@ Synchronously updates the retained auto scroll min size property. Validation, ty
 gf_result set_auto_scroll_position(gf_handle handle, gf_point position)
 ```
 
-Synchronously updates the retained auto scroll position property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits logical scroll position through the scroll model.
 
 ### `get_scroll_state` (public)
 
@@ -116,7 +116,7 @@ Synchronously updates the retained auto scroll position property. Validation, ty
 gf_result get_scroll_state(gf_handle handle, gf_scroll_state* state)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects complete auto-scroll and per-axis state into the ABI record.
 
 ### `set_scroll_axis_state` (public)
 
@@ -124,7 +124,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_scroll_axis_state(gf_handle handle, std::uint32_t orientation, gf_scroll_axis_state state)
 ```
 
-Synchronously updates the retained scroll axis state property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits one horizontal or vertical axis policy/value set.
 
 ### `scroll_control_into_view` (public)
 
@@ -132,7 +132,7 @@ Synchronously updates the retained scroll axis state property. Validation, typed
 gf_result scroll_control_into_view(gf_handle handle, gf_handle child_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Resolves a descendant and updates scroll position to expose it.
 
 ### `suspend_layout` (public)
 
@@ -140,7 +140,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result suspend_layout(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Enters retained layout suspension for the target control.
 
 ### `resume_layout` (public)
 
@@ -148,7 +148,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result resume_layout(gf_handle handle, std::uint32_t perform_layout)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Leaves suspension and optionally performs pending layout.
 
 ### `perform_control_layout` (public)
 
@@ -156,7 +156,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result perform_control_layout(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests an explicit retained layout pass.
 
 ### `get_layout_state` (public)
 
@@ -164,7 +164,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result get_layout_state(gf_handle handle, gf_layout_state* state)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects suspension depth and pending-layout state.
 
 ### `property_grid_set_selected_controls` (public)
 
@@ -172,7 +172,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_set_selected_controls( gf_handle grid_handle, const gf_handle* handles, std::uint64_t count)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates proxy handles and sets the native PropertyGrid multi-selection.
 
 ### `property_object_define` (public)
 
@@ -180,7 +180,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_object_define( gf_handle handle, const gf_property_descriptor_v1* descriptor, const gf_property_callbacks_v1* callbacks)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies one foreign property descriptor/callback table into a proxy control.
 
 ### `property_object_notify_changed` (public)
 
@@ -188,7 +188,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_object_notify_changed( gf_handle handle, gf_string_view property_name)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes one explicit foreign property change by canonical name.
 
 ### `property_grid_try_set_text` (public)
 
@@ -196,7 +196,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_try_set_text( gf_handle handle, gf_string_view property_name, gf_string_view text_value, std::uint32_t* committed)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Routes text editing through native converter/descriptor/property policy.
 
 ### `property_grid_reset_property` (public)
 
@@ -204,7 +204,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_reset_property( gf_handle handle, gf_string_view property_name, std::uint32_t* committed)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Routes reset through native reset/serialization policy.
 
 ### `property_grid_activate_editor` (public)
 
@@ -212,7 +212,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_activate_editor( gf_handle handle, gf_string_view property_name, std::uint32_t* activated)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Invokes the named native editor for the selected property.
 
 ### `property_grid_set_sort` (public)
 
@@ -220,7 +220,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_set_sort(gf_handle grid_handle, std::uint32_t property_sort)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps and commits the closed property sort vocabulary.
 
 ### `property_grid_get_sort` (public)
 
@@ -228,7 +228,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_get_sort(gf_handle grid_handle, std::uint32_t* property_sort)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects current property sort vocabulary.
 
 ### `property_grid_refresh` (public)
 
@@ -236,7 +236,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result property_grid_refresh(gf_handle grid_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Refreshes descriptors/values from selected native proxies.
 
 ### `set_control_png` (public)
 
@@ -244,7 +244,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_control_png(gf_handle handle, const std::uint8_t* encoded, std::uint64_t encoded_size)
 ```
 
-Synchronously updates the retained control png property. Validation, typed invalidation, and notifications are defined by the implementation.
+Copies and validates bounded PNG input into a RasterControl.
 
 ### `set_control_pixels` (public)
 
@@ -252,7 +252,7 @@ Synchronously updates the retained control png property. Validation, typed inval
 gf_result set_control_pixels(gf_handle handle, const std::uint8_t* pixels, std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::uint32_t pixel_format)
 ```
 
-Synchronously updates the retained control pixels property. Validation, typed invalidation, and notifications are defined by the implementation.
+Copies validated premultiplied BGRA dimensions, stride, and bytes into a RasterControl.
 
 ### `compatibility_paint_target` (public)
 
@@ -260,7 +260,7 @@ Synchronously updates the retained control pixels property. Validation, typed in
 gf_result compatibility_paint_target( gf_handle handle, std::weak_ptr<RasterControl>* target, std::thread::id* owner_thread)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns a weak RasterControl and exact owner thread for Windows endpoint binding.
 
 ### `set_child_index` (public)
 
@@ -268,7 +268,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_child_index(gf_handle parent_handle, gf_handle child_handle, std::uint64_t index)
 ```
 
-Synchronously updates the retained child index property. Validation, typed invalidation, and notifications are defined by the implementation.
+Reorders one exact retained child within its parent.
 
 ### `set_control_colors` (public)
 
@@ -276,7 +276,7 @@ Synchronously updates the retained child index property. Validation, typed inval
 gf_result set_control_colors(gf_handle handle, std::uint32_t foreground_argb, std::uint32_t background_argb)
 ```
 
-Synchronously updates the retained control colors property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps authored ARGB foreground/background colors to the applicable adapter.
 
 ### `set_control_text_alignment` (public)
 
@@ -284,7 +284,7 @@ Synchronously updates the retained control colors property. Validation, typed in
 gf_result set_control_text_alignment(gf_handle handle, std::uint32_t content_alignment)
 ```
 
-Synchronously updates the retained control text alignment property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps the closed ABI alignment vocabulary to an applicable text adapter.
 
 ### `set_button_appearance` (public)
 
@@ -292,7 +292,7 @@ Synchronously updates the retained control text alignment property. Validation, 
 gf_result set_button_appearance(gf_handle handle, std::uint32_t visual_style, double flat_border_width)
 ```
 
-Synchronously updates the retained button appearance property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps bounded visual style, border, flat, and image/text relationship options to ButtonBase.
 
 ### `set_panel_border_style` (public)
 
@@ -300,7 +300,7 @@ Synchronously updates the retained button appearance property. Validation, typed
 gf_result set_panel_border_style(gf_handle handle, std::uint32_t border_style)
 ```
 
-Synchronously updates the retained panel border style property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps the closed border vocabulary and width to Panel.
 
 ### `set_field_selection` (public)
 
@@ -308,7 +308,7 @@ Synchronously updates the retained panel border style property. Validation, type
 gf_result set_field_selection(gf_handle handle, std::uint64_t start, std::uint64_t length, std::uint32_t caret_visible)
 ```
 
-Synchronously updates the retained field selection property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates UTF-8 scalar boundaries and commits field anchor/caret direction.
 
 ### `set_field_edit_state` (public)
 
@@ -316,7 +316,7 @@ Synchronously updates the retained field selection property. Validation, typed i
 gf_result set_field_edit_state(gf_handle handle, std::uint64_t anchor, std::uint64_t caret, std::uint32_t caret_visible)
 ```
 
-Synchronously updates the retained field edit state property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits field read-only/password/multiline/viewport policy.
 
 ### `field_position_from_point` (public)
 
@@ -324,7 +324,7 @@ Synchronously updates the retained field edit state property. Validation, typed 
 gf_result field_position_from_point(gf_handle handle, double local_x, std::uint64_t* position)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Maps field-local geometry to an exact UTF-8 scalar boundary.
 
 ### `write_clipboard_text` (public)
 
@@ -332,7 +332,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result write_clipboard_text(gf_handle owner_handle, gf_string_view input)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Uses the active host clipboard service or bounded deterministic fallback.
 
 ### `read_clipboard_text` (public)
 
@@ -340,7 +340,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result read_clipboard_text(gf_handle owner_handle, char* buffer, std::uint64_t capacity, std::uint64_t* required_size, std::uint32_t* has_text)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Reads host/fallback clipboard text through the ABI buffer contract.
 
 ### `field_navigate` (public)
 
@@ -348,7 +348,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result field_navigate(gf_handle handle, std::uint64_t position, std::int32_t direction, std::uint64_t* result)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Routes one closed Unicode navigation command and returns edit telemetry.
 
 ### `field_replace` (public)
 
@@ -356,7 +356,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result field_replace(gf_handle handle, std::uint64_t start, std::uint64_t length, gf_string_view input, gf_field_edit_result* result)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and commits one UTF-8 field replacement with edit telemetry.
 
 ### `field_history` (public)
 
@@ -364,7 +364,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result field_history(gf_handle handle, std::int32_t direction, gf_field_edit_result* result)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves one step through field undo or redo history.
 
 ### `field_clear_history` (public)
 
@@ -372,7 +372,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result field_clear_history(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Drops field undo and redo state.
 
 ### `set_check_state` (public)
 
@@ -380,7 +380,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_check_state(gf_handle handle, std::uint32_t check_state)
 ```
 
-Synchronously updates the retained check state property. Validation, typed invalidation, and notifications are defined by the implementation.
+Maps and commits the closed unchecked/checked/indeterminate vocabulary.
 
 ### `get_check_state` (public)
 
@@ -388,7 +388,7 @@ Synchronously updates the retained check state property. Validation, typed inval
 gf_result get_check_state(gf_handle handle, std::uint32_t* check_state)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects current check state.
 
 ### `set_range` (public)
 
@@ -396,7 +396,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_range(gf_handle handle, double minimum, double maximum)
 ```
 
-Synchronously updates the retained range property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits numeric minimum/maximum on an applicable range control.
 
 ### `get_range` (public)
 
@@ -404,7 +404,7 @@ Synchronously updates the retained range property. Validation, typed invalidatio
 gf_result get_range(gf_handle handle, double* minimum, double* maximum)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns numeric bounds.
 
 ### `set_range_value` (public)
 
@@ -412,7 +412,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_range_value(gf_handle handle, double value)
 ```
 
-Synchronously updates the retained range value property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates and commits current range value.
 
 ### `get_range_value` (public)
 
@@ -420,7 +420,7 @@ Synchronously updates the retained range value property. Validation, typed inval
 gf_result get_range_value(gf_handle handle, double* value)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns current range value.
 
 ### `set_pointer_capture` (public)
 
@@ -428,7 +428,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_pointer_capture(gf_handle handle, std::uint32_t captured)
 ```
 
-Synchronously updates the retained pointer capture property. Validation, typed invalidation, and notifications are defined by the implementation.
+Requests or releases Window pointer capture for an admitted control.
 
 ### `get_pointer_capture` (public)
 
@@ -436,7 +436,7 @@ Synchronously updates the retained pointer capture property. Validation, typed i
 gf_result get_pointer_capture(gf_handle handle, std::uint32_t* captured)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Reports whether the control currently owns capture.
 
 ### `show_path_dialog` (public)
 
@@ -444,7 +444,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result show_path_dialog(gf_handle owner_handle, std::uint32_t kind, gf_string_view title, gf_string_view initial_directory, gf_string_view suggested_name, gf_string_view default_extension, gf_string_view filter, std::uint32_t flags, std::uint32_t* accepted)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds a host-neutral path dialog request, routes it to the active host, and records the result by request identity.
 
 ### `last_dialog_path` (public)
 
@@ -452,7 +452,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result last_dialog_path(gf_handle owner_handle, char* buffer, std::uint64_t capacity, std::uint64_t* required_size)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies the last accepted path through the ABI buffer contract.
 
 ### `show_tooltip` (public)
 
@@ -460,7 +460,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result show_tooltip(gf_handle owner_handle, gf_string_view text, double x, double y, std::uint32_t duration_milliseconds)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds and routes a bounded host tooltip request for owner-relative geometry.
 
 ### `hide_tooltip` (public)
 
@@ -468,7 +468,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result hide_tooltip(gf_handle owner_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Dismisses the owner tooltip through the active host service.
 
 ### `run_window` (public)
 
@@ -476,7 +476,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result run_window(gf_handle handle, std::uint32_t flags)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transitions the root handle through created/running/stopping/stopped host phases using the admitted headless, AppKit, or Win32 adapter.
 
 ### `last_host_trace` (public)
 
@@ -484,7 +484,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result last_host_trace(gf_handle handle, char* buffer, std::uint64_t capacity, std::uint64_t* required_size)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies the latest structured host trace through the ABI buffer contract.
 
 ### `retain` (public)
 
@@ -492,7 +492,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result retain(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Increments an admitted slot reference count without overflow.
 
 ### `release` (public)
 
@@ -500,7 +500,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result release(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Decrements a slot reference and invalidates/disposes ownership when the last reference retires.
 
 ### `dispose` (public)
 
@@ -508,7 +508,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result dispose(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Runs owner-thread Component disposal without releasing the handle reference.
 
 ### `component_state` (public)
 
@@ -516,7 +516,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result component_state(gf_handle handle, std::uint32_t* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Projects native alive/disposing/disposed state.
 
 ### `stable_id` (public)
 
@@ -524,7 +524,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result stable_id(gf_handle handle, char* buffer, std::uint64_t capacity, std::uint64_t* required_size)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies immutable native stable identity.
 
 ### `set_visible` (public)
 
@@ -532,7 +532,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_visible(gf_handle handle, std::uint32_t visible)
 ```
 
-Synchronously updates the retained visible property. Validation, typed invalidation, and notifications are defined by the implementation.
+Commits retained visibility.
 
 ### `get_visible` (public)
 
@@ -540,7 +540,7 @@ Synchronously updates the retained visible property. Validation, typed invalidat
 gf_result get_visible(gf_handle handle, std::uint32_t* visible)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns retained visibility.
 
 ### `set_bounds` (public)
 
@@ -548,7 +548,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result set_bounds(gf_handle handle, gf_rect bounds)
 ```
 
-Synchronously updates the retained bounds property. Validation, typed invalidation, and notifications are defined by the implementation.
+Validates finite geometry and commits retained bounds.
 
 ### `get_bounds` (public)
 
@@ -556,7 +556,7 @@ Synchronously updates the retained bounds property. Validation, typed invalidati
 gf_result get_bounds(gf_handle handle, gf_rect* bounds)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns retained local bounds.
 
 ### `get_control_absolute_bounds` (public)
 
@@ -564,7 +564,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result get_control_absolute_bounds(gf_handle handle, gf_rect* bounds)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Flushes required layout and returns exact window-relative bounds.
 
 ### `add_child` (public)
 
@@ -572,7 +572,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result add_child(gf_handle parent_handle, gf_handle child_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates owner threads, tree identity, and cycle/ownership rules before retained attachment.
 
 ### `remove_child` (public)
 
@@ -580,7 +580,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result remove_child(gf_handle parent_handle, gf_handle child_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Detaches one exact retained child.
 
 ### `attach_popup` (public)
 
@@ -588,7 +588,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result attach_popup(gf_handle owner_handle, gf_handle popup_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Registers an owned popup plane through Window and records its revocable token.
 
 ### `detach_popup` (public)
 
@@ -596,7 +596,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result detach_popup(gf_handle popup_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes one popup token and clears attachment state.
 
 ### `subscribe` (public)
 
@@ -604,7 +604,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe(gf_handle sender_handle, std::uint32_t event_kind, gf_event_callback callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Allocates a generational subscription slot for the legacy event callback surface.
 
 ### `disconnect` (public)
 
@@ -612,7 +612,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result disconnect(gf_event_token token)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects native observation and invalidates the subscription slot.
 
 ### `subscribe_v2` (public)
 
@@ -620,7 +620,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe_v2(gf_handle sender_handle, std::uint32_t event_kind, gf_event_callback_v2 callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Allocates a typed extended-event callback subscription.
 
 ### `subscribe_pointer` (public)
 
@@ -628,7 +628,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe_pointer(gf_handle sender_handle, gf_pointer_callback callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects projected pointer observation for a compatible adapter.
 
 ### `subscribe_key` (public)
 
@@ -636,7 +636,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe_key(gf_handle sender_handle, gf_key_callback callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects projected key observation for a compatible adapter.
 
 ### `subscribe_key_preview` (public)
 
@@ -644,7 +644,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe_key_preview(gf_handle sender_handle, gf_key_callback callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects the root FormControl preview seam.
 
 ### `subscribe_text` (public)
 
@@ -652,7 +652,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscribe_text(gf_handle sender_handle, gf_text_callback callback, void* context, gf_event_token* output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects projected text/composition observation.
 
 ### `begin_invoke` (public)
 
@@ -660,7 +660,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result begin_invoke(gf_handle control_handle, gf_dispatch_callback callback, void* context)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Queues one caller callback through Window dispatch and records cancellation/fault ownership.
 
 ### `request_close` (public)
 
@@ -668,7 +668,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result request_close(gf_handle form_handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Requests the root host loop to enter stopping through its owner-thread path.
 
 ### `callback_fault_count` (public)
 
@@ -676,7 +676,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result callback_fault_count(gf_handle control_handle, std::uint64_t* count)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns contained foreign callback failures for the control record.
 
 ### `root_record_locked` (private)
 
@@ -684,7 +684,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 std::shared_ptr<ControlRecord> root_record_locked( const std::shared_ptr<ControlRecord>& record)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Finds the root ControlRecord while registry mutex ownership is held.
 
 ### `emit_v2` (private)
 
@@ -692,7 +692,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 std::uint32_t emit_v2(gf_handle sender_handle, std::uint32_t event_kind)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Copies a stable typed ABI event and invokes matching connected callbacks outside mutation paths.
 
 ### `pump_pending` (private)
 
@@ -700,7 +700,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void pump_pending(const std::shared_ptr<ControlRecord>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Moves pending dispatch records into Window execution without holding the registry mutex across callbacks.
 
 ### `cancel_pending` (private)
 
@@ -708,7 +708,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void cancel_pending(const std::shared_ptr<ControlRecord>& root) noexcept
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Retires queued dispatch ownership during close or invalidation.
 
 ### `publish_host` (private)
 
@@ -716,7 +716,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void publish_host(const std::shared_ptr<ControlRecord>& root, std::function<void()> wake, std::function<void()> request_close, std::function<gui_forms::HostDialogResult( const gui_forms::HostDialogRequest&)> dialog =
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Commits host callbacks/services and transitions the record to running.
 
 ### `mark_host_stopping` (private)
 
@@ -724,7 +724,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void mark_host_stopping(const std::shared_ptr<ControlRecord>& root) noexcept
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transitions a running host toward stopping once.
 
 ### `close_requested` (private)
 
@@ -732,7 +732,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 bool close_requested(const std::shared_ptr<ControlRecord>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Reports whether the record has entered stopping.
 
 ### `finish_host` (private)
 
@@ -740,7 +740,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void finish_host(const std::shared_ptr<ControlRecord>& root) noexcept
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Clears host services, cancels work, stores trace, and commits stopped.
 
 ### `copy_view` (private)
 
@@ -748,7 +748,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 static bool copy_view(gf_string_view input, std::string& output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Implements the ABI size-query/exact-buffer copy law for UTF-8 strings.
 
 ### `parse_filters` (private)
 
@@ -756,7 +756,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 static std::vector<gui_forms::HostFileDialogFilter> parse_filters(std::string_view serialized)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates and converts ABI dialog filters into host-neutral records.
 
 ### `managed_trace` (private)
 
@@ -764,7 +764,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 std::string managed_trace(const std::shared_ptr<ControlRecord>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Builds bounded compatibility host lifecycle diagnostics.
 
 ### `first_button` (private)
 
@@ -772,7 +772,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 static std::shared_ptr<gui_forms::ButtonBase> first_button( const std::shared_ptr<Control>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Finds the first ButtonBase in a retained subtree for dialog/default mapping.
 
 ### `first_pointer_control` (private)
 
@@ -780,7 +780,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 static std::shared_ptr<Control> first_pointer_control( const std::shared_ptr<Control>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Finds the first pointer-capable adapter in a retained subtree.
 
 ### `named_controls_snapshot` (private)
 
@@ -788,7 +788,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<Control>>> named_controls_snapshot(const std::shared_ptr<ControlRecord>& root)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Collects stable-ID-to-control mappings without exposing executable registry state.
 
 ### `refresh_named_controls` (private)
 
@@ -796,7 +796,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void refresh_named_controls( const std::shared_ptr<ControlRecord>& root, std::unordered_map<std::string, std::shared_ptr<Control>>& result)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Rebuilds a host adapter's stable named-control projection.
 
 ### `contains_control` (private)
 
@@ -804,7 +804,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 static bool contains_control(const std::shared_ptr<Control>& root, const std::shared_ptr<Control>& candidate)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Tests retained subtree membership by pointer identity.
 
 ### `require_thread` (private)
 
@@ -812,7 +812,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result require_thread(const ControlRecord& record) const
 ```
 
-Reports the current require thread value without mutation.
+Rejects a handle operation performed off its recorded UI thread.
 
 ### `get_control` (private)
 
@@ -820,7 +820,7 @@ Reports the current require thread value without mutation.
 gf_result get_control(gf_handle handle, std::shared_ptr<ControlRecord>& output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Resolves and retains one live Control from a generational handle.
 
 ### `control_locked` (private)
 
@@ -828,7 +828,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result control_locked(gf_handle handle, std::shared_ptr<ControlRecord>& output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates slot kind/generation and returns ControlRecord under mutex.
 
 ### `subscription_locked` (private)
 
@@ -836,15 +836,15 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_result subscription_locked(gf_event_token token, std::shared_ptr<SubscriptionRecord>& output)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Validates slot kind/generation and returns SubscriptionRecord under mutex.
 
 ### `slot_locked` (private)
 
 ```cpp
-Slot* slot_locked(gf_handle handle)
+RegistrySlot* slot_locked(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Decodes handle index/generation and rejects stale or empty slots.
 
 ### `allocate_locked` (private)
 
@@ -852,7 +852,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 gf_handle allocate_locked(SlotKind kind, std::shared_ptr<ControlRecord> control, std::shared_ptr<SubscriptionRecord> subscription)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Reuses or appends a slot, preserving nonzero generation, and returns an encoded handle.
 
 ### `invalidate_control_locked` (private)
 
@@ -860,7 +860,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void invalidate_control_locked(gf_handle handle, ControlRecord& record)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Revokes popup/host/pending work, detaches hierarchy, disposes native state, and advances generation.
 
 ### `invalidate_slot_locked` (private)
 
@@ -868,7 +868,7 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void invalidate_slot_locked(gf_handle handle)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Disconnects and clears subscription state and advances generation.
 
 ### `emit_changed` (private)
 
@@ -876,4 +876,4 @@ Public Registry operation. Its exact signature is inventoried here; follow the l
 void emit_changed(gf_handle sender_handle, const std::shared_ptr<ControlRecord>& sender)
 ```
 
-Public Registry operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Snapshots matching legacy callbacks and emits state change without holding registry mutation ownership.

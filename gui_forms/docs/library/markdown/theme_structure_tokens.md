@@ -10,7 +10,7 @@ ThemeStructureTokens groups spacing, geometry, typography, and motion vocabulari
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

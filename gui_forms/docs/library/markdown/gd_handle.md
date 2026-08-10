@@ -1,16 +1,16 @@
 # gd_handle
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drawing C ABI record review**
 - Kind: **struct**
 - Hierarchy: `gd_handle`
 - Declaration: `include/gui_forms/drawing_c_api.h:27`
 - Definition: `inline/header-only`
 
-gd_handle is a struct declared in include/gui_forms/drawing_c_api.h.
+gd_handle encodes one-based drawing registry slot plus generation for deterministic stale-object rejection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

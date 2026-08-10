@@ -3,10 +3,10 @@
 <title>ImageSnapshot · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
 <body><article><header><p class="eyebrow">struct · library</p>
 <h1>ImageSnapshot</h1><p class="summary">ImageSnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels.</p>
-<div class="badges"><span>OBSERVED: bundle 009 immutable image snapshot review; focused M4 tests pass</span><span>grouped migration pending</span></div></header>
-<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<div class="badges"><span>OBSERVED: bundle 012 isolated immutable-image snapshot; native and MinGW M4 builds pass</span><span>isolated per type</span></div></header>
+<section><h2>Visual evidence</h2><p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>ImageSnapshot</dd>
-<dt>Declaration</dt><dd>include/gui_forms/drawing/types/drawing_types.hpp:40</dd><dt>Definition</dt><dd>src/core/drawing/image_reference/image_reference.cpp</dd></dl></section>
+<dt>Declaration</dt><dd>include/gui_forms/drawing/image_snapshot/image_snapshot.hpp:15</dd><dt>Definition</dt><dd>src/core/drawing/image_snapshot/image_snapshot.cpp</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>has_pixels <span class="access">public</span></h3><code>[[nodiscard]] bool has_pixels() const noexcept</code><p>Reports whether shared pixel storage is retained.</p></section><section class="method"><h3>row_bytes <span class="access">public</span></h3><code>[[nodiscard]] std::size_t row_bytes() const noexcept</code><p>Returns storage stride or zero.</p></section><section class="method"><h3>pixels <span class="access">public</span></h3><code>[[nodiscard]] std::span&lt;const std::byte&gt; pixels() const noexcept</code><p>Returns const storage bytes or an empty span.</p></section></section>
 <footer><a href="../markdown/image_snapshot.md">AI-readable Markdown source</a></footer>
 </article></body></html>

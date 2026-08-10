@@ -1,16 +1,16 @@
 # StableId
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 012 isolated retained-control identity owner; native and MinGW M4 builds pass**
 - Kind: **class**
 - Hierarchy: `StableId`
-- Declaration: `include/gui_forms/control.hpp:48`
-- Definition: `src/core/control.cpp`
+- Declaration: `include/gui_forms/control/stable_id/stable_id.hpp:10`
+- Definition: `src/core/control/stable_id/stable_id.cpp`
 
-StableId is a class declared in include/gui_forms/control.hpp.
+StableId owns the immutable authored UTF-8 identity used for lookup, semantics, traces, and cross-boundary correlation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -36,4 +36,4 @@ Reports the current value value without mutation.
 friend bool operator==(const StableId&, const StableId&) = default
 ```
 
-Public StableId operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

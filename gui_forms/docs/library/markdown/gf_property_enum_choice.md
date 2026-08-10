@@ -1,16 +1,16 @@
 # gf_property_enum_choice
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C ABI property review**
 - Kind: **struct**
 - Hierarchy: `gf_property_enum_choice`
 - Declaration: `include/gui_forms/c_api.h:129`
 - Definition: `inline/header-only`
 
-gf_property_enum_choice is a struct declared in include/gui_forms/c_api.h.
+gf_property_enum_choice pairs one numeric enum value with its bounded display label.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

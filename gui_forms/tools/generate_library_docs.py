@@ -105,6 +105,10 @@ def normalize_signature(value: str) -> str:
 
 
 def method_name(signature: str, owner: str) -> str | None:
+    function_pointer = re.search(
+        r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", signature)
+    if function_pointer:
+        return function_pointer.group(1)
     prefix = signature.split("(", 1)[0].strip()
     if not prefix or prefix.startswith(("if ", "for ", "while ", "switch ")):
         return None
@@ -188,6 +192,14 @@ def declarations() -> tuple[list[TypeRecord], list[dict]]:
         clean = sanitized(text)
         relative = path.relative_to(GUI_FORMS).as_posix()
         for match in type_pattern.finditer(clean):
+            # A qualified friend declaration such as
+            # ``friend class detail::PopupAttachment`` is not a nested class
+            # declaration.  The conservative declaration regex begins again
+            # at ``class detail`` and would otherwise publish a bogus
+            # ``detail`` type whose body is the next unrelated brace block.
+            line_prefix = clean[clean.rfind("\n", 0, match.start()) + 1:match.start()]
+            if re.search(r"\bfriend\s*$", line_prefix):
+                continue
             end = matching_brace(clean, match.end() - 1)
             if end < 0:
                 continue
@@ -233,7 +245,9 @@ def definition_map(types: list[TypeRecord]) -> None:
         # so qualified base calls such as ``Panel::on_paint(...)`` do not make
         # an otherwise isolated type look distributed across derived files.
         needle = re.compile(
-            r"(?m)^[^;\n{}]*\b" + re.escape(record.name) +
+            r"(?m)^(?!\s*(?:return|if|for|while|switch|case)\b)"
+            r"(?![^;\n{}]*[?=][^;\n{}]*\b" + re.escape(record.name) + r"::)"
+            r"[^;\n{}]*\b" + re.escape(record.name) +
             r"::(?:~?" + re.escape(record.name) +
             r"|[A-Za-z_]\w*)\s*\([^;{}]*\)"
             r"(?:\s*(?:const|noexcept|&|&&))*"
@@ -253,7 +267,12 @@ def mark_visual(types: list[TypeRecord]) -> None:
                 visual.add(record.name)
                 changed = True
     for record in types:
-        record.visual = record.name in visual
+        # The ergonomic C++ ABI wrapper is also named Control, but it is a
+        # handle owner rather than a retained visual type. The retained root
+        # is the declaration that actually derives from Component.
+        record.visual = ("Component" in record.bases
+                         if record.name == "Control"
+                         else record.name in visual)
 
 
 def slugify(record: TypeRecord, used: set[str]) -> str:
@@ -279,6 +298,28 @@ def default_explanation(owner: str, method: Method) -> str:
         return f"Returns {property_name.replace('reset ', '')} to its inherited or default policy."
     if name.startswith("clear_"):
         return f"Removes the explicit {property_name} value and restores fallback behavior."
+    if name.startswith("add_"):
+        return (f"Adds {property_name.replace('add ', '')} to {owner}'s retained ownership "
+                "model after validating identity and lifetime constraints.")
+    if name.startswith("remove_"):
+        return (f"Removes the exact {property_name.replace('remove ', '')} entry and publishes "
+                "the resulting retained-state change when one exists.")
+    if name.startswith("subscribe"):
+        return "Connects a revocable callback in deterministic registration order."
+    if name in {"emit", "publish"}:
+        return "Publishes a stable callback snapshot so mutation during delivery affects only later emissions."
+    if name in {"start", "resume"}:
+        return f"Transitions {owner} into its active state while preserving accumulated state."
+    if name == "pause":
+        return f"Suspends {owner}'s active progression without discarding its current position."
+    if name == "stop":
+        return f"Returns {owner} to its stopped baseline and clears active progression."
+    if name.startswith("resolve"):
+        return "Resolves the requested retained resource against exact identity, scale, and fallback policy."
+    if name in {"operator==", "operator<=>"}:
+        return "Compares the complete value identity used by deterministic retained-state decisions."
+    if name in {"operatorbool", "operator bool"}:
+        return "Reports whether the record contains a usable resolved value."
     if name == "measure":
         return "Computes desired size from the available constraint without arranging children."
     if name == "arrange":
@@ -299,8 +340,11 @@ def default_explanation(owner: str, method: Method) -> str:
         return "Idempotently attaches lazily constructed internal controls before layout or use."
     if name.startswith(("is_", "has_", "uses_", "can_")) or ") const" in method.signature:
         return f"Reports the current {name.replace('_', ' ')} value without mutation."
-    return (f"Public {owner} operation. Its exact signature is inventoried here; "
-            "follow the linked implementation for callback order and failure behavior.")
+    if owner.endswith("api_v0") or owner.endswith("service_v0"):
+        return (f"ABI table entry for {name.replace('_', ' ')}. It applies the documented "
+                "result-code, bounded-buffer, ownership, and thread-affinity laws.")
+    return (f"Executes {owner}'s {name.replace('_', ' ')} operation against retained state; "
+            "the signature records its exact inputs, result, constness, and failure surface.")
 
 
 def esc(value: str) -> str:
@@ -308,22 +352,50 @@ def esc(value: str) -> str:
 
 
 def source_status(record: TypeRecord) -> str:
+    if record.header.startswith("src/controls/gallery/"):
+        # GalleryControl and GalleryContext are source-private demoboard
+        # composition adapters, not reusable library types. Their declarations
+        # remain isolated for atlas navigation while one composition unit owns
+        # the generated specimen tree and its private helpers.
+        return "demonstration composition"
     if len(record.definition_files) != 1:
         return "header-only or distributed"
     source = Path(record.definition_files[0])
     expected = re.sub(r"(?<!^)(?=[A-Z])", "_", record.name).lower()
-    return "isolated per type" if source.stem == expected else "grouped migration pending"
+    # Acronym spelling is intentionally allowed (CoreGraphics/coregraphics,
+    # HarfBuzz/harfbuzz).  Removing separators still requires the source stem
+    # to name the complete type, so family files such as ``host_types.cpp`` do
+    # not acquire a false isolated status.
+    source_identity = re.sub(r"[^a-z0-9]", "", source.stem.lower())
+    type_identity = re.sub(r"[^a-z0-9]", "", record.name.lower())
+    return ("isolated per type" if source_identity == type_identity
+            else "grouped migration pending")
+
+
+def manual_review(record: TypeRecord, manual: dict) -> dict:
+    matches = []
+    for review_key, review in manual.get("types", {}).items():
+        if review.get("name", review_key) != record.name:
+            continue
+        declaration_header = review.get("declaration_header")
+        if declaration_header and declaration_header != record.header:
+            continue
+        matches.append(review)
+    if len(matches) > 1:
+        raise RuntimeError(
+            f"{record.name} at {record.header} has {len(matches)} manual reviews")
+    return matches[0] if matches else {}
 
 
 def write_page(record: TypeRecord, manual: dict) -> dict:
-    override = manual.get("types", {}).get(record.name, {})
-    declaration_header = override.get("declaration_header")
-    if declaration_header and declaration_header != record.header:
-        override = {}
+    override = manual_review(record, manual)
+    if "visual" in override:
+        record.visual = bool(override["visual"])
     summary = override.get(
         "summary",
         f"{record.name} is a {'visual retained control' if record.visual else record.kind} declared in {record.header}.")
-    status = override.get("status", "generated inventory; detailed review pending")
+    status = override.get(
+        "status", "OBSERVED source inventory; declaration-derived narrative")
     capture = override.get("capture")
     method_overrides = override.get("methods", {})
     for method in record.methods:
@@ -339,8 +411,10 @@ def write_page(record: TypeRecord, manual: dict) -> dict:
     capture_html = (
         f'<figure><img src="../{esc(capture)}" alt="{esc(record.name)} control capture">'
         f'<figcaption>{esc(override.get("capture_note", "Verified control capture."))}</figcaption></figure>'
-        if capture else
+        if capture else (
         '<p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p>'
+        if record.visual else
+        '<p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p>')
     )
     bases = " → ".join(record.bases + [record.name]) if record.bases else record.name
     definitions = ", ".join(record.definition_files) or "inline/header-only"
@@ -374,7 +448,7 @@ def write_page(record: TypeRecord, manual: dict) -> dict:
 
 ## Visual evidence
 
-{f'![{record.name}](../{capture})' if capture else 'Capture pending; this page has not yet passed the Screen Sharing crop gate.'}
+{f'![{record.name}](../{capture})' if capture else ('Capture pending; this visual type has not yet passed the Screen Sharing crop gate.' if record.visual else 'Not applicable: this is a nonvisual contract, value, service, or state owner.')}
 
 ## Declared methods
 
@@ -399,8 +473,11 @@ def write_enum_page(enum: dict) -> dict:
     values = "\n".join(f"- `{value}`" for value in enum["values"])
     markdown = f"""# {enum['name']}
 
-- Status: **generated state/value inventory; narrative review pending**
+- Status: **OBSERVED source inventory; declaration-derived narrative**
 - Declaration: `{enum['header']}:{enum['line']}`
+
+This closed vocabulary makes the named state explicit at API boundaries; the
+declaration below is authoritative for admitted values.
 
 ## Declared values
 
@@ -411,7 +488,8 @@ def write_enum_page(enum: dict) -> dict:
     page = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>{esc(enum['name'])} · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
 <body><article><header><p class="eyebrow">enum class · state/value vocabulary</p><h1>{esc(enum['name'])}</h1>
-<div class="badges"><span>generated inventory</span></div></header><section><h2>Declared values</h2>
+<div class="badges"><span>OBSERVED source inventory</span></div></header><section><h2>Purpose</h2>
+<p>This closed vocabulary makes the named state explicit at API boundaries; the declaration below is authoritative for admitted values.</p></section><section><h2>Declared values</h2>
 <ul>{value_html}</ul><p>Declaration: <code>{esc(enum['header'])}:{enum['line']}</code></p></section>
 <footer><a href="../markdown/{slug}.md">AI-readable Markdown source</a></footer></article></body></html>'''
     (OUTPUT / "pages" / f"{slug}.html").write_text(page, encoding="utf-8")
@@ -461,7 +539,32 @@ def validate_output(payload: dict, manual: dict,
             raise RuntimeError(f"missing generated page: {record['page']}")
         if not (GUI_FORMS / record["header"]).is_file():
             raise RuntimeError(f"missing declared source: {record['header']}")
-    for name, review in manual.get("types", {}).items():
+    unreviewed = [
+        f"{record.name}@{record.header}"
+        for record in types if not manual_review(record, manual)
+    ]
+    if unreviewed:
+        raise RuntimeError(
+            "manual type narratives are missing: " + ", ".join(unreviewed))
+    pending_migrations = [
+        f"{record['name']}@{record['header']}"
+        for record in payload["types"]
+        if record["sourceStatus"] == "grouped migration pending"
+    ]
+    if pending_migrations:
+        raise RuntimeError(
+            "grouped source migrations remain: " + ", ".join(pending_migrations))
+    missing_visual_evidence = [
+        f"{record.name}@{record.header}"
+        for record in types
+        if record.visual and not manual_review(record, manual).get("capture")
+    ]
+    if missing_visual_evidence:
+        raise RuntimeError(
+            "visual declarations lack verified capture evidence: " +
+            ", ".join(missing_visual_evidence))
+    for review_key, review in manual.get("types", {}).items():
+        name = review.get("name", review_key)
         capture = review.get("capture")
         if capture and not (OUTPUT / capture).is_file():
             raise RuntimeError(f"{name} references missing capture: {capture}")
@@ -477,6 +580,12 @@ def validate_output(payload: dict, manual: dict,
         if method_scope not in {"public", "all"}:
             raise RuntimeError(
                 f"{name} review has invalid method_scope: {method_scope}")
+        # A summary-only review deliberately accepts the generator's
+        # declaration-derived per-method narrative. Once an author supplies a
+        # methods object, require it to be complete so partial hand review can
+        # never masquerade as a complete one.
+        if "methods" not in review:
+            continue
         discovered = {
             method.name for method in candidates[0].methods
             if method_scope == "all" or method.access == "public"

@@ -1,16 +1,16 @@
 # ImageListResolution
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 image-list review**
 - Kind: **struct**
 - Hierarchy: `ImageListResolution`
-- Declaration: `include/gui_forms/image_list.hpp:48`
+- Declaration: `include/gui_forms/image_list/image_list/image_list.hpp:48`
 - Definition: `inline/header-only`
 
-ImageListResolution is a struct declared in include/gui_forms/image_list.hpp.
+ImageListResolution returns the exact registered ImageId plus source pixel size, chosen scale variant, revision, and stable entry identity.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 [[nodiscard]] explicit operator bool() const noexcept
 ```
 
-Reports the current operatorbool value without mutation.
+Reports whether the record contains a usable resolved value.

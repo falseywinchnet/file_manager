@@ -300,7 +300,7 @@ Reports the current index at value without mutation.
 void apply_selection(std::vector<std::size_t> selection, std::optional<std::size_t> active)
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ListBox's apply selection operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `ensure_visible` (private)
 
@@ -308,7 +308,7 @@ Public ListBox operation. Its exact signature is inventoried here; follow the li
 void ensure_visible(std::size_t index)
 ```
 
-Public ListBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ListBox's ensure visible operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `visible_row_count` (private)
 

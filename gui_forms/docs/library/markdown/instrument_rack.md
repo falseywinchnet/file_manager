@@ -284,4 +284,4 @@ Projects a named group, module count, and included real descendants.
 void on_dispose() noexcept override
 ```
 
-Public InstrumentRack operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes InstrumentRack's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

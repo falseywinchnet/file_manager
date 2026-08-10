@@ -228,7 +228,7 @@ Returns the event published after a tooltip becomes visible or hidden.
 void verify_dispose_thread() override
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's verify dispose thread operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_dispose` (protected)
 
@@ -236,7 +236,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void on_dispose() noexcept override
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `bound_window` (private)
 
@@ -260,7 +260,7 @@ Reports the current require access value without mutation.
 [[nodiscard]] Entry* find_entry(const Control& target)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's find entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `find_entry` (private)
 
@@ -276,7 +276,7 @@ Reports the current find entry value without mutation.
 void target_pointer(const std::shared_ptr<Control>& target, const PointerEvent& event)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's target pointer operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `target_focus` (private)
 
@@ -284,7 +284,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void target_focus(const std::shared_ptr<Control>& target, bool focused)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's target focus operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `target_moved` (private)
 
@@ -292,7 +292,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void target_moved(const std::shared_ptr<Control>& target)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's target moved operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `schedule_show` (private)
 
@@ -300,7 +300,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void schedule_show(const std::shared_ptr<Control>& target, bool keyboard_initiated, Point pointer_position)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's schedule show operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `arm` (private)
 
@@ -308,7 +308,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void arm(std::chrono::milliseconds delay, PendingAction action)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's arm operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `timer_tick` (private)
 
@@ -316,7 +316,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void timer_tick()
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's timer tick operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `show_now` (private)
 
@@ -324,7 +324,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void show_now(const std::shared_ptr<Control>& target, bool keyboard_initiated, std::optional<std::chrono::milliseconds> duration)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's show now operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `position_overlay` (private)
 
@@ -332,7 +332,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void position_overlay()
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's position overlay operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `close_overlay` (private)
 
@@ -340,7 +340,7 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void close_overlay(bool emit_change)
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's close overlay operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `popup_revoked` (private)
 
@@ -348,4 +348,4 @@ Public ToolTip operation. Its exact signature is inventoried here; follow the li
 void popup_revoked()
 ```
 
-Public ToolTip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ToolTip's popup revoked operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

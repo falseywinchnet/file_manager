@@ -332,7 +332,7 @@ Routes virtual selection and press through ordinary selection and activation sta
 void on_attached_to_window() override
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `item_index` (private)
 
@@ -388,7 +388,7 @@ Reports the current index at value without mutation.
 void ensure_visible(std::size_t index)
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's ensure visible operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `select_index` (private)
 
@@ -396,7 +396,7 @@ Public ObjectView operation. Its exact signature is inventoried here; follow the
 void select_index(std::size_t index, bool activate, Modifier modifiers = Modifier::none)
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's select index operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `focus_index` (private)
 
@@ -404,7 +404,7 @@ Public ObjectView operation. Its exact signature is inventoried here; follow the
 void focus_index(std::size_t index)
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's focus index operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `apply_selection` (private)
 
@@ -412,7 +412,7 @@ Public ObjectView operation. Its exact signature is inventoried here; follow the
 void apply_selection(std::vector<std::string> stable_ids, std::string primary_id, std::string anchor_id, bool move_focus)
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's apply selection operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `is_selected` (private)
 
@@ -436,7 +436,7 @@ Reports the current range selection value without mutation.
 void type_select(std::string_view text)
 ```
 
-Public ObjectView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ObjectView's type select operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `paint_glyph` (private)
 

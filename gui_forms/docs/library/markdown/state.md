@@ -1,16 +1,16 @@
 # State
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 revocable-event state review**
 - Kind: **struct**
 - Hierarchy: `State`
-- Declaration: `include/gui_forms/event.hpp:127`
+- Declaration: `include/gui_forms/event/event/event.hpp:127`
 - Definition: `inline/header-only`
 
-State is a struct declared in include/gui_forms/event.hpp.
+Event::State retains the ordered slot vector and aggregate statistics independently of any individual subscription token.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

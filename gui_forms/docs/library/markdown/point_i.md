@@ -1,16 +1,16 @@
 # PointI
 
-- Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
+- Status: **OBSERVED: bundle 012 isolated integer-point declaration/definition; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `PointI`
-- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:8`
-- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
+- Declaration: `include/gui_forms/drawing/geometry/point_i/point_i.hpp:7`
+- Definition: `src/core/drawing/geometry/point_i/point_i.cpp`
 
 PointI is a signed integer pixel-coordinate pair.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

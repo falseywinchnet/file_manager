@@ -1,16 +1,16 @@
 # CompoundFieldSpec
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 property-grid editor review**
 - Kind: **struct**
 - Hierarchy: `CompoundFieldSpec`
 - Declaration: `src/controls/panel/property_grid/property_grid_utilities.hpp:13`
 - Definition: `inline/header-only`
 
-CompoundFieldSpec is a struct declared in src/controls/panel/property_grid/property_grid_utilities.hpp.
+CompoundFieldSpec assigns a stable field name and getter/setter pair to one structured property editor subfield.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -28,4 +28,4 @@ Constructs or tears down the retained CompoundFieldSpec object according to its 
 : name(authored_name), kind(authored_kind), editor(authored_editor), choices(std::move(authored_choices))
 ```
 
-Public CompoundFieldSpec operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CompoundFieldSpec's name operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

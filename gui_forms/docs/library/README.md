@@ -1,12 +1,21 @@
 # GUI.Forms library atlas
 
-Status: **OBSERVED generated inventory; detailed documentation and verified
-Screen Sharing crops advance bundle by bundle**.
+Status: **OBSERVED complete 470-type/147-enum declaration inventory with 617
+HTML and 617 Markdown pages, reviewed type narratives, declaration-derived
+method explanations, zero grouped migration records, and verified Screen
+Sharing evidence for every visual surface**.
+
+The completion audit classifies 146 types as isolated per type, 321 as
+intentionally header-only or state-machine-distributed contracts, and three as
+demo composition. Among visual declarations, only the foundational `Control`
+(deliberately split by retained state machine) and demo-only `GalleryControl`
+are not exact per-type translation units.
 
 Open `index.html` to navigate the iframe reference. Every generated HTML page
 has an AI-readable Markdown mirror under `markdown/`. The root navigation is
-generated from checked-in declarations; it does not claim that every inventoried
-type is complete, isolated, visually captured, or accepted architecture.
+generated from checked-in declarations. It reports isolation independently from
+API status: an atlas page is evidence of source inventory and documentation,
+not an architecture decision.
 
 Run:
 
@@ -14,10 +23,12 @@ Run:
 python3 gui_forms/tools/generate_library_docs.py
 ```
 
-The generator reads `manual.json` for reviewed explanations and capture paths.
-Pages without that review are deliberately labelled as generated inventory with
-detailed review pending. Captures belong in `captures/` and are admitted only
-after the corresponding native surface has been viewed through Screen Sharing.
+The generator reads `manual.json` for reviewed type explanations, selected
+method-specific narratives, visual classification overrides, and capture paths.
+Every discovered method still receives a signature-grounded explanation when a
+more specific hand review is unnecessary. Captures belong in `captures/` and
+are admitted only after the corresponding native surface has been viewed
+through Screen Sharing.
 The reversible bundle sequence and the evidence required to complete each
 bundle are recorded in `MIGRATION_FRONTIER.md`.
 

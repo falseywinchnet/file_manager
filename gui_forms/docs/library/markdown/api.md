@@ -1,16 +1,16 @@
 # Api
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C++ ABI wrapper review**
 - Kind: **class**
 - Hierarchy: `Api`
 - Declaration: `include/gui_forms/c_api.hpp:24`
 - Definition: `inline/header-only`
 
-Api is a class declared in include/gui_forms/c_api.hpp.
+Api negotiates ABI 0.4 once, retains the immutable function table, and translates thread-local C diagnostics into typed C++ exceptions.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

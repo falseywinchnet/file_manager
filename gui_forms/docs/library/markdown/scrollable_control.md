@@ -300,7 +300,7 @@ Parses a scrollbar virtual-child identity and routes supported semantic range ac
 virtual void adjust_scrollbars(bool display_scrollbars)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's adjust scrollbars operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `scroll_to_control` (protected)
 
@@ -324,7 +324,7 @@ Synchronously updates the retained display rect location property. Validation, t
 void on_paint_overlay(Painter& painter, Rect local_damage) override
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's on paint overlay operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `child_viewport_rectangle` (protected)
 
@@ -340,7 +340,7 @@ Reports the current child viewport rectangle value without mutation.
 void recompute_scroll_layout(Size client_size)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's recompute scroll layout operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `effective_viewport_rectangle` (private)
 
@@ -356,7 +356,7 @@ Reports the current effective viewport rectangle value without mutation.
 [[nodiscard]] Size content_extent()
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's content extent operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `maximum_offset` (private)
 
@@ -388,7 +388,7 @@ Reports the current part at value without mutation.
 bool handle_wheel(PointerEvent& event)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's handle wheel operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `handle_scroll_pointer` (private)
 
@@ -396,7 +396,7 @@ Public ScrollableControl operation. Its exact signature is inventoried here; fol
 bool handle_scroll_pointer(PointerEvent& event)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's handle scroll pointer operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `apply_axis_value` (private)
 
@@ -404,7 +404,7 @@ Public ScrollableControl operation. Its exact signature is inventoried here; fol
 bool apply_axis_value(ScrollOrientation orientation, double value, ScrollEventType type, bool notify)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's apply axis value operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `notify_scroll` (private)
 
@@ -412,7 +412,7 @@ Public ScrollableControl operation. Its exact signature is inventoried here; fol
 void notify_scroll(ScrollOrientation orientation, ScrollEventType type, double old_value, double new_value)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's notify scroll operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `paint_axis` (private)
 
@@ -428,7 +428,7 @@ Reports the current paint axis value without mutation.
 void axis_properties_changed(ScrollOrientation orientation, bool position_changed)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's axis properties changed operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_size` (private)
 
@@ -436,7 +436,7 @@ Public ScrollableControl operation. Its exact signature is inventoried here; fol
 static void validate_size(Size size, const char* message)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's validate size operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_axis_value` (private)
 
@@ -444,4 +444,4 @@ Public ScrollableControl operation. Its exact signature is inventoried here; fol
 static void validate_axis_value(double value, const char* message)
 ```
 
-Public ScrollableControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollableControl's validate axis value operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

@@ -196,7 +196,7 @@ Routes increment, decrement, and set-value through common validation and commit 
 void step(int direction)
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes NumericUpDown's step operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `commit_editor_text` (private)
 
@@ -204,7 +204,7 @@ Public NumericUpDown operation. Its exact signature is inventoried here; follow 
 void commit_editor_text()
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes NumericUpDown's commit editor text operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `synchronize_editor` (private)
 
@@ -212,7 +212,7 @@ Public NumericUpDown operation. Its exact signature is inventoried here; follow 
 void synchronize_editor()
 ```
 
-Public NumericUpDown operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes NumericUpDown's synchronize editor operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `formatted_value` (private)
 

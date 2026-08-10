@@ -1,16 +1,16 @@
 # WindowsApplicationWindow
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 Win32 session review**
 - Kind: **struct**
 - Hierarchy: `WindowsApplicationWindow`
-- Declaration: `include/gui_forms/platform/windows_host.hpp:42`
+- Declaration: `include/gui_forms/platform/windows_host.hpp:43`
 - Definition: `inline/header-only`
 
-WindowsApplicationWindow is a struct declared in include/gui_forms/platform/windows_host.hpp.
+WindowsApplicationWindow is the move-only RAII owner of one native Win32 session and retained Window projection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

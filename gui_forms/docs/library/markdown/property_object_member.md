@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 010 property member review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyObjectMember`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:99`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:43`
 - Definition: `inline/header-only`
 
 PropertyObjectMember is one inert inspectable object member with optional schema, nullability, enum, standard-value, converter, and editor metadata.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -236,7 +236,7 @@ Projects a progress role with numeric range/value and indeterminate state where 
 void on_attached_to_window() override
 ```
 
-Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ProgressBar's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detached_from_window` (protected)
 
@@ -244,7 +244,7 @@ Public ProgressBar operation. Its exact signature is inventoried here; follow th
 void on_detached_from_window() noexcept override
 ```
 
-Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ProgressBar's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `update_animation_registration` (private)
 
@@ -252,7 +252,7 @@ Public ProgressBar operation. Its exact signature is inventoried here; follow th
 void update_animation_registration()
 ```
 
-Public ProgressBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ProgressBar's update animation registration operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `animated_style` (private)
 

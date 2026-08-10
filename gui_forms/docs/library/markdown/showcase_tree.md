@@ -1,16 +1,16 @@
 # ShowcaseTree
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 demoboard-composition review**
 - Kind: **struct**
 - Hierarchy: `ShowcaseTree`
 - Declaration: `src/controls/showcase_controls.hpp:11`
 - Definition: `inline/header-only`
 
-ShowcaseTree is a struct declared in src/controls/showcase_controls.hpp.
+ShowcaseTree retains the root, navigation, content, status, and indexed board controls of the complete native showcase.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

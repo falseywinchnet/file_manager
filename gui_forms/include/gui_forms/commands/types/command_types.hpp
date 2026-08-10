@@ -28,10 +28,11 @@ struct CommandInvocation final {
 };
 
 struct CommandBindingOptions final {
-    bool synchronize_enabled{true};
     bool synchronize_text{true};
     bool synchronize_visibility{true};
     bool synchronize_accessible_description{true};
+    // Appended to preserve the established three-boolean aggregate order.
+    bool synchronize_enabled{true};
 };
 
 } // namespace gui_forms

@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 010 object value storage review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyObjectData`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:117`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:61`
 - Definition: `inline/header-only`
 
 PropertyObjectData is shared immutable type identity plus bounded ordered members.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

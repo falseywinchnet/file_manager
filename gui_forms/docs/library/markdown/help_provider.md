@@ -180,7 +180,7 @@ Returns exact mapping and request counters for diagnostics and tests.
 void verify_dispose_thread() override
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's verify dispose thread operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_dispose` (protected)
 
@@ -188,7 +188,7 @@ Public HelpProvider operation. Its exact signature is inventoried here; follow t
 void on_dispose() noexcept override
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `bound_window` (private)
 
@@ -212,7 +212,7 @@ Reports the current require access value without mutation.
 [[nodiscard]] Entry* find_entry(const Control& target)
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's find entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `find_entry` (private)
 
@@ -228,7 +228,7 @@ Reports the current find entry value without mutation.
 [[nodiscard]] Entry& require_entry(const std::shared_ptr<Control>& target)
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's require entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `entry_effective` (private)
 
@@ -244,7 +244,7 @@ Reports the current entry effective value without mutation.
 void publish_semantics(Entry& entry)
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's publish semantics operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `erase_if_empty` (private)
 
@@ -252,7 +252,7 @@ Public HelpProvider operation. Its exact signature is inventoried here; follow t
 void erase_if_empty(std::uint64_t runtime_id)
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's erase if empty operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `request_focused_help` (private)
 
@@ -260,4 +260,4 @@ Public HelpProvider operation. Its exact signature is inventoried here; follow t
 bool request_focused_help()
 ```
 
-Public HelpProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes HelpProvider's request focused help operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

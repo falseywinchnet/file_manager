@@ -1,10 +1,10 @@
 # PropertyRowSpec
 
-- Status: **OBSERVED: bundle 006 authored-row value split; M4 build and focused tests pass**
+- Status: **OBSERVED: bundle 012 isolated authored-row declaration/definition; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `PropertyRowSpec`
-- Declaration: `include/gui_forms/inspection/inspection_types.hpp:36`
-- Definition: `src/controls/inspection/inspection_types.cpp`
+- Declaration: `include/gui_forms/inspection/property_row_spec/property_row_spec.hpp:12`
+- Definition: `src/controls/inspection/property_row_spec/property_row_spec.cpp`
 
 PropertyRowSpec is the authored settings-row model: stable identity; name/value/description; stock editor/choices; validation; parent/depth disclosure; enable/required state; and reset capability.
 

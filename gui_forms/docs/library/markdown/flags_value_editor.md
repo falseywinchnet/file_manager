@@ -156,7 +156,7 @@ Maps press/expand/collapse to normal transient state changes.
 void on_detached_from_window() noexcept override
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `open_drop_down` (private)
 
@@ -164,7 +164,7 @@ Public FlagsValueEditor operation. Its exact signature is inventoried here; foll
 void open_drop_down()
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's open drop down operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `close_drop_down` (private)
 
@@ -172,7 +172,7 @@ Public FlagsValueEditor operation. Its exact signature is inventoried here; foll
 void close_drop_down()
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's close drop down operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_popup_revoked` (private)
 
@@ -180,7 +180,7 @@ Public FlagsValueEditor operation. Its exact signature is inventoried here; foll
 void on_popup_revoked()
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's on popup revoked operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `synchronize_popup` (private)
 
@@ -188,7 +188,7 @@ Public FlagsValueEditor operation. Its exact signature is inventoried here; foll
 void synchronize_popup()
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's synchronize popup operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `apply_popup_choice` (private)
 
@@ -196,4 +196,4 @@ Public FlagsValueEditor operation. Its exact signature is inventoried here; foll
 void apply_popup_choice(std::size_t popup_index, CheckState state)
 ```
 
-Public FlagsValueEditor operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes FlagsValueEditor's apply popup choice operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

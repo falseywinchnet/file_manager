@@ -10,7 +10,7 @@ ShapedFontRun owns the ordered shaped glyphs emitted by one concrete fallback fa
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -1,16 +1,16 @@
 # WindowsHostOptions
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 host-contract review**
 - Kind: **struct**
 - Hierarchy: `WindowsHostOptions`
-- Declaration: `include/gui_forms/platform/windows_host.hpp:17`
+- Declaration: `include/gui_forms/platform/windows_host.hpp:18`
 - Definition: `inline/header-only`
 
-WindowsHostOptions is a struct declared in include/gui_forms/platform/windows_host.hpp.
+WindowsHostOptions declares initial Win32 title, client geometry, display scale, instance, show state, and run policy.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "gui_forms/input_controls.hpp"
+#include "gui_forms/inspection/property_row_spec/property_row_spec.hpp"
+#include "gui_forms/inspection/types/property_editor_kind/property_editor_kind.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -10,14 +12,6 @@
 #include <vector>
 
 namespace gui_forms {
-
-enum class PropertyEditorKind : std::uint8_t {
-    read_only,
-    text,
-    choice,
-    boolean,
-    custom,
-};
 
 struct PropertyEditorRequest final {
     std::string stable_id;
@@ -31,42 +25,6 @@ struct PropertyEditorRequest final {
 struct PropertyEditorInputError final {
     std::string attempted_value;
     std::string message;
-};
-
-struct PropertyRowSpec final {
-    PropertyRowSpec() = default;
-    PropertyRowSpec(std::string authored_stable_id,
-                    std::string authored_name,
-                    std::string authored_value,
-                    std::string authored_description = {},
-                    PropertyEditorKind authored_editor =
-                        PropertyEditorKind::read_only,
-                    std::vector<std::string> authored_choices = {},
-                    std::string authored_validation = {},
-                    bool authored_enabled = true,
-                    bool authored_required = false,
-                    std::string authored_parent_id = {},
-                    std::uint8_t authored_depth = 0,
-                    bool authored_expandable = false,
-                    bool authored_expanded = false,
-                    bool authored_resettable = false,
-                    bool authored_reset_enabled = false);
-
-    std::string stable_id;
-    std::string name;
-    std::string value;
-    std::string description;
-    PropertyEditorKind editor{PropertyEditorKind::read_only};
-    std::vector<std::string> choices;
-    std::string validation_message;
-    std::string parent_id;
-    std::uint8_t depth{};
-    bool enabled{true};
-    bool required{};
-    bool expandable{};
-    bool expanded{};
-    bool resettable{};
-    bool reset_enabled{};
 };
 
 struct PropertyGroupSpec final {

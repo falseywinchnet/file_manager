@@ -200,32 +200,4 @@ void Window::flush_if_outermost() {
         ensure_layout(false);
     }
 }
-UpdateScope::~UpdateScope() {
-    close();
-}
-
-UpdateScope::UpdateScope(UpdateScope&& other) noexcept
-    : window_(std::exchange(other.window_, nullptr)) {}
-
-UpdateScope& UpdateScope::operator=(UpdateScope&& other) noexcept {
-    if (this != &other) {
-        close();
-        window_ = std::exchange(other.window_, nullptr);
-    }
-    return *this;
-}
-
-void UpdateScope::perform_layout() {
-    if (window_) {
-        window_->perform_layout();
-    }
-}
-
-void UpdateScope::close() {
-    if (window_) {
-        Window* closing = std::exchange(window_, nullptr);
-        closing->leave_update_scope();
-    }
-}
-
 } // namespace gui_forms

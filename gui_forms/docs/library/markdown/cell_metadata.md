@@ -1,16 +1,16 @@
 # CellMetadata
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 table-layout value review**
 - Kind: **struct**
 - Hierarchy: `CellMetadata`
 - Declaration: `include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp:107`
 - Definition: `inline/header-only`
 
-CellMetadata is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp.
+CellMetadata assigns a retained child to a row/column with bounded spans and exact occupancy identity.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -1,16 +1,16 @@
 # SkiaExecutor
 
-- Status: **OBSERVED: bundle 009 CPU Skia executor split; focused M4 raster/trace tests pass**
+- Status: **OBSERVED: bundle 012 hierarchy-named CPU Skia executor unit; native and MinGW M4 builds pass**
 - Kind: **class**
 - Hierarchy: `SkiaExecutor`
-- Declaration: `src/render/skia/executor/drawing_skia.hpp:53`
-- Definition: `src/render/skia/executor/drawing_skia.cpp`
+- Declaration: `src/render/skia/executor/skia_executor.hpp:53`
+- Definition: `src/render/skia/executor/skia_executor.cpp`
 
 SkiaExecutor is the private CPU-only terminal for GUI.Drawing command streams, PNG-only codecs, deterministic text metrics, owned typefaces, and thread-affine execution.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

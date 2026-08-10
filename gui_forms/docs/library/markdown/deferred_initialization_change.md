@@ -1,16 +1,16 @@
 # DeferredInitializationChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 initialization-state review**
 - Kind: **struct**
 - Hierarchy: `DeferredInitializationChange`
-- Declaration: `include/gui_forms/control.hpp:670`
+- Declaration: `include/gui_forms/control/control/control.hpp:661`
 - Definition: `inline/header-only`
 
-DeferredInitializationChange is a struct declared in include/gui_forms/control.hpp.
+DeferredInitializationChange holds one deduplicated event key and publication closure until the outermost initialization transaction commits.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

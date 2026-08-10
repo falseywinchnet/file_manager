@@ -1,16 +1,16 @@
 # LiveSurfaceRegistration
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 Window presentation-state review**
 - Kind: **struct**
 - Hierarchy: `LiveSurfaceRegistration`
-- Declaration: `include/gui_forms/window/window.hpp:619`
+- Declaration: `include/gui_forms/window/window.hpp:621`
 - Definition: `inline/header-only`
 
-LiveSurfaceRegistration is a struct declared in include/gui_forms/window/window.hpp.
+LiveSurfaceRegistration owns one source registration, wake token, frame observation, damage, and scheduled presentation state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

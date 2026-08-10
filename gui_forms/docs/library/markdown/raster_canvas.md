@@ -228,7 +228,7 @@ Projects image role plus bitmap dimensions and zoom without claiming document ed
 void on_attached_to_window() override
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes RasterCanvas's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detaching_from_window` (protected)
 
@@ -236,7 +236,7 @@ Public RasterCanvas operation. Its exact signature is inventoried here; follow t
 void on_detaching_from_window(Window& former_window) noexcept override
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes RasterCanvas's on detaching from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detached_from_window` (protected)
 
@@ -244,7 +244,7 @@ Public RasterCanvas operation. Its exact signature is inventoried here; follow t
 void on_detached_from_window() noexcept override
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes RasterCanvas's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_dispose` (protected)
 
@@ -252,7 +252,7 @@ Public RasterCanvas operation. Its exact signature is inventoried here; follow t
 void on_dispose() noexcept override
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes RasterCanvas's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `publish_full_bitmap` (private)
 
@@ -260,7 +260,7 @@ Public RasterCanvas operation. Its exact signature is inventoried here; follow t
 [[nodiscard]] bool publish_full_bitmap()
 ```
 
-Public RasterCanvas operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes RasterCanvas's publish full bitmap operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `damage_to_client` (private)
 

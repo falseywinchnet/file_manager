@@ -1,16 +1,16 @@
 # MenuStripItemSpec
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 menu-strip item review**
 - Kind: **struct**
 - Hierarchy: `MenuStripItemSpec`
 - Declaration: `include/gui_forms/controls/menu_strip/menu_strip.hpp:21`
 - Definition: `inline/header-only`
 
-MenuStripItemSpec is a struct declared in include/gui_forms/controls/menu_strip/menu_strip.hpp.
+MenuStripItemSpec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

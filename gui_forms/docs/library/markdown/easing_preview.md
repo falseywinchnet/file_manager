@@ -172,7 +172,7 @@ Projects image role, normalized phase/range, motion readout, and busy state only
 void on_attached_to_window() override
 ```
 
-Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes EasingPreview's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detached_from_window` (protected)
 
@@ -180,7 +180,7 @@ Public EasingPreview operation. Its exact signature is inventoried here; follow 
 void on_detached_from_window() noexcept override
 ```
 
-Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes EasingPreview's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `register_frames` (private)
 
@@ -188,7 +188,7 @@ Public EasingPreview operation. Its exact signature is inventoried here; follow 
 void register_frames()
 ```
 
-Public EasingPreview operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes EasingPreview's register frames operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `motion_readout` (private)
 

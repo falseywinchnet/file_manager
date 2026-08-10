@@ -1,16 +1,16 @@
 # PixelStorage
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drawing-storage review**
 - Kind: **struct**
 - Hierarchy: `PixelStorage`
 - Declaration: `src/core/drawing/support/drawing_support.hpp:20`
 - Definition: `inline/header-only`
 
-PixelStorage is a struct declared in src/core/drawing/support/drawing_support.hpp.
+PixelStorage owns aligned bitmap bytes, stride, dimensions, copy-on-write revision, damage, and active lock/edit lease state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

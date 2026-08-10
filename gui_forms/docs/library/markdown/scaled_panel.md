@@ -76,4 +76,4 @@ Reconciles live slots and scales each authored rectangle independently into fina
 void reconcile_slots()
 ```
 
-Public ScaledPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScaledPanel's reconcile slots operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

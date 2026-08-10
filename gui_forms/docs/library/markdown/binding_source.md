@@ -10,7 +10,7 @@ BindingSource owns stable rows, currency, edit snapshots, list/error events, sus
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

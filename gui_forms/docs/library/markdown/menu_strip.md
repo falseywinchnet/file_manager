@@ -196,7 +196,7 @@ Maps virtual focus, expand, collapse, and press to the normal menu coordinator.
 void on_dispose() noexcept override
 ```
 
-Public MenuStrip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MenuStrip's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `mnemonic_matches` (protected)
 
@@ -212,7 +212,7 @@ Reports the current mnemonic matches value without mutation.
 bool process_mnemonic_self(char32_t character) override
 ```
 
-Public MenuStrip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MenuStrip's process mnemonic self operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `item_bounds` (private)
 
@@ -244,7 +244,7 @@ Reports the current next enabled value without mutation.
 bool navigate_root(int direction)
 ```
 
-Public MenuStrip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MenuStrip's navigate root operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `handle_popup_pointer` (private)
 
@@ -252,7 +252,7 @@ Public MenuStrip operation. Its exact signature is inventoried here; follow the 
 bool handle_popup_pointer(const PointerEvent& event)
 ```
 
-Public MenuStrip operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MenuStrip's handle popup pointer operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `set_hot` (private)
 

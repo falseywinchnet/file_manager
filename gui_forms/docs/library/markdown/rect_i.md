@@ -1,16 +1,16 @@
 # RectI
 
-- Status: **OBSERVED: bundle 009 integer rectangle review; focused M4 tests pass**
+- Status: **OBSERVED: bundle 012 isolated integer-rectangle declaration/definition; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `RectI`
-- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:34`
-- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
+- Declaration: `include/gui_forms/drawing/geometry/rect_i/rect_i.hpp:9`
+- Definition: `src/core/drawing/geometry/rect_i/rect_i.cpp`
 
 RectI provides overflow-aware integer pixel containment, intersection, union, translation, and inflation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

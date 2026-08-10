@@ -10,7 +10,7 @@ GraphicsStateToken is the nonzero exact LIFO identity of one saved recorder stat
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

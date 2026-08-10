@@ -1,10 +1,10 @@
 # UpdateScope
 
-- Status: **OBSERVED: bundle 007 lifecycle transaction split; M4 build and focused tests pass**
+- Status: **OBSERVED: bundle 012 isolated update-transaction state owner; native and MinGW M4 builds pass**
 - Kind: **class**
 - Hierarchy: `UpdateScope`
-- Declaration: `include/gui_forms/window/window.hpp:678`
-- Definition: `src/core/window/lifecycle/window_lifecycle.cpp`
+- Declaration: `include/gui_forms/window/update_scope/update_scope.hpp:9`
+- Definition: `src/core/window/update_scope/update_scope.cpp`
 
 UpdateScope is the move-only RAII token for one Window update-depth level; it guarantees balanced close and makes an explicit layout barrier available without opening a nested native loop.
 

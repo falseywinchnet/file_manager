@@ -10,7 +10,7 @@ TextStoreLimits bounds retained UTF-8 bytes and style-span cardinality before mu
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

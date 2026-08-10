@@ -3,7 +3,7 @@
 - Status: **OBSERVED: bundle 006 event value split; M4 build and focused tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyGroupChange`
-- Declaration: `include/gui_forms/inspection/inspection_types.hpp:86`
+- Declaration: `include/gui_forms/inspection/inspection_types.hpp:44`
 - Definition: `inline/header-only`
 
 PropertyGroupChange carries stable group identity and committed disclosure state.

@@ -10,7 +10,7 @@ HarfBuzzFontEngine owns bounded FreeType faces and HarfBuzz shaping state behind
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

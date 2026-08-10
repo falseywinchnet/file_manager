@@ -10,7 +10,7 @@ FontFallbackMatch identifies an admitted face and the exact scalar prefix it cov
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -10,7 +10,7 @@ CallbackState is the revocable weak callback indirection whose owner pointer is 
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

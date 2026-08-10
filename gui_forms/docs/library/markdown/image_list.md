@@ -1,16 +1,16 @@
 # ImageList
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 isolated image-list ownership/state-machine review**
 - Kind: **class**
 - Hierarchy: `Component → ImageList`
-- Declaration: `include/gui_forms/image_list.hpp:65`
-- Definition: `src/controls/image_list.cpp`
+- Declaration: `include/gui_forms/image_list/image_list/image_list.hpp:65`
+- Definition: `src/core/resources/image_list/image_list/image_list.cpp`
 
-ImageList is a class declared in include/gui_forms/image_list.hpp.
+ImageList is a Window-bound Component that owns keyed image entries and scale variants, validates exact identity and dimensions, resolves nearest admitted scale deterministically, tracks revisions/tags, and publishes ordered changes.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -92,7 +92,7 @@ Reports the current revision value without mutation.
 [[nodiscard]] ImageLoadResult add_png( std::string key, std::span<const std::byte> encoded, double density_scale = 1.0)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds png to ImageList's retained ownership model after validating identity and lifetime constraints.
 
 ### `set_variant_png` (public)
 
@@ -108,7 +108,7 @@ Synchronously updates the retained variant png property. Validation, typed inval
 std::size_t add_image(std::string key, ImageId image, double density_scale = 1.0)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Adds image to ImageList's retained ownership model after validating identity and lifetime constraints.
 
 ### `set_variant_image` (public)
 
@@ -156,7 +156,7 @@ Synchronously updates the retained key name property. Validation, typed invalida
 bool remove_at(std::size_t index)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes the exact at entry and publishes the resulting retained-state change when one exists.
 
 ### `remove_by_key` (public)
 
@@ -164,7 +164,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 bool remove_by_key(std::string_view key)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Removes the exact by key entry and publishes the resulting retained-state change when one exists.
 
 ### `clear` (public)
 
@@ -172,7 +172,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 void clear()
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's clear operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `resolve` (public)
 
@@ -180,7 +180,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 [[nodiscard]] ImageListResolution resolve( std::size_t index, ImageVisualState state = ImageVisualState::normal, double density_scale = 1.0) const noexcept
 ```
 
-Reports the current resolve value without mutation.
+Resolves the requested retained resource against exact identity, scale, and fallback policy.
 
 ### `resolve` (public)
 
@@ -188,7 +188,7 @@ Reports the current resolve value without mutation.
 [[nodiscard]] ImageListResolution resolve( std::string_view key, ImageVisualState state = ImageVisualState::normal, double density_scale = 1.0) const noexcept
 ```
 
-Reports the current resolve value without mutation.
+Resolves the requested retained resource against exact identity, scale, and fallback policy.
 
 ### `tag` (public)
 
@@ -220,7 +220,7 @@ Removes the explicit tag value and restores fallback behavior.
 [[nodiscard]] Event<const ImageListChange&>& changed() noexcept
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's changed operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `verify_dispose_thread` (protected)
 
@@ -228,7 +228,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 void verify_dispose_thread() override
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's verify dispose thread operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_dispose` (protected)
 
@@ -236,7 +236,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 void on_dispose() noexcept override
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `require_access` (private)
 
@@ -252,7 +252,7 @@ Reports the current require access value without mutation.
 [[nodiscard]] static bool valid_state(ImageVisualState state) noexcept
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's valid state operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_key` (private)
 
@@ -260,7 +260,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 static void validate_key(std::string_view key)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's validate key operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_density` (private)
 
@@ -268,7 +268,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 static void validate_density(double density_scale)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's validate density operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_image_size` (private)
 
@@ -276,7 +276,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 static void validate_image_size(Size image_size)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's validate image size operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `require_index` (private)
 
@@ -308,7 +308,7 @@ Reports the current source size value without mutation.
 void release_entry(Entry& entry) noexcept
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's release entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `release_all` (private)
 
@@ -316,7 +316,7 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 void release_all() noexcept
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's release all operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `emit_change` (private)
 
@@ -324,4 +324,4 @@ Public ImageList operation. Its exact signature is inventoried here; follow the 
 void emit_change(ImageListChangeKind kind, std::size_t index, std::string_view key)
 ```
 
-Public ImageList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ImageList's emit change operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

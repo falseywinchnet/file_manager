@@ -1,16 +1,16 @@
 # TreeSelectionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 tree event review**
 - Kind: **struct**
 - Hierarchy: `TreeSelectionChange`
 - Declaration: `include/gui_forms/controls/panel/tree_view/tree_view.hpp:27`
 - Definition: `inline/header-only`
 
-TreeSelectionChange is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp.
+TreeSelectionChange reports previous/current optional node identities and interaction source.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

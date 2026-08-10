@@ -1,16 +1,16 @@
 # RectF
 
-- Status: **OBSERVED: bundle 009 logical rectangle review; focused M4 tests pass**
+- Status: **OBSERVED: bundle 012 isolated logical-rectangle declaration/definition; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `RectF`
-- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:62`
-- Definition: `src/core/drawing/geometry/drawing_geometry.cpp`
+- Declaration: `include/gui_forms/drawing/geometry/rect_f/rect_f.hpp:7`
+- Definition: `src/core/drawing/geometry/rect_f/rect_f.cpp`
 
 RectF provides validated finite logical containment, intersection, union, translation, and inflation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -4,7 +4,7 @@
 - Kind: **class / visual retained control**
 - Hierarchy: `Control → CalendarPopup`
 - Declaration: `src/controls/panel/date_time_picker/calendar_popup/calendar_popup.hpp:19`
-- Definition: `inline/header-only`
+- Definition: `src/controls/panel/date_time_picker/calendar_popup/calendar_popup.cpp`
 
 CalendarPopup is DateTimePicker's source-private retained month grid. It owns displayed month, constrained candidate selection, pointer/keyboard navigation, commit/cancel events, stable virtual day identities, and calendar semantics while the picker retains final value authority.
 
@@ -13,6 +13,14 @@ CalendarPopup is DateTimePicker's source-private retained month grid. It owns di
 ![CalendarPopup](../captures/date_time_picker.png)
 
 ## Declared methods
+
+### `~CalendarPopup` (public)
+
+```cpp
+~CalendarPopup() override
+```
+
+Releases the source-private popup through its isolated translation-unit boundary.
 
 ### `CalendarPopup` (public)
 
@@ -116,7 +124,7 @@ Reports the current cell at value without mutation.
 void move_selection(int days)
 ```
 
-Public CalendarPopup operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CalendarPopup's move selection operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `month_candidate` (private)
 
@@ -140,7 +148,7 @@ Reports the current can change month value without mutation.
 void change_month(int direction)
 ```
 
-Public CalendarPopup operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CalendarPopup's change month operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `date_stable_id` (private)
 
@@ -156,4 +164,4 @@ Reports the current date stable id value without mutation.
 [[nodiscard]] static std::string iso_date(DateTimeValue date)
 ```
 
-Public CalendarPopup operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CalendarPopup's iso date operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

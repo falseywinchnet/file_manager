@@ -300,4 +300,4 @@ Projects a named property grid with selection count and included descendant edit
 void on_dispose() noexcept override
 ```
 
-Public PropertyGrid operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes PropertyGrid's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

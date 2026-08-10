@@ -10,7 +10,7 @@ DisplayCommand is the closed renderer-neutral storage record for one Painter ope
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

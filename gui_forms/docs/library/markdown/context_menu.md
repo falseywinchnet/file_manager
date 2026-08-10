@@ -116,7 +116,7 @@ Returns the event published when root transient ownership opens or closes.
 void on_dispose() noexcept override
 ```
 
-Public ContextMenu operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ContextMenu's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `set_root_navigation_handler` (private)
 

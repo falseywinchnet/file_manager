@@ -324,7 +324,7 @@ Routes virtual selection, expansion, collapse, and press through ordinary retain
 void on_detached_from_window() noexcept override
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `item_index` (private)
 
@@ -444,7 +444,7 @@ Reports the current capture anchor value without mutation.
 void restore_anchor(ScrollAnchor anchor)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's restore anchor operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `clamp_scroll_offset` (private)
 
@@ -452,7 +452,7 @@ Public CorrespondenceView operation. Its exact signature is inventoried here; fo
 void clamp_scroll_offset() noexcept
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's clamp scroll offset operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `ensure_visible` (private)
 
@@ -460,7 +460,7 @@ Public CorrespondenceView operation. Its exact signature is inventoried here; fo
 void ensure_visible(std::size_t index)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's ensure visible operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `focus_index` (private)
 
@@ -468,7 +468,7 @@ Public CorrespondenceView operation. Its exact signature is inventoried here; fo
 void focus_index(std::size_t index, CorrespondenceExpansionReason reason)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's focus index operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `set_hovered_index` (private)
 
@@ -484,7 +484,7 @@ Synchronously updates the retained hovered index property. Validation, typed inv
 void schedule_hover_intent(std::size_t index)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's schedule hover intent operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `clear_hover_intent` (private)
 
@@ -500,7 +500,7 @@ Removes the explicit hover intent value and restores fallback behavior.
 void apply_hover_expansion(std::string stable_id)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's apply hover expansion operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `emit_expansion_delta` (private)
 
@@ -508,7 +508,7 @@ Public CorrespondenceView operation. Its exact signature is inventoried here; fo
 void emit_expansion_delta(std::string_view stable_id, bool before, bool after, CorrespondenceExpansionReason reason)
 ```
 
-Public CorrespondenceView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes CorrespondenceView's emit expansion delta operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `paint_glyph` (private)
 

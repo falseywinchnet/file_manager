@@ -1,16 +1,16 @@
 # gf_property_descriptor_v1
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C ABI property review**
 - Kind: **struct**
 - Hierarchy: `gf_property_descriptor_v1`
 - Declaration: `include/gui_forms/c_api.h:156`
 - Definition: `inline/header-only`
 
-gf_property_descriptor_v1 is a struct declared in include/gui_forms/c_api.h.
+gf_property_descriptor_v1 is a size-versioned inert schema record for name/category/description/type/default/range/enum/converter/editor policy.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

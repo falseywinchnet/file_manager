@@ -1,16 +1,16 @@
 # gf_string_view
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C ABI record review**
 - Kind: **struct**
 - Hierarchy: `gf_string_view`
 - Declaration: `include/gui_forms/c_api.h:60`
 - Definition: `inline/header-only`
 
-gf_string_view is a struct declared in include/gui_forms/c_api.h.
+gf_string_view is a non-owning bounded byte view; operations validate null/size and UTF-8 rules before copying.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

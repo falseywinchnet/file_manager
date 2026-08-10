@@ -268,7 +268,7 @@ Reports the current index of value without mutation.
 void select_relative(int delta)
 ```
 
-Public TabControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TabControl's select relative operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `remember_page_focus` (private)
 
@@ -276,7 +276,7 @@ Public TabControl operation. Its exact signature is inventoried here; follow the
 void remember_page_focus(const std::shared_ptr<TabPage>& page)
 ```
 
-Public TabControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TabControl's remember page focus operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `restore_page_focus` (private)
 
@@ -284,7 +284,7 @@ Public TabControl operation. Its exact signature is inventoried here; follow the
 void restore_page_focus(const std::shared_ptr<TabPage>& page, bool selection_owned_focus)
 ```
 
-Public TabControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TabControl's restore page focus operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `reconcile_pages` (private)
 
@@ -292,4 +292,4 @@ Public TabControl operation. Its exact signature is inventoried here; follow the
 void reconcile_pages()
 ```
 
-Public TabControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TabControl's reconcile pages operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

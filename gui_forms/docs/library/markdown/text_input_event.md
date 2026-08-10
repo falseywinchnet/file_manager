@@ -1,16 +1,16 @@
 # TextInputEvent
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 normalized-input review**
 - Kind: **struct**
 - Hierarchy: `TextInputEvent`
-- Declaration: `include/gui_forms/events.hpp:133`
+- Declaration: `include/gui_forms/events/input_events/input_events.hpp:133`
 - Definition: `inline/header-only`
 
-TextInputEvent is a struct declared in include/gui_forms/events.hpp.
+TextInputEvent owns UTF-8 text or composition payload plus replacement range and mutable handled state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

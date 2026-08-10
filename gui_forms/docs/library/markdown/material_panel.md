@@ -68,7 +68,7 @@ Returns exact material shadow/border overflow for damage and composition.
 void on_attached_to_window() override
 ```
 
-Public MaterialPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MaterialPanel's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_window_images` (private)
 

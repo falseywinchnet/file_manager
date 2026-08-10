@@ -3,10 +3,10 @@
 <title>PropertyRowSpec · GUI.Forms</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131822'/%3E%3Cpath d='M17 18h30v8H25v12h18v8H25v10h-8z' fill='%236ee7c8'/%3E%3C/svg%3E"><link rel="stylesheet" href="../assets/page.css"></head>
 <body><article><header><p class="eyebrow">struct · library</p>
 <h1>PropertyRowSpec</h1><p class="summary">PropertyRowSpec is the authored settings-row model: stable identity; name/value/description; stock editor/choices; validation; parent/depth disclosure; enable/required state; and reset capability.</p>
-<div class="badges"><span>OBSERVED: bundle 006 authored-row value split; M4 build and focused tests pass</span><span>grouped migration pending</span></div></header>
+<div class="badges"><span>OBSERVED: bundle 012 isolated authored-row declaration/definition; native and MinGW M4 builds pass</span><span>isolated per type</span></div></header>
 <section><h2>Visual evidence</h2><figure><img src="../captures/property_grid.png" alt="PropertyRowSpec control capture"><figcaption>M4 Complete Showcase crop showing PropertyList rows represented by stable identity, text, editor, hierarchy, validation, and reset policy.</figcaption></figure></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>PropertyRowSpec</dd>
-<dt>Declaration</dt><dd>include/gui_forms/inspection/inspection_types.hpp:36</dd><dt>Definition</dt><dd>src/controls/inspection/inspection_types.cpp</dd></dl></section>
+<dt>Declaration</dt><dd>include/gui_forms/inspection/property_row_spec/property_row_spec.hpp:12</dd><dt>Definition</dt><dd>src/controls/inspection/property_row_spec/property_row_spec.cpp</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>PropertyRowSpec <span class="access">public</span></h3><code>PropertyRowSpec() = default</code><p>Default-constructs an empty row or constructs the complete authored row model from explicitly named fields.</p></section><section class="method"><h3>PropertyRowSpec <span class="access">public</span></h3><code>PropertyRowSpec(std::string authored_stable_id, std::string authored_name, std::string authored_value, std::string authored_description =</code><p>Default-constructs an empty row or constructs the complete authored row model from explicitly named fields.</p></section></section>
 <footer><a href="../markdown/property_row_spec.md">AI-readable Markdown source</a></footer>
 </article></body></html>

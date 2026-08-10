@@ -1,16 +1,16 @@
 # ObjectContextRequest
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 object-view context review**
 - Kind: **struct**
 - Hierarchy: `ObjectContextRequest`
 - Declaration: `include/gui_forms/controls/panel/object_view/object_view.hpp:53`
 - Definition: `inline/header-only`
 
-ObjectContextRequest is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp.
+ObjectContextRequest carries the selected identity and local/window anchor geometry for one context-surface request.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

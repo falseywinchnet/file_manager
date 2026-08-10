@@ -1,16 +1,16 @@
 # AnimationTimeline
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 isolated animation state-machine review**
 - Kind: **class**
 - Hierarchy: `AnimationTimeline`
-- Declaration: `include/gui_forms/animation.hpp:86`
-- Definition: `src/core/animation.cpp`
+- Declaration: `include/gui_forms/animation/animation_timeline/animation_timeline.hpp:86`
+- Definition: `src/core/animation/animation_timeline/animation_timeline.cpp`
 
-AnimationTimeline is a class declared in include/gui_forms/animation.hpp.
+AnimationTimeline validates one specification and deterministically transitions stopped, running, and paused time into iteration-aware eased samples.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -52,7 +52,7 @@ Reports the current specification value without mutation.
 void start(FrameTime start_time) noexcept
 ```
 
-Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transitions AnimationTimeline into its active state while preserving accumulated state.
 
 ### `pause` (public)
 
@@ -60,7 +60,7 @@ Public AnimationTimeline operation. Its exact signature is inventoried here; fol
 void pause(FrameTime pause_time) noexcept
 ```
 
-Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Suspends AnimationTimeline's active progression without discarding its current position.
 
 ### `resume` (public)
 
@@ -68,7 +68,7 @@ Public AnimationTimeline operation. Its exact signature is inventoried here; fol
 void resume(FrameTime resume_time) noexcept
 ```
 
-Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Transitions AnimationTimeline into its active state while preserving accumulated state.
 
 ### `stop` (public)
 
@@ -76,7 +76,7 @@ Public AnimationTimeline operation. Its exact signature is inventoried here; fol
 void stop() noexcept
 ```
 
-Public AnimationTimeline operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Returns AnimationTimeline to its stopped baseline and clears active progression.
 
 ### `running` (public)
 

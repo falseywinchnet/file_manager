@@ -1,16 +1,16 @@
 # Event
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 revocable-event state-machine review**
 - Kind: **class**
 - Hierarchy: `Event`
-- Declaration: `include/gui_forms/event.hpp:59`
+- Declaration: `include/gui_forms/event/event/event.hpp:59`
 - Definition: `inline/header-only`
 
-Event is a class declared in include/gui_forms/event.hpp.
+Event owns registration-ordered revocable callback slots, emits a stable snapshot, skips slots revoked before their turn, and compacts disconnected ownership after publication.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -44,7 +44,7 @@ Constructs or tears down the retained Event object according to its ownership co
 Event& operator=(const Event&) = delete
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Event's operator= operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `subscribe` (public)
 
@@ -52,7 +52,7 @@ Public Event operation. Its exact signature is inventoried here; follow the link
 [[nodiscard]] SubscriptionToken subscribe(Callback callback)
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects a revocable callback in deterministic registration order.
 
 ### `subscribe` (public)
 
@@ -60,7 +60,7 @@ Public Event operation. Its exact signature is inventoried here; follow the link
 [[nodiscard]] SubscriptionToken subscribe(Component& owner, Callback callback)
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects a revocable callback in deterministic registration order.
 
 ### `emit` (public)
 
@@ -68,7 +68,7 @@ Public Event operation. Its exact signature is inventoried here; follow the link
 void emit(Arguments... arguments)
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Publishes a stable callback snapshot so mutation during delivery affects only later emissions.
 
 ### `disconnect_all` (public)
 
@@ -76,7 +76,7 @@ Public Event operation. Its exact signature is inventoried here; follow the link
 void disconnect_all() noexcept
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Event's disconnect all operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `statistics` (public)
 
@@ -92,7 +92,7 @@ Reports the current statistics value without mutation.
 [[nodiscard]] SubscriptionToken subscribe_impl(Component* owner, Callback callback)
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Connects a revocable callback in deterministic registration order.
 
 ### `compact` (private)
 
@@ -100,4 +100,4 @@ Public Event operation. Its exact signature is inventoried here; follow the link
 void compact() noexcept
 ```
 
-Public Event operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Event's compact operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

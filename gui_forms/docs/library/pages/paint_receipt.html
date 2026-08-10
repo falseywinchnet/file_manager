@@ -4,7 +4,7 @@
 <body><article><header><p class="eyebrow">struct · library</p>
 <h1>PaintReceipt</h1><p class="summary">PaintReceipt proves that one complete retained transaction replayed into a host backing surface at a specific content revision and surface epoch.</p>
 <div class="badges"><span>OBSERVED: bundle 008 presentation acknowledgement review; focused M4 tests pass</span><span>header-only or distributed</span></div></header>
-<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Visual evidence</h2><p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>PaintReceipt</dd>
 <dt>Declaration</dt><dd>include/gui_forms/window/presentation/presentation_types.hpp:63</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>operatorbool <span class="access">public</span></h3><code>[[nodiscard]] explicit constexpr operator bool() const noexcept</code><p>Accepts a receipt as structurally present only when both its rendered revision and surface epoch are nonzero.</p></section><section class="method"><h3>operator&lt;=&gt; <span class="access">public</span></h3><code>friend constexpr auto operator&lt;=&gt;(const PaintReceipt&amp;, const PaintReceipt&amp;) = default</code><p>Orders and compares receipts by their exact revision-and-epoch identity.</p></section></section>

@@ -1,16 +1,16 @@
 # MenuStripInvocation
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 menu-strip invocation review**
 - Kind: **struct**
 - Hierarchy: `MenuStripInvocation`
 - Declaration: `include/gui_forms/controls/menu_strip/menu_strip.hpp:29`
 - Definition: `inline/header-only`
 
-MenuStripInvocation is a struct declared in include/gui_forms/controls/menu_strip/menu_strip.hpp.
+MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

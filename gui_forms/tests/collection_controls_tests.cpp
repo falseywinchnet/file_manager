@@ -390,6 +390,13 @@ void test_shared_command_binding() {
     local_command->set_enabled(true);
     require(!local_button->enabled(),
             "command bindings may preserve locally managed enabled state");
+
+    const CommandBindingOptions legacy_aggregate{false, true, true};
+    require(!legacy_aggregate.synchronize_text &&
+                legacy_aggregate.synchronize_visibility &&
+                legacy_aggregate.synchronize_accessible_description &&
+                legacy_aggregate.synchronize_enabled,
+            "new command options must preserve the established aggregate field order");
 }
 
 std::vector<CorrespondenceItem> correspondence_fixture(std::size_t count) {

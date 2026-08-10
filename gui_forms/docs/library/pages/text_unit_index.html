@@ -4,7 +4,7 @@
 <body><article><header><p class="eyebrow">class · library</p>
 <h1>TextUnitIndex</h1><p class="summary">TextUnitIndex prevents accidental mixing of byte, UTF-16, scalar, grapheme, and line coordinate systems.</p>
 <div class="badges"><span>OBSERVED: bundle 009 strongly typed text index review; focused M4 tests pass</span><span>header-only or distributed</span></div></header>
-<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Visual evidence</h2><p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>TextUnitIndex</dd>
 <dt>Declaration</dt><dd>include/gui_forms/text/types/text_types.hpp:10</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>TextUnitIndex <span class="access">public</span></h3><code>explicit constexpr TextUnitIndex(std::size_t value = 0) noexcept : value_(value)</code><p>Constructs an explicit index from a unit count.</p></section><section class="method"><h3>value <span class="access">public</span></h3><code>[[nodiscard]] constexpr std::size_t value() const noexcept</code><p>Returns the stored unit count.</p></section><section class="method"><h3>operator&lt;=&gt; <span class="access">public</span></h3><code>friend constexpr auto operator&lt;=&gt;(const TextUnitIndex&amp;, const TextUnitIndex&amp;) = default</code><p>Orders indices only within the same tagged coordinate system.</p></section></section>

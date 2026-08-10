@@ -1,16 +1,16 @@
 # GalleryContext
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit**
 - Kind: **class**
 - Hierarchy: `GalleryContext`
-- Declaration: `src/controls/gallery_controls.hpp:13`
+- Declaration: `src/controls/gallery/context/gallery_context.hpp:11`
 - Definition: `src/controls/gallery_controls.cpp`
 
-GalleryContext is a class declared in src/controls/gallery_controls.hpp.
+GalleryContext synchronizes shared sample state across the native gallery's source-private demonstration controls.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 void synchronize(std::string_view cause)
 ```
 
-Public GalleryContext operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes GalleryContext's synchronize operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

@@ -316,4 +316,4 @@ Maps virtual selection, expand/collapse, set-value, and reset actions through or
 void on_dispose() noexcept override
 ```
 
-Public PropertyList operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes PropertyList's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

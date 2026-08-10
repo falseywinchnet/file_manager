@@ -1,0 +1,13 @@
+#pragma once
+
+#include <cstdint>
+
+namespace gui_drawing {
+
+struct SizeI final {
+    std::int32_t width{};
+    std::int32_t height{};
+    friend constexpr bool operator==(const SizeI&, const SizeI&) = default;
+};
+
+} // namespace gui_drawing

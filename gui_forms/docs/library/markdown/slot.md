@@ -1,16 +1,16 @@
 # Slot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 revocable-event state review**
 - Kind: **struct**
 - Hierarchy: `Revocable → Slot`
-- Declaration: `include/gui_forms/event.hpp:105`
+- Declaration: `include/gui_forms/event/event/event.hpp:105`
 - Definition: `inline/header-only`
 
-Slot is a struct declared in include/gui_forms/event.hpp.
+Event::Slot owns one callback, weakly references shared event state, and guarantees idempotent disconnection plus exact statistics.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -28,7 +28,7 @@ Constructs or tears down the retained Slot object according to its ownership con
 void disconnect() noexcept override
 ```
 
-Public Slot operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Slot's disconnect operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `connected` (public)
 

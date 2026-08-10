@@ -1,18 +1,26 @@
 # FieldControl
 
-- Status: **OBSERVED: bundle 010 private ABI Unicode field state-machine split; native and MinGW ABI builds pass**
+- Status: **OBSERVED: bundle 013 per-adapter Unicode field state-machine isolation; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `Panel → FieldControl`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:129`
-- Definition: `inline/header-only`
+- Declaration: `src/abi/control_adapters/field_control/field_control.hpp:11`
+- Definition: `src/abi/control_adapters/field_control/field_control.cpp`
 
 FieldControl owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated Unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![FieldControl](../captures/text_input_screen.png)
 
 ## Declared methods
+
+### `~FieldControl` (public)
+
+```cpp
+~FieldControl() override
+```
+
+Releases field text, history, shaping, and event state through its isolated translation-unit boundary.
 
 ### `FieldControl` (public)
 

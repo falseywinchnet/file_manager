@@ -1,7 +1,9 @@
 #pragma once
 
 #include "gui_forms/drawing/color/color.hpp"
+#include "gui_forms/drawing/image_snapshot/image_snapshot.hpp"
 #include "gui_forms/drawing/matrix/matrix.hpp"
+#include "gui_forms/drawing/types/pixel_format/pixel_format.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -29,30 +31,11 @@ enum class PixelOffsetMode : std::uint8_t { default_mode, high_speed, high_quali
 enum class CompositingMode : std::uint8_t { source_over, source_copy };
 enum class CompositingQuality : std::uint8_t { default_mode, high_speed, high_quality, gamma_corrected, assume_linear };
 enum class FillMode : std::uint8_t { alternate, winding };
-enum class PixelFormat : std::uint8_t { bgra32_premultiplied, rgba32_premultiplied };
 enum class WrapMode : std::uint8_t { tile, tile_flip_x, tile_flip_y, tile_flip_xy, clamp };
 enum class HatchStyle : std::uint8_t {
     horizontal, vertical, forward_diagonal, backward_diagonal,
     cross, diagonal_cross,
 };
-struct PixelStorage;
-
-struct ImageSnapshot final {
-    std::uint64_t stable_id{};
-    std::uint32_t width{};
-    std::uint32_t height{};
-    PixelFormat pixel_format{PixelFormat::bgra32_premultiplied};
-    std::uint64_t generation{};
-
-    [[nodiscard]] bool has_pixels() const noexcept;
-    [[nodiscard]] std::size_t row_bytes() const noexcept;
-    [[nodiscard]] std::span<const std::byte> pixels() const noexcept;
-
-private:
-    std::shared_ptr<const PixelStorage> storage_;
-    friend class Bitmap;
-};
-
 enum class BrushKind : std::uint8_t {
     solid,
     hatch,

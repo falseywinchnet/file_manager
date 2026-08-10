@@ -60,7 +60,7 @@ Returns the number of committed attachment epochs, including reattachment after 
 void on_attached_to_window() override
 ```
 
-Public UserControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes UserControl's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_attachment_committed` (protected)
 
@@ -68,7 +68,7 @@ Public UserControl operation. Its exact signature is inventoried here; follow th
 void on_attachment_committed() noexcept override
 ```
 
-Public UserControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes UserControl's on attachment committed operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detached_from_window` (protected)
 
@@ -76,4 +76,4 @@ Public UserControl operation. Its exact signature is inventoried here; follow th
 void on_detached_from_window() noexcept override
 ```
 
-Public UserControl operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes UserControl's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

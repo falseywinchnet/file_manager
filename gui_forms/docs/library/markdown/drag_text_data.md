@@ -1,16 +1,16 @@
 # DragTextData
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drag-contract review**
 - Kind: **struct**
 - Hierarchy: `DragTextData`
-- Declaration: `include/gui_forms/events.hpp:177`
+- Declaration: `include/gui_forms/events/input_events/input_events.hpp:177`
 - Definition: `inline/header-only`
 
-DragTextData is a struct declared in include/gui_forms/events.hpp.
+DragTextData owns one validated UTF-8 text payload.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -18,6 +18,8 @@ using namespace date_time_detail;
 
 class CalendarPopup final : public Control {
 public:
+    ~CalendarPopup() override;
+
     CalendarPopup(StableId stable_id, DateTimeValue selected,
                   DateTimeValue minimum, DateTimeValue maximum,
                   DateTimeFormatProvider provider, BasicControlStyle style)

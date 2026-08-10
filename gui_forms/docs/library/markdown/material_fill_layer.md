@@ -1,10 +1,10 @@
 # MaterialFillLayer
 
-- Status: **OBSERVED: bundle 009 surface-material value split; focused M4 tests pass**
+- Status: **OBSERVED: bundle 012 isolated material-fill declaration/definition; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `MaterialFillLayer`
-- Declaration: `include/gui_forms/surface_material/types/surface_material_types.hpp:21`
-- Definition: `src/core/theme/theme/theme.cpp`
+- Declaration: `include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp:22`
+- Definition: `src/core/surface_material/material_fill_layer/material_fill_layer.cpp`
 
 MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.
 

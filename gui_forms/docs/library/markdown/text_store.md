@@ -10,7 +10,7 @@ TextStore is renderer-neutral contiguous UTF-8 storage with typed UTF-8/UTF-16/s
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

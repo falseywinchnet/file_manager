@@ -1,16 +1,16 @@
 # gd_matrix
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drawing C ABI transform review**
 - Kind: **struct**
 - Hierarchy: `gd_matrix`
 - Declaration: `include/gui_forms/drawing_c_api.h:71`
 - Definition: `inline/header-only`
 
-gd_matrix is a struct declared in include/gui_forms/drawing_c_api.h.
+gd_matrix projects the six coefficients of a 2D affine transform.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 010 executable property registration review; focused M4 binding tests pass**
 - Kind: **struct**
 - Hierarchy: `PropertyRegistration`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:258`
+- Declaration: `include/gui_forms/binding/value/binding_value.hpp:202`
 - Definition: `inline/header-only`
 
 PropertyRegistration privately couples an inert descriptor to explicit getter, setter, change, reset, serialization, and origin callbacks registered by a retained Control.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

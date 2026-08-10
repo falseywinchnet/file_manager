@@ -1,16 +1,16 @@
 # DamageRegion
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 bounded-damage state-machine review**
 - Kind: **class**
 - Hierarchy: `DamageRegion`
-- Declaration: `include/gui_forms/types.hpp:239`
-- Definition: `src/core/types.cpp`
+- Declaration: `include/gui_forms/types/damage_region/damage_region.hpp:12`
+- Definition: `src/core/types/damage_region/damage_region.cpp`
 
-DamageRegion is a class declared in include/gui_forms/types.hpp.
+DamageRegion incrementally merges exact rectangular unions, preserves disjoint damage up to 64 rectangles, then collapses to one bound with explicit compaction/collapse telemetry.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 void add(Rect rect)
 ```
 
-Public DamageRegion operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DamageRegion's add operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `clear` (public)
 
@@ -28,7 +28,7 @@ Public DamageRegion operation. Its exact signature is inventoried here; follow t
 void clear() noexcept
 ```
 
-Public DamageRegion operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DamageRegion's clear operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `empty` (public)
 

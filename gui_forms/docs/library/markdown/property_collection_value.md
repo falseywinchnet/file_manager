@@ -1,16 +1,16 @@
 # PropertyCollectionValue
 
-- Status: **OBSERVED: bundle 010 property collection handle review; focused M4 binding tests pass**
+- Status: **OBSERVED: bundle 012 isolated property-collection handle; native and MinGW M4 builds pass**
 - Kind: **class**
 - Hierarchy: `PropertyCollectionValue`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:73`
-- Definition: `src/core/binding/value/binding_value.cpp`
+- Declaration: `include/gui_forms/binding/value/property_collection_value/property_collection_value.hpp:15`
+- Definition: `src/core/binding/value/property_collection_value/property_collection_value.cpp`
 
 PropertyCollectionValue is a cheap immutable shared handle over a validated bounded homogeneous property sequence.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

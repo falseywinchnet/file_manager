@@ -733,16 +733,35 @@ int main() {
     require(product->request_focus(property_name),
             "session Name property must accept focus");
     property_name->select_all();
-    require(product->dispatch_text({"File Manager"}) &&
-                product->dispatch_key({gui_forms::KeyAction::down,
-                                       gui_forms::PhysicalKey::enter}) &&
-                property_name->text() == "Facade Study.png" &&
-                property_name->accessible_description().find("already exists") !=
-                    std::string::npos &&
-                std::dynamic_pointer_cast<gui_forms::Label>(
-                    product->find("fm.status.authority"))->text().find(
-                    "rename rejected") != std::string::npos,
-            "duplicate session rename must roll back with inline accessible validation");
+    require(product->dispatch_text({"File Manager"}),
+            "duplicate session rename text input must be handled");
+    require(product->dispatch_key({gui_forms::KeyAction::down,
+                                   gui_forms::PhysicalKey::enter}),
+            "duplicate session rename Enter commit must be handled");
+    const gui_forms::EventStatistics rename_commit_statistics =
+        property_list->value_committed().statistics();
+    require(property_name->text() == "Facade Study.png",
+            std::string("duplicate session rename must restore the previous editor value; actual: ") +
+                std::string(property_name->text()) + "; model: " +
+                property_list->value("fm.property.name").value_or("<missing>") +
+                "; accessible: " + property_name->accessible_description() +
+                "; status: " + std::dynamic_pointer_cast<gui_forms::Label>(
+                    product->find("fm.status.authority"))->text() +
+                "; connected/emitted/disconnected: " +
+                std::to_string(rename_commit_statistics.subscriptions_connected) + "/" +
+                std::to_string(rename_commit_statistics.callbacks_emitted) + "/" +
+                std::to_string(rename_commit_statistics.subscriptions_disconnected) +
+                "; selection count/id: " +
+                std::to_string(objects->selected_ids().size()) + "/" +
+                std::string(objects->selected_id()));
+    require(property_name->accessible_description().find("already exists") !=
+                std::string::npos,
+            "duplicate session rename must publish inline accessible validation; actual: " +
+                property_name->accessible_description());
+    require(std::dynamic_pointer_cast<gui_forms::Label>(
+                product->find("fm.status.authority"))->text().find(
+                "rename rejected") != std::string::npos,
+            "duplicate session rename must publish status authority rejection");
     property_name->select_all();
     require(product->dispatch_text({"Facade Final.png"}) &&
                 product->dispatch_key({gui_forms::KeyAction::down,

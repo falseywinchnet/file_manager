@@ -1,16 +1,16 @@
 # MenuSnapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 menu-state review**
 - Kind: **struct**
 - Hierarchy: `MenuSnapshot`
 - Declaration: `src/controls/menu/menu_utilities.hpp:22`
 - Definition: `inline/header-only`
 
-MenuSnapshot is a struct declared in src/controls/menu/menu_utilities.hpp.
+MenuSnapshot captures one menu item's enabled/checked/shortcut/text state for deterministic paint, hit testing, and invocation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -348,7 +348,7 @@ Routes focus, set-value, selection, clipboard, history, commit, and cancel actio
 void on_detached_from_window() noexcept override
 ```
 
-Public TextBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TextBox's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `snapshot` (private)
 
@@ -364,7 +364,7 @@ Reports the current snapshot value without mutation.
 void apply_snapshot(Snapshot snapshot)
 ```
 
-Public TextBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TextBox's apply snapshot operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `set_selection` (private)
 
@@ -380,7 +380,7 @@ Synchronously updates the retained selection property. Validation, typed invalid
 bool replace(Utf8Offset start, Utf8Offset end, std::string_view replacement, bool record_history = true)
 ```
 
-Public TextBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TextBox's replace operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `position_at` (private)
 
@@ -436,7 +436,7 @@ Returns caret blink to its inherited or default policy.
 void schedule_caret_blink()
 ```
 
-Public TextBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TextBox's schedule caret blink operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `push_history` (private)
 
@@ -444,7 +444,7 @@ Public TextBox operation. Its exact signature is inventoried here; follow the li
 void push_history(std::deque<Snapshot>& history, Snapshot snapshot)
 ```
 
-Public TextBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TextBox's push history operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `clear_redo` (private)
 

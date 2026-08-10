@@ -204,7 +204,7 @@ Projects an optional named group whose value reports side-by-side, master, or de
 [[nodiscard]] Control::Ptr replace_role(Control::Ptr& slot, const std::shared_ptr<SplitterPanel>& panel, Control::Ptr replacement)
 ```
 
-Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MasterDetailView's replace role operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `resolve_display_mode` (private)
 
@@ -212,7 +212,7 @@ Public MasterDetailView operation. Its exact signature is inventoried here; foll
 [[nodiscard]] MasterDetailDisplayMode resolve_display_mode( Size available) const noexcept
 ```
 
-Reports the current resolve display mode value without mutation.
+Resolves the requested retained resource against exact identity, scale, and fallback policy.
 
 ### `apply_display_mode` (private)
 
@@ -220,7 +220,7 @@ Reports the current resolve display mode value without mutation.
 void apply_display_mode(MasterDetailDisplayMode mode, bool automatic)
 ```
 
-Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MasterDetailView's apply display mode operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `configure_split` (private)
 
@@ -228,4 +228,4 @@ Public MasterDetailView operation. Its exact signature is inventoried here; foll
 void configure_split()
 ```
 
-Public MasterDetailView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes MasterDetailView's configure split operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

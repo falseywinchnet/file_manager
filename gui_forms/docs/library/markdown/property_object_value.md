@@ -1,16 +1,16 @@
 # PropertyObjectValue
 
-- Status: **OBSERVED: bundle 010 property object handle review; focused M4 binding tests pass**
+- Status: **OBSERVED: bundle 012 isolated property-object handle; native and MinGW M4 builds pass**
 - Kind: **class**
 - Hierarchy: `PropertyObjectValue`
-- Declaration: `include/gui_forms/binding/value/binding_value.hpp:53`
-- Definition: `src/core/binding/value/binding_value.cpp`
+- Declaration: `include/gui_forms/binding/value/property_object_value/property_object_value.hpp:15`
+- Definition: `src/core/binding/value/property_object_value/property_object_value.cpp`
 
 PropertyObjectValue is a cheap immutable shared handle over a validated recursive property object tree.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

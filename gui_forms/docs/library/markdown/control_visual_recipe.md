@@ -10,7 +10,7 @@ ControlVisualRecipe combines a layered material with text/glyph colors, focus/de
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

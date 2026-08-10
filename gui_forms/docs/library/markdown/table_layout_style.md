@@ -1,16 +1,16 @@
 # TableLayoutStyle
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 table-layout style review**
 - Kind: **struct**
 - Hierarchy: `TableLayoutStyle`
 - Declaration: `include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp:20`
 - Definition: `inline/header-only`
 
-TableLayoutStyle is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp.
+TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 friend constexpr bool operator==(const TableLayoutStyle&, const TableLayoutStyle&) = default
 ```
 
-Public TableLayoutStyle operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

@@ -4,9 +4,9 @@
 <body><article><header><p class="eyebrow">struct · library</p>
 <h1>PropertyDescriptor</h1><p class="summary">PropertyDescriptor exposes renderer/language-neutral schema, serialization, mutability, invalidation, enum, standard-value, converter, and editor metadata without executable callbacks.</p>
 <div class="badges"><span>OBSERVED: bundle 010 inert property descriptor review; focused M4 inspection tests pass</span><span>header-only or distributed</span></div></header>
-<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Visual evidence</h2><p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>PropertyDescriptor</dd>
-<dt>Declaration</dt><dd>include/gui_forms/binding/value/binding_value.hpp:201</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
+<dt>Declaration</dt><dd>include/gui_forms/binding/value/binding_value.hpp:145</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>PropertyDescriptor <span class="access">public</span></h3><code>PropertyDescriptor() = default</code><p>Default construction supplies a writable text behavior descriptor; authored construction commits the core schema and invalidation contract.</p></section><section class="method"><h3>PropertyDescriptor <span class="access">public</span></h3><code>PropertyDescriptor(std::string authored_name, BindingValueKind value_kind, std::string authored_category, std::string authored_description, std::optional&lt;BindingValue&gt; authored_default, Dirty authored_effects, bool authored_subtree_effect = false) : name(std::move(authored_name)), kind(value_kind), category(std::move(authored_category)), description(std::move(authored_description)), default_value(std::move(authored_default)), invalidation_effects(authored_effects), invalidates_subtree(authored_subtree_effect)</code><p>Default construction supplies a writable text behavior descriptor; authored construction commits the core schema and invalidation contract.</p></section></section>
 <footer><a href="../markdown/property_descriptor.md">AI-readable Markdown source</a></footer>
 </article></body></html>

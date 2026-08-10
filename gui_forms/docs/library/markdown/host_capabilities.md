@@ -1,16 +1,16 @@
 # HostCapabilities
 
-- Status: **OBSERVED: bundle 007 host capability value split; M4 macOS/MinGW builds and focused tests pass**
+- Status: **OBSERVED: bundle 012 isolated host-capability projection; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `HostCapabilities`
-- Declaration: `include/gui_forms/host/types/host_types.hpp:52`
-- Definition: `src/core/host/types/host_types.cpp`
+- Declaration: `include/gui_forms/host/types/host_capabilities/host_capabilities.hpp:10`
+- Definition: `src/core/host/types/host_capabilities/host_capabilities.cpp`
 
 HostCapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

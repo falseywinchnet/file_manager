@@ -1,16 +1,16 @@
 # ScrollSnapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 scroll-state review**
 - Kind: **struct**
 - Hierarchy: `ScrollSnapshot`
 - Declaration: `include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp:45`
 - Definition: `inline/header-only`
 
-ScrollSnapshot is a struct declared in include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp.
+ScrollSnapshot combines horizontal/vertical axis snapshots with auto-scroll policy, margin, minimum size, offset, and logical position.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

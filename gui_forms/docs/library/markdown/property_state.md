@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 010 private ABI foreign-property state review; native and MinGW ABI builds pass**
 - Kind: **struct**
 - Hierarchy: `PropertyState`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:1393`
+- Declaration: `src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp:511`
 - Definition: `inline/header-only`
 
 PropertyState owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

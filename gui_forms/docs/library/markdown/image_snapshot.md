@@ -1,16 +1,16 @@
 # ImageSnapshot
 
-- Status: **OBSERVED: bundle 009 immutable image snapshot review; focused M4 tests pass**
+- Status: **OBSERVED: bundle 012 isolated immutable-image snapshot; native and MinGW M4 builds pass**
 - Kind: **struct**
 - Hierarchy: `ImageSnapshot`
-- Declaration: `include/gui_forms/drawing/types/drawing_types.hpp:40`
-- Definition: `src/core/drawing/image_reference/image_reference.cpp`
+- Declaration: `include/gui_forms/drawing/image_snapshot/image_snapshot.hpp:15`
+- Definition: `src/core/drawing/image_snapshot/image_snapshot.cpp`
 
 ImageSnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

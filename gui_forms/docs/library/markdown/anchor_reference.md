@@ -1,16 +1,16 @@
 # AnchorReference
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 anchor-layout review**
 - Kind: **struct**
 - Hierarchy: `AnchorReference`
-- Declaration: `include/gui_forms/control.hpp:694`
+- Declaration: `include/gui_forms/control/control/control.hpp:685`
 - Definition: `inline/header-only`
 
-AnchorReference is a struct declared in include/gui_forms/control.hpp.
+AnchorReference snapshots a child's arranged bounds and parent client rectangle so later resize anchoring is deterministic.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

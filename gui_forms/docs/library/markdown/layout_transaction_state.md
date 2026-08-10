@@ -1,16 +1,16 @@
 # LayoutTransactionState
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 layout-state review**
 - Kind: **struct**
 - Hierarchy: `LayoutTransactionState`
-- Declaration: `include/gui_forms/control.hpp:171`
+- Declaration: `include/gui_forms/control/control/control.hpp:162`
 - Definition: `inline/header-only`
 
-LayoutTransactionState is a struct declared in include/gui_forms/control.hpp.
+LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

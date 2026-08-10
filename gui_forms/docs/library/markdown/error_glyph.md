@@ -108,7 +108,7 @@ Advances blink phase at cadence and requests only the next necessary frame.
 void on_attachment_committed() noexcept override
 ```
 
-Public ErrorGlyph operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorGlyph's on attachment committed operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_detached_from_window` (protected)
 
@@ -116,7 +116,7 @@ Public ErrorGlyph operation. Its exact signature is inventoried here; follow the
 void on_detached_from_window() noexcept override
 ```
 
-Public ErrorGlyph operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorGlyph's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `refresh_schedule` (private)
 
@@ -124,4 +124,4 @@ Public ErrorGlyph operation. Its exact signature is inventoried here; follow the
 void refresh_schedule()
 ```
 
-Public ErrorGlyph operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorGlyph's refresh schedule operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

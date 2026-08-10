@@ -1,7 +1,10 @@
 # CursorKind
 
-- Status: **generated state/value inventory; narrative review pending**
-- Declaration: `include/gui_forms/types.hpp:117`
+- Status: **OBSERVED source inventory; declaration-derived narrative**
+- Declaration: `include/gui_forms/types/paint_types/paint_types.hpp:57`
+
+This closed vocabulary makes the named state explicit at API boundaries; the
+declaration below is authoritative for admitted values.
 
 ## Declared values
 

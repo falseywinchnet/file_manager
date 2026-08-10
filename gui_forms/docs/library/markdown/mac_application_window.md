@@ -1,16 +1,16 @@
 # MacApplicationWindow
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 AppKit session review**
 - Kind: **struct**
 - Hierarchy: `MacApplicationWindow`
 - Declaration: `include/gui_forms/platform/macos_host.hpp:45`
 - Definition: `inline/header-only`
 
-MacApplicationWindow is a struct declared in include/gui_forms/platform/macos_host.hpp.
+MacApplicationWindow is the move-only RAII owner of one native AppKit session and its retained Window projection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

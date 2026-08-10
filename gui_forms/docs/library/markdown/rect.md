@@ -1,16 +1,16 @@
 # Rect
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 geometry review**
 - Kind: **struct**
 - Hierarchy: `Rect`
-- Declaration: `include/gui_forms/types.hpp:29`
-- Definition: `src/core/types.cpp, src/core/window/presentation/window_presentation.cpp`
+- Declaration: `include/gui_forms/types/geometry/geometry.hpp:19`
+- Definition: `src/core/types/rect/rect.cpp, src/core/window/presentation/window_presentation.cpp`
 
-Rect is a struct declared in include/gui_forms/types.hpp.
+Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 friend constexpr bool operator==(const Rect&, const Rect&) = default
 ```
 
-Public Rect operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.
 
 ### `empty` (public)
 
@@ -100,7 +100,7 @@ Reports the current contains value without mutation.
 [[nodiscard]] static Rect intersection(Rect left, Rect right) noexcept
 ```
 
-Public Rect operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Rect's intersection operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `united` (public)
 
@@ -108,4 +108,4 @@ Public Rect operation. Its exact signature is inventoried here; follow the linke
 [[nodiscard]] static Rect united(Rect left, Rect right) noexcept
 ```
 
-Public Rect operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Rect's united operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

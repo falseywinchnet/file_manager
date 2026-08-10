@@ -116,7 +116,7 @@ Reports outsets for the active role recipe or compatibility rendering.
 void notify_default(bool value) override
 ```
 
-Public Button operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Button's notify default operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_activate` (private)
 
@@ -140,4 +140,4 @@ Reports the current command dialog result value without mutation.
 void assign_cancel_dialog_result() override
 ```
 
-Public Button operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Button's assign cancel dialog result operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

@@ -1,16 +1,16 @@
 # FontSpec
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 typography-value review**
 - Kind: **struct**
 - Hierarchy: `FontSpec`
-- Declaration: `include/gui_forms/types.hpp:128`
+- Declaration: `include/gui_forms/types/paint_types/paint_types.hpp:68`
 - Definition: `inline/header-only`
 
-FontSpec is a struct declared in include/gui_forms/types.hpp.
+FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 friend constexpr bool operator==(const FontSpec&, const FontSpec&) = default
 ```
 
-Public FontSpec operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

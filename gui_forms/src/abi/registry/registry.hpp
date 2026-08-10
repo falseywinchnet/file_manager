@@ -72,7 +72,7 @@ struct ControlRecord final {
     std::vector<gf_event_token> subscriptions;
 };
 
-struct Slot final {
+struct RegistrySlot final {
     std::uint32_t generation{1};
     SlotKind kind{SlotKind::empty};
     std::shared_ptr<ControlRecord> control;
@@ -1968,7 +1968,7 @@ public:
             }
             // Stale every public identity in the owned visual subtree and
             // revoke callback tokens before user-observable teardown can run.
-            for (const Slot& candidate : slots_) {
+            for (const RegistrySlot& candidate : slots_) {
                 if (candidate.kind == SlotKind::control && candidate.control &&
                     contains_control(record->control, candidate.control->control)) {
                     subtree_records.push_back(candidate.control);
@@ -1976,7 +1976,7 @@ public:
             }
             for (const auto& subtree_record : subtree_records) {
                 const auto found = std::find_if(
-                    slots_.begin(), slots_.end(), [&](const Slot& candidate) {
+                    slots_.begin(), slots_.end(), [&](const RegistrySlot& candidate) {
                         return candidate.kind == SlotKind::control &&
                                candidate.control == subtree_record;
                     });
@@ -2605,7 +2605,7 @@ private:
         const std::shared_ptr<ControlRecord>& record) {
         std::shared_ptr<Control> root = record->control;
         while (const auto parent = root->parent()) root = parent;
-        for (const Slot& candidate : slots_) {
+        for (const RegistrySlot& candidate : slots_) {
             if (candidate.kind == SlotKind::control && candidate.control &&
                 candidate.control->control == root) {
                 return candidate.control;
@@ -2626,7 +2626,7 @@ private:
             root = root_record_locked(sender);
             snapshot.reserve(sender->subscriptions.size());
             for (const gf_event_token token : sender->subscriptions) {
-                Slot* slot = slot_locked(token);
+                RegistrySlot* slot = slot_locked(token);
                 if (slot != nullptr && slot->kind == SlotKind::subscription &&
                     slot->subscription && slot->subscription->connected &&
                     slot->subscription->event_kind == event_kind &&
@@ -2905,7 +2905,7 @@ private:
         std::unordered_map<std::string, std::shared_ptr<Control>>& result) {
         std::scoped_lock lock(mutex_);
         result.clear();
-        for (const Slot& candidate : slots_) {
+        for (const RegistrySlot& candidate : slots_) {
             if (candidate.kind == SlotKind::control && candidate.control &&
                 !candidate.control->name.empty() &&
                 contains_control(root->control, candidate.control->control)) {
@@ -2945,7 +2945,7 @@ private:
     }
 
     gf_result control_locked(gf_handle handle, std::shared_ptr<ControlRecord>& output) {
-        Slot* slot = slot_locked(handle);
+        RegistrySlot* slot = slot_locked(handle);
         if (slot == nullptr) {
             return fail(GF_ERROR_STALE_HANDLE, "control handle is stale");
         }
@@ -2961,7 +2961,7 @@ private:
 
     gf_result subscription_locked(gf_event_token token,
                                   std::shared_ptr<SubscriptionRecord>& output) {
-        Slot* slot = slot_locked(token);
+        RegistrySlot* slot = slot_locked(token);
         if (slot == nullptr) {
             return fail(GF_ERROR_STALE_HANDLE, "event token is stale");
         }
@@ -2973,11 +2973,11 @@ private:
         return GF_OK;
     }
 
-    Slot* slot_locked(gf_handle handle) {
+    RegistrySlot* slot_locked(gf_handle handle) {
         if (handle.slot == 0U || handle.slot > slots_.size()) {
             return nullptr;
         }
-        Slot& slot = slots_[handle.slot - 1U];
+        RegistrySlot& slot = slots_[handle.slot - 1U];
         if (slot.kind == SlotKind::empty || slot.generation != handle.generation) {
             return nullptr;
         }
@@ -2988,7 +2988,7 @@ private:
                               std::shared_ptr<ControlRecord> control,
                               std::shared_ptr<SubscriptionRecord> subscription) {
         auto found = std::find_if(slots_.begin(), slots_.end(),
-                                  [](const Slot& slot) {
+                                  [](const RegistrySlot& slot) {
                                       return slot.kind == SlotKind::empty;
                                   });
         if (found == slots_.end()) {
@@ -3004,7 +3004,7 @@ private:
 
     void invalidate_control_locked(gf_handle handle, ControlRecord& record) {
         for (const gf_event_token token : record.subscriptions) {
-            if (Slot* slot = slot_locked(token);
+            if (RegistrySlot* slot = slot_locked(token);
                 slot != nullptr && slot->kind == SlotKind::subscription) {
                 slot->subscription->connected = false;
                 invalidate_slot_locked(token);
@@ -3015,7 +3015,7 @@ private:
     }
 
     void invalidate_slot_locked(gf_handle handle) {
-        Slot* slot = slot_locked(handle);
+        RegistrySlot* slot = slot_locked(handle);
         if (slot == nullptr) {
             return;
         }
@@ -3035,7 +3035,7 @@ private:
             std::scoped_lock lock(mutex_);
             snapshot.reserve(sender->subscriptions.size());
             for (const gf_event_token token : sender->subscriptions) {
-                Slot* slot = slot_locked(token);
+                RegistrySlot* slot = slot_locked(token);
                 if (slot != nullptr && slot->kind == SlotKind::subscription &&
                     slot->subscription && slot->subscription->connected &&
                     slot->subscription->callback != nullptr) {
@@ -3054,7 +3054,7 @@ private:
     }
 
     std::mutex mutex_;
-    std::vector<Slot> slots_;
+    std::vector<RegistrySlot> slots_;
     std::uint64_t next_dialog_request_{1};
     std::string clipboard_text_;
     std::uint64_t clipboard_generation_{};

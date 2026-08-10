@@ -1,7 +1,10 @@
 # HostServiceError
 
-- Status: **generated state/value inventory; narrative review pending**
-- Declaration: `include/gui_forms/host/types/host_types.hpp:75`
+- Status: **OBSERVED source inventory; declaration-derived narrative**
+- Declaration: `include/gui_forms/host/types/host_types.hpp:31`
+
+This closed vocabulary makes the named state explicit at API boundaries; the
+declaration below is authoritative for admitted values.
 
 ## Declared values
 

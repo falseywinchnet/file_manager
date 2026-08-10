@@ -1,16 +1,16 @@
 # CorrespondenceSelectionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 correspondence event review**
 - Kind: **struct**
 - Hierarchy: `CorrespondenceSelectionChange`
 - Declaration: `include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp:43`
 - Definition: `inline/header-only`
 
-CorrespondenceSelectionChange is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp.
+CorrespondenceSelectionChange reports old/new optional stable identities and the initiating interaction.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

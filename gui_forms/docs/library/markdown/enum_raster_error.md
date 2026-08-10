@@ -1,7 +1,10 @@
 # RasterError
 
-- Status: **generated state/value inventory; narrative review pending**
-- Declaration: `src/render/skia/executor/drawing_skia.hpp:15`
+- Status: **OBSERVED source inventory; declaration-derived narrative**
+- Declaration: `src/render/skia/executor/skia_executor.hpp:15`
+
+This closed vocabulary makes the named state explicit at API boundaries; the
+declaration below is authoritative for admitted values.
 
 ## Declared values
 

@@ -1,16 +1,16 @@
 # DragEvent
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drag-routing review**
 - Kind: **struct**
 - Hierarchy: `DragEvent`
-- Declaration: `include/gui_forms/events.hpp:192`
+- Declaration: `include/gui_forms/events/input_events/input_events.hpp:192`
 - Definition: `inline/header-only`
 
-DragEvent is a struct declared in include/gui_forms/events.hpp.
+DragEvent carries phase, geometry, allowed/proposed effects, typed payload, and mutable handled/result state through preview/target/bubble routing.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

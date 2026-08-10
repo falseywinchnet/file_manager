@@ -10,7 +10,7 @@ XyzD65 carries normalized CIE XYZ D65 coordinates plus straight alpha.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

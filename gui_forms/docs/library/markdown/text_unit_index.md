@@ -10,7 +10,7 @@ TextUnitIndex prevents accidental mixing of byte, UTF-16, scalar, grapheme, and 
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

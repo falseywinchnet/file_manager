@@ -1049,6 +1049,7 @@
       "summary": "CalendarPopup is DateTimePicker's source-private retained month grid. It owns displayed month, constrained candidate selection, pointer/keyboard navigation, commit/cancel events, stable virtual day identities, and calendar semantics while the picker retains final value authority.",
       "methods": {
         "CalendarPopup": "Constructs a focusable month grid from current value, admitted range, format provider, font, and style.",
+        "~CalendarPopup": "Releases the source-private popup through its isolated translation-unit boundary.",
         "committed": "Returns the event carrying the selected DateTimeValue after qualified day activation.",
         "cancelled": "Returns the event raised by Escape without modifying picker value.",
         "on_paint": "Records calendar frame, month navigation, weekday headings, 42 day cells, range-disabled states, selection, hover, and focus.",
@@ -1800,7 +1801,7 @@
       }
     },
     "PropertyRowSpec": {
-      "status": "OBSERVED: bundle 006 authored-row value split; M4 build and focused tests pass",
+      "status": "OBSERVED: bundle 012 isolated authored-row declaration/definition; native and MinGW M4 builds pass",
       "capture": "captures/property_grid.png",
       "capture_note": "M4 Complete Showcase crop showing PropertyList rows represented by stable identity, text, editor, hierarchy, validation, and reset policy.",
       "summary": "PropertyRowSpec is the authored settings-row model: stable identity; name/value/description; stock editor/choices; validation; parent/depth disclosure; enable/required state; and reset capability.",
@@ -2175,7 +2176,7 @@
       }
     },
     "UpdateScope": {
-      "status": "OBSERVED: bundle 007 lifecycle transaction split; M4 build and focused tests pass",
+      "status": "OBSERVED: bundle 012 isolated update-transaction state owner; native and MinGW M4 builds pass",
       "capture": "captures/native_window_host.png",
       "capture_note": "The showcased retained tree is constructed and mutated through nested Window update transactions before host paint.",
       "summary": "UpdateScope is the move-only RAII token for one Window update-depth level; it guarantees balanced close and makes an explicit layout barrier available without opening a nested native loop.",
@@ -2442,7 +2443,7 @@
       "summary": "DialogKeySnapshot reports mnemonic/default/cancel attempts and outcomes plus candidate, collision, cycle, and rejection counts."
     },
     "HostCapabilities": {
-      "status": "OBSERVED: bundle 007 host capability value split; M4 macOS/MinGW builds and focused tests pass",
+      "status": "OBSERVED: bundle 012 isolated host-capability projection; native and MinGW M4 builds pass",
       "summary": "HostCapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative.",
       "methods": {
         "supports": "Tests whether every requested capability bit is available.",
@@ -2531,7 +2532,7 @@
       "summary": "HostModalTransition carries exact dialog request, committed modal depth, and enter/leave direction."
     },
     "HostServicesSnapshot": {
-      "status": "OBSERVED: bundle 007 service telemetry review; M4 builds and focused tests pass",
+      "status": "OBSERVED: bundle 012 isolated host-service telemetry projection; native and MinGW M4 builds pass",
       "summary": "HostServicesSnapshot is machine-readable capability, cursor/capture, monitor/clipboard/dialog/sound, coalescing-policy, modal-depth, rejection, and shutdown state.",
       "methods": {
         "to_json": "Serializes the complete portable service snapshot with stable names."
@@ -2585,7 +2586,7 @@
       }
     },
     "HostSessionSnapshot": {
-      "status": "OBSERVED: bundle 007 lifecycle telemetry review; M4 builds and focused tests pass",
+      "status": "OBSERVED: bundle 012 isolated host-session telemetry projection; native and MinGW M4 builds pass",
       "summary": "HostSessionSnapshot is the complete machine-readable phase, sequence, event, fault, close, display, modal, drag, attachment, activation, occlusion, closed, and shutdown state.",
       "methods": {
         "to_json": "Serializes the complete session snapshot with stable capability and phase names."
@@ -2856,7 +2857,7 @@
       }
     },
     "MaterialFillLayer": {
-      "status": "OBSERVED: bundle 009 surface-material value split; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated material-fill declaration/definition; native and MinGW M4 builds pass",
       "capture": "captures/drawing_raster_material.png",
       "capture_note": "M4 material demoboard showing solid, gradient, repeated, image, border, radius, and shadow realization.",
       "summary": "MaterialFillLayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity.",
@@ -2905,7 +2906,8 @@
         "on_dispose": "Provides the no-throw subtype cleanup hook."
       }
     },
-    "Color": {
+    "DrawingColor": {
+      "name": "Color",
       "declaration_header": "include/gui_forms/drawing/color/color.hpp",
       "status": "OBSERVED: bundle 009 GUI.Drawing color split; focused M4 tests pass",
       "method_scope": "all",
@@ -3202,7 +3204,7 @@
       }
     },
     "SkiaExecutor": {
-      "status": "OBSERVED: bundle 009 CPU Skia executor split; focused M4 raster/trace tests pass",
+      "status": "OBSERVED: bundle 012 hierarchy-named CPU Skia executor unit; native and MinGW M4 builds pass",
       "method_scope": "all",
       "summary": "SkiaExecutor is the private CPU-only terminal for GUI.Drawing command streams, PNG-only codecs, deterministic text metrics, owned typefaces, and thread-affine execution.",
       "methods": {
@@ -3300,12 +3302,12 @@
       }
     },
     "PointI": {
-      "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated integer-point declaration/definition; native and MinGW M4 builds pass",
       "summary": "PointI is a signed integer pixel-coordinate pair.",
       "methods": {"offset": "Adds signed deltas with deterministic 32-bit saturation.", "operator==": "Compares both coordinates."}
     },
     "PointF": {
-      "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated logical-point declaration/definition; native and MinGW M4 builds pass",
       "summary": "PointF is a finite logical-coordinate pair.",
       "methods": {"offset": "Validates finite inputs/result before committing translation.", "operator==": "Compares both coordinates."}
     },
@@ -3320,14 +3322,14 @@
       "methods": {"operator==": "Compares width and height."}
     },
     "RectI": {
-      "status": "OBSERVED: bundle 009 integer rectangle review; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated integer-rectangle declaration/definition; native and MinGW M4 builds pass",
       "summary": "RectI provides overflow-aware integer pixel containment, intersection, union, translation, and inflation.",
       "methods": {
         "left": "Returns signed left edge.", "top": "Returns signed top edge.", "right": "Returns 64-bit x-plus-width edge.", "bottom": "Returns 64-bit y-plus-height edge.", "empty": "Reports nonpositive width or height.", "contains": "Tests point or rectangle containment with wide edge arithmetic.", "intersects": "Tests positive-area overlap.", "offset": "Translates with 32-bit saturation.", "inflate": "Expands symmetrically with saturation.", "intersect": "Replaces this rectangle with exact intersection.", "intersection": "Returns exact overlap or empty.", "united": "Returns conservative union with saturation.", "operator==": "Compares all four fields."
       }
     },
     "RectF": {
-      "status": "OBSERVED: bundle 009 logical rectangle review; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated logical-rectangle declaration/definition; native and MinGW M4 builds pass",
       "summary": "RectF provides validated finite logical containment, intersection, union, translation, and inflation.",
       "methods": {
         "left": "Returns left edge.", "top": "Returns top edge.", "right": "Returns x-plus-width.", "bottom": "Returns y-plus-height.", "empty": "Reports nonpositive width or height.", "finite": "Checks all four fields.", "contains": "Tests point or rectangle containment.", "intersects": "Tests positive-area overlap.", "offset": "Validates and commits finite translation.", "inflate": "Validates and commits symmetric expansion.", "intersect": "Replaces this rectangle with exact intersection.", "intersection": "Returns finite overlap or empty.", "united": "Returns finite conservative union.", "operator==": "Compares all four fields."
@@ -3357,7 +3359,7 @@
     "OklchGamutMapping": {"status": "OBSERVED: bundle 009 gamut-mapping result review; focused M4 tests pass", "summary": "OklchGamutMapping preserves requested and deterministic 24-iteration chroma-reduced OKLCH plus its committed sRGB conversion."},
     "SystemPalette": {"status": "OBSERVED: bundle 009 compatibility palette review; focused M4 tests pass", "summary": "SystemPalette is the renderer-neutral compatibility control/light/text color triplet."},
     "ImageSnapshot": {
-      "status": "OBSERVED: bundle 009 immutable image snapshot review; focused M4 tests pass",
+      "status": "OBSERVED: bundle 012 isolated immutable-image snapshot; native and MinGW M4 builds pass",
       "summary": "ImageSnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels.",
       "methods": {"has_pixels": "Reports whether shared pixel storage is retained.", "row_bytes": "Returns storage stride or zero.", "pixels": "Returns const storage bytes or an empty span."}
     },
@@ -3479,13 +3481,13 @@
     "PropertyObjectData": {"status": "OBSERVED: bundle 010 object value storage review; focused M4 binding tests pass", "summary": "PropertyObjectData is shared immutable type identity plus bounded ordered members."},
     "PropertyCollectionData": {"status": "OBSERVED: bundle 010 collection value storage review; focused M4 binding tests pass", "summary": "PropertyCollectionData is shared immutable item type/kind plus a bounded homogeneous value sequence."},
     "PropertyObjectValue": {
-      "status": "OBSERVED: bundle 010 property object handle review; focused M4 binding tests pass",
+      "status": "OBSERVED: bundle 012 isolated property-object handle; native and MinGW M4 builds pass",
       "summary": "PropertyObjectValue is a cheap immutable shared handle over a validated recursive property object tree.",
       "method_scope": "all",
       "methods": {"PropertyObjectValue": "Default construction is empty; private factory construction admits validated shared data.", "operatorbool": "Reports whether immutable data is present.", "type_name": "Returns the retained type name or an empty view.", "members": "Returns retained members or an empty span.", "data": "Returns the immutable backing record pointer.", "operator==": "Compares structural property data rather than shared-pointer identity."}
     },
     "PropertyCollectionValue": {
-      "status": "OBSERVED: bundle 010 property collection handle review; focused M4 binding tests pass",
+      "status": "OBSERVED: bundle 012 isolated property-collection handle; native and MinGW M4 builds pass",
       "summary": "PropertyCollectionValue is a cheap immutable shared handle over a validated bounded homogeneous property sequence.",
       "method_scope": "all",
       "methods": {"PropertyCollectionValue": "Default construction is empty; private factory construction admits validated shared data.", "operatorbool": "Reports whether immutable data is present.", "item_type_name": "Returns retained item type identity or an empty view.", "item_kind": "Returns the declared non-null item kind.", "data": "Returns the immutable backing record pointer.", "operator==": "Compares structural collection data rather than shared-pointer identity."}
@@ -3537,38 +3539,169 @@
       "method_scope": "all",
       "methods": {"BindingContext": "Binds Window lifetime and verifies construction affinity.", "~BindingContext": "Disposes and contains destructor exceptions.", "add": "Ensures a source has a context entry by resolving its manager.", "manager": "Validates shared owner, liveness, same Window, and uniqueness; installs disposal removal and returns the source manager.", "contains": "Tests source pointer membership.", "remove": "Verifies affinity and removes one source with publication.", "clear": "Verifies affinity, retires all entries, and publishes removal for each still-live source.", "size": "Returns membership count.", "collection_changed": "Returns ordered add/remove observation.", "verify_dispose_thread": "Enforces Window affinity while available.", "on_dispose": "Drops entries, observations, and Window lifetime without publishing into teardown.", "bound_window": "Resolves weak Window lifetime without extending ownership.", "remove_entry": "Disconnects and erases one exact source entry and optionally publishes removal."}
     },
+    "AbiCppError": {"name": "Error", "declaration_header": "include/gui_forms/c_api.hpp", "status": "OBSERVED: bundle 011 C++ ABI wrapper review", "summary": "Error carries the exact C ABI result code alongside a conventional C++ runtime-error message."},
+    "AbiCppApi": {"name": "Api", "declaration_header": "include/gui_forms/c_api.hpp", "status": "OBSERVED: bundle 011 C++ ABI wrapper review", "summary": "Api negotiates ABI 0.4 once, retains the immutable function table, and translates thread-local C diagnostics into typed C++ exceptions."},
+    "AbiCppControl": {"name": "Control", "declaration_header": "include/gui_forms/c_api.hpp", "status": "OBSERVED: bundle 011 C++ ABI wrapper review", "summary": "The abi0::Control wrapper gives a generational C handle deterministic RAII retain/release, value-like copying, move transfer, bounded strings, and exception translation without becoming a retained visual object."},
+    "StableId": {"status": "OBSERVED: bundle 012 isolated retained-control identity owner; native and MinGW M4 builds pass", "summary": "StableId owns the immutable authored UTF-8 identity used for lookup, semantics, traces, and cross-boundary correlation."},
+    "RuntimeId": {"status": "OBSERVED: bundle 011 retained-control identity review", "summary": "RuntimeId is the monotonic process-local identity used for exact retained instances and child operations."},
+    "ControlValidationEvent": {"status": "OBSERVED: bundle 011 validation-state review", "summary": "ControlValidationEvent carries source, destination, bulk-validation intent, and mutable cancellation through one validation turn."},
+    "LayoutTransactionState": {"status": "OBSERVED: bundle 011 layout-state review", "summary": "LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine."},
+    "MnemonicText": {"status": "OBSERVED: bundle 011 command-text review", "summary": "MnemonicText separates rendered UTF-8 from the optional activation scalar parsed from Forms-compatible ampersand notation."},
+    "RetainedControl": {"name": "Control", "declaration_header": "include/gui_forms/control/control/control.hpp", "status": "OBSERVED: bundle 011 hierarchy-mirrored retained-control state-machine review", "capture": "captures/basic_controls_overview.png", "capture_note": "M4 Complete Showcase evidence for the retained root's layout, visibility, enabled, focus, paint, input, semantic, and child-tree services as exercised by concrete controls.", "summary": "Control is the retained visual root and invariant owner for stable/runtime identity, hierarchy, geometry, layout transactions, initialization batching, style/theme resolution, typed invalidation, input eligibility and routing hooks, validation, binding, semantic projection, dispatch, focus, lifetime, and provider extensions."},
+    "DeferredInitializationChange": {"status": "OBSERVED: bundle 011 initialization-state review", "summary": "DeferredInitializationChange holds one deduplicated event key and publication closure until the outermost initialization transaction commits."},
+    "AnchorReference": {"status": "OBSERVED: bundle 011 anchor-layout review", "summary": "AnchorReference snapshots a child's arranged bounds and parent client rectangle so later resize anchoring is deterministic."},
+    "SubscriptionToken": {"status": "OBSERVED: bundle 011 revocable-event review", "summary": "SubscriptionToken is the move-only RAII revocation handle for a retained Event slot; destruction and explicit disconnect are idempotent."},
+    "EventStatistics": {"status": "OBSERVED: bundle 011 revocable-event review", "summary": "EventStatistics records connected, disconnected, and emitted-callback totals for deterministic lifecycle testing."},
+    "Event": {"status": "OBSERVED: bundle 011 revocable-event state-machine review", "summary": "Event owns registration-ordered revocable callback slots, emits a stable snapshot, skips slots revoked before their turn, and compacts disconnected ownership after publication."},
+    "Slot": {"status": "OBSERVED: bundle 011 revocable-event state review", "summary": "Event::Slot owns one callback, weakly references shared event state, and guarantees idempotent disconnection plus exact statistics."},
+    "State": {"status": "OBSERVED: bundle 011 revocable-event state review", "summary": "Event::State retains the ordered slot vector and aggregate statistics independently of any individual subscription token."},
+    "PointerEvent": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "PointerEvent is the mutable routed pointer record: device phase, window/local coordinates, buttons, modifiers, wheel deltas, click count, capture request, and handled state."},
+    "KeyEvent": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "KeyEvent carries logical/physical key identity, modifier and repeat state, key direction, and mutable handled state through preview/target/bubble routing."},
+    "PhysicalKey": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "PhysicalKey preserves host-independent scan position, extended-key state, and location for shortcut and compatibility logic."},
+    "TextInputEvent": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "TextInputEvent owns UTF-8 text or composition payload plus replacement range and mutable handled state."},
+    "DragLimits": {"status": "OBSERVED: bundle 011 drag-contract review", "summary": "DragLimits bounds payload bytes, path count, path length, and advertised format count before foreign drag data enters retained routing."},
+    "DragTextData": {"status": "OBSERVED: bundle 011 drag-contract review", "summary": "DragTextData owns one validated UTF-8 text payload."},
+    "DragFileListData": {"status": "OBSERVED: bundle 011 drag-contract review", "summary": "DragFileListData owns a bounded list of local path strings without implying remote discovery."},
+    "DragBinaryData": {"status": "OBSERVED: bundle 011 drag-contract review", "summary": "DragBinaryData owns a bounded byte payload and explicit format identifier."},
+    "DragEvent": {"status": "OBSERVED: bundle 011 drag-routing review", "summary": "DragEvent carries phase, geometry, allowed/proposed effects, typed payload, and mutable handled/result state through preview/target/bubble routing."},
+    "DragDispatchResult": {"status": "OBSERVED: bundle 011 drag-routing review", "summary": "DragDispatchResult projects the final handled and selected-effect outcome of one routed drag turn."},
+    "AnimationSpec": {"status": "OBSERVED: bundle 011 animation-state review", "summary": "AnimationSpec declares duration, repetition, direction, easing, and reduced-motion behavior for one timeline."},
+    "AnimationSample": {"status": "OBSERVED: bundle 011 animation-state review", "summary": "AnimationSample is one immutable normalized/raw progress, iteration, and completion observation."},
+    "MotionPolicy": {"status": "OBSERVED: bundle 011 animation-policy review", "summary": "MotionPolicy is the resolved environment policy for active/quiescent cadence, speed scaling, and presentation phase."},
+    "AnimationTimeline": {"status": "OBSERVED: bundle 011 isolated animation state-machine review", "summary": "AnimationTimeline validates one specification and deterministically transitions stopped, running, and paused time into iteration-aware eased samples."},
+    "ImageListChange": {"status": "OBSERVED: bundle 011 image-list review", "summary": "ImageListChange identifies revision, mutation kind, entry index, and key affected by one retained resource mutation."},
+    "ImageListResolution": {"status": "OBSERVED: bundle 011 image-list review", "summary": "ImageListResolution returns the exact registered ImageId plus source pixel size, chosen scale variant, revision, and stable entry identity."},
+    "ImageList": {"status": "OBSERVED: bundle 011 isolated image-list ownership/state-machine review", "summary": "ImageList is a Window-bound Component that owns keyed image entries and scale variants, validates exact identity and dimensions, resolves nearest admitted scale deterministically, tracks revisions/tags, and publishes ordered changes."},
+    "Variant": {"status": "OBSERVED: bundle 011 image-list storage review", "summary": "ImageList::Variant correlates one scale factor with exact registered image identity and pixel dimensions."},
+    "Entry": {"status": "OBSERVED: bundle 011 image-list storage review", "summary": "ImageList::Entry owns stable entry identity, optional key and tag, and its scale-ordered image variants."},
+    "StaticNode": {"status": "OBSERVED: bundle 011 static-tree review", "summary": "StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions."},
+    "ControlFactory": {"status": "OBSERVED: bundle 011 static-tree construction review", "summary": "ControlFactory maps explicit type names to construction callbacks, rejects duplicates/unknown types, and recursively creates retained trees without a bundled scripting runtime."},
+    "Point": {"status": "OBSERVED: bundle 011 geometry review", "summary": "Point is a renderer-neutral logical-coordinate pair."},
+    "Size": {"status": "OBSERVED: bundle 011 geometry review", "summary": "Size is a renderer-neutral logical width and height."},
+    "Rect": {"status": "OBSERVED: bundle 011 geometry review", "summary": "Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations."},
+    "Insets": {"status": "OBSERVED: bundle 011 geometry review", "summary": "Insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets."},
+    "FormsColor": {"name": "Color", "declaration_header": "include/gui_forms/types/paint_types/paint_types.hpp", "status": "OBSERVED: bundle 011 paint-value review", "summary": "gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default."},
+    "GradientStop": {"status": "OBSERVED: bundle 011 paint-value review", "summary": "GradientStop pairs a normalized monotonic offset with a copied color for retained display-list safety."},
+    "FontSpec": {"status": "OBSERVED: bundle 011 typography-value review", "summary": "FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting."},
+    "ImageId": {"status": "OBSERVED: bundle 011 image-identity review", "summary": "ImageId is the nonzero renderer-neutral identity returned by a Window image registry."},
+    "Painter": {"status": "OBSERVED: bundle 011 renderer-neutral painting review", "summary": "Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks."},
+    "DamageRegion": {"status": "OBSERVED: bundle 011 bounded-damage state-machine review", "summary": "DamageRegion incrementally merges exact rectangular unions, preserves disjoint damage up to 64 rectangles, then collapses to one bound with explicit compaction/collapse telemetry."},
+    "MacHostOptions": {"status": "OBSERVED: bundle 011 host-contract review", "summary": "MacHostOptions declares initial native window title, geometry, display scale, and run policy."},
+    "MacHostServiceOptions": {"status": "OBSERVED: bundle 011 host-service review", "summary": "MacHostServiceOptions injects bounded dialog, tooltip, clipboard, and semantic-sound services into an AppKit session."},
+    "MacApplicationWindow": {"status": "OBSERVED: bundle 011 AppKit session review", "summary": "MacApplicationWindow is the move-only RAII owner of one native AppKit session and its retained Window projection."},
+    "WindowsHostOptions": {"status": "OBSERVED: bundle 011 host-contract review", "summary": "WindowsHostOptions declares initial Win32 title, client geometry, display scale, instance, show state, and run policy."},
+    "WindowsApplicationWindow": {"status": "OBSERVED: bundle 011 Win32 session review", "summary": "WindowsApplicationWindow is the move-only RAII owner of one native Win32 session and retained Window projection."},
+    "WindowsCompatibilityPaintEndpoint": {"status": "OBSERVED: bundle 012 isolated Win32 compatibility-paint state machine; complete MinGW/Skia M4 build passes", "summary": "WindowsCompatibilityPaintEndpoint is a shared move-only façade over a RasterControl live surface, staging DC, generational writes, invalidation, submission, drain, and retirement."},
+    "WindowLifetime": {"status": "OBSERVED: bundle 011 scheduler-lifetime review", "summary": "WindowLifetime weakly correlates a scheduler request with Window ownership so late work cannot prolong or call a retired host."},
+    "DeferredInputSnapshot": {"status": "OBSERVED: bundle 011 Window input-state review", "summary": "DeferredInputSnapshot preserves the route, transformed event, and target identity required to resume deferred input safely."},
+    "LiveSurfaceRegistration": {"status": "OBSERVED: bundle 011 Window presentation-state review", "summary": "LiveSurfaceRegistration owns one source registration, wake token, frame observation, damage, and scheduled presentation state."},
+    "GalleryContext": {"status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit", "summary": "GalleryContext synchronizes shared sample state across the native gallery's source-private demonstration controls."},
+    "GalleryControl": {"status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit", "capture": "captures/basic_controls_overview.png", "capture_note": "The native M4 showcase exercises the same retained measurement, arrangement, input, focus, activation, and paint contracts used by GalleryControl specimens.", "summary": "GalleryControl is a source-private demoboard adapter that renders and exercises distinct control kinds without enlarging the public control surface."},
+    "GalleryTree": {"status": "OBSERVED: bundle 011 demoboard-composition review", "summary": "GalleryTree retains the typed controls assembled for one gallery window so tests and the host share exact instances."},
+    "ShowcaseTree": {"status": "OBSERVED: bundle 011 demoboard-composition review", "summary": "ShowcaseTree retains the root, navigation, content, status, and indexed board controls of the complete native showcase."},
+    "MenuSnapshot": {"status": "OBSERVED: bundle 011 menu-state review", "summary": "MenuSnapshot captures one menu item's enabled/checked/shortcut/text state for deterministic paint, hit testing, and invocation."},
+    "CompoundFieldSpec": {"status": "OBSERVED: bundle 011 property-grid editor review", "summary": "CompoundFieldSpec assigns a stable field name and getter/setter pair to one structured property editor subfield."},
+    "PixelStorage": {"status": "OBSERVED: bundle 011 drawing-storage review", "summary": "PixelStorage owns aligned bitmap bytes, stride, dimensions, copy-on-write revision, damage, and active lock/edit lease state."},
+    "UnicodeRange": {"status": "OBSERVED: bundle 011 Unicode-table review", "summary": "UnicodeRange maps an inclusive code-point interval to the generated grapheme-break property used by conformance logic."},
+    "AxisGeometry": {"status": "OBSERVED: bundle 011 scroll geometry review", "summary": "AxisGeometry is the resolved track, decrement/increment buttons, thumb, maximum position, and viewport geometry for one scroll axis."},
+    "CardLayout": {"status": "OBSERVED: bundle 011 card value review", "summary": "CardLayout defines validated logical padding, section gaps, and footer/header allocation used by Card measurement and arrangement."},
+    "CellMetadata": {"status": "OBSERVED: bundle 011 table-layout value review", "summary": "CellMetadata assigns a retained child to a row/column with bounded spans and exact occupancy identity."},
+    "CorrespondenceItem": {"status": "OBSERVED: bundle 011 correspondence value review", "summary": "CorrespondenceItem owns stable identity, primary/secondary text, status, hierarchy, pinned/expanded policy, and optional command data for one correspondence row."},
+    "CorrespondenceSelectionChange": {"status": "OBSERVED: bundle 011 correspondence event review", "summary": "CorrespondenceSelectionChange reports old/new optional stable identities and the initiating interaction."},
+    "CorrespondencePinChange": {"status": "OBSERVED: bundle 011 correspondence event review", "summary": "CorrespondencePinChange reports the exact row and resulting pinned state."},
+    "CorrespondenceExpansionChange": {"status": "OBSERVED: bundle 011 correspondence event review", "summary": "CorrespondenceExpansionChange reports the exact hierarchical row and resulting expanded state."},
+    "ScrollAnchor": {"status": "OBSERVED: bundle 011 correspondence scroll-state review", "summary": "ScrollAnchor preserves a stable row identity plus intra-row offset so refreshes restore semantic rather than index-only position."},
+    "ItemCheckEvent": {"status": "OBSERVED: bundle 011 checked-list event review", "summary": "ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit."},
+    "ListSelectionChange": {"status": "OBSERVED: bundle 011 list-selection event review", "summary": "ListSelectionChange reports previous/current indices plus the exact selected-index snapshot after one mutation."},
+    "MasterDetailLayout": {"status": "OBSERVED: bundle 011 master-detail layout review", "summary": "MasterDetailLayout defines bounded navigation width and inter-pane gap for deterministic responsive projection."},
+    "MasterDetailPresentationChange": {"status": "OBSERVED: bundle 011 master-detail event review", "summary": "MasterDetailPresentationChange reports previous/current compact or expanded presentation and active pane."},
+    "MenuItemSpec": {"status": "OBSERVED: bundle 011 context-menu item review", "summary": "MenuItemSpec owns stable identity, mnemonic text, shortcut display, enabled/checked/separator state, optional command, and nested items for one context-menu entry."},
+    "MenuItemInvocation": {"status": "OBSERVED: bundle 011 context-menu invocation review", "summary": "MenuItemInvocation reports the exact stable item identity and source owner for one accepted menu activation."},
+    "MenuStripItemSpec": {"status": "OBSERVED: bundle 011 menu-strip item review", "summary": "MenuStripItemSpec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu."},
+    "MenuStripInvocation": {"status": "OBSERVED: bundle 011 menu-strip invocation review", "summary": "MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation."},
+    "ObjectViewItem": {"status": "OBSERVED: bundle 011 object-view value review", "summary": "ObjectViewItem owns stable identity, primary/secondary text, icon/status metadata, and optional command data for one flat object row."},
+    "ObjectSelectionChange": {"status": "OBSERVED: bundle 011 object-view event review", "summary": "ObjectSelectionChange reports previous/current optional identities and interaction source."},
+    "ObjectContextRequest": {"status": "OBSERVED: bundle 011 object-view context review", "summary": "ObjectContextRequest carries the selected identity and local/window anchor geometry for one context-surface request."},
+    "ReviewRecord": {"status": "OBSERVED: bundle 011 review-card value review", "summary": "ReviewRecord owns the stable author, timestamp, score/status, title, body, and metadata projected by ReviewCard."},
+    "ScrollEvent": {"status": "OBSERVED: bundle 011 scroll event review", "summary": "ScrollEvent reports axis, mutation kind, old/new values, and logical orientation for one admitted scroll transition."},
+    "ScrollAxisSnapshot": {"status": "OBSERVED: bundle 011 scroll-state review", "summary": "ScrollAxisSnapshot exposes minimum, maximum, viewport, small/large change, value, effective maximum, and visibility for one axis."},
+    "ScrollSnapshot": {"status": "OBSERVED: bundle 011 scroll-state review", "summary": "ScrollSnapshot combines horizontal/vertical axis snapshots with auto-scroll policy, margin, minimum size, offset, and logical position."},
+    "Snapshot": {"status": "OBSERVED: bundle 011 text-box history review", "summary": "TextBox::Snapshot captures UTF-8 content, directional selection, and viewport required for exact undo/redo restoration."},
+    "SplitChangeEvent": {"status": "OBSERVED: bundle 011 split-container event review", "summary": "SplitChangeEvent reports old/new splitter distance and whether the change originated from pointer interaction."},
+    "TabSelectionChange": {"status": "OBSERVED: bundle 011 tab-selection event review", "summary": "TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection."},
+    "TableLayoutStyle": {"status": "OBSERVED: bundle 011 table-layout style review", "summary": "TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value."},
+    "TableLayoutCellPosition": {"status": "OBSERVED: bundle 011 table-layout position review", "summary": "TableLayoutCellPosition names a zero-based row and column for exact retained child placement."},
+    "TreeViewItem": {"status": "OBSERVED: bundle 011 tree value review", "summary": "TreeViewItem owns stable identity, text, icon/status metadata, expansion capability/state, and nested children for one tree node."},
+    "TreeSelectionChange": {"status": "OBSERVED: bundle 011 tree event review", "summary": "TreeSelectionChange reports previous/current optional node identities and interaction source."},
+    "TreeExpansionChange": {"status": "OBSERVED: bundle 011 tree event review", "summary": "TreeExpansionChange reports the exact node and resulting expanded state."},
+    "gf_handle": {"status": "OBSERVED: bundle 011 C ABI record review", "summary": "gf_handle encodes one-based registry slot plus nonzero generation so stale GUI.Forms handles are rejected deterministically."},
+    "gf_string_view": {"status": "OBSERVED: bundle 011 C ABI record review", "summary": "gf_string_view is a non-owning bounded byte view; operations validate null/size and UTF-8 rules before copying."},
+    "gf_rect": {"status": "OBSERVED: bundle 011 C ABI record review", "summary": "gf_rect projects renderer-neutral logical rectangle geometry across the stable C ABI."},
+    "gf_point": {"status": "OBSERVED: bundle 011 C ABI record review", "summary": "gf_point projects renderer-neutral logical coordinates across the stable C ABI."},
+    "gf_size": {"status": "OBSERVED: bundle 011 C ABI record review", "summary": "gf_size projects renderer-neutral logical dimensions across the stable C ABI."},
+    "gf_scroll_axis_state": {"status": "OBSERVED: bundle 011 C ABI scroll review", "summary": "gf_scroll_axis_state projects one axis's bounds, viewport, change increments, current/effective maximum, and visibility."},
+    "gf_scroll_state": {"status": "OBSERVED: bundle 011 C ABI scroll review", "summary": "gf_scroll_state combines both axis records with auto-scroll offset, margin, minimum size, and logical position."},
+    "gf_layout_state": {"status": "OBSERVED: bundle 011 C ABI layout review", "summary": "gf_layout_state projects suspension depth, deferred status, and requested/committed revisions."},
+    "gf_property_value": {"status": "OBSERVED: bundle 011 C ABI property review", "summary": "gf_property_value is the tagged scalar/string carrier used by foreign property getters, setters, converters, and editors."},
+    "gf_property_enum_choice": {"status": "OBSERVED: bundle 011 C ABI property review", "summary": "gf_property_enum_choice pairs one numeric enum value with its bounded display label."},
+    "gf_property_descriptor_v1": {"status": "OBSERVED: bundle 011 C ABI property review", "summary": "gf_property_descriptor_v1 is a size-versioned inert schema record for name/category/description/type/default/range/enum/converter/editor policy."},
+    "gf_property_callbacks_v1": {"status": "OBSERVED: bundle 011 C ABI property review", "summary": "gf_property_callbacks_v1 is a size-versioned callback table for bounded foreign get/set/reset/serialize/format/parse/edit operations."},
+    "gf_field_edit_result": {"status": "OBSERVED: bundle 011 C ABI field review", "summary": "gf_field_edit_result reports handled/change state plus resulting directional selection and viewport after one field operation."},
+    "gf_error_view": {"status": "OBSERVED: bundle 011 C ABI error review", "summary": "gf_error_view returns the thread-local result code and borrowed bounded diagnostic for the last failed ABI operation."},
+    "gf_api_v0": {"status": "OBSERVED: bundle 011 complete GUI.Forms ABI table review", "summary": "gf_api_v0 is the size-versioned negotiated function table for generational control ownership, properties, layout/scroll, hierarchy, input, fields, dialogs/services, property proxies, callbacks, host execution, dispatch, and deterministic retirement."},
+    "gd_handle": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_handle encodes one-based drawing registry slot plus generation for deterministic stale-object rejection."},
+    "gd_string_view": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_string_view is a non-owning bounded drawing-ABI string view with explicit validation before copying."},
+    "gd_color": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_color projects packed straight-alpha ARGB plus explicit empty-color identity."},
+    "gd_point": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_point projects one floating-point drawing coordinate."},
+    "gd_size": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_size projects floating-point drawing dimensions."},
+    "gd_rect": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_rect projects floating-point drawing rectangle geometry."},
+    "gd_rect_i": {"status": "OBSERVED: bundle 011 drawing C ABI record review", "summary": "gd_rect_i projects exact integer pixel bounds for bitmap lock/edit/damage contracts."},
+    "gd_color_remap": {"status": "OBSERVED: bundle 011 drawing C ABI image review", "summary": "gd_color_remap maps one exact source ARGB value to a replacement for image-attribute processing."},
+    "gd_matrix": {"status": "OBSERVED: bundle 011 drawing C ABI transform review", "summary": "gd_matrix projects the six coefficients of a 2D affine transform."},
+    "gd_bitmap_lock_view": {"status": "OBSERVED: bundle 011 drawing C ABI bitmap review", "summary": "gd_bitmap_lock_view exposes bounded pixel pointer, dimensions, signed stride, pixel format, and lease token for one active read/write lock."},
+    "gd_bitmap_edit_view": {"status": "OBSERVED: bundle 011 drawing C ABI bitmap review", "summary": "gd_bitmap_edit_view exposes bounded mutable premultiplied BGRA storage, dimensions, stride, and generational edit token."},
+    "gd_bitmap_damage_summary": {"status": "OBSERVED: bundle 011 drawing C ABI damage review", "summary": "gd_bitmap_damage_summary projects revision, rectangle/compaction/collapse counts, and exact bounds after bitmap edits."},
+    "gd_error_view": {"status": "OBSERVED: bundle 011 drawing C ABI error review", "summary": "gd_error_view returns thread-local drawing result code and borrowed bounded diagnostic."},
+    "gd_raster_service_v0": {"status": "OBSERVED: bundle 011 drawing raster-service review", "summary": "gd_raster_service_v0 is the size-versioned host callback table for registering, updating, unregistering, and invalidating shared raster surfaces."},
+    "gd_api_v0": {"status": "OBSERVED: bundle 011 complete GUI.Drawing ABI table review", "summary": "gd_api_v0 is the size-versioned negotiated function table for drawing object ownership, transforms, paths, regions, brushes, pens, fonts, text, images, bitmap locks/edits/damage, recording/replay, native interop, and raster publication."},
     "RasterPointerSample": {"status": "OBSERVED: bundle 010 private ABI pointer record review; native and MinGW ABI builds pass", "summary": "RasterPointerSample is the bounded C-callback projection of one retained pointer event."},
     "RasterKeySample": {"status": "OBSERVED: bundle 010 private ABI key record review; native and MinGW ABI builds pass", "summary": "RasterKeySample is the C-callback projection of physical key, modifiers, repeat, and mutable handled state."},
     "RasterTextSample": {"status": "OBSERVED: bundle 010 private ABI text record review; native and MinGW ABI builds pass", "summary": "RasterTextSample owns UTF-8 text plus composition and replacement-range metadata for a C callback."},
-    "InputTransparentControl": {"status": "OBSERVED: bundle 010 private ABI control-adapter split; native and MinGW ABI builds pass", "summary": "InputTransparentControl participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces.", "methods": {"InputTransparentControl": "Forwards stable identity to the retained Control base.", "hit_test_local": "Always returns false so the placeholder cannot intercept input."}},
-    "FormControl": {"status": "OBSERVED: bundle 010 private ABI form-adapter split; native and MinGW ABI builds pass", "summary": "FormControl is a retained Panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter.", "methods": {"FormControl": "Constructs the retained panel surface.", "key_preview": "Returns mutable compatibility key-preview observation.", "on_key_preview": "Projects a core key event, emits preview, and copies handled state back."}},
+    "InputTransparentControl": {"status": "OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass", "capture": "captures/container_bundle_003_screen.png", "capture_note": "M4 retained-container evidence includes structural compatibility surfaces that preserve layout and paint ordering while allowing input to pass through.", "summary": "InputTransparentControl participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces.", "methods": {"InputTransparentControl": "Forwards stable identity to the retained Control base.", "~InputTransparentControl": "Releases the compatibility placeholder through its isolated translation-unit boundary.", "hit_test_local": "Always returns false so the placeholder cannot intercept input."}},
+    "FormControl": {"status": "OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass", "capture": "captures/native_window_host_screen.png", "capture_note": "M4 native-window evidence exercises the compatibility form adapter inside the real AppKit host session.", "summary": "FormControl is a retained Panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter.", "methods": {"FormControl": "Constructs the retained panel surface.", "~FormControl": "Releases form-preview state through its isolated translation-unit boundary.", "key_preview": "Returns mutable compatibility key-preview observation.", "on_key_preview": "Projects a core key event, emits preview, and copies handled state back."}},
     "FieldSnapshot": {"status": "OBSERVED: bundle 010 private ABI field-history review; native and MinGW ABI builds pass", "summary": "FieldSnapshot captures UTF-8 text, selection anchor/caret, read-only and password state, and horizontal viewport for exact undo/redo."},
     "FieldControl": {
-      "status": "OBSERVED: bundle 010 private ABI Unicode field state-machine split; native and MinGW ABI builds pass",
+      "status": "OBSERVED: bundle 013 per-adapter Unicode field state-machine isolation; native and MinGW ABI builds pass",
+      "capture": "captures/text_input_screen.png",
+      "capture_note": "M4 text-input board evidence covers Unicode selection, caret, focus, clipping, viewport, key, pointer, and text editing paths used by the compatibility field adapter.",
       "summary": "FieldControl owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated Unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native.",
       "method_scope": "all",
-      "methods": {"FieldControl": "Constructs one closed field kind and stable retained panel identity.", "set_colors": "Commits explicit foreground/background compatibility colors.", "set_text": "Validates UTF-8, snapshots history, replaces content, clamps selection, and invalidates retained presentation.", "replace": "Validates a byte range and replacement, applies edit policy/history, and returns exact edit telemetry.", "history": "Moves backward or forward through bounded snapshots.", "clear_history": "Drops undo and redo stacks.", "text": "Returns current UTF-8 content.", "set_selection": "Validates scalar boundaries and commits anchor/caret direction.", "set_edit_state": "Commits read-only, password, multiline, and viewport state after validation.", "position_at": "Maps local x through shaped glyph geometry and viewport to a scalar boundary.", "navigate": "Moves or extends the selection through the requested Unicode navigation operation.", "on_paint": "Paints the compatibility field, selection, caret, masked text, border, and clipping through retained Painter vocabulary.", "on_focus_changed": "Invalidates caret/focus presentation.", "pointer_input": "Returns compatibility pointer observation.", "key_input": "Returns compatibility key observation.", "text_input": "Returns compatibility text observation.", "on_pointer": "Projects pointer events, performs hit-test caret placement, and publishes the sample.", "on_key": "Projects keys, applies navigation/editing when unhandled, and copies handled state.", "on_text_input": "Projects composition/replacement input and commits admitted edits.", "snapshot": "Captures exact edit/history state.", "apply_snapshot": "Restores a snapshot with validation and retained invalidation.", "push_history": "Adds a bounded snapshot while suppressing duplicate adjacent states.", "push_undo": "Captures pre-edit state and clears forward history.", "clear_redo": "Drops redo state after divergent edits.", "edit_result": "Builds exact ABI edit telemetry from old/new state."}
+      "methods": {"FieldControl": "Constructs one closed field kind and stable retained panel identity.", "~FieldControl": "Releases field text, history, shaping, and event state through its isolated translation-unit boundary.", "set_colors": "Commits explicit foreground/background compatibility colors.", "set_text": "Validates UTF-8, snapshots history, replaces content, clamps selection, and invalidates retained presentation.", "replace": "Validates a byte range and replacement, applies edit policy/history, and returns exact edit telemetry.", "history": "Moves backward or forward through bounded snapshots.", "clear_history": "Drops undo and redo stacks.", "text": "Returns current UTF-8 content.", "set_selection": "Validates scalar boundaries and commits anchor/caret direction.", "set_edit_state": "Commits read-only, password, multiline, and viewport state after validation.", "position_at": "Maps local x through shaped glyph geometry and viewport to a scalar boundary.", "navigate": "Moves or extends the selection through the requested Unicode navigation operation.", "on_paint": "Paints the compatibility field, selection, caret, masked text, border, and clipping through retained Painter vocabulary.", "on_focus_changed": "Invalidates caret/focus presentation.", "pointer_input": "Returns compatibility pointer observation.", "key_input": "Returns compatibility key observation.", "text_input": "Returns compatibility text observation.", "on_pointer": "Projects pointer events, performs hit-test caret placement, and publishes the sample.", "on_key": "Projects keys, applies navigation/editing when unhandled, and copies handled state.", "on_text_input": "Projects composition/replacement input and commits admitted edits.", "snapshot": "Captures exact edit/history state.", "apply_snapshot": "Restores a snapshot with validation and retained invalidation.", "push_history": "Adds a bounded snapshot while suppressing duplicate adjacent states.", "push_undo": "Captures pre-edit state and clears forward history.", "clear_redo": "Drops redo state after divergent edits.", "edit_result": "Builds exact ABI edit telemetry from old/new state."}
     },
     "LiveWakeState": {"status": "OBSERVED: bundle 010 private ABI live-surface wake review; native and MinGW ABI builds pass", "summary": "LiveWakeState weakly correlates a RasterControl and Window so producer wakes can queue paint without prolonging either owner."},
     "RasterControl": {
-      "status": "OBSERVED: bundle 010 private ABI raster-control split; native and MinGW ABI builds pass",
+      "status": "OBSERVED: bundle 013 per-adapter raster state-machine isolation; native and MinGW ABI builds pass",
+      "capture": "captures/drawing_raster_material_screen.png",
+      "capture_note": "M4 Images and Drawing board evidence exercises retained raster, registered image, live-surface, clipping, and paint scheduling paths.",
       "summary": "RasterControl is the compatibility owner-painted and scroll-capable retained surface for bounded PNG/BGRA frames or a generational LiveSurface, with input projection and revocable wake scheduling.",
       "method_scope": "all",
-      "methods": {"RasterControl": "Constructs a scrollable compatibility surface.", "hit_test_local": "Uses retained geometry for ordinary input admission.", "pointer_input": "Returns projected pointer observation.", "key_input": "Returns projected key observation.", "set_png": "Validates/stores bounded PNG through the Window image registry and switches from pixel/live sources.", "set_bgra32_premultiplied": "Validates dimensions/stride/extent, copies immutable pixels, and switches from PNG/live sources.", "set_live_surface": "Binds a generational frame source and refreshes wake integration.", "clear_live_surface": "Clears only the matching source and revokes its wake path.", "on_paint": "Selects the newest live frame, retained image, or copied pixels and paints within clipped bounds.", "on_pointer": "Projects a core pointer event to compatibility callbacks.", "on_key": "Projects a core key event and copies handled state back.", "on_attached_to_window": "Connects the revocable live wake once Window ownership is available.", "on_detached_from_window": "Revokes wake integration before base detachment.", "queue_live_surface_paint": "Marshals a producer wake to owner-thread invalidation through Window dispatch.", "connect_live_surface_wake": "Installs one weak source/owner wake callback.", "disconnect_live_surface_wake": "Revokes and clears wake state."}
+      "methods": {"RasterControl": "Constructs a scrollable compatibility surface.", "~RasterControl": "Releases image, live-surface, wake, and input state through its isolated translation-unit boundary.", "hit_test_local": "Uses retained geometry for ordinary input admission.", "pointer_input": "Returns projected pointer observation.", "key_input": "Returns projected key observation.", "set_png": "Validates/stores bounded PNG through the Window image registry and switches from pixel/live sources.", "set_bgra32_premultiplied": "Validates dimensions/stride/extent, copies immutable pixels, and switches from PNG/live sources.", "set_live_surface": "Binds a generational frame source and refreshes wake integration.", "clear_live_surface": "Clears only the matching source and revokes its wake path.", "on_paint": "Selects the newest live frame, retained image, or copied pixels and paints within clipped bounds.", "on_pointer": "Projects a core pointer event to compatibility callbacks.", "on_key": "Projects a core key event and copies handled state back.", "on_attached_to_window": "Connects the revocable live wake once Window ownership is available.", "on_detached_from_window": "Revokes wake integration before base detachment.", "queue_live_surface_paint": "Marshals a producer wake to owner-thread invalidation through Window dispatch.", "connect_live_surface_wake": "Installs one weak source/owner wake callback.", "disconnect_live_surface_wake": "Revokes and clears wake state."}
     },
     "PropertyState": {"status": "OBSERVED: bundle 010 private ABI foreign-property state review; native and MinGW ABI builds pass", "summary": "PropertyState owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing.", "methods": {"get": "Calls the foreign getter and converts its ABI value/text into declared native schema.", "set": "Converts native value to ABI form and invokes the foreign setter.", "reset": "Invokes the optional foreign reset callback.", "should_serialize": "Invokes optional authored serialization policy or derives it from descriptor defaults.", "format": "Invokes optional foreign formatter and validates returned schema.", "parse": "Invokes optional foreign parser and treats declared callback rejection as no conversion.", "edit": "Invokes optional foreign editor and validates the returned value."}},
     "AbiPropertyObjectControl": {
-      "status": "OBSERVED: bundle 010 private ABI property-proxy split; native and MinGW ABI builds pass",
+      "status": "OBSERVED: bundle 013 per-adapter property-proxy state isolation; native and MinGW ABI builds pass",
+      "visual": false,
       "summary": "AbiPropertyObjectControl is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors.",
       "method_scope": "all",
-      "methods": {"AbiPropertyObjectControl": "Constructs a stable nonvisual proxy.", "define": "Copies/validates descriptor and callback table, installs a PropertyRegistration, and retains bounded callback state.", "notify_changed": "Publishes an explicitly named foreign property change.", "install_converters": "Registers named formatter/parser services backed by the retained callback state.", "install_editors": "Registers named editor services backed by the retained callback state.", "copy_text": "Validates ABI string views and copies UTF-8 with a field-specific diagnostic.", "native_kind": "Maps closed ABI value kind to native BindingValueKind.", "abi_kind": "Maps native BindingValueKind to closed ABI kind.", "to_abi": "Projects a native scalar value into an ABI record without leaking ownership.", "from_abi": "Validates and converts an ABI value/text pair through declared descriptor schema.", "callback_text": "Performs size-query then bounded fill for callback-owned UTF-8 output.", "copy_descriptor": "Copies and validates the complete inert ABI descriptor and standard values."}
+      "methods": {"AbiPropertyObjectControl": "Constructs a stable nonvisual proxy.", "~AbiPropertyObjectControl": "Releases copied descriptor and callback state through its isolated translation-unit boundary.", "define": "Copies/validates descriptor and callback table, installs a PropertyRegistration, and retains bounded callback state.", "notify_changed": "Publishes an explicitly named foreign property change.", "install_converters": "Registers named formatter/parser services backed by the retained callback state.", "install_editors": "Registers named editor services backed by the retained callback state.", "copy_text": "Validates ABI string views and copies UTF-8 with a field-specific diagnostic.", "native_kind": "Maps closed ABI value kind to native BindingValueKind.", "abi_kind": "Maps native BindingValueKind to closed ABI kind.", "to_abi": "Projects a native scalar value into an ABI record without leaking ownership.", "from_abi": "Validates and converts an ABI value/text pair through declared descriptor schema.", "callback_text": "Performs size-query then bounded fill for callback-owned UTF-8 output.", "copy_descriptor": "Copies and validates the complete inert ABI descriptor and standard values."}
     },
+    "CapturedSurface": {"status": "OBSERVED: bundle 010 private drawing ABI platform review; native drawing and complete M4 MinGW builds pass", "summary": "CapturedSurface owns the bitmap and source-relative bounds produced by one host-surface capture, keeping platform handles outside the portable drawing contract."},
     "CompatibilityPaintBinding": {"status": "OBSERVED: bundle 010 Windows paint binding review; complete M4 MinGW build passes", "summary": "CompatibilityPaintBinding weakly correlates one RasterControl, its owner thread, and the LiveSurface supplied by a Windows compatibility endpoint."},
     "CompatibilityPaintWrite": {"status": "OBSERVED: bundle 010 Windows paint write-lease review; complete M4 MinGW build passes", "summary": "CompatibilityPaintWrite owns one endpoint during an active device-context write and records the exact DC and acquiring thread required to end it."},
     "SubscriptionRecord": {"status": "OBSERVED: bundle 010 private ABI subscription review; native ABI tests and complete M4 MinGW build pass", "summary": "SubscriptionRecord owns exactly one C callback flavor, caller context, owner thread, native SubscriptionToken, event kind, and connected state."},
     "DispatchRecord": {"status": "OBSERVED: bundle 010 private ABI dispatch review; native ABI tests and complete M4 MinGW build pass", "summary": "DispatchRecord owns one queued C callback plus caller context until Window dispatch executes or retirement cancels it."},
     "ControlRecord": {"status": "OBSERVED: bundle 010 private ABI control record review; native ABI tests and complete M4 MinGW build pass", "summary": "ControlRecord is the registry-owned state for one ABI handle: retained control, owner thread/window, host phase, popup attachment, paint-plane overrides, dialog/tooltip/clipboard services, pending dispatch, and callback-fault telemetry."},
-    "Slot": {"status": "OBSERVED: bundle 010 private ABI slot review; native ABI tests and complete M4 MinGW build pass", "summary": "Slot combines generation, closed slot kind, reference count, and either control or subscription ownership so stale handles fail deterministically."},
+    "RegistrySlot": {"status": "OBSERVED: bundle 010 private ABI slot review; native ABI tests and complete M4 MinGW build pass", "summary": "RegistrySlot combines generation, closed slot kind, reference count, and either control or subscription ownership so stale handles fail deterministically."},
     "Registry": {
       "status": "OBSERVED: bundle 010 private ABI registry state-machine split; native C11/C++/export tests and complete M4 MinGW build pass",
       "summary": "Registry is the single compatibility ABI authority for generational handles, thread affinity, control trees, subscriptions, host sessions, queued callbacks, transient services, property proxies, and deterministic retirement.",

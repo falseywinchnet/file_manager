@@ -1,16 +1,16 @@
 # MotionPolicy
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 animation-policy review**
 - Kind: **struct**
 - Hierarchy: `MotionPolicy`
-- Declaration: `include/gui_forms/animation.hpp:53`
+- Declaration: `include/gui_forms/animation/animation_timeline/animation_timeline.hpp:53`
 - Definition: `inline/header-only`
 
-MotionPolicy is a struct declared in include/gui_forms/animation.hpp.
+MotionPolicy is the resolved environment policy for active/quiescent cadence, speed scaling, and presentation phase.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -60,4 +60,4 @@ Reports the current presentation phase value without mutation.
 friend constexpr bool operator==(const MotionPolicy&, const MotionPolicy&) noexcept = default
 ```
 
-Public MotionPolicy operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

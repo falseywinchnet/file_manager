@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
 - Kind: **struct**
 - Hierarchy: `SizeI`
-- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:22`
+- Declaration: `include/gui_forms/drawing/geometry/size_i/size_i.hpp:7`
 - Definition: `inline/header-only`
 
 SizeI carries signed integer width and height.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

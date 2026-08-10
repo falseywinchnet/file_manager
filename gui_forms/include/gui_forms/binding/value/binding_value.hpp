@@ -1,6 +1,9 @@
 #pragma once
 
 #include "gui_forms/component.hpp"
+#include "gui_forms/binding/value/binding_value_kind/binding_value_kind.hpp"
+#include "gui_forms/binding/value/property_collection_value/property_collection_value.hpp"
+#include "gui_forms/binding/value/property_object_value/property_object_value.hpp"
 #include "gui_forms/dirty.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/types.hpp"
@@ -18,25 +21,6 @@
 
 namespace gui_forms {
 
-enum class BindingValueKind : std::uint8_t {
-    null,
-    boolean,
-    signed_integer,
-    unsigned_integer,
-    number,
-    text,
-    point,
-    size,
-    rectangle,
-    insets,
-    color,
-    font,
-    image,
-    enumeration,
-    object,
-    collection,
-};
-
 struct PropertyEnumValue final {
     std::string type_name;
     std::string name;
@@ -49,46 +33,6 @@ struct PropertyObjectMember;
 struct PropertyObjectData;
 struct PropertyCollectionData;
 struct PropertyEnumDescriptor;
-
-class PropertyObjectValue final {
-public:
-    PropertyObjectValue() = default;
-    [[nodiscard]] explicit operator bool() const noexcept;
-    [[nodiscard]] std::string_view type_name() const noexcept;
-    [[nodiscard]] std::span<const PropertyObjectMember> members() const noexcept;
-    [[nodiscard]] const PropertyObjectData* data() const noexcept {
-        return data_.get();
-    }
-    friend bool operator==(const PropertyObjectValue& left,
-                           const PropertyObjectValue& right) noexcept;
-
-private:
-    explicit PropertyObjectValue(
-        std::shared_ptr<const PropertyObjectData> authored_data)
-        : data_(std::move(authored_data)) {}
-    std::shared_ptr<const PropertyObjectData> data_;
-    friend struct PropertyValueFactoryAccess;
-};
-
-class PropertyCollectionValue final {
-public:
-    PropertyCollectionValue() = default;
-    [[nodiscard]] explicit operator bool() const noexcept;
-    [[nodiscard]] std::string_view item_type_name() const noexcept;
-    [[nodiscard]] BindingValueKind item_kind() const noexcept;
-    [[nodiscard]] const PropertyCollectionData* data() const noexcept {
-        return data_.get();
-    }
-    friend bool operator==(const PropertyCollectionValue& left,
-                           const PropertyCollectionValue& right) noexcept;
-
-private:
-    explicit PropertyCollectionValue(
-        std::shared_ptr<const PropertyCollectionData> authored_data)
-        : data_(std::move(authored_data)) {}
-    std::shared_ptr<const PropertyCollectionData> data_;
-    friend struct PropertyValueFactoryAccess;
-};
 
 using BindingValue = std::variant<std::monostate, bool, std::int64_t,
                                   std::uint64_t, double, std::string,

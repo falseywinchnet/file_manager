@@ -1,16 +1,16 @@
 # ItemCheckEvent
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 checked-list event review**
 - Kind: **struct**
 - Hierarchy: `ItemCheckEvent`
 - Declaration: `include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp:13`
 - Definition: `inline/header-only`
 
-ItemCheckEvent is a struct declared in include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp.
+ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

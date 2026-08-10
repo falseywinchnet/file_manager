@@ -1,16 +1,16 @@
 # MasterDetailLayout
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 master-detail layout review**
 - Kind: **struct**
 - Hierarchy: `MasterDetailLayout`
 - Declaration: `include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp:17`
 - Definition: `inline/header-only`
 
-MasterDetailLayout is a struct declared in include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp.
+MasterDetailLayout defines bounded navigation width and inter-pane gap for deterministic responsive projection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 friend constexpr bool operator==(const MasterDetailLayout&, const MasterDetailLayout&) = default
 ```
 
-Public MasterDetailLayout operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

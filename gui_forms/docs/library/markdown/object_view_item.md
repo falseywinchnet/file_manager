@@ -1,16 +1,16 @@
 # ObjectViewItem
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 object-view value review**
 - Kind: **struct**
 - Hierarchy: `ObjectViewItem`
 - Declaration: `include/gui_forms/controls/panel/object_view/object_view.hpp:31`
 - Definition: `inline/header-only`
 
-ObjectViewItem is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp.
+ObjectViewItem owns stable identity, primary/secondary text, icon/status metadata, and optional command data for one flat object row.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

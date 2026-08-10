@@ -4,9 +4,9 @@
 <body><article><header><p class="eyebrow">struct · library</p>
 <h1>PropertyRegistration</h1><p class="summary">PropertyRegistration privately couples an inert descriptor to explicit getter, setter, change, reset, serialization, and origin callbacks registered by a retained Control.</p>
 <div class="badges"><span>OBSERVED: bundle 010 executable property registration review; focused M4 binding tests pass</span><span>header-only or distributed</span></div></header>
-<section><h2>Visual evidence</h2><p class="pending">Capture pending: the type is inventoried but has not yet passed the Screen Sharing crop gate.</p></section>
+<section><h2>Visual evidence</h2><p>Not applicable: this is a nonvisual contract, value, service, or state owner.</p></section>
 <section><h2>Ownership and hierarchy</h2><dl><dt>Hierarchy</dt><dd>PropertyRegistration</dd>
-<dt>Declaration</dt><dd>include/gui_forms/binding/value/binding_value.hpp:258</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
+<dt>Declaration</dt><dd>include/gui_forms/binding/value/binding_value.hpp:202</dd><dt>Definition</dt><dd>inline/header-only</dd></dl></section>
 <section><h2>Declared methods</h2><section class="method"><h3>PropertyRegistration <span class="access">public</span></h3><code>PropertyRegistration() = default</code><p>Default construction is empty; authored construction moves the descriptor and callback set.</p></section><section class="method"><h3>PropertyRegistration <span class="access">public</span></h3><code>PropertyRegistration(PropertyDescriptor authored_descriptor, Getter authored_get, Setter authored_set, ChangeConnector authored_change =</code><p>Default construction is empty; authored construction moves the descriptor and callback set.</p></section><section class="method"><h3>descriptor <span class="access">public</span></h3><code>: descriptor(std::move(authored_descriptor)), get(std::move(authored_get)), set(std::move(authored_set)), connect_changed(std::move(authored_change)), reset(std::move(authored_reset)), should_serialize(std::move(authored_should_serialize)), origin(std::move(authored_origin))</code><p>Parser-visible declaration of the inert descriptor stored before executable callbacks.</p></section></section>
 <footer><a href="../markdown/property_registration.md">AI-readable Markdown source</a></footer>
 </article></body></html>

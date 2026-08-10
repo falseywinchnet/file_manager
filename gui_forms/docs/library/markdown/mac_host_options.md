@@ -1,16 +1,16 @@
 # MacHostOptions
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 host-contract review**
 - Kind: **struct**
 - Hierarchy: `MacHostOptions`
 - Declaration: `include/gui_forms/platform/macos_host.hpp:15`
 - Definition: `inline/header-only`
 
-MacHostOptions is a struct declared in include/gui_forms/platform/macos_host.hpp.
+MacHostOptions declares initial native window title, geometry, display scale, and run policy.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

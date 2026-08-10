@@ -37,15 +37,20 @@ if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
 endif()
 
 add_library(gui_forms_core STATIC
-    src/core/animation.cpp
+    src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
+    src/core/binding/value/property_collection_value/property_collection_value.cpp
+    src/core/binding/value/property_object_value/property_object_value.cpp
     src/core/binding/currency_manager/currency_manager.cpp
     src/core/binding/binding_source/binding_source.cpp
     src/core/binding/binding/binding.cpp
     src/core/binding/control_bindings_collection/control_bindings_collection.cpp
     src/core/binding/binding_context/binding_context.cpp
-    src/core/types.cpp
+    src/core/types/damage_region/damage_region.cpp
+    src/core/types/painter/painter.cpp
+    src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
+    src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
@@ -59,6 +64,9 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
     src/core/host/types/host_types.cpp
+    src/core/host/types/host_capabilities/host_capabilities.cpp
+    src/core/host/types/host_services_snapshot/host_services_snapshot.cpp
+    src/core/host/types/host_session_snapshot/host_session_snapshot.cpp
     src/core/host/services/host_services.cpp
     src/core/host/session/host_session.cpp
     src/core/feedback/semantic_feedback/semantic_feedback.cpp
@@ -71,6 +79,7 @@ add_library(gui_forms_core STATIC
     src/core/scheduler/request/scheduled_frame_request.cpp
     src/core/window/dispatcher/window_dispatcher.cpp
     src/core/window/lifecycle/window_lifecycle.cpp
+    src/core/window/update_scope/update_scope.cpp
     src/core/window/presentation/window_presentation.cpp
     src/core/window/scheduler/window_scheduler.cpp
     src/core/window/popup/popup_token.cpp
@@ -79,8 +88,9 @@ add_library(gui_forms_core STATIC
     src/core/component/component/component.cpp
     src/core/component/component_container/component_container.cpp
     src/core/timer/timer/timer.cpp
-    src/core/control.cpp
-    src/core/static_tree.cpp
+    src/core/control/control/control.cpp
+    src/core/control/stable_id/stable_id.cpp
+    src/core/control/static_tree/control_factory/control_factory.cpp
     src/core/window/window.cpp
 )
 target_include_directories(gui_forms_core PUBLIC
@@ -155,11 +165,15 @@ add_library(gui_drawing_core STATIC
     src/core/drawing/brush/solid_brush.cpp
     src/core/drawing/color/color.cpp
     src/core/drawing/font/font.cpp
-    src/core/drawing/geometry/drawing_geometry.cpp
+    src/core/drawing/geometry/point_i/point_i.cpp
+    src/core/drawing/geometry/point_f/point_f.cpp
+    src/core/drawing/geometry/rect_i/rect_i.cpp
+    src/core/drawing/geometry/rect_f/rect_f.cpp
     src/core/drawing/graphics_path/graphics_path.cpp
     src/core/drawing/graphics_recorder/graphics_recorder.cpp
     src/core/drawing/image_attributes/image_attributes.cpp
     src/core/drawing/image_reference/image_reference.cpp
+    src/core/drawing/image_snapshot/image_snapshot.cpp
     src/core/drawing/matrix/matrix.cpp
     src/core/drawing/object/drawing_object.cpp
     src/core/drawing/pen/pen.cpp
@@ -268,14 +282,14 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
     src/controls/panel/flags_value_editor/flags_value_editor.cpp
     src/controls/panel/color_value_editor/color_value_editor.cpp
-    src/controls/inspection/inspection_types.cpp
+    src/controls/inspection/property_row_spec/property_row_spec.cpp
     src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp
     src/controls/inspection/property_editor_registry/property_editor_registry.cpp
     src/controls/panel/property_list/property_list.cpp
     src/controls/panel/property_grid/property_grid.cpp
     src/controls/panel/instrument_rack/rack_module_panel/rack_module_panel.cpp
     src/controls/panel/instrument_rack/instrument_rack.cpp
-    src/controls/image_list.cpp
+    src/core/resources/image_list/image_list/image_list.cpp
     src/controls/guidance/error_layer/error_layer.cpp
     src/controls/guidance/error_glyph/error_glyph.cpp
     src/controls/guidance/error_provider/error_provider.cpp
@@ -302,6 +316,11 @@ target_link_libraries(gui_forms_controls PUBLIC gui_forms_core gui_drawing_core)
 
 add_library(gui_forms_c_api SHARED
     src/abi/c_api.cpp
+    src/abi/control_adapters/input_transparent_control/input_transparent_control.cpp
+    src/abi/control_adapters/form_control/form_control.cpp
+    src/abi/control_adapters/field_control/field_control.cpp
+    src/abi/control_adapters/raster_control/raster_control.cpp
+    src/abi/control_adapters/abi_property_object_control/abi_property_object_control.cpp
     src/abi/error/abi_error.cpp
     src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp
 )
@@ -539,7 +558,7 @@ if(GUI_FORMS_ENABLE_SKIA)
     )
 
     add_library(gui_drawing_skia STATIC
-        src/render/skia/executor/drawing_skia.cpp
+        src/render/skia/executor/skia_executor.cpp
     )
     add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
     target_include_directories(gui_drawing_skia
@@ -651,6 +670,7 @@ endif()
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     add_library(gui_forms_host_windows STATIC
         src/host/windows/application/windows_host.cpp
+        src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows

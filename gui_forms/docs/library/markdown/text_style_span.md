@@ -10,7 +10,7 @@ TextStyleSpan maps one UTF-8 half-open range to a compact style identity.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

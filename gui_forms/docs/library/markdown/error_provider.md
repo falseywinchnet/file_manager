@@ -300,7 +300,7 @@ Returns deterministic icon records and live/presented counts for tests and diagn
 void verify_dispose_thread() override
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's verify dispose thread operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_dispose` (protected)
 
@@ -308,7 +308,7 @@ Public ErrorProvider operation. Its exact signature is inventoried here; follow 
 void on_dispose() noexcept override
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's on dispose operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `bound_window` (private)
 
@@ -332,7 +332,7 @@ Reports the current require access value without mutation.
 [[nodiscard]] Entry* find_entry(const Control& target)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's find entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `find_entry` (private)
 
@@ -348,7 +348,7 @@ Reports the current find entry value without mutation.
 [[nodiscard]] Entry& require_entry(const std::shared_ptr<Control>& target)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's require entry operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `refresh_visual` (private)
 
@@ -356,7 +356,7 @@ Public ErrorProvider operation. Its exact signature is inventoried here; follow 
 void refresh_visual(Entry& entry, bool error_changed)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's refresh visual operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `close_visual` (private)
 
@@ -364,7 +364,7 @@ Public ErrorProvider operation. Its exact signature is inventoried here; follow 
 void close_visual(Entry& entry) noexcept
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's close visual operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `refresh_all_visuals` (private)
 
@@ -372,7 +372,7 @@ Public ErrorProvider operation. Its exact signature is inventoried here; follow 
 void refresh_all_visuals(bool restart_blink)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's refresh all visuals operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `position_visual` (private)
 
@@ -380,7 +380,7 @@ Public ErrorProvider operation. Its exact signature is inventoried here; follow 
 void position_visual(Entry& entry)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's position visual operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `icon_bounds` (private)
 
@@ -396,7 +396,7 @@ Reports the current icon bounds value without mutation.
 void erase_if_empty(std::uint64_t runtime_id)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's erase if empty operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `clear_bound_errors` (private)
 
@@ -412,4 +412,4 @@ Removes the explicit bound errors value and restores fallback behavior.
 void binding_completed(BindingCompleteEvent& event)
 ```
 
-Public ErrorProvider operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ErrorProvider's binding completed operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

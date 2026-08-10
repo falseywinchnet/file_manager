@@ -428,7 +428,7 @@ Reports the current paint button text value without mutation.
 void paint_button_content(Painter& painter, Rect bounds, std::string_view text, Color foreground, Point offset =
 ```
 
-Public ButtonBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ButtonBase's paint button content operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `paint_themed_button` (protected)
 
@@ -444,7 +444,7 @@ Reports the current paint themed button value without mutation.
 [[nodiscard]] ImageListResolution resolved_button_image( bool selected = false) const noexcept
 ```
 
-Reports the current resolved button image value without mutation.
+Resolves the requested retained resource against exact identity, scale, and fallback policy.
 
 ### `on_attached_to_window` (protected)
 
@@ -452,7 +452,7 @@ Reports the current resolved button image value without mutation.
 void on_attached_to_window() override
 ```
 
-Public ButtonBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ButtonBase's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `perform_dialog_command` (protected)
 
@@ -460,7 +460,7 @@ Public ButtonBase operation. Its exact signature is inventoried here; follow the
 bool perform_dialog_command() override
 ```
 
-Public ButtonBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ButtonBase's perform dialog command operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `supports_dialog_command` (protected)
 
@@ -484,4 +484,4 @@ Reports the current mnemonic matches value without mutation.
 bool process_mnemonic_self(char32_t character) override
 ```
 
-Public ButtonBase operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ButtonBase's process mnemonic self operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

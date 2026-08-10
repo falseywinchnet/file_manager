@@ -1,16 +1,16 @@
 # DragDispatchResult
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 drag-routing review**
 - Kind: **struct**
 - Hierarchy: `DragDispatchResult`
-- Declaration: `include/gui_forms/events.hpp:204`
+- Declaration: `include/gui_forms/events/input_events/input_events.hpp:204`
 - Definition: `inline/header-only`
 
-DragDispatchResult is a struct declared in include/gui_forms/events.hpp.
+DragDispatchResult projects the final handled and selected-effect outcome of one routed drag turn.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

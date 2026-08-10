@@ -1,16 +1,16 @@
 # Snapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 text-box history review**
 - Kind: **struct**
 - Hierarchy: `Snapshot`
 - Declaration: `include/gui_forms/controls/panel/text_box/text_box.hpp:106`
 - Definition: `inline/header-only`
 
-Snapshot is a struct declared in include/gui_forms/controls/panel/text_box/text_box.hpp.
+TextBox::Snapshot captures UTF-8 content, directional selection, and viewport required for exact undo/redo restoration.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -10,7 +10,7 @@ SourceEntry weakly tracks a source and owns the subscription that removes it whe
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

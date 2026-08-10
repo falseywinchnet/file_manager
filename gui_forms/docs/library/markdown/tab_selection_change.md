@@ -1,16 +1,16 @@
 # TabSelectionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 tab-selection event review**
 - Kind: **struct**
 - Hierarchy: `TabSelectionChange`
 - Declaration: `include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp:29`
 - Definition: `inline/header-only`
 
-TabSelectionChange is a struct declared in include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp.
+TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

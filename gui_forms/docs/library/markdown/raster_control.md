@@ -1,18 +1,26 @@
 # RasterControl
 
-- Status: **OBSERVED: bundle 010 private ABI raster-control split; native and MinGW ABI builds pass**
+- Status: **OBSERVED: bundle 013 per-adapter raster state-machine isolation; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `ScrollableControl → RasterControl`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:576`
-- Definition: `inline/header-only`
+- Declaration: `src/abi/control_adapters/raster_control/raster_control.hpp:13`
+- Definition: `src/abi/control_adapters/raster_control/raster_control.cpp`
 
 RasterControl is the compatibility owner-painted and scroll-capable retained surface for bounded PNG/BGRA frames or a generational LiveSurface, with input projection and revocable wake scheduling.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![RasterControl](../captures/drawing_raster_material_screen.png)
 
 ## Declared methods
+
+### `~RasterControl` (public)
+
+```cpp
+~RasterControl() override
+```
+
+Releases image, live-surface, wake, and input state through its isolated translation-unit boundary.
 
 ### `RasterControl` (public)
 

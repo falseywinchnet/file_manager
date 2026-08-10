@@ -1,7 +1,10 @@
 # FieldControlKind
 
-- Status: **generated state/value inventory; narrative review pending**
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:48`
+- Status: **OBSERVED source inventory; declaration-derived narrative**
+- Declaration: `src/abi/control_adapters/support/abi_control_adapter_support.hpp:48`
+
+This closed vocabulary makes the named state explicit at API boundaries; the
+declaration below is authoritative for admitted values.
 
 ## Declared values
 

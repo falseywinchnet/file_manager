@@ -1,16 +1,16 @@
 # AnimationSample
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 animation-state review**
 - Kind: **struct**
 - Hierarchy: `AnimationSample`
-- Declaration: `include/gui_forms/animation.hpp:36`
+- Declaration: `include/gui_forms/animation/animation_timeline/animation_timeline.hpp:36`
 - Definition: `inline/header-only`
 
-AnimationSample is a struct declared in include/gui_forms/animation.hpp.
+AnimationSample is one immutable normalized/raw progress, iteration, and completion observation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

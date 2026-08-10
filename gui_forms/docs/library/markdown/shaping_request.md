@@ -10,7 +10,7 @@ ShapingRequest is a non-owning, bounded shaping transaction with text, range, fa
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

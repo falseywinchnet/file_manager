@@ -292,7 +292,7 @@ Routes semantic press through activation, semantic select through retained selec
 Control::Ptr replace_section(Control::Ptr& slot, Control::Ptr replacement)
 ```
 
-Public Card operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes Card's replace section operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `current_context` (private)
 

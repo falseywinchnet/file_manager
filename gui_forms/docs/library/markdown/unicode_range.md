@@ -1,16 +1,16 @@
 # UnicodeRange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 Unicode-table review**
 - Kind: **struct**
 - Hierarchy: `UnicodeRange`
 - Declaration: `src/core/text/unicode/unicode_grapheme_data.hpp:22`
 - Definition: `inline/header-only`
 
-UnicodeRange is a struct declared in src/core/text/unicode/unicode_grapheme_data.hpp.
+UnicodeRange maps an inclusive code-point interval to the generated grapheme-break property used by conformance logic.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

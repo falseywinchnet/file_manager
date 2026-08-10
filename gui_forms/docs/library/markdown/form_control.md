@@ -1,18 +1,26 @@
 # FormControl
 
-- Status: **OBSERVED: bundle 010 private ABI form-adapter split; native and MinGW ABI builds pass**
+- Status: **OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `Panel → FormControl`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:99`
-- Definition: `inline/header-only`
+- Declaration: `src/abi/control_adapters/form_control/form_control.hpp:11`
+- Definition: `src/abi/control_adapters/form_control/form_control.cpp`
 
 FormControl is a retained Panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![FormControl](../captures/native_window_host_screen.png)
 
 ## Declared methods
+
+### `~FormControl` (public)
+
+```cpp
+~FormControl() override
+```
+
+Releases form-preview state through its isolated translation-unit boundary.
 
 ### `FormControl` (public)
 

@@ -1,16 +1,16 @@
 # ControlFactory
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 static-tree construction review**
 - Kind: **class**
 - Hierarchy: `ControlFactory`
-- Declaration: `include/gui_forms/static_tree.hpp:21`
-- Definition: `src/core/static_tree.cpp`
+- Declaration: `include/gui_forms/control/static_tree/control_factory/control_factory.hpp:21`
+- Definition: `src/core/control/static_tree/control_factory/control_factory.cpp`
 
-ControlFactory is a class declared in include/gui_forms/static_tree.hpp.
+ControlFactory maps explicit type names to construction callbacks, rejects duplicates/unknown types, and recursively creates retained trees without a bundled scripting runtime.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,7 +20,7 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 void register_type(std::string type, Creator creator)
 ```
 
-Public ControlFactory operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ControlFactory's register type operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `create` (public)
 

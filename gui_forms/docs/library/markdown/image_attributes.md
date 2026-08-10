@@ -10,7 +10,7 @@ ImageAttributes retains an optional finite 5x5 color matrix and bounded unique r
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

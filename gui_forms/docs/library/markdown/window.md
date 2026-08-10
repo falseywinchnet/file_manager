@@ -3,7 +3,7 @@
 - Status: **OBSERVED: bundle 007 retained-window hierarchy and lifecycle/dispatcher split; M4 macOS and MinGW builds, focused tests, and Screen Sharing pass**
 - Kind: **class**
 - Hierarchy: `Window`
-- Declaration: `include/gui_forms/window/window.hpp:213`
+- Declaration: `include/gui_forms/window/window.hpp:215`
 - Definition: `src/core/window/dispatcher/window_dispatcher.cpp, src/core/window/lifecycle/window_lifecycle.cpp, src/core/window/presentation/window_presentation.cpp, src/core/window/scheduler/window_scheduler.cpp, src/core/window/window.cpp`
 
 Window is GUI.Forms' portable retained-root coordinator. It owns exact tree identity, update/layout/paint transactions, damage and presentation receipts, live layers, frame requests, UI-thread dispatch, resources, focus/validation/dialog keys, pointer/drag/deferred input, popups and accelerators, metrics, and semantic projection; native adapters reach it only through the host session and wake seams.

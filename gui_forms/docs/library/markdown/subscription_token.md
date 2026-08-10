@@ -1,16 +1,16 @@
 # SubscriptionToken
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 revocable-event review**
 - Kind: **class**
 - Hierarchy: `SubscriptionToken`
-- Declaration: `include/gui_forms/event.hpp:14`
+- Declaration: `include/gui_forms/event/event/event.hpp:14`
 - Definition: `inline/header-only`
 
-SubscriptionToken is a class declared in include/gui_forms/event.hpp.
+SubscriptionToken is the move-only RAII revocation handle for a retained Event slot; destruction and explicit disconnect are idempotent.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -44,7 +44,7 @@ Constructs or tears down the retained SubscriptionToken object according to its 
 SubscriptionToken& operator=(SubscriptionToken&& other) noexcept
 ```
 
-Public SubscriptionToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SubscriptionToken's operator= operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `SubscriptionToken` (public)
 
@@ -60,7 +60,7 @@ Constructs or tears down the retained SubscriptionToken object according to its 
 SubscriptionToken& operator=(const SubscriptionToken&) = delete
 ```
 
-Public SubscriptionToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SubscriptionToken's operator= operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `disconnect` (public)
 
@@ -68,7 +68,7 @@ Public SubscriptionToken operation. Its exact signature is inventoried here; fol
 void disconnect() noexcept
 ```
 
-Public SubscriptionToken operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SubscriptionToken's disconnect operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `connected` (public)
 

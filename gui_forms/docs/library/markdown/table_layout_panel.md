@@ -260,7 +260,7 @@ Projects a named table as a group and reports overflow state without inventing a
 [[nodiscard]] CellMetadata& metadata_for(const Control& child)
 ```
 
-Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TableLayoutPanel's metadata for operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `metadata_for` (private)
 
@@ -276,7 +276,7 @@ Reports the current metadata for value without mutation.
 void reconcile_metadata()
 ```
 
-Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TableLayoutPanel's reconcile metadata operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `layout_children` (private)
 
@@ -284,7 +284,7 @@ Public TableLayoutPanel operation. Its exact signature is inventoried here; foll
 [[nodiscard]] Size layout_children(Size available, bool assign)
 ```
 
-Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TableLayoutPanel's layout children operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `validate_style` (private)
 
@@ -292,4 +292,4 @@ Public TableLayoutPanel operation. Its exact signature is inventoried here; foll
 static void validate_style(TableLayoutStyle style)
 ```
 
-Public TableLayoutPanel operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TableLayoutPanel's validate style operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gui_forms/window/update_scope/update_scope.hpp"
+
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
@@ -673,22 +675,6 @@ private:
     std::uint64_t semantic_generation_{1U};
     bool in_semantic_snapshot_{};
     HostServices* host_services_{};
-};
-
-class UpdateScope {
-public:
-    explicit UpdateScope(Window& window) noexcept : window_(&window) {}
-    ~UpdateScope();
-    UpdateScope(UpdateScope&& other) noexcept;
-    UpdateScope& operator=(UpdateScope&& other) noexcept;
-    UpdateScope(const UpdateScope&) = delete;
-    UpdateScope& operator=(const UpdateScope&) = delete;
-
-    void perform_layout();
-    void close();
-
-private:
-    Window* window_{};
 };
 
 } // namespace gui_forms

@@ -2,6 +2,10 @@
 
 #include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"
+#include "gui_forms/host/types/host_capabilities/host_capabilities.hpp"
+#include "gui_forms/host/types/host_lifecycle_phase/host_lifecycle_phase.hpp"
+#include "gui_forms/host/types/host_services_snapshot/host_services_snapshot.hpp"
+#include "gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp"
 #include "gui_forms/types.hpp"
 
 #include <cstdint>
@@ -13,54 +17,6 @@
 namespace gui_forms {
 
 class Window;
-
-enum class HostCapability : std::uint64_t {
-    none = 0,
-    lifecycle = 1ULL << 0U,
-    scale_notifications = 1ULL << 1U,
-    monitor_geometry = 1ULL << 2U,
-    occlusion = 1ULL << 3U,
-    scheduled_wake = 1ULL << 4U,
-    pointer_input = 1ULL << 5U,
-    keyboard_input = 1ULL << 6U,
-    text_composition = 1ULL << 7U,
-    pointer_capture = 1ULL << 8U,
-    cursor = 1ULL << 9U,
-    clipboard = 1ULL << 10U,
-    typed_drag_destination = 1ULL << 11U,
-    dialogs = 1ULL << 12U,
-    menus = 1ULL << 13U,
-    font_discovery = 1ULL << 14U,
-    accessibility = 1ULL << 15U,
-    typed_drag_source = 1ULL << 16U,
-    sound_cues = 1ULL << 17U,
-};
-
-[[nodiscard]] constexpr HostCapability operator|(HostCapability left,
-                                                  HostCapability right) noexcept {
-    return static_cast<HostCapability>(static_cast<std::uint64_t>(left) |
-                                       static_cast<std::uint64_t>(right));
-}
-
-[[nodiscard]] constexpr bool has_capability(HostCapability available,
-                                            HostCapability requested) noexcept {
-    return (static_cast<std::uint64_t>(available) &
-            static_cast<std::uint64_t>(requested)) ==
-           static_cast<std::uint64_t>(requested);
-}
-
-struct HostCapabilities final {
-    static constexpr std::uint32_t current_protocol_version = 5;
-
-    std::uint32_t protocol_version{current_protocol_version};
-    std::string platform{"unknown"};
-    HostCapability available{HostCapability::none};
-
-    [[nodiscard]] bool supports(HostCapability capability) const noexcept {
-        return has_capability(available, capability);
-    }
-    [[nodiscard]] std::string to_json() const;
-};
 
 struct HostMonitor final {
     std::string id;
@@ -251,34 +207,6 @@ struct HostModalTransition final {
     bool entering{};
 };
 
-struct HostServicesSnapshot final {
-    HostCapabilities capabilities;
-    CursorKind cursor{CursorKind::arrow};
-    bool pointer_captured{};
-    std::uint64_t captured_pointer_id{};
-    std::uint64_t monitor_queries{};
-    std::uint64_t cursor_updates{};
-    std::uint64_t pointer_capture_updates{};
-    std::uint64_t clipboard_reads{};
-    std::uint64_t clipboard_writes{};
-    std::uint64_t clipboard_generation{};
-    std::uint64_t dialog_requests{};
-    std::uint64_t dialog_completions{};
-    std::uint64_t dialog_cancellations{};
-    std::uint64_t sound_requests{};
-    std::uint64_t sound_playbacks{};
-    std::uint64_t sound_coalesced{};
-    std::uint64_t sound_muted{};
-    std::uint64_t sound_coalescing_window_nanoseconds{50'000'000U};
-    std::uint32_t modal_depth{};
-    std::uint32_t maximum_modal_depth{};
-    std::uint64_t rejected_requests{};
-    bool shutdown{};
-
-    [[nodiscard]] std::string to_json() const;
-};
-
-
 enum class HostCloseReason : std::uint8_t {
     user,
     application,
@@ -359,14 +287,6 @@ enum class HostDispatchError : std::uint8_t {
 // and handle-binding steps, but no portable callback or input may escape before
 // attached. A cancelled close remains attached; an allowed close becomes
 // close_authorized and admits only terminal host notifications.
-enum class HostLifecyclePhase : std::uint8_t {
-    constructed,
-    attached,
-    close_authorized,
-    closed,
-    shutdown,
-};
-
 struct HostDispatchResult final {
     bool handled{};
     bool input_deferred{};
@@ -379,32 +299,6 @@ struct HostDispatchResult final {
         return error == HostDispatchError::none;
     }
 };
-
-struct HostSessionSnapshot final {
-    HostCapabilities capabilities;
-    HostLifecyclePhase phase{HostLifecyclePhase::constructed};
-    std::uint64_t last_sequence{};
-    std::uint64_t events_accepted{};
-    std::uint64_t events_rejected{};
-    std::uint64_t callback_faults{};
-    std::uint64_t close_requests{};
-    std::uint64_t close_cancellations{};
-    std::uint64_t display_changes{};
-    std::uint64_t monitor_count{};
-    std::uint64_t modal_transitions{};
-    std::uint64_t modal_input_suppressions{};
-    std::uint64_t drag_events{};
-    std::uint64_t drag_drops{};
-    std::uint32_t modal_depth{};
-    bool attached{};
-    bool active{};
-    bool occluded{};
-    bool closed{};
-    bool shutdown{};
-
-    [[nodiscard]] std::string to_json() const;
-};
-
 
 [[nodiscard]] const char* host_dispatch_error_name(HostDispatchError error) noexcept;
 [[nodiscard]] const char* host_lifecycle_phase_name(HostLifecyclePhase phase) noexcept;

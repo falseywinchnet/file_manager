@@ -3,7 +3,7 @@
 - Status: **OBSERVED: bundle 007 token/attachment split; M4 build and focused tests pass**
 - Kind: **class**
 - Hierarchy: `PopupToken`
-- Declaration: `include/gui_forms/window/window.hpp:44`
+- Declaration: `include/gui_forms/window/window.hpp:46`
 - Definition: `src/core/window/popup/popup_token.cpp`
 
 PopupToken is a move-only revocation handle for one Window-owned retained overlay root; dropping or disconnecting it closes the overlay through the same ordered state machine.

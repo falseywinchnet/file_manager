@@ -10,7 +10,7 @@ PathSnapshot couples fill rule and immutable ordered PathElement storage.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

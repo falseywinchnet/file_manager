@@ -100,4 +100,4 @@ Reports the current mnemonic matches value without mutation.
 bool process_mnemonic_self(char32_t character) override
 ```
 
-Public GroupBox operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes GroupBox's process mnemonic self operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

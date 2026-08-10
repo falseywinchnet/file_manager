@@ -276,7 +276,7 @@ Maps virtual selection, expansion, collapse, and press back through ordinary ret
 void on_attached_to_window() override
 ```
 
-Public TreeView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TreeView's on attached to window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `rebuild_visible` (private)
 
@@ -284,7 +284,7 @@ Public TreeView operation. Its exact signature is inventoried here; follow the l
 void rebuild_visible()
 ```
 
-Public TreeView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TreeView's rebuild visible operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `item_index` (private)
 
@@ -316,7 +316,7 @@ Reports the current visible row count value without mutation.
 void ensure_visible(std::size_t visible_row)
 ```
 
-Public TreeView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TreeView's ensure visible operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `select_visible_row` (private)
 
@@ -324,7 +324,7 @@ Public TreeView operation. Its exact signature is inventoried here; follow the l
 void select_visible_row(std::size_t visible_row, bool activate)
 ```
 
-Public TreeView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TreeView's select visible row operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `type_select` (private)
 
@@ -332,4 +332,4 @@ Public TreeView operation. Its exact signature is inventoried here; follow the l
 void type_select(std::string_view text)
 ```
 
-Public TreeView operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes TreeView's type select operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

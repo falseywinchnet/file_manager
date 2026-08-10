@@ -1,16 +1,16 @@
 # Variant
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 image-list storage review**
 - Kind: **struct**
 - Hierarchy: `Variant`
-- Declaration: `include/gui_forms/image_list.hpp:120`
+- Declaration: `include/gui_forms/image_list/image_list/image_list.hpp:120`
 - Definition: `inline/header-only`
 
-Variant is a struct declared in include/gui_forms/image_list.hpp.
+ImageList::Variant correlates one scale factor with exact registered image identity and pixel dimensions.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

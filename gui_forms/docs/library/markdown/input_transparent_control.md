@@ -1,18 +1,26 @@
 # InputTransparentControl
 
-- Status: **OBSERVED: bundle 010 private ABI control-adapter split; native and MinGW ABI builds pass**
+- Status: **OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass**
 - Kind: **class / visual retained control**
 - Hierarchy: `Control → InputTransparentControl`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:85`
-- Definition: `inline/header-only`
+- Declaration: `src/abi/control_adapters/input_transparent_control/input_transparent_control.hpp:11`
+- Definition: `src/abi/control_adapters/input_transparent_control/input_transparent_control.cpp`
 
 InputTransparentControl participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+![InputTransparentControl](../captures/container_bundle_003_screen.png)
 
 ## Declared methods
+
+### `~InputTransparentControl` (public)
+
+```cpp
+~InputTransparentControl() override
+```
+
+Releases the compatibility placeholder through its isolated translation-unit boundary.
 
 ### `InputTransparentControl` (public)
 

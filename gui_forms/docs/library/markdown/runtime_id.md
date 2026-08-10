@@ -1,16 +1,16 @@
 # RuntimeId
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 retained-control identity review**
 - Kind: **struct**
 - Hierarchy: `RuntimeId`
-- Declaration: `include/gui_forms/control.hpp:58`
+- Declaration: `include/gui_forms/control/control/control.hpp:49`
 - Definition: `inline/header-only`
 
-RuntimeId is a struct declared in include/gui_forms/control.hpp.
+RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 
@@ -20,4 +20,4 @@ Capture pending; this page has not yet passed the Screen Sharing crop gate.
 friend constexpr auto operator<=>(const RuntimeId&, const RuntimeId&) = default
 ```
 
-Public RuntimeId operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Compares the complete value identity used by deterministic retained-state decisions.

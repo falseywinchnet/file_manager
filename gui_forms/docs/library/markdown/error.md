@@ -1,16 +1,16 @@
 # Error
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C++ ABI wrapper review**
 - Kind: **class**
 - Hierarchy: `runtime_error → Error`
 - Declaration: `include/gui_forms/c_api.hpp:13`
 - Definition: `inline/header-only`
 
-Error is a class declared in include/gui_forms/c_api.hpp.
+Error carries the exact C ABI result code alongside a conventional C++ runtime-error message.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

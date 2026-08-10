@@ -1,18 +1,26 @@
 # AbiPropertyObjectControl
 
-- Status: **OBSERVED: bundle 010 private ABI property-proxy split; native and MinGW ABI builds pass**
-- Kind: **class / visual retained control**
+- Status: **OBSERVED: bundle 013 per-adapter property-proxy state isolation; native and MinGW ABI builds pass**
+- Kind: **class**
 - Hierarchy: `Control → AbiPropertyObjectControl`
-- Declaration: `src/abi/control_adapters/abi_control_adapters.hpp:895`
-- Definition: `inline/header-only`
+- Declaration: `src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp:11`
+- Definition: `src/abi/control_adapters/abi_property_object_control/abi_property_object_control.cpp`
 
 AbiPropertyObjectControl is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
+
+### `~AbiPropertyObjectControl` (public)
+
+```cpp
+~AbiPropertyObjectControl() override
+```
+
+Releases copied descriptor and callback state through its isolated translation-unit boundary.
 
 ### `AbiPropertyObjectControl` (public)
 

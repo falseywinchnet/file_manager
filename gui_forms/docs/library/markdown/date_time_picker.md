@@ -316,7 +316,7 @@ Routes press, expand/collapse, check, increment/decrement, and set-value through
 void on_detached_from_window() noexcept override
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `part_at` (private)
 
@@ -332,7 +332,7 @@ Reports the current part at value without mutation.
 void step_days(int days)
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's step days operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `open_drop_down` (private)
 
@@ -340,7 +340,7 @@ Public DateTimePicker operation. Its exact signature is inventoried here; follow
 void open_drop_down()
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's open drop down operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `close_drop_down` (private)
 
@@ -348,7 +348,7 @@ Public DateTimePicker operation. Its exact signature is inventoried here; follow
 void close_drop_down()
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's close drop down operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `commit_popup_value` (private)
 
@@ -356,7 +356,7 @@ Public DateTimePicker operation. Its exact signature is inventoried here; follow
 void commit_popup_value(DateTimeValue value)
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's commit popup value operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `on_popup_revoked` (private)
 
@@ -364,4 +364,4 @@ Public DateTimePicker operation. Its exact signature is inventoried here; follow
 void on_popup_revoked()
 ```
 
-Public DateTimePicker operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes DateTimePicker's on popup revoked operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

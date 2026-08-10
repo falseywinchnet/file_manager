@@ -1,16 +1,16 @@
 # gf_scroll_state
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 C ABI scroll review**
 - Kind: **struct**
 - Hierarchy: `gf_scroll_state`
 - Declaration: `include/gui_forms/c_api.h:92`
 - Definition: `inline/header-only`
 
-gf_scroll_state is a struct declared in include/gui_forms/c_api.h.
+gf_scroll_state combines both axis records with auto-scroll offset, margin, minimum size, and logical position.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

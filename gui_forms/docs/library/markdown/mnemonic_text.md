@@ -1,16 +1,16 @@
 # MnemonicText
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 command-text review**
 - Kind: **struct**
 - Hierarchy: `MnemonicText`
-- Declaration: `include/gui_forms/control.hpp:183`
+- Declaration: `include/gui_forms/control/control/control.hpp:174`
 - Definition: `inline/header-only`
 
-MnemonicText is a struct declared in include/gui_forms/control.hpp.
+MnemonicText separates rendered UTF-8 from the optional activation scalar parsed from Forms-compatible ampersand notation.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

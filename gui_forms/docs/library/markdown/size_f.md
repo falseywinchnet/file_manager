@@ -3,14 +3,14 @@
 - Status: **OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass**
 - Kind: **struct**
 - Hierarchy: `SizeF`
-- Declaration: `include/gui_forms/drawing/geometry/drawing_geometry.hpp:28`
+- Declaration: `include/gui_forms/drawing/geometry/size_f/size_f.hpp:5`
 - Definition: `inline/header-only`
 
 SizeF carries logical width and height.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

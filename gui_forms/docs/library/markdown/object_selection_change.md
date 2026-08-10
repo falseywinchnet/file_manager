@@ -1,16 +1,16 @@
 # ObjectSelectionChange
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 object-view event review**
 - Kind: **struct**
 - Hierarchy: `ObjectSelectionChange`
 - Declaration: `include/gui_forms/controls/panel/object_view/object_view.hpp:41`
 - Definition: `inline/header-only`
 
-ObjectSelectionChange is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp.
+ObjectSelectionChange reports previous/current optional identities and interaction source.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

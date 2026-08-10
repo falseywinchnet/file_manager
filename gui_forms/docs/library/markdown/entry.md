@@ -1,16 +1,16 @@
 # Entry
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 image-list storage review**
 - Kind: **struct**
 - Hierarchy: `Entry`
-- Declaration: `include/gui_forms/image_list.hpp:127`
+- Declaration: `include/gui_forms/image_list/image_list/image_list.hpp:127`
 - Definition: `inline/header-only`
 
-Entry is a struct declared in include/gui_forms/image_list.hpp.
+ImageList::Entry owns stable entry identity, optional key and tag, and its scale-ordered image variants.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

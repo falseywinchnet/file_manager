@@ -196,7 +196,7 @@ Routes increment, decrement, page, and set-value commands through ordinary const
 void on_detached_from_window() noexcept override
 ```
 
-Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollBar's on detached from window operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `axis_coordinate` (private)
 
@@ -220,7 +220,7 @@ Reports the current value from thumb coordinate value without mutation.
 bool apply_part(ScrollBarPart part)
 ```
 
-Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollBar's apply part operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `begin_repeat` (private)
 
@@ -228,7 +228,7 @@ Public ScrollBar operation. Its exact signature is inventoried here; follow the 
 void begin_repeat(ScrollBarPart part, Point pointer)
 ```
 
-Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollBar's begin repeat operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `stop_interaction` (private)
 
@@ -236,4 +236,4 @@ Public ScrollBar operation. Its exact signature is inventoried here; follow the 
 void stop_interaction() noexcept
 ```
 
-Public ScrollBar operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes ScrollBar's stop interaction operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

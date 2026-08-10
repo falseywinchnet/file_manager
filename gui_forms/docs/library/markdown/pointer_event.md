@@ -1,16 +1,16 @@
 # PointerEvent
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 normalized-input review**
 - Kind: **struct**
 - Hierarchy: `PointerEvent`
-- Declaration: `include/gui_forms/events.hpp:62`
+- Declaration: `include/gui_forms/events/input_events/input_events.hpp:62`
 - Definition: `inline/header-only`
 
-PointerEvent is a struct declared in include/gui_forms/events.hpp.
+PointerEvent is the mutable routed pointer record: device phase, window/local coordinates, buttons, modifiers, wheel deltas, click count, capture request, and handled state.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

@@ -1,16 +1,16 @@
 # DeferredInputSnapshot
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 Window input-state review**
 - Kind: **struct**
 - Hierarchy: `DeferredInputSnapshot`
-- Declaration: `include/gui_forms/window/window.hpp:90`
+- Declaration: `include/gui_forms/window/window.hpp:92`
 - Definition: `inline/header-only`
 
-DeferredInputSnapshot is a struct declared in include/gui_forms/window/window.hpp.
+DeferredInputSnapshot preserves the route, transformed event, and target identity required to resume deferred input safely.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

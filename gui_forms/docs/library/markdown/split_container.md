@@ -420,7 +420,7 @@ Reports the current collapse target origin value without mutation.
 void toggle_collapse_target(SplitCollapseOrigin origin)
 ```
 
-Public SplitContainer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SplitContainer's toggle collapse target operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `reconcile_automatic_collapse` (private)
 
@@ -428,7 +428,7 @@ Public SplitContainer operation. Its exact signature is inventoried here; follow
 void reconcile_automatic_collapse(double total_extent)
 ```
 
-Public SplitContainer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SplitContainer's reconcile automatic collapse operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `set_distance` (private)
 
@@ -444,7 +444,7 @@ Synchronously updates the retained distance property. Validation, typed invalida
 void transfer_focus_from(const std::shared_ptr<SplitterPanel>& panel)
 ```
 
-Public SplitContainer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SplitContainer's transfer focus from operation against retained state; the signature records its exact inputs, result, constness, and failure surface.
 
 ### `update_splitter_cursor` (private)
 
@@ -452,4 +452,4 @@ Public SplitContainer operation. Its exact signature is inventoried here; follow
 void update_splitter_cursor()
 ```
 
-Public SplitContainer operation. Its exact signature is inventoried here; follow the linked implementation for callback order and failure behavior.
+Executes SplitContainer's update splitter cursor operation against retained state; the signature records its exact inputs, result, constness, and failure surface.

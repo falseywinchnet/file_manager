@@ -1,16 +1,16 @@
 # ScrollAnchor
 
-- Status: **generated inventory; detailed review pending**
+- Status: **OBSERVED: bundle 011 correspondence scroll-state review**
 - Kind: **struct**
 - Hierarchy: `ScrollAnchor`
 - Declaration: `include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp:151`
 - Definition: `inline/header-only`
 
-ScrollAnchor is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp.
+ScrollAnchor preserves a stable row identity plus intra-row offset so refreshes restore semantic rather than index-only position.
 
 ## Visual evidence
 
-Capture pending; this page has not yet passed the Screen Sharing crop gate.
+Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
 

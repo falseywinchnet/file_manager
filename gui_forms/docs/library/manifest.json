@@ -2,19 +2,6 @@
   "schema": 1,
   "types": [
     {
-      "name": "AbiPropertyObjectControl",
-      "kind": "class",
-      "bases": [
-        "Control"
-      ],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
-      "visual": true,
-      "page": "pages/abi_property_object_control.html",
-      "status": "OBSERVED: bundle 010 private ABI property-proxy split; native and MinGW ABI builds pass",
-      "sourceStatus": "header-only or distributed",
-      "search": "abipropertyobjectcontrol src/abi/control_adapters/abi_control_adapters.hpp abipropertyobjectcontrol is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors. control"
-    },
-    {
       "name": "AnchoredPopupLayer",
       "kind": "class",
       "bases": [
@@ -63,7 +50,7 @@
       "visual": true,
       "page": "pages/calendar_popup.html",
       "status": "OBSERVED: bundle 004 source-private calendar state-machine split; M4 build, focused tests, and Screen Sharing pass",
-      "sourceStatus": "header-only or distributed",
+      "sourceStatus": "isolated per type",
       "search": "calendarpopup src/controls/panel/date_time_picker/calendar_popup/calendar_popup.hpp calendarpopup is datetimepicker's source-private retained month grid. it owns displayed month, constrained candidate selection, pointer/keyboard navigation, commit/cancel events, stable virtual day identities, and calendar semantics while the picker retains final value authority. control"
     },
     {
@@ -128,7 +115,7 @@
       "visual": true,
       "page": "pages/color_value_editor.html",
       "status": "OBSERVED: bundle 006 split and swatch-width enhancement; M4 build, focused tests, and Screen Sharing pass",
-      "sourceStatus": "header-only or distributed",
+      "sourceStatus": "isolated per type",
       "search": "colorvalueeditor include/gui_forms/controls/panel/color_value_editor/color_value_editor.hpp colorvalueeditor is a retained compound editor that delegates selection, keyboard, clipboard, commit, and cancellation to a real textbox while adding a checker-backed color swatch, canonical #rrggbbaa conversion, bounded swatch width, typed change events, and exact invalid-edit feedback. panel"
     },
     {
@@ -160,27 +147,16 @@
     {
       "name": "Control",
       "kind": "class",
-      "bases": [],
-      "header": "include/gui_forms/c_api.hpp",
-      "visual": true,
-      "page": "pages/control.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "header-only or distributed",
-      "search": "control include/gui_forms/c_api.hpp control is a visual retained control declared in include/gui_forms/c_api.hpp."
-    },
-    {
-      "name": "Control",
-      "kind": "class",
       "bases": [
         "Component",
         "enable_shared_from_this"
       ],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": true,
-      "page": "pages/control_2.html",
-      "status": "generated inventory; detailed review pending",
+      "page": "pages/control.html",
+      "status": "OBSERVED: bundle 011 hierarchy-mirrored retained-control state-machine review",
       "sourceStatus": "header-only or distributed",
-      "search": "control include/gui_forms/control.hpp control is a visual retained control declared in include/gui_forms/control.hpp. component enable_shared_from_this"
+      "search": "control include/gui_forms/control/control/control.hpp control is the retained visual root and invariant owner for stable/runtime identity, hierarchy, geometry, layout transactions, initialization batching, style/theme resolution, typed invalidation, input eligibility and routing hooks, validation, binding, semantic projection, dispatch, focus, lifetime, and provider extensions. component enable_shared_from_this"
     },
     {
       "name": "CorrespondenceView",
@@ -279,12 +255,12 @@
       "bases": [
         "Panel"
       ],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/field_control/field_control.hpp",
       "visual": true,
       "page": "pages/field_control.html",
-      "status": "OBSERVED: bundle 010 private ABI Unicode field state-machine split; native and MinGW ABI builds pass",
-      "sourceStatus": "header-only or distributed",
-      "search": "fieldcontrol src/abi/control_adapters/abi_control_adapters.hpp fieldcontrol owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native. panel"
+      "status": "OBSERVED: bundle 013 per-adapter Unicode field state-machine isolation; native and MinGW ABI builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "fieldcontrol src/abi/control_adapters/field_control/field_control.hpp fieldcontrol owns compatibility text/list/combo/numeric field editing without importing managed runtime state: validated unicode selection, directional navigation, history, geometry, hit testing, clipping, and viewport remain native. panel"
     },
     {
       "name": "FlagsValueEditor",
@@ -318,12 +294,12 @@
       "bases": [
         "Panel"
       ],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/form_control/form_control.hpp",
       "visual": true,
       "page": "pages/form_control.html",
-      "status": "OBSERVED: bundle 010 private ABI form-adapter split; native and MinGW ABI builds pass",
-      "sourceStatus": "header-only or distributed",
-      "search": "formcontrol src/abi/control_adapters/abi_control_adapters.hpp formcontrol is a retained panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter. panel"
+      "status": "OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "formcontrol src/abi/control_adapters/form_control/form_control.hpp formcontrol is a retained panel with a pre-focused-child key-preview bridge kept inside the compatibility adapter. panel"
     },
     {
       "name": "GalleryControl",
@@ -331,12 +307,12 @@
       "bases": [
         "Control"
       ],
-      "header": "src/controls/gallery_controls.hpp",
+      "header": "src/controls/gallery/control/gallery_control.hpp",
       "visual": true,
       "page": "pages/gallery_control.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "gallerycontrol src/controls/gallery_controls.hpp gallerycontrol is a visual retained control declared in src/controls/gallery_controls.hpp. control"
+      "status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit",
+      "sourceStatus": "demonstration composition",
+      "search": "gallerycontrol src/controls/gallery/control/gallery_control.hpp gallerycontrol is a source-private demoboard adapter that renders and exercises distinct control kinds without enlarging the public control surface. control"
     },
     {
       "name": "GroupBox",
@@ -370,12 +346,12 @@
       "bases": [
         "Control"
       ],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/input_transparent_control/input_transparent_control.hpp",
       "visual": true,
       "page": "pages/input_transparent_control.html",
-      "status": "OBSERVED: bundle 010 private ABI control-adapter split; native and MinGW ABI builds pass",
-      "sourceStatus": "header-only or distributed",
-      "search": "inputtransparentcontrol src/abi/control_adapters/abi_control_adapters.hpp inputtransparentcontrol participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces. control"
+      "status": "OBSERVED: bundle 013 per-adapter source isolation; native and MinGW ABI builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "inputtransparentcontrol src/abi/control_adapters/input_transparent_control/input_transparent_control.hpp inputtransparentcontrol participates in retained layout/paint ordering while deliberately declining hit testing for compatibility placeholder surfaces. control"
     },
     {
       "name": "InstrumentRack",
@@ -643,12 +619,12 @@
       "bases": [
         "ScrollableControl"
       ],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/raster_control/raster_control.hpp",
       "visual": true,
       "page": "pages/raster_control.html",
-      "status": "OBSERVED: bundle 010 private ABI raster-control split; native and MinGW ABI builds pass",
-      "sourceStatus": "header-only or distributed",
-      "search": "rastercontrol src/abi/control_adapters/abi_control_adapters.hpp rastercontrol is the compatibility owner-painted and scroll-capable retained surface for bounded png/bgra frames or a generational livesurface, with input projection and revocable wake scheduling. scrollablecontrol"
+      "status": "OBSERVED: bundle 013 per-adapter raster state-machine isolation; native and MinGW ABI builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "rastercontrol src/abi/control_adapters/raster_control/raster_control.hpp rastercontrol is the compatibility owner-painted and scroll-capable retained surface for bounded png/bgra frames or a generational livesurface, with input projection and revocable wake scheduling. scrollablecontrol"
     },
     {
       "name": "ReviewCard",
@@ -898,6 +874,19 @@
       "search": "vscrollbar include/gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp vscrollbar is the explicit vertical leaf type for reflection, serialization, toolbox discovery, and conventional api compatibility. scrollbar"
     },
     {
+      "name": "AbiPropertyObjectControl",
+      "kind": "class",
+      "bases": [
+        "Control"
+      ],
+      "header": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
+      "visual": false,
+      "page": "pages/abi_property_object_control.html",
+      "status": "OBSERVED: bundle 013 per-adapter property-proxy state isolation; native and MinGW ABI builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "abipropertyobjectcontrol src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp abipropertyobjectcontrol is a nonvisual retained proxy that exposes explicitly registered foreign properties to native inspection without retaining managed runtime objects or executable callbacks in descriptors. control"
+    },
+    {
       "name": "AcceleratorAttachment",
       "kind": "class",
       "bases": [
@@ -936,12 +925,12 @@
       "name": "AnchorReference",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/anchor_reference.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 anchor-layout review",
       "sourceStatus": "header-only or distributed",
-      "search": "anchorreference include/gui_forms/control.hpp anchorreference is a struct declared in include/gui_forms/control.hpp."
+      "search": "anchorreference include/gui_forms/control/control/control.hpp anchorreference snapshots a child's arranged bounds and parent client rectangle so later resize anchoring is deterministic."
     },
     {
       "name": "AnchoredPopupPlacement",
@@ -969,34 +958,34 @@
       "name": "AnimationSample",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "visual": false,
       "page": "pages/animation_sample.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 animation-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "animationsample include/gui_forms/animation.hpp animationsample is a struct declared in include/gui_forms/animation.hpp."
+      "search": "animationsample include/gui_forms/animation/animation_timeline/animation_timeline.hpp animationsample is one immutable normalized/raw progress, iteration, and completion observation."
     },
     {
       "name": "AnimationSpec",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "visual": false,
       "page": "pages/animation_spec.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 animation-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "animationspec include/gui_forms/animation.hpp animationspec is a struct declared in include/gui_forms/animation.hpp."
+      "search": "animationspec include/gui_forms/animation/animation_timeline/animation_timeline.hpp animationspec declares duration, repetition, direction, easing, and reduced-motion behavior for one timeline."
     },
     {
       "name": "AnimationTimeline",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "visual": false,
       "page": "pages/animation_timeline.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "animationtimeline include/gui_forms/animation.hpp animationtimeline is a class declared in include/gui_forms/animation.hpp."
+      "status": "OBSERVED: bundle 011 isolated animation state-machine review",
+      "sourceStatus": "isolated per type",
+      "search": "animationtimeline include/gui_forms/animation/animation_timeline/animation_timeline.hpp animationtimeline validates one specification and deterministically transitions stopped, running, and paused time into iteration-aware eased samples."
     },
     {
       "name": "Api",
@@ -1005,9 +994,9 @@
       "header": "include/gui_forms/c_api.hpp",
       "visual": false,
       "page": "pages/api.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C++ ABI wrapper review",
       "sourceStatus": "header-only or distributed",
-      "search": "api include/gui_forms/c_api.hpp api is a class declared in include/gui_forms/c_api.hpp."
+      "search": "api include/gui_forms/c_api.hpp api negotiates abi 0.4 once, retains the immutable function table, and translates thread-local c diagnostics into typed c++ exceptions."
     },
     {
       "name": "AxisGeometry",
@@ -1016,9 +1005,9 @@
       "header": "include/gui_forms/controls/scrollable_control/scrollable_control.hpp",
       "visual": false,
       "page": "pages/axis_geometry.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 scroll geometry review",
       "sourceStatus": "header-only or distributed",
-      "search": "axisgeometry include/gui_forms/controls/scrollable_control/scrollable_control.hpp axisgeometry is a struct declared in include/gui_forms/controls/scrollable_control/scrollable_control.hpp."
+      "search": "axisgeometry include/gui_forms/controls/scrollable_control/scrollable_control.hpp axisgeometry is the resolved track, decrement/increment buttons, thumb, maximum position, and viewport geometry for one scroll axis."
     },
     {
       "name": "BasicControlStyle",
@@ -1259,9 +1248,9 @@
       "header": "src/abi/drawing_platform.hpp",
       "visual": false,
       "page": "pages/captured_surface.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private drawing ABI platform review; native drawing and complete M4 MinGW builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "capturedsurface src/abi/drawing_platform.hpp capturedsurface is a struct declared in src/abi/drawing_platform.hpp."
+      "search": "capturedsurface src/abi/drawing_platform.hpp capturedsurface owns the bitmap and source-relative bounds produced by one host-surface capture, keeping platform handles outside the portable drawing contract."
     },
     {
       "name": "CardLayout",
@@ -1270,9 +1259,9 @@
       "header": "include/gui_forms/controls/panel/card/card.hpp",
       "visual": false,
       "page": "pages/card_layout.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 card value review",
       "sourceStatus": "header-only or distributed",
-      "search": "cardlayout include/gui_forms/controls/panel/card/card.hpp cardlayout is a struct declared in include/gui_forms/controls/panel/card/card.hpp."
+      "search": "cardlayout include/gui_forms/controls/panel/card/card.hpp cardlayout defines validated logical padding, section gaps, and footer/header allocation used by card measurement and arrangement."
     },
     {
       "name": "CellMetadata",
@@ -1281,9 +1270,9 @@
       "header": "include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
       "visual": false,
       "page": "pages/cell_metadata.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 table-layout value review",
       "sourceStatus": "header-only or distributed",
-      "search": "cellmetadata include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp cellmetadata is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp."
+      "search": "cellmetadata include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp cellmetadata assigns a retained child to a row/column with bounded spans and exact occupancy identity."
     },
     {
       "name": "Color",
@@ -1300,12 +1289,12 @@
       "name": "Color",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "visual": false,
       "page": "pages/color_2.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 paint-value review",
       "sourceStatus": "isolated per type",
-      "search": "color include/gui_forms/types.hpp color is a struct declared in include/gui_forms/types.hpp."
+      "search": "color include/gui_forms/types/paint_types/paint_types.hpp gui_forms::color is an explicit unpremultiplied rgba value with opaque alpha default."
     },
     {
       "name": "ColorBlend",
@@ -1437,9 +1426,9 @@
       "header": "src/controls/panel/property_grid/property_grid_utilities.hpp",
       "visual": false,
       "page": "pages/compound_field_spec.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 property-grid editor review",
       "sourceStatus": "header-only or distributed",
-      "search": "compoundfieldspec src/controls/panel/property_grid/property_grid_utilities.hpp compoundfieldspec is a struct declared in src/controls/panel/property_grid/property_grid_utilities.hpp."
+      "search": "compoundfieldspec src/controls/panel/property_grid/property_grid_utilities.hpp compoundfieldspec assigns a stable field name and getter/setter pair to one structured property editor subfield."
     },
     {
       "name": "ContextMenu",
@@ -1453,6 +1442,17 @@
       "status": "OBSERVED: bundle 005 split and preferred-width enhancement; M4 build, focused tests, and Screen Sharing pass",
       "sourceStatus": "isolated per type",
       "search": "contextmenu include/gui_forms/components/context_menu/context_menu.hpp contextmenu is a nonvisual owner for a retained, focus-scoped popup menu tree. its implementation controls transient lifetime, submenu chains, enabled/check state, root handoff, outside-pointer policy, invocation ordering, and caller-configurable preferred width without exposing implementation rows as reusable public controls. component"
+    },
+    {
+      "name": "Control",
+      "kind": "class",
+      "bases": [],
+      "header": "include/gui_forms/c_api.hpp",
+      "visual": false,
+      "page": "pages/control_2.html",
+      "status": "OBSERVED: bundle 011 C++ ABI wrapper review",
+      "sourceStatus": "header-only or distributed",
+      "search": "control include/gui_forms/c_api.hpp the abi0::control wrapper gives a generational c handle deterministic raii retain/release, value-like copying, move transfer, bounded strings, and exception translation without becoming a retained visual object."
     },
     {
       "name": "ControlAvailabilityChange",
@@ -1480,12 +1480,12 @@
       "name": "ControlFactory",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/static_tree.hpp",
+      "header": "include/gui_forms/control/static_tree/control_factory/control_factory.hpp",
       "visual": false,
       "page": "pages/control_factory.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "controlfactory include/gui_forms/static_tree.hpp controlfactory is a class declared in include/gui_forms/static_tree.hpp."
+      "status": "OBSERVED: bundle 011 static-tree construction review",
+      "sourceStatus": "isolated per type",
+      "search": "controlfactory include/gui_forms/control/static_tree/control_factory/control_factory.hpp controlfactory maps explicit type names to construction callbacks, rejects duplicates/unknown types, and recursively creates retained trees without a bundled scripting runtime."
     },
     {
       "name": "ControlRecord",
@@ -1494,9 +1494,9 @@
       "header": "src/abi/registry/registry.hpp",
       "visual": false,
       "page": "pages/control_record.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI control record review; native ABI tests and complete M4 MinGW build pass",
       "sourceStatus": "header-only or distributed",
-      "search": "controlrecord src/abi/registry/registry.hpp controlrecord is a struct declared in src/abi/registry/registry.hpp."
+      "search": "controlrecord src/abi/registry/registry.hpp controlrecord is the registry-owned state for one abi handle: retained control, owner thread/window, host phase, popup attachment, paint-plane overrides, dialog/tooltip/clipboard services, pending dispatch, and callback-fault telemetry."
     },
     {
       "name": "ControlRoleRecipes",
@@ -1513,12 +1513,12 @@
       "name": "ControlValidationEvent",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/control_validation_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 validation-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "controlvalidationevent include/gui_forms/control.hpp controlvalidationevent is a struct declared in include/gui_forms/control.hpp."
+      "search": "controlvalidationevent include/gui_forms/control/control/control.hpp controlvalidationevent carries source, destination, bulk-validation intent, and mutable cancellation through one validation turn."
     },
     {
       "name": "ControlVisualContext",
@@ -1552,7 +1552,7 @@
       "visual": false,
       "page": "pages/core_graphics_raster.html",
       "status": "OBSERVED: bundle 009 CoreGraphics control raster split; focused M4 smoke tests pass",
-      "sourceStatus": "grouped migration pending",
+      "sourceStatus": "isolated per type",
       "search": "coregraphicsraster src/render/coregraphics/raster/coregraphics_raster.hpp coregraphicsraster is the macos comparison painter terminal with the same cpu frame, image, text, clipping, material, and pixel-inspection contract as skiaraster, without entering the portable core. painter"
     },
     {
@@ -1562,9 +1562,9 @@
       "header": "include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "visual": false,
       "page": "pages/correspondence_expansion_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 correspondence event review",
       "sourceStatus": "header-only or distributed",
-      "search": "correspondenceexpansionchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceexpansionchange is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp."
+      "search": "correspondenceexpansionchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceexpansionchange reports the exact hierarchical row and resulting expanded state."
     },
     {
       "name": "CorrespondenceItem",
@@ -1573,9 +1573,9 @@
       "header": "include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "visual": false,
       "page": "pages/correspondence_item.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 correspondence value review",
       "sourceStatus": "header-only or distributed",
-      "search": "correspondenceitem include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceitem is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp."
+      "search": "correspondenceitem include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceitem owns stable identity, primary/secondary text, status, hierarchy, pinned/expanded policy, and optional command data for one correspondence row."
     },
     {
       "name": "CorrespondencePinChange",
@@ -1584,9 +1584,9 @@
       "header": "include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "visual": false,
       "page": "pages/correspondence_pin_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 correspondence event review",
       "sourceStatus": "header-only or distributed",
-      "search": "correspondencepinchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondencepinchange is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp."
+      "search": "correspondencepinchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondencepinchange reports the exact row and resulting pinned state."
     },
     {
       "name": "CorrespondenceSelectionChange",
@@ -1595,9 +1595,9 @@
       "header": "include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "visual": false,
       "page": "pages/correspondence_selection_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 correspondence event review",
       "sourceStatus": "header-only or distributed",
-      "search": "correspondenceselectionchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceselectionchange is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp."
+      "search": "correspondenceselectionchange include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp correspondenceselectionchange reports old/new optional stable identities and the initiating interaction."
     },
     {
       "name": "CurrencyManager",
@@ -1627,12 +1627,12 @@
       "name": "DamageRegion",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/damage_region/damage_region.hpp",
       "visual": false,
       "page": "pages/damage_region.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "damageregion include/gui_forms/types.hpp damageregion is a class declared in include/gui_forms/types.hpp."
+      "status": "OBSERVED: bundle 011 bounded-damage state-machine review",
+      "sourceStatus": "isolated per type",
+      "search": "damageregion include/gui_forms/types/damage_region/damage_region.hpp damageregion incrementally merges exact rectangular unions, preserves disjoint damage up to 64 rectangles, then collapses to one bound with explicit compaction/collapse telemetry."
     },
     {
       "name": "DateTimeFormatProvider",
@@ -1660,23 +1660,23 @@
       "name": "DecodeResult",
       "kind": "struct",
       "bases": [],
-      "header": "src/render/skia/executor/drawing_skia.hpp",
+      "header": "src/render/skia/executor/skia_executor.hpp",
       "visual": false,
       "page": "pages/decode_result.html",
       "status": "OBSERVED: bundle 009 PNG decode result review; focused M4 tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "decoderesult src/render/skia/executor/drawing_skia.hpp decoderesult owns a decoded bitmap only when the closed raster error indicates success."
+      "search": "decoderesult src/render/skia/executor/skia_executor.hpp decoderesult owns a decoded bitmap only when the closed raster error indicates success."
     },
     {
       "name": "DeferredInitializationChange",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/deferred_initialization_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 initialization-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "deferredinitializationchange include/gui_forms/control.hpp deferredinitializationchange is a struct declared in include/gui_forms/control.hpp."
+      "search": "deferredinitializationchange include/gui_forms/control/control/control.hpp deferredinitializationchange holds one deduplicated event key and publication closure until the outermost initialization transaction commits."
     },
     {
       "name": "DeferredInputSnapshot",
@@ -1685,9 +1685,9 @@
       "header": "include/gui_forms/window/window.hpp",
       "visual": false,
       "page": "pages/deferred_input_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 Window input-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "deferredinputsnapshot include/gui_forms/window/window.hpp deferredinputsnapshot is a struct declared in include/gui_forms/window/window.hpp."
+      "search": "deferredinputsnapshot include/gui_forms/window/window.hpp deferredinputsnapshot preserves the route, transformed event, and target identity required to resume deferred input safely."
     },
     {
       "name": "DialogKeySnapshot",
@@ -1742,9 +1742,9 @@
       "header": "src/abi/registry/registry.hpp",
       "visual": false,
       "page": "pages/dispatch_record.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI dispatch review; native ABI tests and complete M4 MinGW build pass",
       "sourceStatus": "header-only or distributed",
-      "search": "dispatchrecord src/abi/registry/registry.hpp dispatchrecord is a struct declared in src/abi/registry/registry.hpp."
+      "search": "dispatchrecord src/abi/registry/registry.hpp dispatchrecord owns one queued c callback plus caller context until window dispatch executes or retirement cancels it."
     },
     {
       "name": "DispatchWork",
@@ -1816,67 +1816,67 @@
       "name": "DragBinaryData",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_binary_data.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "dragbinarydata include/gui_forms/events.hpp dragbinarydata is a struct declared in include/gui_forms/events.hpp."
+      "search": "dragbinarydata include/gui_forms/events/input_events/input_events.hpp dragbinarydata owns a bounded byte payload and explicit format identifier."
     },
     {
       "name": "DragDispatchResult",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_dispatch_result.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-routing review",
       "sourceStatus": "header-only or distributed",
-      "search": "dragdispatchresult include/gui_forms/events.hpp dragdispatchresult is a struct declared in include/gui_forms/events.hpp."
+      "search": "dragdispatchresult include/gui_forms/events/input_events/input_events.hpp dragdispatchresult projects the final handled and selected-effect outcome of one routed drag turn."
     },
     {
       "name": "DragEvent",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-routing review",
       "sourceStatus": "header-only or distributed",
-      "search": "dragevent include/gui_forms/events.hpp dragevent is a struct declared in include/gui_forms/events.hpp."
+      "search": "dragevent include/gui_forms/events/input_events/input_events.hpp dragevent carries phase, geometry, allowed/proposed effects, typed payload, and mutable handled/result state through preview/target/bubble routing."
     },
     {
       "name": "DragFileListData",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_file_list_data.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "dragfilelistdata include/gui_forms/events.hpp dragfilelistdata is a struct declared in include/gui_forms/events.hpp."
+      "search": "dragfilelistdata include/gui_forms/events/input_events/input_events.hpp dragfilelistdata owns a bounded list of local path strings without implying remote discovery."
     },
     {
       "name": "DragLimits",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_limits.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "draglimits include/gui_forms/events.hpp draglimits is a struct declared in include/gui_forms/events.hpp."
+      "search": "draglimits include/gui_forms/events/input_events/input_events.hpp draglimits bounds payload bytes, path count, path length, and advertised format count before foreign drag data enters retained routing."
     },
     {
       "name": "DragTextData",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/drag_text_data.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drag-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "dragtextdata include/gui_forms/events.hpp dragtextdata is a struct declared in include/gui_forms/events.hpp."
+      "search": "dragtextdata include/gui_forms/events/input_events/input_events.hpp dragtextdata owns one validated utf-8 text payload."
     },
     {
       "name": "DrawingCommand",
@@ -1915,12 +1915,12 @@
       "name": "Entry",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "visual": false,
       "page": "pages/entry.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 image-list storage review",
       "sourceStatus": "header-only or distributed",
-      "search": "entry include/gui_forms/image_list.hpp entry is a struct declared in include/gui_forms/image_list.hpp."
+      "search": "entry include/gui_forms/image_list/image_list/image_list.hpp imagelist::entry owns stable entry identity, optional key and tag, and its scale-ordered image variants."
     },
     {
       "name": "Error",
@@ -1931,9 +1931,9 @@
       "header": "include/gui_forms/c_api.hpp",
       "visual": false,
       "page": "pages/error.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C++ ABI wrapper review",
       "sourceStatus": "header-only or distributed",
-      "search": "error include/gui_forms/c_api.hpp error is a class declared in include/gui_forms/c_api.hpp. runtime_error"
+      "search": "error include/gui_forms/c_api.hpp error carries the exact c abi result code alongside a conventional c++ runtime-error message. runtime_error"
     },
     {
       "name": "ErrorIconSnapshot",
@@ -1985,34 +1985,34 @@
       "name": "Event",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/event.hpp",
+      "header": "include/gui_forms/event/event/event.hpp",
       "visual": false,
       "page": "pages/event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 revocable-event state-machine review",
       "sourceStatus": "header-only or distributed",
-      "search": "event include/gui_forms/event.hpp event is a class declared in include/gui_forms/event.hpp."
+      "search": "event include/gui_forms/event/event/event.hpp event owns registration-ordered revocable callback slots, emits a stable snapshot, skips slots revoked before their turn, and compacts disconnected ownership after publication."
     },
     {
       "name": "EventStatistics",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/event.hpp",
+      "header": "include/gui_forms/event/event/event.hpp",
       "visual": false,
       "page": "pages/event_statistics.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 revocable-event review",
       "sourceStatus": "header-only or distributed",
-      "search": "eventstatistics include/gui_forms/event.hpp eventstatistics is a struct declared in include/gui_forms/event.hpp."
+      "search": "eventstatistics include/gui_forms/event/event/event.hpp eventstatistics records connected, disconnected, and emitted-callback totals for deterministic lifecycle testing."
     },
     {
       "name": "FieldSnapshot",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/field_control/field_control.hpp",
       "visual": false,
       "page": "pages/field_snapshot.html",
       "status": "OBSERVED: bundle 010 private ABI field-history review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "fieldsnapshot src/abi/control_adapters/abi_control_adapters.hpp fieldsnapshot captures utf-8 text, selection anchor/caret, read-only and password state, and horizontal viewport for exact undo/redo."
+      "search": "fieldsnapshot src/abi/control_adapters/field_control/field_control.hpp fieldsnapshot captures utf-8 text, selection anchor/caret, read-only and password state, and horizontal viewport for exact undo/redo."
     },
     {
       "name": "FocusScopeChange",
@@ -2130,12 +2130,12 @@
       "name": "FontSpec",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "visual": false,
       "page": "pages/font_spec.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 typography-value review",
       "sourceStatus": "header-only or distributed",
-      "search": "fontspec include/gui_forms/types.hpp fontspec is a struct declared in include/gui_forms/types.hpp."
+      "search": "fontspec include/gui_forms/types/paint_types/paint_types.hpp fontspec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting."
     },
     {
       "name": "FramePollResult",
@@ -2163,23 +2163,23 @@
       "name": "GalleryContext",
       "kind": "class",
       "bases": [],
-      "header": "src/controls/gallery_controls.hpp",
+      "header": "src/controls/gallery/context/gallery_context.hpp",
       "visual": false,
       "page": "pages/gallery_context.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "gallerycontext src/controls/gallery_controls.hpp gallerycontext is a class declared in src/controls/gallery_controls.hpp."
+      "status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit",
+      "sourceStatus": "demonstration composition",
+      "search": "gallerycontext src/controls/gallery/context/gallery_context.hpp gallerycontext synchronizes shared sample state across the native gallery's source-private demonstration controls."
     },
     {
       "name": "GalleryTree",
       "kind": "struct",
       "bases": [],
-      "header": "src/controls/gallery_controls.hpp",
+      "header": "src/controls/gallery/tree/gallery_tree.hpp",
       "visual": false,
       "page": "pages/gallery_tree.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "header-only or distributed",
-      "search": "gallerytree src/controls/gallery_controls.hpp gallerytree is a struct declared in src/controls/gallery_controls.hpp."
+      "status": "OBSERVED: bundle 011 demoboard-composition review",
+      "sourceStatus": "demonstration composition",
+      "search": "gallerytree src/controls/gallery/tree/gallery_tree.hpp gallerytree retains the typed controls assembled for one gallery window so tests and the host share exact instances."
     },
     {
       "name": "GlyphId",
@@ -2218,12 +2218,12 @@
       "name": "GradientStop",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "visual": false,
       "page": "pages/gradient_stop.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 paint-value review",
       "sourceStatus": "header-only or distributed",
-      "search": "gradientstop include/gui_forms/types.hpp gradientstop is a struct declared in include/gui_forms/types.hpp."
+      "search": "gradientstop include/gui_forms/types/paint_types/paint_types.hpp gradientstop pairs a normalized monotonic offset with a copied color for retained display-list safety."
     },
     {
       "name": "GraphicsPath",
@@ -2281,7 +2281,7 @@
       "visual": false,
       "page": "pages/harf_buzz_font_engine.html",
       "status": "OBSERVED: bundle 009 text-engine split; focused M4 shaping tests pass",
-      "sourceStatus": "grouped migration pending",
+      "sourceStatus": "isolated per type",
       "search": "harfbuzzfontengine src/render/text/harfbuzz/harfbuzz_font_engine.hpp harfbuzzfontengine owns bounded freetype faces and harfbuzz shaping state behind renderer-neutral font ids, deterministic fallback ordering, absolute utf-8 clusters, and immutable shaped runs."
     },
     {
@@ -2382,12 +2382,12 @@
       "name": "HostCapabilities",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/host/types/host_types.hpp",
+      "header": "include/gui_forms/host/types/host_capabilities/host_capabilities.hpp",
       "visual": false,
       "page": "pages/host_capabilities.html",
-      "status": "OBSERVED: bundle 007 host capability value split; M4 macOS/MinGW builds and focused tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "hostcapabilities include/gui_forms/host/types/host_types.hpp hostcapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative."
+      "status": "OBSERVED: bundle 012 isolated host-capability projection; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "hostcapabilities include/gui_forms/host/types/host_capabilities/host_capabilities.hpp hostcapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative."
     },
     {
       "name": "HostClipboardTextResult",
@@ -2668,12 +2668,12 @@
       "name": "HostServicesSnapshot",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/host/types/host_types.hpp",
+      "header": "include/gui_forms/host/types/host_services_snapshot/host_services_snapshot.hpp",
       "visual": false,
       "page": "pages/host_services_snapshot.html",
-      "status": "OBSERVED: bundle 007 service telemetry review; M4 builds and focused tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "hostservicessnapshot include/gui_forms/host/types/host_types.hpp hostservicessnapshot is machine-readable capability, cursor/capture, monitor/clipboard/dialog/sound, coalescing-policy, modal-depth, rejection, and shutdown state."
+      "status": "OBSERVED: bundle 012 isolated host-service telemetry projection; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "hostservicessnapshot include/gui_forms/host/types/host_services_snapshot/host_services_snapshot.hpp hostservicessnapshot is machine-readable capability, cursor/capture, monitor/clipboard/dialog/sound, coalescing-policy, modal-depth, rejection, and shutdown state."
     },
     {
       "name": "HostSession",
@@ -2690,12 +2690,12 @@
       "name": "HostSessionSnapshot",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/host/types/host_types.hpp",
+      "header": "include/gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp",
       "visual": false,
       "page": "pages/host_session_snapshot.html",
-      "status": "OBSERVED: bundle 007 lifecycle telemetry review; M4 builds and focused tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "hostsessionsnapshot include/gui_forms/host/types/host_types.hpp hostsessionsnapshot is the complete machine-readable phase, sequence, event, fault, close, display, modal, drag, attachment, activation, occlusion, closed, and shutdown state."
+      "status": "OBSERVED: bundle 012 isolated host-session telemetry projection; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "hostsessionsnapshot include/gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp hostsessionsnapshot is the complete machine-readable phase, sequence, event, fault, close, display, modal, drag, attachment, activation, occlusion, closed, and shutdown state."
     },
     {
       "name": "HostShutdownEvent",
@@ -2758,12 +2758,12 @@
       "name": "ImageId",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "visual": false,
       "page": "pages/image_id.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 image-identity review",
       "sourceStatus": "header-only or distributed",
-      "search": "imageid include/gui_forms/types.hpp imageid is a struct declared in include/gui_forms/types.hpp."
+      "search": "imageid include/gui_forms/types/paint_types/paint_types.hpp imageid is the nonzero renderer-neutral identity returned by a window image registry."
     },
     {
       "name": "ImageList",
@@ -2771,34 +2771,34 @@
       "bases": [
         "Component"
       ],
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "visual": false,
       "page": "pages/image_list.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 isolated image-list ownership/state-machine review",
       "sourceStatus": "isolated per type",
-      "search": "imagelist include/gui_forms/image_list.hpp imagelist is a class declared in include/gui_forms/image_list.hpp. component"
+      "search": "imagelist include/gui_forms/image_list/image_list/image_list.hpp imagelist is a window-bound component that owns keyed image entries and scale variants, validates exact identity and dimensions, resolves nearest admitted scale deterministically, tracks revisions/tags, and publishes ordered changes. component"
     },
     {
       "name": "ImageListChange",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "visual": false,
       "page": "pages/image_list_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 image-list review",
       "sourceStatus": "header-only or distributed",
-      "search": "imagelistchange include/gui_forms/image_list.hpp imagelistchange is a struct declared in include/gui_forms/image_list.hpp."
+      "search": "imagelistchange include/gui_forms/image_list/image_list/image_list.hpp imagelistchange identifies revision, mutation kind, entry index, and key affected by one retained resource mutation."
     },
     {
       "name": "ImageListResolution",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "visual": false,
       "page": "pages/image_list_resolution.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 image-list review",
       "sourceStatus": "header-only or distributed",
-      "search": "imagelistresolution include/gui_forms/image_list.hpp imagelistresolution is a struct declared in include/gui_forms/image_list.hpp."
+      "search": "imagelistresolution include/gui_forms/image_list/image_list/image_list.hpp imagelistresolution returns the exact registered imageid plus source pixel size, chosen scale variant, revision, and stable entry identity."
     },
     {
       "name": "ImageLoadResult",
@@ -2872,23 +2872,23 @@
       "name": "ImageSnapshot",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/types/drawing_types.hpp",
+      "header": "include/gui_forms/drawing/image_snapshot/image_snapshot.hpp",
       "visual": false,
       "page": "pages/image_snapshot.html",
-      "status": "OBSERVED: bundle 009 immutable image snapshot review; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "imagesnapshot include/gui_forms/drawing/types/drawing_types.hpp imagesnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels."
+      "status": "OBSERVED: bundle 012 isolated immutable-image snapshot; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "imagesnapshot include/gui_forms/drawing/image_snapshot/image_snapshot.hpp imagesnapshot couples stable identity, dimensions, format, generation, and optional shared immutable pixels."
     },
     {
       "name": "Insets",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/geometry/geometry.hpp",
       "visual": false,
       "page": "pages/insets.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 geometry review",
       "sourceStatus": "header-only or distributed",
-      "search": "insets include/gui_forms/types.hpp insets is a struct declared in include/gui_forms/types.hpp."
+      "search": "insets include/gui_forms/types/geometry/geometry.hpp insets stores independent logical left, top, right, and bottom extents for margin, padding, damage, and visual outsets."
     },
     {
       "name": "InstrumentFieldChange",
@@ -2963,20 +2963,20 @@
       "header": "include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp",
       "visual": false,
       "page": "pages/item_check_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 checked-list event review",
       "sourceStatus": "header-only or distributed",
-      "search": "itemcheckevent include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp itemcheckevent is a struct declared in include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp."
+      "search": "itemcheckevent include/gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp itemcheckevent carries item index, current state, and mutable proposed state before a checkedlistbox commit."
     },
     {
       "name": "KeyEvent",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/key_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 normalized-input review",
       "sourceStatus": "header-only or distributed",
-      "search": "keyevent include/gui_forms/events.hpp keyevent is a struct declared in include/gui_forms/events.hpp."
+      "search": "keyevent include/gui_forms/events/input_events/input_events.hpp keyevent carries logical/physical key identity, modifier and repeat state, key direction, and mutable handled state through preview/target/bubble routing."
     },
     {
       "name": "KeyGesture",
@@ -2993,12 +2993,12 @@
       "name": "LayoutTransactionState",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/layout_transaction_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 layout-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "layouttransactionstate include/gui_forms/control.hpp layouttransactionstate is a struct declared in include/gui_forms/control.hpp."
+      "search": "layouttransactionstate include/gui_forms/control/control/control.hpp layouttransactionstate exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine."
     },
     {
       "name": "LinearGradientBrush",
@@ -3031,9 +3031,9 @@
       "header": "include/gui_forms/controls/panel/list_box/list_box.hpp",
       "visual": false,
       "page": "pages/list_selection_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 list-selection event review",
       "sourceStatus": "header-only or distributed",
-      "search": "listselectionchange include/gui_forms/controls/panel/list_box/list_box.hpp listselectionchange is a struct declared in include/gui_forms/controls/panel/list_box/list_box.hpp."
+      "search": "listselectionchange include/gui_forms/controls/panel/list_box/list_box.hpp listselectionchange reports previous/current indices plus the exact selected-index snapshot after one mutation."
     },
     {
       "name": "LiveSurface",
@@ -3099,9 +3099,9 @@
       "header": "include/gui_forms/window/window.hpp",
       "visual": false,
       "page": "pages/live_surface_registration.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 Window presentation-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "livesurfaceregistration include/gui_forms/window/window.hpp livesurfaceregistration is a struct declared in include/gui_forms/window/window.hpp."
+      "search": "livesurfaceregistration include/gui_forms/window/window.hpp livesurfaceregistration owns one source registration, wake token, frame observation, damage, and scheduled presentation state."
     },
     {
       "name": "LiveSurfaceSnapshot",
@@ -3162,12 +3162,12 @@
       "name": "LiveWakeState",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/raster_control/raster_control.hpp",
       "visual": false,
       "page": "pages/live_wake_state.html",
       "status": "OBSERVED: bundle 010 private ABI live-surface wake review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "livewakestate src/abi/control_adapters/abi_control_adapters.hpp livewakestate weakly correlates a rastercontrol and window so producer wakes can queue paint without prolonging either owner."
+      "search": "livewakestate src/abi/control_adapters/raster_control/raster_control.hpp livewakestate weakly correlates a rastercontrol and window so producer wakes can queue paint without prolonging either owner."
     },
     {
       "name": "MacApplicationWindow",
@@ -3176,9 +3176,9 @@
       "header": "include/gui_forms/platform/macos_host.hpp",
       "visual": false,
       "page": "pages/mac_application_window.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 AppKit session review",
       "sourceStatus": "header-only or distributed",
-      "search": "macapplicationwindow include/gui_forms/platform/macos_host.hpp macapplicationwindow is a struct declared in include/gui_forms/platform/macos_host.hpp."
+      "search": "macapplicationwindow include/gui_forms/platform/macos_host.hpp macapplicationwindow is the move-only raii owner of one native appkit session and its retained window projection."
     },
     {
       "name": "MacHostOptions",
@@ -3187,9 +3187,9 @@
       "header": "include/gui_forms/platform/macos_host.hpp",
       "visual": false,
       "page": "pages/mac_host_options.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 host-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "machostoptions include/gui_forms/platform/macos_host.hpp machostoptions is a struct declared in include/gui_forms/platform/macos_host.hpp."
+      "search": "machostoptions include/gui_forms/platform/macos_host.hpp machostoptions declares initial native window title, geometry, display scale, and run policy."
     },
     {
       "name": "MacHostServiceOptions",
@@ -3198,9 +3198,9 @@
       "header": "include/gui_forms/platform/macos_host.hpp",
       "visual": false,
       "page": "pages/mac_host_service_options.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 host-service review",
       "sourceStatus": "header-only or distributed",
-      "search": "machostserviceoptions include/gui_forms/platform/macos_host.hpp machostserviceoptions is a struct declared in include/gui_forms/platform/macos_host.hpp."
+      "search": "machostserviceoptions include/gui_forms/platform/macos_host.hpp machostserviceoptions injects bounded dialog, tooltip, clipboard, and semantic-sound services into an appkit session."
     },
     {
       "name": "MasterDetailLayout",
@@ -3209,9 +3209,9 @@
       "header": "include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp",
       "visual": false,
       "page": "pages/master_detail_layout.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 master-detail layout review",
       "sourceStatus": "header-only or distributed",
-      "search": "masterdetaillayout include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp masterdetaillayout is a struct declared in include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp."
+      "search": "masterdetaillayout include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp masterdetaillayout defines bounded navigation width and inter-pane gap for deterministic responsive projection."
     },
     {
       "name": "MasterDetailPresentationChange",
@@ -3220,9 +3220,9 @@
       "header": "include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp",
       "visual": false,
       "page": "pages/master_detail_presentation_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 master-detail event review",
       "sourceStatus": "header-only or distributed",
-      "search": "masterdetailpresentationchange include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp masterdetailpresentationchange is a struct declared in include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp."
+      "search": "masterdetailpresentationchange include/gui_forms/controls/container/master_detail_view/master_detail_view.hpp masterdetailpresentationchange reports previous/current compact or expanded presentation and active pane."
     },
     {
       "name": "MaterialBorder",
@@ -3239,12 +3239,12 @@
       "name": "MaterialFillLayer",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/surface_material/types/surface_material_types.hpp",
+      "header": "include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp",
       "visual": false,
       "page": "pages/material_fill_layer.html",
-      "status": "OBSERVED: bundle 009 surface-material value split; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "materialfilllayer include/gui_forms/surface_material/types/surface_material_types.hpp materialfilllayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity."
+      "status": "OBSERVED: bundle 012 isolated material-fill declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "materialfilllayer include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp materialfilllayer is one renderer-neutral solid, gradient, or image recipe with explicit coordinate space, spread/wrap, source geometry, scale, and opacity."
     },
     {
       "name": "MaterialShadow",
@@ -3275,9 +3275,9 @@
       "header": "include/gui_forms/components/context_menu/context_menu.hpp",
       "visual": false,
       "page": "pages/menu_item_invocation.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 context-menu invocation review",
       "sourceStatus": "header-only or distributed",
-      "search": "menuiteminvocation include/gui_forms/components/context_menu/context_menu.hpp menuiteminvocation is a struct declared in include/gui_forms/components/context_menu/context_menu.hpp."
+      "search": "menuiteminvocation include/gui_forms/components/context_menu/context_menu.hpp menuiteminvocation reports the exact stable item identity and source owner for one accepted menu activation."
     },
     {
       "name": "MenuItemSpec",
@@ -3286,9 +3286,9 @@
       "header": "include/gui_forms/components/context_menu/context_menu.hpp",
       "visual": false,
       "page": "pages/menu_item_spec.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 context-menu item review",
       "sourceStatus": "header-only or distributed",
-      "search": "menuitemspec include/gui_forms/components/context_menu/context_menu.hpp menuitemspec is a struct declared in include/gui_forms/components/context_menu/context_menu.hpp."
+      "search": "menuitemspec include/gui_forms/components/context_menu/context_menu.hpp menuitemspec owns stable identity, mnemonic text, shortcut display, enabled/checked/separator state, optional command, and nested items for one context-menu entry."
     },
     {
       "name": "MenuSnapshot",
@@ -3297,9 +3297,9 @@
       "header": "src/controls/menu/menu_utilities.hpp",
       "visual": false,
       "page": "pages/menu_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 menu-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "menusnapshot src/controls/menu/menu_utilities.hpp menusnapshot is a struct declared in src/controls/menu/menu_utilities.hpp."
+      "search": "menusnapshot src/controls/menu/menu_utilities.hpp menusnapshot captures one menu item's enabled/checked/shortcut/text state for deterministic paint, hit testing, and invocation."
     },
     {
       "name": "MenuStripInvocation",
@@ -3308,9 +3308,9 @@
       "header": "include/gui_forms/controls/menu_strip/menu_strip.hpp",
       "visual": false,
       "page": "pages/menu_strip_invocation.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 menu-strip invocation review",
       "sourceStatus": "header-only or distributed",
-      "search": "menustripinvocation include/gui_forms/controls/menu_strip/menu_strip.hpp menustripinvocation is a struct declared in include/gui_forms/controls/menu_strip/menu_strip.hpp."
+      "search": "menustripinvocation include/gui_forms/controls/menu_strip/menu_strip.hpp menustripinvocation correlates a top-level menu and exact nested item identity after accepted activation."
     },
     {
       "name": "MenuStripItemSpec",
@@ -3319,9 +3319,9 @@
       "header": "include/gui_forms/controls/menu_strip/menu_strip.hpp",
       "visual": false,
       "page": "pages/menu_strip_item_spec.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 menu-strip item review",
       "sourceStatus": "header-only or distributed",
-      "search": "menustripitemspec include/gui_forms/controls/menu_strip/menu_strip.hpp menustripitemspec is a struct declared in include/gui_forms/controls/menu_strip/menu_strip.hpp."
+      "search": "menustripitemspec include/gui_forms/controls/menu_strip/menu_strip.hpp menustripitemspec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu."
     },
     {
       "name": "Metrics",
@@ -3349,23 +3349,23 @@
       "name": "MnemonicText",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/mnemonic_text.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 command-text review",
       "sourceStatus": "header-only or distributed",
-      "search": "mnemonictext include/gui_forms/control.hpp mnemonictext is a struct declared in include/gui_forms/control.hpp."
+      "search": "mnemonictext include/gui_forms/control/control/control.hpp mnemonictext separates rendered utf-8 from the optional activation scalar parsed from forms-compatible ampersand notation."
     },
     {
       "name": "MotionPolicy",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "visual": false,
       "page": "pages/motion_policy.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 animation-policy review",
       "sourceStatus": "header-only or distributed",
-      "search": "motionpolicy include/gui_forms/animation.hpp motionpolicy is a struct declared in include/gui_forms/animation.hpp."
+      "search": "motionpolicy include/gui_forms/animation/animation_timeline/animation_timeline.hpp motionpolicy is the resolved environment policy for active/quiescent cadence, speed scaling, and presentation phase."
     },
     {
       "name": "ObjectContextRequest",
@@ -3374,9 +3374,9 @@
       "header": "include/gui_forms/controls/panel/object_view/object_view.hpp",
       "visual": false,
       "page": "pages/object_context_request.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 object-view context review",
       "sourceStatus": "header-only or distributed",
-      "search": "objectcontextrequest include/gui_forms/controls/panel/object_view/object_view.hpp objectcontextrequest is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp."
+      "search": "objectcontextrequest include/gui_forms/controls/panel/object_view/object_view.hpp objectcontextrequest carries the selected identity and local/window anchor geometry for one context-surface request."
     },
     {
       "name": "ObjectSelectionChange",
@@ -3385,9 +3385,9 @@
       "header": "include/gui_forms/controls/panel/object_view/object_view.hpp",
       "visual": false,
       "page": "pages/object_selection_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 object-view event review",
       "sourceStatus": "header-only or distributed",
-      "search": "objectselectionchange include/gui_forms/controls/panel/object_view/object_view.hpp objectselectionchange is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp."
+      "search": "objectselectionchange include/gui_forms/controls/panel/object_view/object_view.hpp objectselectionchange reports previous/current optional identities and interaction source."
     },
     {
       "name": "ObjectViewItem",
@@ -3396,9 +3396,9 @@
       "header": "include/gui_forms/controls/panel/object_view/object_view.hpp",
       "visual": false,
       "page": "pages/object_view_item.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 object-view value review",
       "sourceStatus": "header-only or distributed",
-      "search": "objectviewitem include/gui_forms/controls/panel/object_view/object_view.hpp objectviewitem is a struct declared in include/gui_forms/controls/panel/object_view/object_view.hpp."
+      "search": "objectviewitem include/gui_forms/controls/panel/object_view/object_view.hpp objectviewitem owns stable identity, primary/secondary text, icon/status metadata, and optional command data for one flat object row."
     },
     {
       "name": "Oklab",
@@ -3470,12 +3470,12 @@
       "name": "Painter",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/painter/painter.hpp",
       "visual": false,
       "page": "pages/painter.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "painter include/gui_forms/types.hpp painter is a class declared in include/gui_forms/types.hpp."
+      "status": "OBSERVED: bundle 011 renderer-neutral painting review",
+      "sourceStatus": "isolated per type",
+      "search": "painter include/gui_forms/types/painter/painter.hpp painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks."
     },
     {
       "name": "PathElement",
@@ -3540,12 +3540,12 @@
       "name": "PhysicalKey",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/physical_key.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 normalized-input review",
       "sourceStatus": "header-only or distributed",
-      "search": "physicalkey include/gui_forms/events.hpp physicalkey is a struct declared in include/gui_forms/events.hpp."
+      "search": "physicalkey include/gui_forms/events/input_events/input_events.hpp physicalkey preserves host-independent scan position, extended-key state, and location for shortcut and compatibility logic."
     },
     {
       "name": "PixelStorage",
@@ -3554,20 +3554,20 @@
       "header": "src/core/drawing/support/drawing_support.hpp",
       "visual": false,
       "page": "pages/pixel_storage.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing-storage review",
       "sourceStatus": "header-only or distributed",
-      "search": "pixelstorage src/core/drawing/support/drawing_support.hpp pixelstorage is a struct declared in src/core/drawing/support/drawing_support.hpp."
+      "search": "pixelstorage src/core/drawing/support/drawing_support.hpp pixelstorage owns aligned bitmap bytes, stride, dimensions, copy-on-write revision, damage, and active lock/edit lease state."
     },
     {
       "name": "PngCodecLimits",
       "kind": "struct",
       "bases": [],
-      "header": "src/render/skia/executor/drawing_skia.hpp",
+      "header": "src/render/skia/executor/skia_executor.hpp",
       "visual": false,
       "page": "pages/png_codec_limits.html",
       "status": "OBSERVED: bundle 009 renderer codec limits review; focused M4 tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "pngcodeclimits src/render/skia/executor/drawing_skia.hpp pngcodeclimits bounds encoded size, dimensions, and total pixels before skia decode or encode."
+      "search": "pngcodeclimits src/render/skia/executor/skia_executor.hpp pngcodeclimits bounds encoded size, dimensions, and total pixels before skia decode or encode."
     },
     {
       "name": "PngMetadata",
@@ -3595,34 +3595,34 @@
       "name": "Point",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/geometry/geometry.hpp",
       "visual": false,
       "page": "pages/point.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 geometry review",
       "sourceStatus": "header-only or distributed",
-      "search": "point include/gui_forms/types.hpp point is a struct declared in include/gui_forms/types.hpp."
+      "search": "point include/gui_forms/types/geometry/geometry.hpp point is a renderer-neutral logical-coordinate pair."
     },
     {
       "name": "PointF",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/point_f/point_f.hpp",
       "visual": false,
       "page": "pages/point_f.html",
-      "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "pointf include/gui_forms/drawing/geometry/drawing_geometry.hpp pointf is a finite logical-coordinate pair."
+      "status": "OBSERVED: bundle 012 isolated logical-point declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "pointf include/gui_forms/drawing/geometry/point_f/point_f.hpp pointf is a finite logical-coordinate pair."
     },
     {
       "name": "PointI",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/point_i/point_i.hpp",
       "visual": false,
       "page": "pages/point_i.html",
-      "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "pointi include/gui_forms/drawing/geometry/drawing_geometry.hpp pointi is a signed integer pixel-coordinate pair."
+      "status": "OBSERVED: bundle 012 isolated integer-point declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "pointi include/gui_forms/drawing/geometry/point_i/point_i.hpp pointi is a signed integer pixel-coordinate pair."
     },
     {
       "name": "PointerCaptureChange",
@@ -3639,12 +3639,12 @@
       "name": "PointerEvent",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/pointer_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 normalized-input review",
       "sourceStatus": "header-only or distributed",
-      "search": "pointerevent include/gui_forms/events.hpp pointerevent is a struct declared in include/gui_forms/events.hpp."
+      "search": "pointerevent include/gui_forms/events/input_events/input_events.hpp pointerevent is the mutable routed pointer record: device phase, window/local coordinates, buttons, modifiers, wheel deltas, click count, capture request, and handled state."
     },
     {
       "name": "PopupAttachment",
@@ -3718,12 +3718,12 @@
       "name": "PropertyCollectionValue",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/binding/value/binding_value.hpp",
+      "header": "include/gui_forms/binding/value/property_collection_value/property_collection_value.hpp",
       "visual": false,
       "page": "pages/property_collection_value.html",
-      "status": "OBSERVED: bundle 010 property collection handle review; focused M4 binding tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "propertycollectionvalue include/gui_forms/binding/value/binding_value.hpp propertycollectionvalue is a cheap immutable shared handle over a validated bounded homogeneous property sequence."
+      "status": "OBSERVED: bundle 012 isolated property-collection handle; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "propertycollectionvalue include/gui_forms/binding/value/property_collection_value/property_collection_value.hpp propertycollectionvalue is a cheap immutable shared handle over a validated bounded homogeneous property sequence."
     },
     {
       "name": "PropertyConversionContext",
@@ -3894,12 +3894,12 @@
       "name": "PropertyObjectValue",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/binding/value/binding_value.hpp",
+      "header": "include/gui_forms/binding/value/property_object_value/property_object_value.hpp",
       "visual": false,
       "page": "pages/property_object_value.html",
-      "status": "OBSERVED: bundle 010 property object handle review; focused M4 binding tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "propertyobjectvalue include/gui_forms/binding/value/binding_value.hpp propertyobjectvalue is a cheap immutable shared handle over a validated recursive property object tree."
+      "status": "OBSERVED: bundle 012 isolated property-object handle; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "propertyobjectvalue include/gui_forms/binding/value/property_object_value/property_object_value.hpp propertyobjectvalue is a cheap immutable shared handle over a validated recursive property object tree."
     },
     {
       "name": "PropertyRegistration",
@@ -3938,23 +3938,23 @@
       "name": "PropertyRowSpec",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/inspection/inspection_types.hpp",
+      "header": "include/gui_forms/inspection/property_row_spec/property_row_spec.hpp",
       "visual": false,
       "page": "pages/property_row_spec.html",
-      "status": "OBSERVED: bundle 006 authored-row value split; M4 build and focused tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "propertyrowspec include/gui_forms/inspection/inspection_types.hpp propertyrowspec is the authored settings-row model: stable identity; name/value/description; stock editor/choices; validation; parent/depth disclosure; enable/required state; and reset capability."
+      "status": "OBSERVED: bundle 012 isolated authored-row declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "propertyrowspec include/gui_forms/inspection/property_row_spec/property_row_spec.hpp propertyrowspec is the authored settings-row model: stable identity; name/value/description; stock editor/choices; validation; parent/depth disclosure; enable/required state; and reset capability."
     },
     {
       "name": "PropertyState",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp",
       "visual": false,
       "page": "pages/property_state.html",
       "status": "OBSERVED: bundle 010 private ABI foreign-property state review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "propertystate src/abi/control_adapters/abi_control_adapters.hpp propertystate owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing."
+      "search": "propertystate src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp propertystate owns one copied inert descriptor and bounded caller callbacks for native property access/conversion/editing."
     },
     {
       "name": "PropertyValueChange",
@@ -4004,45 +4004,45 @@
       "name": "RasterKeySample",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/support/abi_control_adapter_support.hpp",
       "visual": false,
       "page": "pages/raster_key_sample.html",
       "status": "OBSERVED: bundle 010 private ABI key record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rasterkeysample src/abi/control_adapters/abi_control_adapters.hpp rasterkeysample is the c-callback projection of physical key, modifiers, repeat, and mutable handled state."
+      "search": "rasterkeysample src/abi/control_adapters/support/abi_control_adapter_support.hpp rasterkeysample is the c-callback projection of physical key, modifiers, repeat, and mutable handled state."
     },
     {
       "name": "RasterPointerSample",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/support/abi_control_adapter_support.hpp",
       "visual": false,
       "page": "pages/raster_pointer_sample.html",
       "status": "OBSERVED: bundle 010 private ABI pointer record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rasterpointersample src/abi/control_adapters/abi_control_adapters.hpp rasterpointersample is the bounded c-callback projection of one retained pointer event."
+      "search": "rasterpointersample src/abi/control_adapters/support/abi_control_adapter_support.hpp rasterpointersample is the bounded c-callback projection of one retained pointer event."
     },
     {
       "name": "RasterResult",
       "kind": "struct",
       "bases": [],
-      "header": "src/render/skia/executor/drawing_skia.hpp",
+      "header": "src/render/skia/executor/skia_executor.hpp",
       "visual": false,
       "page": "pages/raster_result.html",
       "status": "OBSERVED: bundle 009 Skia execution result review; focused M4 tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rasterresult src/render/skia/executor/drawing_skia.hpp rasterresult couples a closed renderer error to the count of commands committed before completion."
+      "search": "rasterresult src/render/skia/executor/skia_executor.hpp rasterresult couples a closed renderer error to the count of commands committed before completion."
     },
     {
       "name": "RasterTextSample",
       "kind": "struct",
       "bases": [],
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/support/abi_control_adapter_support.hpp",
       "visual": false,
       "page": "pages/raster_text_sample.html",
       "status": "OBSERVED: bundle 010 private ABI text record review; native and MinGW ABI builds pass",
       "sourceStatus": "header-only or distributed",
-      "search": "rastertextsample src/abi/control_adapters/abi_control_adapters.hpp rastertextsample owns utf-8 text plus composition and replacement-range metadata for a c callback."
+      "search": "rastertextsample src/abi/control_adapters/support/abi_control_adapter_support.hpp rastertextsample owns utf-8 text plus composition and replacement-range metadata for a c callback."
     },
     {
       "name": "RecordingPainter",
@@ -4061,34 +4061,34 @@
       "name": "Rect",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/geometry/geometry.hpp",
       "visual": false,
       "page": "pages/rect.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 geometry review",
       "sourceStatus": "header-only or distributed",
-      "search": "rect include/gui_forms/types.hpp rect is a struct declared in include/gui_forms/types.hpp."
+      "search": "rect include/gui_forms/types/geometry/geometry.hpp rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations."
     },
     {
       "name": "RectF",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/rect_f/rect_f.hpp",
       "visual": false,
       "page": "pages/rect_f.html",
-      "status": "OBSERVED: bundle 009 logical rectangle review; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "rectf include/gui_forms/drawing/geometry/drawing_geometry.hpp rectf provides validated finite logical containment, intersection, union, translation, and inflation."
+      "status": "OBSERVED: bundle 012 isolated logical-rectangle declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "rectf include/gui_forms/drawing/geometry/rect_f/rect_f.hpp rectf provides validated finite logical containment, intersection, union, translation, and inflation."
     },
     {
       "name": "RectI",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/rect_i/rect_i.hpp",
       "visual": false,
       "page": "pages/rect_i.html",
-      "status": "OBSERVED: bundle 009 integer rectangle review; focused M4 tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "recti include/gui_forms/drawing/geometry/drawing_geometry.hpp recti provides overflow-aware integer pixel containment, intersection, union, translation, and inflation."
+      "status": "OBSERVED: bundle 012 isolated integer-rectangle declaration/definition; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "recti include/gui_forms/drawing/geometry/rect_i/rect_i.hpp recti provides overflow-aware integer pixel containment, intersection, union, translation, and inflation."
     },
     {
       "name": "Region",
@@ -4121,9 +4121,20 @@
       "header": "src/abi/registry/registry.hpp",
       "visual": false,
       "page": "pages/registry.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI registry state-machine split; native C11/C++/export tests and complete M4 MinGW build pass",
       "sourceStatus": "header-only or distributed",
-      "search": "registry src/abi/registry/registry.hpp registry is a class declared in src/abi/registry/registry.hpp."
+      "search": "registry src/abi/registry/registry.hpp registry is the single compatibility abi authority for generational handles, thread affinity, control trees, subscriptions, host sessions, queued callbacks, transient services, property proxies, and deterministic retirement."
+    },
+    {
+      "name": "RegistrySlot",
+      "kind": "struct",
+      "bases": [],
+      "header": "src/abi/registry/registry.hpp",
+      "visual": false,
+      "page": "pages/registry_slot.html",
+      "status": "OBSERVED: bundle 010 private ABI slot review; native ABI tests and complete M4 MinGW build pass",
+      "sourceStatus": "header-only or distributed",
+      "search": "registryslot src/abi/registry/registry.hpp registryslot combines generation, closed slot kind, reference count, and either control or subscription ownership so stale handles fail deterministically."
     },
     {
       "name": "ReviewRecord",
@@ -4132,9 +4143,9 @@
       "header": "include/gui_forms/controls/panel/card/review_card/review_card.hpp",
       "visual": false,
       "page": "pages/review_record.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 review-card value review",
       "sourceStatus": "header-only or distributed",
-      "search": "reviewrecord include/gui_forms/controls/panel/card/review_card/review_card.hpp reviewrecord is a struct declared in include/gui_forms/controls/panel/card/review_card/review_card.hpp."
+      "search": "reviewrecord include/gui_forms/controls/panel/card/review_card/review_card.hpp reviewrecord owns the stable author, timestamp, score/status, title, body, and metadata projected by reviewcard."
     },
     {
       "name": "Revocable",
@@ -4151,12 +4162,12 @@
       "name": "RuntimeId",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "visual": false,
       "page": "pages/runtime_id.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 retained-control identity review",
       "sourceStatus": "header-only or distributed",
-      "search": "runtimeid include/gui_forms/control.hpp runtimeid is a struct declared in include/gui_forms/control.hpp."
+      "search": "runtimeid include/gui_forms/control/control/control.hpp runtimeid is the monotonic process-local identity used for exact retained instances and child operations."
     },
     {
       "name": "SavedState",
@@ -4189,9 +4200,9 @@
       "header": "include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "visual": false,
       "page": "pages/scroll_anchor.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 correspondence scroll-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "scrollanchor include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp scrollanchor is a struct declared in include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp."
+      "search": "scrollanchor include/gui_forms/controls/panel/correspondence_view/correspondence_view.hpp scrollanchor preserves a stable row identity plus intra-row offset so refreshes restore semantic rather than index-only position."
     },
     {
       "name": "ScrollAxisSnapshot",
@@ -4200,9 +4211,9 @@
       "header": "include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp",
       "visual": false,
       "page": "pages/scroll_axis_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 scroll-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "scrollaxissnapshot include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollaxissnapshot is a struct declared in include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp."
+      "search": "scrollaxissnapshot include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollaxissnapshot exposes minimum, maximum, viewport, small/large change, value, effective maximum, and visibility for one axis."
     },
     {
       "name": "ScrollEvent",
@@ -4211,9 +4222,9 @@
       "header": "include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp",
       "visual": false,
       "page": "pages/scroll_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 scroll event review",
       "sourceStatus": "header-only or distributed",
-      "search": "scrollevent include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollevent is a struct declared in include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp."
+      "search": "scrollevent include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollevent reports axis, mutation kind, old/new values, and logical orientation for one admitted scroll transition."
     },
     {
       "name": "ScrollProperties",
@@ -4233,9 +4244,9 @@
       "header": "include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp",
       "visual": false,
       "page": "pages/scroll_snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 scroll-state review",
       "sourceStatus": "header-only or distributed",
-      "search": "scrollsnapshot include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollsnapshot is a struct declared in include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp."
+      "search": "scrollsnapshot include/gui_forms/controls/scrollable_control/scroll_properties/scroll_properties.hpp scrollsnapshot combines horizontal/vertical axis snapshots with auto-scroll policy, margin, minimum size, offset, and logical position."
     },
     {
       "name": "SemanticDescriptor",
@@ -4356,53 +4367,53 @@
       "header": "src/controls/showcase_controls.hpp",
       "visual": false,
       "page": "pages/showcase_tree.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 demoboard-composition review",
       "sourceStatus": "header-only or distributed",
-      "search": "showcasetree src/controls/showcase_controls.hpp showcasetree is a struct declared in src/controls/showcase_controls.hpp."
+      "search": "showcasetree src/controls/showcase_controls.hpp showcasetree retains the root, navigation, content, status, and indexed board controls of the complete native showcase."
     },
     {
       "name": "Size",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/geometry/geometry.hpp",
       "visual": false,
       "page": "pages/size.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 geometry review",
       "sourceStatus": "header-only or distributed",
-      "search": "size include/gui_forms/types.hpp size is a struct declared in include/gui_forms/types.hpp."
+      "search": "size include/gui_forms/types/geometry/geometry.hpp size is a renderer-neutral logical width and height."
     },
     {
       "name": "SizeF",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/size_f/size_f.hpp",
       "visual": false,
       "page": "pages/size_f.html",
       "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "sizef include/gui_forms/drawing/geometry/drawing_geometry.hpp sizef carries logical width and height."
+      "search": "sizef include/gui_forms/drawing/geometry/size_f/size_f.hpp sizef carries logical width and height."
     },
     {
       "name": "SizeI",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/drawing/geometry/drawing_geometry.hpp",
+      "header": "include/gui_forms/drawing/geometry/size_i/size_i.hpp",
       "visual": false,
       "page": "pages/size_i.html",
       "status": "OBSERVED: bundle 009 drawing geometry review; focused M4 tests pass",
       "sourceStatus": "header-only or distributed",
-      "search": "sizei include/gui_forms/drawing/geometry/drawing_geometry.hpp sizei carries signed integer width and height."
+      "search": "sizei include/gui_forms/drawing/geometry/size_i/size_i.hpp sizei carries signed integer width and height."
     },
     {
       "name": "SkiaExecutor",
       "kind": "class",
       "bases": [],
-      "header": "src/render/skia/executor/drawing_skia.hpp",
+      "header": "src/render/skia/executor/skia_executor.hpp",
       "visual": false,
       "page": "pages/skia_executor.html",
-      "status": "OBSERVED: bundle 009 CPU Skia executor split; focused M4 raster/trace tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "skiaexecutor src/render/skia/executor/drawing_skia.hpp skiaexecutor is the private cpu-only terminal for gui.drawing command streams, png-only codecs, deterministic text metrics, owned typefaces, and thread-affine execution."
+      "status": "OBSERVED: bundle 012 hierarchy-named CPU Skia executor unit; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "skiaexecutor src/render/skia/executor/skia_executor.hpp skiaexecutor is the private cpu-only terminal for gui.drawing command streams, png-only codecs, deterministic text metrics, owned typefaces, and thread-affine execution."
     },
     {
       "name": "SkiaRaster",
@@ -4423,23 +4434,12 @@
       "bases": [
         "Revocable"
       ],
-      "header": "include/gui_forms/event.hpp",
+      "header": "include/gui_forms/event/event/event.hpp",
       "visual": false,
       "page": "pages/slot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 revocable-event state review",
       "sourceStatus": "header-only or distributed",
-      "search": "slot include/gui_forms/event.hpp slot is a struct declared in include/gui_forms/event.hpp. revocable"
-    },
-    {
-      "name": "Slot",
-      "kind": "struct",
-      "bases": [],
-      "header": "src/abi/registry/registry.hpp",
-      "visual": false,
-      "page": "pages/slot_2.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "header-only or distributed",
-      "search": "slot src/abi/registry/registry.hpp slot is a struct declared in src/abi/registry/registry.hpp."
+      "search": "slot include/gui_forms/event/event/event.hpp event::slot owns one callback, weakly references shared event state, and guarantees idempotent disconnection plus exact statistics. revocable"
     },
     {
       "name": "Snapshot",
@@ -4448,9 +4448,9 @@
       "header": "include/gui_forms/controls/panel/text_box/text_box.hpp",
       "visual": false,
       "page": "pages/snapshot.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 text-box history review",
       "sourceStatus": "header-only or distributed",
-      "search": "snapshot include/gui_forms/controls/panel/text_box/text_box.hpp snapshot is a struct declared in include/gui_forms/controls/panel/text_box/text_box.hpp."
+      "search": "snapshot include/gui_forms/controls/panel/text_box/text_box.hpp textbox::snapshot captures utf-8 content, directional selection, and viewport required for exact undo/redo restoration."
     },
     {
       "name": "SolidBrush",
@@ -4483,9 +4483,9 @@
       "header": "include/gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp",
       "visual": false,
       "page": "pages/split_change_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 split-container event review",
       "sourceStatus": "header-only or distributed",
-      "search": "splitchangeevent include/gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp splitchangeevent is a struct declared in include/gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp."
+      "search": "splitchangeevent include/gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp splitchangeevent reports old/new splitter distance and whether the change originated from pointer interaction."
     },
     {
       "name": "SrgbConversion",
@@ -4502,34 +4502,34 @@
       "name": "StableId",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/stable_id/stable_id.hpp",
       "visual": false,
       "page": "pages/stable_id.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "stableid include/gui_forms/control.hpp stableid is a class declared in include/gui_forms/control.hpp."
+      "status": "OBSERVED: bundle 012 isolated retained-control identity owner; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "stableid include/gui_forms/control/stable_id/stable_id.hpp stableid owns the immutable authored utf-8 identity used for lookup, semantics, traces, and cross-boundary correlation."
     },
     {
       "name": "State",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/event.hpp",
+      "header": "include/gui_forms/event/event/event.hpp",
       "visual": false,
       "page": "pages/state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 revocable-event state review",
       "sourceStatus": "header-only or distributed",
-      "search": "state include/gui_forms/event.hpp state is a struct declared in include/gui_forms/event.hpp."
+      "search": "state include/gui_forms/event/event/event.hpp event::state retains the ordered slot vector and aggregate statistics independently of any individual subscription token."
     },
     {
       "name": "StaticNode",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/static_tree.hpp",
+      "header": "include/gui_forms/control/static_tree/control_factory/control_factory.hpp",
       "visual": false,
       "page": "pages/static_node.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 static-tree review",
       "sourceStatus": "header-only or distributed",
-      "search": "staticnode include/gui_forms/static_tree.hpp staticnode is a struct declared in include/gui_forms/static_tree.hpp."
+      "search": "staticnode include/gui_forms/control/static_tree/control_factory/control_factory.hpp staticnode is an inert declarative node containing a registered type name, stable id, and owned child descriptions."
     },
     {
       "name": "StringFormat",
@@ -4562,20 +4562,20 @@
       "header": "src/abi/registry/registry.hpp",
       "visual": false,
       "page": "pages/subscription_record.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 010 private ABI subscription review; native ABI tests and complete M4 MinGW build pass",
       "sourceStatus": "header-only or distributed",
-      "search": "subscriptionrecord src/abi/registry/registry.hpp subscriptionrecord is a struct declared in src/abi/registry/registry.hpp."
+      "search": "subscriptionrecord src/abi/registry/registry.hpp subscriptionrecord owns exactly one c callback flavor, caller context, owner thread, native subscriptiontoken, event kind, and connected state."
     },
     {
       "name": "SubscriptionToken",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/event.hpp",
+      "header": "include/gui_forms/event/event/event.hpp",
       "visual": false,
       "page": "pages/subscription_token.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 revocable-event review",
       "sourceStatus": "header-only or distributed",
-      "search": "subscriptiontoken include/gui_forms/event.hpp subscriptiontoken is a class declared in include/gui_forms/event.hpp."
+      "search": "subscriptiontoken include/gui_forms/event/event/event.hpp subscriptiontoken is the move-only raii revocation handle for a retained event slot; destruction and explicit disconnect are idempotent."
     },
     {
       "name": "SurfaceMaterial",
@@ -4606,9 +4606,9 @@
       "header": "include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp",
       "visual": false,
       "page": "pages/tab_selection_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 tab-selection event review",
       "sourceStatus": "header-only or distributed",
-      "search": "tabselectionchange include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp tabselectionchange is a struct declared in include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp."
+      "search": "tabselectionchange include/gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp tabselectionchange reports previous/current tab indices and stable page identities after one accepted selection."
     },
     {
       "name": "TableLayoutCellPosition",
@@ -4617,9 +4617,9 @@
       "header": "include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
       "visual": false,
       "page": "pages/table_layout_cell_position.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 table-layout position review",
       "sourceStatus": "header-only or distributed",
-      "search": "tablelayoutcellposition include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp tablelayoutcellposition is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp."
+      "search": "tablelayoutcellposition include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp tablelayoutcellposition names a zero-based row and column for exact retained child placement."
     },
     {
       "name": "TableLayoutStyle",
@@ -4628,9 +4628,9 @@
       "header": "include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
       "visual": false,
       "page": "pages/table_layout_style.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 table-layout style review",
       "sourceStatus": "header-only or distributed",
-      "search": "tablelayoutstyle include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp tablelayoutstyle is a struct declared in include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp."
+      "search": "tablelayoutstyle include/gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp tablelayoutstyle pairs absolute, autosize, or percentage sizing policy with its validated authored value."
     },
     {
       "name": "TextEditResult",
@@ -4647,12 +4647,12 @@
       "name": "TextInputEvent",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "visual": false,
       "page": "pages/text_input_event.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 normalized-input review",
       "sourceStatus": "header-only or distributed",
-      "search": "textinputevent include/gui_forms/events.hpp textinputevent is a struct declared in include/gui_forms/events.hpp."
+      "search": "textinputevent include/gui_forms/events/input_events/input_events.hpp textinputevent owns utf-8 text or composition payload plus replacement range and mutable handled state."
     },
     {
       "name": "TextMetricsProvider",
@@ -4898,9 +4898,9 @@
       "header": "include/gui_forms/controls/panel/tree_view/tree_view.hpp",
       "visual": false,
       "page": "pages/tree_expansion_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 tree event review",
       "sourceStatus": "header-only or distributed",
-      "search": "treeexpansionchange include/gui_forms/controls/panel/tree_view/tree_view.hpp treeexpansionchange is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp."
+      "search": "treeexpansionchange include/gui_forms/controls/panel/tree_view/tree_view.hpp treeexpansionchange reports the exact node and resulting expanded state."
     },
     {
       "name": "TreeSelectionChange",
@@ -4909,9 +4909,9 @@
       "header": "include/gui_forms/controls/panel/tree_view/tree_view.hpp",
       "visual": false,
       "page": "pages/tree_selection_change.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 tree event review",
       "sourceStatus": "header-only or distributed",
-      "search": "treeselectionchange include/gui_forms/controls/panel/tree_view/tree_view.hpp treeselectionchange is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp."
+      "search": "treeselectionchange include/gui_forms/controls/panel/tree_view/tree_view.hpp treeselectionchange reports previous/current optional node identities and interaction source."
     },
     {
       "name": "TreeViewItem",
@@ -4920,9 +4920,9 @@
       "header": "include/gui_forms/controls/panel/tree_view/tree_view.hpp",
       "visual": false,
       "page": "pages/tree_view_item.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 tree value review",
       "sourceStatus": "header-only or distributed",
-      "search": "treeviewitem include/gui_forms/controls/panel/tree_view/tree_view.hpp treeviewitem is a struct declared in include/gui_forms/controls/panel/tree_view/tree_view.hpp."
+      "search": "treeviewitem include/gui_forms/controls/panel/tree_view/tree_view.hpp treeviewitem owns stable identity, text, icon/status metadata, expansion capability/state, and nested children for one tree node."
     },
     {
       "name": "UnicodeRange",
@@ -4931,20 +4931,20 @@
       "header": "src/core/text/unicode/unicode_grapheme_data.hpp",
       "visual": false,
       "page": "pages/unicode_range.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 Unicode-table review",
       "sourceStatus": "header-only or distributed",
-      "search": "unicoderange src/core/text/unicode/unicode_grapheme_data.hpp unicoderange is a struct declared in src/core/text/unicode/unicode_grapheme_data.hpp."
+      "search": "unicoderange src/core/text/unicode/unicode_grapheme_data.hpp unicoderange maps an inclusive code-point interval to the generated grapheme-break property used by conformance logic."
     },
     {
       "name": "UpdateScope",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/window/window.hpp",
+      "header": "include/gui_forms/window/update_scope/update_scope.hpp",
       "visual": false,
       "page": "pages/update_scope.html",
-      "status": "OBSERVED: bundle 007 lifecycle transaction split; M4 build and focused tests pass",
-      "sourceStatus": "grouped migration pending",
-      "search": "updatescope include/gui_forms/window/window.hpp updatescope is the move-only raii token for one window update-depth level; it guarantees balanced close and makes an explicit layout barrier available without opening a nested native loop."
+      "status": "OBSERVED: bundle 012 isolated update-transaction state owner; native and MinGW M4 builds pass",
+      "sourceStatus": "isolated per type",
+      "search": "updatescope include/gui_forms/window/update_scope/update_scope.hpp updatescope is the move-only raii token for one window update-depth level; it guarantees balanced close and makes an explicit layout barrier available without opening a nested native loop."
     },
     {
       "name": "Utf8ValidationResult",
@@ -4972,12 +4972,12 @@
       "name": "Variant",
       "kind": "struct",
       "bases": [],
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "visual": false,
       "page": "pages/variant.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 image-list storage review",
       "sourceStatus": "header-only or distributed",
-      "search": "variant include/gui_forms/image_list.hpp variant is a struct declared in include/gui_forms/image_list.hpp."
+      "search": "variant include/gui_forms/image_list/image_list/image_list.hpp imagelist::variant correlates one scale factor with exact registered image identity and pixel dimensions."
     },
     {
       "name": "Window",
@@ -4997,9 +4997,9 @@
       "header": "include/gui_forms/scheduler/types/scheduler_types.hpp",
       "visual": false,
       "page": "pages/window_lifetime.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 scheduler-lifetime review",
       "sourceStatus": "header-only or distributed",
-      "search": "windowlifetime include/gui_forms/scheduler/types/scheduler_types.hpp windowlifetime is a struct declared in include/gui_forms/scheduler/types/scheduler_types.hpp."
+      "search": "windowlifetime include/gui_forms/scheduler/types/scheduler_types.hpp windowlifetime weakly correlates a scheduler request with window ownership so late work cannot prolong or call a retired host."
     },
     {
       "name": "WindowsApplicationWindow",
@@ -5008,20 +5008,20 @@
       "header": "include/gui_forms/platform/windows_host.hpp",
       "visual": false,
       "page": "pages/windows_application_window.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 Win32 session review",
       "sourceStatus": "header-only or distributed",
-      "search": "windowsapplicationwindow include/gui_forms/platform/windows_host.hpp windowsapplicationwindow is a struct declared in include/gui_forms/platform/windows_host.hpp."
+      "search": "windowsapplicationwindow include/gui_forms/platform/windows_host.hpp windowsapplicationwindow is the move-only raii owner of one native win32 session and retained window projection."
     },
     {
       "name": "WindowsCompatibilityPaintEndpoint",
       "kind": "class",
       "bases": [],
-      "header": "include/gui_forms/platform/windows_host.hpp",
+      "header": "include/gui_forms/platform/windows_compatibility_paint_endpoint/windows_compatibility_paint_endpoint.hpp",
       "visual": false,
       "page": "pages/windows_compatibility_paint_endpoint.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "windowscompatibilitypaintendpoint include/gui_forms/platform/windows_host.hpp windowscompatibilitypaintendpoint is a class declared in include/gui_forms/platform/windows_host.hpp."
+      "status": "OBSERVED: bundle 012 isolated Win32 compatibility-paint state machine; complete MinGW/Skia M4 build passes",
+      "sourceStatus": "isolated per type",
+      "search": "windowscompatibilitypaintendpoint include/gui_forms/platform/windows_compatibility_paint_endpoint/windows_compatibility_paint_endpoint.hpp windowscompatibilitypaintendpoint is a shared move-only fa\u00e7ade over a rastercontrol live surface, staging dc, generational writes, invalidation, submission, drain, and retirement."
     },
     {
       "name": "WindowsHostOptions",
@@ -5030,9 +5030,9 @@
       "header": "include/gui_forms/platform/windows_host.hpp",
       "visual": false,
       "page": "pages/windows_host_options.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 host-contract review",
       "sourceStatus": "header-only or distributed",
-      "search": "windowshostoptions include/gui_forms/platform/windows_host.hpp windowshostoptions is a struct declared in include/gui_forms/platform/windows_host.hpp."
+      "search": "windowshostoptions include/gui_forms/platform/windows_host.hpp windowshostoptions declares initial win32 title, client geometry, display scale, instance, show state, and run policy."
     },
     {
       "name": "WindowsHostServices",
@@ -5059,28 +5059,15 @@
       "search": "xyzd65 include/gui_forms/drawing/color/color.hpp xyzd65 carries normalized cie xyz d65 coordinates plus straight alpha."
     },
     {
-      "name": "detail",
-      "kind": "class",
-      "bases": [
-        "vector"
-      ],
-      "header": "include/gui_forms/window/window.hpp",
-      "visual": false,
-      "page": "pages/detail.html",
-      "status": "generated inventory; detailed review pending",
-      "sourceStatus": "grouped migration pending",
-      "search": "detail include/gui_forms/window/window.hpp detail is a class declared in include/gui_forms/window/window.hpp. vector"
-    },
-    {
       "name": "gd_api_v0",
       "kind": "struct",
       "bases": [],
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_api_v0.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 complete GUI.Drawing ABI table review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_api_v0 include/gui_forms/drawing_c_api.h gd_api_v0 is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_api_v0 include/gui_forms/drawing_c_api.h gd_api_v0 is the size-versioned negotiated function table for drawing object ownership, transforms, paths, regions, brushes, pens, fonts, text, images, bitmap locks/edits/damage, recording/replay, native interop, and raster publication."
     },
     {
       "name": "gd_bitmap_damage_summary",
@@ -5089,9 +5076,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_bitmap_damage_summary.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI damage review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_bitmap_damage_summary include/gui_forms/drawing_c_api.h gd_bitmap_damage_summary is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_bitmap_damage_summary include/gui_forms/drawing_c_api.h gd_bitmap_damage_summary projects revision, rectangle/compaction/collapse counts, and exact bounds after bitmap edits."
     },
     {
       "name": "gd_bitmap_edit_view",
@@ -5100,9 +5087,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_bitmap_edit_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI bitmap review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_bitmap_edit_view include/gui_forms/drawing_c_api.h gd_bitmap_edit_view is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_bitmap_edit_view include/gui_forms/drawing_c_api.h gd_bitmap_edit_view exposes bounded mutable premultiplied bgra storage, dimensions, stride, and generational edit token."
     },
     {
       "name": "gd_bitmap_lock_view",
@@ -5111,9 +5098,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_bitmap_lock_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI bitmap review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_bitmap_lock_view include/gui_forms/drawing_c_api.h gd_bitmap_lock_view is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_bitmap_lock_view include/gui_forms/drawing_c_api.h gd_bitmap_lock_view exposes bounded pixel pointer, dimensions, signed stride, pixel format, and lease token for one active read/write lock."
     },
     {
       "name": "gd_color",
@@ -5122,9 +5109,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_color.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_color include/gui_forms/drawing_c_api.h gd_color is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_color include/gui_forms/drawing_c_api.h gd_color projects packed straight-alpha argb plus explicit empty-color identity."
     },
     {
       "name": "gd_color_remap",
@@ -5133,9 +5120,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_color_remap.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI image review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_color_remap include/gui_forms/drawing_c_api.h gd_color_remap is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_color_remap include/gui_forms/drawing_c_api.h gd_color_remap maps one exact source argb value to a replacement for image-attribute processing."
     },
     {
       "name": "gd_error_view",
@@ -5144,9 +5131,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_error_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI error review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_error_view include/gui_forms/drawing_c_api.h gd_error_view is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_error_view include/gui_forms/drawing_c_api.h gd_error_view returns thread-local drawing result code and borrowed bounded diagnostic."
     },
     {
       "name": "gd_handle",
@@ -5155,9 +5142,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_handle.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_handle include/gui_forms/drawing_c_api.h gd_handle is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_handle include/gui_forms/drawing_c_api.h gd_handle encodes one-based drawing registry slot plus generation for deterministic stale-object rejection."
     },
     {
       "name": "gd_matrix",
@@ -5166,9 +5153,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_matrix.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI transform review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_matrix include/gui_forms/drawing_c_api.h gd_matrix is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_matrix include/gui_forms/drawing_c_api.h gd_matrix projects the six coefficients of a 2d affine transform."
     },
     {
       "name": "gd_point",
@@ -5177,9 +5164,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_point.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_point include/gui_forms/drawing_c_api.h gd_point is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_point include/gui_forms/drawing_c_api.h gd_point projects one floating-point drawing coordinate."
     },
     {
       "name": "gd_raster_service_v0",
@@ -5188,9 +5175,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_raster_service_v0.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing raster-service review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_raster_service_v0 include/gui_forms/drawing_c_api.h gd_raster_service_v0 is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_raster_service_v0 include/gui_forms/drawing_c_api.h gd_raster_service_v0 is the size-versioned host callback table for registering, updating, unregistering, and invalidating shared raster surfaces."
     },
     {
       "name": "gd_rect",
@@ -5199,9 +5186,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_rect.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_rect include/gui_forms/drawing_c_api.h gd_rect is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_rect include/gui_forms/drawing_c_api.h gd_rect projects floating-point drawing rectangle geometry."
     },
     {
       "name": "gd_rect_i",
@@ -5210,9 +5197,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_rect_i.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_rect_i include/gui_forms/drawing_c_api.h gd_rect_i is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_rect_i include/gui_forms/drawing_c_api.h gd_rect_i projects exact integer pixel bounds for bitmap lock/edit/damage contracts."
     },
     {
       "name": "gd_size",
@@ -5221,9 +5208,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_size.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_size include/gui_forms/drawing_c_api.h gd_size is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_size include/gui_forms/drawing_c_api.h gd_size projects floating-point drawing dimensions."
     },
     {
       "name": "gd_string_view",
@@ -5232,9 +5219,9 @@
       "header": "include/gui_forms/drawing_c_api.h",
       "visual": false,
       "page": "pages/gd_string_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 drawing C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gd_string_view include/gui_forms/drawing_c_api.h gd_string_view is a struct declared in include/gui_forms/drawing_c_api.h."
+      "search": "gd_string_view include/gui_forms/drawing_c_api.h gd_string_view is a non-owning bounded drawing-abi string view with explicit validation before copying."
     },
     {
       "name": "gf_api_v0",
@@ -5243,9 +5230,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_api_v0.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 complete GUI.Forms ABI table review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_api_v0 include/gui_forms/c_api.h gf_api_v0 is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_api_v0 include/gui_forms/c_api.h gf_api_v0 is the size-versioned negotiated function table for generational control ownership, properties, layout/scroll, hierarchy, input, fields, dialogs/services, property proxies, callbacks, host execution, dispatch, and deterministic retirement."
     },
     {
       "name": "gf_error_view",
@@ -5254,9 +5241,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_error_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI error review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_error_view include/gui_forms/c_api.h gf_error_view is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_error_view include/gui_forms/c_api.h gf_error_view returns the thread-local result code and borrowed bounded diagnostic for the last failed abi operation."
     },
     {
       "name": "gf_field_edit_result",
@@ -5265,9 +5252,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_field_edit_result.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI field review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_field_edit_result include/gui_forms/c_api.h gf_field_edit_result is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_field_edit_result include/gui_forms/c_api.h gf_field_edit_result reports handled/change state plus resulting directional selection and viewport after one field operation."
     },
     {
       "name": "gf_handle",
@@ -5276,9 +5263,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_handle.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_handle include/gui_forms/c_api.h gf_handle is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_handle include/gui_forms/c_api.h gf_handle encodes one-based registry slot plus nonzero generation so stale gui.forms handles are rejected deterministically."
     },
     {
       "name": "gf_layout_state",
@@ -5287,9 +5274,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_layout_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI layout review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_layout_state include/gui_forms/c_api.h gf_layout_state is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_layout_state include/gui_forms/c_api.h gf_layout_state projects suspension depth, deferred status, and requested/committed revisions."
     },
     {
       "name": "gf_point",
@@ -5298,9 +5285,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_point.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_point include/gui_forms/c_api.h gf_point is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_point include/gui_forms/c_api.h gf_point projects renderer-neutral logical coordinates across the stable c abi."
     },
     {
       "name": "gf_property_callbacks_v1",
@@ -5309,9 +5296,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_property_callbacks_v1.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI property review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_property_callbacks_v1 include/gui_forms/c_api.h gf_property_callbacks_v1 is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_property_callbacks_v1 include/gui_forms/c_api.h gf_property_callbacks_v1 is a size-versioned callback table for bounded foreign get/set/reset/serialize/format/parse/edit operations."
     },
     {
       "name": "gf_property_descriptor_v1",
@@ -5320,9 +5307,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_property_descriptor_v1.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI property review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_property_descriptor_v1 include/gui_forms/c_api.h gf_property_descriptor_v1 is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_property_descriptor_v1 include/gui_forms/c_api.h gf_property_descriptor_v1 is a size-versioned inert schema record for name/category/description/type/default/range/enum/converter/editor policy."
     },
     {
       "name": "gf_property_enum_choice",
@@ -5331,9 +5318,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_property_enum_choice.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI property review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_property_enum_choice include/gui_forms/c_api.h gf_property_enum_choice is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_property_enum_choice include/gui_forms/c_api.h gf_property_enum_choice pairs one numeric enum value with its bounded display label."
     },
     {
       "name": "gf_property_value",
@@ -5342,9 +5329,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_property_value.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI property review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_property_value include/gui_forms/c_api.h gf_property_value is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_property_value include/gui_forms/c_api.h gf_property_value is the tagged scalar/string carrier used by foreign property getters, setters, converters, and editors."
     },
     {
       "name": "gf_rect",
@@ -5353,9 +5340,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_rect.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_rect include/gui_forms/c_api.h gf_rect is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_rect include/gui_forms/c_api.h gf_rect projects renderer-neutral logical rectangle geometry across the stable c abi."
     },
     {
       "name": "gf_scroll_axis_state",
@@ -5364,9 +5351,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_scroll_axis_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI scroll review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_scroll_axis_state include/gui_forms/c_api.h gf_scroll_axis_state is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_scroll_axis_state include/gui_forms/c_api.h gf_scroll_axis_state projects one axis's bounds, viewport, change increments, current/effective maximum, and visibility."
     },
     {
       "name": "gf_scroll_state",
@@ -5375,9 +5362,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_scroll_state.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI scroll review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_scroll_state include/gui_forms/c_api.h gf_scroll_state is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_scroll_state include/gui_forms/c_api.h gf_scroll_state combines both axis records with auto-scroll offset, margin, minimum size, and logical position."
     },
     {
       "name": "gf_size",
@@ -5386,9 +5373,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_size.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_size include/gui_forms/c_api.h gf_size is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_size include/gui_forms/c_api.h gf_size projects renderer-neutral logical dimensions across the stable c abi."
     },
     {
       "name": "gf_string_view",
@@ -5397,9 +5384,9 @@
       "header": "include/gui_forms/c_api.h",
       "visual": false,
       "page": "pages/gf_string_view.html",
-      "status": "generated inventory; detailed review pending",
+      "status": "OBSERVED: bundle 011 C ABI record review",
       "sourceStatus": "header-only or distributed",
-      "search": "gf_string_view include/gui_forms/c_api.h gf_string_view is a struct declared in include/gui_forms/c_api.h."
+      "search": "gf_string_view include/gui_forms/c_api.h gf_string_view is a non-owning bounded byte view; operations validate null/size and utf-8 rules before copying."
     }
   ],
   "enums": [
@@ -5417,7 +5404,7 @@
     },
     {
       "name": "AnchorStyles",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_anchor_styles.html",
       "values": [
         "none",
@@ -5426,11 +5413,11 @@
         "left",
         "right"
       ],
-      "search": "anchorstyles include/gui_forms/control.hpp none top bottom left right"
+      "search": "anchorstyles include/gui_forms/control/control/control.hpp none top bottom left right"
     },
     {
       "name": "AnimationDirection",
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "page": "pages/enum_animation_direction.html",
       "values": [
         "normal",
@@ -5438,21 +5425,21 @@
         "alternate",
         "alternate_reverse"
       ],
-      "search": "animationdirection include/gui_forms/animation.hpp normal reverse alternate alternate_reverse"
+      "search": "animationdirection include/gui_forms/animation/animation_timeline/animation_timeline.hpp normal reverse alternate alternate_reverse"
     },
     {
       "name": "AutoSizeMode",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_auto_size_mode.html",
       "values": [
         "grow_and_shrink",
         "grow_only"
       ],
-      "search": "autosizemode include/gui_forms/control.hpp grow_and_shrink grow_only"
+      "search": "autosizemode include/gui_forms/control/control/control.hpp grow_and_shrink grow_only"
     },
     {
       "name": "AutoValidate",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_auto_validate.html",
       "values": [
         "inherit",
@@ -5460,7 +5447,7 @@
         "enable_prevent_focus_change",
         "enable_allow_focus_change"
       ],
-      "search": "autovalidate include/gui_forms/control.hpp inherit disable enable_prevent_focus_change enable_allow_focus_change"
+      "search": "autovalidate include/gui_forms/control/control/control.hpp inherit disable enable_prevent_focus_change enable_allow_focus_change"
     },
     {
       "name": "BindingCompleteContext",
@@ -5498,7 +5485,7 @@
     },
     {
       "name": "BindingValueKind",
-      "header": "include/gui_forms/binding/value/binding_value.hpp",
+      "header": "include/gui_forms/binding/value/binding_value_kind/binding_value_kind.hpp",
       "page": "pages/enum_binding_value_kind.html",
       "values": [
         "null",
@@ -5518,7 +5505,7 @@
         "object",
         "collection"
       ],
-      "search": "bindingvaluekind include/gui_forms/binding/value/binding_value.hpp null boolean signed_integer unsigned_integer number text point size rectangle insets color font image enumeration object collection"
+      "search": "bindingvaluekind include/gui_forms/binding/value/binding_value_kind/binding_value_kind.hpp null boolean signed_integer unsigned_integer number text point size rectangle insets color font image enumeration object collection"
     },
     {
       "name": "BitmapLockMode",
@@ -5545,7 +5532,7 @@
     },
     {
       "name": "BoundsSpecified",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_bounds_specified.html",
       "values": [
         "none",
@@ -5557,7 +5544,7 @@
         "size",
         "all"
       ],
-      "search": "boundsspecified include/gui_forms/control.hpp none x y width height location size all"
+      "search": "boundsspecified include/gui_forms/control/control/control.hpp none x y width height location size all"
     },
     {
       "name": "BrushKind",
@@ -5696,7 +5683,7 @@
     },
     {
       "name": "ControlStyles",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_control_styles.html",
       "values": [
         "none",
@@ -5718,7 +5705,7 @@
         "optimized_double_buffer",
         "use_text_for_accessibility"
       ],
-      "search": "controlstyles include/gui_forms/control.hpp none container_control user_paint opaque resize_redraw fixed_width fixed_height standard_click selectable user_mouse supports_transparent_back_color standard_double_click all_painting_in_one_pass cache_text enable_notify_message double_buffer optimized_double_buffer use_text_for_accessibility"
+      "search": "controlstyles include/gui_forms/control/control/control.hpp none container_control user_paint opaque resize_redraw fixed_width fixed_height standard_click selectable user_mouse supports_transparent_back_color standard_double_click all_painting_in_one_pass cache_text enable_notify_message double_buffer optimized_double_buffer use_text_for_accessibility"
     },
     {
       "name": "ControlSurfaceState",
@@ -5791,7 +5778,7 @@
     },
     {
       "name": "CursorKind",
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "page": "pages/enum_cursor_kind.html",
       "values": [
         "arrow",
@@ -5803,7 +5790,7 @@
         "wait",
         "forbidden"
       ],
-      "search": "cursorkind include/gui_forms/types.hpp arrow text hand crosshair resize_horizontal resize_vertical wait forbidden"
+      "search": "cursorkind include/gui_forms/types/paint_types/paint_types.hpp arrow text hand crosshair resize_horizontal resize_vertical wait forbidden"
     },
     {
       "name": "DashStyle",
@@ -5854,7 +5841,7 @@
     },
     {
       "name": "DialogResult",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_dialog_result.html",
       "values": [
         "none",
@@ -5868,7 +5855,7 @@
         "try_again",
         "continue_"
       ],
-      "search": "dialogresult include/gui_forms/control.hpp none ok cancel abort retry ignore yes no try_again continue_"
+      "search": "dialogresult include/gui_forms/control/control/control.hpp none ok cancel abort retry ignore yes no try_again continue_"
     },
     {
       "name": "Dirty",
@@ -5933,7 +5920,7 @@
     },
     {
       "name": "DockStyle",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_dock_style.html",
       "values": [
         "none",
@@ -5943,11 +5930,11 @@
         "right",
         "fill"
       ],
-      "search": "dockstyle include/gui_forms/control.hpp none top bottom left right fill"
+      "search": "dockstyle include/gui_forms/control/control/control.hpp none top bottom left right fill"
     },
     {
       "name": "DragAction",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_drag_action.html",
       "values": [
         "enter",
@@ -5955,11 +5942,11 @@
         "leave",
         "drop"
       ],
-      "search": "dragaction include/gui_forms/events.hpp enter over leave drop"
+      "search": "dragaction include/gui_forms/events/input_events/input_events.hpp enter over leave drop"
     },
     {
       "name": "DragEffect",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_drag_effect.html",
       "values": [
         "none",
@@ -5967,11 +5954,11 @@
         "move",
         "link"
       ],
-      "search": "drageffect include/gui_forms/events.hpp none copy move link"
+      "search": "drageffect include/gui_forms/events/input_events/input_events.hpp none copy move link"
     },
     {
       "name": "EasingCurve",
-      "header": "include/gui_forms/animation.hpp",
+      "header": "include/gui_forms/animation/animation_timeline/animation_timeline.hpp",
       "page": "pages/enum_easing_curve.html",
       "values": [
         "linear",
@@ -5983,7 +5970,7 @@
         "bounce_out",
         "elastic_out"
       ],
-      "search": "easingcurve include/gui_forms/animation.hpp linear ease_in ease_out ease_in_out smooth_step back_out bounce_out elastic_out"
+      "search": "easingcurve include/gui_forms/animation/animation_timeline/animation_timeline.hpp linear ease_in ease_out ease_in_out smooth_step back_out bounce_out elastic_out"
     },
     {
       "name": "ErrorBlinkStyle",
@@ -6012,18 +5999,18 @@
     },
     {
       "name": "EventPhase",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_event_phase.html",
       "values": [
         "preview",
         "target",
         "bubble"
       ],
-      "search": "eventphase include/gui_forms/events.hpp preview target bubble"
+      "search": "eventphase include/gui_forms/events/input_events/input_events.hpp preview target bubble"
     },
     {
       "name": "FieldControlKind",
-      "header": "src/abi/control_adapters/abi_control_adapters.hpp",
+      "header": "src/abi/control_adapters/support/abi_control_adapter_support.hpp",
       "page": "pages/enum_field_control_kind.html",
       "values": [
         "text_box",
@@ -6034,7 +6021,7 @@
         "tool_strip",
         "numeric_up_down"
       ],
-      "search": "fieldcontrolkind src/abi/control_adapters/abi_control_adapters.hpp text_box combo_box list_box picture_box data_grid tool_strip numeric_up_down"
+      "search": "fieldcontrolkind src/abi/control_adapters/support/abi_control_adapter_support.hpp text_box combo_box list_box picture_box data_grid tool_strip numeric_up_down"
     },
     {
       "name": "FillMode",
@@ -6070,14 +6057,14 @@
     },
     {
       "name": "FontRole",
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "page": "pages/enum_font_role.html",
       "values": [
         "control",
         "content",
         "monospace"
       ],
-      "search": "fontrole include/gui_forms/types.hpp control content monospace"
+      "search": "fontrole include/gui_forms/types/paint_types/paint_types.hpp control content monospace"
     },
     {
       "name": "FontStyle",
@@ -6105,7 +6092,7 @@
     },
     {
       "name": "GetChildAtPointSkip",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_get_child_at_point_skip.html",
       "values": [
         "none",
@@ -6113,7 +6100,7 @@
         "disabled",
         "transparent"
       ],
-      "search": "getchildatpointskip include/gui_forms/control.hpp none invisible disabled transparent"
+      "search": "getchildatpointskip include/gui_forms/control/control/control.hpp none invisible disabled transparent"
     },
     {
       "name": "GlyphRunError",
@@ -6134,14 +6121,14 @@
     },
     {
       "name": "GradientSpreadMode",
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "page": "pages/enum_gradient_spread_mode.html",
       "values": [
         "pad",
         "repeat",
         "reflect"
       ],
-      "search": "gradientspreadmode include/gui_forms/types.hpp pad repeat reflect"
+      "search": "gradientspreadmode include/gui_forms/types/paint_types/paint_types.hpp pad repeat reflect"
     },
     {
       "name": "GraphemeBreak",
@@ -6234,7 +6221,7 @@
     },
     {
       "name": "HostCapability",
-      "header": "include/gui_forms/host/types/host_types.hpp",
+      "header": "include/gui_forms/host/types/host_capability/host_capability.hpp",
       "page": "pages/enum_host_capability.html",
       "values": [
         "none",
@@ -6257,7 +6244,7 @@
         "typed_drag_source",
         "sound_cues"
       ],
-      "search": "hostcapability include/gui_forms/host/types/host_types.hpp none lifecycle scale_notifications monitor_geometry occlusion scheduled_wake pointer_input keyboard_input text_composition pointer_capture cursor clipboard typed_drag_destination dialogs menus font_discovery accessibility typed_drag_source sound_cues"
+      "search": "hostcapability include/gui_forms/host/types/host_capability/host_capability.hpp none lifecycle scale_notifications monitor_geometry occlusion scheduled_wake pointer_input keyboard_input text_composition pointer_capture cursor clipboard typed_drag_destination dialogs menus font_discovery accessibility typed_drag_source sound_cues"
     },
     {
       "name": "HostCloseReason",
@@ -6314,7 +6301,7 @@
     },
     {
       "name": "HostLifecyclePhase",
-      "header": "include/gui_forms/host/types/host_types.hpp",
+      "header": "include/gui_forms/host/types/host_lifecycle_phase/host_lifecycle_phase.hpp",
       "page": "pages/enum_host_lifecycle_phase.html",
       "values": [
         "constructed",
@@ -6323,7 +6310,7 @@
         "closed",
         "shutdown"
       ],
-      "search": "hostlifecyclephase include/gui_forms/host/types/host_types.hpp constructed attached close_authorized closed shutdown"
+      "search": "hostlifecyclephase include/gui_forms/host/types/host_lifecycle_phase/host_lifecycle_phase.hpp constructed attached close_authorized closed shutdown"
     },
     {
       "name": "HostMessageButtons",
@@ -6383,7 +6370,7 @@
     },
     {
       "name": "ImageListChangeKind",
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "page": "pages/enum_image_list_change_kind.html",
       "values": [
         "added",
@@ -6393,16 +6380,16 @@
         "layout",
         "reset"
       ],
-      "search": "imagelistchangekind include/gui_forms/image_list.hpp added replaced removed renamed layout reset"
+      "search": "imagelistchangekind include/gui_forms/image_list/image_list/image_list.hpp added replaced removed renamed layout reset"
     },
     {
       "name": "ImagePatternWrap",
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "page": "pages/enum_image_pattern_wrap.html",
       "values": [
         "tile"
       ],
-      "search": "imagepatternwrap include/gui_forms/types.hpp tile"
+      "search": "imagepatternwrap include/gui_forms/types/paint_types/paint_types.hpp tile"
     },
     {
       "name": "ImageResourceEncoding",
@@ -6451,17 +6438,17 @@
     },
     {
       "name": "ImageSampling",
-      "header": "include/gui_forms/types.hpp",
+      "header": "include/gui_forms/types/paint_types/paint_types.hpp",
       "page": "pages/enum_image_sampling.html",
       "values": [
         "nearest",
         "linear"
       ],
-      "search": "imagesampling include/gui_forms/types.hpp nearest linear"
+      "search": "imagesampling include/gui_forms/types/paint_types/paint_types.hpp nearest linear"
     },
     {
       "name": "ImageVisualState",
-      "header": "include/gui_forms/image_list.hpp",
+      "header": "include/gui_forms/image_list/image_list/image_list.hpp",
       "page": "pages/enum_image_visual_state.html",
       "values": [
         "normal",
@@ -6470,7 +6457,7 @@
         "selected",
         "disabled"
       ],
-      "search": "imagevisualstate include/gui_forms/image_list.hpp normal hot pressed selected disabled"
+      "search": "imagevisualstate include/gui_forms/image_list/image_list/image_list.hpp normal hot pressed selected disabled"
     },
     {
       "name": "IndicConjunctBreak",
@@ -6524,13 +6511,13 @@
     },
     {
       "name": "KeyAction",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_key_action.html",
       "values": [
         "down",
         "up"
       ],
-      "search": "keyaction include/gui_forms/events.hpp down up"
+      "search": "keyaction include/gui_forms/events/input_events/input_events.hpp down up"
     },
     {
       "name": "ListSelectionMode",
@@ -6565,17 +6552,17 @@
     },
     {
       "name": "MaterialCoordinateSpace",
-      "header": "include/gui_forms/surface_material/types/surface_material_types.hpp",
+      "header": "include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp",
       "page": "pages/enum_material_coordinate_space.html",
       "values": [
         "normalized",
         "logical"
       ],
-      "search": "materialcoordinatespace include/gui_forms/surface_material/types/surface_material_types.hpp normalized logical"
+      "search": "materialcoordinatespace include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp normalized logical"
     },
     {
       "name": "MaterialFillKind",
-      "header": "include/gui_forms/surface_material/types/surface_material_types.hpp",
+      "header": "include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp",
       "page": "pages/enum_material_fill_kind.html",
       "values": [
         "solid",
@@ -6583,18 +6570,18 @@
         "radial_gradient",
         "image"
       ],
-      "search": "materialfillkind include/gui_forms/surface_material/types/surface_material_types.hpp solid linear_gradient radial_gradient image"
+      "search": "materialfillkind include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp solid linear_gradient radial_gradient image"
     },
     {
       "name": "MaterialImageMode",
-      "header": "include/gui_forms/surface_material/types/surface_material_types.hpp",
+      "header": "include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp",
       "page": "pages/enum_material_image_mode.html",
       "values": [
         "stretch",
         "tile",
         "nine_patch"
       ],
-      "search": "materialimagemode include/gui_forms/surface_material/types/surface_material_types.hpp stretch tile nine_patch"
+      "search": "materialimagemode include/gui_forms/surface_material/material_fill_layer/material_fill_layer.hpp stretch tile nine_patch"
     },
     {
       "name": "MenuItemKind",
@@ -6611,7 +6598,7 @@
     },
     {
       "name": "Modifier",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_modifier.html",
       "values": [
         "none",
@@ -6620,7 +6607,7 @@
         "alt",
         "meta"
       ],
-      "search": "modifier include/gui_forms/events.hpp none shift control alt meta"
+      "search": "modifier include/gui_forms/events/input_events/input_events.hpp none shift control alt meta"
     },
     {
       "name": "ObjectGlyph",
@@ -6746,13 +6733,13 @@
     },
     {
       "name": "PixelFormat",
-      "header": "include/gui_forms/drawing/types/drawing_types.hpp",
+      "header": "include/gui_forms/drawing/types/pixel_format/pixel_format.hpp",
       "page": "pages/enum_pixel_format.html",
       "values": [
         "bgra32_premultiplied",
         "rgba32_premultiplied"
       ],
-      "search": "pixelformat include/gui_forms/drawing/types/drawing_types.hpp bgra32_premultiplied rgba32_premultiplied"
+      "search": "pixelformat include/gui_forms/drawing/types/pixel_format/pixel_format.hpp bgra32_premultiplied rgba32_premultiplied"
     },
     {
       "name": "PixelOffsetMode",
@@ -6782,7 +6769,7 @@
     },
     {
       "name": "PointerAction",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_pointer_action.html",
       "values": [
         "move",
@@ -6792,11 +6779,11 @@
         "enter",
         "leave"
       ],
-      "search": "pointeraction include/gui_forms/events.hpp move down up wheel enter leave"
+      "search": "pointeraction include/gui_forms/events/input_events/input_events.hpp move down up wheel enter leave"
     },
     {
       "name": "PointerButton",
-      "header": "include/gui_forms/events.hpp",
+      "header": "include/gui_forms/events/input_events/input_events.hpp",
       "page": "pages/enum_pointer_button.html",
       "values": [
         "none",
@@ -6804,7 +6791,7 @@
         "secondary",
         "middle"
       ],
-      "search": "pointerbutton include/gui_forms/events.hpp none primary secondary middle"
+      "search": "pointerbutton include/gui_forms/events/input_events/input_events.hpp none primary secondary middle"
     },
     {
       "name": "PopupDismissReason",
@@ -6865,7 +6852,7 @@
     },
     {
       "name": "PropertyEditorKind",
-      "header": "include/gui_forms/inspection/inspection_types.hpp",
+      "header": "include/gui_forms/inspection/types/property_editor_kind/property_editor_kind.hpp",
       "page": "pages/enum_property_editor_kind.html",
       "values": [
         "read_only",
@@ -6874,7 +6861,7 @@
         "boolean",
         "custom"
       ],
-      "search": "propertyeditorkind include/gui_forms/inspection/inspection_types.hpp read_only text choice boolean custom"
+      "search": "propertyeditorkind include/gui_forms/inspection/types/property_editor_kind/property_editor_kind.hpp read_only text choice boolean custom"
     },
     {
       "name": "PropertySerializationVisibility",
@@ -6928,7 +6915,7 @@
     },
     {
       "name": "RasterError",
-      "header": "src/render/skia/executor/drawing_skia.hpp",
+      "header": "src/render/skia/executor/skia_executor.hpp",
       "page": "pages/enum_raster_error.html",
       "values": [
         "none",
@@ -6942,7 +6929,7 @@
         "dimension_limit_exceeded",
         "internal_error"
       ],
-      "search": "rastererror src/render/skia/executor/drawing_skia.hpp none wrong_thread invalid_argument target_unavailable missing_image_pixels decode_failed encode_failed encoded_limit_exceeded dimension_limit_exceeded internal_error"
+      "search": "rastererror src/render/skia/executor/skia_executor.hpp none wrong_thread invalid_argument target_unavailable missing_image_pixels decode_failed encode_failed encoded_limit_exceeded dimension_limit_exceeded internal_error"
     },
     {
       "name": "ReviewDisposition",
@@ -7347,7 +7334,7 @@
     },
     {
       "name": "ValidationConstraints",
-      "header": "include/gui_forms/control.hpp",
+      "header": "include/gui_forms/control/control/control.hpp",
       "page": "pages/enum_validation_constraints.html",
       "values": [
         "none",
@@ -7357,7 +7344,7 @@
         "tab_stop",
         "immediate_children"
       ],
-      "search": "validationconstraints include/gui_forms/control.hpp none selectable enabled visible tab_stop immediate_children"
+      "search": "validationconstraints include/gui_forms/control/control/control.hpp none selectable enabled visible tab_stop immediate_children"
     },
     {
       "name": "VerticalAlignment",
