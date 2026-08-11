@@ -256,6 +256,9 @@ void test_object_virtualization_view_preservation_and_input() {
     require(target != visible.end(), "focused ObjectView item must be realized");
     const Point center{(*target).bounds.x + (*target).bounds.width * .5,
                        (*target).bounds.y + (*target).bounds.height * .5};
+    require((*objects).item_id_at(center) == "object.777" &&
+                (*objects).item_id_at({421.0, 191.0}).empty(),
+            "ObjectView must map root-client drag coordinates to stable item identity");
     PointerEvent single_down{PointerAction::down, PointerButton::primary, center};
     PointerEvent single_up{PointerAction::up, PointerButton::primary, center};
     require(window.dispatch_pointer(single_down) && window.dispatch_pointer(single_up) &&

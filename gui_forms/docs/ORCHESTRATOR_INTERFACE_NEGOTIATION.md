@@ -1,6 +1,6 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
-Status: **round 001 Orchestrator proposal; awaiting GUI.Forms reply**.
+Status: **round 001 GUI.Forms reply published; Orchestrator reconciliation open**.
 
 Participants: Orchestrator integration authority, GUI.Forms provider, and File
 Manager consumer. Canonical families: `ORC-COM-001`, `ORC-GUI-001`,
@@ -71,9 +71,9 @@ The reply need not claim framework completeness. It must identify the stable
 public seam Frontend 001 may consume without reaching into private GUI.Forms
 sources.
 
-## GUI.Forms reply 001
+## GUI.Forms reply 001 request
 
-Status: **awaiting project reply**.
+Status: **answered by GUI.Forms reply 001 below**.
 
 Please provide:
 
@@ -84,9 +84,52 @@ Please provide:
 - versioning and table-extension constraints;
 - any request that would leak platform/backend state and must be rejected.
 
+## GUI.Forms reply 001 — named FM0 consumption snapshot
+
+Date: 2026-08-10.
+
+Status: **ready for Frontend 001 on macOS arm64 within the named snapshot**.
+
+The provider manifest is
+`../manifests/gui-forms-fm0-macos-arm64-2026-08-10.json`. The stable public
+consumer seam is the installed CMake package `GUIForms 0.1`, especially
+`GUIForms::Application` for the native AppKit/Skia runtime and
+`GUIForms::Controls` for independently testable model consumers. Public host
+entry points are `gui_forms::host::run_macos` and
+`gui_forms::host::run_macos_application`. The retained C ABI remains
+`gui_forms_abi0` with additive experimental tables through 0.26; Frontend 001
+does not need to substitute the C table for its public C++ application target.
+
+**MEASURED:** on the named M4, a clean external project used only
+`find_package(GUIForms 0.1 CONFIG)`, linked `GUIForms::Application`, found the
+installed font payload through `GUIForms_FONT_DIR`, and successfully executed
+its model-only construction probe. The installed dylib is arm64 Mach-O and
+exports the public Window and macOS application entry points. The manifest
+records its SHA-256 digest and the exact commands.
+
+The snapshot admits the retained tree, layout/paint, application/window
+lifecycle, public File Manager control primitives, input/focus/commands,
+popups, headless conformance, deterministic fonts, CPU Skia host, and
+fail-closed Web.Forms generated public C++ tree. Full VoiceOver campaign and
+browser/native raster equivalence remain `degraded`, not silently complete.
+Signed packaging, other native host platforms, outbound drag source, and any
+runtime web stack remain unavailable.
+
+Thread rule: the AppKit host owns the main UI thread. Provider/service calls do
+not enter GUI.Forms. Frontend workers post immutable application snapshots to
+their own UI dispatch boundary. Native handles and renderer objects never
+cross Orchestrator.
+
 ## Orchestrator reconciliation 001
 
-Status: **not started; waits for GUI.Forms reply 001**.
+Status: **provider reply complete; Orchestrator may project
+`gui_forms.consumption_manifest=available` with the exact manifest id**.
+
+The reply preserves `ORC-GUI-001` authority: Orchestrator mirrors availability
+and manifest identity but receives no GUI handle, callback, native window, or
+renderer state. Any target mismatch or absent required capability fails the
+frontend build/opening check. Later FM1/FM2/FMX rows and proposal 002 remain
+independent negotiations.
 
 ## Orchestrator proposal 002 — first-party application surfaces
 

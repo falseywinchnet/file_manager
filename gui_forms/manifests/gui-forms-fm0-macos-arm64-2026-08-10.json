@@ -1,0 +1,110 @@
+{
+  "schema": {
+    "family": "gui-forms.consumption-manifest",
+    "major": 1,
+    "minor": 0
+  },
+  "identity": {
+    "id": "gui-forms-fm0-macos-arm64-2026-08-10",
+    "provider": "gui-forms",
+    "profile": "file-manager-frontend-001",
+    "state": "ready",
+    "source_base_revision": "f406d6a5a18313eaec6efe8703e2c1dc2882878c",
+    "target": "arm64-apple-darwin"
+  },
+  "public_surface": {
+    "cmake_package": "GUIForms 0.1",
+    "targets": [
+      "GUIForms::Application",
+      "GUIForms::Controls",
+      "GUIForms::Core",
+      "GUIForms::Drawing"
+    ],
+    "native_application_library": "libgui_forms_application.0.1.0.dylib",
+    "native_application_sha256": "97ec55b946f6f5cf69f0f38ac4a6f4caf16db7040381d481fef29d9ffbf16bd5",
+    "c_abi_family": "gui_forms_abi0",
+    "c_abi_library_version": "0.4.0",
+    "highest_additive_experimental_table": "0.26",
+    "host_protocol": 5,
+    "runtime_font_locator": "GUIForms_FONT_DIR"
+  },
+  "lifecycle": {
+    "model": "retained",
+    "ui_thread": "host-owned main Aqua thread",
+    "application_entry": "gui_forms::host::run_macos_application",
+    "window_entry": "gui_forms::host::run_macos",
+    "cross_thread_rule": "application workers post immutable results through frontend-owned dispatch",
+    "shutdown": "host close negotiation followed by deterministic retained teardown"
+  },
+  "capabilities": [
+    {
+      "id": "fm0.install.native_application",
+      "state": "available",
+      "evidence": "clean external find_package consumer configured, linked, and ran --model-only on the M4"
+    },
+    {
+      "id": "fm0.retained_tree.layout.paint",
+      "state": "available",
+      "evidence": "GUI.Forms 62-test M4 baseline plus public installed-consumer construction"
+    },
+    {
+      "id": "fm0.input.focus.commands.popups",
+      "state": "available",
+      "evidence": "public installed-consumer and host suites cover focus, accelerators, menus, popup placement, and command binding"
+    },
+    {
+      "id": "fm0.file_manager.controls",
+      "state": "available",
+      "evidence": "public TreeView, ObjectView with stable pointer-coordinate item lookup, CorrespondenceView, PropertyList, InstrumentRack, SplitContainer, menu, text, and status primitives"
+    },
+    {
+      "id": "fm0.macos.host",
+      "state": "available",
+      "evidence": "AppKit host, multi-window ownership, close negotiation, CPU Skia renderer, CoreText/HarfBuzz/FreeType text stack"
+    },
+    {
+      "id": "fm0.headless.conformance",
+      "state": "available",
+      "evidence": "renderer-neutral construction, layout, semantics, input, and lifecycle tests are part of the named 62-test M4 baseline"
+    },
+    {
+      "id": "fm0.web_forms.generated_tree",
+      "state": "available",
+      "evidence": "Web.Forms 27-test compiler suite emits an exact fail-closed public GUI.Forms C++ tree from browser-valid HTML/CSS"
+    },
+    {
+      "id": "fm0.accessibility",
+      "state": "degraded",
+      "evidence": "retained semantic graph and macOS publisher exist; full Frontend 001 VoiceOver campaign remains unmeasured"
+    },
+    {
+      "id": "fm0.raster_fidelity",
+      "state": "degraded",
+      "evidence": "native materials are implemented; browser/native File Manager raster comparison remains a promotion measurement"
+    }
+  ],
+  "explicitly_unavailable": [
+    "signed or notarized product package",
+    "Windows and Linux native application targets in this snapshot",
+    "native outbound file drag source",
+    "production-complete IME and assistive-technology campaign",
+    "runtime HTML, DOM, CSS, JavaScript, or bundled browser engine"
+  ],
+  "compatibility": {
+    "horizon": "0.1.x experimental C++ package; additive gui_forms_abi0 tables through 0.26",
+    "failure_rule": "missing target, incompatible manifest family, target mismatch, or unavailable required capability fails closed",
+    "reversal": "frontend may pin another named GUI.Forms manifest and rebuild; no serialized private GUI.Forms state is authoritative"
+  },
+  "verification": {
+    "host": "Joshuah's Mac mini, Apple M4, macOS arm64",
+    "date": "2026-08-10",
+    "commands": [
+      "m4build -- cmake --build gui_forms/build --target gui_forms_application --parallel 10",
+      "m4build -- cmake --install gui_forms/build --prefix gui_forms/.build/fm0-install",
+      "m4build -- cmake -S gui_forms/file_manager_demoboard/tests/installed_native_consumer -B gui_forms/.build/installed-native-consumer -DCMAKE_PREFIX_PATH=<fm0-install>",
+      "m4build -- cmake --build gui_forms/.build/installed-native-consumer --parallel 8",
+      "gui_forms_installed_native_consumer --model-only"
+    ],
+    "result": "passed"
+  }
+}

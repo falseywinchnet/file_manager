@@ -1,8 +1,10 @@
 # GUI.Forms proving project
 
-Status: implementation spike. This subtree builds a native, retained,
-custom-rendered control framework demonstration backed by CPU-only Skia. It is
-not the File Manager application and does not yet constitute a stable ABI.
+Status: active proving project with a named File Manager FM0 consumption
+manifest. This subtree builds a native, retained, custom-rendered control
+framework backed by CPU-only Skia and now exports an installed
+`GUIForms::Application` host boundary. It is not the File Manager application
+and does not yet constitute a stable 1.0 ABI.
 
 The first deliverable is a Modern.Forms-style control gallery with structured
 instrumentation, automated tests, and private AppKit and Win32 hosts. The same
@@ -113,10 +115,10 @@ MSAA/UIA boundary.
   unchanged Wine specimen still uses the earlier managed paint path. M11g owns
   the visible zero-passthrough cutover; the prior retired compatibility specimen result is not native
   drawing closure.
-- The checked-in C++ header is the compiled form of the provisional Gallery DML
-  schema. The planning-stage sibling `../web_forms/` now owns the proposed
-  bounded HTML/CSS authoring/compiler direction; no Web.Forms compiler or
-  designer is implemented yet.
+- The checked-in C++ header remains the compiled form of the provisional
+  Gallery DML schema. The sibling `../web_forms/` now implements the bounded
+  HTML/CSS compiler and generates the File Manager's public retained C++ tree.
+  A visual designer and general browser/CSS runtime remain excluded.
 - Text input proves committed UTF-8 and the AppKit IME bridge, not a finished
   shaping, selection, or editing engine.
 - The M3e host seam supplies monitor/work-area records and change events,

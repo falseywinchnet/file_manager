@@ -666,6 +666,65 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_macos)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_MACOS_HOST=1)
+
+    # First-party native applications consume one installed dynamic boundary.
+    # The renderer, text stack, controls, and AppKit adapter remain private
+    # implementation details; force-loading the internal archives keeps the
+    # public C++ surface available without exporting source-tree-only targets.
+    add_library(gui_forms_application SHARED
+        src/runtime/application_bundle.cpp
+    )
+    add_library(GUIForms::Application ALIAS gui_forms_application)
+    set_target_properties(gui_forms_application PROPERTIES
+        EXPORT_NAME Application
+        OUTPUT_NAME gui_forms_application
+        VERSION 0.1.0
+        SOVERSION 0
+    )
+    target_include_directories(gui_forms_application PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    target_compile_features(gui_forms_application PUBLIC cxx_std_20)
+    target_link_libraries(gui_forms_application PRIVATE
+        gui_forms_core
+        gui_drawing_core
+        gui_forms_controls
+        gui_forms_skia
+        gui_forms_host_macos
+        gui_forms_skia_archive
+        gui_forms_skcms_archive
+        gui_forms_png_archive
+        gui_forms_zlib_archive
+        ${GUI_FORMS_APPKIT}
+        ${GUI_FORMS_COREVIDEO}
+        ${GUI_FORMS_COREGRAPHICS}
+        ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
+    )
+    target_link_options(gui_forms_application PRIVATE
+        "LINKER:-force_load,$<TARGET_FILE:gui_forms_core>"
+        "LINKER:-force_load,$<TARGET_FILE:gui_drawing_core>"
+        "LINKER:-force_load,$<TARGET_FILE:gui_forms_controls>"
+        "LINKER:-force_load,$<TARGET_FILE:gui_forms_skia>"
+        "LINKER:-force_load,$<TARGET_FILE:gui_forms_host_macos>"
+    )
+    if(TARGET gui_forms_text_engine)
+        target_link_libraries(gui_forms_application PRIVATE
+            gui_forms_text_engine freetype harfbuzz)
+        target_link_options(gui_forms_application PRIVATE
+            "LINKER:-force_load,$<TARGET_FILE:gui_forms_text_engine>")
+    endif()
+
+    install(TARGETS gui_forms_application
+            EXPORT GUIFormsApplicationTargets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(EXPORT GUIFormsApplicationTargets
+            FILE GUIFormsApplicationTargets.cmake
+            NAMESPACE GUIForms::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
+    install(DIRECTORY assets/fonts/
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/GUIForms/fonts)
 endif()
 
 if(GUI_FORMS_ENABLE_WINDOWS_HOST)

@@ -65,6 +65,10 @@ public:
     [[nodiscard]] std::span<const ObjectViewItem> items() const noexcept {
         return items_;
     }
+    // Maps a root-client pointer position back to the retained stable item.
+    // This is presentation identity only; applications retain all domain and
+    // transfer authority.
+    [[nodiscard]] std::string_view item_id_at(Point absolute) const noexcept;
     void set_items(std::vector<ObjectViewItem> items);
     [[nodiscard]] ObjectViewMode view_mode() const noexcept { return view_mode_; }
     void set_view_mode(ObjectViewMode mode);

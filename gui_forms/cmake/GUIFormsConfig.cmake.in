@@ -1,5 +1,10 @@
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/GUIFormsTargets.cmake")
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/GUIFormsApplicationTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/GUIFormsApplicationTargets.cmake")
+endif()
+
+set(GUIForms_FONT_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/GUIForms/fonts")
 
 check_required_components(GUIForms)

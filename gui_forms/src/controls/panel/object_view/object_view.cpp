@@ -370,6 +370,11 @@ std::optional<std::size_t> ObjectView::index_at(Point absolute) const noexcept {
                                  : std::optional<std::size_t>{};
 }
 
+std::string_view ObjectView::item_id_at(const Point absolute) const noexcept {
+    const auto index = index_at(absolute);
+    return index ? std::string_view(items_[*index].stable_id) : std::string_view{};
+}
+
 void ObjectView::ensure_visible(std::size_t index) {
     const std::size_t row = index / columns();
     const std::size_t count = visible_row_count();
