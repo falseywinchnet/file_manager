@@ -45,3 +45,32 @@ does not admit the development JSONL Engine child; installed Engine discovery
 and authentication remain a separate contract gate. The internal atomic batch
 primitive is compiled into the Rust library but is not selected for blocking
 session or Engine-child I/O.
+
+## Named GUI.Forms gate redeployment
+
+Status: **MEASURED rollback-safe update and live bootstrap pass**.
+
+After GUI.Forms published its named FM0 manifest, the complete prescribed M4
+gate passed again: the service atlas was regenerated and checked, the C atomic
+worker primitive passed, all Rust/C++/Go/hostile tests passed, Clippy completed
+with warnings denied, and Cargo produced the locked release build.
+
+- replacement artifact SHA-256:
+  `10415336f77978bc5b088233cf7fa07157923e92f3322b980ce52fb3d37ae359`
+- embedded Core manifest digest:
+  `fb1b2a5eea27fd0dfcc662e2958817e88d5b77260e40f1d63c5c737f3064fa3c`
+- previous installed artifact retained for rollback as:
+  `orchestrator.previous-dea0b4d5`
+- the installed artifact hash matched the replacement before activation;
+- graceful shutdown returned `state=stopped`;
+- the next authenticated bootstrap activated launchd run 3 at PID 21759;
+- the live `frontend_opening` projection reported the Orchestrator gate
+  `available`, GUI.Forms gate `available`, and architect direction `recorded`,
+  all with `satisfied=true`;
+- the live GUI.Forms capability named
+  `gui-forms-fm0-macos-arm64-2026-08-10` and `ORC-GUI-001` projected
+  `frozen_v0`.
+
+Installed Engine transport remained explicitly unavailable. This deployment
+closes the live Frontend 001 opening predicate; it does not promote later
+provider contracts.

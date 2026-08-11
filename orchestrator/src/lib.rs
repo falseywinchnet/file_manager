@@ -13,6 +13,8 @@ pub mod common;
 pub mod contract;
 pub mod engine_contract;
 pub mod engine_jsonl;
+#[cfg(target_os = "macos")]
+pub mod engine_local;
 pub mod engine_port;
 pub mod kernel;
 pub mod lifecycle;
@@ -23,6 +25,7 @@ pub mod local_wire;
 pub mod release;
 pub mod runtime_health;
 mod service;
+pub mod settings;
 pub mod worker_pool;
 
 pub use common::{ApiError, ApiErrorCode, Request, Response, TerminalStatus};

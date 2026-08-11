@@ -1,6 +1,6 @@
 # Engine search route
 
-Status: **OBSERVED development adapter; installed Engine transport remains open**.
+Status: **OBSERVED development and contained M4 installed adapters; other-platform promotion remains open**.
 
 The frontend submits one orchestrator.search request without selecting catalogue or live lanes. The broker preserves the accepted fallback law and projects one result shape while keeping source and completeness explicit.
 
@@ -14,13 +14,15 @@ The frontend submits one orchestrator.search request without selecting catalogue
 
 ## Current implementation claim
 
-The typed Rust adapter supervises a separately built Go Engine over bounded JSONL for development conformance. Availability becomes available only when the connected peer advertises engine.live.query and contract.ORC-ENG-004. This does not establish installed Engine discovery, query/admin authentication, or platform service supervision.
+The typed Rust development adapter supervises a separately built Go Engine over bounded JSONL for conformance. The contained M4 product route instead validates the Engine's private host-bound ENG1 discovery, same-user peer, query/admin authority split and instance identity. Availability becomes available only when the connected peer advertises the required capability. This named installed route does not promote Windows/Linux transport or distribution signing.
 
 ## Authority and evidence locators
 
 - [../decisions/ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md](../../../../decisions/ADR-007-ENGINE-ORCHESTRATOR-SEMANTIC-V0-AND-CAPABILITY-GATES.md)
 - [../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md](../../../../decisions/ADR-008-CATALOGUE-INDEPENDENT-LIVE-SEARCH.md)
+- [../decisions/ADR-019-CONTAINED-ENGINE-ADAPTER-AND-IDENTITY-BOUND-SERVICE-CONTROLS.md](../../../../decisions/ADR-019-CONTAINED-ENGINE-ADAPTER-AND-IDENTITY-BOUND-SERVICE-CONTROLS.md)
 - [spec/contracts/ENGINE_AND_KOLMOGROV.md](../../../spec/contracts/ENGINE_AND_KOLMOGROV.md)
 - [src/engine_port.rs](../../../src/engine_port.rs)
 - [src/engine_jsonl.rs](../../../src/engine_jsonl.rs)
+- [src/engine_local.rs](../../../src/engine_local.rs)
 - [tests/live_search.rs](../../../tests/live_search.rs)

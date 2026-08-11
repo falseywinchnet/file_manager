@@ -26,31 +26,31 @@ Source: [src/service/launchd.rs](../../../src/service/launchd.rs)
 
 ## Source inventory
 
-### [serve_launchd](../../../src/service/launchd.rs#L12)
+### [serve_launchd](../../../src/service/launchd.rs#L18)
 
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn serve_launchd(runtime_directory: &Path) -> Result<(), String>
+pub(crate) fn serve_launchd( runtime_directory: &Path, settings_directory: &Path, ) -> Result<(), String>
 ```
 
-### [print_launchd_plist](../../../src/service/launchd.rs#L27)
+### [print_launchd_plist](../../../src/service/launchd.rs#L68)
 
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn print_launchd_plist(runtime_directory: &Path) -> Result<(), String>
+pub(crate) fn print_launchd_plist( runtime_directory: &Path, settings_directory: &Path, ) -> Result<(), String>
 ```
 
-### [launchd_plist_document](../../../src/service/launchd.rs#L51)
+### [launchd_plist_document](../../../src/service/launchd.rs#L99)
 
 `fn` · `private`
 
 ```rust
-fn launchd_plist_document(executable: &str, runtime_directory: &str, socket: &str) -> String
+fn launchd_plist_document( executable: &str, runtime_directory: &str, socket: &str, settings_directory: &str, ) -> String
 ```
 
-### [xml_escape](../../../src/service/launchd.rs#L85)
+### [xml_escape](../../../src/service/launchd.rs#L140)
 
 `fn` · `private`
 
@@ -58,7 +58,7 @@ fn launchd_plist_document(executable: &str, runtime_directory: &str, socket: &st
 fn xml_escape(value: &str) -> String
 ```
 
-### [plist_preserves_the_accepted_activation_contract](../../../src/service/launchd.rs#L99)
+### [plist_preserves_the_accepted_activation_contract](../../../src/service/launchd.rs#L154)
 
 `fn` · `private`
 

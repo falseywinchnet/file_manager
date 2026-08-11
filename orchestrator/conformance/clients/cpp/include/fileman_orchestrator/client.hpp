@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace fileman::orchestrator {
@@ -191,11 +192,112 @@ struct BootstrapSnapshot {
     [[nodiscard]] bool orchestrator_gate_ready() const noexcept;
 };
 
+struct SearchResultInfo {
+    std::string name;
+    std::filesystem::path path;
+    std::string kind;
+    std::uint64_t size{};
+    bool unavailable{};
+};
+
+struct SearchCursorInfo {
+    std::string source;
+    std::string value;
+};
+
 struct SearchPageInfo {
     std::string terminal;
     std::string source;
     bool complete{};
+    std::optional<std::uint64_t> generation;
+    std::optional<SearchCursorInfo> cursor;
+    std::vector<SearchResultInfo> results;
     std::vector<std::string> names;
+};
+
+using SettingValue = std::variant<bool, std::uint64_t, std::string>;
+
+struct SettingSchemaFieldInfo {
+    std::string id;
+    std::string name_space;
+    std::string presentation_tab;
+    std::string label_key;
+    std::string value_type;
+    SettingValue default_value;
+    std::optional<std::uint64_t> minimum;
+    std::optional<std::uint64_t> maximum;
+    std::vector<std::string> choices;
+    std::string restart_effect;
+    std::string availability;
+    std::string availability_reason;
+};
+
+struct SettingsSchemaInfo {
+    std::string schema_revision;
+    std::vector<SettingSchemaFieldInfo> fields;
+};
+
+struct SettingValueInfo {
+    std::string id;
+    SettingValue value;
+};
+
+struct SettingsSnapshotInfo {
+    std::string schema_revision;
+    std::uint64_t revision{};
+    std::string recovery_provenance;
+    std::vector<SettingValueInfo> values;
+
+    [[nodiscard]] const SettingValue* find(std::string_view id) const noexcept;
+};
+
+struct SettingsCommitInfo {
+    std::vector<std::string> changed_fields;
+    bool restart_required{};
+    std::string audit_id;
+    SettingsSnapshotInfo snapshot;
+};
+
+struct SettingChange {
+    std::string id;
+    SettingValue value;
+};
+
+struct ServiceCommandInfo {
+    std::string id;
+    std::string title;
+    bool available{};
+    std::string effect;
+};
+
+struct ServiceInfo {
+    std::string id;
+    std::string title;
+    std::string state;
+    bool ready{};
+    std::optional<std::string> instance_id;
+    std::optional<std::uint64_t> generation;
+    std::string transport;
+    std::optional<std::string> currentness;
+    std::vector<std::string> roots;
+    std::optional<std::string> reason;
+    std::vector<ServiceCommandInfo> commands;
+};
+
+struct ServicesSnapshotInfo {
+    std::uint16_t schema_major{};
+    std::uint16_t schema_minor{};
+    std::string snapshot_kind;
+    std::vector<ServiceInfo> services;
+
+    [[nodiscard]] const ServiceInfo* find(std::string_view id) const noexcept;
+};
+
+struct ServiceCommandResultInfo {
+    std::string service_id;
+    std::string command_id;
+    std::string terminal;
+    std::string effect;
 };
 
 class Client final {
@@ -218,6 +320,29 @@ public:
     [[nodiscard]] std::vector<AvailabilityInfo> availability();
     [[nodiscard]] BootstrapSnapshot bootstrap();
     [[nodiscard]] SearchPageInfo search(std::string root_id, std::string text);
+    [[nodiscard]] SearchPageInfo search_subtree(
+        std::string root_id,
+        std::optional<std::string> relative_path,
+        std::string text,
+        std::uint32_t maximum_results = 128,
+        std::optional<SearchCursorInfo> cursor = std::nullopt);
+    [[nodiscard]] SettingsSchemaInfo settings_schema();
+    [[nodiscard]] SettingsSnapshotInfo settings_snapshot();
+    [[nodiscard]] SettingsCommitInfo apply_setting(std::uint64_t expected_revision,
+                                                   std::string id,
+                                                   SettingValue value);
+    [[nodiscard]] SettingsCommitInfo apply_settings(
+        std::uint64_t expected_revision,
+        std::vector<SettingChange> changes);
+    [[nodiscard]] SettingsCommitInfo reset_setting(std::uint64_t expected_revision,
+                                                   std::string id);
+    [[nodiscard]] ServicesSnapshotInfo services_snapshot();
+    [[nodiscard]] ServiceCommandResultInfo service_command(
+        std::string service_id,
+        std::string command_id,
+        std::optional<std::string> expected_instance_id = std::nullopt,
+        std::optional<std::uint64_t> expected_generation = std::nullopt,
+        std::optional<std::string> root_id = std::nullopt);
     void shutdown();
 
 private:

@@ -6,11 +6,14 @@ use crate::common::{
 };
 use crate::contract::{CONTRACTS, supported_contract_for_method};
 use crate::engine_contract::{EngineSearchCursorSource, EngineSearchRequest};
+use crate::engine_jsonl::{EngineJsonlCaller, project_engine_error};
 use crate::engine_port::{EngineSearchOutcome, UnifiedEngineSearch};
 use crate::lifecycle::{Lifecycle, LifecycleState};
 use crate::local_session::{LOCAL_WIRE_FAMILY, LOCAL_WIRE_MAJOR, LOCAL_WIRE_MINOR};
 use crate::release::core_release_manifest;
 use crate::runtime_health::RuntimeHealth;
+use crate::settings::{SettingsApplyRequest, SettingsService};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,10 +21,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Kernel {
     lifecycle: Mutex<Lifecycle>,
+    instance_id: Option<String>,
     runtime_health: Arc<RuntimeHealth>,
     supervisor_restart: bool,
     engine_search: Option<Mutex<Box<dyn UnifiedEngineSearch>>>,
+    engine_transport: &'static str,
+    engine_admin: Option<Mutex<Box<dyn EngineJsonlCaller + Send>>>,
     engine_live_available: AtomicBool,
+    settings: SettingsService,
 }
 
 impl Default for Kernel {
@@ -39,10 +46,14 @@ impl Kernel {
     pub fn new() -> Self {
         Self {
             lifecycle: Mutex::new(Lifecycle::started()),
+            instance_id: None,
             runtime_health: Arc::new(RuntimeHealth::in_process()),
             supervisor_restart: false,
             engine_search: None,
+            engine_transport: "unavailable",
+            engine_admin: None,
             engine_live_available: AtomicBool::new(false),
+            settings: SettingsService::in_memory(),
         }
     }
 
@@ -50,10 +61,14 @@ impl Kernel {
     pub fn for_local_daemon() -> Self {
         Self {
             lifecycle: Mutex::new(Lifecycle::started()),
+            instance_id: None,
             runtime_health: Arc::new(RuntimeHealth::local_daemon()),
             supervisor_restart: false,
             engine_search: None,
+            engine_transport: "unavailable",
+            engine_admin: None,
             engine_live_available: AtomicBool::new(false),
+            settings: SettingsService::in_memory(),
         }
     }
 
@@ -61,18 +76,56 @@ impl Kernel {
     pub fn for_supervised_daemon() -> Self {
         Self {
             lifecycle: Mutex::new(Lifecycle::started()),
+            instance_id: None,
             runtime_health: Arc::new(RuntimeHealth::local_daemon()),
             supervisor_restart: true,
             engine_search: None,
+            engine_transport: "unavailable",
+            engine_admin: None,
             engine_live_available: AtomicBool::new(false),
+            settings: SettingsService::in_memory(),
         }
     }
 
     #[must_use]
     pub fn with_engine_search(mut self, search: impl UnifiedEngineSearch + 'static) -> Self {
+        self.engine_transport = "development_jsonl";
         self.engine_live_available
             .store(search.live_available(), Ordering::Release);
         self.engine_search = Some(Mutex::new(Box::new(search)));
+        self
+    }
+
+    #[must_use]
+    pub fn with_installed_engine_search(
+        mut self,
+        search: impl UnifiedEngineSearch + 'static,
+    ) -> Self {
+        self.engine_transport = "engine.local.v1";
+        self.engine_live_available
+            .store(search.live_available(), Ordering::Release);
+        self.engine_search = Some(Mutex::new(Box::new(search)));
+        self
+    }
+
+    #[must_use]
+    pub fn with_installed_engine_admin(
+        mut self,
+        caller: impl EngineJsonlCaller + Send + 'static,
+    ) -> Self {
+        self.engine_admin = Some(Mutex::new(Box::new(caller)));
+        self
+    }
+
+    #[must_use]
+    pub fn with_settings(mut self, settings: SettingsService) -> Self {
+        self.settings = settings;
+        self
+    }
+
+    #[must_use]
+    pub fn with_instance_id(mut self, instance_id: String) -> Self {
+        self.instance_id = Some(instance_id);
         self
     }
 
@@ -82,6 +135,9 @@ impl Kernel {
     }
 
     #[must_use]
+    // The closed method table is intentionally kept visible in one place so a
+    // new cross-project edge cannot hide behind indirect registration.
+    #[allow(clippy::too_many_lines)]
     pub fn handle(&self, request: Request) -> Response {
         if let Err(error) = validate_request_id(&request.id) {
             return Response::failure("", error);
@@ -134,10 +190,38 @@ impl Kernel {
             "orchestrator.release" => serde_json::to_value(core_release_manifest())
                 .map_err(|error| internal_serialization_error(&error)),
             "orchestrator.status" => Ok(self.status_result()),
-            "orchestrator.frontend.bootstrap" => Ok(self.frontend_bootstrap_result()),
+            "orchestrator.frontend.bootstrap" => self.frontend_bootstrap_result(),
             "orchestrator.contracts.list" => serde_json::to_value(CONTRACTS)
                 .map_err(|error| internal_serialization_error(&error)),
             "orchestrator.availability.list" => Ok(self.availability_result()),
+            "orchestrator.settings.schema" => Ok(self.settings.schema_result()),
+            "orchestrator.settings.snapshot" => self.settings.snapshot_result(),
+            "orchestrator.settings.apply" => {
+                serde_json::from_value::<SettingsApplyRequest>(request.params)
+                    .map_err(|error| {
+                        ApiError::new(
+                            ApiErrorCode::InvalidRequest,
+                            TerminalStatus::Invalid,
+                            format!("invalid settings transaction: {error}"),
+                        )
+                    })
+                    .and_then(|settings_request| {
+                        self.settings
+                            .apply(settings_request, request.deadline_unix_ms)
+                    })
+            }
+            "orchestrator.services.snapshot" => Ok(self.services_snapshot_result()),
+            "orchestrator.services.command" => {
+                serde_json::from_value::<ServiceCommandRequest>(request.params)
+                    .map_err(|error| {
+                        ApiError::new(
+                            ApiErrorCode::InvalidRequest,
+                            TerminalStatus::Invalid,
+                            format!("invalid service command: {error}"),
+                        )
+                    })
+                    .and_then(|command| self.service_command_result(&command))
+            }
             "orchestrator.plugins.status" => Ok(stub_result(
                 "plugins.runtime",
                 "plugin and plugin-AI APIs are deliberately absent",
@@ -197,12 +281,12 @@ impl Kernel {
             "has_gui": false,
             "engine_scope": "systemwide",
             "normal_integration_route": "orchestrator",
-            "degraded_engine_fallback": true,
+            "degraded_engine_fallback": self.engine_transport != "engine.local.v1",
             "search": {
                 "unified_operation": "orchestrator.search",
                 "available": self.engine_search.is_some(),
                 "live_search_available": self.live_search_available(),
-                "provider_transport": if self.engine_search.is_some() { "development_jsonl" } else { "unavailable" }
+                "provider_transport": self.engine_transport
             },
             "runtime_health": self.runtime_health.snapshot(),
             "availability_summary": {
@@ -216,17 +300,26 @@ impl Kernel {
         })
     }
 
-    fn frontend_bootstrap_result(&self) -> Value {
+    fn frontend_bootstrap_result(&self) -> Result<Value, ApiError> {
         let lifecycle = self.lifecycle_snapshot();
         let release = core_release_manifest();
-        let restart_eligible = release.ready && self.supervisor_restart;
+        let restart_eligible =
+            release.ready && self.supervisor_restart && self.instance_id.is_some();
         let opening = frontend_opening_result(release, CAPABILITIES, restart_eligible);
-        json!({
+        let settings = self.settings.snapshot_result()?;
+        let configuration_generation = settings["revision"].as_u64().ok_or_else(|| {
+            ApiError::new(
+                ApiErrorCode::Internal,
+                TerminalStatus::InternalFault,
+                "settings snapshot has no configuration generation",
+            )
+        })?;
+        Ok(json!({
             "schema": {"family": "ORC-FE-001", "major": 1, "minor": 0},
             "snapshot": {
                 "kind": "immutable",
                 "lifecycle_generation": lifecycle.generation,
-                "configuration_generation": 0
+                "configuration_generation": configuration_generation
             },
             "version": version_result(),
             "release": release,
@@ -244,21 +337,31 @@ impl Kernel {
                 },
                 "direct_engine_fallback": {
                     "registered": true,
-                    "eligible": false,
-                    "state": "deferred",
-                    "reason": "the fallback route is registered, but installed Engine discovery and authentication are not available"
+                    "eligible": self.engine_transport == "engine.local.v1",
+                    "state": if self.engine_transport == "engine.local.v1" { "available" } else { "deferred" },
+                    "reason": if self.engine_transport == "engine.local.v1" {
+                        "the installed authenticated Engine adapter is connected"
+                    } else {
+                        "the fallback route is registered, but installed Engine discovery and authentication are not available"
+                    }
                 }
             },
             "service_controls": {
-                "shutdown_eligible": true,
+                "shutdown_eligible": self.instance_id.is_some(),
                 "restart_eligible": restart_eligible,
                 "restart_strategy": if restart_eligible { "shutdown_then_supervisor_reactivate" } else { "unavailable" },
                 "restart_effect": if restart_eligible { "new_instance_and_lifecycle_generation" } else { "none" },
                 "diagnostics_state": "unavailable",
                 "diagnostics_locator": Value::Null
             },
+            "settings": {
+                "contract": "ORC-SET-001",
+                "schema_revision": settings["schema_revision"],
+                "revision": configuration_generation,
+                "recovery_provenance": settings["recovery_provenance"]
+            },
             "frontend_opening": opening
-        })
+        }))
     }
 
     fn availability_result(&self) -> Value {
@@ -277,10 +380,46 @@ impl Kernel {
                     .to_owned(),
                 );
                 live["reason"] = Value::String(if self.live_search_available() {
-                    "connected Engine provider advertises ORC-ENG-004 through the bounded development adapter"
+                    "the connected Engine provider advertises ORC-ENG-004 through a bounded authenticated adapter"
                 } else {
                     "ORC-ENG-004 is implemented, but no Engine provider transport is connected to this process"
                 }.to_owned());
+            }
+            if let Some(cached) = entries
+                .iter_mut()
+                .find(|entry| entry["id"] == "engine.query.cached_exact")
+            {
+                if self.engine_search.is_some() {
+                    cached["state"] = Value::String("available".to_owned());
+                    cached["reason"] = Value::String(
+                        "the connected installed Engine serves checked catalogue generations"
+                            .to_owned(),
+                    );
+                }
+            }
+            if let Some(admin) = entries
+                .iter_mut()
+                .find(|entry| entry["id"] == "engine.query.manual_reconcile")
+            {
+                if self.engine_admin.is_some() {
+                    admin["state"] = Value::String("available".to_owned());
+                    admin["reason"] = Value::String(
+                        "the authenticated installed Engine admin endpoint admits checked reconcile"
+                            .to_owned(),
+                    );
+                }
+            }
+            if let Some(installed) = entries
+                .iter_mut()
+                .find(|entry| entry["id"] == "engine.transport.installed_local")
+            {
+                if self.engine_transport == "engine.local.v1" {
+                    installed["state"] = Value::String("available".to_owned());
+                    installed["reason"] = Value::String(
+                        "same-user private discovery, credentials, peer authentication, framing, and query/admin separation are connected"
+                            .to_owned(),
+                    );
+                }
             }
         }
         value
@@ -290,14 +429,26 @@ impl Kernel {
         CAPABILITIES
             .iter()
             .filter(|capability| {
-                let current = if capability.id == "engine.query.catalogue_free_fallback" {
-                    if self.live_search_available() {
-                        AvailabilityState::Available
-                    } else {
-                        AvailabilityState::Unavailable
+                let current = match capability.id {
+                    "engine.query.catalogue_free_fallback" => {
+                        if self.live_search_available() {
+                            AvailabilityState::Available
+                        } else {
+                            AvailabilityState::Unavailable
+                        }
                     }
-                } else {
-                    capability.state
+                    "engine.query.cached_exact" if self.engine_search.is_some() => {
+                        AvailabilityState::Available
+                    }
+                    "engine.query.manual_reconcile" if self.engine_admin.is_some() => {
+                        AvailabilityState::Available
+                    }
+                    "engine.transport.installed_local"
+                        if self.engine_transport == "engine.local.v1" =>
+                    {
+                        AvailabilityState::Available
+                    }
+                    _ => capability.state,
                 };
                 current == state
             })
@@ -409,12 +560,258 @@ impl Kernel {
         Ok(json!({"state": "stopped"}))
     }
 
+    fn services_snapshot_result(&self) -> Value {
+        let lifecycle = self.lifecycle_snapshot();
+        let orchestrator = json!({
+            "id": "orchestrator",
+            "title": "Orchestrator",
+            "state": lifecycle.state,
+            "ready": lifecycle.state == LifecycleState::Ready,
+            "instance_id": self.instance_id.clone(),
+            "generation": lifecycle.generation,
+            "transport": "orchestrator.local",
+            "currentness": Value::Null,
+            "roots": [],
+            "commands": [
+                {"id": "restart", "title": "Restart", "available": self.supervisor_restart && self.instance_id.is_some(),
+                 "effect": "new_instance_and_lifecycle_generation"},
+                {"id": "shutdown", "title": "Shut down", "available": self.instance_id.is_some(),
+                 "effect": "stopped_until_next_activation"}
+            ]
+        });
+        let engine = self.engine_service_snapshot();
+        json!({
+            "schema": {"family": "ORC-UI-001", "major": 1, "minor": 0},
+            "snapshot_kind": "immutable",
+            "services": [orchestrator, engine]
+        })
+    }
+
+    fn engine_service_snapshot(&self) -> Value {
+        let Some(admin) = self.engine_admin.as_ref() else {
+            return unavailable_engine_service("installed admin endpoint is not connected");
+        };
+        let Ok(mut admin) = admin.lock() else {
+            return unavailable_engine_service("installed Engine admin state is poisoned");
+        };
+        let status = match admin.call("engine.status", &json!({})) {
+            Ok(status) => status,
+            Err(error) => {
+                return unavailable_engine_service(&format!(
+                    "installed Engine status is unavailable: {error}"
+                ));
+            }
+        };
+        let lifecycle = &status["lifecycle"];
+        let roots = status["roots"].clone();
+        let currentness = status["work"]["currentness"].clone();
+        json!({
+            "id": "engine",
+            "title": "Engine",
+            "state": lifecycle["state"],
+            "ready": status["ready"],
+            "instance_id": lifecycle["instance_id"],
+            "generation": status["generation"],
+            "transport": self.engine_transport,
+            "currentness": currentness,
+            "roots": roots,
+            "commands": [
+                {"id": "integrity_check", "title": "Check integrity", "available": true,
+                 "effect": "read_only_report"},
+                {"id": "reconcile", "title": "Reconcile", "available": true,
+                 "effect": "authoritative_metadata_scan"},
+                {"id": "rebuild", "title": "Rebuild projection", "available": true,
+                 "effect": "checked_generation_replacement"},
+                {"id": "restart", "title": "Restart", "available": true,
+                 "effect": "new_instance_same_admitted_policy"}
+            ]
+        })
+    }
+
+    fn service_command_result(&self, command: &ServiceCommandRequest) -> Result<Value, ApiError> {
+        match command.service_id.as_str() {
+            "orchestrator" => self.orchestrator_command_result(command),
+            "engine" => self.engine_command_result(command),
+            _ => Err(invalid_service_command("unknown service id")),
+        }
+    }
+
+    fn orchestrator_command_result(
+        &self,
+        command: &ServiceCommandRequest,
+    ) -> Result<Value, ApiError> {
+        if command.root_id.is_some() {
+            return Err(invalid_service_command(
+                "Orchestrator commands do not accept Engine root fields",
+            ));
+        }
+        let lifecycle = self.lifecycle_snapshot();
+        if self.instance_id.is_none()
+            || command.expected_instance_id.as_deref() != self.instance_id.as_deref()
+            || command.expected_generation != Some(lifecycle.generation)
+        {
+            return Err(ApiError::new(
+                ApiErrorCode::InvalidRequest,
+                TerminalStatus::Stale,
+                "Orchestrator instance identity or lifecycle generation is stale",
+            ));
+        }
+        if command.command_id == "restart" && !self.supervisor_restart {
+            return Err(ApiError::new(
+                ApiErrorCode::Unavailable,
+                TerminalStatus::Unavailable,
+                "no admitted supervisor can restart this Orchestrator instance",
+            ));
+        }
+        if !matches!(command.command_id.as_str(), "restart" | "shutdown") {
+            return Err(invalid_service_command(
+                "command is not admitted for Orchestrator",
+            ));
+        }
+        let result = self.shutdown_result()?;
+        Ok(json!({
+            "schema": {"family": "ORC-UI-001", "major": 1, "minor": 0},
+            "service_id": "orchestrator",
+            "command_id": command.command_id,
+            "terminal": "accepted",
+            "effect": if command.command_id == "restart" {
+                "supervisor_reactivate_on_reconnect"
+            } else {
+                "stopped_until_next_activation"
+            },
+            "provider_result": result
+        }))
+    }
+
+    fn engine_command_result(&self, command: &ServiceCommandRequest) -> Result<Value, ApiError> {
+        if command.expected_generation.is_some() {
+            return Err(invalid_service_command(
+                "Engine commands use expected_instance_id, not Orchestrator generation",
+            ));
+        }
+        let Some(admin) = self.engine_admin.as_ref() else {
+            return Err(ApiError::new(
+                ApiErrorCode::Unavailable,
+                TerminalStatus::Unavailable,
+                "installed Engine admin endpoint is not connected",
+            ));
+        };
+        let mut admin = admin.lock().map_err(|_| {
+            ApiError::new(
+                ApiErrorCode::Internal,
+                TerminalStatus::InternalFault,
+                "installed Engine admin state is poisoned",
+            )
+        })?;
+        let status = admin
+            .call("engine.status", &json!({}))
+            .map_err(|error| engine_admin_error(error, "engine.status"))?;
+        let current_instance = status["lifecycle"]["instance_id"].as_str().ok_or_else(|| {
+            ApiError::new(
+                ApiErrorCode::Internal,
+                TerminalStatus::InternalFault,
+                "Engine status has no instance identity",
+            )
+        })?;
+        if command.expected_instance_id.as_deref() != Some(current_instance) {
+            return Err(ApiError::new(
+                ApiErrorCode::InvalidRequest,
+                TerminalStatus::Stale,
+                "Engine instance identity is stale",
+            ));
+        }
+        let (method, params, effect) = match command.command_id.as_str() {
+            "integrity_check" if command.root_id.is_none() => {
+                ("engine.integrity_check", json!({}), "read_only_report")
+            }
+            "reconcile" => (
+                "engine.scan_reconcile",
+                json!({"root": required_root_id(command)?}),
+                "checked_generation_publication",
+            ),
+            "rebuild" => (
+                "engine.projection_rebuild",
+                json!({"root": required_root_id(command)?}),
+                "checked_generation_replacement",
+            ),
+            "restart" if command.root_id.is_none() => {
+                ("engine.shutdown", json!({}), "launchd_keepalive_restart")
+            }
+            _ => {
+                return Err(invalid_service_command(
+                    "command shape is not admitted for Engine",
+                ));
+            }
+        };
+        let provider_result = admin
+            .call(method, &params)
+            .map_err(|error| engine_admin_error(error, method))?;
+        Ok(json!({
+            "schema": {"family": "ORC-UI-001", "major": 1, "minor": 0},
+            "service_id": "engine",
+            "command_id": command.command_id,
+            "terminal": "success",
+            "effect": effect,
+            "provider_result": provider_result
+        }))
+    }
+
     fn lifecycle_snapshot(&self) -> crate::lifecycle::LifecycleSnapshot {
         self.lifecycle
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .snapshot()
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ServiceCommandRequest {
+    service_id: String,
+    command_id: String,
+    #[serde(default)]
+    expected_instance_id: Option<String>,
+    #[serde(default)]
+    expected_generation: Option<u64>,
+    #[serde(default)]
+    root_id: Option<String>,
+}
+
+fn unavailable_engine_service(reason: &str) -> Value {
+    json!({
+        "id": "engine",
+        "title": "Engine",
+        "state": "unavailable",
+        "ready": false,
+        "instance_id": Value::Null,
+        "generation": Value::Null,
+        "transport": "unavailable",
+        "currentness": "unavailable",
+        "roots": [],
+        "reason": reason,
+        "commands": []
+    })
+}
+
+fn required_root_id(command: &ServiceCommandRequest) -> Result<&str, ApiError> {
+    command
+        .root_id
+        .as_deref()
+        .filter(|root| !root.is_empty())
+        .ok_or_else(|| invalid_service_command("Engine reconcile/rebuild requires root_id"))
+}
+
+fn invalid_service_command(message: &str) -> ApiError {
+    ApiError::new(
+        ApiErrorCode::InvalidRequest,
+        TerminalStatus::Invalid,
+        message,
+    )
+}
+
+fn engine_admin_error(error: crate::engine_jsonl::EngineJsonlError, operation: &str) -> ApiError {
+    let (terminal, _, message) = project_engine_error(error, operation);
+    ApiError::new(search_error_code(terminal), terminal, message)
 }
 
 fn frontend_opening_result(
@@ -799,6 +1196,41 @@ mod tests {
     }
 
     #[test]
+    fn settings_contract_uses_one_typed_optimistic_transaction() {
+        let kernel = Kernel::new();
+        let schema = kernel.handle(Request::local(
+            "settings-schema",
+            "orchestrator.settings.schema",
+        ));
+        assert_eq!(schema.status, TerminalStatus::Success);
+        assert_eq!(
+            schema.result.expect("settings schema")["fields"]
+                .as_array()
+                .map(Vec::len),
+            Some(16)
+        );
+
+        let mut apply = Request::local("settings-apply", "orchestrator.settings.apply");
+        apply.params = serde_json::json!({
+            "expected_revision": 0,
+            "mutations": [{"id": "navigation.show_hidden", "set": true}]
+        });
+        let committed = kernel.handle(apply);
+        assert_eq!(committed.status, TerminalStatus::Success);
+        assert_eq!(
+            committed.result.expect("settings commit")["snapshot"]["revision"],
+            1
+        );
+
+        let mut stale = Request::local("settings-stale", "orchestrator.settings.apply");
+        stale.params = serde_json::json!({
+            "expected_revision": 0,
+            "mutations": [{"id": "navigation.show_hidden", "set": false}]
+        });
+        assert_eq!(kernel.handle(stale).status, TerminalStatus::Stale);
+    }
+
+    #[test]
     fn shutdown_is_terminal() {
         let kernel = Kernel::new();
         let response = kernel.handle(Request::local("one", "orchestrator.shutdown"));
@@ -824,8 +1256,14 @@ mod tests {
             result["snapshot"]["lifecycle_generation"],
             result["status"]["lifecycle"]["generation"]
         );
-        assert_eq!(result["contracts"].as_array().map(Vec::len), Some(24));
-        assert_eq!(result["availability"].as_array().map(Vec::len), Some(27));
+        assert_eq!(
+            result["contracts"].as_array().map(Vec::len),
+            Some(crate::contract::CONTRACTS.len())
+        );
+        assert_eq!(
+            result["availability"].as_array().map(Vec::len),
+            Some(crate::availability::CAPABILITIES.len())
+        );
         assert_eq!(result["release"]["ready"], true);
         assert_eq!(
             result["frontend_opening"]["orchestrator_gate"]["satisfied"],
@@ -839,7 +1277,11 @@ mod tests {
         );
         assert_eq!(
             result["frontend_opening"]["external_gates"]["gui_forms"]["state"],
-            "negotiating"
+            "available"
+        );
+        assert_eq!(
+            result["frontend_opening"]["external_gates"]["gui_forms"]["satisfied"],
+            true
         );
         assert_eq!(
             result["frontend_opening"]["external_gates"]["architect_direction"]["state"],
@@ -874,7 +1316,8 @@ mod tests {
             ApiErrorCode::ResourceBudgetExceeded
         );
 
-        let supervised = Kernel::for_supervised_daemon();
+        let supervised = Kernel::for_supervised_daemon()
+            .with_instance_id("supervised-bootstrap-instance".to_owned());
         let response = supervised.handle(Request::local(
             "supervised",
             "orchestrator.frontend.bootstrap",
@@ -1026,5 +1469,38 @@ mod tests {
             status.result.expect("status result")["search"]["live_search_available"],
             false
         );
+    }
+
+    #[test]
+    fn service_commands_bind_orchestrator_instance_and_generation() {
+        let kernel =
+            Kernel::for_supervised_daemon().with_instance_id("orchestrator-instance-a".to_owned());
+        let snapshot = kernel.handle(Request::local("services", "orchestrator.services.snapshot"));
+        let result = snapshot.result.expect("service snapshot");
+        assert_eq!(
+            result["services"][0]["instance_id"],
+            "orchestrator-instance-a"
+        );
+        assert_eq!(result["services"][0]["generation"], 1);
+
+        let mut stale = Request::local("stale", "orchestrator.services.command");
+        stale.params = serde_json::json!({
+            "service_id": "orchestrator",
+            "command_id": "restart",
+            "expected_instance_id": "orchestrator-instance-old",
+            "expected_generation": 1
+        });
+        assert_eq!(kernel.handle(stale).status, TerminalStatus::Stale);
+        assert!(!kernel.is_stopped());
+
+        let mut accepted = Request::local("accepted", "orchestrator.services.command");
+        accepted.params = serde_json::json!({
+            "service_id": "orchestrator",
+            "command_id": "restart",
+            "expected_instance_id": "orchestrator-instance-a",
+            "expected_generation": 1
+        });
+        assert_eq!(kernel.handle(accepted).status, TerminalStatus::Success);
+        assert!(kernel.is_stopped());
     }
 }

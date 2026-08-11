@@ -1,8 +1,9 @@
 # Orchestrator ↔ File Manager interface negotiation
 
-Status: **round 003 Core bootstrap reconciled; owner start/composition direction
-007 recorded; live Core 1.0 bootstrap edge still requires final launchd
-lifecycle evidence before Frontend 001 under ADR-006**.
+Status: **round 010 settings/service/installed-Engine reconciliation recorded;
+live Core 1.0, the named GUI.Forms FM0 consumption manifest, and owner start
+direction are satisfied; Frontend 001/F1 is active while later-provider rounds
+remain independent**.
 
 Participants: Orchestrator integration authority and the future C++ File
 Manager frontend. Canonical families: `ORC-COM-001`, `ORC-LIF-001`,
@@ -342,3 +343,86 @@ GUI.Forms owns portable-to-native menu publication. File Manager owns menu
 grouping and Settings tab composition. Orchestrator owns the application and
 settings/service facts. The complete staged program is
 [`TOTAL_IMPLEMENTATION_PLAN.md`](TOTAL_IMPLEMENTATION_PLAN.md).
+
+## Frontend opening reconciliation 008
+
+Date: 2026-08-10.
+
+Status: **OBSERVED opening predicates satisfied; F1 implementation active**.
+
+This round appends the evidence that was unavailable in rounds 003, 004, and
+007; it does not rewrite their historical gate state:
+
+- Orchestrator Core 1.0 is installed and its atomic C++ bootstrap projection is
+  exercised by the frontend worker/UI-queue adapter.
+- GUI.Forms reply 001 now names
+  `gui-forms-fm0-macos-arm64-2026-08-10`, exporting the installed
+  `GUIForms::Application` target and the public retained host boundary.
+- [`OWNER_DIRECTION_2026-08-10.md`](OWNER_DIRECTION_2026-08-10.md) records the
+  explicit architect implementation direction carried into this round.
+- The first frontend source, build, Web.Forms-authored surface, protected-root
+  filesystem model, and focused tests now live under `../`.
+- M4 Screen Sharing evidence for both the browser-valid authoring source and
+  native retained application is recorded under
+  `../results/2026-08-10-m4-dogfood/`.
+
+This satisfies ADR-006's opening predicate. It does not freeze the later
+settings, handlers, command, picker, Engine-search, plugin, packaging, signing,
+or daily-replacement contracts. Those retain their own rounds and evidence.
+
+## Settings reconciliation 009
+
+Date: 2026-08-10.
+
+Status: **semantic v1 accepted for contained implementation under ADR-018;
+provider/consumer conformance pending**.
+
+The frontend requirement in direction 007 is reconciled as `ORC-SET-001` 1.0
+in `orchestrator/spec/contracts/HIVES_AND_SETTINGS.md`. Orchestrator returns
+bounded typed field schemas and immutable value snapshots, never controls.
+File Manager composes its own tabbed GUI.Forms surface. The CLI and C++ client
+submit the same optimistic transaction and observe the same committed revision,
+validation, restart effect, recovery provenance, and audit identity.
+
+The first physical profile is the bounded atomic store selected by ADR-018 after
+an M4 comparison against SQLite WAL FULL. It is not a hive/database decision.
+Secret values, plugin namespaces, arbitrary settings files, and destructive
+administrative service commands remain unavailable until separately admitted.
+
+## Installed Engine and service-control reconciliation 010
+
+Date: 2026-08-10.
+
+Status: **ORC-UI-001 v1 and the contained installed Engine route accepted and
+measured under ADR-019**.
+
+The frontend reply to direction 007 is now executable without server-driven
+UI. `orchestrator.services.snapshot` returns immutable Orchestrator/Engine
+facts and a closed command allowlist. The native Settings page composes those
+facts with GUI.Forms controls, disables unavailable operations and confirms
+rebuild/restart/shutdown. It receives no layout, callbacks or policy secrets.
+
+Commands carry the optimistic identity from the displayed snapshot:
+
+- Orchestrator requires both its authenticated ORC1 process identity and
+  lifecycle generation;
+- Engine requires its process identity, plus `fm1-contained` for root-bound
+  reconcile/rebuild;
+- admin transport calls are never automatically replayed; and
+- the frontend discards the old snapshot and refreshes after a terminal result.
+
+The normal search route now reaches the separately installed host-bound Engine
+through Orchestrator's authenticated `ENG1` adapter. The contained service owns
+one durable catalogue for the explicit protected dogfood root; File Manager
+still rechecks result containment and filesystem identity before presenting an
+object. The direct Engine route remains registered fallback policy rather than
+the normal C++ application path.
+
+M4 evidence covers Rust CLI/C++ agreement, exact catalogue search, integrity,
+reconcile, both supervised restart paths, instance rotation, stale-command
+refusal, the short Unix-socket repair, and the retained code-signing failure:
+`../../orchestrator/conformance/evidence/M4_FILE_MANAGER_SERVICES_2026-08-10.md`.
+
+This round does not freeze event subscriptions, cross-platform installed
+transports, durable general audit, plugin administration, handler/command
+registries, or the reusable picker surface.

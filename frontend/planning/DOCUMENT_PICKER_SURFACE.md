@@ -2,8 +2,8 @@
 
 Date: 2026-08-06.
 
-Status: **GIVEN product direction; CANDIDATE package/process design; planning
-only while Frontend 001 remains closed**.
+Status: **GIVEN product direction; first protected implementation DECIDED by
+ADR-020 and MEASURED as an installed M4 package**.
 
 ## Purpose
 
@@ -40,7 +40,10 @@ The initial reusable boundary should separate:
 - host adapter — obtains the Orchestrator session, owns the picker window/sheet,
   and returns the terminal result to Paint, Text Editor, or File Manager.
 
-Names are **CANDIDATE**. The separation is the requirement.
+The controller and view names are **DECIDED for the 1.0 package** under ADR-020.
+`FileBrowserModel` remains a conceptual name: the first package reuses the
+frontend's `DirectorySnapshot` model rather than creating a divergent browser
+type. The host adapter remains consumer-owned.
 
 ## Surface profiles
 
@@ -110,11 +113,11 @@ acceptance.
 
 ## Reuse and build boundary
 
-**CANDIDATE recommendation:** File Manager's eventual build exports the browser
-model, selection controller, and picker view as an independently consumable
-first-party package. Paint and Text Editor link that package against the same
-compatible GUI.Forms ABI. The shipping File Manager executable is not a library
-dependency.
+**DECIDED and MEASURED for 1.0:** File Manager installs
+`FileManager::FrontendModel`, `FileManager::DocumentPicker`, and
+`FileManager::DocumentPickerView`. A separately configured M4 consumer linked
+and ran against that package and the compatible GUI.Forms ABI without linking
+the shipping File Manager executable.
 
 A later out-of-process Picker Host may wrap the same package. Its existence must
 not force cross-process native child-window embedding or change the semantic
@@ -135,13 +138,11 @@ request/result.
 9. no Engine, stale Engine, and provider-limited search states;
 10. Paint import/drag handoff without plugin UI or unbounded eager bytes.
 
-## Open frontend decisions
+## Remaining frontend decisions
 
-- exact shared-package location and versioning;
-- whether the first picker includes a folder tree or only breadcrumb/object
-  field;
-- search admission in the first slice;
+- post-1.0 compatibility horizon and out-of-process Picker Host timing;
+- whether a later picker profile admits a folder tree or search; 1.0 uses only
+  the path/up/object field and excludes search;
 - overwrite-dialog rendering ownership;
 - whether preview is ever admitted in a picker profile;
-- standalone Picker Host timing;
 - theme/locale selection when host and File Manager preferences differ.

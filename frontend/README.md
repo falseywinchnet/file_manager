@@ -1,9 +1,9 @@
 # File Manager frontend
 
-Status: **Frontend 001 specified; explicit architect start direction recorded
-2026-08-07; waiting for Orchestrator Core 1.0 and the GUI.Forms go-ahead**.
+Status: **File Manager 1.0 protected-root M4 build; the rejected 2026-08-10
+0.001-alpha surface is retained as negative evidence, not shipped behavior**.
 
-This directory will become the C++ application called **File Manager**. It
+This directory contains the C++ application called **File Manager**. It
 normally consumes Orchestrator as the integration/policy authority while using
 GUI.Forms in-process. The systemwide engine remains available through
 Orchestrator and through a registered degraded fallback:
@@ -14,14 +14,78 @@ Orchestrator and through a registered degraded fallback:
 - [`../orchestrator/`](../orchestrator/) — Orchestrator, Rust contract authority,
   control plane, hives, settings, CLI, handlers, plugins and integration broker.
 
-Orchestrator advances headlessly and independently of GUI.Forms. The grand
-architect directed the frontend workstream to start on 2026-08-07, satisfying
-the owner-direction predicate. Product source begins after Orchestrator Core
-1.0 is available and GUI.Forms gives its named FM0 consumption go-ahead. Product
-startup uses the live Orchestrator; deterministic Core 1.0 fixtures remain test
-doubles only. Engine and later providers open through their own negotiated
-contracts. File Manager renders Orchestrator's settings and service controls;
-Orchestrator itself has no GUI.
+Orchestrator Core 1.0 is ready, GUI.Forms published the named
+`gui-forms-fm0-macos-arm64-2026-08-10` installed snapshot, and the grand
+architect supplied explicit implementation/M4 dogfood direction on 2026-08-10.
+Product startup uses the live Orchestrator; deterministic Core fixtures remain
+test doubles only. Engine and later providers open through their own negotiated
+contracts. Orchestrator itself has no GUI.
+
+The current protected-root prototype compiles the checked-in browser-valid
+Web.Forms source into a retained public GUI.Forms tree and has no browser or
+Python runtime. It supplies asynchronous navigation, paged installed-Engine
+search through Orchestrator, typed settings/service control, bounded text/PNG
+previews, identity-checked default Open, fixed-argv Terminal Here, streamed
+SHA-256 with cancellation/expected-digest comparison, clipboard path/digest
+copy, and explicit-opt-in recoverable operations. Read-only remains the
+default. The mutation profile requires a separate same-volume quarantine and
+implements New Folder, inline Rename, internal drag, staged no-overwrite Copy,
+same-volume Move, two-step recoverable Delete, and one-step identity-checked
+Undo under ADR-017 and ADR-020.
+
+The 2026-08-11 repair replaced the rejected synthetic navigation and generic
+shell with the accepted dense House Composite geography, removed `Places` and
+`Recent locations` from both authored and native trees, installed a complete
+command/menu vocabulary, and exercised the current signed bundle in the M4
+Aqua session. The rejected build remains documented under
+[`planning/OWNER_CORRECTION_2026-08-11.md`](planning/OWNER_CORRECTION_2026-08-11.md)
+and the first dogfood record; it is not counted as 1.0 evidence.
+
+`FileManager::DocumentPicker`, `FileManager::DocumentPickerView`, and their
+shared `FileManager::FrontendModel` are independently installed CMake targets.
+The bounded GUI.Forms picker supports open-one, open-many, folder, save-as,
+import, and export profiles without linking the File Manager executable.
+Ordinary picker browsing does not require Engine; acceptance revalidates both
+the filesystem observation and the Orchestrator selection-session state.
+
+Build on the M4 after installing the named GUI.Forms package:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- /bin/sh -c '
+  /opt/homebrew/bin/cmake -S frontend -B frontend/build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DGUIForms_DIR="$PWD/gui_forms/.build/fm0-install/lib/cmake/GUIForms"
+  /opt/homebrew/bin/cmake --build frontend/build --parallel 10
+  /opt/homebrew/bin/ctest --test-dir frontend/build --output-on-failure
+'
+```
+
+Launch `frontend/build/File Manager.app` from Terminal inside the M4 Screen
+Sharing desktop with `--root <protected-directory>`. A disposable mutation run
+must opt in explicitly:
+
+```sh
+open -n "frontend/build/File Manager.app" --args \
+  --root /absolute/disposable/root \
+  --allow-mutations \
+  --quarantine /absolute/separate/same-volume/quarantine
+```
+
+Launching the bundle, rather than invoking its binary through a symlink, is
+required so the host resolves bundled fonts and resources correctly.
+
+An external first-party picker consumer can use the installed package:
+
+```cmake
+find_package(FileManagerDocumentPicker 1.0 REQUIRED CONFIG)
+target_link_libraries(my_app PRIVATE FileManager::DocumentPickerView)
+```
+
+The corrective 1.0 build, control audit, cross-component test results, and M4
+Screen Sharing observations are recorded under
+[`results/2026-08-11-m4-dogfood/`](results/2026-08-11-m4-dogfood/). The
+[`2026-08-10 record`](results/2026-08-10-m4-dogfood/) remains the rejected
+baseline and negative evidence.
 
 The exact first slice and gate are in
 [`planning/FRONTEND_001.md`](planning/FRONTEND_001.md) and

@@ -121,7 +121,7 @@ func runLaunchd(args []string) error {
 	if err != nil {
 		return err
 	}
-	engine, err := service.NewPersistent(guard, manifest.StoreRoot)
+	engine, err := service.NewLaunchdPersistent(guard, manifest.StoreRoot)
 	if err != nil {
 		return err
 	}

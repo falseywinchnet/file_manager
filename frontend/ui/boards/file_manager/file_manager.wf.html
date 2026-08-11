@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>File Manager</title>
+  <link rel="stylesheet" href="file_manager.wf.css">
+</head>
+<body id="file-manager-app" data-wf-surface="own-surface">
+  <main id="file-manager-app.shell" class="app-shell" data-wf-control="panel" data-wf-surface="own-surface">
+    <header id="file-manager-app.shell.title" class="title-bar" data-wf-control="toolbar" data-wf-surface="own-surface">
+      <div id="file-manager-app.shell.title.mark" class="app-mark" data-wf-surface="own-surface">
+        <span id="file-manager-app.shell.title.mark.front" class="mark-front" data-wf-surface="own-surface">F</span>
+      </div>
+      <div id="file-manager-app.shell.title.copy" class="title-copy">
+        <strong id="file-manager-app.shell.title.copy.name">File Manager</strong>
+        <small id="file-manager-app.shell.title.copy.subtitle">local machine · one location</small>
+      </div>
+      <span id="file-manager-app.shell.title.service" class="service-state">LOCAL · CONNECTING</span>
+    </header>
+
+    <nav id="file-manager-app.shell.menu" class="menu-bar" data-wf-control="menu-bar" data-wf-surface="own-surface" aria-label="Application menu">
+      <button id="file-manager-app.shell.menu.file" class="menu-command" data-wf-command="open-file-menu" data-wf-surface="own-surface">File</button>
+      <button id="file-manager-app.shell.menu.home" class="menu-command active" data-wf-command="open-home-menu" data-wf-surface="own-surface">Home</button>
+      <button id="file-manager-app.shell.menu.edit" class="menu-command" data-wf-command="open-edit-menu" data-wf-surface="own-surface">Edit</button>
+      <button id="file-manager-app.shell.menu.view" class="menu-command" data-wf-command="open-view-menu" data-wf-surface="own-surface">View</button>
+      <button id="file-manager-app.shell.menu.go" class="menu-command" data-wf-command="open-go-menu" data-wf-surface="own-surface">Go</button>
+      <button id="file-manager-app.shell.menu.commands" class="menu-command" data-wf-command="open-commands-menu" data-wf-surface="own-surface">Commands</button>
+      <button id="file-manager-app.shell.menu.help" class="menu-command" data-wf-command="open-help-menu" data-wf-surface="own-surface">Help</button>
+    </nav>
+
+    <section id="file-manager-app.shell.commands" class="command-shelf" data-wf-control="toolbar" data-wf-surface="own-surface">
+      <div id="file-manager-app.shell.commands.selection-group" class="command-group" data-wf-surface="own-surface">
+        <div id="file-manager-app.shell.commands.selection-group.actions" class="command-actions" data-wf-surface="own-surface">
+          <button id="file-manager-app.shell.commands.selection-group.actions.copy" class="shelf-command arrow" data-wf-command="move-copy-selection" data-wf-surface="own-surface">⇢ Move / copy ▾</button>
+          <button id="file-manager-app.shell.commands.selection-group.actions.delete" class="shelf-command danger" data-wf-command="delete-selection" data-wf-surface="own-surface">⌫ Delete</button>
+        </div>
+        <span id="file-manager-app.shell.commands.selection-group.label" class="command-group-label">SELECTION</span>
+      </div>
+      <div id="file-manager-app.shell.commands.arrange-group" class="command-group arrange-group" data-wf-surface="own-surface">
+        <div id="file-manager-app.shell.commands.arrange-group.actions" class="command-actions" data-wf-surface="own-surface">
+          <button id="file-manager-app.shell.commands.arrange-group.actions.details" class="shelf-command arrow" data-wf-command="choose-view" data-wf-surface="own-surface">▦ View ▾</button>
+          <button id="file-manager-app.shell.commands.arrange-group.actions.refresh" class="shelf-command arrow sort-command" data-wf-command="choose-sort" data-wf-surface="own-surface">≡ Sort: name ▾</button>
+          <button id="file-manager-app.shell.commands.arrange-group.actions.settings" class="shelf-command" data-wf-command="show-properties" data-wf-surface="own-surface">ⓘ Properties</button>
+        </div>
+        <span id="file-manager-app.shell.commands.arrange-group.label" class="command-group-label">ARRANGE &amp; INSPECT</span>
+      </div>
+
+      <button id="file-manager-app.shell.commands.home" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Scope root</button>
+      <button id="file-manager-app.shell.commands.new-folder" class="hidden-control" data-wf-command="new-folder" data-wf-surface="own-surface">New folder</button>
+      <button id="file-manager-app.shell.commands.rename" class="hidden-control" data-wf-command="rename-selection" data-wf-surface="own-surface">Rename</button>
+      <button id="file-manager-app.shell.commands.move" class="hidden-control" data-wf-command="move-selection" data-wf-surface="own-surface">Move</button>
+      <button id="file-manager-app.shell.commands.paste" class="hidden-control" data-wf-command="paste-transfer" data-wf-surface="own-surface">Paste</button>
+      <span id="file-manager-app.shell.commands.rule" class="hidden-control" data-wf-surface="own-surface"></span>
+    </section>
+
+    <section id="file-manager-app.shell.location" class="location-row" data-wf-control="toolbar" data-wf-surface="own-surface">
+      <div id="file-manager-app.shell.location.navigation" class="navigation-cluster">
+        <button id="file-manager-app.shell.location.navigation.back" class="nav-command" data-wf-command="navigate-back" data-wf-surface="own-surface" aria-label="Back">←</button>
+        <button id="file-manager-app.shell.location.navigation.forward" class="nav-command" data-wf-command="navigate-forward" data-wf-surface="own-surface" aria-label="Forward">→</button>
+        <button id="file-manager-app.shell.location.navigation.up" class="nav-command" data-wf-command="navigate-up" data-wf-surface="own-surface" aria-label="Up">↑</button>
+      </div>
+      <span id="file-manager-app.shell.location.label" class="hidden-control" data-wf-surface="own-surface">LOCATION</span>
+      <div id="file-manager-app.shell.location.path-host" class="path-host" data-wf-control="panel" data-wf-surface="own-surface">
+        <span id="file-manager-app.shell.location.path-host.placeholder" class="path-placeholder">Home&nbsp; › &nbsp;Projects&nbsp; ›</span>
+      </div>
+      <div id="file-manager-app.shell.location.search-host" class="search-host" data-wf-control="panel" data-wf-surface="own-surface">
+        <span id="file-manager-app.shell.location.search-host.placeholder" class="search-placeholder">Search this subtree</span>
+      </div>
+    </section>
+
+    <section id="file-manager-app.shell.workspace" class="workspace" data-wf-control="split-view" data-wf-surface="own-surface">
+      <aside id="file-manager-app.shell.workspace.sidebar" class="sidebar" data-wf-control="stack" data-wf-surface="own-surface">
+        <p id="file-manager-app.shell.workspace.sidebar.label" class="pane-caption" data-wf-surface="own-surface">FOLDERS · scope-rooted</p>
+        <button id="file-manager-app.shell.workspace.sidebar.root" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Scope root</button>
+        <button id="file-manager-app.shell.workspace.sidebar.parent" class="hidden-control" data-wf-command="navigate-up" data-wf-surface="own-surface">Parent folder</button>
+        <p id="file-manager-app.shell.workspace.sidebar.tree-label" class="hidden-control" data-wf-surface="own-surface">FOLDERS</p>
+        <div id="file-manager-app.shell.workspace.sidebar.tree-host" class="tree-host" data-wf-control="panel" data-wf-surface="own-surface">
+          <span id="file-manager-app.shell.workspace.sidebar.tree-host.placeholder" class="tree-placeholder">Reading folders…</span>
+        </div>
+      </aside>
+
+      <button id="file-manager-app.shell.workspace.tree-seam" class="split-seam" data-wf-command="toggle-folder-tree" data-wf-surface="own-surface" aria-label="Collapse folder tree">‹</button>
+
+      <article id="file-manager-app.shell.workspace.content" class="content" data-wf-control="panel" data-wf-surface="own-surface">
+        <header id="file-manager-app.shell.workspace.content.heading" class="content-heading" data-wf-surface="own-surface">
+          <div id="file-manager-app.shell.workspace.content.heading.copy" class="heading-copy">
+            <p id="file-manager-app.shell.workspace.content.heading.copy.eyebrow" class="eyebrow">LOCAL RESULTS</p>
+            <h1 id="file-manager-app.shell.workspace.content.heading.copy.title">Current folder</h1>
+          </div>
+          <span id="file-manager-app.shell.workspace.content.heading.count" class="object-count">loading</span>
+          <button id="file-manager-app.shell.workspace.content.heading.more-results" class="more-results" data-wf-command="search-more" data-wf-surface="own-surface">More results</button>
+        </header>
+        <section id="file-manager-app.shell.workspace.content.objects" class="object-host" data-wf-control="panel" data-wf-surface="own-surface">
+          <span id="file-manager-app.shell.workspace.content.objects.placeholder" class="empty-state">Reading this location…</span>
+        </section>
+      </article>
+
+      <button id="file-manager-app.shell.workspace.inspector-seam" class="split-seam" data-wf-command="toggle-selection-pane" data-wf-surface="own-surface" aria-label="Collapse Selection and Properties">›</button>
+
+      <aside id="file-manager-app.shell.workspace.inspector" class="inspector" data-wf-control="stack" data-wf-surface="own-surface">
+        <p id="file-manager-app.shell.workspace.inspector.label" class="pane-caption" data-wf-surface="own-surface">SELECTION · properties</p>
+        <div id="file-manager-app.shell.workspace.inspector.preview" class="preview-block" data-wf-surface="own-surface">
+          <strong id="file-manager-app.shell.workspace.inspector.preview.name" class="preview-name">Nothing selected</strong>
+          <div id="file-manager-app.shell.workspace.inspector.preview.surface" class="preview-surface" data-wf-control="panel" data-wf-surface="own-surface">
+            <span id="file-manager-app.shell.workspace.inspector.preview.surface.glyph" class="preview-glyph">—</span>
+          </div>
+          <small id="file-manager-app.shell.workspace.inspector.preview.kind" class="preview-kind">Choose an object to inspect it</small>
+        </div>
+        <p id="file-manager-app.shell.workspace.inspector.facts-label" class="property-caption" data-wf-surface="own-surface">IDENTITY</p>
+        <div id="file-manager-app.shell.workspace.inspector.facts" class="facts" data-wf-surface="own-surface">
+          <span id="file-manager-app.shell.workspace.inspector.facts.path" class="fact-line" data-wf-surface="own-surface">Location · —</span>
+          <span id="file-manager-app.shell.workspace.inspector.facts.size" class="fact-line" data-wf-surface="own-surface">Size · —</span>
+          <span id="file-manager-app.shell.workspace.inspector.facts.modified" class="fact-line" data-wf-surface="own-surface">Modified · —</span>
+        </div>
+        <p id="file-manager-app.shell.workspace.inspector.commands-label" class="hidden-control" data-wf-surface="own-surface">CONTEXT TOOL</p>
+        <div id="file-manager-app.shell.workspace.inspector.commands" class="hidden-control" data-wf-control="stack" data-wf-surface="own-surface">
+          <button id="file-manager-app.shell.workspace.inspector.commands.open" data-wf-command="open-selection" data-wf-surface="own-surface">Open</button>
+          <button id="file-manager-app.shell.workspace.inspector.commands.checksum" data-wf-command="checksum-selection" data-wf-surface="own-surface">SHA-256</button>
+          <div id="file-manager-app.shell.workspace.inspector.commands.expected-host" class="expected-checksum-host" data-wf-control="panel" data-wf-surface="own-surface">
+            <span id="file-manager-app.shell.workspace.inspector.commands.expected-host.placeholder">Expected SHA-256 (optional)</span>
+          </div>
+          <button id="file-manager-app.shell.workspace.inspector.commands.terminal" data-wf-command="open-terminal-here" data-wf-surface="own-surface">Terminal here</button>
+          <button id="file-manager-app.shell.workspace.inspector.commands.copy-path" data-wf-command="copy-path" data-wf-surface="own-surface">Copy path</button>
+        </div>
+      </aside>
+    </section>
+
+    <section id="file-manager-app.shell.settings" class="settings-workspace" data-wf-control="panel" data-wf-surface="own-surface">
+      <header id="file-manager-app.shell.settings.heading" class="settings-heading" data-wf-surface="own-surface">
+        <div id="file-manager-app.shell.settings.heading.copy" class="settings-heading-copy">
+          <p id="file-manager-app.shell.settings.heading.copy.eyebrow" class="eyebrow">FILE MANAGER · LOCAL CONFIGURATION</p>
+          <h1 id="file-manager-app.shell.settings.heading.copy.title">Settings</h1>
+        </div>
+        <span id="file-manager-app.shell.settings.heading.revision" class="settings-revision">connecting…</span>
+      </header>
+      <div id="file-manager-app.shell.settings.body" class="settings-body" data-wf-control="split-view" data-wf-surface="own-surface">
+        <aside id="file-manager-app.shell.settings.body.tabs" class="settings-tabs" data-wf-control="stack" data-wf-surface="own-surface" aria-label="Settings categories">
+          <button id="file-manager-app.shell.settings.body.tabs.general" class="settings-tab selected" data-wf-command="settings-general" data-wf-surface="own-surface">General</button>
+          <button id="file-manager-app.shell.settings.body.tabs.appearance" class="settings-tab" data-wf-command="settings-appearance" data-wf-surface="own-surface">Appearance &amp; Access</button>
+          <button id="file-manager-app.shell.settings.body.tabs.navigation" class="settings-tab" data-wf-command="settings-navigation" data-wf-surface="own-surface">Navigation &amp; Views</button>
+          <button id="file-manager-app.shell.settings.body.tabs.search" class="settings-tab" data-wf-command="settings-search" data-wf-surface="own-surface">Search &amp; Indexing</button>
+          <button id="file-manager-app.shell.settings.body.tabs.services" class="settings-tab" data-wf-command="settings-services" data-wf-surface="own-surface">Services</button>
+          <button id="file-manager-app.shell.settings.body.tabs.handlers" class="settings-tab" data-wf-command="settings-handlers" data-wf-surface="own-surface">Handlers &amp; Commands</button>
+          <button id="file-manager-app.shell.settings.body.tabs.previews" class="settings-tab" data-wf-command="settings-previews" data-wf-surface="own-surface">Previews &amp; Extensions</button>
+          <button id="file-manager-app.shell.settings.body.tabs.applications" class="settings-tab" data-wf-command="settings-applications" data-wf-surface="own-surface">Applications</button>
+          <button id="file-manager-app.shell.settings.body.tabs.privacy" class="settings-tab" data-wf-command="settings-privacy" data-wf-surface="own-surface">Privacy &amp; Data</button>
+          <button id="file-manager-app.shell.settings.body.tabs.advanced" class="settings-tab" data-wf-command="settings-advanced" data-wf-surface="own-surface">Advanced</button>
+        </aside>
+        <article id="file-manager-app.shell.settings.body.page" class="settings-page" data-wf-control="panel" data-wf-surface="own-surface">
+          <h2 id="file-manager-app.shell.settings.body.page.title">General</h2>
+          <p id="file-manager-app.shell.settings.body.page.description" class="settings-description">Typed local values use the same optimistic transaction as the CLI.</p>
+          <div id="file-manager-app.shell.settings.body.page.host" class="settings-fields-host" data-wf-control="panel" data-wf-surface="own-surface">
+            <span id="file-manager-app.shell.settings.body.page.host.placeholder" class="empty-state">Reading the typed settings schema…</span>
+          </div>
+        </article>
+      </div>
+      <footer id="file-manager-app.shell.settings.actions" class="settings-actions" data-wf-control="toolbar" data-wf-surface="own-surface">
+        <span id="file-manager-app.shell.settings.actions.status" class="settings-action-status">No pending changes</span>
+        <button id="file-manager-app.shell.settings.actions.reset" class="settings-action" data-wf-command="settings-reset" data-wf-surface="own-surface">Reset page</button>
+        <button id="file-manager-app.shell.settings.actions.cancel" class="settings-action" data-wf-command="settings-cancel" data-wf-surface="own-surface">Cancel</button>
+        <button id="file-manager-app.shell.settings.actions.apply" class="settings-action selected" data-wf-command="settings-apply" data-wf-surface="own-surface">Apply</button>
+        <button id="file-manager-app.shell.settings.actions.back" class="settings-action" data-wf-command="settings-back" data-wf-surface="own-surface">Back to files</button>
+      </footer>
+    </section>
+
+    <footer id="file-manager-app.shell.status" class="status-bar" data-wf-control="status-bar" data-wf-surface="own-surface">
+      <span id="file-manager-app.shell.status.ready">Starting File Manager…</span>
+      <span id="file-manager-app.shell.status.summary" class="status-summary" data-wf-surface="own-surface">local navigation · direct filesystem</span>
+    </footer>
+  </main>
+</body>
+</html>

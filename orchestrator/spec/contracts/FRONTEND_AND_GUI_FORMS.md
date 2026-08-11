@@ -63,9 +63,13 @@ release and availability evidence, not for GUI.Forms owner approval or grand
 architect direction. Its `orchestrator_gate.satisfied` value requires both the
 Core release manifest and `frontend.bootstrap` capability to be ready and the
 live daemon to expose the admitted supervisor restart path; blockers carry
-exact release-requirement, capability, or runtime-hosting evidence. The GUI.Forms gate is
-an attributed mirror of `gui_forms.consumption_manifest`. Architect direction
-is now `recorded` from the authority-owned 2026-08-07 frontend start record.
+exact release-requirement, capability, or runtime-hosting evidence. The
+GUI.Forms gate is an attributed mirror of
+`gui_forms.consumption_manifest`. It is `available` for the named
+`gui-forms-fm0-macos-arm64-2026-08-10` installed snapshot; later FM rows and
+other targets remain independently gated. Architect direction is `recorded`
+from the authority-owned frontend start records, most recently the explicit
+2026-08-10 implementation and M4 dogfood direction.
 
 Core restart is supervisor-mediated. A client requests clean shutdown, closes
 the old session, and reconnects through the stable launchd socket; the new
@@ -99,6 +103,56 @@ explicitly stale, read-only state. It cannot authorize mutation, plugin work,
 or fallback routing that was not registered by that same compatible snapshot.
 `registered` and `eligible` are separate: the first records policy, while the
 second records whether the provider/transport can currently be used.
+
+## Bounded administration presentation
+
+`ORC-UI-001` 1.0 freezes facts and command semantics, not controls. File
+Manager owns every tab, row, label, confirmation and focus decision. The
+Orchestrator returns no markup, control type, color, geometry, callback, native
+handle or executable presentation content.
+
+`orchestrator.services.snapshot` returns one bounded immutable value:
+
+- schema family `ORC-UI-001`, major 1, minor 0, and `snapshot_kind`;
+- stable service ID/title, lifecycle state, readiness, process instance ID,
+  generation, transport and optional unavailable reason;
+- optional currentness plus admitted root IDs for Engine-like providers; and
+- a closed list of command ID/title/availability/effect descriptors.
+
+The first profile contains `orchestrator` and `engine`. Absence is one explicit
+unavailable service row, never an empty successful provider. A snapshot is
+display authority only; it cannot authorize a later command after identity or
+generation changes.
+
+`orchestrator.services.command` accepts `service_id`, `command_id`, and the
+optimistic identity fields for exactly one observed snapshot. Orchestrator
+commands require both the ORC1 `instance_id` and lifecycle generation because a
+new process may begin again at generation one. Engine commands require its
+current instance ID; reconcile/rebuild also require one currently admitted root
+ID. Unknown fields and command shapes are invalid. Identity mismatch is
+`stale`. Missing transport/authority is `unavailable`. Provider faults retain a
+typed terminal failure rather than becoming empty success.
+
+The first closed command set is:
+
+| Service | Commands | Effect rule |
+|---|---|---|
+| Orchestrator | `restart`, `shutdown` | clean stop; restart relies on the admitted supervisor and changes process identity |
+| Engine | `integrity_check`, `reconcile`, `rebuild`, `restart` | integrity is read-only; root commands are root-bound; restart relies on the host-bound supervisor |
+
+Query calls through the installed Engine adapter may rediscover and retry once
+after a transport failure because they are idempotent. Administrative calls are
+never automatically replayed. The response's `provider_result` is a bounded
+provider diagnostic/result projection; frontend policy derives only from the
+ORC-UI terminal/effect and a new immutable snapshot.
+
+**MEASURED contained M4 evidence:** both services were observed through the
+Rust CLI and independent C++17 client; integrity, reconcile, Engine restart and
+Orchestrator restart completed. Each restart rotated the applicable instance
+ID and replay with the prior identity was rejected as stale. Evidence and
+retained failures are in
+`../../conformance/evidence/M4_FILE_MANAGER_SERVICES_2026-08-10.md` and
+ADR-019.
 
 ## Unified frontend search
 

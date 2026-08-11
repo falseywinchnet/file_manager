@@ -2,6 +2,8 @@
 
 | File | Purpose |
 |---|---|
+| `OWNER_CORRECTION_2026-08-11.md` | GIVEN rejection of the premature 1.0 claim, synthetic Places/Recent UI, dead visible controls, and prototype divergence |
+| `OWNER_DIRECTION_2026-08-10.md` | Active implementation, repo-extension, combined Web.Forms/GUI.Forms, and M4 Screen Sharing dogfood direction |
 | `OWNER_DIRECTION_2026-08-07.md` | Superseding owner direction for frontend start, inline chevron breadcrumbs, backend settings, native suite menus, and contained integrated dogfood |
 | `TOTAL_IMPLEMENTATION_PLAN.md` | Complete staged frontend/component-integration implementation, verification, containment, dogfood, and platform-promotion program |
 | `FRONTEND_CHARTER.md` | What the frontend owns and refuses to absorb |
@@ -16,3 +18,7 @@
 | `visual/DESIGN_DNA_VERDICTS_007.md` | Nineteen GIVEN owner verdicts for participation, resize, command authority, typography, drag/drop, criteria, sound, contrast, path, and folder-size behavior |
 | `visual/CEREMONIAL_VERDICTS_001.md` | Ceremonial-atlas verdicts plus recovered earlier-thread survey provenance and visual/product directions |
 | `visual/` | Frontend design evidence, finalized DNA constitution, atlases, and asset audits |
+
+Execution evidence lives under `../results/`. The rejected first native/browser
+run is `../results/2026-08-10-m4-dogfood/`; the corrective protected-root 1.0
+run is `../results/2026-08-11-m4-dogfood/`.

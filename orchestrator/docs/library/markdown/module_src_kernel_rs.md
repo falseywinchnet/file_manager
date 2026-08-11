@@ -28,7 +28,7 @@ Source: [src/kernel.rs](../../../src/kernel.rs)
 
 ## Source inventory
 
-### [Kernel](../../../src/kernel.rs#L19)
+### [Kernel](../../../src/kernel.rs#L22)
 
 `struct` · `pub`
 
@@ -36,7 +36,7 @@ Source: [src/kernel.rs](../../../src/kernel.rs)
 pub struct Kernel
 ```
 
-### [default](../../../src/kernel.rs#L28)
+### [default](../../../src/kernel.rs#L35)
 
 `fn` · `private`
 
@@ -44,7 +44,7 @@ pub struct Kernel
 fn default() -> Self
 ```
 
-### [live_search_available](../../../src/kernel.rs#L34)
+### [live_search_available](../../../src/kernel.rs#L41)
 
 `fn` · `private`
 
@@ -52,7 +52,7 @@ fn default() -> Self
 fn live_search_available(&self) -> bool
 ```
 
-### [new](../../../src/kernel.rs#L39)
+### [new](../../../src/kernel.rs#L46)
 
 `fn` · `pub`
 
@@ -60,7 +60,7 @@ fn live_search_available(&self) -> bool
 pub fn new() -> Self
 ```
 
-### [for_local_daemon](../../../src/kernel.rs#L50)
+### [for_local_daemon](../../../src/kernel.rs#L61)
 
 `fn` · `pub`
 
@@ -68,7 +68,7 @@ pub fn new() -> Self
 pub fn for_local_daemon() -> Self
 ```
 
-### [for_supervised_daemon](../../../src/kernel.rs#L61)
+### [for_supervised_daemon](../../../src/kernel.rs#L76)
 
 `fn` · `pub`
 
@@ -76,7 +76,7 @@ pub fn for_local_daemon() -> Self
 pub fn for_supervised_daemon() -> Self
 ```
 
-### [with_engine_search](../../../src/kernel.rs#L72)
+### [with_engine_search](../../../src/kernel.rs#L91)
 
 `fn` · `pub`
 
@@ -84,7 +84,39 @@ pub fn for_supervised_daemon() -> Self
 pub fn with_engine_search(mut self, search: impl UnifiedEngineSearch + 'static) -> Self
 ```
 
-### [runtime_health](../../../src/kernel.rs#L80)
+### [with_installed_engine_search](../../../src/kernel.rs#L100)
+
+`fn` · `pub`
+
+```rust
+pub fn with_installed_engine_search( mut self, search: impl UnifiedEngineSearch + 'static, ) -> Self
+```
+
+### [with_installed_engine_admin](../../../src/kernel.rs#L112)
+
+`fn` · `pub`
+
+```rust
+pub fn with_installed_engine_admin( mut self, caller: impl EngineJsonlCaller + Send + 'static, ) -> Self
+```
+
+### [with_settings](../../../src/kernel.rs#L121)
+
+`fn` · `pub`
+
+```rust
+pub fn with_settings(mut self, settings: SettingsService) -> Self
+```
+
+### [with_instance_id](../../../src/kernel.rs#L127)
+
+`fn` · `pub`
+
+```rust
+pub fn with_instance_id(mut self, instance_id: String) -> Self
+```
+
+### [runtime_health](../../../src/kernel.rs#L133)
 
 `fn` · `pub`
 
@@ -92,7 +124,7 @@ pub fn with_engine_search(mut self, search: impl UnifiedEngineSearch + 'static) 
 pub fn runtime_health(&self) -> Arc<RuntimeHealth>
 ```
 
-### [handle](../../../src/kernel.rs#L85)
+### [handle](../../../src/kernel.rs#L141)
 
 `fn` · `pub`
 
@@ -100,7 +132,7 @@ pub fn runtime_health(&self) -> Arc<RuntimeHealth>
 pub fn handle(&self, request: Request) -> Response
 ```
 
-### [is_stopped](../../../src/kernel.rs#L171)
+### [is_stopped](../../../src/kernel.rs#L255)
 
 `fn` · `pub`
 
@@ -108,7 +140,7 @@ pub fn handle(&self, request: Request) -> Response
 pub fn is_stopped(&self) -> bool
 ```
 
-### [lifecycle_generation](../../../src/kernel.rs#L176)
+### [lifecycle_generation](../../../src/kernel.rs#L260)
 
 `fn` · `pub`
 
@@ -116,7 +148,7 @@ pub fn is_stopped(&self) -> bool
 pub fn lifecycle_generation(&self) -> u64
 ```
 
-### [status_result](../../../src/kernel.rs#L180)
+### [status_result](../../../src/kernel.rs#L264)
 
 `fn` · `private`
 
@@ -124,7 +156,7 @@ pub fn lifecycle_generation(&self) -> u64
 fn status_result(&self) -> Value
 ```
 
-### [status_result_with](../../../src/kernel.rs#L185)
+### [status_result_with](../../../src/kernel.rs#L269)
 
 `fn` · `private`
 
@@ -132,15 +164,15 @@ fn status_result(&self) -> Value
 fn status_result_with(&self, release: &crate::release::CoreReleaseManifest) -> Value
 ```
 
-### [frontend_bootstrap_result](../../../src/kernel.rs#L219)
+### [frontend_bootstrap_result](../../../src/kernel.rs#L303)
 
 `fn` · `private`
 
 ```rust
-fn frontend_bootstrap_result(&self) -> Value
+fn frontend_bootstrap_result(&self) -> Result<Value, ApiError>
 ```
 
-### [availability_result](../../../src/kernel.rs#L264)
+### [availability_result](../../../src/kernel.rs#L367)
 
 `fn` · `private`
 
@@ -148,7 +180,7 @@ fn frontend_bootstrap_result(&self) -> Value
 fn availability_result(&self) -> Value
 ```
 
-### [availability_count](../../../src/kernel.rs#L289)
+### [availability_count](../../../src/kernel.rs#L428)
 
 `fn` · `private`
 
@@ -156,7 +188,7 @@ fn availability_result(&self) -> Value
 fn availability_count(&self, state: AvailabilityState) -> usize
 ```
 
-### [search_response](../../../src/kernel.rs#L307)
+### [search_response](../../../src/kernel.rs#L458)
 
 `fn` · `private`
 
@@ -164,7 +196,7 @@ fn availability_count(&self, state: AvailabilityState) -> usize
 fn search_response(&self, id: String, params: Value) -> Response
 ```
 
-### [shutdown_result](../../../src/kernel.rs#L391)
+### [shutdown_result](../../../src/kernel.rs#L542)
 
 `fn` · `private`
 
@@ -172,7 +204,47 @@ fn search_response(&self, id: String, params: Value) -> Response
 fn shutdown_result(&self) -> Result<Value, ApiError>
 ```
 
-### [lifecycle_snapshot](../../../src/kernel.rs#L412)
+### [services_snapshot_result](../../../src/kernel.rs#L563)
+
+`fn` · `private`
+
+```rust
+fn services_snapshot_result(&self) -> Value
+```
+
+### [engine_service_snapshot](../../../src/kernel.rs#L590)
+
+`fn` · `private`
+
+```rust
+fn engine_service_snapshot(&self) -> Value
+```
+
+### [service_command_result](../../../src/kernel.rs#L631)
+
+`fn` · `private`
+
+```rust
+fn service_command_result(&self, command: &ServiceCommandRequest) -> Result<Value, ApiError>
+```
+
+### [orchestrator_command_result](../../../src/kernel.rs#L639)
+
+`fn` · `private`
+
+```rust
+fn orchestrator_command_result( &self, command: &ServiceCommandRequest, ) -> Result<Value, ApiError>
+```
+
+### [engine_command_result](../../../src/kernel.rs#L686)
+
+`fn` · `private`
+
+```rust
+fn engine_command_result(&self, command: &ServiceCommandRequest) -> Result<Value, ApiError>
+```
+
+### [lifecycle_snapshot](../../../src/kernel.rs#L759)
 
 `fn` · `private`
 
@@ -180,7 +252,47 @@ fn shutdown_result(&self) -> Result<Value, ApiError>
 fn lifecycle_snapshot(&self) -> crate::lifecycle::LifecycleSnapshot
 ```
 
-### [frontend_opening_result](../../../src/kernel.rs#L420)
+### [ServiceCommandRequest](../../../src/kernel.rs#L769)
+
+`struct` · `private`
+
+```rust
+struct ServiceCommandRequest
+```
+
+### [unavailable_engine_service](../../../src/kernel.rs#L780)
+
+`fn` · `private`
+
+```rust
+fn unavailable_engine_service(reason: &str) -> Value
+```
+
+### [required_root_id](../../../src/kernel.rs#L796)
+
+`fn` · `private`
+
+```rust
+fn required_root_id(command: &ServiceCommandRequest) -> Result<&str, ApiError>
+```
+
+### [invalid_service_command](../../../src/kernel.rs#L804)
+
+`fn` · `private`
+
+```rust
+fn invalid_service_command(message: &str) -> ApiError
+```
+
+### [engine_admin_error](../../../src/kernel.rs#L812)
+
+`fn` · `private`
+
+```rust
+fn engine_admin_error(error: crate::engine_jsonl::EngineJsonlError, operation: &str) -> ApiError
+```
+
+### [frontend_opening_result](../../../src/kernel.rs#L817)
 
 `fn` · `private`
 
@@ -188,7 +300,7 @@ fn lifecycle_snapshot(&self) -> crate::lifecycle::LifecycleSnapshot
 fn frontend_opening_result( release: &crate::release::CoreReleaseManifest, capabilities: &[crate::availability::CapabilityAvailability], restart_eligible: bool, ) -> Value
 ```
 
-### [validate_critical_extensions](../../../src/kernel.rs#L494)
+### [validate_critical_extensions](../../../src/kernel.rs#L891)
 
 `fn` · `private`
 
@@ -196,7 +308,7 @@ fn frontend_opening_result( release: &crate::release::CoreReleaseManifest, capab
 fn validate_critical_extensions(request: &Request) -> Result<(), ApiError>
 ```
 
-### [validate_request_id](../../../src/kernel.rs#L505)
+### [validate_request_id](../../../src/kernel.rs#L902)
 
 `fn` · `private`
 
@@ -204,7 +316,7 @@ fn validate_critical_extensions(request: &Request) -> Result<(), ApiError>
 fn validate_request_id(id: &str) -> Result<(), ApiError>
 ```
 
-### [validate_request_shape](../../../src/kernel.rs#L516)
+### [validate_request_shape](../../../src/kernel.rs#L913)
 
 `fn` · `private`
 
@@ -212,7 +324,7 @@ fn validate_request_id(id: &str) -> Result<(), ApiError>
 fn validate_request_shape(request: &Request) -> Result<(), ApiError>
 ```
 
-### [validate_cancellation](../../../src/kernel.rs#L567)
+### [validate_cancellation](../../../src/kernel.rs#L964)
 
 `fn` · `private`
 
@@ -220,7 +332,7 @@ fn validate_request_shape(request: &Request) -> Result<(), ApiError>
 fn validate_cancellation(request: &Request) -> Result<(), ApiError>
 ```
 
-### [version_result](../../../src/kernel.rs#L585)
+### [version_result](../../../src/kernel.rs#L982)
 
 `fn` · `private`
 
@@ -228,7 +340,7 @@ fn validate_cancellation(request: &Request) -> Result<(), ApiError>
 fn version_result() -> Value
 ```
 
-### [search_error_code](../../../src/kernel.rs#L606)
+### [search_error_code](../../../src/kernel.rs#L1003)
 
 `fn` · `private`
 
@@ -236,7 +348,7 @@ fn version_result() -> Value
 const fn search_error_code(status: TerminalStatus) -> ApiErrorCode
 ```
 
-### [stub_result](../../../src/kernel.rs#L623)
+### [stub_result](../../../src/kernel.rs#L1020)
 
 `fn` · `private`
 
@@ -244,7 +356,7 @@ const fn search_error_code(status: TerminalStatus) -> ApiErrorCode
 fn stub_result(capability: &str, reason: &str) -> Value
 ```
 
-### [stub_error](../../../src/kernel.rs#L631)
+### [stub_error](../../../src/kernel.rs#L1028)
 
 `fn` · `private`
 
@@ -252,7 +364,7 @@ fn stub_result(capability: &str, reason: &str) -> Value
 fn stub_error(message: &str) -> ApiError
 ```
 
-### [internal_serialization_error](../../../src/kernel.rs#L639)
+### [internal_serialization_error](../../../src/kernel.rs#L1036)
 
 `fn` · `private`
 
@@ -260,7 +372,7 @@ fn stub_error(message: &str) -> ApiError
 fn internal_serialization_error(error: &serde_json::Error) -> ApiError
 ```
 
-### [validate_deadline](../../../src/kernel.rs#L647)
+### [validate_deadline](../../../src/kernel.rs#L1044)
 
 `fn` · `private`
 
@@ -268,7 +380,7 @@ fn internal_serialization_error(error: &serde_json::Error) -> ApiError
 fn validate_deadline(request: &Request) -> Result<(), ApiError>
 ```
 
-### [validate_contract](../../../src/kernel.rs#L671)
+### [validate_contract](../../../src/kernel.rs#L1068)
 
 `fn` · `private`
 
@@ -276,7 +388,7 @@ fn validate_deadline(request: &Request) -> Result<(), ApiError>
 fn validate_contract(request: &Request) -> Result<(), ApiError>
 ```
 
-### [enforce_response_budget](../../../src/kernel.rs#L700)
+### [enforce_response_budget](../../../src/kernel.rs#L1097)
 
 `fn` · `private`
 
@@ -284,7 +396,7 @@ fn validate_contract(request: &Request) -> Result<(), ApiError>
 fn enforce_response_budget( response_id: String, max_response_bytes: Option<u64>, response: Response, ) -> Response
 ```
 
-### [BlockingSearch](../../../src/kernel.rs#L741)
+### [BlockingSearch](../../../src/kernel.rs#L1138)
 
 `struct` · `private`
 
@@ -292,7 +404,7 @@ fn enforce_response_budget( response_id: String, max_response_bytes: Option<u64>
 struct BlockingSearch
 ```
 
-### [search](../../../src/kernel.rs#L747)
+### [search](../../../src/kernel.rs#L1144)
 
 `fn` · `private`
 
@@ -300,7 +412,7 @@ struct BlockingSearch
 fn search( &mut self, _request: &crate::engine_contract::EngineSearchRequest, ) -> EngineSearchOutcome
 ```
 
-### [live_available](../../../src/kernel.rs#L760)
+### [live_available](../../../src/kernel.rs#L1157)
 
 `fn` · `private`
 
@@ -308,7 +420,7 @@ fn search( &mut self, _request: &crate::engine_contract::EngineSearchRequest, ) 
 fn live_available(&self) -> bool
 ```
 
-### [BecomesUnavailable](../../../src/kernel.rs#L765)
+### [BecomesUnavailable](../../../src/kernel.rs#L1162)
 
 `struct` · `private`
 
@@ -316,7 +428,7 @@ fn live_available(&self) -> bool
 struct BecomesUnavailable
 ```
 
-### [search](../../../src/kernel.rs#L770)
+### [search](../../../src/kernel.rs#L1167)
 
 `fn` · `private`
 
@@ -324,7 +436,7 @@ struct BecomesUnavailable
 fn search( &mut self, _request: &crate::engine_contract::EngineSearchRequest, ) -> EngineSearchOutcome
 ```
 
-### [live_available](../../../src/kernel.rs#L782)
+### [live_available](../../../src/kernel.rs#L1179)
 
 `fn` · `private`
 
@@ -332,7 +444,7 @@ fn search( &mut self, _request: &crate::engine_contract::EngineSearchRequest, ) 
 fn live_available(&self) -> bool
 ```
 
-### [kernel_reports_stubs_without_fact_or_plugin_operations](../../../src/kernel.rs#L788)
+### [kernel_reports_stubs_without_fact_or_plugin_operations](../../../src/kernel.rs#L1185)
 
 `fn` · `private`
 
@@ -340,7 +452,15 @@ fn live_available(&self) -> bool
 fn kernel_reports_stubs_without_fact_or_plugin_operations()
 ```
 
-### [shutdown_is_terminal](../../../src/kernel.rs#L802)
+### [settings_contract_uses_one_typed_optimistic_transaction](../../../src/kernel.rs#L1199)
+
+`fn` · `private`
+
+```rust
+fn settings_contract_uses_one_typed_optimistic_transaction()
+```
+
+### [shutdown_is_terminal](../../../src/kernel.rs#L1234)
 
 `fn` · `private`
 
@@ -348,7 +468,7 @@ fn kernel_reports_stubs_without_fact_or_plugin_operations()
 fn shutdown_is_terminal()
 ```
 
-### [frontend_bootstrap_is_one_bounded_immutable_snapshot](../../../src/kernel.rs#L813)
+### [frontend_bootstrap_is_one_bounded_immutable_snapshot](../../../src/kernel.rs#L1245)
 
 `fn` · `private`
 
@@ -356,7 +476,7 @@ fn shutdown_is_terminal()
 fn frontend_bootstrap_is_one_bounded_immutable_snapshot()
 ```
 
-### [separately_gated_provider_absence_does_not_block_a_ready_core_projection](../../../src/kernel.rs#L901)
+### [separately_gated_provider_absence_does_not_block_a_ready_core_projection](../../../src/kernel.rs#L1344)
 
 `fn` · `private`
 
@@ -364,7 +484,7 @@ fn frontend_bootstrap_is_one_bounded_immutable_snapshot()
 fn separately_gated_provider_absence_does_not_block_a_ready_core_projection()
 ```
 
-### [attacker_controlled_envelope_fields_are_bounded_before_error_reflection](../../../src/kernel.rs#L939)
+### [attacker_controlled_envelope_fields_are_bounded_before_error_reflection](../../../src/kernel.rs#L1382)
 
 `fn` · `private`
 
@@ -372,7 +492,7 @@ fn separately_gated_provider_absence_does_not_block_a_ready_core_projection()
 fn attacker_controlled_envelope_fields_are_bounded_before_error_reflection()
 ```
 
-### [blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state](../../../src/kernel.rs#L966)
+### [blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state](../../../src/kernel.rs#L1409)
 
 `fn` · `private`
 
@@ -380,10 +500,18 @@ fn attacker_controlled_envelope_fields_are_bounded_before_error_reflection()
 fn blocked_engine_provider_does_not_hold_core_status_or_lifecycle_state()
 ```
 
-### [provider_health_cache_updates_after_terminal_worker_call](../../../src/kernel.rs#L1012)
+### [provider_health_cache_updates_after_terminal_worker_call](../../../src/kernel.rs#L1455)
 
 `fn` · `private`
 
 ```rust
 fn provider_health_cache_updates_after_terminal_worker_call()
+```
+
+### [service_commands_bind_orchestrator_instance_and_generation](../../../src/kernel.rs#L1475)
+
+`fn` · `private`
+
+```rust
+fn service_commands_bind_orchestrator_instance_and_generation()
 ```

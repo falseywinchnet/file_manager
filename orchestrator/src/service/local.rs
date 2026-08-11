@@ -10,6 +10,7 @@ use crate::engine_port::EngineSearchBroker;
 use crate::local_endpoint::{UnixEndpoint, connect_authenticated};
 use crate::local_wire::{LocalWireError, read_json_frame, write_json_frame};
 use crate::runtime_health::{LOCAL_PENDING_SESSIONS, LOCAL_SESSION_WORKERS, RuntimeHealth};
+use crate::settings::SettingsService;
 use crate::{Kernel, Request, Response};
 use std::collections::HashMap;
 use std::os::unix::net::UnixStream;
@@ -28,9 +29,13 @@ const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(5);
 pub(crate) fn serve_local(
     runtime_directory: &Path,
     engine_options: Option<EngineProviderConfig>,
+    settings_directory: Option<&Path>,
 ) -> Result<(), String> {
     let endpoint = UnixEndpoint::bind(runtime_directory).map_err(|error| error.to_string())?;
     let mut kernel = Kernel::for_local_daemon();
+    if let Some(directory) = settings_directory {
+        kernel = kernel.with_settings(SettingsService::open(directory)?);
+    }
     if let Some(options) = engine_options {
         let child = EngineJsonlChild::spawn(
             &options.binary,
@@ -45,6 +50,7 @@ pub(crate) fn serve_local(
 }
 
 pub(crate) fn serve_owned(endpoint: UnixEndpoint, kernel: Kernel) -> Result<(), String> {
+    let kernel = kernel.with_instance_id(endpoint.instance_id().to_owned());
     let service_result = serve_endpoint(&endpoint, kernel);
     let cleanup_result = endpoint.cleanup().map_err(|error| error.to_string());
     service_result.and(cleanup_result)
@@ -281,11 +287,10 @@ fn remove_active_session(active: &Mutex<HashMap<usize, UnixStream>>, worker_id: 
     }
 }
 
-pub(crate) fn call_local(runtime_directory: &Path, method: &str) -> Result<Response, String> {
+pub(crate) fn call_local(runtime_directory: &Path, request: &Request) -> Result<Response, String> {
     let (mut stream, _) = connect_authenticated(runtime_directory, "orchestrator-cli")
         .map_err(|error| error.to_string())?;
-    write_json_frame(&mut stream, &Request::local("cli-local-1", method))
-        .map_err(|error| error.to_string())?;
+    write_json_frame(&mut stream, &request).map_err(|error| error.to_string())?;
     read_json_frame(&mut stream).map_err(|error| error.to_string())
 }
 
