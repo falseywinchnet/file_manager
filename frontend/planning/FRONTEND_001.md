@@ -1,11 +1,13 @@
 # Frontend 001 specification
 
-Status: **DECIDED scope; architect start direction recorded 2026-08-07; waiting
-for Orchestrator Core 1.0 and the GUI.Forms go-ahead under ADR-004 and ADR-006**.
+Status: **implementation and M4 dogfood active; opening predicate passed under
+ADR-004, ADR-006, ADR-016, and the 2026-08-10 owner direction**.
 
-Frontend 001 is the first executable File Manager application slice. It is a
-GUI.Forms consumer and a deterministic composition laboratory, not the first
-fully integrated product build.
+Frontend 001 is the first executable File Manager application slice. Its
+opening and exit evidence produced the protected-root product spine; later
+ADRs have since added real operations, settings, search, trusted commands,
+previews, and the reusable picker without changing its GUI.Forms-consumer
+boundary. This record does not promote daily roots or distribution packaging.
 
 ## Opening predicate
 
@@ -15,9 +17,12 @@ Implementation begins only after all three are recorded:
 2. GUI.Forms gives a named go-ahead for the consumption surface below.
 3. The grand architect explicitly directs File Manager frontend work to begin.
 
-Predicate 3 was satisfied on 2026-08-07. Predicates 1 and 2 remain open; see
-[`OWNER_DIRECTION_2026-08-07.md`](OWNER_DIRECTION_2026-08-07.md) and
-[`TOTAL_IMPLEMENTATION_PLAN.md`](TOTAL_IMPLEMENTATION_PLAN.md).
+All three predicates are satisfied. Orchestrator Core 1.0 has accepted installed
+macOS evidence, GUI.Forms published
+`gui-forms-fm0-macos-arm64-2026-08-10`, and
+[`OWNER_DIRECTION_2026-08-10.md`](OWNER_DIRECTION_2026-08-10.md) explicitly
+opens implementation and M4 dogfood. Later provider/promotion gates remain
+independent; see [`TOTAL_IMPLEMENTATION_PLAN.md`](TOTAL_IMPLEMENTATION_PLAN.md).
 
 Engine, plugin execution, semantic facts, and Kolmogrov readiness are not part
 of this predicate. Their actual states are supplied by the live Orchestrator as

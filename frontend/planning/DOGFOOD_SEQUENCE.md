@@ -1,6 +1,8 @@
 # File Manager frontend and dogfood sequence
 
-Status: **future delivery order**.
+Status: **the corrective protected-root macOS 1.0 sequence passed on the M4 on
+2026-08-11; daily-root replacement, distribution packaging, accessibility
+promotion, and other platforms remain later gates**.
 
 ## Frontend 001 / F1 — deterministic shell
 
@@ -10,7 +12,10 @@ custom title bar, menu/control shelf, one dense inline-editing chevron
 breadcrumb, search field, collapsible tree, content surface, and
 preview/properties pane. The earlier pulled-down matrix is not the edit surface.
 Prove keyboard, selection, focus, resize, collapse and shutdown traces.
-Engine and later-provider states are explicitly simulated in this slice.
+The implemented slice uses the live Orchestrator bootstrap and direct
+protected-root filesystem enumeration. Installed Engine search and the admitted
+settings/service contracts have subsequently opened and are consumed through
+their typed Orchestrator routes; unavailable later providers remain explicit.
 Deterministic tests replay Orchestrator's canonical Core fixtures, but product
 startup uses the live authority. See [`FRONTEND_001.md`](FRONTEND_001.md).
 
@@ -19,6 +24,10 @@ startup uses the live authority. See [`FRONTEND_001.md`](FRONTEND_001.md).
 Navigate a disposable macOS root with list/small-icon views, sorting, inline
 rename, drag/drop, deletion and one-step undo according to the operation oracle.
 No real Home/root mutation.
+
+**MEASURED:** the protected mutation profile now covers create, rename,
+internal drag, staged copy, same-volume move, quarantine delete and one-step
+identity-checked undo. Crash recovery remains outside this tranche's evidence.
 
 ## F2P — reusable Document Picker in parallel with navigation
 
@@ -29,12 +38,19 @@ visibility, cancellation, and native fallback against disposable roots. This is
 implemented alongside the real navigation substrate so it cannot become a
 second divergent file browser.
 
+**MEASURED:** installed CMake targets expose the controller and GUI.Forms view;
+an external M4 consumer links them without the File Manager executable.
+
 ## F3 — real engine
 
 Connect exact object/navigation metadata, indexed folder sizes, current-subtree
 search, deterministic result updates, unindexed live fallback and unavailable
 states. Exercise Kolmogrov-ready candidate envelopes without waiting for final
 research quality.
+
+**MEASURED for the contained APFS profile:** the installed authenticated route
+returns catalogue and bounded live-filesystem states, including source-bound
+pagination. Kolmogrov quality and other-platform promotion remain separate.
 
 ## F4 — later Orchestrator user services
 
@@ -45,6 +61,11 @@ degraded/restart behavior. Plugin code never enters the frontend process.
 Dogfood the trusted built-in checksum and `Open Command Line Here` commands
 before first-party plugin commands so command identity, contextual visibility,
 settings, cancellation and host-owned dialogs have a known trusted reference.
+
+**MEASURED trusted subset:** typed settings transactions, service facts and
+controls, built-in text/PNG preview, streamed SHA-256, default Open, Copy Path,
+and fixed-argv Terminal Here are wired. Dynamic handlers/commands, plugin
+preview workers and native suite menus remain gated.
 
 ## F5 — macOS package and protected dogfood
 

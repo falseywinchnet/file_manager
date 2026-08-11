@@ -1,13 +1,16 @@
 # Frontend gates
 
-Status: **DECIDED split gates under ADR-004 and ADR-006**.
+Status: **DECIDED split gates under ADR-004 and ADR-006; all Frontend 001
+opening gates passed 2026-08-10**.
 
 The earlier global Gate F0 is superseded. Frontend 001 has two independent
 foundation gates—Orchestrator Core 1.0 and GUI.Forms FM0—plus explicit architect
-start direction. The architect direction was recorded on 2026-08-07 in
-[`OWNER_DIRECTION_2026-08-07.md`](OWNER_DIRECTION_2026-08-07.md); the two
-technical foundation gates remain open. Other provider adapters retain their
-own later gates.
+start direction. Orchestrator Core 1.0 has accepted installed launchd evidence;
+GUI.Forms published
+`gui-forms-fm0-macos-arm64-2026-08-10`; and the architect reaffirmed and
+expanded start direction in
+[`OWNER_DIRECTION_2026-08-10.md`](OWNER_DIRECTION_2026-08-10.md). Other
+provider adapters retain their own later gates.
 
 ## Orchestrator Core 1.0 bootstrap gate
 
@@ -56,12 +59,19 @@ The snapshot may explicitly narrow the 001 feature set. Semicomplete means the
 first slice does not have to invent or reach inside its admitted foundations;
 it does not mean every WinForms-compatible control is finished.
 
+**MEASURED passed for Frontend 001:** the named macOS arm64 manifest records the
+public package/host seam, and a clean external M4 consumer installed, linked,
+and constructed through `GUIForms::Application`. Full VoiceOver and raster-
+correspondence campaigns remain degraded promotion evidence, not opening
+blockers.
+
 ## Owner start direction
 
-Passing Core 1.0 and the GUI.Forms snapshot does not start implementation
-automatically. The grand architect explicitly directs File Manager frontend
-work to begin. Engine, Kolmogrov, plugin execution, and semantic facts cannot
-veto Frontend 001 when the live Orchestrator reports their reduced state.
+Passing Core 1.0 and the GUI.Forms snapshot did not start implementation
+automatically. The grand architect explicitly directed File Manager frontend
+work to begin on 2026-08-10. Engine, Kolmogrov, plugin execution, and semantic
+facts cannot veto Frontend 001 when the live Orchestrator reports their reduced
+state.
 
 ## Engine consumption snapshot
 
@@ -84,12 +94,23 @@ Required before replacing the Frontend 001 Engine fixture port:
 and stable consumption semantics, not final compaction, federation, semantic
 providers, or every performance target.
 
+**MEASURED passed for the contained macOS profile:** the installed Engine and
+Orchestrator route exact/catalogue search and bounded live-filesystem fallback,
+publish currentness/source/partial truth, and use source-bound pagination. This
+opens the protected-root F6 consumer; it does not satisfy NTFS/ext4,
+million-entry, daily-root, or final performance promotion gates.
+
 ## Later Orchestrator capability gates
 
 Settings transactions, immutable handler/context-command snapshots, the Engine
 query broker, plugin supervision, hives, and semantic facts enter when their own
 contract families pass. They are not silently included in Core 1.0 merely
 because the daemon itself is available.
+
+`ORC-SET-001` and the admitted `ORC-UI-001` contained service slice now pass and
+are consumed by the protected-root frontend. Dynamic handler/command snapshots,
+plugin supervision, hives, semantic facts and the native application registry
+remain unavailable or separately gated.
 
 ## Kolmogrov transfer gate
 

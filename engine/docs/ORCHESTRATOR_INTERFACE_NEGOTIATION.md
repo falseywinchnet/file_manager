@@ -1,8 +1,9 @@
 # Orchestrator ↔ Engine interface negotiation
 
 Status: **ORC-ENG round 001 reconciled under ADR-007; semantic v0 frozen for
-experimental implementation; catalogue-independent fallback reply 006 is
-recorded under ADR-008 with cross-platform promotion evidence still open**.
+experimental implementation; catalogue-independent fallback reply 006 and the
+contained installed route reconciliation 007 are recorded with cross-platform
+promotion evidence still open**.
 
 Participants: Orchestrator integration authority and the systemwide Go engine.
 Canonical families: `ORC-COM-001`, `ORC-LIF-001`, `ORC-ENG-001`,
@@ -743,3 +744,42 @@ Red reply items retained without euphemism:
 
 This reply does not rename `scan.reconcile`, build a disposable catalogue, or
 claim that the development JSONL adapter is the installed Engine transport.
+
+## Installed transport reconciliation 007
+
+Date: 2026-08-10.
+
+Status: **contained M4 query/admin route measured and accepted under ADR-019;
+general platform promotion remains open**.
+
+The File Manager dogfood profile installs a second host-bound Engine deployment
+with stable ID/root `fm1-contained`, one approved root, a durable store outside
+that root, and a short private runtime directory. The provider publishes
+separate `0600` query/admin Unix sockets and credentials through `ENG1` v1.
+Orchestrator validates the private same-user discovery objects, peer UID,
+protocol, instance correlation and advertised capabilities before exposing
+search or administration.
+
+The adapter preserves the round-001 authority split. Query calls are
+idempotent and may rediscover/retry once after a transport failure. Admin calls
+are never automatically replayed. Service commands re-read Engine status and
+require its current process identity; reconcile/rebuild also require the
+currently admitted root ID.
+
+**MEASURED:** the Go suite passed; the Rust Orchestrator and independent C++17
+client observed the installed service; exact `read-me.txt` search returned two
+rows; integrity/reconcile passed; supervised restart rotated identity; and an
+old-identity admin command was rejected as stale. The provider now derives
+`engine.supervisor.launchd=available` from the explicit host-bound launchd
+construction path rather than a literal deployment-name exception.
+
+Retained failures are material: the first long Application Support runtime
+exceeded the usable Darwin Unix-socket path and failed `bind` with `EINVAL`;
+the first replacement binary was rejected by launchd with
+`OS_REASON_CODESIGNING` until the exact local artifact was ad-hoc signed and
+verified. Evidence:
+`../../orchestrator/conformance/evidence/M4_FILE_MANAGER_SERVICES_2026-08-10.md`.
+
+This reconciliation does not close Windows named pipes, Linux installed IPC,
+native NTFS/ext4 evidence, event subscription/replay, distribution signing, or
+million-entry live-query measurement.

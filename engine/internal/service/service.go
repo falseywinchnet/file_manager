@@ -20,22 +20,23 @@ import (
 // catalogue state, durable reader generations, live traversal, lifecycle, and
 // optional background observation while keeping their representations private.
 type Service struct {
-	guard            *sandbox.Guard
-	store            *catalog.Store
-	scanner          metadataScanner
-	lifecycle        *serviceLifecycle
-	admin            sync.Mutex
-	durable          *generation.Store
-	durableDirectory string
-	readerMu         sync.RWMutex
-	reader           *generation.Reader
-	recoveryProblems int
-	pendingRecovery  []generation.RecoveryProblem
-	generationFloor  api.Generation
-	quarantined      int
-	quarantineError  string
-	background       backgroundObservation
-	live             *live.Manager
+	guard             *sandbox.Guard
+	store             *catalog.Store
+	scanner           metadataScanner
+	lifecycle         *serviceLifecycle
+	admin             sync.Mutex
+	durable           *generation.Store
+	durableDirectory  string
+	readerMu          sync.RWMutex
+	reader            *generation.Reader
+	recoveryProblems  int
+	pendingRecovery   []generation.RecoveryProblem
+	generationFloor   api.Generation
+	quarantined       int
+	quarantineError   string
+	background        backgroundObservation
+	live              *live.Manager
+	launchdProjection bool
 }
 
 type metadataScanner interface {
@@ -119,6 +120,21 @@ func NewPersistent(guard *sandbox.Guard, directory string) (*Service, error) {
 			engine.recoveryProblems = 0
 		}
 	}
+	return engine, nil
+}
+
+// NewLaunchdPersistent opens the durable service for the host-bound launchd
+// command projection. It rejects development sandbox guards so a command-line
+// test process cannot manufacture the installed-supervisor capability.
+func NewLaunchdPersistent(guard *sandbox.Guard, directory string) (*Service, error) {
+	if guard == nil || guard.Sandboxed() {
+		return nil, errors.New("launchd projection requires a host-bound deployment guard")
+	}
+	engine, err := NewPersistent(guard, directory)
+	if err != nil {
+		return nil, err
+	}
+	engine.launchdProjection = true
 	return engine, nil
 }
 

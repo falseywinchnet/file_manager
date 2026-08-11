@@ -1,28 +1,20 @@
 # File Manager frontend operating instructions
 
-This nested directory is the future C++ File Manager application—not the parent
+This nested directory is the active C++ File Manager application—not the parent
 multi-project workspace. It consumes Orchestrator as the normal integration
 authority, GUI.Forms in-process, and the systemwide Go engine through
 Orchestrator or the registered degraded fallback.
 
-## Current phase: owner direction recorded; Frontend 001 waiting on Core 1.0 and GUI.Forms
+## Current phase: Frontend 001 implementation and M4 dogfood open
 
-Do not create application source, CMake/build files, generated bindings, product
-assets, packages, or prototypes until Orchestrator Core 1.0 is available through
-the real frontend bootstrap edge and GUI.Forms gives the named FM0/Frontend 001
-consumption go-ahead. The grand architect supplied the third opening event on
-2026-08-07; see `planning/OWNER_DIRECTION_2026-08-07.md`. Engine, Kolmogrov,
-plugin execution, and semantic facts retain separate gates; their actual states
-come from Orchestrator.
-
-Permitted work before that start direction:
-
-- product-flow and anti-model documentation;
-- frontend-owned state and responsibility definitions;
-- dependency/contract review;
-- fake-service scenario design on paper;
-- dogfood workflows and acceptance gates;
-- visual grammar references owned by the parent planning project.
+Orchestrator Core 1.0, the named GUI.Forms FM0 snapshot, and explicit architect
+direction are all recorded as passed. See
+`planning/OWNER_DIRECTION_2026-08-10.md`,
+`../gui_forms/manifests/gui-forms-fm0-macos-arm64-2026-08-10.json`, and ADR-016.
+Application source, CMake/install work, generated build-tree C++, and protected
+M4 dogfood are authorized. Engine, settings, handlers, plugins, semantic facts,
+mutation, packaging/signing, and non-macOS promotion retain their own gates;
+their actual states come from Orchestrator and the staged plan.
 
 Before editing, read:
 
@@ -39,6 +31,8 @@ Before editing, read:
 11. `../orchestrator/spec/CONTRACT_REGISTRY.md`
 12. the accepted root ADRs and relevant parent planning records.
 13. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the frontend client edge.
+14. `planning/OWNER_DIRECTION_2026-08-10.md` and root ADR-016 for the active
+    implementation/authoring route.
 
 ## Boundary rules
 

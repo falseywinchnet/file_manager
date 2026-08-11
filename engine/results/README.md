@@ -15,8 +15,10 @@ live-format admission record.
 
 `M1L_LIVE_QUERY_001.md` records the first zero-catalogue live traversal,
 cross-process Orchestrator/C++ route, and 10,000-entry APFS resource control.
-It deliberately leaves the million-entry, NTFS/ext4, distribution, CPU/RSS,
-and installed-transport gates red.
+It deliberately leaves the million-entry, NTFS/ext4, distribution, and
+CPU/RSS gates red. ADR-019 and the Orchestrator evidence ledger separately
+close the named contained M4 installed-transport route; they do not alter this
+older benchmark's scope or promote other platforms.
 
 `M2_TIERED_COHORT_COMPACTION_003.md` retains cohort-only tiered compaction after
 22 epochs measure about 2.00x with eight visible runs. It separately rejects

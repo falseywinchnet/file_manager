@@ -35,6 +35,7 @@ pub(crate) use local::{call_local, serve_local};
 pub(crate) fn serve_local(
     _runtime_directory: &std::path::Path,
     _engine_options: Option<EngineProviderConfig>,
+    _settings_directory: Option<&std::path::Path>,
 ) -> Result<(), String> {
     Err("serve-local is not implemented on this platform".to_owned())
 }
@@ -42,7 +43,7 @@ pub(crate) fn serve_local(
 #[cfg(not(unix))]
 pub(crate) fn call_local(
     _runtime_directory: &std::path::Path,
-    _method: &str,
+    _request: crate::Request,
 ) -> Result<crate::Response, String> {
     Err("call-local is not implemented on this platform".to_owned())
 }
@@ -51,11 +52,17 @@ pub(crate) fn call_local(
 pub(crate) use launchd::{print_launchd_plist, serve_launchd};
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn serve_launchd(_runtime_directory: &std::path::Path) -> Result<(), String> {
+pub(crate) fn serve_launchd(
+    _runtime_directory: &std::path::Path,
+    _settings_directory: &std::path::Path,
+) -> Result<(), String> {
     Err("serve-launchd is available only on macOS".to_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn print_launchd_plist(_runtime_directory: &std::path::Path) -> Result<(), String> {
+pub(crate) fn print_launchd_plist(
+    _runtime_directory: &std::path::Path,
+    _settings_directory: &std::path::Path,
+) -> Result<(), String> {
     Err("launchd-plist is available only on macOS".to_owned())
 }

@@ -47,7 +47,7 @@ pub struct CapabilityAvailability
 pub const CAPABILITIES: &[CapabilityAvailability] = &[ CapabilityAvailability
 ```
 
-### [state_count](../../../src/availability.rs#L216)
+### [state_count](../../../src/availability.rs#L223)
 
 `fn` · `pub`
 
@@ -55,7 +55,7 @@ pub const CAPABILITIES: &[CapabilityAvailability] = &[ CapabilityAvailability
 pub fn state_count(state: AvailabilityState) -> usize
 ```
 
-### [facts_and_plugins_are_explicit_stubs](../../../src/availability.rs#L228)
+### [facts_and_plugins_are_explicit_stubs](../../../src/availability.rs#L235)
 
 `fn` · `private`
 
@@ -63,7 +63,7 @@ pub fn state_count(state: AvailabilityState) -> usize
 fn facts_and_plugins_are_explicit_stubs()
 ```
 
-### [development_engine_adapter_does_not_claim_installed_transport](../../../src/availability.rs#L240)
+### [development_engine_adapter_does_not_claim_installed_transport](../../../src/availability.rs#L247)
 
 `fn` · `private`
 

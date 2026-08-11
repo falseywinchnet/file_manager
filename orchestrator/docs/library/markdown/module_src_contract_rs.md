@@ -55,7 +55,7 @@ pub struct SupportedContract
 pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract>
 ```
 
-### [CONTRACTS](../../../src/contract.rs#L59)
+### [CONTRACTS](../../../src/contract.rs#L73)
 
 `const` · `pub`
 
@@ -63,7 +63,7 @@ pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract>
 pub const CONTRACTS: &[ContractDescriptor] = &[ ContractDescriptor
 ```
 
-### [identifiers_are_unique](../../../src/contract.rs#L231)
+### [identifiers_are_unique](../../../src/contract.rs#L252)
 
 `fn` · `pub`
 
@@ -71,7 +71,7 @@ pub const CONTRACTS: &[ContractDescriptor] = &[ ContractDescriptor
 pub fn identifiers_are_unique() -> bool
 ```
 
-### [contract_identifiers_are_unique](../../../src/contract.rs#L241)
+### [contract_identifiers_are_unique](../../../src/contract.rs#L262)
 
 `fn` · `private`
 

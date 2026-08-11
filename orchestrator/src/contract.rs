@@ -52,6 +52,20 @@ pub fn supported_contract_for_method(method: &str) -> Option<SupportedContract> 
                 minor: 0,
             })
         }
+        "orchestrator.settings.schema"
+        | "orchestrator.settings.snapshot"
+        | "orchestrator.settings.apply" => Some(SupportedContract {
+            id: "ORC-SET-001",
+            major: 1,
+            minor: 0,
+        }),
+        "orchestrator.services.snapshot" | "orchestrator.services.command" => {
+            Some(SupportedContract {
+                id: "ORC-UI-001",
+                major: 1,
+                minor: 0,
+            })
+        }
         _ => None,
     }
 }
@@ -117,7 +131,7 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-GUI-001",
         name: "GUI.Forms consumption manifest, C ABI, and lifecycle",
         provider: "gui-forms",
-        stage: ContractStage::Negotiating,
+        stage: ContractStage::FrozenV0,
         executable: false,
     },
     ContractDescriptor {
@@ -194,14 +208,21 @@ pub const CONTRACTS: &[ContractDescriptor] = &[
         id: "ORC-SET-001",
         name: "Settings schema and value transactions",
         provider: "orchestrator",
-        stage: ContractStage::Outline,
-        executable: false,
+        stage: ContractStage::FrozenV0,
+        executable: true,
     },
     ContractDescriptor {
         id: "ORC-CLI-001",
         name: "Human and structured local CLI",
         provider: "orchestrator",
         stage: ContractStage::Stable,
+        executable: true,
+    },
+    ContractDescriptor {
+        id: "ORC-UI-001",
+        name: "Bounded service status and admitted administration commands",
+        provider: "orchestrator",
+        stage: ContractStage::FrozenV0,
         executable: true,
     },
     ContractDescriptor {

@@ -15,6 +15,10 @@ path = "src/main.rs"
 name = "orchestrator-worker-bench"
 path = "src/bin/worker_bench.rs"
 
+[[bin]]
+name = "orchestrator-fixtures"
+path = "src/bin/generate_fixtures.rs"
+
 [dependencies]
 getrandom = "0.4.3"
 serde = { version = "1.0.228", features = ["derive"] }

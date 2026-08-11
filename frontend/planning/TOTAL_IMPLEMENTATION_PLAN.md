@@ -1,14 +1,16 @@
 # File Manager total implementation plan
 
-Date: 2026-08-07.
+Date: 2026-08-07; execution update 2026-08-11.
 
-Status: **implementation program proposed from GIVEN/DECIDED direction and the
-current OBSERVED component state**. This is the frontend delivery authority once
-approved; it is not a new cross-project ABI, a claim that a dependency gate has
-passed, or a parent-wide replacement for the still-gated `planning/PLAN.md`.
+Status: **approved execution program; the corrective protected-root macOS 1.0
+profile passed its M4 control audit on 2026-08-11 after the rejected prototype
+was replaced**. F10 daily-root/distribution promotion and F11 other-platform
+work remain open. No later tranche is promoted from screenshots or subsystem
+tests alone.
 
 Owner direction:
-[`OWNER_DIRECTION_2026-08-07.md`](OWNER_DIRECTION_2026-08-07.md).
+[`OWNER_DIRECTION_2026-08-10.md`](OWNER_DIRECTION_2026-08-10.md), superseding
+the execution timing in the 2026-08-07 record.
 
 ## 1. Outcome
 
@@ -40,14 +42,20 @@ demo:
 
 | Object | Current status | Consequence |
 |---|---|---|
-| Owner opening direction | **GIVEN, recorded 2026-08-07** | The owner-direction predicate is satisfied. |
-| Orchestrator Core 1.0 | **OBSERVED `development`, `ready: false`** | Installed LaunchAgent bootstrap/reactivation/removal evidence must close before Frontend 001 source opens. |
-| GUI.Forms FM0 | **OBSERVED negotiation active, named reply absent** | GUI.Forms must publish a named installable snapshot and capability manifest. |
+| Owner opening direction | **GIVEN, recorded 2026-08-10** | Implementation, supporting repo extensions, and M4 dogfood are open. |
+| Orchestrator Core 1.0 | **MEASURED installed macOS release ready** | Frontend consumes the live independent C++ bootstrap; supervisor-host state remains visible at runtime. |
+| GUI.Forms FM0 | **MEASURED named macOS arm64 snapshot ready** | `GUIForms::Application` and deterministic fonts pass clean external install/consume. |
 | GUI.Forms demoboard | **MEASURED partial D0-D6/D9** | Reuse its public-control evidence; do not copy its fixture model or now-rejected path matrix into the product. |
-| Engine | **MEASURED 64/100 controlled-sandbox readiness** | Exact development integration is useful; solid daily search, installed transport, and live query remain open. |
-| `ORC-ENG-004` | **REQUIRED, provider reply/implementation absent** | Search cannot be called ready without bounded zero-catalogue name/path traversal. |
-| Settings/handlers/commands | **OBSERVED outline/deferred** | Build deterministic UI ports first, then admit real operations only after canonical contracts and fixtures. |
+| Engine | **MEASURED named M4 installed service and contained File Manager profile passed** | Exact query/admin, identity rotation and authenticated Orchestrator routing are live; daily-root and other-platform promotion remain open. |
+| `ORC-ENG-004` | **MEASURED development and contained installed routes pass** | Keep source/partial/fallback truth visible; native NTFS/ext4 and million-entry gates remain open. |
+| Settings/services | **MEASURED ORC-SET/ORC-UI contained profile passed** | Native composition uses typed transactions and identity-bound commands; general audit/event replay remains open. |
+| Handlers/commands | **OBSERVED outline/deferred** | Admit real dynamic operations only after canonical contracts and fixtures; trusted built-ins remain application-owned. |
 | Plugins/semantic facts | **OBSERVED stubbed** | Display honest unavailability; do not infer operations. |
+
+Historical baseline checks ran on 2026-08-07. The first execution evidence on
+2026-08-10 is recorded in
+`../results/2026-08-10-m4-dogfood/README.md` and supersedes the old readiness
+values above without erasing the historical measurements.
 
 Baseline checks run on 2026-08-07:
 
@@ -58,6 +66,19 @@ Baseline checks run on 2026-08-07:
   `ready: false`, with `daemon.discovery` pending.
 
 These results establish healthy slices only within their recorded scope.
+
+### 2026-08-10 execution checkpoint
+
+| Tranche | Measured status | Remaining edge |
+|---|---|---|
+| F1-F3 shell/navigation | **MEASURED protected-root implementation** | Daily-root, full accessibility and performance promotion remain F10 gates. |
+| F4 operations | **MEASURED disposable-root implementation** | Crash/restart journal recovery and physical fault campaigns remain open. |
+| F5 settings/services | **MEASURED contained installed route** | General audit/event replay and providers beyond the two admitted services remain open. |
+| F6 search | **MEASURED installed Orchestrator/Engine route** | Broader corpus/performance and non-APFS platform campaigns remain open. |
+| F7 commands/previews/menus | **MEASURED trusted built-in subset** | Dynamic handlers/commands, plugin previews and native suite menus remain gated. |
+| F8 picker | **MEASURED installed package and external consumer** | VoiceOver, modality/focus restoration and optional native fallback execution remain promotion work. |
+| F9 full chain | **MEASURED live contained components; harness partial** | One-command provisioning, corruption/reinstall and exact cleanup campaign remain open. |
+| F10-F11 | **OPEN** | Developer ID/notarization, admitted daily roots, Windows and Linux. |
 
 ## 3. Authority and process topology
 
@@ -216,9 +237,12 @@ is missing.
 9. Keep plugin, semantic, hive, handler, command, and application families
    unavailable/stubbed until their actual contracts pass; no empty success.
 
-The physical settings store remains unresolved. It requires a numbered ADR
-after representative schema/transaction/recovery workloads compare candidates;
-the frontend plan does not silently choose SQLite, files, or one universal hive.
+ADR-018 resolves the bounded first-party scalar settings store after the M4
+JSON/SQLite comparison. It selects atomic canonical JSON plus one verified
+previous snapshot for this profile only. ADR-019 resolves the contained
+installed Engine route and identity-bound `ORC-UI-001` service commands. A
+general operational registry, plugin settings store, or universal hive remains
+unselected.
 
 ## 7. Required Engine delta
 

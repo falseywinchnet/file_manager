@@ -692,7 +692,7 @@ fn live_failure(
     }
 }
 
-fn project_engine_error(
+pub(crate) fn project_engine_error(
     error: EngineJsonlError,
     operation: &str,
 ) -> (TerminalStatus, String, String) {

@@ -23,6 +23,7 @@
 #include <sstream>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <variant>
 
 namespace fileman::orchestrator {
@@ -550,6 +551,143 @@ std::optional<bool> optional_boolean(const JsonValue& value,
     return boolean(value, context);
 }
 
+std::optional<std::uint64_t> optional_unsigned_integer(
+    const JsonValue& value, const std::string_view context) {
+    if (std::holds_alternative<std::nullptr_t>(value.value)) return std::nullopt;
+    return unsigned_integer(value, context);
+}
+
+SettingValue parse_setting_value(const JsonValue& value,
+                                 const std::string_view context) {
+    if (const auto* boolean_value = std::get_if<bool>(&value.value)) {
+        return *boolean_value;
+    }
+    if (std::holds_alternative<JsonNumber>(value.value)) {
+        return unsigned_integer(value, context);
+    }
+    if (const auto* string_value = std::get_if<std::string>(&value.value)) {
+        return *string_value;
+    }
+    fail(std::string(context) + " is not an admitted settings scalar");
+}
+
+std::string encode_setting_value(const SettingValue& value) {
+    return std::visit(
+        [](const auto& item) -> std::string {
+            using Item = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<Item, bool>) {
+                return item ? "true" : "false";
+            } else if constexpr (std::is_same_v<Item, std::uint64_t>) {
+                return std::to_string(item);
+            } else {
+                return json_escape(item);
+            }
+        },
+        value);
+}
+
+SettingsSnapshotInfo parse_settings_snapshot(const JsonValue& value) {
+    const auto& snapshot = object(value, "settings snapshot");
+    SettingsSnapshotInfo output{
+        string(field(snapshot, "schema_revision"),
+               "settings.snapshot.schema_revision"),
+        unsigned_integer(field(snapshot, "revision"),
+                         "settings.snapshot.revision"),
+        string(field(snapshot, "recovery_provenance"),
+               "settings.snapshot.recovery_provenance"),
+        {},
+    };
+    const auto& values = object(field(snapshot, "values"),
+                                "settings.snapshot.values");
+    output.values.reserve(values.size());
+    for (const auto& [id, setting_value] : values) {
+        output.values.push_back({id, parse_setting_value(
+            setting_value, "settings.snapshot.value")});
+    }
+    return output;
+}
+
+SettingsCommitInfo parse_settings_commit(const JsonValue& value) {
+    const auto& commit = object(value, "settings commit");
+    if (!boolean(field(commit, "committed"), "settings.commit.committed") ||
+        string(field(commit, "terminal"), "settings.commit.terminal") !=
+            "success") {
+        fail("settings commit did not report committed success");
+    }
+    SettingsCommitInfo output{
+        {},
+        boolean(field(commit, "restart_required"),
+                "settings.commit.restart_required"),
+        string(field(commit, "audit_id"), "settings.commit.audit_id"),
+        parse_settings_snapshot(field(commit, "snapshot")),
+    };
+    for (const auto& id : array(field(commit, "changed_fields"),
+                                "settings.commit.changed_fields")) {
+        output.changed_fields.push_back(string(id, "settings changed field"));
+    }
+    return output;
+}
+
+ServicesSnapshotInfo parse_services_snapshot(const JsonValue& value) {
+    const auto& snapshot = object(value, "services snapshot");
+    const auto& schema = object(field(snapshot, "schema"),
+                                "services snapshot schema");
+    ServicesSnapshotInfo output{
+        narrow_u16(unsigned_integer(field(schema, "major"),
+                                    "services.schema.major"),
+                   "services.schema.major"),
+        narrow_u16(unsigned_integer(field(schema, "minor"),
+                                    "services.schema.minor"),
+                   "services.schema.minor"),
+        string(field(snapshot, "snapshot_kind"),
+               "services.snapshot_kind"),
+        {},
+    };
+    if (string(field(schema, "family"), "services.schema.family") !=
+            "ORC-UI-001" || output.schema_major != 1) {
+        fail("services snapshot uses an unsupported contract");
+    }
+    for (const auto& item : array(field(snapshot, "services"),
+                                  "services list")) {
+        const auto& record = object(item, "service record");
+        ServiceInfo service{
+            string(field(record, "id"), "service.id"),
+            string(field(record, "title"), "service.title"),
+            string(field(record, "state"), "service.state"),
+            boolean(field(record, "ready"), "service.ready"),
+            optional_string(field(record, "instance_id"),
+                            "service.instance_id"),
+            optional_unsigned_integer(field(record, "generation"),
+                                      "service.generation"),
+            string(field(record, "transport"), "service.transport"),
+            optional_string(field(record, "currentness"),
+                            "service.currentness"),
+            {},
+            {},
+            {},
+        };
+        if (const auto reason = record.find("reason"); reason != record.end()) {
+            service.reason = optional_string(reason->second, "service.reason");
+        }
+        for (const auto& root : array(field(record, "roots"), "service.roots")) {
+            service.roots.push_back(string(root, "service root"));
+        }
+        for (const auto& item_command : array(field(record, "commands"),
+                                              "service.commands")) {
+            const auto& command = object(item_command, "service command");
+            service.commands.push_back({
+                string(field(command, "id"), "service.command.id"),
+                string(field(command, "title"), "service.command.title"),
+                boolean(field(command, "available"),
+                        "service.command.available"),
+                string(field(command, "effect"), "service.command.effect"),
+            });
+        }
+        output.services.push_back(std::move(service));
+    }
+    return output;
+}
+
 VersionInfo parse_version_info(const JsonValue& value) {
     const auto& result = object(value, "version result");
     const auto& protocol = object(field(result, "protocol"), "version.protocol");
@@ -857,9 +995,32 @@ std::string Client::call(const std::string_view method,
 }
 
 SearchPageInfo Client::search(std::string root_id, std::string text) {
+    return search_subtree(std::move(root_id), std::nullopt, std::move(text));
+}
+
+SearchPageInfo Client::search_subtree(
+    std::string root_id,
+    std::optional<std::string> relative_path,
+    std::string text,
+    const std::uint32_t maximum_results,
+    std::optional<SearchCursorInfo> cursor) {
+    if (maximum_results == 0 || maximum_results > 1'000) {
+        fail("search result limit is outside the contract bound");
+    }
+    if (cursor && (cursor->value.empty() ||
+                   (cursor->source != "catalogue" &&
+                    cursor->source != "live_filesystem"))) {
+        fail("search cursor is outside the closed source/value shape");
+    }
     const auto params = "{\"query_id\":\"cpp-live\",\"root_id\":" + json_escape(root_id) +
+                        (relative_path ? ",\"relative_path\":" + json_escape(*relative_path) : "") +
                         ",\"descendants\":true,\"text\":" + json_escape(text) +
-                        ",\"budget\":{\"max_results\":128,\"max_visited_entries\":10000,"
+                        (cursor ? ",\"cursor\":{\"source\":" +
+                                      json_escape(cursor->source) +
+                                      ",\"value\":" + json_escape(cursor->value) + "}"
+                                : "") +
+                        ",\"budget\":{\"max_results\":" + std::to_string(maximum_results) +
+                        ",\"max_visited_entries\":100000,"
                         "\"max_stat_calls\":4096,\"max_wall_time_ms\":1000,"
                         "\"max_open_directories\":8,\"max_response_bytes\":131072}}";
     const auto response = call("orchestrator.search", "ORC-FE-001", 1, 0, params, true);
@@ -870,14 +1031,171 @@ SearchPageInfo Client::search(std::string root_id, std::string text) {
         string(field(response_root, "status"), "search.status"),
         string(field(result, "source"), "search.source"),
         boolean(field(result, "complete"), "search.complete"),
+        std::nullopt,
+        std::nullopt,
+        {},
         {},
     };
+    if (const auto generation = result.find("generation"); generation != result.end()) {
+        page.generation = optional_unsigned_integer(generation->second,
+                                                    "search.generation");
+    }
+    if (const auto cursor = result.find("cursor"); cursor != result.end() &&
+        !std::holds_alternative<std::nullptr_t>(cursor->second.value)) {
+        const auto& cursor_object = object(cursor->second, "search.cursor");
+        page.cursor = SearchCursorInfo{
+            string(field(cursor_object, "source"), "search.cursor.source"),
+            string(field(cursor_object, "value"), "search.cursor.value")};
+    }
     for (const auto& item : array(field(result, "results"), "search.results")) {
         const auto& record = object(item, "search result record");
         const auto& metadata = object(field(record, "metadata"), "search result metadata");
-        page.names.push_back(string(field(metadata, "name"), "search result name"));
+        const auto& object_record = object(field(record, "object"), "search result object");
+        SearchResultInfo projected{
+            string(field(metadata, "name"), "search result name"),
+            string(field(object_record, "path"), "search result path"),
+            string(field(metadata, "kind"), "search result kind"),
+            unsigned_integer(field(metadata, "size"), "search result size"),
+            boolean(field(record, "unavailable"), "search result unavailable"),
+        };
+        page.names.push_back(projected.name);
+        page.results.push_back(std::move(projected));
     }
     return page;
+}
+
+SettingsSchemaInfo Client::settings_schema() {
+    const auto response = call("orchestrator.settings.schema", "ORC-SET-001", 1, 0);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "settings schema result");
+    SettingsSchemaInfo schema{
+        string(field(result, "schema_revision"),
+               "settings.schema_revision"),
+        {},
+    };
+    for (const auto& item : array(field(result, "fields"),
+                                  "settings schema fields")) {
+        const auto& record = object(item, "settings schema field");
+        SettingSchemaFieldInfo field_info{
+            string(field(record, "id"), "settings.field.id"),
+            string(field(record, "namespace"), "settings.field.namespace"),
+            string(field(record, "presentation_tab"),
+                   "settings.field.presentation_tab"),
+            string(field(record, "label_key"), "settings.field.label_key"),
+            string(field(record, "value_type"), "settings.field.value_type"),
+            parse_setting_value(field(record, "default"),
+                                "settings.field.default"),
+            optional_unsigned_integer(field(record, "minimum"),
+                                      "settings.field.minimum"),
+            optional_unsigned_integer(field(record, "maximum"),
+                                      "settings.field.maximum"),
+            {},
+            string(field(record, "restart_effect"),
+                   "settings.field.restart_effect"),
+            string(field(record, "availability"),
+                   "settings.field.availability"),
+            string(field(record, "availability_reason"),
+                   "settings.field.availability_reason"),
+        };
+        for (const auto& choice : array(field(record, "choices"),
+                                        "settings field choices")) {
+            field_info.choices.push_back(string(choice, "settings field choice"));
+        }
+        schema.fields.push_back(std::move(field_info));
+    }
+    return schema;
+}
+
+SettingsSnapshotInfo Client::settings_snapshot() {
+    const auto response = call("orchestrator.settings.snapshot", "ORC-SET-001", 1, 0);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    return parse_settings_snapshot(parsed.result());
+}
+
+SettingsCommitInfo Client::apply_setting(const std::uint64_t expected_revision,
+                                         std::string id,
+                                         SettingValue value) {
+    return apply_settings(expected_revision,
+                          {{std::move(id), std::move(value)}});
+}
+
+SettingsCommitInfo Client::apply_settings(
+    const std::uint64_t expected_revision,
+    std::vector<SettingChange> changes) {
+    if (changes.empty() || changes.size() > 64) {
+        fail("settings transaction requires 1..=64 changes");
+    }
+    std::string mutations = "[";
+    for (std::size_t index = 0; index < changes.size(); ++index) {
+        if (index != 0) mutations += ',';
+        mutations += "{\"id\":" + json_escape(changes[index].id) +
+                     ",\"set\":" + encode_setting_value(changes[index].value) + "}";
+    }
+    mutations += ']';
+    const auto params = "{\"expected_revision\":" +
+                        std::to_string(expected_revision) +
+                        ",\"mutations\":" + mutations + "}";
+    const auto response = call("orchestrator.settings.apply", "ORC-SET-001", 1, 0,
+                               params);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    return parse_settings_commit(parsed.result());
+}
+
+SettingsCommitInfo Client::reset_setting(const std::uint64_t expected_revision,
+                                         std::string id) {
+    const auto params = "{\"expected_revision\":" +
+                        std::to_string(expected_revision) +
+                        ",\"mutations\":[{\"id\":" + json_escape(id) +
+                        ",\"reset_to_default\":true}]}";
+    const auto response = call("orchestrator.settings.apply", "ORC-SET-001", 1, 0,
+                               params);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    return parse_settings_commit(parsed.result());
+}
+
+ServicesSnapshotInfo Client::services_snapshot() {
+    const auto response = call("orchestrator.services.snapshot", "ORC-UI-001", 1, 0);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    return parse_services_snapshot(parsed.result());
+}
+
+ServiceCommandResultInfo Client::service_command(
+    std::string service_id,
+    std::string command_id,
+    std::optional<std::string> expected_instance_id,
+    std::optional<std::uint64_t> expected_generation,
+    std::optional<std::string> root_id) {
+    if (service_id.empty() || command_id.empty()) {
+        fail("service and command identifiers must be nonempty");
+    }
+    std::string params = "{\"service_id\":" + json_escape(service_id) +
+                         ",\"command_id\":" + json_escape(command_id);
+    if (expected_instance_id) {
+        params += ",\"expected_instance_id\":" +
+                  json_escape(*expected_instance_id);
+    }
+    if (expected_generation) {
+        params += ",\"expected_generation\":" +
+                  std::to_string(*expected_generation);
+    }
+    if (root_id) params += ",\"root_id\":" + json_escape(*root_id);
+    params += '}';
+    const auto response = call("orchestrator.services.command", "ORC-UI-001",
+                               1, 0, params);
+    auto parsed = parse_successful_response(
+        response, "cpp-" + std::to_string(next_request_id_ - 1));
+    const auto& result = object(parsed.result(), "service command result");
+    return {
+        string(field(result, "service_id"), "service command service_id"),
+        string(field(result, "command_id"), "service command command_id"),
+        string(field(result, "terminal"), "service command terminal"),
+        string(field(result, "effect"), "service command effect"),
+    };
 }
 
 VersionInfo Client::version() {
@@ -1116,6 +1434,24 @@ bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept {
     return bootstrap != availability.end();
 }
 
+const SettingValue* SettingsSnapshotInfo::find(
+    const std::string_view id) const noexcept {
+    const auto found = std::find_if(values.begin(), values.end(),
+                                    [id](const auto& entry) {
+                                        return entry.id == id;
+                                    });
+    return found == values.end() ? nullptr : &found->value;
+}
+
+const ServiceInfo* ServicesSnapshotInfo::find(
+    const std::string_view id) const noexcept {
+    const auto found = std::find_if(services.begin(), services.end(),
+                                    [id](const auto& service) {
+                                        return service.id == id;
+                                    });
+    return found == services.end() ? nullptr : &*found;
+}
+
 void Client::shutdown() {
     (void)call("orchestrator.shutdown", "ORC-LIF-001", 1, 0);
     ::close(std::exchange(socket_, -1));
@@ -1149,6 +1485,24 @@ std::vector<ContractInfo> Client::contracts() { throw ClientError("unsupported p
 std::vector<AvailabilityInfo> Client::availability() { throw ClientError("unsupported platform"); }
 BootstrapSnapshot Client::bootstrap() { throw ClientError("unsupported platform"); }
 SearchPageInfo Client::search(std::string, std::string) { throw ClientError("unsupported platform"); }
+SearchPageInfo Client::search_subtree(std::string, std::optional<std::string>, std::string,
+                                      std::uint32_t, std::optional<SearchCursorInfo>) {
+    throw ClientError("unsupported platform");
+}
+SettingsSchemaInfo Client::settings_schema() { throw ClientError("unsupported platform"); }
+SettingsSnapshotInfo Client::settings_snapshot() { throw ClientError("unsupported platform"); }
+SettingsCommitInfo Client::apply_setting(std::uint64_t, std::string, SettingValue) { throw ClientError("unsupported platform"); }
+SettingsCommitInfo Client::apply_settings(std::uint64_t, std::vector<SettingChange>) { throw ClientError("unsupported platform"); }
+SettingsCommitInfo Client::reset_setting(std::uint64_t, std::string) { throw ClientError("unsupported platform"); }
+ServicesSnapshotInfo Client::services_snapshot() { throw ClientError("unsupported platform"); }
+ServiceCommandResultInfo Client::service_command(std::string, std::string,
+                                                  std::optional<std::string>,
+                                                  std::optional<std::uint64_t>,
+                                                  std::optional<std::string>) {
+    throw ClientError("unsupported platform");
+}
+const SettingValue* SettingsSnapshotInfo::find(std::string_view) const noexcept { return nullptr; }
+const ServiceInfo* ServicesSnapshotInfo::find(std::string_view) const noexcept { return nullptr; }
 bool BootstrapSnapshot::orchestrator_gate_ready() const noexcept { return false; }
 void Client::shutdown() { throw ClientError("unsupported platform"); }
 std::string Client::call(std::string_view, std::string_view, std::uint16_t, std::uint16_t, std::string_view, bool) {

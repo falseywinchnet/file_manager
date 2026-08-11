@@ -1,19 +1,40 @@
 #include "fileman_orchestrator/client.hpp"
 
 #include <iostream>
+#include <optional>
 #include <string>
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 3 && argc != 5) {
-		std::cerr << "usage: orchestrator-cpp-client [RUNTIME_DIR] probe|shutdown|search ROOT_ID TEXT\n";
+    if (argc < 2) {
+        std::cerr << "usage: orchestrator-cpp-client [RUNTIME_DIR] "
+                     "probe|shutdown|search ROOT_ID TEXT [MAX_RESULTS "
+                     "[CURSOR_SOURCE CURSOR]]\n";
         return 2;
     }
     try {
-        auto client = argc >= 3 ? fileman::orchestrator::Client::connect(argv[1])
-                                : fileman::orchestrator::Client::connect_default();
-        const std::string command = argc >= 3 ? argv[2] : argv[1];
+        const std::string first = argv[1];
+        const bool default_runtime = first == "probe" || first == "shutdown" ||
+            first == "search";
+        const int command_index = default_runtime ? 1 : 2;
+        if (command_index >= argc) {
+            std::cerr << "missing command\n";
+            return 2;
+        }
+        auto client = default_runtime
+            ? fileman::orchestrator::Client::connect_default()
+            : fileman::orchestrator::Client::connect(argv[1]);
+        const std::string command = argv[command_index];
+        const int argument_index = command_index + 1;
         if (command == "probe") {
+            if (argument_index != argc) {
+                std::cerr << "probe accepts no arguments\n";
+                return 2;
+            }
             const auto snapshot = client.bootstrap();
+            const auto settings_schema = client.settings_schema();
+            const auto settings = client.settings_snapshot();
+            const auto services = client.services_snapshot();
+            const auto* engine = services.find("engine");
             std::cout << "instance=" << snapshot.session.instance_id
                       << " generation=" << snapshot.session.lifecycle_generation
                       << " component=" << snapshot.version.component
@@ -35,16 +56,55 @@ int main(int argc, char** argv) {
                       << " architect-gate="
                       << snapshot.frontend_opening.architect_direction_gate.state
                       << " opening-blockers="
-                      << snapshot.frontend_opening.orchestrator_gate.blockers.size() << '\n';
-        } else if (command == "search" && argc == 5) {
-            const auto page = client.search(argv[3], argv[4]);
+                      << snapshot.frontend_opening.orchestrator_gate.blockers.size()
+                      << " settings-fields=" << settings_schema.fields.size()
+                      << " settings-revision=" << settings.revision
+                      << " services=" << services.services.size()
+                      << " engine=" << (engine ? engine->state : "missing")
+                      << " engine-currentness="
+                      << (engine && engine->currentness
+                              ? *engine->currentness
+                              : "unavailable")
+                      << '\n';
+        } else if (command == "search") {
+            const int remaining = argc - argument_index;
+            if (remaining != 2 && remaining != 3 && remaining != 5) {
+                std::cerr << "search requires ROOT_ID TEXT [MAX_RESULTS "
+                             "[CURSOR_SOURCE CURSOR]]\n";
+                return 2;
+            }
+            auto maximum = 128U;
+            if (remaining >= 3) {
+                const auto parsed = std::stoul(argv[argument_index + 2]);
+                if (parsed == 0UL || parsed > 1'000UL) {
+                    std::cerr << "MAX_RESULTS must be in the closed range 1..1000\n";
+                    return 2;
+                }
+                maximum = static_cast<std::uint32_t>(parsed);
+            }
+            std::optional<fileman::orchestrator::SearchCursorInfo> cursor;
+            if (remaining == 5) {
+                cursor = fileman::orchestrator::SearchCursorInfo{
+                    argv[argument_index + 3], argv[argument_index + 4]};
+            }
+            const auto page = client.search_subtree(
+                argv[argument_index], std::nullopt,
+                argv[argument_index + 1], maximum, cursor);
             std::cout << "terminal=" << page.terminal
                       << " source=" << page.source
                       << " complete=" << (page.complete ? "true" : "false")
                       << " results=" << page.names.size();
             if (!page.names.empty()) std::cout << " first=" << page.names.front();
+            if (page.cursor) {
+                std::cout << " cursor_source=" << page.cursor->source
+                          << " cursor=" << page.cursor->value;
+            }
             std::cout << '\n';
         } else if (command == "shutdown") {
+            if (argument_index != argc) {
+                std::cerr << "shutdown accepts no arguments\n";
+                return 2;
+            }
             client.shutdown();
             std::cout << "shutdown=success\n";
         } else {

@@ -1,7 +1,8 @@
 # Engine API contract
 
 Status: **ORC-ENG semantic v0 frozen for experimental implementation;
-development JSONL projection OBSERVED; installed transport ABI gated**.
+development JSONL and contained M4 installed `ENG1` projections OBSERVED;
+general cross-platform transport promotion gated**.
 
 The Go package `api` is the provider projection. Canonical cross-project meaning
 lives in `../../orchestrator/spec/contracts/ENGINE_AND_KOLMOGROV.md`; neither side
@@ -19,9 +20,12 @@ not frozen:
 - named pipe or local authenticated transport on Windows;
 - inherited stdio for supervised workers and test sandboxes.
 
-A binary payload or length-framed JSON remains a transport candidate rather
-than semantic authority. Query and administrative capabilities use distinct
-authority even if a development launcher exposes both in one process.
+The contained M4 profile uses bounded length-framed JSON over distinct
+same-user authenticated Unix query/admin sockets (`ENG1` v1). That installed
+projection is measured for the named host-bound File Manager service but does
+not promote Windows/Linux transports or make framing semantic authority. Query
+and administrative capabilities use distinct authority even if a development
+launcher exposes both in one process.
 
 Every request contains `id`, `method`, and optional `params`. Every response
 contains the same `id` and exactly one of `result` or `error`. Unknown fields are
@@ -50,7 +54,7 @@ cross-project names use the `engine.*` family.
   persisting, consulting, or requiring a catalogue. It returns process-local
   expiring continuation cursors, exact live observations, work counters, and
   named unavailable paths under `ORC-ENG-004`. Native NTFS/ext4, million-entry,
-  and installed-transport promotion evidence remains open.
+  promotion evidence remains open beyond the contained M4 installed route.
 - `inspect` — exact record and all stored evidence/provenance.
 - `explain` — concise ordinary evidence, exclusions, staleness, and unavailable
   shards; complete query plans and internal candidate diagnostics require the

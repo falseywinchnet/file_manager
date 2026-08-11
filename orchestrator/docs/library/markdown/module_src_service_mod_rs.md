@@ -37,29 +37,29 @@ pub(crate) struct EngineProviderConfig
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn serve_local( _runtime_directory: &std::path::Path, _engine_options: Option<EngineProviderConfig>, ) -> Result<(), String>
+pub(crate) fn serve_local( _runtime_directory: &std::path::Path, _engine_options: Option<EngineProviderConfig>, _settings_directory: Option<&std::path::Path>, ) -> Result<(), String>
 ```
 
-### [call_local](../../../src/service/mod.rs#L43)
+### [call_local](../../../src/service/mod.rs#L44)
 
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn call_local( _runtime_directory: &std::path::Path, _method: &str, ) -> Result<crate::Response, String>
+pub(crate) fn call_local( _runtime_directory: &std::path::Path, _request: crate::Request, ) -> Result<crate::Response, String>
 ```
 
-### [serve_launchd](../../../src/service/mod.rs#L54)
+### [serve_launchd](../../../src/service/mod.rs#L55)
 
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn serve_launchd(_runtime_directory: &std::path::Path) -> Result<(), String>
+pub(crate) fn serve_launchd( _runtime_directory: &std::path::Path, _settings_directory: &std::path::Path, ) -> Result<(), String>
 ```
 
-### [print_launchd_plist](../../../src/service/mod.rs#L59)
+### [print_launchd_plist](../../../src/service/mod.rs#L63)
 
 `fn` · `pub(crate)`
 
 ```rust
-pub(crate) fn print_launchd_plist(_runtime_directory: &std::path::Path) -> Result<(), String>
+pub(crate) fn print_launchd_plist( _runtime_directory: &std::path::Path, _settings_directory: &std::path::Path, ) -> Result<(), String>
 ```

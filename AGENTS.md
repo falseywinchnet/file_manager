@@ -126,10 +126,13 @@ processes, and logs. Quote remote commands as one shell argument so local path
 expansion does not leak into them.
 
 The private AWDL route shares the Mini's physical wireless adapter with Screen
-Sharing and does not give the Mini Internet access. Fetch dependencies on the
-Neo first, then mirror them. Expect high-volume sync/build traffic and frequent
-screen captures to contend with the interactive display; avoid needless live
-refreshes while a build is moving large files.
+Sharing. The Mini also has ordinary Wi-Fi Internet connectivity; AWDL is the
+private build/control route, not its Internet uplink. Prefer fetching pinned
+source dependencies on the Neo and mirroring them when the repository workflow
+requires authoritative local bytes, but do not diagnose the Mini as offline
+without checking its ordinary Wi-Fi route. Expect high-volume sync/build
+traffic and frequent screen captures to contend with the interactive display;
+avoid needless live refreshes while a build is moving large files.
 
 ### GUI operation through Screen Sharing
 

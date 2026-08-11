@@ -21,6 +21,7 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     let mut arguments: Vec<String> = arguments.into_iter().collect();
     let json_output = remove_flag(&mut arguments, "--json");
     let runtime_directory = remove_option(&mut arguments, "--runtime-dir")?;
+    let settings_directory = remove_option(&mut arguments, "--settings-dir")?;
     let engine_options = remove_engine_options(&mut arguments)?;
     let Some(command) = arguments.first().map(String::as_str) else {
         print_help();
@@ -30,23 +31,27 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     match command {
         "serve-local" => {
             if json_output || arguments.len() != 1 {
-                return Err("serve-local accepts only --runtime-dir".to_owned());
+                return Err(
+                    "serve-local accepts only runtime, settings, and Engine options".to_owned(),
+                );
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
-            return serve_local(&runtime, engine_options);
+            let settings = settings_directory.map(PathBuf::from);
+            return serve_local(&runtime, engine_options, settings.as_deref());
         }
         "call-local" => {
             if engine_options.is_some() {
                 return Err("Engine provider options are valid only with serve-local".to_owned());
             }
-            if arguments.len() != 2 {
-                return Err("call-local requires one operation".to_owned());
+            if settings_directory.is_some() {
+                return Err("--settings-dir is invalid for call-local clients".to_owned());
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
-            let operation = &arguments[1];
-            let method = method_for_command(operation)
-                .ok_or_else(|| format!("unsupported local operation: {operation}"))?;
-            let response = call_local(&runtime, method)?;
+            let operation = arguments
+                .get(1)
+                .ok_or_else(|| "call-local requires an operation".to_owned())?;
+            let request = local_request_for_arguments(&arguments)?;
+            let response = call_local(&runtime, &request)?;
             return render_response(operation, &response, json_output);
         }
         "serve-launchd" => {
@@ -60,7 +65,8 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
                 return Err("serve-launchd accepts only --runtime-dir".to_owned());
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
-            return serve_launchd(&runtime);
+            let settings = resolve_settings_directory(settings_directory)?;
+            return serve_launchd(&runtime, &settings);
         }
         "launchd-plist" => {
             if engine_options.is_some() {
@@ -70,7 +76,8 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
                 return Err("launchd-plist accepts only --runtime-dir".to_owned());
             }
             let runtime = resolve_runtime_directory(runtime_directory)?;
-            return print_launchd_plist(&runtime);
+            let settings = resolve_settings_directory(settings_directory)?;
+            return print_launchd_plist(&runtime, &settings);
         }
         _ => {}
     }
@@ -78,6 +85,12 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<(), String> {
     if runtime_directory.is_some() {
         return Err(
             "--runtime-dir is valid only with serve-local, call-local, serve-launchd, or launchd-plist"
+                .to_owned(),
+        );
+    }
+    if settings_directory.is_some() {
+        return Err(
+            "--settings-dir is valid only with serve-local, serve-launchd, or launchd-plist"
                 .to_owned(),
         );
     }
@@ -146,6 +159,20 @@ fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String
     )
 }
 
+#[cfg(target_os = "macos")]
+fn resolve_settings_directory(explicit: Option<String>) -> Result<PathBuf, String> {
+    explicit.map_or_else(crate::settings::default_settings_directory, |path| {
+        Ok(path.into())
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resolve_settings_directory(explicit: Option<String>) -> Result<PathBuf, String> {
+    explicit
+        .map(Into::into)
+        .ok_or_else(|| "this platform requires --settings-dir PATH".to_owned())
+}
+
 #[cfg(not(unix))]
 fn resolve_runtime_directory(explicit: Option<String>) -> Result<PathBuf, String> {
     explicit
@@ -185,11 +212,103 @@ fn method_for_command(command: &str) -> Option<&'static str> {
         "contracts" => Some("orchestrator.contracts.list"),
         "availability" => Some("orchestrator.availability.list"),
         "bootstrap" => Some("orchestrator.frontend.bootstrap"),
+        "settings-schema" => Some("orchestrator.settings.schema"),
+        "settings" => Some("orchestrator.settings.snapshot"),
+        "services" => Some("orchestrator.services.snapshot"),
         "plugins" => Some("orchestrator.plugins.status"),
         "semantic-facts" => Some("orchestrator.semantic_facts.status"),
         "shutdown" => Some("orchestrator.shutdown"),
         _ => None,
     }
+}
+
+fn local_request_for_arguments(arguments: &[String]) -> Result<Request, String> {
+    let operation = arguments
+        .get(1)
+        .ok_or_else(|| "call-local requires an operation".to_owned())?;
+    if operation == "settings-set" {
+        if arguments.len() != 5 {
+            return Err(
+                "call-local settings-set requires ID JSON_VALUE EXPECTED_REVISION".to_owned(),
+            );
+        }
+        let value: Value = serde_json::from_str(&arguments[3])
+            .map_err(|error| format!("settings JSON value is invalid: {error}"))?;
+        if !(value.is_boolean() || value.is_u64() || value.is_string()) {
+            return Err(
+                "settings-set admits only Boolean, unsigned integer, or string JSON values"
+                    .to_owned(),
+            );
+        }
+        let expected_revision = arguments[4]
+            .parse::<u64>()
+            .map_err(|_| "expected settings revision must be an unsigned integer".to_owned())?;
+        let mut request = Request::local("cli-local-1", "orchestrator.settings.apply");
+        request.params = serde_json::json!({
+            "expected_revision": expected_revision,
+            "mutations": [{"id": arguments[2], "set": value}]
+        });
+        return Ok(request);
+    }
+    if operation == "settings-reset" {
+        if arguments.len() != 4 {
+            return Err("call-local settings-reset requires ID EXPECTED_REVISION".to_owned());
+        }
+        let expected_revision = arguments[3]
+            .parse::<u64>()
+            .map_err(|_| "expected settings revision must be an unsigned integer".to_owned())?;
+        let mut request = Request::local("cli-local-1", "orchestrator.settings.apply");
+        request.params = serde_json::json!({
+            "expected_revision": expected_revision,
+            "mutations": [{"id": arguments[2], "reset_to_default": true}]
+        });
+        return Ok(request);
+    }
+    if operation == "service-command" {
+        if !(arguments.len() == 5 || arguments.len() == 6) {
+            return Err(
+                "call-local service-command requires SERVICE COMMAND INSTANCE_ID [GENERATION_OR_ROOT]"
+                    .to_owned(),
+            );
+        }
+        let service_id = arguments[2].as_str();
+        let mut params = serde_json::json!({
+            "service_id": service_id,
+            "command_id": arguments[3]
+        });
+        match service_id {
+            "orchestrator" => {
+                if arguments.len() != 6 {
+                    return Err(
+                        "Orchestrator service commands require INSTANCE_ID GENERATION".to_owned(),
+                    );
+                }
+                params["expected_instance_id"] = serde_json::json!(arguments[4]);
+                params["expected_generation"] =
+                    serde_json::json!(arguments[5].parse::<u64>().map_err(|_| {
+                        "Orchestrator expected generation must be an unsigned integer".to_owned()
+                    })?);
+            }
+            "engine" => {
+                params["expected_instance_id"] = serde_json::json!(arguments[4]);
+                if arguments.len() == 6 {
+                    params["root_id"] = serde_json::json!(arguments[5]);
+                }
+            }
+            _ => return Err("service-command admits only orchestrator or engine".to_owned()),
+        }
+        let mut request = Request::local("cli-local-1", "orchestrator.services.command");
+        request.params = params;
+        return Ok(request);
+    }
+    if arguments.len() != 2 {
+        return Err(format!(
+            "call-local {operation} accepts no additional arguments"
+        ));
+    }
+    let method = method_for_command(operation)
+        .ok_or_else(|| format!("unsupported local operation: {operation}"))?;
+    Ok(Request::local("cli-local-1", method))
 }
 
 fn render_response(command: &str, response: &Response, json_output: bool) -> Result<(), String> {
@@ -241,6 +360,39 @@ fn print_human(command: &str, response: &Response) -> Result<(), String> {
             string_field(&result["schema"], "family")?,
             string_field(&result["release"], "state")?,
             integer_field(&result["snapshot"], "lifecycle_generation")?
+        ),
+        "settings-schema" => println!(
+            "Settings schema {} ({} fields)",
+            string_field(result, "schema_revision")?,
+            result["fields"]
+                .as_array()
+                .ok_or_else(|| "settings fields are not an array".to_owned())?
+                .len()
+        ),
+        "settings" => println!(
+            "Settings revision {} ({})",
+            integer_field(result, "revision")?,
+            string_field(result, "recovery_provenance")?
+        ),
+        "services" => println!(
+            "Services snapshot {} ({} services)",
+            string_field(&result["schema"], "family")?,
+            result["services"]
+                .as_array()
+                .ok_or_else(|| "services are not an array".to_owned())?
+                .len()
+        ),
+        "settings-set" | "settings-reset" => println!(
+            "Settings committed at revision {} ({})",
+            integer_field(&result["snapshot"], "revision")?,
+            string_field(result, "audit_id")?
+        ),
+        "service-command" => println!(
+            "{} {}: {} ({})",
+            string_field(result, "service_id")?,
+            string_field(result, "command_id")?,
+            string_field(result, "terminal")?,
+            string_field(result, "effect")?
         ),
         "plugins" | "semantic-facts" => println!(
             "{}: {} — {}",
@@ -313,6 +465,8 @@ fn print_help() {
            contracts        List canonical contract families\n\
            availability     List required and available capabilities\n\
            bootstrap        Read one immutable frontend bootstrap snapshot\n\
+           settings-schema  Read the bounded typed settings schema\n\
+           settings         Read the immutable settings value snapshot\n\
            plugins          Show the plugin-system stub\n\
            semantic-facts   Show the semantic-fact stub\n\
            shutdown         Exercise clean lifecycle shutdown\n\
@@ -320,13 +474,16 @@ fn print_help() {
            serve-local      Serve authenticated framed requests [--runtime-dir]\n\
            serve-launchd    Adopt the macOS launchd socket [--runtime-dir]\n\
            launchd-plist    Print the macOS LaunchAgent definition [--runtime-dir]\n\
-           call-local OP    Discover/activate and call the daemon [--runtime-dir]"
+           call-local OP    Discover/activate and call the daemon [--runtime-dir]\n\
+             settings-set ID JSON_VALUE EXPECTED_REVISION\n\
+             settings-reset ID EXPECTED_REVISION\n\
+             service-command SERVICE COMMAND INSTANCE_ID [GENERATION_OR_ROOT]"
     );
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{method_for_command, remove_engine_options};
+    use super::{local_request_for_arguments, method_for_command, remove_engine_options};
 
     #[test]
     fn command_projection_is_explicit() {
@@ -359,5 +516,36 @@ mod tests {
                 .is_some()
         );
         assert!(complete.is_empty());
+    }
+
+    #[test]
+    fn settings_mutation_cli_builds_the_canonical_transaction() {
+        let arguments = vec![
+            "call-local".to_owned(),
+            "settings-set".to_owned(),
+            "navigation.show_hidden".to_owned(),
+            "true".to_owned(),
+            "7".to_owned(),
+        ];
+        let request = local_request_for_arguments(&arguments).expect("settings request");
+        assert_eq!(request.method, "orchestrator.settings.apply");
+        assert_eq!(request.params["expected_revision"], 7);
+        assert_eq!(request.params["mutations"][0]["set"], true);
+    }
+
+    #[test]
+    fn service_command_cli_preserves_identity_and_root() {
+        let arguments = vec![
+            "call-local".to_owned(),
+            "service-command".to_owned(),
+            "engine".to_owned(),
+            "reconcile".to_owned(),
+            "instance-7".to_owned(),
+            "fm1-contained".to_owned(),
+        ];
+        let request = local_request_for_arguments(&arguments).expect("service request");
+        assert_eq!(request.method, "orchestrator.services.command");
+        assert_eq!(request.params["expected_instance_id"], "instance-7");
+        assert_eq!(request.params["root_id"], "fm1-contained");
     }
 }

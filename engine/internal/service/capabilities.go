@@ -10,11 +10,11 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 	}
 	rootRevision := "development-sandbox-v0"
 	transportState, transportReason := api.CapabilityDeferred, "installed authenticated endpoint is not active in development sandbox mode"
-	launchdState, launchdReason := api.CapabilityUnavailable, "launchd projection is admitted only by the M4 dogfood deployment"
+	launchdState, launchdReason := api.CapabilityUnavailable, "host-bound launchd projection is not active for this process"
 	if !s.guard.Sandboxed() {
 		rootRevision = "host-bound-manifest-v1"
 		transportState, transportReason = api.CapabilityAvailable, ""
-		if s.guard.Deployment() == "m4-dogfood" {
+		if s.launchdProjection {
 			launchdState, launchdReason = api.CapabilityAvailable, ""
 		}
 	}
@@ -36,7 +36,7 @@ func (s *Service) capabilities() []api.CapabilityStatus {
 		{ID: "engine.background.observation", State: api.CapabilityExperimental, Revision: "portable-coalescer-0.2+macos-fsevents-0.2+windows-rdcw-0.1", Reason: "bounded macOS and Windows native adapters exist, but coverage is incomplete, the watermark is volatile, Linux is absent, and Windows has compatibility-only validation"},
 		{ID: "engine.status.subscribe", State: api.CapabilityNegotiating, Reason: "bounded replay and overflow fixtures remain red"},
 		{ID: "engine.transport.framed_local", State: transportState, Revision: "ENG1-v1", Reason: transportReason},
-		{ID: "engine.supervisor.launchd", State: launchdState, Revision: "m4-dogfood-v1", Reason: launchdReason},
+		{ID: "engine.supervisor.launchd", State: launchdState, Revision: "host-bound-v1", Reason: launchdReason},
 		{ID: "contract.ORC-LIF-001", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
 		{ID: "contract.ORC-ENG-001", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},
 		{ID: "contract.ORC-ENG-002", State: api.CapabilityAvailable, Revision: "semantic-v0.1"},

@@ -387,10 +387,10 @@ fn live_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> Engin
 
 ### [project_engine_error](../../../src/engine_jsonl.rs#L695)
 
-`fn` · `private`
+`fn` · `pub(crate)`
 
 ```rust
-fn project_engine_error( error: EngineJsonlError, operation: &str, ) -> (TerminalStatus, String, String)
+pub(crate) fn project_engine_error( error: EngineJsonlError, operation: &str, ) -> (TerminalStatus, String, String)
 ```
 
 ### [error_kind](../../../src/engine_jsonl.rs#L730)

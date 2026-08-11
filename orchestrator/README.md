@@ -60,9 +60,13 @@ zero-catalogue route. Availability is derived from the connected Engine's
 advertised `engine.live.query` and `contract.ORC-ENG-004` capabilities. The
 authenticated Rust integration test and independently compiled C++17 client
 both pass without exposing catalogue/live selection to the frontend. Installed
-Engine discovery/authentication and native NTFS/ext4 promotion evidence remain
-open. The bounded Rust development client also passes version, status, exact
-query, and shutdown against a separately built Go Engine process.
+The contained M4 profile now connects a separately installed, host-bound Go
+Engine through its authenticated `ENG1` discovery and distinct query/admin
+authorities. Exact search, status, integrity, reconcile and supervised restart
+pass through Orchestrator; native NTFS/ext4 and other installed-platform
+promotion evidence remain open. The bounded Rust development client also
+passes version, status, exact query, and shutdown against a separately built Go
+Engine process.
 The first ADR-009 local-daemon slice now provides bounded `ORC1` framing,
 private Unix discovery, an OS-random credential hello, instance verification,
 and CLI status/shutdown across separate processes. ADR-011 adds a stable macOS
@@ -79,9 +83,12 @@ non-authoritative live transport counters harden that boundary. A separately
 built C++17 conformance client now reads the
 atomic typed bootstrap snapshot—including contracts, availability, route/
 fallback state, and service-control eligibility—verifies the golden digest,
-and reconnects across daemon restarts. A database, plugin worker,
-semantic fact API, GUI, and durable user settings remain absent and
-independently reported.
+and reconnects across daemon restarts. `ORC-SET-001` now supplies a bounded
+durable scalar settings store selected by ADR-018, while `ORC-UI-001` supplies
+immutable service facts and identity-bound closed commands selected by ADR-019.
+The independently built C++17 client consumes both. A general database, plugin
+worker, semantic fact API, and Orchestrator GUI remain absent and independently
+reported; File Manager owns their presentation.
 
 The release projection now carries a deterministic SHA-256 digest over the
 manifest fields and embedded Core contract inputs. It is explicitly unsigned;
@@ -116,6 +123,10 @@ producer code into ABI.
   starts the macOS Core contract/wire 1.0 line and defines Core 1.x compatibility.
 - [`ADR-011`](../decisions/ADR-011-ORCHESTRATOR-MACOS-LAUNCHD-ACTIVATION.md)
   defines stable macOS discovery, launchd socket adoption, and activation retry.
+- [`ADR-018`](../decisions/ADR-018-ORCHESTRATOR-BOUNDED-ATOMIC-SETTINGS-STORE.md)
+  selects the bounded atomic first settings store.
+- [`ADR-019`](../decisions/ADR-019-CONTAINED-ENGINE-ADAPTER-AND-IDENTITY-BOUND-SERVICE-CONTROLS.md)
+  selects the contained installed Engine route and service-command identity law.
 - [`spec/CONTRACT_REGISTRY.md`](spec/CONTRACT_REGISTRY.md) is the master
   inventory.
 - [`planning/MASTER_SPECIFICATION.md`](planning/MASTER_SPECIFICATION.md) defines
@@ -178,6 +189,8 @@ cargo run --manifest-path orchestrator/Cargo.toml -- \
   serve-local
 cargo run --manifest-path orchestrator/Cargo.toml -- \
   call-local status --json
+cargo run --manifest-path orchestrator/Cargo.toml -- \
+  call-local services --json
 cargo run --manifest-path orchestrator/Cargo.toml -- \
   call-local shutdown
 ```

@@ -90,14 +90,14 @@ fn run_one_daemon_generation(client: &Path, runtime: &Path) -> String {
             .expect("golden release digest")
     );
     assert!(output.contains("lifecycle=ready"));
-    assert!(output.contains("contracts=24"));
-    assert!(output.contains("capabilities=27"));
+    assert!(output.contains("contracts=25"));
+    assert!(output.contains("capabilities=28"));
     assert!(output.contains("route=orchestrator"));
     assert!(output.contains("fallback=deferred"));
     assert!(output.contains("shutdown=eligible"));
     assert!(output.contains("restart=unavailable"));
     assert!(output.contains("orchestrator-gate=blocked"));
-    assert!(output.contains("gui-forms-gate=negotiating"));
+    assert!(output.contains("gui-forms-gate=available"));
     assert!(output.contains("architect-gate=recorded"));
     assert!(output.contains("opening-blockers=1"));
     let instance = output
