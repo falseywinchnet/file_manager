@@ -3,7 +3,8 @@
 Date: 2026-08-10
 
 Status: **partly DECIDED boundary; detailed element/property limits remain
-CANDIDATE and no compiler implementation is authorized**.
+CANDIDATE; bounded dogfood implementation is authorized by ADR-003 without a
+0.1 compatibility promise**.
 
 ## 1. Source form
 
@@ -22,6 +23,11 @@ Web.Forms is a strict profile of HTML/CSS plus inert `wf-*` class tokens and
 `data-wf-*` attributes. A normal browser ignores the compiler metadata and
 renders the ordinary HTML/CSS. The compiler rejects anything outside the
 profile.
+
+**OBSERVED dogfood implementation:** `webforms profile` emits the current
+machine-readable elements, control kinds, attributes, properties, states,
+pseudo-elements, and numeric limits from the same constants used by Stage 1.
+The profile remains experimental rather than a 0.1 compatibility promise.
 
 ## 2. JavaScript exclusion
 
@@ -111,12 +117,18 @@ every HTML element is a control.
 | text | text nodes, `span`, `strong`, `b`, `em`, `small`, `mark`, `br`, headings, `p`, `dl/dt/dd` | shaped text runs, labels, or semantic groups |
 | controls | `button`, `input` with admitted types, `label`, `textarea`, `select`, `option` | stock GUI.Forms controls |
 | collections | `ul/ol/li`, admitted `table` subset, typed `data-wf-control` hosts | static or virtual collection controls |
-| resources | local PNG `img`; closed inline SVG subset if approved | resource/drawing records |
+| resources | local PNG `img`; later closed SVG files as indivisible image resources | resource/drawing records |
 | compile-time reuse | inert `template` with `data-wf-component` if approved | bounded static expansion only |
 
 Reject `iframe`, `frame`, `object`, `embed`, media playback, browser canvas,
 portal, form submission/navigation, arbitrary custom elements, and elements
 whose semantics require a web document environment.
+
+Inline `<svg>` is also rejected in 0.1. Vector art may later enter only through
+a local image resource hosted by a normal HTML element. Its host participates
+in layout, surface inheritance, state, semantics, and hit testing; vector
+descendants do not. The resource's intrinsic coordinates scale into the
+already-resolved host box and never determine surrounding GUI geometry.
 
 ## 6. CSS selector profile
 
@@ -130,6 +142,10 @@ Candidate allowed selectors:
 - GUI state pseudo-classes: `:hover`, `:active`, `:focus`, `:focus-visible`,
   `:disabled`, `:checked`, `:selected`, and approved popup/expanded states;
 - `::before` and `::after` only for nonsemantic decoration owned by the parent.
+
+Use relational CSS decoration for geometry whose position or size depends on a
+control box. For example, a breadcrumb chevron is a bounded `::after` recipe
+anchored by layout, not a fixed-coordinate SVG subtree.
 
 Reject relational `:has`, general/sibling combinators in 0.1, unbounded selector
 nesting, arbitrary substring attribute tests, dynamic language/direction policy,
@@ -168,11 +184,24 @@ physical device pixel. Percent, `fr`, `auto`, `minmax`, `repeat`, `calc`, and
 viewport-relative values enter only where GUI.Forms has a named equivalent and
 the fidelity test passes. Browser acceptance alone is insufficient.
 
-## 8. Nested context, themes, and composition
+## 8. Content, style generations, and nested composition
 
 Web.Forms compiles the nested ambient context defined in
 `NESTED_LANDSCAPE_001.md`; it does not implement arbitrary behavioral multiple
 inheritance.
+
+Stage 1 keeps application content/identity separate from three independently
+interned style domains:
+
+- geometry/layout;
+- typography metrics and shaping intent;
+- material, including color, fills, borders, radii, shadows, and effects.
+
+The same accepted content tree may compile with a different attached CSS
+generation. Dogfood requires content and unaffected geometry/typography records
+to remain byte-equivalent while material records change. A target capability
+loss is reported against the generated requirements; identity, layout,
+behavior, ownership, and accessibility never silently fall back.
 
 - One node maps to at most one concrete GUI.Forms control kind.
 - Visual classes and typed theme roles may compose around it.

@@ -48,6 +48,12 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
                 command.secondary_scalar, command.tertiary_scalar,
                 command.color);
             break;
+        case DisplayOperation::draw_inset_box_shadow:
+            painter.draw_inset_box_shadow(
+                command.rect, command.scalar, command.first,
+                command.secondary_scalar, command.tertiary_scalar,
+                command.color);
+            break;
         case DisplayOperation::draw_line:
             painter.draw_line(command.first, command.second, command.color,
                               command.scalar);

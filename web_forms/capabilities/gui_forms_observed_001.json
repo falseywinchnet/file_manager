@@ -1,0 +1,131 @@
+{
+  "schema": "web.forms.gui-capabilities/0.1-experimental",
+  "target": "gui.forms.observed-2026-08-10",
+  "features": {
+    "construction.generated-material-parts": {
+      "status": "supported",
+      "evidence": "focused GUI.Forms material test proves bounded pointer/count stop, fill, shadow, and border construction with retained ownership",
+      "fallback": "none"
+    },
+    "construction.generated-control-state-recipes": {
+      "status": "supported",
+      "evidence": "GUI.Forms ButtonBase owns a validated retained ControlStateRecipes set; focused tests prove normal, hot, pressed, disabled, whole-visual translation, and external focus geometry",
+      "fallback": "use the named GUI.Forms theme role and report the authored-state loss"
+    },
+    "construction.generated-native-tree": {
+      "status": "supported",
+      "evidence": "experimental Stage 2 composes only exact manifest-backed material, layout, typography, state, and decoration projections into one deterministic typed retained tree; focused dogfood compile tests and a linked 38-node structure/layout probe pass",
+      "fallback": "none; refuse the entire tree when any retained node cannot be projected"
+    },
+    "decoration.before": {
+      "status": "supported",
+      "evidence": "Control owns bounded pointer/count decorations in a before-content retained paint layer; focused native and generated-code tests prove ordering with the symmetric after-content layer",
+      "fallback": "none for nonsemantic box decoration"
+    },
+    "decoration.after": {
+      "status": "supported",
+      "evidence": "Control owns bounded pointer/count decorations in an after-content retained paint layer; live owner-relative anchors, rotation, symmetric before/after ordering, semantic exclusion, and atomic invalid rejection have focused coverage",
+      "fallback": "none for semantic geometry; explicit text separator may be authored separately"
+    },
+    "effect.bounded-shadow": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial bounded outer shadows are generated exactly, retained in display chunks, and covered by material/damage tests",
+      "fallback": "none"
+    },
+    "effect.inset-shadow": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial retains inset identity; display chunks preserve it and a pixel-checked Skia CPU smoke test proves the live rounded complement remains clipped to its owner",
+      "fallback": "none"
+    },
+    "geometry.rounded-corners": {
+      "status": "supported",
+      "evidence": "generated SurfaceMaterial corner radii retain rounded clip, fill, border, focus, and shadow geometry",
+      "fallback": "none"
+    },
+    "identity.typed-hierarchical": {
+      "status": "supported",
+      "evidence": "native tree Stage 2 requires every retained node id, rejects normalized member collisions, emits one typed member per id, and the linked 38-node probe verifies exact StableId preservation",
+      "fallback": "none"
+    },
+    "layout.flex": {
+      "status": "supported",
+      "evidence": "FlowLayoutPanel publishes retained direction, wrapping, bounded gaps, main/cross alignment, padding, and per-child grow; focused tests prove live-frame center, space-between, stretch, and ratio growth",
+      "fallback": "none"
+    },
+    "layout.grid": {
+      "status": "supported",
+      "evidence": "TableLayoutPanel publishes bounded absolute, weighted fraction, auto tracks, retained inter-track spacing, deterministic cells, and fill docking; focused tests prove gap-aware fractional resolution",
+      "fallback": "none"
+    },
+    "paint.linear-gradient": {
+      "status": "supported",
+      "evidence": "MaterialFillLayer, retained multi-stop linear gradients, and generated pointer/count stop construction are composed by native tree Stage 2",
+      "fallback": "none"
+    },
+    "paint.css-angle-gradient": {
+      "status": "supported",
+      "evidence": "MaterialFillLayer CSS-angle geometry resolves gradient-line endpoints from current rectangular bounds and is covered by a focused retained paint test",
+      "fallback": "use authored background-color"
+    },
+    "paint.radial-gradient": {
+      "status": "primitive-present",
+      "evidence": "MaterialFillLayer and measured elliptical radial gradients exist",
+      "fallback": "use authored background-color, otherwise fail"
+    },
+    "paint.side-border": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial publishes independently retained square-edge borders; rounded edge joins and mixed shorthand cascade expansion remain refused",
+      "fallback": "none"
+    },
+    "paint.uniform-border": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial publishes a retained uniform MaterialBorder",
+      "fallback": "omit only when the authored width is zero"
+    },
+    "state.active": {
+      "status": "supported",
+      "evidence": "GUI.Forms retained pressed state selects generated owned recipes; Web.Forms bounds whole-visual translate state projection",
+      "fallback": "base style with reported state-material degradation"
+    },
+    "state.focus-visible": {
+      "status": "supported",
+      "evidence": "Window retains keyboard/pointer/semantic focus-cue modality independently of actual focus; ButtonBase and derived controls use it for authored focus outlines and visual outsets",
+      "fallback": "none for the bounded button focus-visible profile"
+    },
+    "state.hover": {
+      "status": "supported",
+      "evidence": "GUI.Forms retained hot state selects generated owned recipes through its existing pointer state machine",
+      "fallback": "base style with reported state-material degradation"
+    },
+    "surface.authored-material": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial plus the Control authored-background hook exist, bounded construction is measured, and the experimental generator publishes exact/refused base-surface projections",
+      "fallback": "named GUI.Forms baseline role with reported loss"
+    },
+    "surface.nested-ambient-context": {
+      "status": "supported",
+      "evidence": "Stage 1 records owned/revealed edges; native tree Stage 2 applies authored layers to the same retained layout owner, clears Forms-default margins/padding to CSS initial values, and the linked standard-shell probe proves nested shell/grid composition",
+      "fallback": "none; loose overlay is rejected"
+    },
+    "transform.rotate": {
+      "status": "supported",
+      "evidence": "Control owner-decoration recipes retain bounded rotation around the CSS-default box center and recompute endpoints from live owner geometry",
+      "fallback": "none for breadcrumb chevron geometry"
+    },
+    "transform.translate": {
+      "status": "supported",
+      "evidence": "generated button recipes project one logical translate/translateX/translateY up to 32px as a paint-only whole-visual offset with measured outsets",
+      "fallback": "omit with reported active-state degradation"
+    },
+    "typography.bundled-font-pack": {
+      "status": "supported",
+      "evidence": "GUI.Forms registers bundled Carlito, Cousine, and Portsmouth Rapids faces by stable role; Web.Forms admits only matching local @font-face declarations",
+      "fallback": "none"
+    },
+    "typography.retained": {
+      "status": "supported",
+      "evidence": "Label and ButtonBase retain font size, weight, italic state, letter spacing, line spacing, alignment, and bounded text case projection; Label retains foreground and wrapping",
+      "fallback": "none"
+    }
+  }
+}

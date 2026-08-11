@@ -1,11 +1,12 @@
 # GUI.Forms exact-behavior rewrite program
 
-Status: **architect decisions reconciled; implementation forbidden until an
-explicit sibling start direction**.
+Status: **rewrite complete on 2026-08-10; future lifecycle and CBMC work remain
+separate, unopened rounds**.
 
-This directory holds the governing instructions for a future sibling to rewrite
-the existing `../gui_forms/` first-party C++ in place. It is planning material,
-not permission to begin.
+This directory now holds both the governing decisions and the retained evidence
+for the completed in-place rewrite of `../gui_forms/` first-party C++. The
+historical planning and handoff documents remain as reversal evidence; they no
+longer describe the program's current gate.
 
 ## Mission
 
@@ -62,7 +63,8 @@ Consequently:
   evidence.
 - `AUDIT_AND_MEASUREMENTS.md` — repeatable rewrite audit method.
 - `MIGRATION_SKELETON.md` — candidate, behavior-preserving implementation order.
-- `SIBLING_HANDOFF.md` — instructions for the future implementing sibling.
+- `SIBLING_HANDOFF.md` — historical instructions followed by the implementing
+  sibling.
 - `ARCHITECT_SELECTIONS.md` — authoritative closure of every option in
   `OPEN_ITEMS.md`.
 - `FEATURE_EDGE_AUDIT.md` — observed C++20 feature edges and their selected
@@ -73,11 +75,22 @@ Consequently:
 - `ENFORCEMENT_SPEC.md` — selected LibTooling, textual-control, and warning
   ratchet design.
 - `IMPLEMENTATION_START_CHECKLIST.md` — exact preflight and first-batch handoff
-  for the implementing sibling.
+  used by the implementing sibling; retained as historical procedure.
+- `COMPLETION_REPORT.md` — O-032-A closure, phase status, build/test evidence,
+  approved API deltas, and explicitly deferred work.
+- `CXX20_FEATURE_AUDIT.md` — actual C++20 surface retained under the house
+  subset.
+- `STD_FUNCTION_AUDIT.md` — generated role inventory plus callback allocation
+  evidence.
+- `CBMC_AUDIT.md` — exact boundary between execution-based testing and the
+  separately proposed bounded model-checking experiment.
+- `gui_forms_house_policy_first_party_final.json` — fatal native closure ledger;
+  the corresponding MinGW and no-HarfBuzz ledgers remain alongside it.
 
 ## Current gate
 
-The option interview is closed. Implementation remains blocked until the exact
-starting snapshot and overlap are recorded, semantic inventories/oracles are
-refreshed, the first batch is reviewed, and the architect explicitly directs
-the implementing sibling to begin.
+The rewrite gate is closed as complete. New ownership/lifecycle design, stable
+pools, allocator work, constrained-runtime work, CBMC proofs, or additional
+house algorithm migrations require their own decision and evidence round. The
+existing CoreVideo deprecation warning is recorded warning debt, not hidden
+rewrite work.

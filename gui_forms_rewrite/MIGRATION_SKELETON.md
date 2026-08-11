@@ -1,8 +1,9 @@
 # Exact-behavior migration skeleton
 
-Status: **DECIDED sequence under O-030-A; does not itself authorize work**.
+Status: **historical O-030-A sequence; completed on 2026-08-10**.
 
-This sequence is intentionally conservative and does not authorize work.
+This sequence records the order used by the completed rewrite. It does not
+authorize a new migration round.
 
 ## Phase 0 — close and freeze
 

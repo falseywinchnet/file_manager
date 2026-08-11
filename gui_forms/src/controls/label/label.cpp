@@ -267,6 +267,21 @@ void Label::set_line_spacing(double spacing) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
+void Label::set_text_case_transform(TextCaseTransform transform) {
+    require_mutable();
+    switch (transform) {
+    case TextCaseTransform::none:
+    case TextCaseTransform::uppercase_ascii:
+    case TextCaseTransform::lowercase_ascii:
+        break;
+    default:
+        throw std::invalid_argument("Label text case transform is invalid");
+    }
+    if (text_case_transform_ == transform) return;
+    text_case_transform_ = transform;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
 void Label::set_maximum_lines(std::size_t maximum_lines) {
     require_mutable();
     if (maximum_lines > 4096U) {
@@ -310,7 +325,18 @@ Size Label::measure(Size available) {
 }
 
 std::string Label::display_text() const {
-    return use_mnemonic_ ? parse_mnemonic_text(text_).display_text : text_;
+    std::string display = use_mnemonic_
+        ? parse_mnemonic_text(text_).display_text : text_;
+    for (char& character : display) {
+        if (text_case_transform_ == TextCaseTransform::uppercase_ascii &&
+            character >= 'a' && character <= 'z') {
+            character = static_cast<char>(character - 'a' + 'A');
+        } else if (text_case_transform_ == TextCaseTransform::lowercase_ascii &&
+                   character >= 'A' && character <= 'Z') {
+            character = static_cast<char>(character - 'A' + 'a');
+        }
+    }
+    return display;
 }
 
 void Label::paint_label_text(Painter& painter, std::string_view text) const {
@@ -365,7 +391,9 @@ bool Label::hit_test_local(Point) const {
 SemanticDescriptor Label::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::static_text;
-    descriptor.name = accessible_name().empty() ? display_text() : accessible_name();
+    descriptor.name = accessible_name().empty()
+        ? (use_mnemonic_ ? parse_mnemonic_text(text_).display_text : text_)
+        : accessible_name();
     descriptor.description = accessible_description();
     descriptor.exposed = !descriptor.name.empty();
     return descriptor;

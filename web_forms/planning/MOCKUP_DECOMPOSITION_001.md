@@ -111,7 +111,7 @@ and commands a native implementation must own.
 | class-based theme and construction variants | interned immutable style generations |
 | CSS pseudo-state | GUI.Forms control-state style matrix |
 | pseudo-element or decorative `i` | parent display chunk/backplane decoration |
-| inline SVG symbol library | build-time closed SVG lowering or precompiled resource; no runtime SVG parser |
+| inline SVG symbol library | extract indivisible local vector resources, then build-time path or raster lowering; no SVG control tree |
 | absolute path matrix | owned anchored popup/top-layer contract, not arbitrary z-index escape |
 | fake state/content changes | C++ model/handler logic using generated stable handles |
 
@@ -124,11 +124,12 @@ and commands a native implementation must own.
   collapse, and runtime visibility; the compiler needs typed meanings.
 - Classes currently mix component identity, visual style, state, and planning
   taxonomy. Web.Forms must separate those axes.
-- Inline SVG is central to the prototype, while GUI.Forms admits no runtime SVG
-  decoder. Build-time lowering is therefore a required decision.
+- Inline SVG is central to the prototype, but its fixed internal coordinates do
+  not replace HTML/CSS relationships. Web.Forms retains the host box and lowers
+  approved art only as one build-time visual resource; structural decoration
+  such as breadcrumb chevrons remains box-relative CSS geometry.
 - Hover-driven result expansion needs keyboard/touch/pinned equivalents; visual
   pseudo-state alone is insufficient behavior.
 - Fully precompositing the canvas would destroy independent damage, focus,
   semantics, and dynamic text. Only static backplanes and immutable style
   recipes should be baked at design time.
-

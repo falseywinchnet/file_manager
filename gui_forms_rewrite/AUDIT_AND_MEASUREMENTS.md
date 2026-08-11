@@ -1,7 +1,12 @@
 # Rewrite audit and measurement program
 
-Status: **active implementation audit; first native baseline and semantic
-inventory captured on 2026-08-10**.
+Status: **historical running audit; final closure is recorded in
+`COMPLETION_REPORT.md`**.
+
+The measurements below preserve the incremental path and should not be read as
+the final configuration matrix. Final native, no-HarfBuzz, MinGW, Wine,
+semantic-policy, and managed-facade results are collected in the completion
+report.
 
 ## 0. Captured implementation baseline
 

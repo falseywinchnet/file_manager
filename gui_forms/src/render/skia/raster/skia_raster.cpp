@@ -20,6 +20,8 @@
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkPath.h"
+#include "include/core/SkPathBuilder.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkRegion.h"
 #include "include/core/SkRRect.h"
@@ -655,6 +657,45 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
     }
     (*canvas).drawRRect(to_sk_rrect(
         shadow, std::max(0.0, corner_radius + spread)), paint);
+}
+
+void SkiaRaster::draw_inset_box_shadow(
+    Rect rect, double corner_radius, Point offset, double blur_radius,
+    double spread, Color color) {
+    SkCanvas* canvas = (*impl_).canvas();
+    if (canvas == nullptr || rect.empty() || color.alpha == 0U ||
+        blur_radius < 0.0) {
+        return;
+    }
+    const Rect hole{rect.x + offset.x + spread,
+                    rect.y + offset.y + spread,
+                    rect.width - spread * 2.0,
+                    rect.height - spread * 2.0};
+    const double reach = std::max(rect.width, rect.height) +
+                         std::abs(offset.x) + std::abs(offset.y) +
+                         std::abs(spread) + blur_radius * 3.0 + 1.0;
+    const Rect outside{rect.x - reach, rect.y - reach,
+                       rect.width + reach * 2.0,
+                       rect.height + reach * 2.0};
+    SkPathBuilder complement_builder;
+    complement_builder.setFillType(SkPathFillType::kEvenOdd);
+    complement_builder.addRect(to_sk_rect(outside));
+    if (!hole.empty()) {
+        complement_builder.addRRect(to_sk_rrect(
+            hole, std::max(0.0, corner_radius - spread)));
+    }
+    const SkPath complement = complement_builder.detach();
+    SkPaint paint = make_paint(color);
+    if (blur_radius > 0.0) {
+        paint.setMaskFilter(SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(blur_radius * 0.5),
+            false));
+    }
+    (*canvas).save();
+    (*canvas).clipRRect(to_sk_rrect(rect, corner_radius),
+                       SkClipOp::kIntersect, true);
+    (*canvas).drawPath(complement, paint);
+    (*canvas).restore();
 }
 
 void SkiaRaster::draw_line(Point from, Point to, Color color, double width) {

@@ -123,6 +123,33 @@ enum class AutoSizeMode : std::uint8_t {
     grow_only = 1U,
 };
 
+enum class OwnerDecorationLayer : std::uint8_t {
+    before_content,
+    after_content,
+};
+
+struct OwnerDecorationRecipe final {
+    OwnerDecorationLayer layer{OwnerDecorationLayer::after_content};
+    Size size{};
+    std::optional<double> left;
+    std::optional<double> top;
+    std::optional<double> right;
+    std::optional<double> bottom;
+    double rotation_degrees{};
+    MaterialBorderEdges border_edges;
+    friend bool operator==(const OwnerDecorationRecipe& left_value,
+                           const OwnerDecorationRecipe& right_value) noexcept {
+        return left_value.layer == right_value.layer &&
+               left_value.size == right_value.size &&
+               left_value.left == right_value.left &&
+               left_value.top == right_value.top &&
+               left_value.right == right_value.right &&
+               left_value.bottom == right_value.bottom &&
+               left_value.rotation_degrees == right_value.rotation_degrees &&
+               left_value.border_edges == right_value.border_edges;
+    }
+};
+
 enum class AutoValidate : std::int8_t {
     inherit = -1,
     disable = 0,
@@ -401,6 +428,19 @@ public:
     }
     void set_theme_override(std::shared_ptr<const Theme> theme);
     void clear_theme_override();
+    [[nodiscard]] const std::optional<SurfaceMaterial>&
+    authored_surface_material() const noexcept {
+        return authored_surface_material_;
+    }
+    void set_authored_surface_material(SurfaceMaterial material);
+    void clear_authored_surface_material();
+    [[nodiscard]] std::span<const OwnerDecorationRecipe>
+    owned_decorations() const noexcept {
+        return owned_decorations_;
+    }
+    void set_owned_decorations(const OwnerDecorationRecipe* decorations,
+                               std::size_t decoration_count);
+    void clear_owned_decorations();
     [[nodiscard]] ControlVisualStatus visual_status() const noexcept {
         return visual_status_;
     }
@@ -685,6 +725,12 @@ private:
     [[nodiscard]] std::uint64_t subtree_size() const noexcept;
     [[nodiscard]] bool initialization_blocked() const noexcept;
     void verify_dispose_thread() override;
+    void paint_authored_surface(Painter& painter, Rect bounds) const;
+    void paint_owned_decorations(Painter& painter, Rect bounds,
+                                 OwnerDecorationLayer layer) const;
+    [[nodiscard]] Insets effective_visual_outsets() const noexcept;
+    void validate_authored_surface_material_images(
+        const SurfaceMaterial& material) const;
     void publish_change(const void* event_key,
                         std::function<void()> publication);
     void define_structural_property(PropertyDescriptor descriptor,
@@ -769,6 +815,8 @@ private:
                           ControlStyles::all_painting_in_one_pass};
     std::optional<CursorKind> cursor_;
     std::shared_ptr<const Theme> theme_override_;
+    std::optional<SurfaceMaterial> authored_surface_material_;
+    std::vector<OwnerDecorationRecipe> owned_decorations_;
     ControlVisualStatus visual_status_{ControlVisualStatus::normal};
     std::string accessible_name_;
     std::string accessible_description_;

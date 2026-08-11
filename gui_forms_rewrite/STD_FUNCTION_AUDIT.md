@@ -4,7 +4,7 @@ Status: **OBSERVED lexical inventory plus measured M4 allocation evidence; retai
 
 ## Snapshot
 
-Generated UTC: `2026-08-10T21:20:02+00:00`. Scope: first-party GUI.Forms C++/Objective-C++ outside third-party, experiments, and build products. Explicit spellings: **210**.
+Generated UTC: `2026-08-10T21:51:56+00:00`. Scope: first-party GUI.Forms C++/Objective-C++ outside third-party, experiments, and build products. Explicit spellings: **208**.
 
 One spelling is not necessarily one callback object: nested host signatures contain several spellings, while aliases can create many runtime objects from one spelling. This file is a review map, not an allocation profiler.
 
@@ -12,13 +12,13 @@ One spelling is not necessarily one callback object: nested host signatures cont
 
 | Role | Spellings | Rewrite decision |
 |---|---:|---|
-| Binding, inspection, and property registries | 31 | Retain: heterogeneous property/value registries intentionally own erased operations. |
+| Binding, inspection, and property registries | 30 | Retain: heterogeneous property/value registries intentionally own erased operations. |
 | Commands and input routing | 8 | Retain unless a concrete member binding can use Delegate without changing result/lifetime semantics. |
 | Dispatch, scheduling, and cancellation | 32 | Retain: ownership, cancellation, wake, thread transfer, and exception transport differ from Event. |
 | Event compatibility/storage | 1 | Retain the legacy owning overload; direct member subscriptions use Delegate first. |
 | First-party support and dogfooding | 48 | Retain where it exercises the owning API; support code does not redesign production. |
 | Host, platform, and C ABI adapters | 66 | Retain: these callbacks cross explicit host/provider lifetime boundaries; C ABI remains function pointer plus context. |
-| Other retained owning callbacks | 20 | Reviewed individually; no allocation-heavy production target was proven by spelling alone. |
+| Other retained owning callbacks | 19 | Reviewed individually; no allocation-heavy production target was proven by spelling alone. |
 | Rendering and live content | 4 | Retain: owning paint/wake work has distinct surface and cancellation lifetime. |
 
 ## Quantified decision
@@ -71,8 +71,6 @@ The conspicuous large-target Event case is now documented, but no matching first
 | Other retained owning callbacks | `include/gui_forms/control/control/control.hpp:989` | `std::function<void()> changed) const {` |
 | Other retained owning callbacks | `include/gui_forms/control/static_tree/control_factory/control_factory.hpp:23` | `using Creator = std::function<Control::Ptr(StableId)>;` |
 | Rendering and live content | `include/gui_forms/controls/drawing_surface/drawing_surface.hpp:13` | `using PaintCallback = std::function<void(Painter&, Rect, Rect)>;` |
-| Other retained owning callbacks | `include/gui_forms/detail/bound_member_function.hpp:7` | `// Explicit adapter for APIs that deliberately retain std::function but bind a` |
-| Binding, inspection, and property registries | `include/gui_forms/detail/property_binding_adapters.hpp:15` | `// already-authored decision for std::function-based registration seams.` |
 | Binding, inspection, and property registries | `include/gui_forms/detail/property_binding_adapters.hpp:110` | `explicit PropertyChangeRelay(std::function<void()> changed)` |
 | Binding, inspection, and property registries | `include/gui_forms/detail/property_binding_adapters.hpp:116` | `std::function<void()> changed_;` |
 | Binding, inspection, and property registries | `include/gui_forms/detail/property_binding_adapters.hpp:126` | `std::function<void()> changed) const {` |

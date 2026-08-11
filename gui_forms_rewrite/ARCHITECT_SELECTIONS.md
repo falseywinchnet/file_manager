@@ -1,6 +1,7 @@
 # GUI.Forms rewrite architect selections
 
-Status: **DECIDED on 2026-08-10; implementation remains separately gated**.
+Status: **DECIDED on 2026-08-10 and implemented; see
+`COMPLETION_REPORT.md`**.
 
 This record closes the option queue in `OPEN_ITEMS.md`. The detailed option
 descriptions remain there as reversal evidence. Where this record and an older
@@ -172,8 +173,7 @@ be updated after the production surface changes.
 
 ## Gate after these selections
 
-The option interview is closed. Implementation remains blocked only until the
-planning package is reconciled, the ownership evidence report and semantic
-checker plan are present, the exact starting snapshot is recorded, and the
-architect explicitly directs the implementing sibling to begin.
-
+Historical gate: the option interview, evidence preflight, exact snapshot, and
+explicit start direction were satisfied. O-032-A closure is recorded in
+`COMPLETION_REPORT.md`. Reopening a selected decision now requires a new round,
+not reinterpretation of the pre-implementation gate.

@@ -166,6 +166,39 @@ void Painter::draw_box_shadow(Rect rect, double corner_radius, Point offset,
     }
 }
 
+void Painter::draw_inset_box_shadow(Rect rect, double corner_radius,
+                                    Point offset, double blur_radius,
+                                    double spread, Color color) {
+    if (rect.empty() || color.alpha == 0U || !std::isfinite(blur_radius) ||
+        !std::isfinite(spread) || blur_radius < 0.0) {
+        return;
+    }
+    save();
+    clip_rounded_rect(rect, corner_radius);
+    constexpr unsigned rings = 16U;
+    const double reach = std::max(1.0, blur_radius * 3.0 + 1.0);
+    const Rect hole{rect.x + offset.x + spread,
+                    rect.y + offset.y + spread,
+                    std::max(0.0, rect.width - spread * 2.0),
+                    std::max(0.0, rect.height - spread * 2.0)};
+    for (unsigned ring = 0U; ring < rings; ++ring) {
+        const double amount = static_cast<double>(ring) /
+                              static_cast<double>(rings - 1U);
+        Color ring_color = color;
+        ring_color.alpha = static_cast<std::uint8_t>(std::lround(
+            static_cast<double>(color.alpha) * (1.0 - amount) /
+            static_cast<double>(rings)));
+        const double inset = amount * reach;
+        const Rect stroke{hole.x + inset, hole.y + inset,
+                          std::max(0.0, hole.width - inset * 2.0),
+                          std::max(0.0, hole.height - inset * 2.0)};
+        stroke_rounded_rect(
+            stroke, std::max(0.0, corner_radius - spread - inset),
+            ring_color, std::max(1.0, reach * 2.0 / rings));
+    }
+    restore();
+}
+
 void Painter::draw_image_region(ImageId image, Rect source, Rect destination,
                                 double opacity) {
     if (image.value == 0U || source.empty() || destination.empty() ||

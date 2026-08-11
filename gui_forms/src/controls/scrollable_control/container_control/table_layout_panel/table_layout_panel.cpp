@@ -94,23 +94,30 @@ struct TableOccupancyGrid final {
 void draw_table_grid(Painter& painter,
                      std::span<const double> column_widths,
                      std::span<const double> row_heights,
-                     Insets inset, double width, double height,
+                     Insets inset, Size track_spacing,
+                     double width, double height,
                      Color color, double offset) {
     double x = inset.left;
     painter.draw_line({x + offset, inset.top},
                       {x + offset, inset.top + height}, color, 1.0);
-    for (double extent : column_widths) {
-        x += extent;
-        painter.draw_line({x + offset, inset.top},
-                          {x + offset, inset.top + height}, color, 1.0);
+    for (std::size_t index = 0U; index < column_widths.size(); ++index) {
+        x += column_widths[index];
+        const bool has_gap = index + 1U < column_widths.size();
+        const double line_x = x + (has_gap ? track_spacing.width * 0.5 : 0.0);
+        painter.draw_line({line_x + offset, inset.top},
+                          {line_x + offset, inset.top + height}, color, 1.0);
+        if (has_gap) x += track_spacing.width;
     }
     double y = inset.top;
     painter.draw_line({inset.left, y + offset},
                       {inset.left + width, y + offset}, color, 1.0);
-    for (double extent : row_heights) {
-        y += extent;
-        painter.draw_line({inset.left, y + offset},
-                          {inset.left + width, y + offset}, color, 1.0);
+    for (std::size_t index = 0U; index < row_heights.size(); ++index) {
+        y += row_heights[index];
+        const bool has_gap = index + 1U < row_heights.size();
+        const double line_y = y + (has_gap ? track_spacing.height * 0.5 : 0.0);
+        painter.draw_line({inset.left, line_y + offset},
+                          {inset.left + width, line_y + offset}, color, 1.0);
+        if (has_gap) y += track_spacing.height;
     }
 }
 
@@ -231,6 +238,19 @@ void TableLayoutPanel::set_cell_border_style(TableCellBorderStyle style) {
     if (cell_border_style_ == style) return;
     cell_border_style_ = style;
     invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
+}
+
+void TableLayoutPanel::set_track_spacing(Size spacing) {
+    require_mutable();
+    if (!std::isfinite(spacing.width) || !std::isfinite(spacing.height) ||
+        spacing.width < 0.0 || spacing.height < 0.0 ||
+        spacing.width > 256.0 || spacing.height > 256.0) {
+        throw std::invalid_argument(
+            "TableLayoutPanel track spacing must be finite and between zero and 256");
+    }
+    if (track_spacing_ == spacing) return;
+    track_spacing_ = spacing;
+    invalidate(invalidation::bounds);
 }
 
 void TableLayoutPanel::set_column_style(std::size_t column,
@@ -463,6 +483,10 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
     std::vector<TableLayoutStyle> row_styles = row_styles_;
     column_styles.resize(grid.columns);
     row_styles.resize(grid.rows);
+    const double horizontal_spacing = track_spacing_.width *
+        static_cast<double>(grid.columns > 0U ? grid.columns - 1U : 0U);
+    const double vertical_spacing = track_spacing_.height *
+        static_cast<double>(grid.rows > 0U ? grid.rows - 1U : 0U);
     std::vector<double> column_minimum(grid.columns, 0.0);
     std::vector<double> row_minimum(grid.rows, 0.0);
     std::vector<TrackSpanDemand> column_spans;
@@ -491,7 +515,9 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
                 column_minimum[item.position.column], required_width);
         } else if (item.column_span > 1U) {
             column_spans.push_back(
-                {item.position.column, item.column_span, required_width});
+                {item.position.column, item.column_span,
+                 std::max(0.0, required_width - track_spacing_.width *
+                     static_cast<double>(item.column_span - 1U))});
         }
         if (item.row_span == 1U &&
             row_styles[item.position.row].size_mode != TableSizeMode::absolute) {
@@ -499,24 +525,33 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
                 row_minimum[item.position.row], required_height);
         } else if (item.row_span > 1U) {
             row_spans.push_back(
-                {item.position.row, item.row_span, required_height});
+                {item.position.row, item.row_span,
+                 std::max(0.0, required_height - track_spacing_.height *
+                     static_cast<double>(item.row_span - 1U))});
         }
     }
 
     const TrackResolution horizontal = resolve_table_tracks(
-        column_styles, std::move(column_minimum), column_spans, inner.width);
+        column_styles, std::move(column_minimum), column_spans,
+        std::max(0.0, inner.width - horizontal_spacing));
     const TrackResolution vertical = resolve_table_tracks(
-        row_styles, std::move(row_minimum), row_spans, inner.height);
+        row_styles, std::move(row_minimum), row_spans,
+        std::max(0.0, inner.height - vertical_spacing));
     if (assign) {
         column_widths_ = horizontal.actual;
         row_heights_ = vertical.actual;
     }
     std::vector<double> column_offsets(grid.columns + 1U, 0.0);
     std::vector<double> row_offsets(grid.rows + 1U, 0.0);
-    std::partial_sum(horizontal.actual.begin(), horizontal.actual.end(),
-                     column_offsets.begin() + 1);
-    std::partial_sum(vertical.actual.begin(), vertical.actual.end(),
-                     row_offsets.begin() + 1);
+    for (std::size_t index = 0U; index < grid.columns; ++index) {
+        column_offsets[index + 1U] = column_offsets[index] +
+            horizontal.actual[index] +
+            (index + 1U < grid.columns ? track_spacing_.width : 0.0);
+    }
+    for (std::size_t index = 0U; index < grid.rows; ++index) {
+        row_offsets[index + 1U] = row_offsets[index] + vertical.actual[index] +
+            (index + 1U < grid.rows ? track_spacing_.height : 0.0);
+    }
 
     for (const Item& item : resolved) {
         if (!item.control || !is_current_layout_child(item.control)) continue;
@@ -524,10 +559,14 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
         if (!assign) continue;
         const double cell_width =
             column_offsets[item.position.column + item.column_span] -
-            column_offsets[item.position.column];
+            column_offsets[item.position.column] -
+            (item.position.column + item.column_span < grid.columns
+                 ? track_spacing_.width : 0.0);
         const double cell_height =
             row_offsets[item.position.row + item.row_span] -
-            row_offsets[item.position.row];
+            row_offsets[item.position.row] -
+            (item.position.row + item.row_span < grid.rows
+                 ? track_spacing_.height : 0.0);
         const double available_width = std::max(
             0.0, cell_width - horizontal_extent(item.margin));
         const double available_height = std::max(
@@ -585,8 +624,8 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             }
         }
     }
-    return {horizontal.desired + horizontal_extent(inset),
-            vertical.desired + vertical_extent(inset)};
+    return {horizontal.desired + horizontal_spacing + horizontal_extent(inset),
+            vertical.desired + vertical_spacing + vertical_extent(inset)};
 }
 
 Control::Ptr TableLayoutPanel::control_from_position(std::size_t column,
@@ -638,21 +677,23 @@ void TableLayoutPanel::on_paint(Painter& painter, Rect) {
     const BasicControlStyle style;
     const Insets inset = padding();
     const double width = std::accumulate(column_widths_.begin(),
-                                         column_widths_.end(), 0.0);
+                                         column_widths_.end(), 0.0) +
+        track_spacing_.width * static_cast<double>(column_widths_.size() - 1U);
     const double height = std::accumulate(row_heights_.begin(),
-                                          row_heights_.end(), 0.0);
+                                          row_heights_.end(), 0.0) +
+        track_spacing_.height * static_cast<double>(row_heights_.size() - 1U);
     if (cell_border_style_ == TableCellBorderStyle::single) {
-        draw_table_grid(painter, column_widths_, row_heights_, inset,
+        draw_table_grid(painter, column_widths_, row_heights_, inset, track_spacing_,
                         width, height, style.border, 0.0);
     } else if (cell_border_style_ == TableCellBorderStyle::inset) {
-        draw_table_grid(painter, column_widths_, row_heights_, inset,
+        draw_table_grid(painter, column_widths_, row_heights_, inset, track_spacing_,
                         width, height, style.dark_border, 0.0);
-        draw_table_grid(painter, column_widths_, row_heights_, inset,
+        draw_table_grid(painter, column_widths_, row_heights_, inset, track_spacing_,
                         width, height, style.highlight, 1.0);
     } else {
-        draw_table_grid(painter, column_widths_, row_heights_, inset,
+        draw_table_grid(painter, column_widths_, row_heights_, inset, track_spacing_,
                         width, height, style.highlight, 0.0);
-        draw_table_grid(painter, column_widths_, row_heights_, inset,
+        draw_table_grid(painter, column_widths_, row_heights_, inset, track_spacing_,
                         width, height, style.dark_border, 1.0);
     }
 }

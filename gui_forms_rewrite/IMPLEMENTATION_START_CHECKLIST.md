@@ -1,7 +1,11 @@
 # GUI.Forms rewrite implementation-start checklist
 
-Status: **ready for an explicitly directed sibling; no source implementation
-authorized by this file**.
+Status: **historical checklist; start gate was satisfied and the rewrite was
+completed on 2026-08-10**.
+
+See `COMPLETION_REPORT.md` for the phase and O-032-A closure record. The
+preflight below remains useful evidence of what the implementation was required
+to preserve; it is no longer a pending authorization gate.
 
 ## 1. Confirm authority and overlap
 
@@ -77,4 +81,3 @@ complete is not by itself that direction.
 Every phase stays compilable, reversible, and behavior-checked. Current
 shared/weak ownership remains untouched; `OWNERSHIP_AUDIT.md` belongs to a
 future lifecycle round.
-

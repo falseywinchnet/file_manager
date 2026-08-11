@@ -179,6 +179,12 @@ int main() {
     raster.fill_linear_gradient_spread(
         {8.0, 100.0, 80.0, 14.0}, {8.0, 100.0}, {16.0, 100.0},
         repeating_gradient, gui_forms::GradientSpreadMode::repeat);
+    const gui_forms::Rect inset_panel{154.0, 96.0, 56.0, 18.0};
+    raster.fill_rounded_rect(inset_panel, 5.0,
+                             gui_forms::Color::rgba(244U, 247U, 250U));
+    raster.draw_inset_box_shadow(
+        inset_panel, 5.0, {0.0, 2.0}, 4.0, 0.0,
+        gui_forms::Color::rgba(12U, 24U, 36U, 180U));
     raster.end_frame();
 
     const std::uint8_t* pixels = static_cast<const std::uint8_t*>(raster.pixels());
@@ -225,6 +231,12 @@ int main() {
         pixels, raster.row_bytes(), 2, 106, 104);
     const std::uint8_t* pattern_repeat = pixel_at(
         pixels, raster.row_bytes(), 2, 114, 104);
+    const std::uint8_t* inset_outside = pixel_at(
+        pixels, raster.row_bytes(), 2, 153, 104);
+    const std::uint8_t* inset_edge = pixel_at(
+        pixels, raster.row_bytes(), 2, 180, 97);
+    const std::uint8_t* inset_center = pixel_at(
+        pixels, raster.row_bytes(), 2, 180, 105);
     if (rounded_corner[0] != 241U || rounded_corner[1] != 238U ||
         rounded_corner[2] != 226U || title_left[2] <= title_left[0] ||
         title_right[0] <= title_right[2] || glow_center[0] <= glow_edge[0] ||
@@ -242,6 +254,14 @@ int main() {
         pattern_repeat[0] < 220U || pattern_repeat[1] > 24U) {
         std::fputs("Skia exact image-pattern period contract changed\n", stderr);
         return 14;
+    }
+    if (inset_outside[0] != 241U || inset_outside[1] != 238U ||
+        inset_outside[2] != 226U ||
+        inset_edge[0] >= inset_center[0] ||
+        inset_edge[1] >= inset_center[1] ||
+        inset_edge[2] >= inset_center[2]) {
+        std::fputs("Skia inset shadow clipping/gradient contract changed\n", stderr);
+        return 15;
     }
     if (repeat_first[0] != repeat_second[0] ||
         repeat_first[1] != repeat_second[1] ||

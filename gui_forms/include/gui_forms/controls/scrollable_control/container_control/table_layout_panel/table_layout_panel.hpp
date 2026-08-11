@@ -71,6 +71,8 @@ public:
         return cell_border_style_;
     }
     void set_cell_border_style(TableCellBorderStyle style);
+    [[nodiscard]] Size track_spacing() const noexcept { return track_spacing_; }
+    void set_track_spacing(Size spacing);
 
     [[nodiscard]] std::span<const TableLayoutStyle> column_styles() const noexcept {
         return column_styles_;
@@ -134,6 +136,7 @@ private:
     std::size_t row_count_{1U};
     TableLayoutGrowStyle grow_style_{TableLayoutGrowStyle::add_rows};
     TableCellBorderStyle cell_border_style_{TableCellBorderStyle::none};
+    Size track_spacing_{};
     bool layout_overflowed_{};
 };
 

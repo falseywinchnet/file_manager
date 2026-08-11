@@ -22,11 +22,13 @@ struct MaterialShadow final {
     double blur_radius{4.0};
     double spread{};
     Color color{Color::rgba(20, 30, 42, 72)};
+    bool inset{};
     friend constexpr bool operator==(const MaterialShadow& left,
                                      const MaterialShadow& right) noexcept {
         return left.offset == right.offset &&
                left.blur_radius == right.blur_radius &&
-               left.spread == right.spread && left.color == right.color;
+               left.spread == right.spread && left.color == right.color &&
+               left.inset == right.inset;
     }
 };
 struct MaterialBorderEdges final {

@@ -2,8 +2,8 @@
 
 Date: 2026-08-10
 
-Status: **DECIDED principle under ADR-001; detailed lowering remains to be
-measured**.
+Status: **DECIDED principle under ADR-001; MEASURED experimental native-tree
+composition under ADR-004**.
 
 ## The object being preserved
 
@@ -54,6 +54,21 @@ The compiler reports at least:
   density and gap;
 - state variants that expose a surface or clip not present in the base graph.
 
+**MEASURED dogfood slice:** Stage 1 records each retained parent and one of
+`reveal-parent`, `own-surface`, or `baked-into-parent`. The native layout pass
+projects 2/2 button-board, 4/4 breadcrumb-board, and 11/11 standard-shell flex
+containers into retained direction, wrapping, gap, padding, main/cross
+alignment, and grow relationships. This removes fixed-frame child coordinates
+from those container algorithms. GUI.Forms' opt-in `Control` background layer
+also proves parent reveal and child surface ownership without a wrapper panel.
+The fail-closed constructor applies those edges to the same controls that own
+layout and identity. A linked 38-node native probe verifies the resulting
+shell, workspace, sidebar, and content containment. It also retained a failed
+first result: Forms' default 3px margin created a 204px sidebar until the
+generator explicitly applied CSS initial zero margins/padding before authored
+geometry. The passing result is therefore an end-to-end structural and logical-
+geometry measurement, not a claim inferred from available primitives.
+
 A provenance inspector must be able to answer which ancestor, recipe, rule, and
 state supplied each effective layout/style value.
 
@@ -76,4 +91,3 @@ The accepted target is exact logical structure and geometry under a pinned
 profile, with declared tolerance for rounding. Native/browser typography and
 material rasterization are scored separately. A visually pleasing result with
 different nesting, gaps, clipping, or ownership is not conformant.
-

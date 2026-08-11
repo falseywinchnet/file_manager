@@ -15,6 +15,66 @@ namespace gui_forms {
 
 namespace {
 
+[[nodiscard]] Rect owner_decoration_box(
+    const OwnerDecorationRecipe& decoration, Rect owner) noexcept {
+    const double x = decoration.left
+        ? *decoration.left
+        : owner.width - *decoration.right - decoration.size.width;
+    const double y = decoration.top
+        ? *decoration.top
+        : owner.height - *decoration.bottom - decoration.size.height;
+    return {x, y, decoration.size.width, decoration.size.height};
+}
+
+[[nodiscard]] Point rotate_owner_decoration_point(
+    Point point, Rect box, double degrees) noexcept {
+    const double radians = degrees * 3.14159265358979323846 / 180.0;
+    const double cosine = std::cos(radians);
+    const double sine = std::sin(radians);
+    const Point center{box.x + box.width * 0.5, box.y + box.height * 0.5};
+    const double x = point.x - center.x;
+    const double y = point.y - center.y;
+    return {center.x + x * cosine - y * sine,
+            center.y + x * sine + y * cosine};
+}
+
+[[nodiscard]] Rect owner_decoration_visual_bounds(
+    const OwnerDecorationRecipe& decoration, Rect owner) noexcept {
+    const Rect box = owner_decoration_box(decoration, owner);
+    const Point corners[]{
+        rotate_owner_decoration_point({box.x, box.y}, box,
+                                      decoration.rotation_degrees),
+        rotate_owner_decoration_point({box.x + box.width, box.y}, box,
+                                      decoration.rotation_degrees),
+        rotate_owner_decoration_point(
+            {box.x + box.width, box.y + box.height}, box,
+            decoration.rotation_degrees),
+        rotate_owner_decoration_point({box.x, box.y + box.height}, box,
+                                      decoration.rotation_degrees),
+    };
+    double minimum_x = corners[0].x;
+    double maximum_x = corners[0].x;
+    double minimum_y = corners[0].y;
+    double maximum_y = corners[0].y;
+    for (std::size_t index = 1U; index < 4U; ++index) {
+        minimum_x = std::min(minimum_x, corners[index].x);
+        maximum_x = std::max(maximum_x, corners[index].x);
+        minimum_y = std::min(minimum_y, corners[index].y);
+        maximum_y = std::max(maximum_y, corners[index].y);
+    }
+    return {minimum_x, minimum_y,
+            maximum_x - minimum_x, maximum_y - minimum_y};
+}
+
+void draw_owner_decoration_edge(
+    Painter& painter, Point from, Point to, const MaterialBorder& border,
+    Rect box, double rotation_degrees) {
+    painter.draw_line(
+        rotate_owner_decoration_point(from, box, rotation_degrees),
+        rotate_owner_decoration_point(to, box, rotation_degrees),
+        border.color, border.width);
+}
+
 [[nodiscard]] constexpr bool valid_bounds_specified(
     BoundsSpecified value) noexcept {
     return (static_cast<std::uint8_t>(value) &
@@ -522,6 +582,110 @@ void Control::clear_theme_override() {
     if (!theme_override_) return;
     theme_override_.reset();
     invalidate_subtree(invalidation::conservative_subtree);
+}
+
+void Control::set_authored_surface_material(SurfaceMaterial material) {
+    require_mutable();
+    if (!valid_surface_material(material)) {
+        throw std::invalid_argument("control authored surface material is invalid");
+    }
+    validate_authored_surface_material_images(material);
+    if (authored_surface_material_ && *authored_surface_material_ == material) {
+        return;
+    }
+    authored_surface_material_ = std::move(material);
+    invalidate(Dirty::style | Dirty::paint);
+}
+
+void Control::clear_authored_surface_material() {
+    require_mutable();
+    if (!authored_surface_material_) return;
+    authored_surface_material_.reset();
+    invalidate(Dirty::style | Dirty::paint);
+}
+
+void Control::set_owned_decorations(
+    const OwnerDecorationRecipe* decorations, std::size_t decoration_count) {
+    require_mutable();
+    constexpr std::size_t maximum_owner_decorations = 8U;
+    if (decoration_count > maximum_owner_decorations ||
+        (decoration_count != 0U && decorations == nullptr)) {
+        throw std::invalid_argument(
+            "control owned decorations require zero through eight pointer/count recipes");
+    }
+    std::vector<OwnerDecorationRecipe> candidate;
+    if (decoration_count != 0U) {
+        candidate.assign(decorations, decorations + decoration_count);
+    }
+    for (const OwnerDecorationRecipe& decoration : candidate) {
+        const bool valid_layer =
+            decoration.layer == OwnerDecorationLayer::before_content ||
+            decoration.layer == OwnerDecorationLayer::after_content;
+        const bool horizontal = decoration.left.has_value() !=
+            decoration.right.has_value();
+        const bool vertical = decoration.top.has_value() !=
+            decoration.bottom.has_value();
+        const std::optional<double>* offsets[]{
+            &decoration.left, &decoration.top,
+            &decoration.right, &decoration.bottom,
+        };
+        bool valid_offsets = true;
+        for (const std::optional<double>* offset : offsets) {
+            if ((*offset).has_value() &&
+                (!std::isfinite((*offset).value()) ||
+                 std::abs((*offset).value()) > 4096.0)) {
+                valid_offsets = false;
+            }
+        }
+        const std::optional<MaterialBorder>* borders[]{
+            &decoration.border_edges.top, &decoration.border_edges.right,
+            &decoration.border_edges.bottom, &decoration.border_edges.left,
+        };
+        bool valid_borders = !decoration.border_edges.empty();
+        for (const std::optional<MaterialBorder>* border : borders) {
+            if ((*border).has_value() &&
+                (!std::isfinite((*border).value().width) ||
+                 (*border).value().width <= 0.0 ||
+                 (*border).value().width > 64.0)) {
+                valid_borders = false;
+            }
+        }
+        if (!valid_layer || !std::isfinite(decoration.size.width) ||
+            !std::isfinite(decoration.size.height) ||
+            decoration.size.width <= 0.0 || decoration.size.height <= 0.0 ||
+            decoration.size.width > 4096.0 ||
+            decoration.size.height > 4096.0 || !horizontal || !vertical ||
+            !valid_offsets || !std::isfinite(decoration.rotation_degrees) ||
+            std::abs(decoration.rotation_degrees) > 360.0 || !valid_borders) {
+            throw std::invalid_argument(
+                "control owned decoration recipe is outside bounded geometry");
+        }
+    }
+    if (owned_decorations_ == candidate) return;
+    owned_decorations_ = std::move(candidate);
+    invalidate(Dirty::style | Dirty::paint);
+}
+
+void Control::clear_owned_decorations() {
+    set_owned_decorations(nullptr, 0U);
+}
+
+void Control::validate_authored_surface_material_images(
+    const SurfaceMaterial& material) const {
+    if (window_ == nullptr) return;
+    for (const MaterialFillLayer& fill : material.fills) {
+        if (fill.kind != MaterialFillKind::image) continue;
+        const std::optional<ImageResourceView> resource =
+            (*window_).image_resources().find(fill.image);
+        if (!resource ||
+            static_cast<double>((*resource).metadata.width) !=
+                fill.image_pixel_size.width ||
+            static_cast<double>((*resource).metadata.height) !=
+                fill.image_pixel_size.height) {
+            throw std::invalid_argument(
+                "control authored surface image is missing or has stale pixel geometry");
+        }
+    }
 }
 
 void Control::set_visual_status(ControlVisualStatus status) {
@@ -2081,6 +2245,68 @@ bool Control::is_current_layout_child(const Ptr& child) const noexcept {
 
 void Control::on_paint(Painter&, Rect) {}
 void Control::on_paint_overlay(Painter&, Rect) {}
+
+void Control::paint_authored_surface(Painter& painter, Rect bounds) const {
+    if (authored_surface_material_) {
+        paint_surface_material(painter, bounds, *authored_surface_material_);
+    }
+}
+
+void Control::paint_owned_decorations(
+    Painter& painter, Rect bounds, OwnerDecorationLayer layer) const {
+    for (const OwnerDecorationRecipe& decoration : owned_decorations_) {
+        if (decoration.layer != layer) continue;
+        const Rect box = owner_decoration_box(decoration, bounds);
+        const MaterialBorderEdges& edges = decoration.border_edges;
+        if (edges.top) {
+            const double y = box.y + (*edges.top).width * 0.5;
+            draw_owner_decoration_edge(
+                painter, {box.x, y}, {box.x + box.width, y}, *edges.top,
+                box, decoration.rotation_degrees);
+        }
+        if (edges.right) {
+            const double x = box.x + box.width - (*edges.right).width * 0.5;
+            draw_owner_decoration_edge(
+                painter, {x, box.y}, {x, box.y + box.height}, *edges.right,
+                box, decoration.rotation_degrees);
+        }
+        if (edges.bottom) {
+            const double y = box.y + box.height - (*edges.bottom).width * 0.5;
+            draw_owner_decoration_edge(
+                painter, {box.x, y}, {box.x + box.width, y}, *edges.bottom,
+                box, decoration.rotation_degrees);
+        }
+        if (edges.left) {
+            const double x = box.x + (*edges.left).width * 0.5;
+            draw_owner_decoration_edge(
+                painter, {x, box.y}, {x, box.y + box.height}, *edges.left,
+                box, decoration.rotation_degrees);
+        }
+    }
+}
+
+Insets Control::effective_visual_outsets() const noexcept {
+    Insets result = visual_outsets();
+    if (authored_surface_material_) {
+        const Insets surface =
+            surface_material_visual_outsets(*authored_surface_material_);
+        result.left = std::max(result.left, surface.left);
+        result.top = std::max(result.top, surface.top);
+        result.right = std::max(result.right, surface.right);
+        result.bottom = std::max(result.bottom, surface.bottom);
+    }
+    const Rect owner{0.0, 0.0, arranged_bounds_.width, arranged_bounds_.height};
+    for (const OwnerDecorationRecipe& decoration : owned_decorations_) {
+        const Rect visual = owner_decoration_visual_bounds(decoration, owner);
+        result.left = std::max(result.left, std::max(0.0, -visual.x));
+        result.top = std::max(result.top, std::max(0.0, -visual.y));
+        result.right = std::max(
+            result.right, std::max(0.0, visual.x + visual.width - owner.width));
+        result.bottom = std::max(
+            result.bottom, std::max(0.0, visual.y + visual.height - owner.height));
+    }
+    return result;
+}
 
 Insets Control::visual_outsets() const noexcept {
     return {};

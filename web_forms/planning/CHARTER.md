@@ -32,7 +32,8 @@ test. See `NATIVE_TRANSLATION_NEGATIVE_001.md`.
 - Parent containment must compile into one nested ambient layout, paint, style,
   and effective-state landscape; loose visual overlay is not conformant.
 - Product output is C++17-compatible source in the accepted orthodox generated
-  profile. The build-time compiler is Rust and adds no product runtime.
+  profile. The two-stage build-time compiler is Python and adds no product
+  runtime.
 - Browser preview and generated-native result are compared explicitly; visual
   accuracy is a conformance claim, not an adjective.
 
@@ -85,9 +86,11 @@ must include:
 - source lines touched, handwritten C++ extension lines, and elapsed
   reconciliation effort for representative visual revisions.
 
-## Implementation opening gate
+## Promotion gate
 
-Compiler implementation may begin only after:
+ADR-003 opens bounded Python dogfood before every 0.1 edge is frozen. Promotion
+from descriptor experiments to a production GUI.Forms construction adapter
+requires:
 
 1. Language Profile 0.1 is owner-approved and fail-closed.
 2. GUI.Forms supplies or accepts a versioned control/property/layout/style
@@ -99,4 +102,5 @@ Compiler implementation may begin only after:
 5. Numeric resource/complexity limits and rejection diagnostics are recorded.
 6. The first atlas slice has a mapping table with no silent fallback.
 7. Generated-output packaging and GUI.Forms' C++17-compatible public generation
-   seam are closed; the compiler language is selected by ADR-002.
+   seam are closed; the compiler language and two-stage sequence are selected
+   by ADR-003.

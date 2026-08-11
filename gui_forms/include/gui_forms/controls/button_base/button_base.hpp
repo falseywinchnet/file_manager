@@ -47,6 +47,10 @@ public:
     virtual void set_text(std::string text);
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
+    [[nodiscard]] double text_line_spacing() const noexcept {
+        return text_line_spacing_;
+    }
+    void set_text_line_spacing(double spacing);
     [[nodiscard]] const BasicControlStyle& style() const noexcept;
     [[nodiscard]] bool has_style_override() const noexcept {
         return style_override_.has_value();
@@ -100,6 +104,7 @@ public:
         return pointer_pressed_ || keyboard_pressed_;
     }
     [[nodiscard]] bool focused_visual() const noexcept { return focused_; }
+    [[nodiscard]] bool focus_cue_visible() const noexcept;
     [[nodiscard]] bool hovered_visual() const noexcept { return hovered_; }
     // Optional disclosure state for buttons that own a popup or retained
     // disclosure region. Nullopt is an ordinary push button; false/true expose
@@ -158,6 +163,7 @@ private:
 
     std::string text_;
     FontSpec font_{FontRole::control, 12.0, 400, false, 0.24};
+    double text_line_spacing_{1.25};
     std::optional<BasicControlStyle> style_override_;
     std::optional<ControlStateRecipes> visual_recipes_override_;
     ImageId image_{};

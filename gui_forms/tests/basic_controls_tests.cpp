@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -53,11 +54,13 @@ public:
         ++fills;
         last_fill_bounds = bounds;
         last_fill_color = color;
+        fill_colors.push_back(color);
     }
     void fill_rounded_rect(Rect bounds, double, Color color) override {
         ++rounded_fills;
         last_fill_bounds = bounds;
         last_fill_color = color;
+        fill_colors.push_back(color);
     }
     void stroke_rect(Rect, Color, double) override { ++strokes; }
     void stroke_rounded_rect(Rect bounds, double, Color color, double width) override {
@@ -70,11 +73,17 @@ public:
                               std::span<const GradientStop>) override {
         ++gradients;
     }
-    void draw_line(Point, Point, Color, double) override { ++lines; }
+    void draw_line(Point from, Point to, Color, double) override {
+        ++lines;
+        line_starts.push_back(from);
+        line_ends.push_back(to);
+        text_line_order.push_back('L');
+    }
     void draw_text_utf8(Point origin, std::string_view text, FontSpec font, Color) override {
         texts.emplace_back(text);
         roles.push_back(font.role);
         text_origins.push_back(origin);
+        text_line_order.push_back('T');
     }
     void draw_image(ImageId image, Rect destination, double opacity) override {
         images.push_back(image);
@@ -97,9 +106,13 @@ public:
     Rect last_rounded_stroke_bounds{};
     Color last_rounded_stroke_color{};
     double last_rounded_stroke_width{};
+    std::vector<Color> fill_colors;
     std::vector<std::string> texts;
     std::vector<FontRole> roles;
     std::vector<Point> text_origins;
+    std::vector<Point> line_starts;
+    std::vector<Point> line_ends;
+    std::vector<char> text_line_order;
     std::vector<ImageId> images;
     std::vector<Rect> image_destinations;
     std::vector<double> image_opacities;
@@ -282,6 +295,64 @@ void test_button_pointer_and_keyboard_activation() {
             "Button keyboard visual must clear after activation");
 }
 
+void test_button_focus_cue_tracks_input_modality() {
+    std::shared_ptr<gui_forms::Panel> root =
+        make_control<Panel>(StableId("focus-visible.root"));
+    std::shared_ptr<gui_forms::Button> first =
+        make_control<Button>(StableId("focus-visible.first"), "First");
+    std::shared_ptr<gui_forms::Button> second =
+        make_control<Button>(StableId("focus-visible.second"), "Second");
+    ControlVisualRecipe focus_values[control_surface_state_count];
+    for (std::size_t index = 0; index < control_surface_state_count; ++index) {
+        focus_values[index].material =
+            solid_material(Color::rgba(224U, 232U, 240U));
+        focus_values[index].focus_ring = Color::rgba(40U, 125U, 155U);
+        focus_values[index].focus_width = 2.0;
+        focus_values[index].focus_offset = 3.0;
+        focus_values[index].authored_focus_outline = true;
+    }
+    const ControlStateRecipes focus_recipes = ControlStateRecipes::from_parts(
+        focus_values, control_surface_state_count);
+    (*first).set_visual_recipes(focus_recipes);
+    (*second).set_visual_recipes(focus_recipes);
+    (*first).set_requested_bounds({10.0, 10.0, 80.0, 30.0});
+    (*second).set_requested_bounds({100.0, 10.0, 80.0, 30.0});
+    (*root).add_child(first);
+    (*root).add_child(second);
+    Window window(root, {200.0, 50.0});
+    window.perform_layout();
+
+    click(window, first);
+    require(window.focused_control() == first &&
+                !window.focus_cue_visible() && !(*first).focus_cue_visible() &&
+                (*first).visual_outsets() == Insets{},
+            "primary-pointer focus must suppress focus-visible without losing focus");
+
+    KeyEvent tab;
+    tab.action = KeyAction::down;
+    tab.physical_key = PhysicalKey::tab;
+    require(window.dispatch_key(tab) && window.focused_control() == second &&
+                window.focus_cue_visible() && (*second).focus_cue_visible() &&
+                (*second).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
+            "keyboard traversal must expose focus-visible on the moved focus");
+
+    require(window.perform_semantic_action(
+                "focus-visible.first", SemanticAction::focus) &&
+                window.focused_control() == first &&
+                window.focus_cue_visible() && (*first).focus_cue_visible() &&
+                (*first).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
+            "semantic focus navigation must retain a visible accessibility cue");
+
+    click(window, second);
+    require(window.focused_control() == second && !window.focus_cue_visible() &&
+                (*second).visual_outsets() == Insets{},
+            "a later primary-pointer focus must return to pointer modality");
+    require(window.request_focus(first) && window.focused_control() == first &&
+                !window.focus_cue_visible() &&
+                (*first).visual_outsets() == Insets{},
+            "programmatic focus must preserve the current modality deterministically");
+}
+
 void test_button_authored_state_recipes_are_owned_and_retained() {
     const Color normal_color = Color::rgba(21, 42, 63);
     const Color hot_color = Color::rgba(31, 62, 93);
@@ -293,7 +364,7 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
         recipe_values[index].focus_ring = Color::rgba(40, 125, 155);
         recipe_values[index].focus_width = 2.0;
         recipe_values[index].focus_offset = 3.0;
-        recipe_values[index].focus_external = true;
+        recipe_values[index].authored_focus_outline = true;
         recipe_values[index].default_width = 0.0;
         recipe_values[index].visual_offset = {};
         recipe_values[index].pressed_content_offset = {};
@@ -333,6 +404,21 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
                 (*button).visual_outsets() == Insets{5.0, 5.0, 5.0, 5.0},
             "authored outline offset must paint and invalidate outside the button box");
     (*button).on_focus_changed(false);
+
+    ControlStateRecipes inset_recipes = recipes;
+    for (ControlVisualRecipe& recipe : inset_recipes.values) {
+        recipe.focus_offset = -3.0;
+    }
+    (*button).set_visual_recipes(inset_recipes);
+    (*button).on_focus_changed(true);
+    RecordingPainter inset_focus_painter;
+    (*button).on_paint(inset_focus_painter, (*button).absolute_bounds());
+    require(inset_focus_painter.last_rounded_stroke_bounds ==
+                Rect{2.0, 2.0, 116.0, 28.0} &&
+                (*button).visual_outsets() == Insets{},
+            "negative authored outline offset must remain inside the button box");
+    (*button).on_focus_changed(false);
+    (*button).set_visual_recipes(recipes);
 
     PointerEvent enter;
     enter.action = PointerAction::enter;
@@ -381,6 +467,57 @@ void test_button_authored_state_recipes_are_owned_and_retained() {
     }
     require(rejected_invalid,
             "authored state recipes must reject an invalid surface atomically");
+}
+
+void test_nested_authored_surfaces_are_control_background_layers() {
+    const Color root_color = Color::rgba(18, 37, 52);
+    const Color child_color = Color::rgba(232, 241, 244);
+    std::shared_ptr<Control> root = make_control<Control>(
+        StableId("authored-surface"));
+    std::shared_ptr<Control> child = make_control<Control>(
+        StableId("authored-surface.child"));
+    (*root).set_authored_surface_material(solid_material(root_color));
+    (*child).set_requested_bounds({10.0, 10.0, 60.0, 24.0});
+    (*root).add_child(child);
+    Window window(root, {100.0, 60.0});
+    window.perform_layout();
+
+    RecordingPainter reveal_painter;
+    window.paint(reveal_painter, {0.0, 0.0, 100.0, 60.0});
+    require(std::count(reveal_painter.fill_colors.begin(),
+                       reveal_painter.fill_colors.end(), root_color) == 1 &&
+                std::count(reveal_painter.fill_colors.begin(),
+                           reveal_painter.fill_colors.end(), child_color) == 0,
+            "a child without an authored surface must reveal its retained parent surface");
+
+    (*child).set_authored_surface_material(solid_material(child_color));
+    RecordingPainter owned_painter;
+    window.paint(owned_painter, {0.0, 0.0, 100.0, 60.0});
+    require(std::count(owned_painter.fill_colors.begin(),
+                       owned_painter.fill_colors.end(), root_color) == 1 &&
+                std::count(owned_painter.fill_colors.begin(),
+                           owned_painter.fill_colors.end(), child_color) == 1,
+            "a child authored surface must paint as its background before child content");
+
+    (*child).clear_authored_surface_material();
+    SurfaceMaterial invalid = solid_material(child_color);
+    invalid.corner_radius = -1.0;
+    bool rejected = false;
+    try {
+        (*child).set_authored_surface_material(invalid);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    RecordingPainter restored_reveal_painter;
+    window.paint(restored_reveal_painter, {0.0, 0.0, 100.0, 60.0});
+    require(rejected && !(*child).authored_surface_material() &&
+                std::count(restored_reveal_painter.fill_colors.begin(),
+                           restored_reveal_painter.fill_colors.end(),
+                           root_color) == 1 &&
+                std::count(restored_reveal_painter.fill_colors.begin(),
+                           restored_reveal_painter.fill_colors.end(),
+                           child_color) == 0,
+            "invalid child surfaces must fail atomically and restore parent reveal");
 }
 
 void test_mnemonics_and_dialog_buttons_are_retained_commands() {
@@ -702,6 +839,62 @@ void test_label_multiline_wrapping_and_alignment() {
     }
     require(rejected && (*label).line_spacing() == 1.25,
             "Label must reject invalid line spacing without mutation");
+
+    (*label).set_text("Visual source");
+    (*label).set_text_wrapping(TextWrapping::no_wrap);
+    (*label).set_text_case_transform(TextCaseTransform::uppercase_ascii);
+    RecordingPainter transformed_painter;
+    window.paint(transformed_painter, {0.0, 0.0, 120.0, 80.0});
+    require(transformed_painter.texts.size() == 1U &&
+                transformed_painter.texts[0] == "VISUAL SOURCE" &&
+                (*label).semantic_descriptor().name == "Visual source",
+            "Label text transforms must change retained display without rewriting semantic source text");
+}
+
+void test_owner_decoration_is_retained_and_owner_relative() {
+    std::shared_ptr<gui_forms::Button> button = make_control<Button>(
+        StableId("decoration.owner"), "Owner");
+    const MaterialBorder edge{Color::rgba(141U, 214U, 223U), 1.0};
+    OwnerDecorationRecipe before_recipe;
+    before_recipe.layer = OwnerDecorationLayer::before_content;
+    before_recipe.size = {10.0, 10.0};
+    before_recipe.top = 14.0;
+    before_recipe.left = 10.0;
+    before_recipe.rotation_degrees = 45.0;
+    before_recipe.border_edges = MaterialBorderEdges::from_parts(
+        &edge, &edge, nullptr, nullptr);
+    OwnerDecorationRecipe after_recipe = before_recipe;
+    after_recipe.layer = OwnerDecorationLayer::after_content;
+    after_recipe.left.reset();
+    after_recipe.right = 10.0;
+    const OwnerDecorationRecipe recipes[]{before_recipe, after_recipe};
+    (*button).set_owned_decorations(recipes, 2U);
+    Window window(button, {80.0, 40.0});
+    RecordingPainter first;
+    window.paint(first, {0.0, 0.0, 80.0, 40.0});
+    const std::vector<char> expected_order{'L', 'L', 'T', 'L', 'L'};
+    require(first.lines == 4U && (*button).owned_decorations().size() == 2U &&
+                first.text_line_order == expected_order,
+            "owner decorations must paint in distinct before-content and after-content layers");
+
+    window.resize({120.0, 40.0});
+    RecordingPainter second;
+    window.paint(second, {0.0, 0.0, 120.0, 40.0});
+    require(second.lines == 4U &&
+                std::abs(second.line_starts[2].x -
+                         first.line_starts[2].x - 40.0) < 0.000001,
+            "right-anchored owner decoration must relax against live owner width");
+
+    OwnerDecorationRecipe invalid = after_recipe;
+    invalid.right.reset();
+    bool rejected{};
+    try {
+        (*button).set_owned_decorations(&invalid, 1U);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && (*button).owned_decorations().size() == 2U,
+            "invalid owner decoration geometry must be rejected atomically");
 }
 
 void test_basic_control_layout_customization_is_bounded_and_atomic() {
@@ -1059,7 +1252,9 @@ int main() {
     try {
         test_public_controls_render_with_role_policy();
         test_button_pointer_and_keyboard_activation();
+        test_button_focus_cue_tracks_input_modality();
         test_button_authored_state_recipes_are_owned_and_retained();
+        test_nested_authored_surfaces_are_control_background_layers();
         test_mnemonics_and_dialog_buttons_are_retained_commands();
         test_checkbox_state_and_click_order();
         test_radio_group_scope_and_order();
@@ -1067,6 +1262,7 @@ int main() {
         test_wrong_thread_property_mutation_is_rejected();
         test_fixed_label_text_is_paint_only();
         test_label_multiline_wrapping_and_alignment();
+        test_owner_decoration_is_retained_and_owner_relative();
         test_basic_control_layout_customization_is_bounded_and_atomic();
         test_label_inherits_theme_typography_until_explicitly_overridden();
         test_picture_box_modes_registry_and_semantics();

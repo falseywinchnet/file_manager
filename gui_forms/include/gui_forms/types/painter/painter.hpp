@@ -42,6 +42,12 @@ public:
     virtual void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                                  double blur_radius, double spread,
                                  Color color);
+    // Drawn over the owning surface fill and clipped to its interior. The
+    // source is the complement of a translated, spread-adjusted inner box, so
+    // the recipe relaxes with live owner geometry rather than fixed traces.
+    virtual void draw_inset_box_shadow(Rect rect, double corner_radius,
+                                       Point offset, double blur_radius,
+                                       double spread, Color color);
     virtual void draw_line(Point from, Point to, Color color, double width) = 0;
     virtual void draw_text_utf8(Point origin,
                                 std::string_view text,

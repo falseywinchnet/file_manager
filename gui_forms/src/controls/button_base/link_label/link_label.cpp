@@ -36,7 +36,7 @@ void LinkLabel::on_paint(Painter& painter, Rect) {
     painter.draw_text_utf8({2.0, baseline}, display_text(), font(), foreground);
     painter.draw_line({2.0, baseline + 2.0}, {2.0 + std::max(0.0, width), baseline + 2.0},
                       foreground, 1.0);
-    if (focused_visual()) {
+    if (focus_cue_visible()) {
         paint_focus(painter, bounds, foreground);
     }
 }

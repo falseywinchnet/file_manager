@@ -32,7 +32,7 @@ Active dialogue:
 - `../../../frontend/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`;
 - `../../../web_forms/planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md` for the
   proposed build-time `ORC-GUI-002` authoring/capability-manifest edge. It adds
-  no runtime Orchestrator, Rust, or browser dependency. That proposal also
+  no runtime Orchestrator, Python, or browser dependency. That proposal also
   requires nested ambient layout/surface/state capability and a C++17-compatible
   orthodox code-generation seam.
 

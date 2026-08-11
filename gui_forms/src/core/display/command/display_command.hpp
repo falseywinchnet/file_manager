@@ -31,6 +31,7 @@ enum class DisplayOperation : std::uint8_t {
     fill_image_pattern = 17,
     draw_image_region_sampled = 18,
     draw_live_surface = 19,
+    draw_inset_box_shadow = 20,
 };
 
 struct DisplayCommand final {

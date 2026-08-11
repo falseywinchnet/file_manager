@@ -6,13 +6,13 @@ Status: **OBSERVED lexical evidence for a future lifecycle round; no ownership c
 
 | Field | Value |
 |---|---|
-| Generated UTC | `2026-08-10T21:10:58+00:00` |
+| Generated UTC | `2026-08-10T21:52:00+00:00` |
 | Branch | `main` |
-| Commit | `6f29824c85e465da99f51a9faf931fe9e0da2ffe` |
-| Dirty entries at scan | `111` |
+| Commit | `b880fe9703cc69d653d9a29ab85a90821b0688ef` |
+| Dirty entries at scan | `14` |
 | Scope | `production include/src plus support` |
-| C/C++ files | `552` |
-| Corpus SHA-256 | `a9ae33359fd7fbfe3ac10e51b938f254929e9e61bae84884089ef557dc77dc46` |
+| C/C++ files | `556` |
+| Corpus SHA-256 | `e8db7d7efbdbf8830b78895a8d8fb0ccd73bcd724d25e0a8e54a7cc094d02360` |
 
 The report was produced by `gui_forms_rewrite/tools/trace_ownership.py`.
 Run it again at the start of any future lifecycle round; do not treat this dirty-tree snapshot as timeless.
@@ -29,13 +29,13 @@ It does **not** prove runtime reachability, cycle absence, destruction order, ca
 
 | Kind | Occurrences |
 |---|---:|
-| `alias:shared_ptr` | 2 |
+| `alias:shared_ptr` | 3 |
 | `alias:weak_ptr` | 1 |
-| `qualified-alias:shared_ptr` | 583 |
+| `qualified-alias:shared_ptr` | 586 |
 | `qualified-alias:weak_ptr` | 31 |
-| `raw_pointer` | 1047 |
-| `shared_ptr` | 2059 |
-| `unique_ptr` | 135 |
+| `raw_pointer` | 1068 |
+| `shared_ptr` | 2060 |
+| `unique_ptr` | 144 |
 | `weak_ptr` | 319 |
 
 ### Lifetime operations
@@ -45,15 +45,15 @@ It does **not** prove runtime reachability, cycle absence, destruction order, ca
 | `component_container` | 16 |
 | `delete_expression` | 1 |
 | `dynamic_pointer_cast` | 195 |
-| `free_call` | 2 |
+| `free_call` | 6 |
 | `make_shared` | 124 |
 | `make_unique` | 50 |
-| `malloc_family` | 2 |
+| `malloc_family` | 4 |
 | `new_expression` | 4 |
 | `owner_revocable` | 8 |
 | `shared_from_this` | 56 |
 | `static_pointer_cast` | 30 |
-| `subscription_token` | 285 |
+| `subscription_token` | 287 |
 | `weak_from_this` | 10 |
 | `weak_lock` | 291 |
 
@@ -81,12 +81,12 @@ It does **not** prove runtime reachability, cycle absence, destruction order, ca
 | `src/abi/drawing_c_api.cpp` | 50 |
 | `src/controls/tool_tip/tool_tip.cpp` | 49 |
 | `src/host/macos/services/appkit_host_services.mm` | 46 |
+| `src/host/windows/application/windows_host.cpp` | 44 |
 | `src/controls/gallery_controls.cpp` | 42 |
 | `src/controls/guidance/help_provider/help_provider.cpp` | 40 |
 | `src/controls/scrollable_control/container_control/tab_control/tab_control.cpp` | 40 |
 | `src/controls/inspection/property_editor_registry/property_editor_registry.cpp` | 35 |
 | `include/gui_forms/c_api.h` | 34 |
-| `src/host/windows/application/windows_host.cpp` | 34 |
 | `tests/menu_controls_tests.cpp` | 34 |
 | `src/render/skia/raster/skia_raster.cpp` | 32 |
 | `tests/macos_host_close_tests.mm` | 32 |
@@ -99,7 +99,7 @@ This is a review queue, not a proposed graph rewrite.
 | Owner | Kind | Target | Location | Declaration evidence |
 |---|---|---|---|---|
 | `AbiPropertyObjectControl` | `shared_ptr` | `PropertyState` | `src/abi/control_adapters/abi_property_object_control/abi_property_object_control.hpp:749` | `std::map<std::string, std::shared_ptr<PropertyState>> properties_;` |
-| `Aggregate` | `shared_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:442` | `std::shared_ptr<Control> target;` |
+| `Aggregate` | `shared_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:436` | `std::shared_ptr<Control> target;` |
 | `AnchoredPopupLayer` | `qualified-alias:shared_ptr` | `Control` | `include/gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp:24` | `AnchoredPopupLayer(StableId stable_id, Control::Ptr anchor,` |
 | `AnchoredPopupLayer` | `qualified-alias:shared_ptr` | `Control` | `include/gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp:27` | `[[nodiscard]] Control::Ptr anchor() const noexcept { return anchor_.lock(); }` |
 | `AnchoredPopupLayer` | `qualified-alias:shared_ptr` | `Control` | `include/gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp:28` | `void set_anchor(Control::Ptr anchor);` |
@@ -218,9 +218,9 @@ This is a review queue, not a proposed graph rewrite.
 | `ErrorProvider` | `weak_ptr` | `detail::WindowLifetime` | `include/gui_forms/components/error_provider/error_provider.hpp:172` | `std::weak_ptr<detail::WindowLifetime> window_lifetime_;` |
 | `ErrorProvider` | `weak_ptr` | `BindingSource` | `include/gui_forms/components/error_provider/error_provider.hpp:186` | `std::weak_ptr<BindingSource> data_source_;` |
 | `ErrorProvider` | `weak_ptr` | `Control` | `include/gui_forms/components/error_provider/error_provider.hpp:188` | `std::unordered_map<std::uint64_t, std::weak_ptr<Control>> bound_targets_;` |
-| `ErrorProvider` | `weak_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:25` | `std::weak_ptr<Control> target;` |
-| `ErrorProvider` | `unique_ptr` | `PopupToken` | `src/controls/guidance/error_provider/error_provider.cpp:31` | `std::unique_ptr<PopupToken> popup;` |
-| `ErrorProvider` | `weak_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:37` | `std::weak_ptr<Control> target;` |
+| `ErrorProvider` | `weak_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:24` | `std::weak_ptr<Control> target;` |
+| `ErrorProvider` | `unique_ptr` | `PopupToken` | `src/controls/guidance/error_provider/error_provider.cpp:30` | `std::unique_ptr<PopupToken> popup;` |
+| `ErrorProvider` | `weak_ptr` | `Control` | `src/controls/guidance/error_provider/error_provider.cpp:36` | `std::weak_ptr<Control> target;` |
 | `Event` | `shared_ptr` | `State` | `include/gui_forms/event/event/event.hpp:209` | `std::shared_ptr<State> state_;` |
 | `FieldState` | `qualified-alias:shared_ptr` | `Control` | `src/controls/panel/instrument_rack/instrument_rack.cpp:102` | `Control::Ptr editor;` |
 | `FinalSnapshotCallback` | `shared_ptr` | `ControlRecord` | `src/abi/registry/registry.hpp:2586` | `std::shared_ptr<ControlRecord> record;` |
@@ -436,11 +436,11 @@ This is a review queue, not a proposed graph rewrite.
 | `ToolTip` | `shared_ptr` | `Control` | `include/gui_forms/components/tool_tip/tool_tip.hpp:112` | `std::shared_ptr<Control> overlay_layer_;` |
 | `ToolTip` | `shared_ptr` | `Control` | `include/gui_forms/components/tool_tip/tool_tip.hpp:113` | `std::shared_ptr<Control> overlay_bubble_;` |
 | `ToolTip` | `unique_ptr` | `PopupHolder` | `include/gui_forms/components/tool_tip/tool_tip.hpp:115` | `std::unique_ptr<PopupHolder> popup_;` |
-| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:25` | `std::weak_ptr<Control> target;` |
-| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:34` | `std::weak_ptr<Control> target;` |
-| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:44` | `std::weak_ptr<Control> target;` |
-| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:54` | `std::weak_ptr<Control> target;` |
-| `ToolTip` | `weak_ptr` | `detail::WindowLifetime` | `src/controls/tool_tip/tool_tip.cpp:64` | `std::weak_ptr<detail::WindowLifetime> window_lifetime;` |
+| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:24` | `std::weak_ptr<Control> target;` |
+| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:33` | `std::weak_ptr<Control> target;` |
+| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:43` | `std::weak_ptr<Control> target;` |
+| `ToolTip` | `weak_ptr` | `Control` | `src/controls/tool_tip/tool_tip.cpp:53` | `std::weak_ptr<Control> target;` |
+| `ToolTip` | `weak_ptr` | `detail::WindowLifetime` | `src/controls/tool_tip/tool_tip.cpp:63` | `std::weak_ptr<detail::WindowLifetime> window_lifetime;` |
 | `TreeFixture` | `unique_ptr` | `Window` | `tests/invalidation_damage_tests.cpp:342` | `std::unique_ptr<Window> window;` |
 | `TreeView` | `shared_ptr` | `ImageList` | `include/gui_forms/controls/panel/tree_view/tree_view.hpp:70` | `void set_image_list(std::shared_ptr<ImageList> image_list);` |
 | `TreeView` | `shared_ptr` | `ImageList` | `include/gui_forms/controls/panel/tree_view/tree_view.hpp:125` | `std::shared_ptr<ImageList> image_list_;` |
@@ -547,11 +547,11 @@ This is a review queue, not a proposed graph rewrite.
 | `WindowsApplicationWindow` | `unique_ptr` | `Window` | `include/gui_forms/platform/windows_host.hpp:46` | `std::unique_ptr<Window> model;` |
 | `WindowsCompatibilityPaintEndpoint` | `unique_ptr` | `Implementation` | `include/gui_forms/platform/windows_compatibility_paint_endpoint/windows_compatibility_paint_endpoint.hpp:51` | `std::unique_ptr<Implementation> implementation) noexcept;` |
 | `WindowsCompatibilityPaintEndpoint` | `unique_ptr` | `Implementation` | `include/gui_forms/platform/windows_compatibility_paint_endpoint/windows_compatibility_paint_endpoint.hpp:53` | `std::unique_ptr<Implementation> implementation_;` |
-| `WindowsCompatibilityPaintEndpoint` | `shared_ptr` | `LiveSurface` | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:453` | `std::shared_ptr<LiveSurface> surface;` |
+| `WindowsCompatibilityPaintEndpoint` | `shared_ptr` | `LiveSurface` | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:458` | `std::shared_ptr<LiveSurface> surface;` |
 | `WindowsDispatchPendingCallback` | `shared_ptr` | `ControlRecord` | `src/abi/registry/registry.hpp:2555` | `std::shared_ptr<ControlRecord> record;` |
 | `WindowsDispatchPendingCallback` | `shared_ptr` | `std::unordered_map< std::string, std::shared_ptr<Control>>` | `src/abi/registry/registry.hpp:2556` | `std::shared_ptr<std::unordered_map<` |
 | `WindowsDispatchPendingCallback` | `shared_ptr` | `Control` | `src/abi/registry/registry.hpp:2557` | `std::string, std::shared_ptr<Control>>> automation_controls;` |
-| `WindowsHostState` | `unique_ptr` | `Window` | `src/host/windows/application/windows_host.cpp:2670` | `std::unique_ptr<Window> model_;` |
+| `WindowsHostState` | `unique_ptr` | `Window` | `src/host/windows/application/windows_host.cpp:2641` | `std::unique_ptr<Window> model_;` |
 
 ## All detected smart-pointer and alias evidence
 
@@ -1135,33 +1135,36 @@ This is a review queue, not a proposed graph rewrite.
 | `CapturedSurface` | `unique_ptr` | `Bitmap` | class declaration | `src/abi/drawing_platform.hpp:13` |
 | `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform.hpp:18` |
 | `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform_stub.cpp:9` |
-| `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform_windows.cpp:183` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:19` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:28` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:35` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:38` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:43` |
+| `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform_windows.cpp:187` |
+| `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform_windows.cpp:198` |
+| `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/abi/drawing_platform_windows.cpp:278` |
+| `<namespace>` | `alias:shared_ptr` | `CompatibilityEndpoint` | alias definition | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:19` |
+| `<file/function>` | `shared_ptr` | `CompatibilityEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:19` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:34` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:42` |
 | `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:45` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:53` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:55` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:61` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:63` |
-| `<file/function>` | `weak_ptr` | `RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:78` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:88` |
-| `<file/function>` | `shared_ptr` | `gui_forms::LiveSurface` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:96` |
-| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:98` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:117` |
-| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:132` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:144` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:154` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:171` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:195` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:210` |
-| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:232` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:246` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:262` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:274` |
-| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:289` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:50` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:52` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:60` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:62` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:68` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:70` |
+| `<file/function>` | `weak_ptr` | `RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:85` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:95` |
+| `<file/function>` | `shared_ptr` | `gui_forms::LiveSurface` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:103` |
+| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:105` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:124` |
+| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:140` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:152` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:162` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:179` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:203` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:218` |
+| `<file/function>` | `shared_ptr` | `gui_forms::abi::detail::RasterControl` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:242` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:256` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:272` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:284` |
+| `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:299` |
 | `CompatibilityPaintBinding` | `weak_ptr` | `RasterControl` | class declaration | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp:17` |
 | `CompatibilityPaintBinding` | `shared_ptr` | `gui_forms::LiveSurface` | class declaration | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp:19` |
 | `CompatibilityPaintWrite` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | class declaration | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp:23` |
@@ -1499,56 +1502,56 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/controls/gallery_controls.cpp:1035` |
 | `<file/function>` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/controls/gallery_controls.cpp:1037` |
 | `<file/function>` | `shared_ptr` | `gui_forms::ErrorGlyph` | local/signature/use | `src/controls/guidance/error_glyph/error_glyph.cpp:137` |
-| `ErrorProvider` | `weak_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:25` |
-| `ErrorProvider` | `shared_ptr` | `ErrorLayer` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:29` |
-| `ErrorProvider` | `shared_ptr` | `ErrorGlyph` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:30` |
-| `ErrorProvider` | `unique_ptr` | `PopupToken` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:31` |
-| `ErrorProvider` | `weak_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:37` |
-| `ErrorProvider` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:40` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:97` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:99` |
-| `<file/function>` | `shared_ptr` | `gui_forms::detail::WindowLifetime` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:110` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:125` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:145` |
-| `<file/function>` | `unique_ptr` | `gui_forms::ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:151` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:153` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:161` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:190` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:192` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:193` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:203` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:206` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:215` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:235` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:310` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:312` |
-| `<file/function>` | `shared_ptr` | `BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:315` |
-| `<file/function>` | `shared_ptr` | `BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:399` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:405` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:408` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:410` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:411` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:421` |
-| `<file/function>` | `shared_ptr` | `gui_forms::BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:434` |
-| `Aggregate` | `shared_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:442` |
-| `<file/function>` | `shared_ptr` | `Binding` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:446` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Binding` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:448` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:451` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:470` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:486` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:488` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:489` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:495` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:511` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:566` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:603` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:605` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:625` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:627` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:628` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:661` |
-| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:663` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:664` |
+| `ErrorProvider` | `weak_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:24` |
+| `ErrorProvider` | `shared_ptr` | `ErrorLayer` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:28` |
+| `ErrorProvider` | `shared_ptr` | `ErrorGlyph` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:29` |
+| `ErrorProvider` | `unique_ptr` | `PopupToken` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:30` |
+| `ErrorProvider` | `weak_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:36` |
+| `ErrorProvider` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:39` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:94` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:96` |
+| `<file/function>` | `shared_ptr` | `gui_forms::detail::WindowLifetime` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:107` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:122` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:142` |
+| `<file/function>` | `unique_ptr` | `gui_forms::ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:148` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:150` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:158` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:187` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:189` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:190` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:200` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:203` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:212` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:232` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:307` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:309` |
+| `<file/function>` | `shared_ptr` | `BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:312` |
+| `<file/function>` | `shared_ptr` | `BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:393` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:399` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:402` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:404` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:405` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:415` |
+| `<file/function>` | `shared_ptr` | `gui_forms::BindingSource` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:428` |
+| `Aggregate` | `shared_ptr` | `Control` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:436` |
+| `<file/function>` | `shared_ptr` | `Binding` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:440` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Binding` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:442` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:445` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:464` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:480` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:482` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:483` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:489` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:505` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:560` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:597` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:599` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:619` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:621` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:622` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:655` |
+| `<file/function>` | `unique_ptr` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:657` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:658` |
 | `HelpProvider` | `weak_ptr` | `Control` | class declaration | `src/controls/guidance/help_provider/help_provider.cpp:20` |
 | `<file/function>` | `shared_ptr` | `gui_forms::detail::WindowLifetime` | local/signature/use | `src/controls/guidance/help_provider/help_provider.cpp:58` |
 | `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/guidance/help_provider/help_provider.cpp:73` |
@@ -1641,10 +1644,10 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `shared_ptr` | `gui_forms::DropDownLayer` | local/signature/use | `src/controls/panel/combo_box/combo_box.cpp:302` |
 | `<file/function>` | `shared_ptr` | `gui_forms::ListBox` | local/signature/use | `src/controls/panel/combo_box/combo_box.cpp:304` |
 | `<file/function>` | `weak_ptr` | `ComboBox` | local/signature/use | `src/controls/panel/combo_box/combo_box.cpp:319` |
-| `CorrespondenceView` | `weak_ptr` | `CorrespondenceView` | class declaration | `src/controls/panel/correspondence_view/correspondence_view.cpp:19` |
-| `CorrespondenceView` | `shared_ptr` | `CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:23` |
-| `<file/function>` | `shared_ptr` | `gui_forms::CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:446` |
-| `<file/function>` | `weak_ptr` | `CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:448` |
+| `CorrespondenceView` | `weak_ptr` | `CorrespondenceView` | class declaration | `src/controls/panel/correspondence_view/correspondence_view.cpp:20` |
+| `CorrespondenceView` | `shared_ptr` | `CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:24` |
+| `<file/function>` | `shared_ptr` | `gui_forms::CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:450` |
+| `<file/function>` | `weak_ptr` | `CorrespondenceView` | local/signature/use | `src/controls/panel/correspondence_view/correspondence_view.cpp:452` |
 | `<file/function>` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/controls/panel/date_time_picker/date_time_picker.cpp:292` |
 | `<file/function>` | `shared_ptr` | `gui_forms::CalendarPopupLayer` | local/signature/use | `src/controls/panel/date_time_picker/date_time_picker.cpp:306` |
 | `<file/function>` | `shared_ptr` | `gui_forms::CalendarPopup` | local/signature/use | `src/controls/panel/date_time_picker/date_time_picker.cpp:308` |
@@ -1708,7 +1711,7 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `shared_ptr` | `NumericUpDown` | local/signature/use | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:41` |
 | `<file/function>` | `weak_ptr` | `NumericUpDown` | local/signature/use | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:52` |
 | `<file/function>` | `shared_ptr` | `gui_forms::SpinButtons` | local/signature/use | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:56` |
-| `<file/function>` | `shared_ptr` | `ImageList` | local/signature/use | `src/controls/panel/object_view/object_view.cpp:270` |
+| `<file/function>` | `shared_ptr` | `ImageList` | local/signature/use | `src/controls/panel/object_view/object_view.cpp:269` |
 | `CustomEditorCommit` | `qualified-alias:weak_ptr` | `Control` | class declaration | `src/controls/panel/property_grid/property_grid.cpp:94` |
 | `CustomEditorCommit` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/controls/panel/property_grid/property_grid.cpp:97` |
 | `CustomEditorFailure` | `qualified-alias:weak_ptr` | `Control` | class declaration | `src/controls/panel/property_grid/property_grid.cpp:106` |
@@ -2412,37 +2415,37 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `shared_ptr` | `gui_forms::Button` | local/signature/use | `src/controls/showcase_controls.cpp:3704` |
 | `<file/function>` | `weak_ptr` | `ShowcaseContext` | local/signature/use | `src/controls/showcase_controls.cpp:3710` |
 | `ShowcaseTree` | `qualified-alias:shared_ptr` | `Control` | class declaration | `src/controls/showcase_controls.hpp:12` |
-| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:25` |
-| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:34` |
-| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:37` |
-| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:44` |
-| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:47` |
-| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:54` |
-| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:57` |
-| `ToolTip` | `weak_ptr` | `detail::WindowLifetime` | class declaration | `src/controls/tool_tip/tool_tip.cpp:64` |
-| `ToolTip` | `shared_ptr` | `detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:67` |
-| `<file/function>` | `shared_ptr` | `gui_forms::detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:102` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:128` |
-| `<file/function>` | `unique_ptr` | `gui_forms::ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:152` |
-| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:155` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:232` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:238` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:250` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:259` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:263` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:293` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:301` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:305` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:318` |
-| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipLayer` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:333` |
-| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipBubble` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:336` |
-| `<file/function>` | `weak_ptr` | `detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:349` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:363` |
-| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipBubble` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:364` |
-| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:396` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:401` |
-| `<file/function>` | `unique_ptr` | `PopupHolder` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:408` |
-| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:427` |
+| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:24` |
+| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:33` |
+| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:36` |
+| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:43` |
+| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:46` |
+| `ToolTip` | `weak_ptr` | `Control` | class declaration | `src/controls/tool_tip/tool_tip.cpp:53` |
+| `ToolTip` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:56` |
+| `ToolTip` | `weak_ptr` | `detail::WindowLifetime` | class declaration | `src/controls/tool_tip/tool_tip.cpp:63` |
+| `ToolTip` | `shared_ptr` | `detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:66` |
+| `<file/function>` | `shared_ptr` | `gui_forms::detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:100` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:126` |
+| `<file/function>` | `unique_ptr` | `gui_forms::ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:150` |
+| `<file/function>` | `weak_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:153` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:230` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:236` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:248` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:257` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:261` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:291` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:299` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:303` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:316` |
+| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipLayer` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:331` |
+| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipBubble` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:334` |
+| `<file/function>` | `weak_ptr` | `detail::WindowLifetime` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:347` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:361` |
+| `<file/function>` | `shared_ptr` | `gui_forms::ToolTipBubble` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:362` |
+| `<file/function>` | `shared_ptr` | `Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:394` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:399` |
+| `<file/function>` | `unique_ptr` | `PopupHolder` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:406` |
+| `<file/function>` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:425` |
 | `ToolTipBubble` | `shared_ptr` | `Label` | class declaration | `src/controls/tool_tip/tool_tip_bubble/tool_tip_bubble.hpp:20` |
 | `<file/function>` | `shared_ptr` | `BindingSource` | local/signature/use | `src/core/binding/binding/binding.cpp:24` |
 | `<file/function>` | `shared_ptr` | `Binding` | local/signature/use | `src/core/binding/binding/binding.cpp:51` |
@@ -2846,31 +2849,41 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/host/macos/application/macos_host.mm:1672` |
 | `<file/function>` | `unique_ptr` | `Window` | local/signature/use | `src/host/macos/application/macos_host.mm:1917` |
 | `<file/function>` | `unique_ptr` | `HostServices` | local/signature/use | `src/host/macos/services/appkit_host_services.mm:501` |
-| `DibPainter` | `shared_ptr` | `LiveSurface` | local/signature/use | `src/host/windows/application/windows_host.cpp:992` |
-| `WindowsHostState` | `unique_ptr` | `Window` | local/signature/use | `src/host/windows/application/windows_host.cpp:1654` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2405` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2424` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2440` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2462` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2482` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2507` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2548` |
-| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2593` |
-| `WindowsHostState` | `unique_ptr` | `Window` | class declaration | `src/host/windows/application/windows_host.cpp:2670` |
-| `<file/function>` | `unique_ptr` | `Window` | local/signature/use | `src/host/windows/application/windows_host.cpp:2731` |
-| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2874` |
-| `PendingFrame` | `shared_ptr` | `LiveSurface` | class declaration | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:205` |
-| `WindowsCompatibilityPaintEndpoint` | `shared_ptr` | `LiveSurface` | class declaration | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:453` |
-| `<file/function>` | `unique_ptr` | `Implementation` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:474` |
-| `<file/function>` | `shared_ptr` | `WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:481` |
+| `DibPainter` | `shared_ptr` | `LiveSurface` | local/signature/use | `src/host/windows/application/windows_host.cpp:1011` |
+| `WindowsHostState` | `unique_ptr` | `Window` | local/signature/use | `src/host/windows/application/windows_host.cpp:1681` |
+| `WindowsHostState` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2229` |
+| `WindowsHostState` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2291` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2376` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2395` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2411` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2433` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2453` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2478` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2519` |
+| `WindowsHostState` | `shared_ptr` | `gui_forms::Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2564` |
+| `WindowsHostState` | `qualified-alias:shared_ptr` | `Control` | local/signature/use | `src/host/windows/application/windows_host.cpp:2572` |
+| `WindowsHostState` | `unique_ptr` | `Window` | class declaration | `src/host/windows/application/windows_host.cpp:2641` |
+| `<file/function>` | `unique_ptr` | `Window` | local/signature/use | `src/host/windows/application/windows_host.cpp:2704` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2848` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2871` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2931` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2947` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2972` |
+| `<file/function>` | `unique_ptr` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2980` |
+| `PendingFrame` | `shared_ptr` | `LiveSurface` | class declaration | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:208` |
+| `WindowsCompatibilityPaintEndpoint` | `shared_ptr` | `LiveSurface` | class declaration | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:458` |
+| `<file/function>` | `unique_ptr` | `Implementation` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:479` |
 | `<file/function>` | `shared_ptr` | `WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:486` |
-| `<file/function>` | `shared_ptr` | `LiveSurface` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:502` |
+| `<file/function>` | `unique_ptr` | `Implementation` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:489` |
+| `<file/function>` | `shared_ptr` | `WindowsCompatibilityPaintEndpoint` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:492` |
+| `<file/function>` | `shared_ptr` | `LiveSurface` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:508` |
 | `CoreGraphicsRaster` | `unique_ptr` | `Impl` | class declaration | `src/render/coregraphics/raster/coregraphics_raster.hpp:78` |
 | `<file/function>` | `unique_ptr` | `Bitmap` | local/signature/use | `src/render/skia/executor/skia_executor.cpp:692` |
 | `<file/function>` | `unique_ptr` | `SkCodec` | local/signature/use | `src/render/skia/executor/skia_executor.cpp:865` |
 | `<file/function>` | `unique_ptr` | `gui_drawing::Bitmap` | local/signature/use | `src/render/skia/executor/skia_executor.cpp:878` |
-| `DecodeResult` | `unique_ptr` | `Bitmap` | class declaration | `src/render/skia/executor/skia_executor.hpp:38` |
-| `SkiaExecutor` | `unique_ptr` | `Impl` | class declaration | `src/render/skia/executor/skia_executor.hpp:81` |
+| `DecodeResult` | `unique_ptr` | `Bitmap` | class declaration | `src/render/skia/executor/skia_executor.hpp:39` |
+| `DecodeResult` | `unique_ptr` | `Bitmap` | local/signature/use | `src/render/skia/executor/skia_executor.hpp:46` |
+| `SkiaExecutor` | `unique_ptr` | `Impl` | class declaration | `src/render/skia/executor/skia_executor.hpp:90` |
 | `<file/function>` | `unique_ptr` | `SkCodec` | local/signature/use | `src/render/skia/raster/skia_raster.cpp:449` |
 | `<file/function>` | `shared_ptr` | `LiveSurface` | local/signature/use | `src/render/skia/raster/skia_raster.cpp:752` |
 | `SkiaRaster` | `shared_ptr` | `LiveSurface` | class declaration | `src/render/skia/raster/skia_raster.hpp:68` |
@@ -3685,8 +3698,9 @@ This is a review queue, not a proposed graph rewrite.
 | `<file/function>` | `shared_ptr` | `gui_forms::BindingSource` | local/signature/use | `tests/validation_tests.cpp:247` |
 | `<file/function>` | `shared_ptr` | `Binding` | local/signature/use | `tests/validation_tests.cpp:257` |
 | `<file/function>` | `shared_ptr` | `gui_forms::host::WindowsCompatibilityPaintEndpoint` | local/signature/use | `tests/windows_live_surface_endpoint_tests.cpp:54` |
-| `PolicyAction` | `unique_ptr` | `clang::ASTConsumer` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:785` |
-| `PolicyActionFactory` | `unique_ptr` | `clang::FrontendAction` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:817` |
+| `<file/function>` | `shared_ptr` | `WindowsCompatibilityPaintEndpoint` | local/signature/use | `tests/windows_live_surface_endpoint_tests.cpp:88` |
+| `PolicyAction` | `unique_ptr` | `clang::ASTConsumer` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:802` |
+| `PolicyActionFactory` | `unique_ptr` | `clang::FrontendAction` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:834` |
 
 ## Raw-pointer plumbing
 
@@ -3900,15 +3914,15 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `<file/function>` | `void` | local/signature/use | `src/abi/drawing_c_api.cpp:1944` | `void* decoded = nullptr;` |
 | `HdcLease` | `Bitmap` | class declaration | `src/abi/drawing_platform_windows.cpp:22` | `Bitmap* bitmap{};` |
 | `HdcLease` | `void` | class declaration | `src/abi/drawing_platform_windows.cpp:27` | `void* pixels{};` |
-| `CaptureStaging` | `void` | class declaration | `src/abi/drawing_platform_windows.cpp:72` | `void* pixels{};` |
-| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:132` | `void copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {` |
-| `<file/function>` | `std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:134` | `std::byte* output = static_cast<std::byte*>(destination);` |
-| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:148` | `void* pixels = nullptr;` |
-| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:246` | `void* pixels = nullptr;` |
-| `<file/function>` | `const std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:327` | `const std::byte* source_bytes = static_cast<const std::byte*>(capture_staging.pixels);` |
-| `<file/function>` | `std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:329` | `std::byte* destination = lock.writable_data +` |
-| `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:383` | `const void* pixels = snapshot.pixels().data();` |
-| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:417` | `void* pixels = nullptr;` |
+| `CaptureStaging` | `void` | class declaration | `src/abi/drawing_platform_windows.cpp:80` | `void* pixels{};` |
+| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:140` | `void copy_as_bgra(const ImageSnapshot& snapshot, void* destination) {` |
+| `<file/function>` | `std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:142` | `std::byte* output = static_cast<std::byte*>(destination);` |
+| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:156` | `void* pixels = nullptr;` |
+| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:250` | `void* pixels = nullptr;` |
+| `<file/function>` | `const std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:331` | `const std::byte* source_bytes = static_cast<const std::byte*>(capture_staging.pixels);` |
+| `<file/function>` | `std::byte` | local/signature/use | `src/abi/drawing_platform_windows.cpp:333` | `std::byte* destination = lock.writable_data +` |
+| `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:387` | `const void* pixels = snapshot.pixels().data();` |
+| `<file/function>` | `void` | local/signature/use | `src/abi/drawing_platform_windows.cpp:421` | `void* pixels = nullptr;` |
 | `<file/function>` | `const char` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:101` | `if (const char* trace = std::getenv("GUI_DRAWING_TRACE_FONTS");` |
 | `<file/function>` | `const char` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:235` | `if (const char* trace = std::getenv("GUI_DRAWING_TRACE_FONTS");` |
 | `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:279` | `gd_result execute(const void* recorder, void* bitmap,` |
@@ -3918,8 +3932,8 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:323` | `gd_result decode_png(const void* data, std::uint64_t size, void** bitmap) {` |
 | `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:340` | `gd_result measure_string(const void* font, const void* format,` |
 | `<file/function>` | `const void` | local/signature/use | `src/abi/drawing_skia_c_api.cpp:340` | `gd_result measure_string(const void* font, const void* format,` |
-| `<file/function>` | `char` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:165` | `std::uint64_t token, char* buffer, std::uint64_t capacity,` |
-| `<file/function>` | `const void` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:188` | `std::uint64_t row_bytes, const void* pixels) {` |
+| `<file/function>` | `char` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:173` | `std::uint64_t token, char* buffer, std::uint64_t capacity,` |
+| `<file/function>` | `const void` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:196` | `std::uint64_t row_bytes, const void* pixels) {` |
 | `<file/function>` | `char` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp:37` | `std::uint64_t token, char* buffer, std::uint64_t capacity,` |
 | `<file/function>` | `const void` | local/signature/use | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.hpp:41` | `std::uint32_t height, std::uint64_t row_bytes, const void* pixels);` |
 | `SubscriptionRecord` | `void` | class declaration | `src/abi/registry/registry.hpp:23` | `void* context{};` |
@@ -3971,30 +3985,30 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `<file/function>` | `NodeSpec` | local/signature/use | `src/controls/gallery_controls.cpp:694` | `const dml::NodeSpec* gallery_child = dml::find((*child).stable_id().value());` |
 | `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_glyph/error_glyph.cpp:94` | `Window* owner = attached_window();` |
 | `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_glyph/error_glyph.cpp:129` | `Window* owner = attached_window();` |
-| `ErrorProvider` | `ErrorProvider` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:36` | `ErrorProvider* provider{};` |
-| `ErrorProvider` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:42` | `Entry* entry = (*provider).find_entry(*retained);` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:95` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:109` | `Window* ErrorProvider::bound_window() const noexcept {` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:118` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:126` | `Window* owner = bound_window();` |
-| `<file/function>` | `ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:133` | `ErrorProvider::Entry* ErrorProvider::find_entry(const Control& target) {` |
-| `<file/function>` | `const ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:138` | `const ErrorProvider::Entry* ErrorProvider::find_entry(const Control& target) const {` |
-| `<file/function>` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:150` | `if (Entry* existing = find_entry(*target)) return *existing;` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:183` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider error query");` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:184` | `const Entry* entry = find_entry(target);` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:202` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:228` | `if (Window* owner = bound_window()) {` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:231` | `const Entry* entry = find_entry(target);` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:249` | `if (Window* owner = bound_window()) {` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:252` | `const Entry* entry = find_entry(target);` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:299` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:311` | `Window* owner = bound_window();` |
-| `<file/function>` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:419` | `Control* raw = (*event.binding).target();` |
-| `<file/function>` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:450` | `Control* raw = binding ? (*binding).target() : nullptr;` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:512` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:565` | `Window* owner = bound_window();` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:622` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider snapshot");` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:649` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider disposal");` |
+| `ErrorProvider` | `ErrorProvider` | class declaration | `src/controls/guidance/error_provider/error_provider.cpp:35` | `ErrorProvider* provider{};` |
+| `ErrorProvider` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:41` | `Entry* entry = (*provider).find_entry(*retained);` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:92` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:106` | `Window* ErrorProvider::bound_window() const noexcept {` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:115` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:123` | `Window* owner = bound_window();` |
+| `<file/function>` | `ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:130` | `ErrorProvider::Entry* ErrorProvider::find_entry(const Control& target) {` |
+| `<file/function>` | `const ErrorProvider::Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:135` | `const ErrorProvider::Entry* ErrorProvider::find_entry(const Control& target) const {` |
+| `<file/function>` | `Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:147` | `if (Entry* existing = find_entry(*target)) return *existing;` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:180` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider error query");` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:181` | `const Entry* entry = find_entry(target);` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:199` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:225` | `if (Window* owner = bound_window()) {` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:228` | `const Entry* entry = find_entry(target);` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:246` | `if (Window* owner = bound_window()) {` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:249` | `const Entry* entry = find_entry(target);` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:296` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:308` | `Window* owner = bound_window();` |
+| `<file/function>` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:413` | `Control* raw = (*event.binding).target();` |
+| `<file/function>` | `Control` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:444` | `Control* raw = binding ? (*binding).target() : nullptr;` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:506` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:559` | `Window* owner = bound_window();` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:616` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider snapshot");` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/error_provider/error_provider.cpp:643` | `if (Window* owner = bound_window()) (*owner).verify_access("ErrorProvider disposal");` |
 | `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/help_provider/help_provider.cpp:57` | `Window* HelpProvider::bound_window() const noexcept {` |
 | `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/help_provider/help_provider.cpp:66` | `Window* owner = bound_window();` |
 | `<file/function>` | `Window` | local/signature/use | `src/controls/guidance/help_provider/help_provider.cpp:74` | `Window* owner = bound_window();` |
@@ -4143,24 +4157,24 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `PropertySpecimenClick` | `Window` | local/signature/use | `src/controls/showcase_controls.cpp:1925` | `if (Window* window = grid.attached_window()) {` |
 | `DialogInvoker` | `HostServices` | local/signature/use | `src/controls/showcase_controls.cpp:2977` | `HostServices* services = source.attached_window() == nullptr` |
 | `HostServiceClick` | `HostServices` | local/signature/use | `src/controls/showcase_controls.cpp:3072` | `HostServices* services = source.attached_window() == nullptr` |
-| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:33` | `ToolTip* tool_tip{};` |
-| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:43` | `ToolTip* tool_tip{};` |
-| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:53` | `ToolTip* tool_tip{};` |
-| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:63` | `ToolTip* tool_tip{};` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:101` | `Window* ToolTip::bound_window() const noexcept {` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:110` | `Window* owner = bound_window();` |
-| `<file/function>` | `ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:117` | `ToolTip::Entry* ToolTip::find_entry(const Control& target) {` |
-| `<file/function>` | `const ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:122` | `const ToolTip::Entry* ToolTip::find_entry(const Control& target) const {` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:131` | `Window* owner = bound_window();` |
-| `<file/function>` | `Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:144` | `if (Entry* existing = find_entry(*target)) {` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:166` | `const Entry* entry = find_entry(target);` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:265` | `const Entry* entry = find_entry(*target);` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:321` | `Window* owner = bound_window();` |
-| `<file/function>` | `Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:322` | `Entry* entry = target ? find_entry(*target) : nullptr;` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:362` | `Window* owner = bound_window();` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:404` | `if (const Entry* entry = find_entry(*target)) text = (*entry).text;` |
-| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:430` | `if (const Entry* entry = find_entry(*target)) text = (*entry).text;` |
-| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:446` | `if (Window* owner = bound_window()) (*owner).verify_access("ToolTip disposal");` |
+| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:32` | `ToolTip* tool_tip{};` |
+| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:42` | `ToolTip* tool_tip{};` |
+| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:52` | `ToolTip* tool_tip{};` |
+| `ToolTip` | `ToolTip` | class declaration | `src/controls/tool_tip/tool_tip.cpp:62` | `ToolTip* tool_tip{};` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:99` | `Window* ToolTip::bound_window() const noexcept {` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:108` | `Window* owner = bound_window();` |
+| `<file/function>` | `ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:115` | `ToolTip::Entry* ToolTip::find_entry(const Control& target) {` |
+| `<file/function>` | `const ToolTip::Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:120` | `const ToolTip::Entry* ToolTip::find_entry(const Control& target) const {` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:129` | `Window* owner = bound_window();` |
+| `<file/function>` | `Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:142` | `if (Entry* existing = find_entry(*target)) {` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:164` | `const Entry* entry = find_entry(target);` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:263` | `const Entry* entry = find_entry(*target);` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:319` | `Window* owner = bound_window();` |
+| `<file/function>` | `Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:320` | `Entry* entry = target ? find_entry(*target) : nullptr;` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:360` | `Window* owner = bound_window();` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:402` | `if (const Entry* entry = find_entry(*target)) text = (*entry).text;` |
+| `<file/function>` | `const Entry` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:428` | `if (const Entry* entry = find_entry(*target)) text = (*entry).text;` |
+| `<file/function>` | `Window` | local/signature/use | `src/controls/tool_tip/tool_tip.cpp:444` | `if (Window* owner = bound_window()) (*owner).verify_access("ToolTip disposal");` |
 | `<file/function>` | `const BindableProperty` | local/signature/use | `src/core/binding/binding/binding.cpp:88` | `const BindableProperty* property = (*target_).find_bindable_property(property_name_);` |
 | `<file/function>` | `const BindableProperty` | local/signature/use | `src/core/binding/binding/binding.cpp:158` | `const BindableProperty* property =` |
 | `<file/function>` | `const BindableProperty` | local/signature/use | `src/core/binding/binding/binding.cpp:227` | `const BindableProperty* property =` |
@@ -4462,32 +4476,34 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `AppKitHostServices` | `NSString` | local/signature/use | `src/host/macos/services/appkit_host_services.mm:470` | `NSString* name = @"Ping";` |
 | `AppKitHostServices` | `NSSound` | local/signature/use | `src/host/macos/services/appkit_host_services.mm:478` | `NSSound* sound = [NSSound soundNamed:name];` |
 | `AppKitHostServices` | `NSPasteboard` | class declaration | `src/host/macos/services/appkit_host_services.mm:493` | `__strong NSPasteboard* pasteboard_{};` |
-| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:53` | `const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_INPUT");` |
-| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:61` | `const char* value = std::getenv("GUI_FORMS_TRACE_WIN32_TEXT");` |
-| `<file/function>` | `const wchar_t` | local/signature/use | `src/host/windows/application/windows_host.cpp:166` | `const wchar_t* cursor = path.data() + first.size() + 1U;` |
-| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:516` | `Function load_function(HMODULE module, const char* name) noexcept {` |
-| `DibPainter` | `IWICImagingFactory` | local/signature/use | `src/host/windows/application/windows_host.cpp:601` | `IWICImagingFactory* factory{};` |
-| `DibPainter` | `const std::byte` | local/signature/use | `src/host/windows/application/windows_host.cpp:1034` | `const std::byte* source = frame.pixels().data();` |
-| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1306` | `[[nodiscard]] static const wchar_t* primary_font_family(FontRole role) {` |
-| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1310` | `[[nodiscard]] HFONT create_font(FontSpec font, const wchar_t* family) const {` |
-| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1488` | `[[nodiscard]] bool font_covers(HFONT font, const wchar_t* requested_family,` |
-| `DibPainter` | `IWICStream` | local/signature/use | `src/host/windows/application/windows_host.cpp:1596` | `IWICStream* stream{};` |
-| `DibPainter` | `IWICBitmapDecoder` | local/signature/use | `src/host/windows/application/windows_host.cpp:1597` | `IWICBitmapDecoder* decoder{};` |
-| `DibPainter` | `IWICBitmapFrameDecode` | local/signature/use | `src/host/windows/application/windows_host.cpp:1598` | `IWICBitmapFrameDecode* frame{};` |
-| `DibPainter` | `IWICFormatConverter` | local/signature/use | `src/host/windows/application/windows_host.cpp:1599` | `IWICFormatConverter* converter{};` |
-| `DibPainter` | `const ImageRegistry` | class declaration | `src/host/windows/application/windows_host.cpp:1647` | `const ImageRegistry* image_registry_{};` |
-| `WindowsHostState` | `const wchar_t` | local/signature/use | `src/host/windows/application/windows_host.cpp:2052` | `const wchar_t* locked = data == nullptr` |
-| `WindowsHostState` | `void` | local/signature/use | `src/host/windows/application/windows_host.cpp:2083` | `void* destination = GlobalLock(storage);` |
-| `WindowsHostState` | `const RECT` | local/signature/use | `src/host/windows/application/windows_host.cpp:2122` | `if (const RECT* suggested = reinterpret_cast<const RECT*>(lparam)) {` |
-| `WindowsHostState` | `MINMAXINFO` | class declaration | `src/host/windows/application/windows_host.cpp:2329` | `void minimum_size(MINMAXINFO* info) const {` |
-| `WindowsHostState` | `const COPYDATASTRUCT` | class declaration | `src/host/windows/application/windows_host.cpp:2350` | `LRESULT automation(const COPYDATASTRUCT* data) {` |
-| `WindowsHostState` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:2353` | `const char* bytes = static_cast<const char*>((*data).lpData);` |
-| `WindowsHostState` | `const wchar_t` | local/signature/use | `src/host/windows/application/windows_host.cpp:2641` | `for (const wchar_t* name : names) {` |
-| `WindowsCompatibilityPaintEndpoint` | `void` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:141` | `void* next_pixels{};` |
-| `WindowsCompatibilityPaintEndpoint` | `const std::byte` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:188` | `const std::byte* source = reinterpret_cast<const std::byte*>(pixels);` |
-| `WindowsCompatibilityPaintEndpoint` | `const char` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:396` | `const char* state = released \|\| compatibility_handle == 0U` |
-| `WindowsHostServices` | `const wchar_t` | local/signature/use | `src/host/windows/services/windows_host_services.hpp:76` | `const wchar_t* locked = data == nullptr` |
-| `WindowsHostServices` | `void` | local/signature/use | `src/host/windows/services/windows_host_services.hpp:104` | `void* destination = GlobalLock(storage);` |
+| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:52` | `bool environment_flag(const char* name) noexcept {` |
+| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:53` | `const char* value = std::getenv(name);` |
+| `<file/function>` | `const wchar_t` | local/signature/use | `src/host/windows/application/windows_host.cpp:168` | `const wchar_t* cursor = path.data() + first.size() + 1U;` |
+| `<file/function>` | `TooltipPopup` | local/signature/use | `src/host/windows/application/windows_host.cpp:427` | `TooltipPopup* state = reinterpret_cast<TooltipPopup*>(` |
+| `<file/function>` | `const CREATESTRUCTW` | local/signature/use | `src/host/windows/application/windows_host.cpp:430` | `const CREATESTRUCTW* create =` |
+| `<file/function>` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:524` | `Function load_function(HMODULE module, const char* name) noexcept {` |
+| `DibPainter` | `IWICImagingFactory` | local/signature/use | `src/host/windows/application/windows_host.cpp:619` | `IWICImagingFactory* factory{};` |
+| `DibPainter` | `const std::byte` | local/signature/use | `src/host/windows/application/windows_host.cpp:1053` | `const std::byte* source = frame.pixels().data();` |
+| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1333` | `[[nodiscard]] static const wchar_t* primary_font_family(FontRole role) {` |
+| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1337` | `[[nodiscard]] HFONT create_font(FontSpec font, const wchar_t* family) const {` |
+| `DibPainter` | `const wchar_t` | class declaration | `src/host/windows/application/windows_host.cpp:1515` | `[[nodiscard]] bool font_covers(HFONT font, const wchar_t* requested_family,` |
+| `DibPainter` | `IWICStream` | local/signature/use | `src/host/windows/application/windows_host.cpp:1623` | `IWICStream* stream{};` |
+| `DibPainter` | `IWICBitmapDecoder` | local/signature/use | `src/host/windows/application/windows_host.cpp:1624` | `IWICBitmapDecoder* decoder{};` |
+| `DibPainter` | `IWICBitmapFrameDecode` | local/signature/use | `src/host/windows/application/windows_host.cpp:1625` | `IWICBitmapFrameDecode* frame{};` |
+| `DibPainter` | `IWICFormatConverter` | local/signature/use | `src/host/windows/application/windows_host.cpp:1626` | `IWICFormatConverter* converter{};` |
+| `DibPainter` | `const ImageRegistry` | class declaration | `src/host/windows/application/windows_host.cpp:1674` | `const ImageRegistry* image_registry_{};` |
+| `WindowsHostState` | `const RECT` | local/signature/use | `src/host/windows/application/windows_host.cpp:2089` | `if (const RECT* suggested = reinterpret_cast<const RECT*>(lparam)) {` |
+| `WindowsHostState` | `MINMAXINFO` | class declaration | `src/host/windows/application/windows_host.cpp:2300` | `void minimum_size(MINMAXINFO* info) const {` |
+| `WindowsHostState` | `const COPYDATASTRUCT` | class declaration | `src/host/windows/application/windows_host.cpp:2321` | `LRESULT automation(const COPYDATASTRUCT* data) {` |
+| `WindowsHostState` | `const char` | local/signature/use | `src/host/windows/application/windows_host.cpp:2324` | `const char* bytes = static_cast<const char*>((*data).lpData);` |
+| `WindowsHostState` | `const wchar_t` | local/signature/use | `src/host/windows/application/windows_host.cpp:2612` | `for (const wchar_t* name : names) {` |
+| `<file/function>` | `WindowsHostState` | local/signature/use | `src/host/windows/application/windows_host.cpp:2672` | `WindowsHostState* state = reinterpret_cast<WindowsHostState*>(` |
+| `<file/function>` | `const CREATESTRUCTW` | local/signature/use | `src/host/windows/application/windows_host.cpp:2675` | `const CREATESTRUCTW* create =` |
+| `WindowsCompatibilityPaintEndpoint` | `void` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:143` | `void* next_pixels{};` |
+| `WindowsCompatibilityPaintEndpoint` | `const std::byte` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:191` | `const std::byte* source = reinterpret_cast<const std::byte*>(pixels);` |
+| `WindowsCompatibilityPaintEndpoint` | `const char` | local/signature/use | `src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp:401` | `const char* state = released \|\| compatibility_handle == 0U` |
+| `WindowsHostServices` | `const wchar_t` | local/signature/use | `src/host/windows/services/windows_host_services.hpp:53` | `const wchar_t* locked = data == nullptr` |
+| `WindowsHostServices` | `void` | local/signature/use | `src/host/windows/services/windows_host_services.hpp:81` | `void* destination = GlobalLock(storage);` |
 | `<file/function>` | `const char` | local/signature/use | `src/host/windows/win32_compat_shim.cpp:79` | `Function forms_entry(const char* name) noexcept {` |
 | `<file/function>` | `HDC` | local/signature/use | `src/host/windows/win32_compat_shim.cpp:89` | `bool endpoint_dc(HWND window, HDC* output) noexcept {` |
 | `<file/function>` | `HBITMAP` | local/signature/use | `src/host/windows/win32_compat_shim.cpp:150` | `bool selected_dib32(HDC dc, HBITMAP* bitmap, DIBSECTION* section) noexcept {` |
@@ -4530,7 +4546,7 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `BitmapUnlock` | `Bitmap` | class declaration | `src/render/skia/executor/skia_executor.cpp:495` | `Bitmap* bitmap_;` |
 | `<file/function>` | `SkCanvas` | local/signature/use | `src/render/skia/executor/skia_executor.cpp:701` | `SkCanvas* canvas = (*surface).getCanvas();` |
 | `<file/function>` | `RasterError` | local/signature/use | `src/render/skia/executor/skia_executor.cpp:931` | `const Bitmap& bitmap, RasterError* error, const PngCodecLimits& limits) {` |
-| `SkiaExecutor` | `RasterError` | class declaration | `src/render/skia/executor/skia_executor.hpp:74` | `const Bitmap& bitmap, RasterError* error = nullptr,` |
+| `SkiaExecutor` | `RasterError` | class declaration | `src/render/skia/executor/skia_executor.hpp:83` | `const Bitmap& bitmap, RasterError* error = nullptr,` |
 | `SkiaRaster` | `const ImageRegistry` | class declaration | `src/render/skia/raster/skia_raster.cpp:153` | `const ImageRegistry* image_registry{};` |
 | `SkiaRaster` | `SkCanvas` | class declaration | `src/render/skia/raster/skia_raster.cpp:157` | `[[nodiscard]] SkCanvas* canvas() const noexcept {` |
 | `SkiaRaster` | `const RegisteredTypeface` | local/signature/use | `src/render/skia/raster/skia_raster.cpp:169` | `const RegisteredTypeface* registered = nullptr;` |
@@ -4696,6 +4712,7 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `<file/function>` | `const SemanticNode` | local/signature/use | `tests/semantic_tests.cpp:210` | `const SemanticNode* selected = find_node(after.roots, "virtual.list.item.1");` |
 | `<file/function>` | `const char` | local/signature/use | `tests/showcase_interaction_tests.cpp:18` | `void require(bool condition, const char* message) {` |
 | `<file/function>` | `const char` | local/signature/use | `tests/showcase_interaction_tests.cpp:23` | `void require_eventually(Predicate predicate, const char* message) {` |
+| `<file/function>` | `const char` | local/signature/use | `tests/sort_algorithm_tests.cpp:13` | `void require(bool condition, const char* message) {` |
 | `<file/function>` | `const char` | local/signature/use | `tests/split_container_tests.cpp:15` | `void require(bool condition, const char* message) {` |
 | `<file/function>` | `const char` | local/signature/use | `tests/tab_control_tests.cpp:16` | `void require(bool condition, const char* message) {` |
 | `<file/function>` | `const char` | local/signature/use | `tests/text_shaping_tests.cpp:16` | `void require(bool condition, const char *message) {` |
@@ -4715,32 +4732,50 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `AppendFocusTransition` | `const char` | class declaration | `tests/validation_tests.cpp:63` | `const char* label)` |
 | `AppendFocusTransition` | `const char` | class declaration | `tests/validation_tests.cpp:75` | `const char* label_;` |
 | `<file/function>` | `const char` | local/signature/use | `tests/windows_gdi_compat_shim_tests.cpp:27` | `Function entry(HMODULE module, const char* name) {` |
-| `<file/function>` | `const char` | local/signature/use | `tests/windows_gdi_compat_shim_tests.cpp:35` | `gf_string_view text(const char* value) {` |
-| `<file/function>` | `void` | local/signature/use | `tests/windows_gdi_compat_shim_tests.cpp:359` | `void* storage{};` |
-| `FindingCollector` | `AutoType` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:222` | `const clang::AutoType* type = location.getTypePtr();` |
-| `FindingCollector` | `NamedDecl` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:448` | `const clang::NamedDecl* named = parent.get<clang::NamedDecl>();` |
-| `PolicyVisitor` | `VarDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:523` | `bool VisitVarDecl(clang::VarDecl* declaration) {` |
-| `PolicyVisitor` | `TypeSourceInfo` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:524` | `const clang::TypeSourceInfo* source_info =` |
-| `PolicyVisitor` | `LambdaExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:538` | `bool VisitLambdaExpr(clang::LambdaExpr* expression) {` |
-| `PolicyVisitor` | `DecompositionDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:544` | `bool VisitDecompositionDecl(clang::DecompositionDecl* declaration) {` |
-| `PolicyVisitor` | `MemberExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:550` | `bool VisitMemberExpr(clang::MemberExpr* expression) {` |
-| `PolicyVisitor` | `CXXDependentScopeMemberExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:558` | `clang::CXXDependentScopeMemberExpr* expression) {` |
-| `PolicyVisitor` | `FunctionDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:565` | `bool VisitFunctionDecl(clang::FunctionDecl* declaration) {` |
-| `PolicyVisitor` | `TypeSourceInfo` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:567` | `const clang::TypeSourceInfo* source_info =` |
-| `PolicyVisitor` | `FunctionProtoType` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:589` | `const clang::FunctionProtoType* prototype =` |
-| `PolicyVisitor` | `IfStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:617` | `bool VisitIfStmt(clang::IfStmt* statement) {` |
-| `PolicyVisitor` | `RequiresExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:626` | `bool VisitRequiresExpr(clang::RequiresExpr* expression) {` |
-| `PolicyVisitor` | `CoroutineBodyStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:638` | `bool VisitCoroutineBodyStmt(clang::CoroutineBodyStmt* statement) {` |
-| `PolicyVisitor` | `CoawaitExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:644` | `bool VisitCoawaitExpr(clang::CoawaitExpr* expression) {` |
-| `PolicyVisitor` | `CoyieldExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:650` | `bool VisitCoyieldExpr(clang::CoyieldExpr* expression) {` |
-| `PolicyVisitor` | `CoreturnStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:656` | `bool VisitCoreturnStmt(clang::CoreturnStmt* statement) {` |
-| `PolicyVisitor` | `DesignatedInitExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:662` | `bool VisitDesignatedInitExpr(clang::DesignatedInitExpr* expression) {` |
-| `PolicyVisitor` | `ConceptSpecializationExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:670` | `clang::ConceptSpecializationExpr* expression) {` |
-| `PolicyVisitor` | `DeclRefExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:700` | `bool VisitDeclRefExpr(clang::DeclRefExpr* expression) {` |
-| `PolicyVisitor` | `NamedDecl` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:701` | `const clang::NamedDecl* declaration = expression->getFoundDecl();` |
+| `<file/function>` | `const char` | local/signature/use | `tests/windows_gdi_compat_shim_tests.cpp:84` | `gf_string_view text(const char* value) {` |
+| `<file/function>` | `void` | local/signature/use | `tests/windows_gdi_compat_shim_tests.cpp:410` | `void* storage{};` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:30` | `void* operator new(std::size_t size) {` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:32` | `void* memory = std::malloc(size);` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:37` | `void* operator new[](std::size_t size) {` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:39` | `void* memory = std::malloc(size);` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:44` | `void operator delete(void* memory) noexcept { std::free(memory); }` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:45` | `void operator delete[](void* memory) noexcept { std::free(memory); }` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:46` | `void operator delete(void* memory, std::size_t) noexcept { std::free(memory); }` |
+| `<file/function>` | `void` | local/signature/use | `tools/callback_lab.cpp:47` | `void operator delete[](void* memory, std::size_t) noexcept { std::free(memory); }` |
+| `SmallOwningCallback` | `CallbackTarget` | class declaration | `tools/callback_lab.cpp:73` | `CallbackTarget* target_{};` |
+| `LargeOwningCallback` | `CallbackTarget` | class declaration | `tools/callback_lab.cpp:84` | `CallbackTarget* target_{};` |
+| `<file/function>` | `const char` | local/signature/use | `tools/callback_lab.cpp:112` | `void print_invocation(const char* kind,` |
+| `FindingCollector` | `AutoType` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:239` | `const clang::AutoType* type = location.getTypePtr();` |
+| `FindingCollector` | `NamedDecl` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:465` | `const clang::NamedDecl* named = parent.get<clang::NamedDecl>();` |
+| `PolicyVisitor` | `VarDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:540` | `bool VisitVarDecl(clang::VarDecl* declaration) {` |
+| `PolicyVisitor` | `TypeSourceInfo` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:541` | `const clang::TypeSourceInfo* source_info =` |
+| `PolicyVisitor` | `LambdaExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:555` | `bool VisitLambdaExpr(clang::LambdaExpr* expression) {` |
+| `PolicyVisitor` | `DecompositionDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:561` | `bool VisitDecompositionDecl(clang::DecompositionDecl* declaration) {` |
+| `PolicyVisitor` | `MemberExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:567` | `bool VisitMemberExpr(clang::MemberExpr* expression) {` |
+| `PolicyVisitor` | `CXXDependentScopeMemberExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:575` | `clang::CXXDependentScopeMemberExpr* expression) {` |
+| `PolicyVisitor` | `FunctionDecl` | class declaration | `tools/house_policy_check/house_policy_check.cpp:582` | `bool VisitFunctionDecl(clang::FunctionDecl* declaration) {` |
+| `PolicyVisitor` | `TypeSourceInfo` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:584` | `const clang::TypeSourceInfo* source_info =` |
+| `PolicyVisitor` | `FunctionProtoType` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:606` | `const clang::FunctionProtoType* prototype =` |
+| `PolicyVisitor` | `IfStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:634` | `bool VisitIfStmt(clang::IfStmt* statement) {` |
+| `PolicyVisitor` | `RequiresExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:643` | `bool VisitRequiresExpr(clang::RequiresExpr* expression) {` |
+| `PolicyVisitor` | `CoroutineBodyStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:655` | `bool VisitCoroutineBodyStmt(clang::CoroutineBodyStmt* statement) {` |
+| `PolicyVisitor` | `CoawaitExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:661` | `bool VisitCoawaitExpr(clang::CoawaitExpr* expression) {` |
+| `PolicyVisitor` | `CoyieldExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:667` | `bool VisitCoyieldExpr(clang::CoyieldExpr* expression) {` |
+| `PolicyVisitor` | `CoreturnStmt` | class declaration | `tools/house_policy_check/house_policy_check.cpp:673` | `bool VisitCoreturnStmt(clang::CoreturnStmt* statement) {` |
+| `PolicyVisitor` | `DesignatedInitExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:679` | `bool VisitDesignatedInitExpr(clang::DesignatedInitExpr* expression) {` |
+| `PolicyVisitor` | `ConceptSpecializationExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:687` | `clang::ConceptSpecializationExpr* expression) {` |
+| `PolicyVisitor` | `DeclRefExpr` | class declaration | `tools/house_policy_check/house_policy_check.cpp:717` | `bool VisitDeclRefExpr(clang::DeclRefExpr* expression) {` |
+| `PolicyVisitor` | `NamedDecl` | local/signature/use | `tools/house_policy_check/house_policy_check.cpp:718` | `const clang::NamedDecl* declaration = (*expression).getFoundDecl();` |
+| `<file/function>` | `const char` | local/signature/use | `tools/sort_lab.cpp:137` | `void measure(const char* case_name,` |
+| `<file/function>` | `const char` | local/signature/use | `tools/sort_lab.cpp:138` | `const char* stability,` |
+| `<file/function>` | `const char` | local/signature/use | `tools/sort_lab.cpp:139` | `const char* algorithm,` |
+| `<file/function>` | `const char` | local/signature/use | `tools/sort_lab.cpp:231` | `void measure_unstable_family(const char* case_name,` |
+| `<file/function>` | `const char` | local/signature/use | `tools/sort_lab.cpp:245` | `void measure_stable_family(const char* case_name,` |
 | `<file/function>` | `const char` | local/signature/use | `tools/windows_automation_probe.cpp:13` | `std::wstring wide_from_utf8(const char* text) {` |
-| `<file/function>` | `void` | local/signature/use | `tools/windows_automation_probe.cpp:219` | `void* captured_pixels{};` |
-| `<file/function>` | `const char` | local/signature/use | `tools/windows_automation_probe.cpp:293` | `if (const char* requested_handle = std::getenv("GUI_FORMS_AUTOMATION_HANDLE");` |
+| `<file/function>` | `void` | local/signature/use | `tools/windows_automation_probe.cpp:222` | `void* captured_pixels{};` |
+| `<file/function>` | `char` | local/signature/use | `tools/windows_automation_probe.cpp:236` | `const unsigned char* pixels =` |
+| `<file/function>` | `char` | local/signature/use | `tools/windows_automation_probe.cpp:240` | `const unsigned char* pixel =` |
+| `<file/function>` | `const char` | local/signature/use | `tools/windows_automation_probe.cpp:298` | `if (const char* requested_handle = std::getenv("GUI_FORMS_AUTOMATION_HANDLE");` |
 
 ## Lifetime-operation evidence
 
@@ -4901,15 +4936,15 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `make_shared` | `src/abi/drawing_c_api.cpp:344` | `std::make_shared<ObjectRecord>();` |
 | `weak_lock` | `src/abi/drawing_c_api.cpp:736` | `const gui_drawing::BitmapLockView native = bitmap.lock(` |
 | `delete_expression` | `src/abi/drawing_c_api.cpp:1947` | `delete static_cast<gui_drawing::Bitmap*>(decoded);` |
-| `make_unique` | `src/abi/drawing_platform_windows.cpp:194` | `auto bitmap = std::make_unique<Bitmap>(width, height,` |
-| `weak_lock` | `src/abi/drawing_platform_windows.cpp:196` | `BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);` |
-| `make_unique` | `src/abi/drawing_platform_windows.cpp:274` | `auto bitmap = std::make_unique<Bitmap>(width, height,` |
-| `weak_lock` | `src/abi/drawing_platform_windows.cpp:276` | `BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);` |
-| `weak_lock` | `src/abi/drawing_platform_windows.cpp:324` | `BitmapLockView lock = bitmap.lock(BitmapLockMode::write);` |
-| `weak_lock` | `src/abi/drawing_platform_windows.cpp:482` | `BitmapLockView lock = bitmap.lock(BitmapLockMode::write);` |
-| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:98` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = target.lock()) {` |
-| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:132` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = binding.target.lock()) {` |
-| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:232` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = binding.target.lock()) {` |
+| `make_unique` | `src/abi/drawing_platform_windows.cpp:198` | `std::unique_ptr<Bitmap> bitmap = std::make_unique<Bitmap>(` |
+| `weak_lock` | `src/abi/drawing_platform_windows.cpp:200` | `BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);` |
+| `make_unique` | `src/abi/drawing_platform_windows.cpp:278` | `std::unique_ptr<Bitmap> bitmap = std::make_unique<Bitmap>(` |
+| `weak_lock` | `src/abi/drawing_platform_windows.cpp:280` | `BitmapLockView lock = (*bitmap).lock(BitmapLockMode::write);` |
+| `weak_lock` | `src/abi/drawing_platform_windows.cpp:328` | `BitmapLockView lock = bitmap.lock(BitmapLockMode::write);` |
+| `weak_lock` | `src/abi/drawing_platform_windows.cpp:487` | `BitmapLockView lock = bitmap.lock(BitmapLockMode::write);` |
+| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:105` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = target.lock()) {` |
+| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:140` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = binding.target.lock()) {` |
+| `weak_lock` | `src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp:242` | `if (const std::shared_ptr<gui_forms::abi::detail::RasterControl> raster = binding.target.lock()) {` |
 | `subscription_token` | `src/abi/registry/registry.hpp:25` | `gui_forms::SubscriptionToken native_subscription;` |
 | `make_shared` | `src/abi/registry/registry.hpp:108` | `std::shared_ptr<gui_forms::abi::detail::ControlRecord> record = std::make_shared<ControlRecord>();` |
 | `make_shared` | `src/abi/registry/registry.hpp:112` | `(*record).control = std::make_shared<FormControl>(std::move(native_id));` |
@@ -5038,28 +5073,28 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `make_shared` | `src/controls/gallery_controls.cpp:974` | `std::shared_ptr<gui_forms::gallery::GalleryContext> context = std::make_shared<GalleryContext>();` |
 | `dynamic_pointer_cast` | `src/controls/guidance/error_glyph/error_glyph.cpp:137` | `std::shared_ptr<gui_forms::ErrorGlyph> self = std::dynamic_pointer_cast<ErrorGlyph>(shared_from_this());` |
 | `shared_from_this` | `src/controls/guidance/error_glyph/error_glyph.cpp:137` | `std::shared_ptr<gui_forms::ErrorGlyph> self = std::dynamic_pointer_cast<ErrorGlyph>(shared_from_this());` |
-| `subscription_token` | `src/controls/guidance/error_provider/error_provider.cpp:32` | `SubscriptionToken bounds_subscription;` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:40` | `const std::shared_ptr<Control> retained = target.lock();` |
-| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:54` | `: window_lifetime_(window.lifetime_), tool_tip_(std::make_unique<ToolTip>(window)),` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:110` | `const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();` |
-| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:151` | `std::unique_ptr<gui_forms::ErrorProvider::Entry> entry = std::make_unique<Entry>();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:193` | `if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:206` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:317` | `if (data_source_.lock() == source) {` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:411` | `if (const std::shared_ptr<gui_forms::Control> target = weak.lock(); target && (*target).is_alive()) {` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:418` | `if (!event.binding \|\| (*event.binding).source() != data_source_.lock()) return;` |
-| `weak_from_this` | `src/controls/guidance/error_provider/error_provider.cpp:421` | `const std::shared_ptr<gui_forms::Control> target = (*raw).weak_from_this().lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:421` | `const std::shared_ptr<gui_forms::Control> target = (*raw).weak_from_this().lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:434` | `const std::shared_ptr<gui_forms::BindingSource> source = data_source_.lock();` |
-| `weak_from_this` | `src/controls/guidance/error_provider/error_provider.cpp:451` | `const std::shared_ptr<gui_forms::Control> target = raw ? (*raw).weak_from_this().lock() : nullptr;` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:451` | `const std::shared_ptr<gui_forms::Control> target = raw ? (*raw).weak_from_this().lock() : nullptr;` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:489` | `if (const std::shared_ptr<gui_forms::Control> target = weak.lock(); target && (*target).is_alive()) {` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:495` | `const std::shared_ptr<Control> target = (*error).second.first.lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:511` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:566` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
-| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:590` | `entry.popup = std::make_unique<PopupToken>(std::move(popup));` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:628` | `const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock();` |
-| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:664` | `if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {` |
+| `subscription_token` | `src/controls/guidance/error_provider/error_provider.cpp:31` | `SubscriptionToken bounds_subscription;` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:39` | `const std::shared_ptr<Control> retained = target.lock();` |
+| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:53` | `: window_lifetime_(window.lifetime_), tool_tip_(std::make_unique<ToolTip>(window)),` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:107` | `const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();` |
+| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:148` | `std::unique_ptr<gui_forms::ErrorProvider::Entry> entry = std::make_unique<Entry>();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:190` | `if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:203` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:314` | `if (data_source_.lock() == source) {` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:405` | `if (const std::shared_ptr<gui_forms::Control> target = weak.lock(); target && (*target).is_alive()) {` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:412` | `if (!event.binding \|\| (*event.binding).source() != data_source_.lock()) return;` |
+| `weak_from_this` | `src/controls/guidance/error_provider/error_provider.cpp:415` | `const std::shared_ptr<gui_forms::Control> target = (*raw).weak_from_this().lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:415` | `const std::shared_ptr<gui_forms::Control> target = (*raw).weak_from_this().lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:428` | `const std::shared_ptr<gui_forms::BindingSource> source = data_source_.lock();` |
+| `weak_from_this` | `src/controls/guidance/error_provider/error_provider.cpp:445` | `const std::shared_ptr<gui_forms::Control> target = raw ? (*raw).weak_from_this().lock() : nullptr;` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:445` | `const std::shared_ptr<gui_forms::Control> target = raw ? (*raw).weak_from_this().lock() : nullptr;` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:483` | `if (const std::shared_ptr<gui_forms::Control> target = weak.lock(); target && (*target).is_alive()) {` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:489` | `const std::shared_ptr<Control> target = (*error).second.first.lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:505` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:560` | `const std::shared_ptr<gui_forms::Control> target = entry.target.lock();` |
+| `make_unique` | `src/controls/guidance/error_provider/error_provider.cpp:584` | `entry.popup = std::make_unique<PopupToken>(std::move(popup));` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:622` | `const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock();` |
+| `weak_lock` | `src/controls/guidance/error_provider/error_provider.cpp:658` | `if (const std::shared_ptr<gui_forms::Control> target = (*entry).target.lock(); target && (*target).is_alive()) {` |
 | `make_unique` | `src/controls/guidance/help_provider/help_provider.cpp:41` | `accelerator_ = std::make_unique<AcceleratorHolder>(window.register_accelerator(` |
 | `weak_lock` | `src/controls/guidance/help_provider/help_provider.cpp:58` | `const std::shared_ptr<gui_forms::detail::WindowLifetime> lifetime = window_lifetime_.lock();` |
 | `make_unique` | `src/controls/guidance/help_provider/help_provider.cpp:99` | `std::unique_ptr<gui_forms::HelpProvider::Entry> entry = std::make_unique<Entry>();` |
@@ -5102,12 +5137,12 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `shared_from_this` | `src/controls/panel/combo_box/combo_box.cpp:314` | `PopupToken popup_token = (*window()).open_popup(shared_from_this(), layer);` |
 | `shared_from_this` | `src/controls/panel/combo_box/combo_box.cpp:320` | `std::static_pointer_cast<ComboBox>(shared_from_this());` |
 | `static_pointer_cast` | `src/controls/panel/combo_box/combo_box.cpp:320` | `std::static_pointer_cast<ComboBox>(shared_from_this());` |
-| `weak_lock` | `src/controls/panel/correspondence_view/correspondence_view.cpp:23` | `const std::shared_ptr<CorrespondenceView> retained = view.lock();` |
-| `static_pointer_cast` | `src/controls/panel/correspondence_view/correspondence_view.cpp:446` | `const std::shared_ptr<gui_forms::CorrespondenceView> self = std::static_pointer_cast<CorrespondenceView>(` |
-| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:447` | `shared_from_this());` |
-| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:704` | `static_cast<void>((*window()).request_focus(shared_from_this()));` |
-| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:907` | `static_cast<void>((*window()).request_focus(shared_from_this()));` |
-| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:924` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
+| `weak_lock` | `src/controls/panel/correspondence_view/correspondence_view.cpp:24` | `const std::shared_ptr<CorrespondenceView> retained = view.lock();` |
+| `static_pointer_cast` | `src/controls/panel/correspondence_view/correspondence_view.cpp:450` | `const std::shared_ptr<gui_forms::CorrespondenceView> self = std::static_pointer_cast<CorrespondenceView>(` |
+| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:451` | `shared_from_this());` |
+| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:708` | `static_cast<void>((*window()).request_focus(shared_from_this()));` |
+| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:911` | `static_cast<void>((*window()).request_focus(shared_from_this()));` |
+| `shared_from_this` | `src/controls/panel/correspondence_view/correspondence_view.cpp:928` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
 | `shared_from_this` | `src/controls/panel/date_time_picker/date_time_picker.cpp:292` | `const Control::Ptr owner = shared_from_this();` |
 | `shared_from_this` | `src/controls/panel/date_time_picker/date_time_picker.cpp:319` | `std::static_pointer_cast<DateTimePicker>(shared_from_this());` |
 | `static_pointer_cast` | `src/controls/panel/date_time_picker/date_time_picker.cpp:319` | `std::static_pointer_cast<DateTimePicker>(shared_from_this());` |
@@ -5144,10 +5179,10 @@ Raw pointers are recorded because a future lifecycle round must distinguish non-
 | `shared_from_this` | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:53` | `std::static_pointer_cast<NumericUpDown>(shared_from_this());` |
 | `static_pointer_cast` | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:53` | `std::static_pointer_cast<NumericUpDown>(shared_from_this());` |
 | `dynamic_pointer_cast` | `src/controls/panel/numeric_up_down/numeric_up_down.cpp:56` | `std::shared_ptr<gui_forms::SpinButtons> spin = std::dynamic_pointer_cast<SpinButtons>(spinner_);` |
-| `shared_from_this` | `src/controls/panel/object_view/object_view.cpp:568` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
-| `shared_from_this` | `src/controls/panel/object_view/object_view.cpp:748` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
+| `shared_from_this` | `src/controls/panel/object_view/object_view.cpp:566` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
+| `shared_from_this` | `src/controls/panel/object_view/object_view.cpp:746` | `if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));` |
 
-Detailed action rows were capped at 400; 674 additional rows remain represented in the summary counts.
+Detailed action rows were capped at 400; 682 additional rows remain represented in the summary counts.
 
 ## Required next evidence before any lifecycle change
 

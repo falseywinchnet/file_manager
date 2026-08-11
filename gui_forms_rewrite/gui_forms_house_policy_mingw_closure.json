@@ -5922,7 +5922,7 @@
       "replacementCategory": "retain_explicit_nonowning_range"
     }
   ],
-  "mode": "inventory",
+  "mode": "closure",
   "schema": "gui.forms.house-policy-findings/v1",
   "sourceRoot": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms",
   "sourceScope": "first-party"

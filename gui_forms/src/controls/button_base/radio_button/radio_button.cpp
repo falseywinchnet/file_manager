@@ -110,7 +110,7 @@ void RadioButton::on_paint(Painter& painter, Rect) {
         const double top = std::max(1.0, (bounds.height - 15.0) * 0.5);
         const Rect indicator_bounds{1.0, top, indicator_width, 15.0};
         const ControlVisualContext context = visual_context(
-            hovered_visual(), pressed_visual(), checked_, focused_visual());
+            hovered_visual(), pressed_visual(), checked_, focus_cue_visible());
         const ControlVisualRecipe& recipe = effective_theme().resolve(
             ControlVisualRole::choice, context);
         SurfaceMaterial indicator = recipe.material;
@@ -173,7 +173,7 @@ void RadioButton::on_paint(Painter& painter, Rect) {
 Insets RadioButton::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     const ControlVisualContext context = visual_context(
-        hovered_visual(), pressed_visual(), checked_, focused_visual());
+        hovered_visual(), pressed_visual(), checked_, focus_cue_visible());
     return surface_material_visual_outsets(
         effective_theme().resolve(ControlVisualRole::choice, context).material);
 }

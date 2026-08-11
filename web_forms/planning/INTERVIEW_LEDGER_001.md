@@ -107,10 +107,18 @@ for addressable retained objects.
 Should 0.1 admit bounded inert `<template data-wf-component>` expansion, or
 defer reusable components until one atlas slice compiles without it?
 
-### WF005 — SVG
+### WF005 — SVG — RESOLVED FOR 0.1
 
-Should the first compiler lower a closed SVG subset into GUI.Forms paths, or
-precompile scale-specific PNGs first?
+SVG is admitted only as an indivisible local visual resource hosted by an
+HTML/CSS-laid box. It is not a structural element language: SVG descendants do
+not become controls, layout nodes, stable IDs, state owners, hit targets, or
+selector subjects. Relational geometry such as breadcrumb chevrons remains CSS
+decoration attached to the owning box so it relaxes with layout.
+
+Stage 1 rejects inline `<svg>` trees in 0.1. A later resource lane may accept a
+closed, script-free SVG file with an intrinsic `viewBox` and lower the whole
+asset at build time to retained path records or provenance-tracked raster scale
+variants. No SVG parser ships in the product.
 
 ### WF006 — CSS transitions
 
@@ -125,8 +133,8 @@ not promised.
 
 ### WF008 — compiler implementation — RESOLVED
 
-ADR-002 selects a build-time Rust compiler. Product output is C++17-compatible
-orthodox source; Rust contributes no runtime.
+ADR-003 selects a two-stage build-time Python compiler. Product output is
+C++17-compatible orthodox source; Python contributes no runtime.
 
 ### WF009 — style freedom — RESOLVED
 

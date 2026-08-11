@@ -1,6 +1,10 @@
 # Future sibling implementation handoff
 
-Status: **instructions prepared; implementation BLOCKED**.
+Status: **historical handoff; implementation completed on 2026-08-10**.
+
+The implementing sibling followed this sequence. See `COMPLETION_REPORT.md` for
+the accepted outcomes and final gates. The imperative text below is retained as
+process and reversal evidence, not as an outstanding work order.
 
 ## Mission after opening
 

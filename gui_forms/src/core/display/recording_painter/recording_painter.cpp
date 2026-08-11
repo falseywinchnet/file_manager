@@ -144,6 +144,20 @@ void RecordingPainter::draw_box_shadow(Rect rect, double corner_radius,
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_inset_box_shadow(
+    Rect rect, double corner_radius, Point offset, double blur_radius,
+    double spread, Color color) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_inset_box_shadow;
+    command.rect = rect;
+    command.first = offset;
+    command.color = color;
+    command.scalar = corner_radius;
+    command.secondary_scalar = blur_radius;
+    command.tertiary_scalar = spread;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::draw_line(Point from, Point to, Color color, double width) {
     DisplayCommand command;
     command.operation = DisplayOperation::draw_line;

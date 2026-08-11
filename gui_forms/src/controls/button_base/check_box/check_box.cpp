@@ -96,7 +96,7 @@ void CheckBox::on_paint(Painter& painter, Rect) {
         const Rect box{1.0, std::max(1.0, (bounds.height - 15.0) * 0.5),
                        indicator_width, 15.0};
         const ControlVisualContext context = visual_context(
-            hovered_visual(), pressed_visual(), checked(), focused_visual());
+            hovered_visual(), pressed_visual(), checked(), focus_cue_visible());
         const ControlVisualRecipe& recipe = effective_theme().resolve(
             ControlVisualRole::choice, context);
         SurfaceMaterial indicator = recipe.material;
@@ -174,7 +174,7 @@ void CheckBox::on_paint(Painter& painter, Rect) {
 Insets CheckBox::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     const ControlVisualContext context = visual_context(
-        hovered_visual(), pressed_visual(), checked(), focused_visual());
+        hovered_visual(), pressed_visual(), checked(), focus_cue_visible());
     return surface_material_visual_outsets(
         effective_theme().resolve(ControlVisualRole::choice, context).material);
 }

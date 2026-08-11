@@ -2,13 +2,13 @@
 
 Date: 2026-08-10
 
-Status: **GIVEN restrictions plus DECIDED compiler boundary under ADR-002**.
+Status: **GIVEN restrictions plus DECIDED compiler boundary under ADR-003**.
 
 ## Product baseline
 
 Generated output is standard C++17-compatible source and must continue to
 compile when the consuming GUI.Forms build selects a later standard. It uses no
-compiler extension and brings no Rust runtime into the product.
+compiler extension and brings no Python runtime into the product.
 
 ## Required generated idiom
 
@@ -33,4 +33,3 @@ or claim that BFFT already follows every rule.
 Exception policy, RTTI policy, template limits, allocation arenas, generated
 namespace spelling, file partitioning, and the exact listener/token types need
 separate decisions before output is frozen.
-

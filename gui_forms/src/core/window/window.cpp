@@ -536,6 +536,20 @@ bool Window::request_focus(const Control::Ptr& control) {
     return true;
 }
 
+void Window::set_focus_cue_visible(bool visible) {
+    if (focus_cue_visible_ == visible) return;
+    const Control::Ptr focused = focused_.lock();
+    if (focused && (*focused).is_alive() &&
+        (*focused).attached_window() == this) {
+        add_damage_all_planes(paint_damage_bounds_of(*focused));
+    }
+    focus_cue_visible_ = visible;
+    if (focused && (*focused).is_alive() &&
+        (*focused).attached_window() == this) {
+        (*focused).invalidate(Dirty::paint);
+    }
+}
+
 void Window::set_accept_button(const Control::Ptr& control) {
     require_ui_thread("accept button mutation");
     if (control && ((*control).attached_window() != this || !(*control).is_alive() ||
@@ -1179,6 +1193,10 @@ bool Window::dispatch_pointer(PointerEvent event) {
         return defer_input(DeferredInput{std::move(event)});
     }
     metrics_.record_input();
+    if (event.action == PointerAction::down &&
+        event.button == PointerButton::primary) {
+        set_focus_cue_visible(false);
+    }
     if (event.action == PointerAction::move) {
         Control::Ptr next_hover = hit_test(event.position);
         Control::Ptr previous_hover = hovered_.lock();
@@ -1300,6 +1318,9 @@ bool Window::dispatch_key(KeyEvent event) {
         return defer_input(DeferredInput{std::move(event)});
     }
     metrics_.record_input();
+    if (event.action == KeyAction::down) {
+        set_focus_cue_visible(true);
+    }
     const bool traversal_key = event.action == KeyAction::down &&
         event.physical_key == PhysicalKey::tab;
     const bool forward =
@@ -1685,6 +1706,10 @@ void Window::attach_subtree(const Control::Ptr& control, const Control::WeakPtr&
     try {
         for (const Control::Ptr& current : controls) {
             notified.push_back(current);
+            if ((*current).authored_surface_material_) {
+                (*current).validate_authored_surface_material_images(
+                    *(*current).authored_surface_material_);
+            }
             (*current).on_attached_to_window();
         }
     } catch (...) {
@@ -2105,7 +2130,10 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         return false;
     }
     if (!eligible(control)) return false;
-    if (action == SemanticAction::focus) return request_focus(control);
+    if (action == SemanticAction::focus) {
+        set_focus_cue_visible(true);
+        return request_focus(control);
+    }
     return (*control).on_semantic_action(action, value);
 }
 
@@ -2480,8 +2508,8 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         }
         ++callbacks;
         if (!(*control).is_alive() || (*control).window_ != this) return;
-        const Rect new_bounds = visual_bounds_of(*control,
-                                                  (*control).visual_outsets());
+        const Rect new_bounds = visual_bounds_of(
+            *control, (*control).effective_visual_outsets());
         if (old_bounds != new_bounds) {
             // Arrangement changes expose content below the moved control. The
             // compositor uses one target across ordered paint planes, so both
@@ -2608,7 +2636,7 @@ void Window::paint_recursive(const Control::Ptr& control,
     }
     Control* const retained_parent = (*control).parent_.lock().get();
     const Rect bounds = absolute_bounds_of(*control);
-    const Insets current_outsets = (*control).visual_outsets();
+    const Insets current_outsets = (*control).effective_visual_outsets();
     if (!(*control).is_alive() || (*control).window_ != this ||
         (*control).parent_.lock().get() != retained_parent) {
         return;
@@ -2639,6 +2667,10 @@ void Window::paint_recursive(const Control::Ptr& control,
         if (rebuild) {
             (*control).clear_dirty(Dirty::paint);
             detail::RecordingPainter recorder;
+            (*control).paint_authored_surface(recorder, logical_bounds);
+            (*control).paint_owned_decorations(
+                recorder, logical_bounds,
+                OwnerDecorationLayer::before_content);
             (*control).on_paint(recorder, logical_bounds);
             if (!(*control).is_alive() || (*control).window_ != this ||
                 (*control).parent_.lock().get() != retained_parent) {
@@ -2649,6 +2681,9 @@ void Window::paint_recursive(const Control::Ptr& control,
                 (*control).parent_.lock().get() != retained_parent) {
                 return;
             }
+            (*control).paint_owned_decorations(
+                recorder, logical_bounds,
+                OwnerDecorationLayer::after_content);
             (*control).display_chunk_ = recorder.finish(++display_generation_, plane,
                                                       logical_bounds);
             ++chunks_rebuilt;
@@ -2779,7 +2814,7 @@ Rect Window::visual_bounds_of(const Control& control, Insets outsets) const {
 
 Rect Window::paint_damage_bounds_of(const Control& control) const {
     return Rect::united(
-        visual_bounds_of(control, control.visual_outsets()),
+        visual_bounds_of(control, control.effective_visual_outsets()),
         visual_bounds_of(control, control.last_painted_visual_outsets_));
 }
 

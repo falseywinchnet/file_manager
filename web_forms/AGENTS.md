@@ -1,6 +1,6 @@
 # Web.Forms planning guardrails
 
-This subtree is the planning-stage **Web.Forms** project. It defines a bounded,
+This subtree is the dogfood-stage **Web.Forms** project. It defines a bounded,
 browser-valid HTML/CSS authoring profile and a build-time compiler into retained
 GUI.Forms construction. It is not a browser engine, a web application, or a
 second GUI runtime.
@@ -18,17 +18,21 @@ Before changing this subtree, read in order:
 9. `planning/COMPILER_BOUNDARY_001.md`
 10. `planning/INTERVIEW_LEDGER_001.md`
 11. `decisions/README.md`
-12. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`
-13. parent `../AGENTS.md`
-14. `../planning/SURFACE_PIPELINE.md`
-15. `../gui_forms/AGENTS.md`
+12. `decisions/ADR-003_PYTHON_TWO_STAGE_DOGFOOD.md`
+13. `experiments/DOGFOOD_001.md`
+14. `planning/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`
+15. parent `../AGENTS.md`
+16. `../planning/SURFACE_PIPELINE.md`
+17. `../gui_forms/AGENTS.md`
 
 ## Current permission
 
-Research, language specification, conformance-corpus design, and interface
-negotiation are open. Parser, generator, designer, runtime, and build-system
-implementation remain closed until the language profile, GUI.Forms metadata
-edge, fidelity oracle, and first experiment gate are approved.
+Python Stage 1 validation/IR, Stage 2 descriptor generation, the dogfood corpus,
+tests, capability reports, bounded native component projections, and the
+fail-closed experimental typed native-tree generator are open under ADR-003 and
+ADR-004. A production/frozen GUI.Forms generation ABI, designer, runtime
+parsing, or 0.1 compatibility promise remains gated on native visual fidelity
+measurement and an explicit owner decision.
 
 ## Hard boundaries
 
@@ -50,18 +54,22 @@ edge, fidelity oracle, and first experiment gate are approved.
   semantic nodes. Decorative fragments lower into their owning paint/style
   record and do not become addressable controls merely because HTML used a
   `div` or pseudo-element to draw them.
+- SVG descendants never join the retained structure. Approved vector art is an
+  indivisible build-time resource hosted by an HTML/CSS-laid box; the host owns
+  identity, state, semantics, hit testing, and relational geometry.
 - Repeated/virtualized items receive runtime identities from model keys; static
   source IDs are never cloned into duplicates.
 - Generated code is disposable. Source and compiler version are authoritative;
   hand edits to generated C++ are not a supported workflow.
 - Product output is C++17-compatible source in the accepted orthodox generated
-  profile. Rust is permitted only in the build-time compiler and contributes no
-  runtime dependency.
+  profile. Python is permitted only in the build-time compiler and contributes
+  no runtime dependency.
 - Preserve GUI.Forms' accepted deterministic event and initialization-order
   contract. A Web.Forms compiler may coalesce work but may not invent a second
   runtime ordering mode.
-- Preserve unrelated work in the dirty parent tree. Do not change GUI.Forms
-  implementation while defining this project.
+- Preserve unrelated work in the dirty parent tree. GUI.Forms changes are
+  permitted only when a Web.Forms specimen exposes a named public capability
+  gap with a focused test; do not fold unrelated framework cleanup into them.
 
 ## Epistemic discipline
 

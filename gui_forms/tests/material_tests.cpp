@@ -64,6 +64,10 @@ public:
     void draw_box_shadow(Rect, double, Point, double, double, Color) override {
         ++shadows;
     }
+    void draw_inset_box_shadow(
+        Rect, double, Point, double, double, Color) override {
+        ++inset_shadows;
+    }
     void draw_line(Point start, Point end, Color color, double width) override {
         lines.push_back({start, end, color, width});
     }
@@ -112,6 +116,7 @@ public:
     unsigned spread_linear_fills{};
     unsigned radial_fills{};
     unsigned shadows{};
+    unsigned inset_shadows{};
     double last_radius{};
     double last_width{};
     Point last_start{};
@@ -488,6 +493,25 @@ void test_shadow_outsets_participate_in_damage() {
             "shrinking a decoration must damage its former visual extent");
 }
 
+void test_inset_shadow_is_retained_inside_owner_geometry() {
+    std::shared_ptr<gui_forms::MaterialPanel> panel =
+        make_control<MaterialPanel>(StableId("material.inset"));
+    (*panel).set_requested_bounds({0.0, 0.0, 120.0, 44.0});
+    SurfaceMaterial material;
+    material.shadows = {
+        {{0.0, 1.0}, 0.0, 0.0, Color::rgba(255, 255, 255, 48), true}};
+    (*panel).set_material(material);
+    Window window(panel, {120.0, 44.0});
+    window.perform_layout();
+    RichPainter painter;
+    window.paint(painter, {0.0, 0.0, 120.0, 44.0});
+
+    require(painter.shadows == 0U && painter.inset_shadows == 1U,
+            "retained replay must preserve inset shadow identity");
+    require((*panel).visual_outsets() == Insets{},
+            "inset shadows must not expand owner damage geometry");
+}
+
 } // namespace
 
 int main() {
@@ -501,6 +525,7 @@ int main() {
         test_image_materials_retain_crop_tile_and_nine_patch();
         test_minimal_painter_fallbacks_are_bounded();
         test_shadow_outsets_participate_in_damage();
+        test_inset_shadow_is_retained_inside_owner_geometry();
         std::cout << "gui_forms_material_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

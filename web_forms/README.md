@@ -1,6 +1,7 @@
 # Web.Forms
 
-Status: **grand-architect intake and language planning; implementation closed**.
+Status: **Python two-stage dogfood plus fail-closed native-tree experiment open
+under ADR-003 and ADR-004**.
 
 Web.Forms is the proposed design-time authoring and compilation companion to
 GUI.Forms. An author writes ordinary browser-valid HTML and CSS inside a strict,
@@ -8,20 +9,34 @@ versioned subset. A compiler validates the document, resolves its bounded
 cascade and layout/style vocabulary, and emits dense C++ construction plus
 static GUI.Forms schema, style, resource, and typed-handle records.
 
-The generated application is an ordinary retained GUI.Forms program:
+The target application is an ordinary retained GUI.Forms program. The current
+dogfood emits a compile-checked descriptor, separate manifest-backed component
+projections, and a complete experimental typed control tree. The whole tree is
+refused if any required record lacks an exact native projection:
 
 ```text
 *.wf.html + *.wf.css
         |
         v
-Web.Forms validator/compiler (build time only)
-        |
-        +--> generated C++ construction and typed ID handles
-        +--> immutable style/layout/resource records
-        +--> inspection metadata and source map
+Stage 1: accept/reject -> typed, versioned *.wfir.json
         |
         v
-GUI.Forms retained controls + public behavior + private CPU Skia renderer
+Stage 2: IR only -> orthodox C++17 descriptor + typed handles
+        |          + geometry / typography / material / state / decoration
+        |          + explicit GUI.Forms capability report
+        +
+        +--> experimental exact material projection
+        |      -> GUI.Forms retained fills/borders/shadows
+        |      -> retained hot/pressed/disabled/focus recipes
+        |      -> per-style refusal report for inexact geometry
+        |
+        +--> exact native component projections
+        |      -> surface/state/inset-shadow recipes
+        |      -> flex + grid tracks/cells + bounded boxes
+        |      -> retained typography + owned pseudo-decoration
+        |
+        v
+experimental typed NativeForm -> GUI.Forms retained controls + private CPU Skia
 ```
 
 There is no browser or HTML/CSS parser in the product runtime. Application code
@@ -50,8 +65,16 @@ ambient layout, surface, typography, theme, accommodation, and effective-state
 context from its parent. The native result must preserve that landscape rather
 than placing independently painted controls over an approximate background.
 
-The compiler is a build-time Rust tool. It emits C++17-compatible source in the
-orthodox generated profile; Rust is absent from the product runtime.
+SVG is visual-resource input, not a second structure language. Inline SVG trees
+are rejected in the 0.1 dogfood profile. A later closed local SVG asset may
+paint one HTML/CSS-laid image box, but its descendants cannot become controls,
+layout nodes, IDs, states, or hit targets. Relational decoration such as a
+breadcrumb chevron remains CSS geometry owned by its box.
+
+The compiler is a build-time Python tool. Stage 1 accepts/rejects source and
+emits versioned IR; Stage 2 consumes only that IR and emits C++17-compatible
+source in the orthodox generated profile. Python is absent from the product
+runtime.
 
 ## Planning artifacts
 
@@ -79,3 +102,43 @@ orthodox generated profile; Rust is absent from the product runtime.
 The latest source specimen remains
 [`../frontend/planning/visual/frontend-concept-atlas.html`](../frontend/planning/visual/frontend-concept-atlas.html).
 Web.Forms does not copy or execute it at runtime.
+
+## Dogfood commands
+
+```sh
+python3 web_forms/tools/webforms.py check \
+  web_forms/boards/widgets/breadcrumb/breadcrumb.wf.html --quiet
+
+python3 web_forms/tools/webforms.py build \
+  web_forms/boards/apps/standard_shell/standard_shell.wf.html \
+  --emit-ir /tmp/standard-shell.wfir.json \
+  --output-dir /tmp/standard-shell-generated
+
+python3 web_forms/tools/webforms.py report \
+  /tmp/standard-shell.wfir.json \
+  --manifest web_forms/capabilities/gui_forms_observed_001.json
+
+python3 web_forms/tools/webforms.py generate-gui-materials \
+  /tmp/standard-shell.wfir.json \
+  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --output-dir /tmp/standard-shell-native-materials
+
+python3 web_forms/tools/webforms.py generate-gui-layouts \
+  /tmp/standard-shell.wfir.json \
+  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --output-dir /tmp/standard-shell-native-layouts
+
+python3 web_forms/tools/webforms.py generate-gui-tree \
+  /tmp/standard-shell.wfir.json \
+  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --output-dir /tmp/standard-shell-native-tree \
+  --unit standard_shell_sapphire
+
+python3 web_forms/tools/webforms.py profile
+
+python3 -m unittest discover -s web_forms/tests -v
+python3 web_forms/tools/measure_dogfood.py --iterations 50
+```
+
+[`experiments/DOGFOOD_001.md`](experiments/DOGFOOD_001.md) records the first
+acceptance, geometry, visual, C++ compilation, and GUI.Forms capability results.

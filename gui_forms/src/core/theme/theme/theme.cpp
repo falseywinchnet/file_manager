@@ -327,8 +327,8 @@ bool valid_recipe(const ControlVisualRecipe& value) noexcept {
     return valid_surface_material(value.material) &&
            std::isfinite(value.focus_width) && value.focus_width >= 0.0 &&
            value.focus_width <= 16.0 && std::isfinite(value.focus_offset) &&
-           value.focus_offset >= 0.0 && value.focus_offset <= 64.0 &&
-           (value.focus_external || value.focus_offset == 0.0) &&
+           value.focus_offset >= -64.0 && value.focus_offset <= 64.0 &&
+           (value.authored_focus_outline || value.focus_offset == 0.0) &&
            std::isfinite(value.default_width) &&
            value.default_width >= 0.0 && value.default_width <= 16.0 &&
            finite(value.visual_offset) &&
@@ -493,8 +493,11 @@ void paint_surface_material(Painter& painter, Rect bounds,
                             const SurfaceMaterial& material) {
     if (bounds.empty() || !valid_surface_material(material)) return;
     for (const MaterialShadow& shadow : material.shadows) {
-        painter.draw_box_shadow(bounds, material.corner_radius, shadow.offset,
-                                shadow.blur_radius, shadow.spread, shadow.color);
+        if (!shadow.inset) {
+            painter.draw_box_shadow(
+                bounds, material.corner_radius, shadow.offset,
+                shadow.blur_radius, shadow.spread, shadow.color);
+        }
     }
     const bool clipped = material.corner_radius > 0.0;
     if (clipped) {
@@ -546,6 +549,13 @@ void paint_surface_material(Painter& painter, Rect bounds,
         }
     }
     if (clipped) painter.restore();
+    for (const MaterialShadow& shadow : material.shadows) {
+        if (shadow.inset) {
+            painter.draw_inset_box_shadow(
+                bounds, material.corner_radius, shadow.offset,
+                shadow.blur_radius, shadow.spread, shadow.color);
+        }
+    }
     if (material.border) {
         const double inset = (*material.border).width * 0.5;
         painter.stroke_rounded_rect(
@@ -584,6 +594,7 @@ void paint_surface_material(Painter& painter, Rect bounds,
 Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept {
     Insets result{};
     for (const MaterialShadow& shadow : material.shadows) {
+        if (shadow.inset) continue;
         const double extent = std::max(0.0, shadow.spread) +
                               shadow.blur_radius * 3.0;
         result.left = std::max(result.left,

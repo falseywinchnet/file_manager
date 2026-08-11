@@ -30,6 +30,9 @@ public:
     void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                          double blur_radius, double spread,
                          Color color) override;
+    void draw_inset_box_shadow(Rect rect, double corner_radius, Point offset,
+                               double blur_radius, double spread,
+                               Color color) override;
     void draw_line(Point from, Point to, Color color, double width) override;
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override;

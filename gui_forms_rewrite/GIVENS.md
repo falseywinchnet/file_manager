@@ -8,8 +8,10 @@ label differs.
 
 ## Rewrite boundary
 
-- Plan now; do not implement now.
-- A future sibling performs the rewrite after explicit direction.
+- The exact-behavior rewrite was completed on 2026-08-10; this policy remains
+  authoritative for maintenance of the rewritten source.
+- Future lifecycle, allocator, constrained-runtime, and model-checking rounds
+  remain separately gated.
 - Rewrite `include/` and production `src/` first as the normative scope.
 - After production changes, update first-party tests, demo, tools,
   compatibility code, and generated output only where needed to compile,

@@ -479,6 +479,42 @@ void test_table_cell_dock_fill_consumes_growth() {
             "a table-cell Dock=Fill child must consume later growth without rewriting authored bounds");
 }
 
+void test_table_track_spacing_is_relational_and_bounded() {
+    std::shared_ptr<gui_forms::TableLayoutPanel> table =
+        make_control<TableLayoutPanel>(StableId("layout.table.spacing"));
+    (*table).set_column_count(2U);
+    (*table).set_row_count(1U);
+    (*table).set_column_style(0U, {TableSizeMode::percent, 1.0});
+    (*table).set_column_style(1U, {TableSizeMode::percent, 1.0});
+    (*table).set_row_style(0U, {TableSizeMode::percent, 1.0});
+    (*table).set_track_spacing({18.0, 0.0});
+    std::shared_ptr<Button> first =
+        sized_button("layout.table.spacing.first", 20.0, 20.0);
+    std::shared_ptr<Button> second =
+        sized_button("layout.table.spacing.second", 20.0, 20.0);
+    (*first).set_dock(DockStyle::fill);
+    (*second).set_dock(DockStyle::fill);
+    (*table).add_child(first);
+    (*table).add_child(second);
+    Window window(table, {218.0, 80.0});
+    window.perform_layout();
+    require((*table).column_widths().size() == 2U &&
+                near((*table).column_widths()[0], 100.0) &&
+                near((*table).column_widths()[1], 100.0) &&
+                (*first).arranged_bounds() == Rect{0.0, 0.0, 100.0, 80.0} &&
+                (*second).arranged_bounds() == Rect{118.0, 0.0, 100.0, 80.0},
+            "table track spacing must be removed before fractional allocation and retained between live cells");
+
+    bool rejected{};
+    try {
+        (*table).set_track_spacing({257.0, 0.0});
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && (*table).track_spacing() == Size{18.0, 0.0},
+            "table track spacing must reject invalid geometry atomically");
+}
+
 class GridPainter final : public Painter {
 public:
     void save() override {}
@@ -693,6 +729,7 @@ int main() {
         test_table_mixed_tracks_spans_and_lookup();
         test_table_growth_hidden_children_and_fixed_overflow();
         test_table_cell_dock_fill_consumes_growth();
+        test_table_track_spacing_is_relational_and_bounded();
         test_table_border_paint_is_public_geometry();
         test_scaled_panel_and_group_are_public_layout_controls();
         test_default_dock_layout_all_directions_and_z_order();

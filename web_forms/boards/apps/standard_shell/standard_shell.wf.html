@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Web.Forms Standard Application</title>
+  <link rel="stylesheet" href="sapphire.wf.css">
+</head>
+<body id="standard-app" data-wf-surface="own-surface">
+  <main id="standard-app.shell" class="app-shell" data-wf-control="panel" data-wf-surface="own-surface">
+    <header id="standard-app.shell.title" class="title-bar" data-wf-control="toolbar" data-wf-surface="own-surface">
+      <div id="standard-app.shell.title.mark" class="app-mark" data-wf-surface="own-surface">W</div>
+      <div id="standard-app.shell.title.copy" class="title-copy">
+        <strong id="standard-app.shell.title.copy.name">Web.Forms Workshop</strong>
+        <small id="standard-app.shell.title.copy.subtitle">standard application specimen</small>
+      </div>
+      <button id="standard-app.shell.title.help" class="title-command" data-wf-command="show-help" data-wf-surface="own-surface">Help</button>
+    </header>
+    <nav id="standard-app.shell.menu" class="menu-bar" data-wf-control="menu-bar" data-wf-surface="own-surface" aria-label="Application menu">
+      <button id="standard-app.shell.menu.file" class="menu-command" data-wf-command="open-file-menu" data-wf-surface="own-surface">File</button>
+      <button id="standard-app.shell.menu.edit" class="menu-command" data-wf-command="open-edit-menu" data-wf-surface="own-surface">Edit</button>
+      <button id="standard-app.shell.menu.view" class="menu-command" data-wf-command="open-view-menu" data-wf-surface="own-surface">View</button>
+    </nav>
+    <section id="standard-app.shell.workspace" class="workspace" data-wf-control="split-view">
+      <aside id="standard-app.shell.workspace.sidebar" class="sidebar" data-wf-control="stack" data-wf-surface="own-surface">
+        <p id="standard-app.shell.workspace.sidebar.label" class="section-label">WORKSPACE</p>
+        <button id="standard-app.shell.workspace.sidebar.overview" class="side-command selected" data-wf-command="show-overview" data-wf-surface="own-surface">Overview</button>
+        <button id="standard-app.shell.workspace.sidebar.library" class="side-command" data-wf-command="show-library" data-wf-surface="own-surface">Library</button>
+        <button id="standard-app.shell.workspace.sidebar.activity" class="side-command" data-wf-command="show-activity" data-wf-surface="own-surface">Activity</button>
+      </aside>
+      <article id="standard-app.shell.workspace.content" class="content" data-wf-control="panel" data-wf-surface="own-surface">
+        <header id="standard-app.shell.workspace.content.heading" class="content-heading">
+          <div id="standard-app.shell.workspace.content.heading.copy">
+            <p id="standard-app.shell.workspace.content.heading.copy.eyebrow" class="eyebrow">TODAY'S WORK</p>
+            <h1 id="standard-app.shell.workspace.content.heading.copy.title">Make native software feel composed.</h1>
+          </div>
+          <button id="standard-app.shell.workspace.content.heading.new" class="primary-command" data-wf-command="new-project" data-wf-surface="own-surface">New project</button>
+        </header>
+        <section id="standard-app.shell.workspace.content.cards" class="card-grid">
+          <article id="standard-app.shell.workspace.content.cards.visual" class="work-card" data-wf-surface="own-surface">
+            <span id="standard-app.shell.workspace.content.cards.visual.index" class="card-index">01</span>
+            <h2 id="standard-app.shell.workspace.content.cards.visual.title">Visual source</h2>
+            <p id="standard-app.shell.workspace.content.cards.visual.description">Author structure in HTML and keep a complete attached style generation.</p>
+            <button id="standard-app.shell.workspace.content.cards.visual.command" class="card-command" data-wf-command="open-visual-source" data-wf-surface="own-surface">Open study</button>
+          </article>
+          <article id="standard-app.shell.workspace.content.cards.native" class="work-card accent-card" data-wf-surface="own-surface">
+            <span id="standard-app.shell.workspace.content.cards.native.index" class="card-index">02</span>
+            <h2 id="standard-app.shell.workspace.content.cards.native.title">Native result</h2>
+            <p id="standard-app.shell.workspace.content.cards.native.description">Compile stable identity, nested surfaces, and finite states into C++.</p>
+            <button id="standard-app.shell.workspace.content.cards.native.command" class="card-command" data-wf-command="open-native-result" data-wf-surface="own-surface">Inspect output</button>
+          </article>
+        </section>
+      </article>
+    </section>
+    <footer id="standard-app.shell.status" class="status-bar" data-wf-control="status-bar" data-wf-surface="own-surface">
+      <span id="standard-app.shell.status.ready">Ready</span>
+      <span id="standard-app.shell.status.summary">2 studies · C++17 descriptor</span>
+    </footer>
+  </main>
+</body>
+</html>

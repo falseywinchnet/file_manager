@@ -37,6 +37,12 @@ enum class TextStyleRole : std::uint8_t {
     monospace,
 };
 
+enum class TextCaseTransform : std::uint8_t {
+    none,
+    uppercase_ascii,
+    lowercase_ascii,
+};
+
 class Label : public Control {
 public:
     explicit Label(StableId stable_id, std::string text = {});
@@ -69,6 +75,10 @@ public:
     void set_text_wrapping(TextWrapping wrapping);
     [[nodiscard]] double line_spacing() const noexcept { return line_spacing_; }
     void set_line_spacing(double spacing);
+    [[nodiscard]] TextCaseTransform text_case_transform() const noexcept {
+        return text_case_transform_;
+    }
+    void set_text_case_transform(TextCaseTransform transform);
     // Zero keeps all produced lines. A positive value bounds both desired
     // height and painting while semantics retain the complete authored text.
     [[nodiscard]] std::size_t maximum_lines() const noexcept {
@@ -106,6 +116,7 @@ private:
     VerticalAlignment vertical_alignment_{VerticalAlignment::center};
     TextWrapping text_wrapping_{TextWrapping::no_wrap};
     double line_spacing_{1.25};
+    TextCaseTransform text_case_transform_{TextCaseTransform::none};
     std::size_t maximum_lines_{};
     bool use_mnemonic_{true};
     Event<const std::string&> text_changed_;

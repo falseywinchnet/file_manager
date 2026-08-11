@@ -228,12 +228,21 @@ enable Skia GPU backends or WIC:
 The Mini's native arm64 .NET 10 SDK is user-scoped at
 `$HOME/.local/share/dotnet-sdk-10.0.105`; the separate Windows x64 SDK/runtime
 used by Wine and as the Windows Desktop reference source is at
-`$HOME/.local/share/dotnet-win-x64-sdk-10.0.105`. Build the compatibility facade
-and runner into persistent remote output with:
+`$HOME/.local/share/dotnet-win-x64-sdk-10.0.105`. Build the checked-in generated
+facade and its two managed consumers in one remote invocation (ordinary
+`bin/`/`obj/` products are intentionally not persistent across later
+`m4build` synchronizations):
 
 ```sh
 /Users/ultimussecundai/.local/bin/m4build -- \
-  /bin/sh gui_forms/tools/build_managed_facade_m4.sh gui_forms
+  /bin/sh -c '
+    export DOTNET_ROOT="$HOME/.local/share/dotnet-sdk-10.0.105"
+    export GUI_FORMS_WINDOWS_DESKTOP_REF="$HOME/.local/share/dotnet-win-x64-sdk-10.0.105/packs/Microsoft.WindowsDesktop.App.Ref/10.0.5/ref/net10.0"
+    gui_forms_dotnet="$DOTNET_ROOT/dotnet"
+    "$gui_forms_dotnet" build gui_forms/generated/facade-v1/System.Windows.Forms/System.Windows.Forms.csproj -c Release
+    "$gui_forms_dotnet" build gui_forms/tools/facade_smoke/GuiForms.FacadeSmoke.csproj -c Release
+    "$gui_forms_dotnet" build gui_forms/tools/facade_behavior_smoke/GuiForms.FacadeBehaviorSmoke.csproj -c Release
+  '
 ```
 
 Proprietary specimens, writable profiles, extracted bundles, and runtime logs

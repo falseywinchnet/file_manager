@@ -373,6 +373,11 @@ public:
     [[nodiscard]] Control::Ptr hit_test(Point position);
     bool request_focus(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr focused_control() const noexcept { return focused_.lock(); }
+    // Browser-style focus-visible modality: keyboard and semantic navigation
+    // expose a cue; primary-pointer focus suppresses it without losing focus.
+    [[nodiscard]] bool focus_cue_visible() const noexcept {
+        return focus_cue_visible_;
+    }
     bool validate_control(const Control::Ptr& control,
                           Control* destination = nullptr,
                           bool bulk = false);
@@ -633,6 +638,7 @@ private:
     [[nodiscard]] Rect paint_damage_bounds_of(const Control& control) const;
     [[nodiscard]] bool eligible(const Control::Ptr& control) const noexcept;
     [[nodiscard]] bool move_focus_after(const Control::Ptr& origin);
+    void set_focus_cue_visible(bool visible);
     [[nodiscard]] bool validate_command_activation(
         const Control::Ptr& destination);
     [[nodiscard]] bool dispatch_mnemonic(char32_t character);
@@ -656,6 +662,7 @@ private:
     bool active_{true};
     StableIdMap stable_ids_;
     Control::WeakPtr focused_;
+    bool focus_cue_visible_{};
     Control::WeakPtr accept_button_;
     Control::WeakPtr cancel_button_;
     std::uint64_t mnemonic_attempts_{};

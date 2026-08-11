@@ -2,8 +2,7 @@
 
 Date: 2026-08-10
 
-Status: **DECIDED — compiler selection delegated by the grand architect on
-2026-08-10**.
+Status: **SUPERSEDED by ADR-003 on 2026-08-10**.
 
 ## Question
 
@@ -71,3 +70,9 @@ golden fixture corpus. Another permitted implementation language may replace
 Rust without changing source or application ABI. Changing the generated C++
 profile requires a new ADR and regenerated conformance corpus.
 
+## Supersession note
+
+The grand architect subsequently selected Python explicitly and opened the
+two-stage implementation/dogfood experiment. ADR-003 retains the orthodox C++
+output constraints while replacing only the compiler language and experiment
+sequence.

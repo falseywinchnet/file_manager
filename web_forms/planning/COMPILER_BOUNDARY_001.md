@@ -2,19 +2,21 @@
 
 Date: 2026-08-10
 
-Status: **HYPOTHESIS; intended to falsify with the first atlas slice**.
+Status: **MEASURED experimental construction under ADR-003 and ADR-004;
+production API and native/browser raster fidelity remain gated**.
 
 ## 1. Pipeline
 
 ```text
 HTML/CSS source
-  -> standards-aware parse with source locations
-  -> Web.Forms profile validation and budget checks
-  -> typed source graph (structure, identity, layout, style, state, resources)
-  -> compile-time cascade/nested-context/component expansion
-  -> GUI.Forms construction IR and capability validation
-  -> generated C++ + immutable records + typed handles + source map
-  -> ordinary native compiler/linker
+  -> Stage 1 parse, profile validation, budgets, cascade and nested context
+  -> typed versioned IR (content + geometry + typography + material + state)
+  -> Stage 2 reads IR only and validates target capabilities
+  -> generated C++17 descriptor + typed value tokens + handles + source map
+  -> manifest-backed material/layout/typography/decoration projections
+  -> fail-closed typed NativeForm construction
+  -> linked GUI.Forms structural and logical-geometry probe
+  -> gated: frozen production API and native/browser raster-fidelity claim
 ```
 
 Unknown or inexact lowering stops compilation. The compiler never emits “close
@@ -39,9 +41,27 @@ The compiler may retain compact inspection metadata:
 
 ## 3. Generated construction
 
-Generated C++ constructs stable retained controls once under GUI.Forms
+The production Stage 2 target constructs stable retained controls once under GUI.Forms
 initialization/update scopes, applies properties in the source-defined
 deterministic order, attaches the tree, and returns a typed handle object.
+
+**MEASURED dogfood boundary:** the current Stage 2 emits a dense runtime-node
+descriptor with hashed property IDs and typed values. Numbers, logical units,
+colors, gradients, borders, shadows, tracks, and transforms are tokenized at
+build time; it emits no CSS value strings requiring runtime grammar. The same
+output emits typed stable-ID indices and compiles as C++17. Separate
+experimental projections now emit direct GUI.Forms construction for exact
+surface materials and state recipes, flex and grid relationships, bounded box
+geometry, bundled-font typography, and owner-relative pseudo-decoration. Each
+nonprojectable record is retained in a refusal report. The tree generator
+composes those passes only when all required records are exact. It emits 7-,
+14-, and 38-node typed trees for the dogfood fixtures; a linked 38-node probe
+constructs and lays out the Sapphire tree. Arbitrary CSS gradient angles,
+square side borders, outer and inset shadows, signed focus outlines, whole-
+visual pressed translation, flex growth, weighted grid tracks, CSS initial box
+values, and keyboard/pointer/semantic focus-visible modality have focused
+coverage. Rounded joins between independently colored side borders remain
+refused rather than approximated.
 
 Illustrative shape only (conforming to the generated C++ profile):
 
@@ -126,16 +146,24 @@ picture.
 ## 7. Build-time vector and image policy
 
 GUI.Forms admits PNG as its runtime decoder. The atlas nevertheless relies on
-inline SVG symbols. The compiler has two bounded candidates:
+inline SVG symbols. Web.Forms does not preserve that SVG DOM. Vector art is an
+indivisible paint resource hosted by an ordinary HTML/CSS layout box; it cannot
+contribute controls, layout nodes, IDs, selector state, semantics, or hit
+testing. Fixed vector coordinates therefore cannot substitute for relational
+CSS/control geometry.
 
-- parse a closed SVG subset at build time and emit GUI.Forms path/gradient
-  records; or
+Stage 1 rejects inline `<svg>` in 0.1. A later local SVG resource lane has two
+bounded lowering candidates:
+
+- parse a closed, script-free SVG file with an intrinsic `viewBox` at build time
+  and emit one GUI.Forms path/gradient resource; or
 - rasterize approved SVG inputs at declared scale variants into provenance-
   tracked PNG resources.
 
 No SVG parser ships in the application. Unsupported SVG features fail the
-build. Which candidate is default remains an experiment decision because path
-output, scale quality, generated size, and renderer fidelity differ.
+build. Resource descendants are never addressable. Which output form is the
+default remains an experiment decision because path output, scale quality,
+generated size, and renderer fidelity differ.
 
 ## 8. WYSIWYG contract
 

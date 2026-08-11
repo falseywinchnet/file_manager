@@ -108,6 +108,17 @@ void ButtonBase::set_font(FontSpec font) {
     invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
 }
 
+void ButtonBase::set_text_line_spacing(double spacing) {
+    require_mutable();
+    if (!std::isfinite(spacing) || spacing < 0.75 || spacing > 3.0) {
+        throw std::invalid_argument(
+            "Button text line spacing must be finite and between 0.75 and 3.0");
+    }
+    if (text_line_spacing_ == spacing) return;
+    text_line_spacing_ = spacing;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
 void ButtonBase::set_style(BasicControlStyle style) {
     require_mutable();
     if (style_override_ && *style_override_ == style) {
@@ -330,7 +341,8 @@ Size ButtonBase::measure(Size available) {
     const std::string display = display_text();
     const double text_width = display.empty() ? 0.0
                                                : estimated_text_width(display, font);
-    const double text_height = display.empty() ? 0.0 : font.size * 1.25;
+    const double text_height = display.empty()
+        ? 0.0 : font.size * text_line_spacing_;
     Size image_size{};
     if (image_.value != 0U) {
         if (window() != nullptr) {
@@ -390,9 +402,16 @@ void ButtonBase::paint_button_frame(Painter& painter, Rect bounds,
         painter.stroke_rect({0.5, 0.5, bounds.width - 1.0, bounds.height - 1.0},
                             colors.accent, 1.0);
     }
-    if (focused_) {
+    if (focus_cue_visible()) {
         paint_focus(painter, bounds, colors.text);
     }
+}
+
+bool ButtonBase::focus_cue_visible() const noexcept {
+    if (!focused_) return false;
+    Window* owner = window();
+    return owner == nullptr || (*owner).focused_control().get() != this ||
+           (*owner).focus_cue_visible();
 }
 
 void ButtonBase::paint_button_text(Painter& painter, Rect bounds,
@@ -455,7 +474,7 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                                        : painter.measure_text_utf8(text, font);
     const Size text_size{text.empty() ? 0.0 : std::max(0.0, measured.width),
                          text.empty() ? 0.0
-                                      : std::max(font.size * 1.2,
+                                      : std::max(font.size * text_line_spacing_,
                                                  measured.height)};
     const ImageListResolution image = resolved_button_image(selected);
     Size image_size{};
@@ -534,7 +553,7 @@ void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,
                                      bool default_cue,
                                      bool command_alignment) const {
     const ControlVisualContext context = visual_context(
-        hovered_, pressed_visual(), false, focused_, default_cue);
+        hovered_, pressed_visual(), false, focus_cue_visible(), default_cue);
     const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
     const Rect visual_bounds{
         bounds.x + recipe.visual_offset.x,
@@ -564,8 +583,9 @@ Insets ButtonBase::resolved_visual_outsets(
     const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
     Insets result = surface_material_visual_outsets(recipe.material);
     double cue_extent = 0.0;
-    if (context.focused && recipe.focus_external && recipe.focus_width > 0.0) {
-        cue_extent = recipe.focus_offset + recipe.focus_width;
+    if (context.focused && recipe.authored_focus_outline &&
+        recipe.focus_width > 0.0) {
+        cue_extent = std::max(0.0, recipe.focus_offset + recipe.focus_width);
     }
     result.left = std::max(
         0.0, std::max(result.left, cue_extent) - recipe.visual_offset.x);
@@ -592,7 +612,7 @@ void ButtonBase::on_paint(Painter& painter, Rect) {
 Insets ButtonBase::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     const ControlVisualContext context = visual_context(
-        hovered_, pressed_visual(), false, focused_, false);
+        hovered_, pressed_visual(), false, focus_cue_visible(), false);
     return resolved_visual_outsets(ControlVisualRole::button, context);
 }
 

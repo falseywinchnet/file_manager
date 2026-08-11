@@ -1,7 +1,6 @@
 # House-language enforcement specification
 
-Status: **DECIDED design for the future implementation sibling; checker not yet
-implemented**.
+Status: **IMPLEMENTED; checker and closure ledgers retained**.
 
 The semantic authority is a narrow standalone Clang LibTooling program. Cheap
 text scans and tightened compiler warnings supplement it; neither substitutes
@@ -9,7 +8,7 @@ for source-aware AST classification.
 
 ## Tool boundary
 
-- Proposed implementation home: `gui_forms/tools/house_policy_check/`.
+- Implementation home: `gui_forms/tools/house_policy_check/`.
 - Development/build dependency only; it does not link into GUI.Forms products.
 - Consume the exact build's `compile_commands.json`.
 - Use a current Clang/LLVM toolchain in C++20 mode.
@@ -111,4 +110,3 @@ comparison implementations. Test diagnostics and JSON records for stability.
 Run the checker under the actual native and MinGW compilation databases before
 closure. A result produced from an incomplete configuration is not a whole-tree
 proof.
-

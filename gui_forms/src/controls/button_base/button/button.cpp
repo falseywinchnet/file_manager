@@ -154,7 +154,7 @@ Insets Button::visual_outsets() const noexcept {
         role = ControlVisualRole::command_button;
     }
     const ControlVisualContext context = visual_context(
-        hovered_visual(), pressed_visual(), false, focused_visual(),
+        hovered_visual(), pressed_visual(), false, focus_cue_visible(),
         default_button_);
     return resolved_visual_outsets(role, context);
 }
