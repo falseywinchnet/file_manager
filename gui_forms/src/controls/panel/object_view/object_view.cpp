@@ -13,6 +13,34 @@
 
 namespace gui_forms {
 
+namespace {
+
+std::string elide_object_name(Painter& painter, std::string_view text,
+                              FontSpec font, const double maximum_width) {
+    if (maximum_width <= 0.0 ||
+        painter.measure_text_utf8(text, font).width <= maximum_width) {
+        return std::string(text);
+    }
+    constexpr std::string_view ellipsis = "…";
+    std::string prefix(text);
+    while (!prefix.empty()) {
+        std::size_t scalar = prefix.size() - 1U;
+        while (scalar > 0U &&
+               (static_cast<unsigned char>(prefix[scalar]) & 0xc0U) == 0x80U) {
+            --scalar;
+        }
+        prefix.resize(scalar);
+        std::string candidate(prefix);
+        candidate.append(ellipsis);
+        if (painter.measure_text_utf8(candidate, font).width <= maximum_width) {
+            return candidate;
+        }
+    }
+    return std::string(ellipsis);
+}
+
+} // namespace
+
 using namespace collection_detail;
 ObjectView::ObjectView(StableId stable_id) : Panel(std::move(stable_id)) {
     set_paint_plane(PaintPlane::control);
@@ -501,11 +529,13 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                     painter, item, index, selected, glyph_bounds)) {
                 paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
             }
-            const Size measured = painter.measure_text_utf8(item.name, font);
+            const std::string display_name = elide_object_name(
+                painter, item.name, font, std::max(0.0, cell.width - 8.0));
+            const Size measured = painter.measure_text_utf8(display_name, font);
             const double text_x = cell.x + std::max(4.0, (cell.width - measured.width) * .5);
             painter.draw_text_utf8({text_x, cell.y +
                                     std::max(65.0, 48.0 + font.size)},
-                                   item.name, font,
+                                   display_name, font,
                                    item.enabled ? style().text : style().disabled_text);
             if (show_secondary_text_ && !item.secondary_text.empty()) {
                 FontSpec authored_secondary{font_.role,

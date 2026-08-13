@@ -12,10 +12,25 @@
 
 namespace gui_forms::host {
 
+enum class MacTitlebarPresentation : std::uint8_t {
+    standard,
+    transparent_full_size_content,
+};
+
 struct MacHostOptions {
     std::string title{"GUI.Forms Application"};
     Size initial_size{1120.0, 680.0};
     Size minimum_size{150.0, 150.0};
+    // Full-size content retains the native titled window, traffic-light
+    // controls, resize behavior, system title, and accessibility identity. It
+    // only makes the title material transparent and lets retained content
+    // occupy that region.
+    MacTitlebarPresentation titlebar_presentation{
+        MacTitlebarPresentation::standard};
+    // Optional stable ID of a retained backdrop that may begin a native window
+    // drag. A primary click must hit this exact control; a descendant wins its
+    // own input, so interactive content is never converted into a drag target.
+    std::string window_drag_region_id;
     bool print_metrics_on_close{true};
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};

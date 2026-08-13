@@ -33,8 +33,12 @@ public:
     void stroke_rounded_rect(Rect, double, Color, double) override {}
     void fill_linear_gradient(Rect, Point, Point,
                               std::span<const GradientStop>) override {}
-    void draw_line(Point, Point, Color, double) override {}
-    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_line(Point from, Point to, Color, double) override {
+        lines.emplace_back(from, to);
+    }
+    void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override {
+        texts.emplace_back(text);
+    }
     void draw_image(ImageId image, Rect destination, double opacity) override {
         images.push_back(image);
         destinations.push_back(destination);
@@ -44,6 +48,8 @@ public:
     std::vector<ImageId> images;
     std::vector<Rect> destinations;
     std::vector<double> opacities;
+    std::vector<std::string> texts;
+    std::vector<std::pair<Point, Point>> lines;
 };
 
 void require(bool condition, const char* message) {
@@ -116,6 +122,97 @@ public:
 private:
     std::string& trace_;
 };
+
+void test_breadcrumb_identity_overflow_edit_and_input() {
+    std::shared_ptr<BreadcrumbTrail> trail = make_control<BreadcrumbTrail>(
+        StableId("breadcrumb"), "breadcrumb.exact-editor");
+    (*trail).set_requested_bounds({0.0, 0.0, 160.0, 28.0});
+    (*trail).set_accessible_name("Current location breadcrumb");
+    (*trail).set_segments({
+        {"path.root", "Home", "Navigate to Home"},
+        {"path.one", "Projects", "Navigate to Projects"},
+        {"path.two", "House Composite", "Navigate to House Composite"},
+        {"path.three", "Frontend", "Navigate to Frontend"},
+        {"path.current", "Source", "Current location"},
+    });
+    Window window(trail, {160.0, 28.0});
+    window.perform_layout();
+
+    require((*trail).children().size() == 1U &&
+                (*trail).children().front() == (*trail).editor(),
+            "BreadcrumbTrail must own exactly one retained same-row editor rather than per-segment controls");
+    require(!(*trail).hidden_segment_ids().empty(),
+            "constrained BreadcrumbTrail must retain explicit middle-overflow identities");
+    const std::vector<SemanticNode> constrained =
+        (*trail).semantic_virtual_children();
+    require(constrained.size() >= 4U &&
+                constrained.front().stable_id == "path.root" &&
+                constrained[1].stable_id == (*trail).overflow_stable_id() &&
+                constrained[constrained.size() - 2U].stable_id == "path.current" &&
+                constrained.back().stable_id == (*trail).edit_stable_id(),
+            "BreadcrumbTrail overflow must preserve root/current identities and expose overflow/edit actuators");
+
+    std::string activated;
+    std::size_t overflow_count{};
+    std::string committed;
+    std::size_t cancelled{};
+    SubscriptionToken activation = (*trail).segment_activated().subscribe(
+        test_support::RecordValue<std::string>(activated));
+    SubscriptionToken overflow = (*trail).overflow_activated().subscribe(
+        [&overflow_count] { ++overflow_count; });
+    SubscriptionToken commit = (*trail).edit_committed().subscribe(
+        test_support::RecordValue<std::string>(committed));
+    SubscriptionToken cancel = (*trail).edit_cancelled().subscribe(
+        [&cancelled] { ++cancelled; });
+    require((*trail).on_semantic_child_action(
+                "path.root", SemanticAction::press, {}) &&
+                activated == "path.root",
+            "breadcrumb semantic segment press must share typed activation");
+    require((*trail).on_semantic_child_action(
+                (*trail).overflow_stable_id(), SemanticAction::show_menu, {}) &&
+                overflow_count == 1U,
+            "breadcrumb overflow semantic action must enter the operational overflow path");
+
+    require(window.request_focus(trail),
+            "BreadcrumbTrail must accept retained keyboard focus");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::home}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                activated == "path.root",
+            "Home and Enter must activate the first stable breadcrumb segment");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                (*trail).editing() && (*trail).editor()->visible(),
+            "End and Enter must replace the trail presentation with its owned editor");
+    window.perform_layout();
+    const Rect trail_bounds = (*trail).committed_arranged_bounds();
+    const Rect editor_bounds = (*trail).editor()->committed_arranged_bounds();
+    require(editor_bounds.x == 1.0 && editor_bounds.y == 1.0 &&
+                editor_bounds.width == trail_bounds.width - 2.0 &&
+                editor_bounds.height == trail_bounds.height - 2.0,
+            "breadcrumb editing must preserve outer identity and row geometry");
+    (*trail).editor()->set_text("/Users/example/Projects");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                committed == "/Users/example/Projects" && (*trail).editing(),
+            "path commit must publish exact editor text while the caller decides admissibility");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
+                !(*trail).editing() && cancelled == 1U,
+            "Escape must roll back presentation and restore the breadcrumb row");
+
+    ImageRecordingPainter painter;
+    window.paint(painter, {0.0, 0.0, 160.0, 28.0});
+    require(!painter.lines.empty(),
+            "BreadcrumbTrail must paint connected shared chevron edges");
+
+    bool duplicate_rejected{};
+    try {
+        (*trail).set_segments({{"duplicate", "One", {}},
+                               {"duplicate", "Two", {}}});
+    } catch (const std::invalid_argument&) {
+        duplicate_rejected = true;
+    }
+    require(duplicate_rejected,
+            "BreadcrumbTrail must reject duplicate caller identities");
+}
 
 void test_tree_visibility_identity_and_navigation() {
     std::shared_ptr<gui_forms::TreeView> tree = make_control<TreeView>(StableId("tree"));
@@ -192,7 +289,9 @@ void test_tree_and_object_view_consume_keyed_image_list() {
     (*objects).set_image_list(images);
     (*tree).set_items({{"tree.image", "Folder", 0U, false, false, true,
                       "FOLDER"}});
-    (*objects).set_items({{"object.image", "Folder", "1 item", "Fixture",
+    (*objects).set_items({{"object.image",
+                         "An impossibly long local object name that cannot fit",
+                         "1 item", "Fixture",
                          ObjectGlyph::folder, true, "folder"}});
     window.perform_layout();
     ImageRecordingPainter painter;
@@ -203,6 +302,11 @@ void test_tree_and_object_view_consume_keyed_image_list() {
                 !painter.destinations[0].empty() &&
                 !painter.destinations[1].empty(),
             "TreeView and ObjectView must paint shared keyed ImageList resources instead of private glyph paths");
+    require(std::any_of(painter.texts.begin(), painter.texts.end(),
+                        [](const std::string& text) {
+                            return text.ends_with("…");
+                        }),
+            "ObjectView icon labels must elide instead of painting across adjacent cells");
 }
 
 void test_object_virtualization_view_preservation_and_input() {
@@ -603,6 +707,7 @@ void test_correspondence_keyboard_pin_semantics_and_activation() {
 
 int main() {
     try {
+        test_breadcrumb_identity_overflow_edit_and_input();
         test_tree_visibility_identity_and_navigation();
         test_tree_model_validation();
         test_tree_and_object_view_consume_keyed_image_list();

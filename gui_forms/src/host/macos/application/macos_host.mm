@@ -455,8 +455,12 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     NSArray* _semanticAccessibilityChildren;
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
+    BOOL _transparentFullSizeContent;
+    std::string _windowDragRegionId;
 }
-- (instancetype)initWithModel:(std::unique_ptr<Window>)model;
+- (instancetype)initWithModel:(std::unique_ptr<Window>)model
+       transparentFullSizeContent:(BOOL)transparentFullSizeContent
+               windowDragRegionId:(std::string)windowDragRegionId;
 - (BOOL)initializeHost;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
 - (HostDispatchResult)dispatchHostPayload:(HostEventPayload)payload
@@ -771,7 +775,9 @@ private:
 
 @implementation GUIFormsView
 
-- (instancetype)initWithModel:(std::unique_ptr<Window>)model {
+- (instancetype)initWithModel:(std::unique_ptr<Window>)model
+       transparentFullSizeContent:(BOOL)transparentFullSizeContent
+               windowDragRegionId:(std::string)windowDragRegionId {
     self = [super initWithFrame:NSMakeRect(0.0, 0.0, 980.0, 680.0)];
     if (self != nil) {
         _model = std::move(model);
@@ -783,6 +789,8 @@ private:
         _lastSemanticGeneration = 0;
         _accessibilityCacheGeneration = 0;
         _nativeCallbackFaults = 0;
+        _transparentFullSizeContent = transparentFullSizeContent;
+        _windowDragRegionId = std::move(windowDragRegionId);
         _semanticAccessibilityChildren = nil;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
@@ -1524,6 +1532,20 @@ private:
 
 - (void)mouseDown:(NSEvent*)event {
     [self.window makeFirstResponder:self];
+    if (event.buttonNumber == 0 && !_windowDragRegionId.empty() && _model) {
+        const GFPoint point = [self modelPointForEvent:event];
+        const gui_forms::Control::Ptr region =
+            (*_model).find(_windowDragRegionId);
+        const gui_forms::Control::Ptr target = (*_model).hit_test(point);
+        // Exact-target matching is deliberate. A button/editor/splitter (or
+        // any future interactive descendant) keeps its portable input simply
+        // by remaining the hit-test winner. Authors may make decorative
+        // descendants transparent when the backdrop should remain draggable.
+        if (region && target && region.get() == target.get()) {
+            [self.window performWindowDragWithEvent:event];
+            return;
+        }
+    }
     [self dispatchPointerEvent:event action:PointerAction::down];
 }
 
@@ -1696,7 +1718,46 @@ private:
         ? (*_hostSession).snapshot().to_json() : std::string("{}");
     const std::string services = _hostServices
         ? (*_hostServices).snapshot().to_json() : std::string("{}");
+    const NSWindow* nativeWindow = self.window;
+    const bool fullSizeContent = nativeWindow != nil &&
+        ((nativeWindow.styleMask & NSWindowStyleMaskFullSizeContentView) != 0);
+    const bool titleHidden = nativeWindow != nil &&
+        nativeWindow.titleVisibility == NSWindowTitleHidden;
+    const bool titlebarTransparent = nativeWindow != nil &&
+        nativeWindow.titlebarAppearsTransparent;
+    const bool closeButtonPresent = nativeWindow != nil &&
+        [nativeWindow standardWindowButton:NSWindowCloseButton] != nil;
+    const bool minimizeButtonPresent = nativeWindow != nil &&
+        [nativeWindow standardWindowButton:NSWindowMiniaturizeButton] != nil;
+    const bool zoomButtonPresent = nativeWindow != nil &&
+        [nativeWindow standardWindowButton:NSWindowZoomButton] != nil;
+    const bool nativeTitlePresent = nativeWindow != nil &&
+        nativeWindow.title.length != 0;
+    const bool dragRegionConfigured = !_windowDragRegionId.empty();
+    const bool dragRegionResolved = dragRegionConfigured && _model &&
+        static_cast<bool>((*_model).find(_windowDragRegionId));
     return "{\"session\":" + session + ",\"services\":" + services +
+        ",\"titlebar_presentation\":\"" +
+        (_transparentFullSizeContent
+             ? std::string("transparent_full_size_content")
+             : std::string("standard")) + "\"" +
+        ",\"native_full_size_content\":" +
+        (fullSizeContent ? "true" : "false") +
+        ",\"native_title_hidden\":" + (titleHidden ? "true" : "false") +
+        ",\"native_titlebar_transparent\":" +
+        (titlebarTransparent ? "true" : "false") +
+        ",\"native_close_button_present\":" +
+        (closeButtonPresent ? "true" : "false") +
+        ",\"native_minimize_button_present\":" +
+        (minimizeButtonPresent ? "true" : "false") +
+        ",\"native_zoom_button_present\":" +
+        (zoomButtonPresent ? "true" : "false") +
+        ",\"native_system_title_present\":" +
+        (nativeTitlePresent ? "true" : "false") +
+        ",\"window_drag_region_configured\":" +
+        (dragRegionConfigured ? "true" : "false") +
+        ",\"window_drag_region_resolved\":" +
+        (dragRegionResolved ? "true" : "false") +
         ",\"native_callback_faults\":" +
         std::to_string(_nativeCallbackFaults) + "}";
 }
@@ -1926,9 +1987,15 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         const NSRect frame = NSMakeRect(0.0, 0.0,
                                         options.initial_size.width,
                                         options.initial_size.height);
-        const NSWindowStyleMask style = NSWindowStyleMaskTitled |
+        const bool transparentFullSizeContent =
+            options.titlebar_presentation ==
+            MacTitlebarPresentation::transparent_full_size_content;
+        NSWindowStyleMask style = NSWindowStyleMaskTitled |
             NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
             NSWindowStyleMaskResizable;
+        if (transparentFullSizeContent) {
+            style |= NSWindowStyleMaskFullSizeContentView;
+        }
         NSWindow* nativeWindow = [[NSWindow alloc]
             initWithContentRect:frame
                       styleMask:style
@@ -1938,7 +2005,10 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         // self-release-on-close policy would otherwise release the same window
         // a second time when the autorelease pool drains.
         [nativeWindow setReleasedWhenClosed:NO];
-        GUIFormsView* view = [[GUIFormsView alloc] initWithModel:std::move(model)];
+        GUIFormsView* view = [[GUIFormsView alloc]
+            initWithModel:std::move(model)
+            transparentFullSizeContent:transparentFullSizeContent
+            windowDragRegionId:std::move(options.window_drag_region_id)];
         [view installCloseRequestHandler:std::move(options.close_request)];
         GUIFormsWindowDelegate* delegate =
             [[GUIFormsWindowDelegate alloc] initWithView:view
@@ -1946,6 +2016,10 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                                             closedHandler:std::move(options.closed)];
         [nativeWindow setDelegate:delegate];
         [nativeWindow setTitle:[NSString stringWithUTF8String:options.title.c_str()]];
+        if (transparentFullSizeContent) {
+            [nativeWindow setTitlebarAppearsTransparent:YES];
+            [nativeWindow setTitleVisibility:NSWindowTitleHidden];
+        }
         [nativeWindow setMinSize:NSMakeSize(options.minimum_size.width,
                                             options.minimum_size.height)];
         [nativeWindow setContentView:view];
@@ -2044,10 +2118,16 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             const NSRect frame = NSMakeRect(0.0, 0.0,
                                             entry.options.initial_size.width,
                                             entry.options.initial_size.height);
+            const bool transparentFullSizeContent =
+                entry.options.titlebar_presentation ==
+                MacTitlebarPresentation::transparent_full_size_content;
             NSWindowStyleMask style = NSWindowStyleMaskTitled |
                 NSWindowStyleMaskClosable | NSWindowStyleMaskResizable;
             if (!entry.tool_window) style |= NSWindowStyleMaskMiniaturizable;
             else style |= NSWindowStyleMaskUtilityWindow;
+            if (transparentFullSizeContent) {
+                style |= NSWindowStyleMaskFullSizeContentView;
+            }
             NSWindow* nativeWindow = entry.tool_window
                 ? static_cast<NSWindow*>([[NSPanel alloc]
                       initWithContentRect:frame styleMask:style
@@ -2056,8 +2136,11 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                       initWithContentRect:frame styleMask:style
                                   backing:NSBackingStoreBuffered defer:NO];
             [nativeWindow setReleasedWhenClosed:NO];
-            GUIFormsView* view =
-                [[GUIFormsView alloc] initWithModel:std::move(entry.model)];
+            GUIFormsView* view = [[GUIFormsView alloc]
+                initWithModel:std::move(entry.model)
+                transparentFullSizeContent:transparentFullSizeContent
+                windowDragRegionId:std::move(
+                    entry.options.window_drag_region_id)];
             [view installCloseRequestHandler:std::move(entry.options.close_request)];
             const BOOL primary = entry.owner_id.empty() && !entry.tool_window;
             GUIFormsWindowDelegate* delegate =
@@ -2066,6 +2149,10 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                                                 closedHandler:std::move(entry.options.closed)];
             [nativeWindow setDelegate:delegate];
             [nativeWindow setTitle:native_string(entry.options.title)];
+            if (transparentFullSizeContent) {
+                [nativeWindow setTitlebarAppearsTransparent:YES];
+                [nativeWindow setTitleVisibility:NSWindowTitleHidden];
+            }
             [nativeWindow setMinSize:NSMakeSize(entry.options.minimum_size.width,
                                                 entry.options.minimum_size.height)];
             [nativeWindow setContentView:view];

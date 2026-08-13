@@ -49,6 +49,16 @@ struct RearmProbeState final {
     bool synchronous_ran_on_ui_thread{};
     bool synchronous_returned{};
     std::string synchronous_fault;
+    std::function<void()> finish;
+};
+
+struct NativeWindowProbeState final {
+    bool found{};
+    bool moved{};
+    bool resized{};
+    bool zoomed{};
+    bool minimized{};
+    bool restored{};
 };
 
 void run_rearm_cycle(const std::shared_ptr<RearmProbeState>& state);
@@ -202,12 +212,14 @@ public:
         const std::shared_ptr<FrameProbe>& surface,
         gui_forms::Window* live_window,
         gui_forms::FrameRequestToken& active,
-        std::thread& synchronous_worker) noexcept
+        std::thread& synchronous_worker,
+        const std::shared_ptr<NativeWindowProbeState>& native_window_probe) noexcept
         : rearm_state_(rearm_state),
           surface_(surface),
           live_window_(live_window),
           active_(active),
-          synchronous_worker_(synchronous_worker) {}
+          synchronous_worker_(synchronous_worker),
+          native_window_probe_(native_window_probe) {}
 
     void operator()(
         VoidHostCallback wake,
@@ -231,6 +243,55 @@ public:
         worker.join();
         synchronous_worker_ =
             std::thread{RunSynchronousDispatch(rearm_state_)};
+        const std::shared_ptr<NativeWindowProbeState> nativeWindowProbe =
+            native_window_probe_;
+        const std::function<void()> requestClose =
+            (*rearm_state_).request_close;
+        (*rearm_state_).finish = [nativeWindowProbe, requestClose] {
+            NSWindow* nativeWindow = nil;
+            for (NSWindow* candidate in NSApplication.sharedApplication.windows) {
+                if ([candidate.title isEqualToString:@"GUI.Forms Close Test"]) {
+                    nativeWindow = candidate;
+                    break;
+                }
+            }
+            if (nativeWindow == nil) return;
+            nativeWindowProbe->found = true;
+            [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
+            const NSRect original = nativeWindow.frame;
+            NSRect changed = original;
+            changed.origin.x += 6.0;
+            changed.origin.y -= 6.0;
+            changed.size.width += 12.0;
+            changed.size.height += 12.0;
+            [nativeWindow setFrame:changed display:NO];
+            const NSRect committed = nativeWindow.frame;
+            nativeWindowProbe->moved =
+                committed.origin.x != original.origin.x ||
+                committed.origin.y != original.origin.y;
+            nativeWindowProbe->resized =
+                committed.size.width != original.size.width ||
+                committed.size.height != original.size.height;
+            [nativeWindow zoom:nil];
+            nativeWindowProbe->zoomed = nativeWindow.isZoomed ||
+                !NSEqualRects(nativeWindow.frame, committed);
+            [nativeWindow zoom:nil];
+            [nativeWindow miniaturize:nil];
+            dispatch_after(
+                dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+                dispatch_get_main_queue(), ^{
+                    nativeWindowProbe->minimized = nativeWindow.isMiniaturized;
+                    [nativeWindow deminiaturize:nil];
+                    dispatch_after(
+                        dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+                        dispatch_get_main_queue(), ^{
+                            nativeWindowProbe->restored =
+                                !nativeWindow.isMiniaturized;
+                            requestClose();
+                            requestClose();
+                        });
+                });
+        };
         const std::shared_ptr<RearmProbeState> scheduled_state = rearm_state_;
         const std::shared_ptr<FrameProbe> scheduled_surface = surface_;
         dispatch_after(
@@ -252,6 +313,7 @@ private:
     gui_forms::Window* live_window_;
     gui_forms::FrameRequestToken& active_;
     std::thread& synchronous_worker_;
+    std::shared_ptr<NativeWindowProbeState> native_window_probe_;
 };
 
 void run_rearm_cycle(const std::shared_ptr<RearmProbeState>& state) {
@@ -291,8 +353,12 @@ void run_rearm_cycle(const std::shared_ptr<RearmProbeState>& state) {
                     ++(*retained_state).cycle;
                     if ((*retained_state).cycle ==
                         (*retained_state).ticks_before.size()) {
-                        (*retained_state).request_close();
-                        (*retained_state).request_close();
+                        if ((*retained_state).finish) {
+                            (*retained_state).finish();
+                        } else {
+                            (*retained_state).request_close();
+                            (*retained_state).request_close();
+                        }
                         return;
                     }
                     dispatch_after(
@@ -417,18 +483,25 @@ int main() {
         surface, std::chrono::milliseconds(10),
         gui_forms::FrameClock::now() + std::chrono::milliseconds(10));
     std::shared_ptr<RearmProbeState> rearm_state;
+    const std::shared_ptr<NativeWindowProbeState> native_window_probe =
+        std::make_shared<NativeWindowProbeState>();
     std::thread synchronous_worker;
     gui_forms::host::MacHostOptions options;
     options.title = "GUI.Forms Close Test";
     options.initial_size = {320.0, 180.0};
     options.minimum_size = {320.0, 180.0};
+    options.titlebar_presentation =
+        gui_forms::host::MacTitlebarPresentation::
+            transparent_full_size_content;
+    options.window_drag_region_id = "host.close.root";
     options.print_metrics_on_close = false;
     std::uint64_t close_requests = 0;
     std::string final_host_snapshot;
     options.close_request = CountCloseRequests(close_requests);
     options.final_snapshot = StoreFinalHostSnapshot(final_host_snapshot);
     options.host_ready = PrepareCloseTestHost(
-        rearm_state, surface, live_window, active, synchronous_worker);
+        rearm_state, surface, live_window, active, synchronous_worker,
+        native_window_probe);
     const int result = gui_forms::host::run_macos(std::move(window), std::move(options));
     if (synchronous_worker.joinable()) synchronous_worker.join();
     if (result != 0) {
@@ -436,6 +509,17 @@ int main() {
     }
     if (!rearm_state || active.connected() || (*rearm_state).replacement.connected()) {
         return 3;
+    }
+    if (!native_window_probe->found || !native_window_probe->moved ||
+        !native_window_probe->resized || !native_window_probe->zoomed ||
+        !native_window_probe->minimized || !native_window_probe->restored) {
+        std::cerr << "native_window_probe found=" << native_window_probe->found
+                  << " moved=" << native_window_probe->moved
+                  << " resized=" << native_window_probe->resized
+                  << " zoomed=" << native_window_probe->zoomed
+                  << " minimized=" << native_window_probe->minimized
+                  << " restored=" << native_window_probe->restored << '\n';
+        return 9;
     }
     if (close_requests != 2) {
         return 5;
@@ -445,6 +529,29 @@ int main() {
         final_host_snapshot.find("\"monitor_count\":1") == std::string::npos ||
         final_host_snapshot.find("\"pointer_capture\"") == std::string::npos) {
         return 7;
+    }
+    if (final_host_snapshot.find(
+            "\"titlebar_presentation\":\"transparent_full_size_content\"") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_full_size_content\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_title_hidden\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_titlebar_transparent\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_close_button_present\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_minimize_button_present\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_zoom_button_present\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"native_system_title_present\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"window_drag_region_configured\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"window_drag_region_resolved\":true") ==
+            std::string::npos) {
+        return 8;
     }
     if ((*rearm_state).ticks_before.front() == 0 ||
         (*rearm_state).ticks_after.back() <= (*rearm_state).ticks_before.front() + 2U ||

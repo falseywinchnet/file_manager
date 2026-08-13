@@ -241,6 +241,7 @@ add_library(gui_forms_controls STATIC
     src/controls/button_base/radio_button/radio_button.cpp
     src/controls/button_base/link_label/link_label.cpp
     src/controls/raster_canvas/raster_canvas.cpp
+    src/controls/panel/breadcrumb_trail/breadcrumb_trail.cpp
     src/controls/panel/tree_view/tree_view.cpp
     src/controls/panel/object_view/object_view.cpp
     src/controls/panel/correspondence_view/correspondence_view.cpp

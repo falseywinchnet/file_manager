@@ -117,6 +117,10 @@ int main() {
     product.options.title = "GUI.Forms Product Root";
     product.options.initial_size = {240.0, 140.0};
     product.options.minimum_size = {160.0, 100.0};
+    product.options.titlebar_presentation =
+        gui_forms::host::MacTitlebarPresentation::
+            transparent_full_size_content;
+    product.options.window_drag_region_id = "test.root.product";
     product.options.closed = CountClosed(product_closed);
     product.options.host_ready = CaptureCloseRequest(close_product);
     product.options.final_snapshot = StoreCombinedSnapshot(product_snapshot);
@@ -141,6 +145,27 @@ int main() {
     if (result != 0 || product_closed != 1U || controller_closed != 1U ||
         product_snapshot.empty() || controller_snapshot.empty()) {
         return 2;
+    }
+    if (product_snapshot.find(
+            "\"titlebar_presentation\":\"transparent_full_size_content\"") ==
+            std::string::npos ||
+        product_snapshot.find("\"native_full_size_content\":true") ==
+            std::string::npos ||
+        product_snapshot.find("\"native_close_button_present\":true") ==
+            std::string::npos ||
+        product_snapshot.find("\"native_minimize_button_present\":true") ==
+            std::string::npos ||
+        product_snapshot.find("\"native_zoom_button_present\":true") ==
+            std::string::npos ||
+        product_snapshot.find("\"native_system_title_present\":true") ==
+            std::string::npos ||
+        product_snapshot.find("\"window_drag_region_resolved\":true") ==
+            std::string::npos ||
+        controller_snapshot.find("\"titlebar_presentation\":\"standard\"") ==
+            std::string::npos ||
+        controller_snapshot.find("\"native_full_size_content\":false") ==
+            std::string::npos) {
+        return 3;
     }
     return 0;
 }
