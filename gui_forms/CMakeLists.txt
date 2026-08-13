@@ -55,8 +55,11 @@ add_library(gui_forms_core STATIC
     src/core/text/text_store/text_store.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
+    src/core/typography/resolution/typography_resolution.cpp
     src/core/metrics/metrics/metrics.cpp
     src/core/metrics/snapshot/metrics_snapshot.cpp
+    src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
+    src/core/window/inspection/window_visual_inspection.cpp
     src/core/resources/image_registry/image_registry.cpp
     src/core/live_surface/buffer/live_surface_buffer.cpp
     src/core/live_surface/frame/live_surface_frame.cpp
@@ -80,6 +83,7 @@ add_library(gui_forms_core STATIC
     src/core/scheduler/request/scheduled_frame_request.cpp
     src/core/window/dispatcher/window_dispatcher.cpp
     src/core/window/lifecycle/window_lifecycle.cpp
+    src/core/window/typography/window_typography.cpp
     src/core/window/update_scope/update_scope.cpp
     src/core/window/presentation/window_presentation.cpp
     src/core/window/scheduler/window_scheduler.cpp
@@ -231,6 +235,7 @@ target_link_libraries(gui_forms_host_headless PUBLIC gui_forms_core)
 
 add_library(gui_forms_controls STATIC
     src/controls/basic/basic_control_rendering.cpp
+    src/controls/connected_controls/connected_controls.cpp
     src/controls/panel/panel.cpp
     src/controls/panel/group_box/group_box.cpp
     src/controls/panel/picture_box/picture_box.cpp
@@ -261,6 +266,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/group_box/scaled_group_box/scaled_group_box.cpp
     src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp
     src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp
+    src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp
     src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp
     src/controls/scrollable_control/container_control/tab_control/tab_control.cpp
     src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
@@ -274,6 +280,8 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/date_time_picker/date_time_picker.cpp
     src/controls/drawing_surface/drawing_surface.cpp
     src/controls/metrics_view/metrics_view.cpp
+    src/controls/visual_inspector_view/visual_inspector_view.cpp
+    src/controls/typography_specimen/typography_specimen.cpp
     src/controls/easing_preview/easing_preview.cpp
     src/controls/panel/text_box/text_box.cpp
     src/controls/panel/list_box/list_box.cpp
@@ -867,6 +875,69 @@ if(GUI_FORMS_BUILD_GALLERY)
     )
     target_link_libraries(gui_forms_vsync_lab_model PUBLIC gui_forms_controls)
 
+    add_library(gui_forms_visual_inspector_lab_model STATIC
+        demo/visual_inspector_lab.cpp
+    )
+    target_include_directories(gui_forms_visual_inspector_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_visual_inspector_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_layered_material_lab_model STATIC
+        demo/layered_material_lab.cpp
+    )
+    target_include_directories(gui_forms_layered_material_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_layered_material_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_custom_chrome_lab_model STATIC
+        demo/custom_chrome_lab.cpp
+    )
+    target_include_directories(gui_forms_custom_chrome_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_custom_chrome_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_typography_scale_lab_model STATIC
+        demo/typography_scale_lab.cpp
+    )
+    target_include_directories(gui_forms_typography_scale_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_typography_scale_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_responsive_tracks_lab_model STATIC
+        demo/responsive_tracks_lab.cpp
+    )
+    target_include_directories(gui_forms_responsive_tracks_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_responsive_tracks_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_connected_controls_lab_model STATIC
+        demo/connected_controls_lab.cpp
+    )
+    target_include_directories(gui_forms_connected_controls_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_connected_controls_lab_model PUBLIC
+        gui_forms_controls)
+
+    add_library(gui_forms_seam_proximity_lab_model STATIC
+        demo/seam_proximity_lab.cpp
+    )
+    target_include_directories(gui_forms_seam_proximity_lab_model PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/demo
+    )
+    target_link_libraries(gui_forms_seam_proximity_lab_model PUBLIC
+        gui_forms_controls)
+
     if(GUI_FORMS_ENABLE_MACOS_HOST)
         set_source_files_properties(
             ${GUI_FORMS_GALLERY_FONTS}
@@ -927,6 +998,132 @@ if(GUI_FORMS_BUILD_GALLERY)
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
             OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
         )
+
+        add_executable(gui_forms_visual_inspector_lab MACOSX_BUNDLE
+            src/host/macos/visual_inspector_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_visual_inspector_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_visual_inspector_lab PRIVATE
+            gui_forms_visual_inspector_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_visual_inspector_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Visual Inspector Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.visual-inspector-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Visual Inspector Lab"
+        )
+
+        add_executable(gui_forms_layered_material_lab MACOSX_BUNDLE
+            src/host/macos/layered_material_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_layered_material_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_layered_material_lab PRIVATE
+            gui_forms_layered_material_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_layered_material_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Layered Material Fidelity Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.layered-material-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Layered Material Fidelity Lab"
+        )
+
+        add_executable(gui_forms_custom_chrome_lab MACOSX_BUNDLE
+            src/host/macos/custom_chrome_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_custom_chrome_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_custom_chrome_lab PRIVATE
+            gui_forms_custom_chrome_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_custom_chrome_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Custom Chrome Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.custom-chrome-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Custom Chrome Lab"
+        )
+
+        add_executable(gui_forms_typography_scale_lab MACOSX_BUNDLE
+            src/host/macos/typography_scale_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_typography_scale_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_typography_scale_lab PRIVATE
+            gui_forms_typography_scale_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_typography_scale_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Typography + Scale Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.typography-scale-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Typography + Scale Lab"
+        )
+
+        add_executable(gui_forms_responsive_tracks_lab MACOSX_BUNDLE
+            src/host/macos/responsive_tracks_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_responsive_tracks_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_responsive_tracks_lab PRIVATE
+            gui_forms_responsive_tracks_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_responsive_tracks_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Responsive Tracks Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.responsive-tracks-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Responsive Tracks Lab"
+        )
+
+        add_executable(gui_forms_connected_controls_lab MACOSX_BUNDLE
+            src/host/macos/connected_controls_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_connected_controls_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_connected_controls_lab PRIVATE
+            gui_forms_connected_controls_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_connected_controls_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Connected Controls Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.connected-controls-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Connected Controls Lab"
+        )
+
+        add_executable(gui_forms_seam_proximity_lab MACOSX_BUNDLE
+            src/host/macos/seam_proximity_lab_main.mm
+            ${GUI_FORMS_GALLERY_FONTS}
+            ${GUI_FORMS_GALLERY_FONT_NOTICES}
+        )
+        target_compile_options(gui_forms_seam_proximity_lab PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_seam_proximity_lab PRIVATE
+            gui_forms_seam_proximity_lab_model
+            gui_forms_host_macos
+        )
+        set_target_properties(gui_forms_seam_proximity_lab PROPERTIES
+            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Physical Seam + Proximity Lab"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.seam-proximity-lab"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            MACOSX_BUNDLE_BUNDLE_VERSION "1"
+            OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
+        )
     endif()
 
     if(GUI_FORMS_ENABLE_WINDOWS_HOST)
@@ -971,8 +1168,112 @@ if(GUI_FORMS_BUILD_GALLERY)
         set_target_properties(gui_forms_vsync_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
         )
+
+        add_executable(gui_forms_visual_inspector_lab_windows
+            src/host/windows/visual_inspector_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_visual_inspector_lab_windows PRIVATE
+            gui_forms_visual_inspector_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_visual_inspector_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_visual_inspector_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Visual Inspector Lab"
+        )
+
+        add_executable(gui_forms_layered_material_lab_windows
+            src/host/windows/layered_material_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_layered_material_lab_windows PRIVATE
+            gui_forms_layered_material_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_layered_material_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_layered_material_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Layered Material Fidelity Lab"
+        )
+
+        add_executable(gui_forms_custom_chrome_lab_windows
+            src/host/windows/custom_chrome_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_custom_chrome_lab_windows PRIVATE
+            gui_forms_custom_chrome_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_custom_chrome_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_custom_chrome_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Custom Chrome Lab"
+        )
+
+        add_executable(gui_forms_typography_scale_lab_windows
+            src/host/windows/typography_scale_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_typography_scale_lab_windows PRIVATE
+            gui_forms_typography_scale_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_typography_scale_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_typography_scale_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Typography + Scale Lab"
+        )
+
+        add_executable(gui_forms_responsive_tracks_lab_windows
+            src/host/windows/responsive_tracks_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_responsive_tracks_lab_windows PRIVATE
+            gui_forms_responsive_tracks_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_responsive_tracks_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_responsive_tracks_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Responsive Tracks Lab"
+        )
+
+        add_executable(gui_forms_connected_controls_lab_windows
+            src/host/windows/connected_controls_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_connected_controls_lab_windows PRIVATE
+            gui_forms_connected_controls_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_connected_controls_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_connected_controls_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Connected Controls Lab"
+        )
+
+        add_executable(gui_forms_seam_proximity_lab_windows
+            src/host/windows/seam_proximity_lab_main.cpp
+        )
+        target_link_libraries(gui_forms_seam_proximity_lab_windows PRIVATE
+            gui_forms_seam_proximity_lab_model
+            gui_forms_host_windows
+        )
+        target_link_options(gui_forms_seam_proximity_lab_windows PRIVATE
+            -static -static-libgcc -static-libstdc++
+        )
+        set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
+            OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
+        )
         foreach(font_target IN ITEMS
-                gui_forms_showcase_windows gui_forms_gallery_windows)
+                gui_forms_showcase_windows gui_forms_gallery_windows
+                gui_forms_visual_inspector_lab_windows
+                gui_forms_layered_material_lab_windows
+                gui_forms_custom_chrome_lab_windows
+                gui_forms_typography_scale_lab_windows
+                gui_forms_connected_controls_lab_windows
+                gui_forms_seam_proximity_lab_windows)
             add_custom_command(TARGET ${font_target} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory
                     "$<TARGET_FILE_DIR:${font_target}>/fonts")
@@ -1184,6 +1485,13 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_basic_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_basic_controls_tests COMMAND gui_forms_basic_controls_tests)
 
+    add_executable(gui_forms_connected_controls_tests
+        tests/connected_controls_tests.cpp)
+    target_link_libraries(gui_forms_connected_controls_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_connected_controls_tests
+             COMMAND gui_forms_connected_controls_tests)
+
     add_executable(gui_forms_scrollable_control_tests
         tests/scrollable_control_tests.cpp)
     target_link_libraries(gui_forms_scrollable_control_tests PRIVATE
@@ -1204,6 +1512,13 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_controls)
     add_test(NAME gui_forms_inspection_controls_tests
              COMMAND gui_forms_inspection_controls_tests)
+
+    add_executable(gui_forms_visual_inspection_tests
+        tests/visual_inspection_tests.cpp)
+    target_link_libraries(gui_forms_visual_inspection_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_visual_inspection_tests
+             COMMAND gui_forms_visual_inspection_tests)
 
     add_executable(gui_forms_instrument_controls_tests
         tests/instrument_controls_tests.cpp)
@@ -1274,6 +1589,14 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_layout_panel_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_layout_panel_tests
              COMMAND gui_forms_layout_panel_tests)
+
+    add_executable(gui_forms_responsive_track_panel_tests
+        tests/responsive_track_panel_tests.cpp
+    )
+    target_link_libraries(gui_forms_responsive_track_panel_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_responsive_track_panel_tests
+             COMMAND gui_forms_responsive_track_panel_tests)
 
     add_executable(gui_forms_tab_control_tests
         tests/tab_control_tests.cpp
@@ -1447,6 +1770,100 @@ if(GUI_FORMS_BUILD_TESTS)
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_showcase_public_controls.cmake
         )
     endif()
+
+    if(TARGET gui_forms_visual_inspector_lab_model)
+        add_executable(gui_forms_visual_inspector_lab_tests
+            tests/visual_inspector_lab_tests.cpp)
+        target_include_directories(gui_forms_visual_inspector_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_visual_inspector_lab_tests PRIVATE
+            gui_forms_visual_inspector_lab_model)
+        add_test(NAME gui_forms_visual_inspector_lab_tests
+                 COMMAND gui_forms_visual_inspector_lab_tests)
+    endif()
+
+    if(TARGET gui_forms_layered_material_lab_model)
+        add_executable(gui_forms_layered_material_lab_tests
+            tests/layered_material_lab_tests.cpp)
+        target_include_directories(gui_forms_layered_material_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_layered_material_lab_tests PRIVATE
+            gui_forms_layered_material_lab_model)
+        add_test(NAME gui_forms_layered_material_lab_tests
+                 COMMAND gui_forms_layered_material_lab_tests)
+
+        if(APPLE AND TARGET gui_forms_skia AND TARGET gui_forms_coregraphics)
+            add_executable(gui_forms_layered_material_raster_tests
+                tests/layered_material_raster_tests.cpp)
+            target_include_directories(gui_forms_layered_material_raster_tests PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/demo
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/raster
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/render/coregraphics/raster)
+            target_link_libraries(gui_forms_layered_material_raster_tests PRIVATE
+                gui_forms_layered_material_lab_model
+                gui_forms_skia
+                gui_forms_coregraphics)
+            add_test(NAME gui_forms_layered_material_raster_tests
+                     COMMAND gui_forms_layered_material_raster_tests)
+        endif()
+    endif()
+
+    if(TARGET gui_forms_custom_chrome_lab_model)
+        add_executable(gui_forms_custom_chrome_lab_tests
+            tests/custom_chrome_lab_tests.cpp)
+        target_include_directories(gui_forms_custom_chrome_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/host/headless)
+        target_link_libraries(gui_forms_custom_chrome_lab_tests PRIVATE
+            gui_forms_custom_chrome_lab_model
+            gui_forms_host_headless)
+        add_test(NAME gui_forms_custom_chrome_lab_tests
+                 COMMAND gui_forms_custom_chrome_lab_tests)
+    endif()
+
+    if(TARGET gui_forms_typography_scale_lab_model)
+        add_executable(gui_forms_typography_scale_lab_tests
+            tests/typography_scale_lab_tests.cpp)
+        target_include_directories(gui_forms_typography_scale_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_typography_scale_lab_tests PRIVATE
+            gui_forms_typography_scale_lab_model)
+        add_test(NAME gui_forms_typography_scale_lab_tests
+                 COMMAND gui_forms_typography_scale_lab_tests)
+    endif()
+
+    if(TARGET gui_forms_responsive_tracks_lab_model)
+        add_executable(gui_forms_responsive_tracks_lab_tests
+            tests/responsive_tracks_lab_tests.cpp)
+        target_include_directories(gui_forms_responsive_tracks_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_responsive_tracks_lab_tests PRIVATE
+            gui_forms_responsive_tracks_lab_model)
+        add_test(NAME gui_forms_responsive_tracks_lab_tests
+                 COMMAND gui_forms_responsive_tracks_lab_tests)
+    endif()
+
+    if(TARGET gui_forms_connected_controls_lab_model)
+        add_executable(gui_forms_connected_controls_lab_tests
+            tests/connected_controls_lab_tests.cpp)
+        target_include_directories(gui_forms_connected_controls_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_connected_controls_lab_tests PRIVATE
+            gui_forms_connected_controls_lab_model)
+        add_test(NAME gui_forms_connected_controls_lab_tests
+                 COMMAND gui_forms_connected_controls_lab_tests)
+    endif()
+
+    if(TARGET gui_forms_seam_proximity_lab_model)
+        add_executable(gui_forms_seam_proximity_lab_tests
+            tests/seam_proximity_lab_tests.cpp)
+        target_include_directories(gui_forms_seam_proximity_lab_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/demo)
+        target_link_libraries(gui_forms_seam_proximity_lab_tests PRIVATE
+            gui_forms_seam_proximity_lab_model)
+        add_test(NAME gui_forms_seam_proximity_lab_tests
+                 COMMAND gui_forms_seam_proximity_lab_tests)
+    endif()
     endif()
 
     if(TARGET gui_forms_gallery)
@@ -1463,6 +1880,69 @@ if(GUI_FORMS_BUILD_TESTS)
             NAME gui_forms_showcase_font_policy
             COMMAND ${CMAKE_COMMAND}
                 -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_showcase>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_visual_inspector_lab)
+        add_test(
+            NAME gui_forms_visual_inspector_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_visual_inspector_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_layered_material_lab)
+        add_test(
+            NAME gui_forms_layered_material_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_layered_material_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_custom_chrome_lab)
+        add_test(
+            NAME gui_forms_custom_chrome_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_custom_chrome_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_typography_scale_lab)
+        add_test(
+            NAME gui_forms_typography_scale_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_typography_scale_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_responsive_tracks_lab)
+        add_test(
+            NAME gui_forms_responsive_tracks_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_responsive_tracks_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_connected_controls_lab)
+        add_test(
+            NAME gui_forms_connected_controls_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_connected_controls_lab>/Contents/Resources/fonts
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
+        )
+    endif()
+
+    if(TARGET gui_forms_seam_proximity_lab)
+        add_test(
+            NAME gui_forms_seam_proximity_lab_font_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_seam_proximity_lab>/Contents/Resources/fonts
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
         )
     endif()

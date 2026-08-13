@@ -79,6 +79,17 @@ void CheckBox::set_auto_check(bool enabled_value) {
     invalidate(Dirty::semantics);
 }
 
+void CheckBox::set_appearance(const CheckBoxAppearance appearance_value) {
+    require_mutable();
+    if (appearance_value != CheckBoxAppearance::normal &&
+        appearance_value != CheckBoxAppearance::button) {
+        throw std::invalid_argument("invalid CheckBox appearance");
+    }
+    if (appearance_ == appearance_value) return;
+    appearance_ = appearance_value;
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+}
+
 void CheckBox::set_indicator_style(ChoiceIndicatorStyle style_value) {
     require_mutable();
     if (indicator_style_ == style_value) {
@@ -90,6 +101,11 @@ void CheckBox::set_indicator_style(ChoiceIndicatorStyle style_value) {
 
 void CheckBox::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
+    if (appearance_ == CheckBoxAppearance::button && !has_style_override()) {
+        paint_themed_button(painter, bounds, ControlVisualRole::button, false,
+                            false, checked());
+        return;
+    }
     if (!has_style_override()) {
         const double indicator_width =
             indicator_style_ == ChoiceIndicatorStyle::toggle ? 30.0 : 15.0;
@@ -175,6 +191,9 @@ Insets CheckBox::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     const ControlVisualContext context = visual_context(
         hovered_visual(), pressed_visual(), checked(), focus_cue_visible());
+    if (appearance_ == CheckBoxAppearance::button) {
+        return resolved_visual_outsets(ControlVisualRole::button, context);
+    }
     return surface_material_visual_outsets(
         effective_theme().resolve(ControlVisualRole::choice, context).material);
 }

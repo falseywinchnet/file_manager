@@ -1,4 +1,5 @@
 #include "gui_forms/controls/button_base/button_base.hpp"
+#include "gui_forms/connected_controls.hpp"
 #include "../basic/basic_control_rendering.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
 #include "gui_forms/detail/property_binding_adapters.hpp"
@@ -155,6 +156,18 @@ void ButtonBase::clear_visual_recipes() {
     require_mutable();
     if (!visual_recipes_override_) return;
     visual_recipes_override_.reset();
+    invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
+}
+
+void ButtonBase::set_connection_topology(
+    std::optional<ConnectedControlTopology> topology) {
+    require_mutable();
+    if (topology && !valid_connected_control_topology(*topology)) {
+        throw std::invalid_argument(
+            "ButtonBase connection topology requires count >= 2 and index < count");
+    }
+    if (connection_topology_ == topology) return;
+    connection_topology_ = topology;
     invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
 }
 
@@ -562,8 +575,14 @@ void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,
         bounds.width,
         bounds.height,
     };
-    paint_surface_material(painter, visual_bounds, recipe.material);
-    paint_theme_cues(painter, visual_bounds, recipe, context);
+    paint_connected_surface_material(
+        painter, visual_bounds, recipe.material, connection_topology_);
+    ControlVisualRecipe cue_recipe = recipe;
+    // Connection shapes the physical stock only. Focus/default ownership is
+    // still per control, so use a square per-segment cue instead of implying
+    // that the whole joined instrument owns one focus identity.
+    if (connection_topology_) cue_recipe.material.corner_radius = 0.0;
+    paint_theme_cues(painter, visual_bounds, cue_recipe, context);
     const Point offset = context.surface == ControlSurfaceState::pressed
         ? recipe.pressed_content_offset : Point{};
     const std::string display = display_text();
@@ -582,7 +601,8 @@ const ControlVisualRecipe& ButtonBase::resolve_visual_recipe(
 Insets ButtonBase::resolved_visual_outsets(
     ControlVisualRole role, ControlVisualContext context) const noexcept {
     const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
-    Insets result = surface_material_visual_outsets(recipe.material);
+    Insets result = connected_surface_visual_outsets(
+        recipe.material, connection_topology_);
     double cue_extent = 0.0;
     if (context.focused && recipe.authored_focus_outline &&
         recipe.focus_width > 0.0) {

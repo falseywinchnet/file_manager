@@ -558,6 +558,18 @@ FontSpec Control::effective_font(FontSpec authored) const noexcept {
     return authored;
 }
 
+ResolvedTextLayout Control::resolve_text_layout_utf8(
+    std::string_view utf8, FontSpec effective) const {
+    return window_ != nullptr
+        ? (*window_).resolve_text_layout_utf8(utf8, effective)
+        : estimate_text_layout_utf8(utf8, effective);
+}
+
+double Control::snap_text_baseline(double logical_baseline) const noexcept {
+    return gui_forms::snap_text_baseline(
+        logical_baseline, window_ != nullptr ? (*window_).scale() : 1.0);
+}
+
 const Theme& Control::effective_theme() const noexcept {
     if (theme_override_) return *theme_override_;
     if (const Ptr visual_parent = parent_.lock()) {
@@ -1826,11 +1838,12 @@ CursorKind Control::effective_cursor() const noexcept {
 }
 
 bool Control::effectively_visible() const noexcept {
-    if (!visible_ || !is_alive()) {
+    if (!visible_ || layout_collapsed_ || !is_alive()) {
         return false;
     }
     for (Ptr ancestor = parent(); ancestor; ancestor = (*ancestor).parent()) {
-        if (!(*ancestor).visible_ || !(*ancestor).is_alive()) {
+        if (!(*ancestor).visible_ || (*ancestor).layout_collapsed_ ||
+            !(*ancestor).is_alive()) {
             return false;
         }
     }
@@ -2241,6 +2254,22 @@ std::vector<Control::Ptr> Control::snapshot_layout_children() const {
 bool Control::is_current_layout_child(const Ptr& child) const noexcept {
     return child && (*child).is_alive() && (*child).parent_.lock().get() == this &&
            (*child).window_ == window_;
+}
+
+void Control::set_child_layout_collapsed(const Ptr& child, bool collapsed) {
+    if (!is_current_layout_child(child)) {
+        throw std::invalid_argument(
+            "layout collapse requires a live direct child");
+    }
+    if ((*child).layout_collapsed_ == collapsed) return;
+    (*child).layout_collapsed_ = collapsed;
+    if (collapsed && (*child).window_ != nullptr) {
+        (*(*child).window_).on_eligibility_changed(child);
+    }
+    (*child).invalidate_subtree(invalidation::visibility);
+    if ((*child).window_ != nullptr && (*child).is_alive()) {
+        (*(*child).window_).publish_control_availability(*child);
+    }
 }
 
 void Control::on_paint(Painter&, Rect) {}

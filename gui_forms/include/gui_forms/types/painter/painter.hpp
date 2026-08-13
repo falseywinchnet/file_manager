@@ -2,6 +2,7 @@
 
 #include "gui_forms/types/geometry/geometry.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
+#include "gui_forms/typography.hpp"
 
 #include <memory>
 #include <span>
@@ -11,7 +12,7 @@ namespace gui_forms {
 
 class LiveSurface;
 
-class Painter {
+class Painter : public TextMetricsProvider {
 public:
     virtual ~Painter() = default;
 
@@ -66,6 +67,12 @@ public:
             ? static_cast<double>(scalars - 1U) * font.letter_spacing : 0.0;
         return {static_cast<double>(scalars) * font.size * 0.55 + tracking,
                 font.size * 1.2};
+    }
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view text, FontSpec font) override {
+        ResolvedTextLayout result = estimate_text_layout_utf8(text, font);
+        result.logical_size = measure_text_utf8(text, font);
+        return result;
     }
     virtual void draw_image(ImageId image,
                             Rect destination,

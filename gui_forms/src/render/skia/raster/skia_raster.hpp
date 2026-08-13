@@ -67,6 +67,8 @@ public:
                         Color color) override;
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view text, FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_live_surface(std::shared_ptr<LiveSurface> surface,
                            Rect destination, double opacity) override;

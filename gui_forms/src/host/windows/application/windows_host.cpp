@@ -1002,6 +1002,125 @@ public:
         return {width / scale_, height / scale_};
     }
 
+    ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view text, FontSpec font) override {
+        ResolvedTextLayout result;
+        result.effective_font = font;
+        if (!valid_font_spec(font) || !validate_utf8(text).valid()) {
+            result.status = TextResolutionStatus::invalid_request;
+            return result;
+        }
+        if (!bundled_fonts_ready_ || memory_dc_ == nullptr) {
+            result.status = TextResolutionStatus::missing_primary_face;
+            return result;
+        }
+        if (text.empty()) {
+            const wchar_t* requested = primary_font_family(font.role);
+            HFONT native_font = create_font(font, requested);
+            if (native_font == nullptr) {
+                result.status = TextResolutionStatus::missing_primary_face;
+                return result;
+            }
+            const int saved = SaveDC(memory_dc_);
+            HGDIOBJ old = SelectObject(memory_dc_, native_font);
+            std::array<wchar_t, LF_FACESIZE> actual_family{};
+            const int family_length = GetTextFaceW(
+                memory_dc_, static_cast<int>(actual_family.size()),
+                actual_family.data());
+            TEXTMETRICW metrics{};
+            const bool exact_face = family_length > 0 &&
+                _wcsicmp(actual_family.data(), requested) == 0 &&
+                GetTextMetricsW(memory_dc_, &metrics) != 0;
+            if (exact_face) {
+                result.primary_family = utf8_from_wide(actual_family.data());
+                result.ascent = metrics.tmAscent / scale_;
+                result.descent = metrics.tmDescent / scale_;
+                result.line_gap = metrics.tmExternalLeading / scale_;
+                result.logical_size = {
+                    0.0, std::max(font.size, result.ascent + result.descent +
+                                                result.line_gap)};
+                result.status = TextResolutionStatus::exact;
+            } else {
+                result.status = TextResolutionStatus::missing_primary_face;
+            }
+            SelectObject(memory_dc_, old);
+            RestoreDC(memory_dc_, saved);
+            DeleteObject(native_font);
+            return result;
+        }
+        const std::vector<GdiTextRun> runs = text_runs(text, font);
+        if (!text.empty() && runs.empty()) {
+            result.status = TextResolutionStatus::missing_primary_face;
+            return result;
+        }
+        const int saved = SaveDC(memory_dc_);
+        double width{};
+        bool missing_face{};
+        for (const GdiTextRun& run : runs) {
+            HFONT native_font = create_font(font, run.family.c_str());
+            if (native_font == nullptr) {
+                missing_face = true;
+                break;
+            }
+            HGDIOBJ old = SelectObject(memory_dc_, native_font);
+            std::array<wchar_t, LF_FACESIZE> actual_family{};
+            const int family_length = GetTextFaceW(
+                memory_dc_, static_cast<int>(actual_family.size()),
+                actual_family.data());
+            const std::wstring_view actual_name(actual_family.data());
+            const bool expected_face = family_length > 0 &&
+                _wcsicmp(actual_family.data(), run.family.c_str()) == 0;
+            TEXTMETRICW metrics{};
+            SIZE measured{};
+            SetTextCharacterExtra(memory_dc_, static_cast<int>(
+                std::lround(font.letter_spacing * scale_)));
+            const bool measured_ok = expected_face &&
+                GetTextMetricsW(memory_dc_, &metrics) != 0 &&
+                shape_text_run(run.text, 0, 0, false, measured);
+            if (measured_ok) {
+                if (!run.fallback && result.primary_family.empty()) {
+                    result.primary_family = utf8_from_wide(
+                        actual_name);
+                }
+                result.runs.push_back({
+                    run.utf8_start, run.utf8_length,
+                    utf8_from_wide(actual_name),
+                    run.registered_weight, run.registered_italic, run.fallback});
+                width += measured.cx / scale_;
+                result.ascent = std::max(
+                    result.ascent, metrics.tmAscent / scale_);
+                result.descent = std::max(
+                    result.descent, metrics.tmDescent / scale_);
+                result.line_gap = std::max(
+                    result.line_gap, metrics.tmExternalLeading / scale_);
+                result.missing_clusters += run.missing_clusters;
+            } else {
+                missing_face = true;
+            }
+            SelectObject(memory_dc_, old);
+            DeleteObject(native_font);
+            if (missing_face) break;
+        }
+        RestoreDC(memory_dc_, saved);
+        if (missing_face || (result.primary_family.empty() && !text.empty())) {
+            result = {};
+            result.effective_font = font;
+            result.status = TextResolutionStatus::missing_primary_face;
+            return result;
+        }
+        result.logical_size = {
+            width, std::max(font.size,
+                            result.ascent + result.descent + result.line_gap)};
+        result.status = result.missing_clusters == 0U
+            ? TextResolutionStatus::exact
+            : TextResolutionStatus::missing_cluster_coverage;
+        return result;
+    }
+
+    void set_bundled_fonts_ready(bool ready) noexcept {
+        bundled_fonts_ready_ = ready;
+    }
+
     void draw_image(ImageId image, Rect destination, double opacity) override {
         const ImageMap::iterator found = images_.find(image.value);
         if (found == images_.end()) return;
@@ -1191,6 +1310,12 @@ private:
     struct GdiTextRun {
         std::wstring family;
         std::wstring text;
+        std::size_t utf8_start{};
+        std::size_t utf8_length{};
+        std::size_t missing_clusters{};
+        std::uint16_t registered_weight{400};
+        bool registered_italic{};
+        bool fallback{};
     };
     struct PixelRect {
         int left{}; int top{}; int right{}; int bottom{};
@@ -1598,10 +1723,25 @@ private:
                 std::fprintf(stderr, "win32-text selected=%s\n",
                              utf8_from_wide(families[selected]).c_str());
             }
-            if (!runs.empty() && runs.back().family == families[selected]) {
+            const bool fallback = selected != 0U;
+            const std::uint16_t registered_weight = fallback
+                ? 400U : (font.weight >= 550U ? 700U : 400U);
+            const bool registered_italic = !fallback &&
+                font.role != FontRole::control && font.italic;
+            if (!runs.empty() && runs.back().family == families[selected] &&
+                runs.back().registered_weight == registered_weight &&
+                runs.back().registered_italic == registered_italic &&
+                runs.back().fallback == fallback) {
                 runs.back().text.append(cluster);
+                runs.back().utf8_length =
+                    range.end.value() - runs.back().utf8_start;
+                if (!covered) ++runs.back().missing_clusters;
             } else {
-                runs.push_back({families[selected], cluster});
+                runs.push_back({
+                    families[selected], cluster, range.start.value(),
+                    range.end.value() - range.start.value(),
+                    covered ? 0U : 1U, registered_weight,
+                    registered_italic, fallback});
             }
         }
         for (HFONT candidate : candidates) {
@@ -1678,6 +1818,7 @@ private:
     const ImageRegistry* image_registry_{};
     std::uint64_t image_revision_{std::numeric_limits<std::uint64_t>::max()};
     bool images_synchronized_{true};
+    bool bundled_fonts_ready_{};
 };
 
 class WindowsHostState final {
@@ -1700,6 +1841,7 @@ public:
         }
         hide_tooltip();
         if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
+        if (model_) (*model_).set_text_metrics_provider(nullptr);
         session_.shutdown();
         services_.shutdown();
         for (const std::wstring& path : private_font_paths_) {
@@ -1720,14 +1862,19 @@ public:
         }
         hwnd_ = window;
         scale_ = query_scale(window);
-        load_private_fonts();
+        const bool fonts_ready = load_private_fonts();
         RECT client{};
         GetClientRect(window, &client);
         const Size logical{(client.right - client.left) / scale_,
                            (client.bottom - client.top) / scale_};
         raster_.resize(logical, scale_);
+        raster_.set_bundled_fonts_ready(fonts_ready);
+        (*model_).set_text_metrics_provider(fonts_ready ? &raster_ : nullptr);
         (*model_).metrics().set_renderer(
-            "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts", true);
+            fonts_ready
+                ? "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts"
+                : "Win32 DIB CPU · incomplete bundled font pack",
+            true);
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
         if (!attached.accepted()) return false;
         native_phase_ = NativePhase::attached;
@@ -2602,9 +2749,9 @@ private:
         return FALSE;
     }
 
-    void load_private_fonts() {
+    bool load_private_fonts() {
         const std::wstring directory = executable_directory();
-        if (directory.empty()) return;
+        if (directory.empty()) return false;
         constexpr std::array<const wchar_t*, 12> names{
             L"PortsmouthRapids.ttf", L"PortsmouthRapids-Bold.ttf",
             L"Carlito-Regular.ttf", L"Carlito-Bold.ttf",
@@ -2619,6 +2766,7 @@ private:
                 private_font_paths_.push_back(std::move(path));
             }
         }
+        return private_font_paths_.size() == names.size();
     }
 
     static std::wstring executable_directory() {

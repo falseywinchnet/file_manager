@@ -9,6 +9,8 @@ namespace gui_forms::detail {
 
 class RecordingPainter final : public Painter {
 public:
+    explicit RecordingPainter(TextMetricsProvider* text_metrics = nullptr)
+        : text_metrics_(text_metrics) {}
     void save() override;
     void restore() override;
     void translate(Point offset) override;
@@ -38,6 +40,8 @@ public:
                         FontSpec font, Color color) override;
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view text, FontSpec font) override;
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_live_surface(std::shared_ptr<LiveSurface> surface,
                            Rect destination, double opacity) override;
@@ -56,6 +60,7 @@ public:
 private:
     std::vector<DisplayCommand> commands_;
     std::uint64_t save_depth_{};
+    TextMetricsProvider* text_metrics_{};
 };
 
 } // namespace gui_forms::detail

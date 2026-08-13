@@ -6,6 +6,7 @@
 #include "gui_forms/controls/panel/picture_box/picture_box.hpp"
 
 #include <memory>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,6 +28,10 @@ BindingValue picture_box_size_mode_value(PictureBoxSizeMode mode);
                                 ContentAlignment alignment) noexcept;
 [[nodiscard]] std::vector<std::string> label_lines(
     std::string_view text, FontSpec font, double width, TextWrapping wrapping);
+using TextWidthResolver = std::function<double(std::string_view)>;
+[[nodiscard]] std::vector<std::string> label_lines(
+    std::string_view text, FontSpec font, double width, TextWrapping wrapping,
+    const TextWidthResolver& resolve_width);
 void paint_relief(Painter& painter, Rect bounds,
                   const BasicControlStyle& style, bool pressed);
 void fill_radio_disc(Painter& painter, double left, double top, Color color,

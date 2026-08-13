@@ -360,11 +360,31 @@ void test_application_controls_navigate_real_directories() {
     window->perform_layout();
     require(root_mode &&
                 root_mode->text() ==
-                    tree_fixture.root().filename().string() + "-rooted ▾",
+                    tree_fixture.root().filename().string() + "-rooted",
             "tree header must expose the active honest root mode");
-    require(root_mode->committed_arranged_bounds().width >= 96.0 &&
-                root_mode->committed_arranged_bounds().height >= 27.0,
-            "tree root mode must own visible arranged header geometry");
+    const auto tree_header = window->find("fm.navigation.header");
+    const auto tree_caption = window->find(
+        "file-manager-app.shell.workspace.sidebar.label");
+    const bool one_tree_header_band = tree_header && tree_caption &&
+        root_mode->parent() == tree_header && tree_caption->parent() == tree_header &&
+        tree_header->committed_arranged_bounds().height == 27.0 &&
+        root_mode->committed_arranged_bounds().width == 112.0 &&
+        root_mode->committed_arranged_bounds().height == 27.0 &&
+        root_mode->committed_arranged_bounds().y ==
+            tree_caption->committed_arranged_bounds().y;
+    if (!one_tree_header_band) {
+        const auto rect_text = [](const gui_forms::Control::Ptr& control) {
+            if (!control) return std::string("absent");
+            const auto value = control->committed_arranged_bounds();
+            return std::to_string(value.x) + "," + std::to_string(value.y) +
+                "," + std::to_string(value.width) + "," +
+                std::to_string(value.height);
+        };
+        throw std::runtime_error(
+            "folder caption and root-mode disclosure must share one compact header band: header=" +
+            rect_text(tree_header) + " caption=" + rect_text(tree_caption) +
+            " mode=" + rect_text(root_mode));
+    }
     require(window->perform_semantic_action(
                 "fm.navigation.root-mode", gui_forms::SemanticAction::press) &&
                 window->find(
@@ -379,7 +399,7 @@ void test_application_controls_navigate_real_directories() {
     require_eventually(*application,
         [&] {
             const auto home = tree_item(*tree, "Home");
-            return home && home->depth == 0U && root_mode->text() == "Home-rooted ▾";
+            return home && home->depth == 0U && root_mode->text() == "Home-rooted";
         },
         "Home mode switch must expose one honest Home-rooted tree");
     require(window->perform_semantic_action(
@@ -405,7 +425,34 @@ void test_application_controls_navigate_real_directories() {
         "expanding a tree row must enumerate and retain its real children");
 
     const std::string documents = object_id(*objects, "Documents");
-    require(!documents.empty() &&
+    require(!documents.empty() && window->perform_semantic_action(
+                documents, gui_forms::SemanticAction::select),
+            "folder selection must route into the factual inspector");
+    const auto preview_house_icon =
+        std::dynamic_pointer_cast<gui_forms::Button>(
+            window->find("fm.inspector.preview.house-icon"));
+    const auto preview_glyph = window->find(
+        "file-manager-app.shell.workspace.inspector.preview.surface.glyph");
+    require_eventually(*application,
+        [&] {
+            return preview_house_icon && preview_house_icon->visible() &&
+                preview_house_icon->image_key() == "folder" &&
+                preview_house_icon->image_list() &&
+                preview_house_icon->image_list()->image_size() ==
+                    gui_forms::Size{72.0, 72.0} && preview_glyph &&
+                !preview_glyph->visible();
+        },
+        "directory inspection must use a large House material object instead of a textual DIR card");
+    window->perform_layout();
+    require(preview_house_icon->committed_arranged_bounds().width == 72.0 &&
+                preview_house_icon->committed_arranged_bounds().height == 72.0,
+            "visible directory material art must retain its exact inspector geometry");
+    ImageRecordingPainter preview_painter;
+    preview_house_icon->on_paint(
+        preview_painter, {0.0, 0.0, 72.0, 72.0});
+    require(preview_painter.images == 1U,
+            "directory inspector fallback must emit one native House image draw");
+    require(
                 window->perform_semantic_action(
                     documents, gui_forms::SemanticAction::press),
             "object activation must route to directory navigation");
@@ -709,6 +756,16 @@ void test_application_command_surfaces_and_house_mark() {
     auto objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
         window->find("fm.objects.current-folder"));
     require(objects != nullptr, "application object field must exist");
+    const auto tree = std::dynamic_pointer_cast<gui_forms::TreeView>(
+        window->find("fm.navigation.tree"));
+    require(objects->icon_cell_size() == gui_forms::Size{86.0, 78.0} &&
+                objects->image_list() &&
+                objects->image_list()->image_size() ==
+                    gui_forms::Size{42.0, 42.0} &&
+                tree && tree->image_list() &&
+                tree->image_list()->image_size() ==
+                    gui_forms::Size{17.0, 17.0},
+            "File Manager must supply the exact compact object and tree art geometry");
     const auto selection_group = window->find(
         "file-manager-app.shell.commands.selection-group");
     const auto arrange_group = window->find(
@@ -755,14 +812,26 @@ void test_application_command_surfaces_and_house_mark() {
              std::static_pointer_cast<gui_forms::Button>(sort_button),
              properties_button}) {
         const auto& recipes = button->visual_recipes_override();
-        require(recipes.has_value() &&
+        const auto image_list = button->image_list();
+        require(recipes.has_value(),
+                "every permanent shelf member must retain authored visual recipes");
+        const auto& normal = recipes->resolve(
+            gui_forms::ControlSurfaceState::normal);
+        require(image_list &&
+                    image_list->image_size() == gui_forms::Size{28.0, 28.0} &&
+                    normal.material.fills.size() == 1U &&
+                    normal.material.fills.front().kind ==
+                        gui_forms::MaterialFillKind::solid &&
+                    normal.material.fills.front().color.alpha == 0U &&
+                    normal.material.border &&
+                    normal.material.border->color.alpha == 0U &&
                     recipes->resolve(gui_forms::ControlSurfaceState::normal) !=
                         recipes->resolve(gui_forms::ControlSurfaceState::hot) &&
                     recipes->resolve(gui_forms::ControlSurfaceState::hot) !=
                         recipes->resolve(gui_forms::ControlSurfaceState::pressed) &&
                     recipes->resolve(gui_forms::ControlSurfaceState::normal) !=
                         recipes->resolve(gui_forms::ControlSurfaceState::disabled),
-                "every permanent shelf member must retain distinct Office Pearl state recipes");
+                "ordinary shelf commands must use 28-unit art on a transparent rest plate with distinct active states");
     }
     const auto shelf_bounds = command_shelf->committed_arranged_bounds();
     const auto selection_bounds = selection_group->committed_arranged_bounds();
@@ -2281,7 +2350,7 @@ void test_installed_daily_navigation_when_requested() {
                        *application) > 0U &&
                 file_manager::ApplicationInteractionProbe::location(
                     *application) == home &&
-                root_mode->text() == "Home-rooted ▾";
+                root_mode->text() == "Home-rooted";
         },
         "installed daily startup must settle at the real user Home");
     window->perform_layout();
@@ -2345,7 +2414,7 @@ void test_installed_daily_navigation_when_requested() {
         [&] {
             const auto volumes = tree_item(*tree, "Volumes");
             return volumes && volumes->depth == 0U &&
-                root_mode->text() == "Volumes-rooted ▾";
+                root_mode->text() == "Volumes-rooted";
         },
         "installed daily Volumes mode must retain the real root row");
     require(window->perform_semantic_action(

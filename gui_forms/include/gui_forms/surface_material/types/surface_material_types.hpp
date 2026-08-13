@@ -31,6 +31,22 @@ struct MaterialShadow final {
                left.inset == right.inset;
     }
 };
+enum class MaterialEdge : std::uint8_t { top, right, bottom, left };
+
+// One ordered physical keyline. An inset of zero places the stroke immediately
+// inside the owned edge; positive insets allow a separate highlight or lowlight
+// to sit behind/inside an outer boundary without requiring a nested control.
+struct MaterialKeyline final {
+    MaterialEdge edge{MaterialEdge::top};
+    Color color{Color::rgba(255, 255, 255, 128)};
+    double width{1.0};
+    double inset{};
+    friend constexpr bool operator==(const MaterialKeyline& left,
+                                     const MaterialKeyline& right) noexcept {
+        return left.edge == right.edge && left.color == right.color &&
+               left.width == right.width && left.inset == right.inset;
+    }
+};
 struct MaterialBorderEdges final {
     std::optional<MaterialBorder> top;
     std::optional<MaterialBorder> right;
@@ -53,11 +69,13 @@ struct MaterialBorderEdges final {
 struct SurfaceMaterial final {
     static constexpr std::size_t maximum_fill_layers = 8U;
     static constexpr std::size_t maximum_shadows = 4U;
+    static constexpr std::size_t maximum_keylines = 8U;
     std::vector<MaterialFillLayer> fills{
         MaterialFillLayer::solid(Color::rgba(255, 255, 255))};
     std::vector<MaterialShadow> shadows;
     std::optional<MaterialBorder> border;
     MaterialBorderEdges border_edges;
+    std::vector<MaterialKeyline> keylines;
     double corner_radius{};
     [[nodiscard]] static SurfaceMaterial from_parts(
         const MaterialFillLayer* fills, std::size_t fill_count,
@@ -68,14 +86,22 @@ struct SurfaceMaterial final {
         const MaterialShadow* shadows, std::size_t shadow_count,
         const MaterialBorder* border, const MaterialBorderEdges* border_edges,
         double corner_radius);
+    [[nodiscard]] static SurfaceMaterial from_parts(
+        const MaterialFillLayer* fills, std::size_t fill_count,
+        const MaterialShadow* shadows, std::size_t shadow_count,
+        const MaterialBorder* border, const MaterialBorderEdges* border_edges,
+        const MaterialKeyline* keylines, std::size_t keyline_count,
+        double corner_radius);
     friend bool operator==(const SurfaceMaterial& left,
                            const SurfaceMaterial& right) noexcept(noexcept(
         left.fills == right.fills && left.shadows == right.shadows &&
         left.border == right.border && left.border_edges == right.border_edges &&
+        left.keylines == right.keylines &&
         left.corner_radius == right.corner_radius)) {
         return left.fills == right.fills && left.shadows == right.shadows &&
                left.border == right.border &&
                left.border_edges == right.border_edges &&
+               left.keylines == right.keylines &&
                left.corner_radius == right.corner_radius;
     }
 };

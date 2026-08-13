@@ -306,20 +306,29 @@ Size Label::measure(Size available) {
     const FontSpec font = effective_font((*this).font());
     const double wrap_width = requested.width > 0.0
         ? requested.width : available.width;
-    std::vector<std::string> lines = label_lines(text, font, std::max(0.0, wrap_width - 4.0),
-                             text_wrapping_);
+    const auto resolve = [this, font](std::string_view value) {
+        return resolve_text_layout_utf8(value, font).logical_size.width;
+    };
+    std::vector<std::string> lines = label_lines(
+        text, font, std::max(0.0, wrap_width - 4.0), text_wrapping_, resolve);
     if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
         lines.resize(maximum_lines_);
     }
     double content_width{};
+    double line_height{};
     for (const std::string& line : lines) {
-        content_width = std::max(content_width, estimated_text_width(line, font));
+        const ResolvedTextLayout metrics = resolve_text_layout_utf8(line, font);
+        content_width = std::max(content_width, metrics.logical_size.width);
+        line_height = std::max(
+            line_height, std::max(font.size, metrics.logical_size.height) *
+                             line_spacing_);
     }
+    if (line_height <= 0.0) line_height = font.size * line_spacing_;
     const double preferred_width = requested.width > 0.0
         ? requested.width : content_width + 4.0;
     const double preferred_height = requested.height > 0.0
         ? requested.height
-        : static_cast<double>(lines.size()) * font.size * line_spacing_ + 4.0;
+        : static_cast<double>(lines.size()) * line_height + 4.0;
     return {std::min(available.width, preferred_width),
             std::min(available.height, preferred_height)};
 }
@@ -342,12 +351,25 @@ std::string Label::display_text() const {
 void Label::paint_label_text(Painter& painter, std::string_view text) const {
     const Rect arranged = committed_arranged_bounds();
     const FontSpec font = effective_font((*this).font());
-    std::vector<std::string> lines = label_lines(text, font, std::max(0.0, arranged.width - 4.0),
-                             text_wrapping_);
+    const auto resolve = [&painter, font](std::string_view value) {
+        return painter.resolve_text_layout_utf8(value, font).logical_size.width;
+    };
+    std::vector<std::string> lines = label_lines(
+        text, font, std::max(0.0, arranged.width - 4.0), text_wrapping_, resolve);
     if (maximum_lines_ != 0U && lines.size() > maximum_lines_) {
         lines.resize(maximum_lines_);
     }
-    const double line_height = font.size * line_spacing_;
+    std::vector<ResolvedTextLayout> metrics;
+    metrics.reserve(lines.size());
+    double line_height{};
+    for (const std::string& line : lines) {
+        metrics.push_back(painter.resolve_text_layout_utf8(line, font));
+        line_height = std::max(
+            line_height,
+            std::max(font.size, metrics.back().logical_size.height) *
+                line_spacing_);
+    }
+    if (line_height <= 0.0) line_height = font.size * line_spacing_;
     const double block_height = static_cast<double>(lines.size()) * line_height;
     double top = 1.0;
     if (vertical_alignment_ == VerticalAlignment::center) {
@@ -357,15 +379,18 @@ void Label::paint_label_text(Painter& painter, std::string_view text) const {
     }
     const Color color = foreground();
     for (std::size_t index = 0; index < lines.size(); ++index) {
-        const double text_width = estimated_text_width(lines[index], font);
+        const double text_width = metrics[index].logical_size.width;
         double x = 2.0;
         if (alignment_ == HorizontalAlignment::center) {
             x = std::max(2.0, (arranged.width - text_width) * 0.5);
         } else if (alignment_ == HorizontalAlignment::far) {
             x = std::max(2.0, arranged.width - text_width - 2.0);
         }
-        const double baseline = top + font.size +
-            static_cast<double>(index) * line_height;
+        const double leading = std::max(
+            0.0, line_height - metrics[index].logical_size.height);
+        const double baseline = snap_text_baseline(
+            top + leading * 0.5 + metrics[index].ascent +
+                static_cast<double>(index) * line_height);
         painter.draw_text_utf8({x, baseline}, lines[index], font, color);
     }
 }

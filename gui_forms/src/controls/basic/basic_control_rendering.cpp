@@ -104,6 +104,16 @@ Rect aligned_rect(Rect bounds, Size size,
 
 std::vector<std::string> label_lines(std::string_view text, FontSpec font,
                                      double width, TextWrapping wrapping) {
+    return label_lines(
+        text, font, width, wrapping,
+        [font](std::string_view candidate) {
+            return estimated_text_width(candidate, font);
+        });
+}
+
+std::vector<std::string> label_lines(
+    std::string_view text, FontSpec font, double width, TextWrapping wrapping,
+    const TextWidthResolver& resolve_width) {
     std::vector<std::string> lines;
     std::size_t paragraph_start{};
     while (paragraph_start <= text.size()) {
@@ -136,7 +146,7 @@ std::vector<std::string> label_lines(std::string_view text, FontSpec font,
                     candidate.push_back(' ');
                 }
                 candidate.append(word);
-                if (!line.empty() && estimated_text_width(candidate, font) > width) {
+                if (!line.empty() && resolve_width(candidate) > width) {
                     lines.push_back(std::move(line));
                     line.assign(word);
                 } else {

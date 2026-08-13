@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/text_shaping.hpp"
+#include "gui_forms/typography.hpp"
 #include "gui_forms/types.hpp"
 
 #include <cstddef>
@@ -31,6 +32,7 @@ struct ShapedGlyph final {
 
 struct ShapedFontRun final {
     FontFaceId face{};
+    Utf8Range source_range{};
     std::vector<ShapedGlyph> glyphs;
 };
 
@@ -63,6 +65,8 @@ public:
         std::uint16_t weight, bool italic,
         std::span<const std::byte> encoded, std::uint32_t face_index = 0U);
     [[nodiscard]] ShapedText shape(std::string_view utf8, FontSpec font);
+    [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
+                                             FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;
 
 private:

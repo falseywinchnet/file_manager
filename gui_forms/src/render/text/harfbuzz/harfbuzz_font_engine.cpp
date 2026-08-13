@@ -76,14 +76,19 @@ public:
         std::optional<FontRole> role;
         std::uint16_t weight{};
         bool italic{};
+        bool fallback{};
+        std::string family;
         std::vector<std::byte> encoded;
         FT_Face face{};
 
         Face(FontFaceId id_value, std::optional<FontRole> role_value,
              std::uint16_t weight_value, bool italic_value,
+             bool fallback_value, std::string family_value,
              std::vector<std::byte> bytes, FT_Face face_value)
             : id(id_value), role(role_value), weight(weight_value),
-              italic(italic_value), encoded(std::move(bytes)), face(face_value) {}
+              italic(italic_value), fallback(fallback_value),
+              family(std::move(family_value)), encoded(std::move(bytes)),
+              face(face_value) {}
         ~Face() {
             if (face != nullptr) FT_Done_Face(face);
         }
@@ -91,7 +96,8 @@ public:
         Face& operator=(const Face&) = delete;
         Face(Face&& other) noexcept
             : id(other.id), role(other.role), weight(other.weight),
-              italic(other.italic), encoded(std::move(other.encoded)),
+              italic(other.italic), fallback(other.fallback),
+              family(std::move(other.family)), encoded(std::move(other.encoded)),
               face(std::exchange(other.face, nullptr)) {}
         Face& operator=(Face&&) = delete;
     };
@@ -142,6 +148,12 @@ public:
         return result;
     }
 
+    [[nodiscard]] bool has_primary(FontRole role) const noexcept {
+        return std::any_of(faces.begin(), faces.end(), [role](const Face& face) {
+            return face.role && *face.role == role;
+        });
+    }
+
     [[nodiscard]] static bool covers(Face& face,
                                      std::span<const char32_t> scalars) {
         for (const char32_t scalar : scalars) {
@@ -174,7 +186,10 @@ public:
             return std::nullopt;
         }
         const FontFaceId id{next_face_id++};
-        faces.emplace_back(id, role, weight, italic, std::move(owned), native);
+        std::string family = (*native).family_name != nullptr
+            ? (*native).family_name : "unknown bundled face";
+        faces.emplace_back(id, role, weight, italic, !role.has_value(),
+                           std::move(family), std::move(owned), native);
         return id;
     }
 
@@ -207,6 +222,7 @@ public:
             hb_buffer_get_glyph_positions(buffer, &count);
         ShapedFontRun run;
         run.face = face.id;
+        run.source_range = range;
         run.glyphs.reserve(count);
         double pen_x = run_origin;
         double pen_y{};
@@ -268,7 +284,7 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
         return result;
     }
     std::vector<Impl::Face*> candidates = (*impl_).candidates(font);
-    if (candidates.empty()) {
+    if (!(*impl_).has_primary(font.role) || candidates.empty()) {
         result.missing_primary_face = true;
         return result;
     }
@@ -311,6 +327,52 @@ ShapedText HarfBuzzFontEngine::shape(std::string_view utf8, FontSpec font) {
 
 std::size_t HarfBuzzFontEngine::face_count() const noexcept {
     return (*impl_).faces.size();
+}
+
+ResolvedTextLayout HarfBuzzFontEngine::resolve(std::string_view utf8,
+                                               FontSpec font) {
+    ResolvedTextLayout result;
+    result.effective_font = font;
+    if (!validate_utf8(utf8).valid() || !valid_font_spec(font)) {
+        result.status = TextResolutionStatus::invalid_request;
+        return result;
+    }
+    const std::vector<Impl::Face*> candidates = (*impl_).candidates(font);
+    if (!(*impl_).has_primary(font.role) || candidates.empty()) {
+        result.status = TextResolutionStatus::missing_primary_face;
+        return result;
+    }
+    result.primary_family = (*candidates.front()).family;
+    const ShapedText shaped = shape(utf8, font);
+    result.logical_size = {shaped.width, shaped.height};
+    result.ascent = shaped.ascent;
+    result.descent = shaped.descent;
+    result.line_gap = std::max(
+        0.0, shaped.height - shaped.ascent - shaped.descent);
+    result.missing_clusters = shaped.missing_clusters;
+    result.status = shaped.missing_primary_face
+        ? TextResolutionStatus::missing_primary_face
+        : shaped.missing_clusters != 0U
+            ? TextResolutionStatus::missing_cluster_coverage
+            : TextResolutionStatus::exact;
+    result.runs.reserve(shaped.runs.size());
+    for (const ShapedFontRun& run : shaped.runs) {
+        const Impl::Face* resolved = nullptr;
+        for (const Impl::Face& face : (*impl_).faces) {
+            if (face.id == run.face) {
+                resolved = &face;
+                break;
+            }
+        }
+        if (resolved == nullptr) continue;
+        result.runs.push_back({
+            run.source_range.start.value(),
+            run.source_range.end.value() - run.source_range.start.value(),
+            (*resolved).family, (*resolved).weight, (*resolved).italic,
+            (*resolved).fallback || !(*resolved).role ||
+                *(*resolved).role != font.role});
+    }
+    return result;
 }
 
 } // namespace gui_forms::render::text

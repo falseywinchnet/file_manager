@@ -278,7 +278,7 @@ private:
     std::shared_ptr<gui_forms::BreadcrumbTrail> breadcrumb_;
     std::shared_ptr<gui_forms::TextBox> path_box_;
     std::shared_ptr<gui_forms::TextBox> search_box_;
-    std::shared_ptr<gui_forms::Button> tree_root_mode_button_;
+    std::shared_ptr<gui_forms::DropDownButton> tree_root_mode_button_;
     std::shared_ptr<gui_forms::TreeView> tree_;
     std::shared_ptr<gui_forms::ObjectView> objects_;
     std::shared_ptr<gui_forms::Panel> criteria_console_;
@@ -289,10 +289,12 @@ private:
     std::shared_ptr<gui_forms::ImageList> object_images_;
     std::shared_ptr<gui_forms::ImageList> tree_images_;
     std::shared_ptr<gui_forms::ImageList> command_images_;
+    std::shared_ptr<gui_forms::ImageList> preview_images_;
     std::shared_ptr<gui_forms::CorrespondenceView> correspondence_;
     std::shared_ptr<gui_forms::PropertyList> property_list_;
     std::shared_ptr<gui_forms::PictureBox> preview_picture_;
     std::shared_ptr<gui_forms::Label> preview_text_;
+    std::shared_ptr<gui_forms::Button> preview_house_icon_;
     std::shared_ptr<gui_forms::TextBox> expected_checksum_box_;
     std::shared_ptr<gui_forms::TextBox> rename_box_;
     std::shared_ptr<gui_forms::DropDownButton> shelf_move_copy_button_;

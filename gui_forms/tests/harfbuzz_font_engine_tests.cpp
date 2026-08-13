@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -250,6 +251,73 @@ void test_rejection_and_missing_role_are_honest() {
             "an absent bundled role must be reported rather than resolved from the host");
 }
 
+void test_public_resolution_record_names_actual_bundled_runs() {
+    HarfBuzzFontEngine engine;
+    const std::vector<std::byte> rapids =
+        read_file(GUI_FORMS_TEST_RAPIDS_REGULAR);
+    const std::vector<std::byte> carlito =
+        read_file(GUI_FORMS_TEST_CARLITO_REGULAR);
+    const std::vector<std::byte> cousine =
+        read_file(GUI_FORMS_TEST_COUSINE_REGULAR);
+    const std::vector<std::byte> noto_cjk =
+        read_file(GUI_FORMS_TEST_NOTO_CJK_REGULAR);
+    const std::vector<std::byte> noto_emoji =
+        read_file(GUI_FORMS_TEST_NOTO_EMOJI);
+    require(engine.register_typeface(FontRole::control, 400, false, rapids) &&
+                engine.register_typeface(FontRole::content, 400, false, carlito) &&
+                engine.register_typeface(FontRole::monospace, 400, false, cousine) &&
+                engine.register_fallback_typeface(400, false, noto_cjk) &&
+                engine.register_fallback_typeface(400, false, noto_emoji),
+            "resolution-record fixture pack must register completely");
+
+    const std::string sample = "Report 日本語 · launch 🚀";
+    const ResolvedTextLayout resolved = engine.resolve(
+        sample, {FontRole::content, 12.0, 400, false});
+    require(resolved.status == TextResolutionStatus::exact &&
+                resolved.primary_family == "Carlito" &&
+                resolved.logical_size.width > 0.0 && resolved.ascent > 0.0 &&
+                resolved.descent >= 0.0 && resolved.missing_clusters == 0U &&
+                std::any_of(resolved.runs.begin(), resolved.runs.end(),
+                    [](const ResolvedFontRun& run) {
+                        return run.family == "Noto Sans CJK JP" && run.fallback;
+                    }) &&
+                std::any_of(resolved.runs.begin(), resolved.runs.end(),
+                    [](const ResolvedFontRun& run) {
+                        return run.family == "Noto Emoji" && run.fallback;
+                    }),
+            "resolution record must name only faces selected by actual shaped runs");
+    std::cout << std::fixed << std::setprecision(3)
+              << "resolution corpus bytes=" << sample.size()
+              << " width=" << resolved.logical_size.width
+              << " ascent=" << resolved.ascent
+              << " descent=" << resolved.descent
+              << " runs=" << resolved.runs.size() << '\n';
+
+    double prior_width{};
+    for (const double scale : std::array{1.0, 1.25, 1.5, 2.0}) {
+        const ResolvedTextLayout scaled = engine.resolve(
+            sample, {FontRole::content, 12.0 * scale, 400, false});
+        require(scaled.status == TextResolutionStatus::exact &&
+                    scaled.primary_family == "Carlito" &&
+                    scaled.logical_size.width > prior_width &&
+                    scaled.runs.size() == resolved.runs.size(),
+                "text scaling must preserve actual face/run selection while metrics grow");
+        prior_width = scaled.logical_size.width;
+        std::cout << "resolution scale=" << scale
+                  << " width=" << scaled.logical_size.width
+                  << " line=" << scaled.logical_size.height << '\n';
+    }
+
+    HarfBuzzFontEngine missing;
+    require(missing.register_fallback_typeface(400, false, noto_cjk).has_value(),
+            "missing-primary fixture fallback must register");
+    const ResolvedTextLayout unavailable = missing.resolve(
+        "No host substitution", {FontRole::content, 12.0, 400, false});
+    require(unavailable.status == TextResolutionStatus::missing_primary_face &&
+                unavailable.primary_family.empty() && unavailable.runs.empty(),
+            "missing bundled role must remain unavailable in resolution diagnostics");
+}
+
 } // namespace
 
 int main() {
@@ -261,6 +329,7 @@ int main() {
         test_shared_cjk_and_emoji_fallback_across_roles();
         test_letter_spacing_is_a_shaped_layout_input();
         test_rejection_and_missing_role_are_honest();
+        test_public_resolution_record_names_actual_bundled_runs();
         std::cout << "harfbuzz font engine tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

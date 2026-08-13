@@ -229,11 +229,11 @@ button {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  background-color: #e8f0f7;
-  background-image: linear-gradient(180deg, #ffffff, #dce8f3);
-  border: 1px solid #8fa4be;
+  font-size: 10px;
+  line-height: 1;
+  background-color: transparent;
+  border: 1px solid transparent;
   border-radius: 3px;
-  box-shadow: inset 0 1px 0 #ffffff;
 }
 
 .shelf-command:hover {

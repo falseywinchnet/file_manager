@@ -2449,7 +2449,8 @@ void Window::measure_dirty_recursive(const Control::Ptr& control,
         return;
     }
     ++visited_nodes;
-    if (!(*control).is_alive() || !(*control).visible_) {
+    if (!(*control).is_alive() || !(*control).visible_ ||
+        (*control).layout_collapsed_) {
         clear_layout_dirty_subtree(control);
         return;
     }
@@ -2492,7 +2493,8 @@ void Window::arrange_dirty_recursive(const Control::Ptr& control,
         return;
     }
     ++visited_nodes;
-    if (!(*control).is_alive() || !(*control).visible_) {
+    if (!(*control).is_alive() || !(*control).visible_ ||
+        (*control).layout_collapsed_) {
         clear_layout_dirty_subtree(control);
         return;
     }
@@ -2632,7 +2634,8 @@ void Window::paint_recursive(const Control::Ptr& control,
                              std::uint64_t& chunks_reused,
                              std::uint64_t& commands_replayed) {
     ++visited_nodes;
-    if (!(*control).is_alive() || (*control).window_ != this || !(*control).visible_) {
+    if (!(*control).is_alive() || (*control).window_ != this ||
+        !(*control).visible_ || (*control).layout_collapsed_) {
         clear_paint_dirty_subtree(control);
         return;
     }
@@ -2668,7 +2671,7 @@ void Window::paint_recursive(const Control::Ptr& control,
                              (*(*control).display_chunk_).logical_bounds() != logical_bounds;
         if (rebuild) {
             (*control).clear_dirty(Dirty::paint);
-            detail::RecordingPainter recorder;
+            detail::RecordingPainter recorder(text_metrics_provider_);
             (*control).paint_authored_surface(recorder, logical_bounds);
             (*control).paint_owned_decorations(
                 recorder, logical_bounds,

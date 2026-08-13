@@ -8,7 +8,9 @@
 #include "gui_forms/host/types/host_session_snapshot/host_session_snapshot.hpp"
 #include "gui_forms/types.hpp"
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -17,6 +19,49 @@
 namespace gui_forms {
 
 class Window;
+
+// Portable result for a host's non-client drag decision. The retained target
+// remains authoritative: an authored drag backdrop is draggable only while it
+// is the exact hit-test winner, so an interactive descendant keeps ordinary
+// pointer input without a platform-specific exclusion rectangle.
+enum class WindowChromeHitRole : std::uint8_t {
+    client,
+    drag_region,
+};
+
+struct WindowChromeHit final {
+    WindowChromeHitRole role{WindowChromeHitRole::client};
+    std::string target_stable_id;
+    std::string matched_drag_region_id;
+
+    [[nodiscard]] bool begins_native_drag() const noexcept {
+        return role == WindowChromeHitRole::drag_region;
+    }
+};
+
+enum class WindowChromeRegionError : std::uint8_t {
+    none,
+    empty_id,
+    duplicate_id,
+    unresolved_id,
+};
+
+struct WindowChromeRegionValidation final {
+    WindowChromeRegionError error{WindowChromeRegionError::none};
+    std::size_t index{};
+    std::string stable_id;
+
+    [[nodiscard]] bool accepted() const noexcept {
+        return error == WindowChromeRegionError::none;
+    }
+};
+
+[[nodiscard]] WindowChromeRegionValidation validate_window_chrome_drag_regions(
+    const Window& window, std::span<const std::string> drag_region_ids);
+
+[[nodiscard]] WindowChromeHit resolve_window_chrome_hit(
+    Window& window, Point position,
+    std::span<const std::string> drag_region_ids);
 
 struct HostMonitor final {
     std::string id;

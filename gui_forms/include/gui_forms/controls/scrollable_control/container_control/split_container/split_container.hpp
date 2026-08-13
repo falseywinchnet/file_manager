@@ -21,6 +21,8 @@ enum class SplitChangeReason : std::uint8_t {
     programmatic,
     pointer,
     keyboard,
+    semantic,
+    cancel,
     collapse,
     container_resize,
 };
@@ -37,6 +39,56 @@ struct SplitChangeEvent final {
     double new_distance{};
     SplitChangeReason reason{SplitChangeReason::programmatic};
     SplitCollapseOrigin collapse_origin{SplitCollapseOrigin::none};
+};
+
+// A split seam may retain an authored logical thickness or collapse its paint
+// to one physical device pixel. Hit extents remain logical in both modes so a
+// crisp line never becomes the only usable pointer target.
+enum class SplitSeamThicknessPolicy : std::uint8_t {
+    logical,
+    device_pixel_hairline,
+};
+
+enum class SplitSeamState : std::uint8_t {
+    idle,
+    near,
+    hot,
+    dragging,
+    focused,
+    disabled,
+    collapsed,
+};
+
+struct SplitSeamGeometry final {
+    static constexpr double maximum_visible_thickness = 64.0;
+    static constexpr double maximum_hit_extension = 128.0;
+    static constexpr double maximum_hit_target = 256.0;
+
+    double visible_thickness{3.0};
+    SplitSeamThicknessPolicy thickness_policy{
+        SplitSeamThicknessPolicy::logical};
+    double hit_before{3.0};
+    double hit_after{3.0};
+    double minimum_hit_target{9.0};
+
+    friend constexpr bool operator==(const SplitSeamGeometry& left,
+                                     const SplitSeamGeometry& right) noexcept {
+        return left.visible_thickness == right.visible_thickness &&
+            left.thickness_policy == right.thickness_policy &&
+            left.hit_before == right.hit_before &&
+            left.hit_after == right.hit_after &&
+            left.minimum_hit_target == right.minimum_hit_target;
+    }
+};
+
+struct SplitSeamSnapshot final {
+    Orientation orientation{Orientation::vertical};
+    SplitSeamGeometry geometry;
+    SplitSeamState state{SplitSeamState::idle};
+    Rect visible_bounds;
+    Rect hit_bounds;
+    double device_scale{1.0};
+    double visible_device_pixels{3.0};
 };
 
 class SplitContainer final : public ContainerControl {
@@ -67,6 +119,14 @@ public:
         return splitter_hit_width_;
     }
     void set_splitter_hit_width(double width);
+    [[nodiscard]] const SplitSeamGeometry& splitter_geometry() const noexcept {
+        return splitter_geometry_;
+    }
+    // Validates the whole geometry before publishing any part of it. This is
+    // the preferred API when asymmetric hit extents or a physical hairline are
+    // required; the width-only setters above remain compatibility shorthands.
+    void set_splitter_geometry(SplitSeamGeometry geometry);
+    [[nodiscard]] SplitSeamSnapshot splitter_seam_snapshot() const noexcept;
     [[nodiscard]] double first_minimum() const noexcept { return first_minimum_; }
     void set_first_minimum(double extent);
     [[nodiscard]] double second_minimum() const noexcept { return second_minimum_; }
@@ -129,17 +189,23 @@ public:
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
 
+protected:
+    void on_detaching_from_window(Window& former_window) noexcept override;
+    void on_detached_from_window() noexcept override;
+
 private:
     [[nodiscard]] double axis_extent(Rect bounds) const noexcept;
     [[nodiscard]] double pointer_axis(Point point) const noexcept;
     [[nodiscard]] double constrained_distance(double requested,
                                               double total_extent) const noexcept;
+    [[nodiscard]] double effective_splitter_width() const noexcept;
     [[nodiscard]] Rect collapse_tab_bounds() const noexcept;
     [[nodiscard]] bool collapse_target_is_collapsed() const noexcept;
     [[nodiscard]] SplitCollapseOrigin collapse_target_origin() const noexcept;
     void toggle_collapse_target(SplitCollapseOrigin origin);
     void reconcile_automatic_collapse(double total_extent);
     void set_distance(double distance, SplitChangeReason reason);
+    void cancel_splitter_interaction(bool restore_distance) noexcept;
     void transfer_focus_from(const std::shared_ptr<SplitterPanel>& panel);
     void update_splitter_cursor();
 
@@ -156,6 +222,7 @@ private:
     double previous_second_extent_{};
     double splitter_width_{3.0};
     double splitter_hit_width_{9.0};
+    SplitSeamGeometry splitter_geometry_{};
     double first_minimum_{25.0};
     double second_minimum_{25.0};
     std::optional<double> first_maximum_;
@@ -163,6 +230,7 @@ private:
     double keyboard_increment_{4.0};
     double automatic_collapse_threshold_{};
     double pointer_offset_{};
+    double pointer_start_distance_{};
     bool first_collapsed_{};
     bool second_collapsed_{};
     SplitCollapseOrigin first_collapse_origin_{SplitCollapseOrigin::none};

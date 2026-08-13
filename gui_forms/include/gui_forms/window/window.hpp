@@ -10,6 +10,7 @@
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/window/presentation/presentation_types.hpp"
+#include "gui_forms/visual_inspection/types/visual_inspection_types.hpp"
 
 #include <chrono>
 #include <array>
@@ -246,6 +247,15 @@ public:
     }
     void set_presentation_settings(PresentationSettings settings);
     void set_text_scale(double text_scale);
+    // The host installs its terminal text engine through this non-owning,
+    // renderer-neutral seam. Replacing it invalidates measurement so controls
+    // never retain geometry produced by a previous font/raster profile.
+    void set_text_metrics_provider(TextMetricsProvider* provider);
+    [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
+        return text_metrics_provider_;
+    }
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view utf8, FontSpec effective_font) const;
     [[nodiscard]] Event<const PresentationSettings&>& presentation_changed() noexcept {
         return presentation_changed_;
     }
@@ -452,6 +462,12 @@ public:
     [[nodiscard]] MetricsSnapshot metrics_snapshot() const { return metrics_.snapshot(); }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
+    // Captures the committed retained visual state without exposing a renderer
+    // or native host object. Layout is brought to its ordinary read barrier;
+    // painting is never forced, so display_chunk_current truthfully reports
+    // whether operation/font inspection describes the current control state.
+    [[nodiscard]] VisualInspectionSnapshot visual_inspection_snapshot(
+        VisualInspectionOptions options = {});
     [[nodiscard]] SemanticSnapshot semantic_snapshot();
     [[nodiscard]] std::uint64_t semantic_generation() const noexcept {
         return semantic_generation_;
@@ -655,6 +671,7 @@ private:
     Size client_size_{};
     double scale_{1.0};
     PresentationSettings presentation_settings_{};
+    TextMetricsProvider* text_metrics_provider_{};
     Event<const PresentationSettings&> presentation_changed_;
     std::shared_ptr<const Theme> theme_;
     Event<const Theme&> theme_changed_;

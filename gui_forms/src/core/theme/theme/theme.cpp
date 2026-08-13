@@ -33,6 +33,52 @@ bool valid_material_border(const MaterialBorder& border) noexcept {
            border.width <= 64.0;
 }
 
+bool valid_material_keyline(const MaterialKeyline& keyline) noexcept {
+    return (keyline.edge == MaterialEdge::top ||
+            keyline.edge == MaterialEdge::right ||
+            keyline.edge == MaterialEdge::bottom ||
+            keyline.edge == MaterialEdge::left) &&
+           std::isfinite(keyline.width) && keyline.width > 0.0 &&
+           keyline.width <= 16.0 && std::isfinite(keyline.inset) &&
+           keyline.inset >= 0.0 && keyline.inset <= 4096.0;
+}
+
+void paint_material_keyline(Painter& painter, Rect bounds,
+                            const MaterialKeyline& keyline) {
+    const double offset = keyline.inset + keyline.width * 0.5;
+    switch (keyline.edge) {
+    case MaterialEdge::top:
+        if (offset * 2.0 > bounds.height) return;
+        painter.draw_line({bounds.x + keyline.inset, bounds.y + offset},
+                          {bounds.right() - keyline.inset, bounds.y + offset},
+                          keyline.color, keyline.width);
+        break;
+    case MaterialEdge::right:
+        if (offset * 2.0 > bounds.width) return;
+        painter.draw_line({bounds.right() - offset,
+                           bounds.y + keyline.inset},
+                          {bounds.right() - offset,
+                           bounds.bottom() - keyline.inset},
+                          keyline.color, keyline.width);
+        break;
+    case MaterialEdge::bottom:
+        if (offset * 2.0 > bounds.height) return;
+        painter.draw_line({bounds.x + keyline.inset,
+                           bounds.bottom() - offset},
+                          {bounds.right() - keyline.inset,
+                           bounds.bottom() - offset},
+                          keyline.color, keyline.width);
+        break;
+    case MaterialEdge::left:
+        if (offset * 2.0 > bounds.width) return;
+        painter.draw_line({bounds.x + offset, bounds.y + keyline.inset},
+                          {bounds.x + offset,
+                           bounds.bottom() - keyline.inset},
+                          keyline.color, keyline.width);
+        break;
+    }
+}
+
 Point resolve_point(Point point, MaterialCoordinateSpace space,
                     Rect bounds) noexcept {
     if (space == MaterialCoordinateSpace::normalized) {
@@ -371,6 +417,7 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
     if (material.fills.empty() ||
         material.fills.size() > SurfaceMaterial::maximum_fill_layers ||
         material.shadows.size() > SurfaceMaterial::maximum_shadows ||
+        material.keylines.size() > SurfaceMaterial::maximum_keylines ||
         !std::isfinite(material.corner_radius) ||
         material.corner_radius < 0.0 || material.corner_radius > 4096.0) {
         return false;
@@ -399,6 +446,9 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
             std::abs(shadow.offset.y) > 4096.0) {
             return false;
         }
+    }
+    for (const MaterialKeyline& keyline : material.keylines) {
+        if (!valid_material_keyline(keyline)) return false;
     }
     for (const MaterialFillLayer& fill : material.fills) {
         if (fill.coordinate_space != MaterialCoordinateSpace::normalized &&
@@ -491,6 +541,8 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
 
 void paint_surface_material(Painter& painter, Rect bounds,
                             const SurfaceMaterial& material) {
+    // Material replay deliberately stays in authored order; recording painters
+    // retain these calls while terminal CPU painters realize the same sequence.
     if (bounds.empty() || !valid_surface_material(material)) return;
     for (const MaterialShadow& shadow : material.shadows) {
         if (!shadow.inset) {
@@ -588,6 +640,16 @@ void paint_surface_material(Painter& painter, Rect bounds,
         const double x = bounds.x + border.width * 0.5;
         painter.draw_line({x, bounds.y}, {x, bounds.y + bounds.height},
                           border.color, border.width);
+    }
+    if (!material.keylines.empty() && material.corner_radius > 0.0) {
+        painter.save();
+        painter.clip_rounded_rect(bounds, material.corner_radius);
+    }
+    for (const MaterialKeyline& keyline : material.keylines) {
+        paint_material_keyline(painter, bounds, keyline);
+    }
+    if (!material.keylines.empty() && material.corner_radius > 0.0) {
+        painter.restore();
     }
 }
 

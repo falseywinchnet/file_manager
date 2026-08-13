@@ -12,6 +12,11 @@ enum class CheckState : std::uint8_t {
     indeterminate,
 };
 
+enum class CheckBoxAppearance : std::uint8_t {
+    normal,
+    button,
+};
+
 class CheckBox : public ButtonBase {
 public:
     explicit CheckBox(StableId stable_id, std::string text = {});
@@ -26,6 +31,12 @@ public:
     void set_three_state(bool enabled);
     [[nodiscard]] bool auto_check() const noexcept { return auto_check_; }
     void set_auto_check(bool enabled);
+    [[nodiscard]] CheckBoxAppearance appearance() const noexcept {
+        return appearance_;
+    }
+    // Button appearance changes only the visual projection. CheckBox retains
+    // its check-box role, checked state, command path, focus, and hit target.
+    void set_appearance(CheckBoxAppearance appearance);
     [[nodiscard]] ChoiceIndicatorStyle indicator_style() const noexcept {
         return indicator_style_;
     }
@@ -48,6 +59,7 @@ private:
     Event<bool> checked_changed_;
     bool three_state_{};
     bool auto_check_{true};
+    CheckBoxAppearance appearance_{CheckBoxAppearance::normal};
     ChoiceIndicatorStyle indicator_style_{ChoiceIndicatorStyle::classic};
 };
 

@@ -18,12 +18,12 @@
 namespace file_manager {
 namespace {
 
-class ApplicationMark final : public gui_forms::Button {
+class HouseImage final : public gui_forms::Button {
 public:
-    ApplicationMark()
-        : gui_forms::Button(gui_forms::StableId("fm.house.application-mark")) {
+    HouseImage(gui_forms::StableId stable_id, std::string accessible_name)
+        : gui_forms::Button(std::move(stable_id)) {
         set_focusable(false);
-        set_accessible_name("File Manager");
+        set_accessible_name(std::move(accessible_name));
     }
 
     [[nodiscard]] gui_forms::SemanticDescriptor semantic_descriptor()
@@ -44,6 +44,31 @@ public:
         return false;
     }
 };
+
+[[nodiscard]] gui_forms::BasicControlStyle transparent_image_style() {
+    gui_forms::BasicControlStyle style;
+    const auto clear = gui_forms::Color::rgba(0, 0, 0, 0);
+    style.face = clear;
+    style.face_light = clear;
+    style.paper = clear;
+    style.highlight = clear;
+    style.border = clear;
+    style.dark_border = clear;
+    style.text = clear;
+    style.disabled_text = clear;
+    style.accent = clear;
+    style.accent_light = clear;
+    style.link = clear;
+    style.visited_link = clear;
+    return style;
+}
+
+[[nodiscard]] gui_forms::BasicControlStyle tree_mode_style() {
+    auto style = transparent_image_style();
+    style.text = gui_forms::Color::rgba(75, 101, 129);
+    style.disabled_text = gui_forms::Color::rgba(116, 130, 145);
+    return style;
+}
 
 class CriteriaConsolePanel final : public gui_forms::Panel {
 public:
@@ -498,9 +523,11 @@ void Application::install_house_art() {
     if (!window_) return;
     object_images_ = house_art::make_image_list(*window_, 42.0);
     tree_images_ = house_art::make_image_list(*window_, 17.0);
-    command_images_ = house_art::make_image_list(*window_, 22.0);
+    command_images_ = house_art::make_image_list(*window_, 28.0);
+    preview_images_ = house_art::make_image_list(*window_, 72.0);
     objects_->set_image_list(object_images_);
     tree_->set_image_list(tree_images_);
+    preview_house_icon_->set_image_list(preview_images_);
 
     const auto image_button = [this](
         const std::shared_ptr<gui_forms::Button>& button,
@@ -545,7 +572,8 @@ void Application::install_house_art() {
     }
 
     if (command_images_->contains_key(house_art::key(house_art::Icon::app))) {
-        auto mark = std::make_shared<ApplicationMark>();
+        auto mark = std::make_shared<HouseImage>(
+            gui_forms::StableId("fm.house.application-mark"), "File Manager");
         mark->set_requested_bounds({0.0, 0.0, 30.0, 30.0});
         mark->set_minimum_size({30.0, 30.0});
         mark->set_maximum_size({30.0, 30.0});
@@ -556,21 +584,7 @@ void Application::install_house_art() {
         mark->set_content_padding({4.0, 4.0, 4.0, 4.0});
         mark->set_visual_style(gui_forms::ButtonVisualStyle::flat);
         mark->set_flat_border_width(0.0);
-        gui_forms::BasicControlStyle transparent;
-        const auto clear = gui_forms::Color::rgba(0, 0, 0, 0);
-        transparent.face = clear;
-        transparent.face_light = clear;
-        transparent.paper = clear;
-        transparent.highlight = clear;
-        transparent.border = clear;
-        transparent.dark_border = clear;
-        transparent.text = clear;
-        transparent.disabled_text = clear;
-        transparent.accent = clear;
-        transparent.accent_light = clear;
-        transparent.link = clear;
-        transparent.visited_link = clear;
-        mark->set_style(transparent);
+        mark->set_style(transparent_image_style());
 
         // The compiled HTML mark is a nested flow-label projection. Its child
         // currently receives a native slot but does not paint. Put the House
@@ -692,14 +706,65 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_location_search_host->set_flex_grow(*search_box_, 1.0);
 
     form_.file_manager_app_shell_workspace_sidebar_label->set_text("FOLDERS");
-    tree_root_mode_button_ = std::make_shared<gui_forms::Button>(
-        gui_forms::StableId("fm.navigation.root-mode"), "Home-rooted ▾");
+    tree_root_mode_button_ = std::make_shared<gui_forms::DropDownButton>(
+        gui_forms::StableId("fm.navigation.root-mode"), "Home-rooted",
+        gui_forms::DropDownButtonMode::menu);
     tree_root_mode_button_->set_visual_style(gui_forms::ButtonVisualStyle::flat);
-    tree_root_mode_button_->set_requested_bounds({0, 0, 96, 27});
-    tree_root_mode_button_->set_minimum_size({96, 27});
+    tree_root_mode_button_->set_flat_border_width(0.0);
+    tree_root_mode_button_->set_style(tree_mode_style());
+    tree_root_mode_button_->set_drop_down_width(14.0);
+    tree_root_mode_button_->set_requested_bounds({0, 0, 112, 27});
+    tree_root_mode_button_->set_minimum_size({112, 27});
+    tree_root_mode_button_->set_maximum_size({112, 27});
     tree_root_mode_button_->set_accessible_name("Folder tree root mode");
     tree_root_mode_button_->set_accessible_description(
         "Switch immediately between the honest Home and Volumes trees");
+
+    auto tree_header = std::make_shared<gui_forms::TableLayoutPanel>(
+        gui_forms::StableId("fm.navigation.header"));
+    tree_header->set_column_count(2);
+    tree_header->set_row_count(1);
+    tree_header->set_column_style(
+        0, {gui_forms::TableSizeMode::percent, 100.0});
+    tree_header->set_column_style(
+        1, {gui_forms::TableSizeMode::absolute, 112.0});
+    tree_header->set_row_style(
+        0, {gui_forms::TableSizeMode::absolute, 27.0});
+    tree_header->set_grow_style(gui_forms::TableLayoutGrowStyle::fixed_size);
+    tree_header->set_requested_bounds({0, 0, 218, 27});
+    tree_header->set_minimum_size({0, 27});
+    tree_header->set_maximum_size({0, 27});
+    tree_header->set_margin({0, 0, 0, 0});
+    tree_header->set_padding({0, 0, 0, 0});
+
+    const auto& tree_caption =
+        form_.file_manager_app_shell_workspace_sidebar_label;
+    const auto removed_caption =
+        form_.file_manager_app_shell_workspace_sidebar->remove_child(
+            tree_caption->runtime_id());
+    if (!removed_caption) {
+        throw std::logic_error("authored folder caption has no sidebar owner");
+    }
+    tree_caption->set_dock(gui_forms::DockStyle::fill);
+    tree_caption->set_margin({0, 0, 0, 0});
+    tree_root_mode_button_->set_dock(gui_forms::DockStyle::fill);
+    tree_root_mode_button_->set_margin({0, 0, 0, 0});
+    tree_header->add_child(tree_caption);
+    tree_header->set_cell_position(*tree_caption, {0, 0});
+    tree_header->add_child(tree_root_mode_button_);
+    tree_header->set_cell_position(*tree_root_mode_button_, {1, 0});
+    form_.file_manager_app_shell_workspace_sidebar->clear_children();
+    form_.file_manager_app_shell_workspace_sidebar->add_child(tree_header);
+    form_.file_manager_app_shell_workspace_sidebar->add_child(
+        form_.file_manager_app_shell_workspace_sidebar_root);
+    form_.file_manager_app_shell_workspace_sidebar->add_child(
+        form_.file_manager_app_shell_workspace_sidebar_parent);
+    form_.file_manager_app_shell_workspace_sidebar->add_child(
+        form_.file_manager_app_shell_workspace_sidebar_tree_label);
+    form_.file_manager_app_shell_workspace_sidebar->add_child(
+        form_.file_manager_app_shell_workspace_sidebar_tree_host);
+    form_.file_manager_app_shell_workspace_sidebar->set_flex_grow(
+        *form_.file_manager_app_shell_workspace_sidebar_tree_host, 1.0);
 
     tree_ = std::make_shared<gui_forms::TreeView>(
         gui_forms::StableId("fm.navigation.tree"));
@@ -709,8 +774,6 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_workspace_sidebar_tree_host->clear_children();
     form_.file_manager_app_shell_workspace_sidebar_tree_host->set_flow_direction(
         gui_forms::FlowDirection::top_down);
-    form_.file_manager_app_shell_workspace_sidebar_tree_host->add_child(
-        tree_root_mode_button_);
     form_.file_manager_app_shell_workspace_sidebar_tree_host->add_child(tree_);
     form_.file_manager_app_shell_workspace_sidebar_tree_host->set_flex_grow(*tree_, 1.0);
 
@@ -718,7 +781,7 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.objects.current-folder"));
     objects_->set_requested_bounds({0, 0, 736, 455});
     objects_->set_view_mode(gui_forms::ObjectViewMode::icons);
-    objects_->set_icon_cell_size({96, 78});
+    objects_->set_icon_cell_size({86, 78});
     objects_->set_show_secondary_text(false);
     objects_->set_font({gui_forms::FontRole::content, 10.0, 400, false});
     objects_->set_selection_mode(gui_forms::ObjectSelectionMode::multiple);
@@ -813,11 +876,28 @@ void Application::install_dynamic_controls() {
     preview_text_->set_vertical_alignment(gui_forms::VerticalAlignment::near);
     preview_text_->set_accessible_name("Selected text preview");
     preview_text_->set_visible(false);
+    preview_house_icon_ = std::make_shared<HouseImage>(
+        gui_forms::StableId("fm.inspector.preview.house-icon"),
+        "Selected object material icon");
+    preview_house_icon_->set_requested_bounds({0, 0, 72, 72});
+    preview_house_icon_->set_minimum_size({72, 72});
+    preview_house_icon_->set_maximum_size({72, 72});
+    preview_house_icon_->set_image_alignment(
+        gui_forms::ContentAlignment::middle_center);
+    preview_house_icon_->set_text_image_relation(
+        gui_forms::TextImageRelation::overlay);
+    preview_house_icon_->set_content_padding({0, 0, 0, 0});
+    preview_house_icon_->set_visual_style(gui_forms::ButtonVisualStyle::flat);
+    preview_house_icon_->set_flat_border_width(0.0);
+    preview_house_icon_->set_style(transparent_image_style());
+    preview_house_icon_->set_visible(false);
     form_.file_manager_app_shell_workspace_inspector_preview_surface->clear_children();
     form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
         preview_picture_);
     form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
         preview_text_);
+    form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
+        preview_house_icon_);
     form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
         form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph);
     form_.file_manager_app_shell_workspace_inspector_preview->set_minimum_size(
@@ -1366,6 +1446,7 @@ void Application::install_command_surfaces() {
             command_tree_admitted_roots_[index]});
     }
     tree_root_menu_->set_items(std::move(tree_root_items));
+    project_open(tree_root_menu_, tree_root_mode_button_);
     object_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.context.object");
     object_menu_->set_items({
         {"open", MenuItemKind::command, command_open_},
@@ -2214,7 +2295,16 @@ void Application::install_handlers() {
           [this] { request_navigation(home_root_, true); });
     click(form_.file_manager_app_shell_workspace_sidebar_parent,
           [this] { navigate_up(); });
-    click(tree_root_mode_button_, [this] { show_tree_root_menu(); });
+    subscriptions_.push_back(
+        tree_root_mode_button_->drop_down_requested().subscribe(
+            [this](gui_forms::DropDownButton&) {
+                show_tree_root_menu();
+            }));
+    subscriptions_.push_back(
+        tree_root_mode_button_->drop_down_close_requested().subscribe(
+            [this](gui_forms::DropDownButton&) {
+                tree_root_menu_->close();
+            }));
 
     subscriptions_.push_back(breadcrumb_->segment_activated().subscribe(
         [this](const std::string& id) {
@@ -3401,7 +3491,7 @@ void Application::rebuild_tree(const DirectorySnapshot& snapshot) {
     std::vector<gui_forms::TreeViewItem> items;
     tree_directory_entries_[snapshot.location.generic_string()] = snapshot.entries;
     tree_locations_.clear();
-    const auto mode_label = navigation_label(tree_root_mode_) + "-rooted ▾";
+    const auto mode_label = navigation_label(tree_root_mode_) + "-rooted";
     tree_root_mode_button_->set_text(mode_label);
     tree_root_mode_button_->set_accessible_description(
         "Current mode: " + mode_label +
@@ -4137,6 +4227,7 @@ void Application::reset_preview() {
     preview_picture_->set_visible(false);
     preview_text_->set_text({});
     preview_text_->set_visible(false);
+    preview_house_icon_->set_visible(false);
     form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
         ->set_visible(true);
 }
@@ -4144,8 +4235,13 @@ void Application::reset_preview() {
 void Application::request_preview(const DirectoryEntry& entry) {
     const auto generation = preview_generation_.fetch_add(1) + 1U;
     reset_preview();
+    preview_house_icon_->set_image_key(
+        std::string(house_art::object_key(entry.kind)));
+    preview_house_icon_->set_accessible_name(
+        kind_text(entry) + " material icon");
+    preview_house_icon_->set_visible(true);
     form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
-        ->set_text(entry.directory ? "DIR" : "FILE");
+        ->set_visible(false);
     if (!builtin_previews_enabled_) {
         form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
             kind_text(entry) + " · built-in preview disabled");
@@ -4204,8 +4300,13 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
         result.code = "png-decode-failed";
         result.message = "GUI.Forms rejected the encoded PNG";
     }
+    preview_house_icon_->set_image_key(
+        std::string(house_art::object_key(selected->kind)));
+    preview_house_icon_->set_accessible_name(
+        kind_text(*selected) + " material icon");
+    preview_house_icon_->set_visible(true);
     form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
-        ->set_text(selected->directory ? "DIR" : "FILE");
+        ->set_visible(false);
     form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
         kind_text(*selected) + " · " + result.message);
 }

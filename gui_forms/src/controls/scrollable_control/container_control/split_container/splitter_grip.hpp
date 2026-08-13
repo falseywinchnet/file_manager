@@ -12,9 +12,12 @@ public:
     explicit SplitterGrip(StableId stable_id);
 
     void set_orientation(Orientation orientation);
-    void set_visible_width(double width);
+    void set_visible_geometry(double origin, double width);
     void set_collapse_appearance(SplitFixedPanel panel, bool collapsed);
-    void set_interaction_active(bool active);
+    void set_dragging(bool dragging);
+    void set_actuator_pressed(bool pressed);
+    void reset_interaction() noexcept;
+    [[nodiscard]] SplitSeamState seam_state() const noexcept;
     [[nodiscard]] Rect actuator_bounds() const noexcept;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
     void on_pointer(PointerEvent& event) override;
@@ -23,15 +26,19 @@ public:
 
 private:
     [[nodiscard]] bool engaged() const noexcept;
-    [[nodiscard]] Rect actuator_bounds(bool expanded) const noexcept;
+    [[nodiscard]] Rect actuator_bounds(double cross_extent,
+                                       double axis_extent) const noexcept;
     [[nodiscard]] bool point_in_proximity(Point window_point) const noexcept;
 
     Orientation orientation_{Orientation::vertical};
     SplitFixedPanel collapse_panel_{SplitFixedPanel::none};
+    double visible_origin_{3.0};
     double visible_width_{3.0};
     bool collapsed_{};
-    bool hovered_{};
-    bool active_{};
+    bool near_{};
+    bool hot_{};
+    bool dragging_{};
+    bool actuator_pressed_{};
     bool focused_{};
 };
 

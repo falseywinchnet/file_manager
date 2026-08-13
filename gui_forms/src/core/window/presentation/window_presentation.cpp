@@ -135,7 +135,7 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // Application callbacks and retained chunk rebuilding record into a
         // complete candidate command list. No candidate command reaches the
         // host raster until every callback has returned successfully.
-        detail::RecordingPainter candidate;
+        detail::RecordingPainter candidate(text_metrics_provider_);
         // A top-level retained surface owns an explicit backplane even when
         // its application root is a transparent layout container. Replaying
         // only children cannot erase pixels formerly occupied by an overlay

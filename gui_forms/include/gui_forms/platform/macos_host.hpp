@@ -31,6 +31,11 @@ struct MacHostOptions {
     // drag. A primary click must hit this exact control; a descendant wins its
     // own input, so interactive content is never converted into a drag target.
     std::string window_drag_region_id;
+    // Additional exact retained backdrops. This portable-ID list allows a
+    // composed title surface to have several disconnected drag islands without
+    // converting an interactive descendant into non-client input. The singular
+    // spelling above remains source-compatible and is evaluated first.
+    std::vector<std::string> window_drag_region_ids;
     bool print_metrics_on_close{true};
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};

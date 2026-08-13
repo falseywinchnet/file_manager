@@ -161,6 +161,8 @@ int main() {
             std::string::npos ||
         product_snapshot.find("\"window_drag_region_resolved\":true") ==
             std::string::npos ||
+        product_snapshot.find("\"window_drag_region_count\":1") ==
+            std::string::npos ||
         controller_snapshot.find("\"titlebar_presentation\":\"standard\"") ==
             std::string::npos ||
         controller_snapshot.find("\"native_full_size_content\":false") ==

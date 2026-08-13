@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/connected_controls/types/connected_control_types.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/image_list.hpp"
@@ -63,6 +64,14 @@ public:
     }
     void set_visual_recipes(ControlStateRecipes recipes);
     void clear_visual_recipes();
+    [[nodiscard]] const std::optional<ConnectedControlTopology>&
+    connection_topology() const noexcept {
+        return connection_topology_;
+    }
+    // Nullopt is a standalone control. A non-null value is explicit authored
+    // topology; layout coordinates are never consulted to infer connection.
+    void set_connection_topology(
+        std::optional<ConnectedControlTopology> topology);
     [[nodiscard]] ImageId image() const noexcept { return image_; }
     void set_image(ImageId image);
     void clear_image();
@@ -167,6 +176,7 @@ private:
     double text_line_spacing_{1.25};
     std::optional<BasicControlStyle> style_override_;
     std::optional<ControlStateRecipes> visual_recipes_override_;
+    std::optional<ConnectedControlTopology> connection_topology_;
     ImageId image_{};
     std::shared_ptr<ImageList> image_list_;
     SubscriptionToken image_list_changed_;

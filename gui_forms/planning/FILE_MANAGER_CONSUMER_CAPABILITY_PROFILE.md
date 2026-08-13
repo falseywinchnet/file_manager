@@ -293,6 +293,111 @@ retained chunk or mutates an explicitly owned image surface.
 | FM-X08 | FM1 | Hot reload preserves compatible identities and reports destructive migrations |
 | FM-X09 | FMX | Deterministic visual/semantic exporter produces native review corpus without a browser engine |
 
+**MEASURED PARTIAL (2026-08-13, FM-R11/FM-X04/FM-X06):** the public,
+renderer-neutral `Window::visual_inspection_snapshot` now captures bounded final
+control geometry, absolute and effective ancestor clips, live focus/hover/
+press/capture state, authored material layers, presentation inputs, committed
+effective `FontSpec` values, display-chunk freshness, retained draw operations,
+and non-destructive damage. Text is redacted unless a local caller explicitly
+opts in. `VisualInspectorView` and its pointer-transparent overlay consume only
+that public snapshot, and the native Visual Inspector Lab plus headless tests
+exercise material, typography, state, clipping, resize, accessibility, capture
+bounds, and deterministic JSON. The effective font record remains the
+committed GUI.Forms request; when a terminal installs an exact public
+`TextMetricsProvider`, a separate optional record identifies the primary
+bundled face, actual shaped fallback runs, and logical metrics without leaking
+backend identity types. Provider absence stays explicitly estimated. Semantic
+pixel probes, cost attribution, and profile-qualified PNG export remain open. Evidence:
+`../experiments/M12P27_VISUAL_STATE_INSPECTION.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-L7/FM-R02/FM-R03/FM-R05/FM-R06/FM-R11/
+FM-R12/FM-V01/FM-V02/FM-V08/FM-X04/FM-X06):** retained `SurfaceMaterial` now
+adds up to eight ordered edge keylines, each with physical edge, width, color,
+and inward inset, closing the dark-outer-plus-inset-specular gap without nested
+controls. Existing ordered pad/repeat/reflect/radial/image/nine-patch fills and
+inset/outset shadows were sufficient for bounded Watercolor, Office Pearl,
+Workshop Graphite, and Studio 2003 specimens. Construction rejects atomically
+beyond the hard limit; recording and inspection JSON preserve authored order;
+Skia/CoreGraphics semantic probes differ by at most 5 summed RGB levels; and
+the native Layered Material Fidelity Lab exercises five visual states,
+inspection, contrast, 100/125/150% text scale, active/inactive, and resize.
+Arbitrary masks, isolated groups, blend modes, color-management policy,
+nine-patch center tiling, profile-qualified PNG export, and Windows native
+review remain open rather than simulated. Evidence:
+`../experiments/M12P28_LAYERED_MATERIAL_FIDELITY.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-W07/FM-LY05/FM-R02/FM-V02/FM-X04/FM-X06):**
+`SplitContainer` now has an explicit bounded physical-seam contract: logical or
+one-device-pixel visible thickness, independent symmetric/asymmetric logical hit
+extents, a declared minimum hit target, inspectable idle/near/hot/drag/focus/
+disabled/collapsed states, Escape cancellation, and numeric semantic actions.
+At 1×/2× the hairline trace remains exactly one device pixel while its declared
+logical hit target does not shrink; overlap resolves to the seam without a dead
+crack; hover does not move layout or focus; disable/detach revoke capture; and
+invalid geometry is rejected atomically. The native macOS and Win32-cross-built
+Physical Seam + Proximity Lab supplies vertical/horizontal, collapsed,
+disabled, scale, minimum, keyboard and inspection specimens. The approximately
+90 ms reference interpolation, persisted extent store, DML/C ABI spelling and
+host accessibility conformance remain open. Evidence:
+`../experiments/M12P32_PHYSICAL_SEAMS_AND_PROXIMITY.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-W04/FM-LY04/FM-T01–T08/FM-R07/FM-X04/FM-X06):**
+the portable typography-resolution seam now distinguishes effective `FontSpec`,
+actual bundled primary and shaped fallback run families, logical line metrics,
+and final device-pixel baseline snapping. Skia/HarfBuzz reports the face tied
+to each actual run; a complete private-pack Win32 provider verifies the family
+selected by GDI; missing providers and invalid/missing bundles fail or remain
+labelled rather than inventing host resolution. The Typography + Scale Lab,
+headless injected provider, pinned-font checks, mixed Carlito/Noto corpus, and
+100/125/150/200% reflow tests are green on the M4 Mac mini. Profile-qualified
+native raster review and the rest of FM-R07 remain open. Evidence:
+`../experiments/M12P30_DETERMINISTIC_TYPOGRAPHY_SCALE.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-W03/FM-W04/FM-X04/FM-X06):** the macOS
+host can now place an ordinary retained GUI.Forms identity surface at client
+`y=0` continuously through the native title region while keeping genuine
+AppKit caption controls. A public, renderer-neutral chrome-hit contract admits
+one or more stable drag-backdrop identities, rejects empty/duplicate/unresolved
+configuration, and preserves interactive descendants through exact retained
+hit testing. Activation is reflected into the portable `Window` visual state.
+The Custom Chrome Lab and deterministic tests cover active/inactive material,
+transparent decoration, interactive exclusion, drag decisions, 1x/2x logical
+geometry, and host lifecycle. Win32 still uses its standard native title bar;
+full-client nonclient composition there remains an explicit platform gap.
+Evidence: `../experiments/M12P29_NATIVE_CUSTOM_CHROME.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-C03/FM-R02/FM-R04/FM-V01/FM-V02/FM-X04/
+FM-X06):** explicit `ConnectedControlTopology` now lets separate `ButtonBase`
+controls paint as one horizontal or vertical physical instrument without
+coordinate inference. Expanded clipped material painting removes joined-edge
+corners and duplicate borders; every non-leading control owns one deterministic
+seam while retaining separate hit testing, keyboard focus, semantic identity,
+checked/default/disabled state, and split/menu disclosure boundaries. Invalid
+axes, sizes, indices, duplicates, mixed parents/windows, and mixed-axis requests
+are rejected before mutation. Deterministic traces cover exact seam ownership,
+state precedence, focus, semantics, and paint operation cardinality; the native
+Connected Control Painting Lab covers isolated and 2/3/5-member horizontal and
+three-member vertical sets, mixed/disabled-interior states, disclosure, resize,
+inactive/active presentation, and the public visual inspector. Command-shelf
+layout/overflow, product policy, Windows native capture, and accessibility
+adapter publication remain open. Evidence:
+`../experiments/M12P31_CONNECTED_CONTROL_PAINTING.md`.
+
+**MEASURED PARTIAL (2026-08-13, FM-W04/FM-LY01–LY04/FM-X04/FM-X06):** the
+renderer-neutral `ResponsiveTrackPanel` now nests fixed, content-measured, and
+weighted remaining tracks with finite min/preferred/max, relational gaps,
+authored hidden state, explicit unique priority collapse, focus protection/
+fallback, reveal, cumulative device-boundary snapping, committed revision, and
+complete resolution diagnostics. Automatic layout collapse remains distinct
+from authored visibility and removes subtrees from paint, input, focus, and
+semantics while preserving retained identity. The Responsive Tracks Lab and
+headless matrix reproduce 40/23/66/40/remaining/24 reference bands,
+218+3/fluid/3+288 grouped columns, deterministic Selection/Tree thresholds,
+100/125/150/200% reflow-before-collapse, stable resize cycles, and a bounded
+150×150 primary field. Command-group overflow, FM-LY06 scroll-plane focus
+reveal, Windows native review, and profile-qualified raster evidence remain
+open. Evidence: `../experiments/M12P33_FIXED_RESPONSIVE_TRACKS.md`.
+
 ## 16. Promotion summary
 
 For the File Manager lane, TreeView, ListView/object modes, SplitContainer,

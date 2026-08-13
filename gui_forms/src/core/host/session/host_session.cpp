@@ -209,6 +209,7 @@ void HostSession::DispatchVisitor::operator()(
         (*(*session).window_).set_scale(payload.scale);
     } else if constexpr (std::is_same_v<Payload, HostActivationEvent>) {
         (*session).snapshot_.active = payload.active;
+        (*(*session).window_).set_active(payload.active);
     } else if constexpr (std::is_same_v<Payload, HostOcclusionEvent>) {
         (*session).snapshot_.occluded = payload.occluded;
         (*(*session).window_).set_occluded(

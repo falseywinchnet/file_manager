@@ -12,6 +12,8 @@ namespace {
 
 constexpr double expanded_actuator_width = 12.0;
 constexpr double expanded_actuator_extent = 42.0;
+constexpr double near_actuator_width = 9.0;
+constexpr double near_actuator_extent = 34.0;
 constexpr double rest_actuator_width = 7.0;
 constexpr double rest_actuator_extent = 28.0;
 constexpr Point engaged_shadow_offset{0.0, 2.0};
@@ -34,8 +36,9 @@ void SplitterGrip::set_orientation(Orientation orientation) {
     invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
 }
 
-void SplitterGrip::set_visible_width(double width) {
-    if (visible_width_ == width) return;
+void SplitterGrip::set_visible_geometry(double origin, double width) {
+    if (visible_origin_ == origin && visible_width_ == width) return;
+    visible_origin_ = origin;
     visible_width_ = width;
     invalidate(Dirty::paint);
 }
@@ -48,14 +51,39 @@ void SplitterGrip::set_collapse_appearance(SplitFixedPanel panel,
     invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
 }
 
-void SplitterGrip::set_interaction_active(const bool active) {
-    if (active_ == active) return;
-    active_ = active;
+void SplitterGrip::set_dragging(const bool dragging) {
+    if (dragging_ == dragging) return;
+    dragging_ = dragging;
     invalidate(Dirty::paint);
 }
 
+void SplitterGrip::set_actuator_pressed(const bool pressed) {
+    if (actuator_pressed_ == pressed) return;
+    actuator_pressed_ = pressed;
+    invalidate(Dirty::paint);
+}
+
+void SplitterGrip::reset_interaction() noexcept {
+    near_ = false;
+    hot_ = false;
+    dragging_ = false;
+    actuator_pressed_ = false;
+    focused_ = false;
+}
+
+SplitSeamState SplitterGrip::seam_state() const noexcept {
+    if (!effectively_enabled()) return SplitSeamState::disabled;
+    if (dragging_ && has_pointer_capture()) return SplitSeamState::dragging;
+    if (focused_) return SplitSeamState::focused;
+    if (hot_) return SplitSeamState::hot;
+    if (near_) return SplitSeamState::near;
+    if (collapsed_) return SplitSeamState::collapsed;
+    return SplitSeamState::idle;
+}
+
 Rect SplitterGrip::actuator_bounds() const noexcept {
-    return actuator_bounds(true);
+    return actuator_bounds(expanded_actuator_width,
+                           expanded_actuator_extent);
 }
 
 Insets SplitterGrip::visual_outsets() const noexcept {
@@ -64,7 +92,8 @@ Insets SplitterGrip::visual_outsets() const noexcept {
     // engaged actuator without widening layout or hit testing.
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
-    const Rect tab = actuator_bounds(true);
+    const Rect tab = actuator_bounds(expanded_actuator_width,
+                                     expanded_actuator_extent);
     const Rect shadow{
         tab.x + engaged_shadow_offset.x - engaged_shadow_reach,
         tab.y + engaged_shadow_offset.y - engaged_shadow_reach,
@@ -85,10 +114,11 @@ void SplitterGrip::on_pointer(PointerEvent& event) {
     if (event.action != PointerAction::enter &&
         event.action != PointerAction::move &&
         event.action != PointerAction::leave) return;
-    const bool hovered = event.action != PointerAction::leave &&
-                         point_in_proximity(event.position);
-    if (hovered_ == hovered) return;
-    hovered_ = hovered;
+    const bool near = event.action != PointerAction::leave;
+    const bool hot = near && point_in_proximity(event.position);
+    if (near_ == near && hot_ == hot) return;
+    near_ = near;
+    hot_ = hot;
     invalidate(Dirty::paint);
 }
 
@@ -98,63 +128,82 @@ void SplitterGrip::on_focus_changed(bool focused) {
 }
 
 bool SplitterGrip::engaged() const noexcept {
-    return hovered_ || active_ ||
+    return hot_ || (dragging_ && has_pointer_capture()) ||
+        (actuator_pressed_ && has_pointer_capture()) ||
         (focused_ && window() != nullptr && (*window()).focus_cue_visible());
 }
 
-Rect SplitterGrip::actuator_bounds(const bool expanded) const noexcept {
+Rect SplitterGrip::actuator_bounds(double cross_extent,
+                                   double axis_extent) const noexcept {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
+    const double seam_center = visible_origin_ + visible_width_ * 0.5;
     if (orientation_ == Orientation::vertical) {
-        const double width = expanded ? expanded_actuator_width
-                                      : rest_actuator_width;
-        const double height = std::min(
-            expanded ? expanded_actuator_extent : rest_actuator_extent,
-            bounds.height);
-        return {(bounds.width - width) * 0.5,
-                std::max(0.0, (bounds.height - height) * 0.5), width, height};
+        const double height = std::min(axis_extent, bounds.height);
+        return {seam_center - cross_extent * 0.5,
+                std::max(0.0, (bounds.height - height) * 0.5),
+                cross_extent, height};
     }
-    const double width = std::min(
-        expanded ? expanded_actuator_extent : rest_actuator_extent,
-        bounds.width);
-    const double height = expanded ? expanded_actuator_width
-                                   : rest_actuator_width;
+    const double width = std::min(axis_extent, bounds.width);
     return {std::max(0.0, (bounds.width - width) * 0.5),
-            (bounds.height - height) * 0.5, width, height};
+            seam_center - cross_extent * 0.5, width, cross_extent};
 }
 
 bool SplitterGrip::point_in_proximity(const Point window_point) const noexcept {
     const Point local = point_from_window(window_point);
-    return actuator_bounds(true).contains(local);
+    return actuator_bounds(expanded_actuator_width,
+                           expanded_actuator_extent).contains(local);
 }
 
 void SplitterGrip::on_paint(Painter& painter, Rect) {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
     const BasicControlStyle style;
+    const SplitSeamState state = seam_state();
+    const bool disabled = state == SplitSeamState::disabled;
+    const bool dragging = state == SplitSeamState::dragging;
     if (orientation_ == Orientation::vertical) {
         const double width = std::min(visible_width_, bounds.width);
-        const double x = std::floor((bounds.width - width) * 0.5);
-        painter.fill_rect({x, 0.0, width, bounds.height}, style.face);
-        painter.draw_line({x, 0.0}, {x, bounds.height}, style.highlight, 1.0);
-        painter.draw_line({x + std::max(0.0, width - 1.0), 0.0},
-                          {x + std::max(0.0, width - 1.0), bounds.height},
-                          style.dark_border, 1.0);
+        const double x = std::clamp(visible_origin_, 0.0,
+                                    std::max(0.0, bounds.width - width));
+        painter.fill_rect({x, 0.0, width, bounds.height},
+                          disabled ? style.face_light
+                                   : (dragging ? style.accent_light : style.face));
+        if (width >= 2.0) {
+            painter.draw_line({x, 0.0}, {x, bounds.height},
+                              disabled ? style.border : style.highlight, 1.0);
+            painter.draw_line({x + width - 1.0, 0.0},
+                              {x + width - 1.0, bounds.height},
+                              disabled ? style.border : style.dark_border,
+                              1.0);
+        }
     } else {
         const double height = std::min(visible_width_, bounds.height);
-        const double y = std::floor((bounds.height - height) * 0.5);
-        painter.fill_rect({0.0, y, bounds.width, height}, style.face);
-        painter.draw_line({0.0, y}, {bounds.width, y}, style.highlight, 1.0);
-        painter.draw_line({0.0, y + std::max(0.0, height - 1.0)},
-                          {bounds.width, y + std::max(0.0, height - 1.0)},
-                          style.dark_border, 1.0);
+        const double y = std::clamp(visible_origin_, 0.0,
+                                    std::max(0.0, bounds.height - height));
+        painter.fill_rect({0.0, y, bounds.width, height},
+                          disabled ? style.face_light
+                                   : (dragging ? style.accent_light : style.face));
+        if (height >= 2.0) {
+            painter.draw_line({0.0, y}, {bounds.width, y},
+                              disabled ? style.border : style.highlight, 1.0);
+            painter.draw_line({0.0, y + height - 1.0},
+                              {bounds.width, y + height - 1.0},
+                              disabled ? style.border : style.dark_border,
+                              1.0);
+        }
     }
     if (collapse_panel_ == SplitFixedPanel::none) return;
 
     const bool expanded_grip = engaged();
+    const bool near_grip = !expanded_grip && near_;
     const bool first = collapse_panel_ == SplitFixedPanel::first;
     std::string arrow;
-    const Rect tab = actuator_bounds(expanded_grip);
+    const Rect tab = expanded_grip
+        ? actuator_bounds(expanded_actuator_width, expanded_actuator_extent)
+        : (near_grip
+            ? actuator_bounds(near_actuator_width, near_actuator_extent)
+            : actuator_bounds(rest_actuator_width, rest_actuator_extent));
     Point text_origin;
     if (orientation_ == Orientation::vertical) {
         arrow = first ? (collapsed_ ? "▶" : "◀")
@@ -167,22 +216,40 @@ void SplitterGrip::on_paint(Painter& painter, Rect) {
         text_origin = {tab.x + tab.width * 0.5 - 4.0,
                        tab.y + tab.height * 0.5 + 4.0};
     }
-    if (expanded_grip) {
+    if (expanded_grip && !disabled) {
         painter.draw_box_shadow(
             tab, 0.0, engaged_shadow_offset, engaged_shadow_blur, 0.0,
             Color::rgba(style.dark_border.red, style.dark_border.green,
                         style.dark_border.blue, 102));
     }
-    painter.fill_rect(tab, expanded_grip ? style.accent_light
-                                         : style.face_light);
+    painter.fill_rect(tab, disabled ? style.face_light
+                                    : (expanded_grip ? style.accent_light
+                                                     : style.face_light));
     painter.stroke_rect({tab.x + 0.5, tab.y + 0.5,
                          std::max(0.0, tab.width - 1.0),
                          std::max(0.0, tab.height - 1.0)},
-                        expanded_grip ? style.accent : style.border, 1.0);
+                        disabled ? style.border
+                                 : (expanded_grip ? style.accent : style.border),
+                        1.0);
     if (expanded_grip) {
         painter.draw_line({tab.x + 1.0, tab.y + 1.0},
                           {tab.x + tab.width - 1.0, tab.y + 1.0},
                           style.highlight, 1.0);
+    }
+    if (dragging) {
+        if (orientation_ == Orientation::vertical) {
+            painter.draw_line({tab.x + tab.width * 0.5 - 2.0,
+                               tab.y + tab.height * 0.5},
+                              {tab.x + tab.width * 0.5 + 2.0,
+                               tab.y + tab.height * 0.5},
+                              style.dark_border, 1.0);
+        } else {
+            painter.draw_line({tab.x + tab.width * 0.5,
+                               tab.y + tab.height * 0.5 - 2.0},
+                              {tab.x + tab.width * 0.5,
+                               tab.y + tab.height * 0.5 + 2.0},
+                              style.dark_border, 1.0);
+        }
     }
     painter.draw_text_utf8(text_origin, arrow,
                            effective_font(

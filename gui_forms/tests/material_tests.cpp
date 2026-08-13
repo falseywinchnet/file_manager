@@ -269,6 +269,57 @@ void test_independent_edge_borders_are_owned_and_inset() {
             "edge borders with rounded joins must wait for a proven corner primitive");
 }
 
+void test_ordered_outer_and_inset_keylines_are_bounded() {
+    SurfaceMaterial material;
+    material.keylines = {
+        {MaterialEdge::bottom, Color::rgba(20, 30, 40), 1.0, 0.0},
+        {MaterialEdge::bottom, Color::rgba(230, 240, 250), 1.0, 2.0},
+        {MaterialEdge::top, Color::rgba(120, 140, 160), 2.0, 3.0},
+    };
+    require(valid_surface_material(material),
+            "ordered outer and inset keylines must form a valid material");
+
+    RichPainter painter;
+    paint_surface_material(painter, {10.0, 20.0, 100.0, 40.0}, material);
+    require(painter.lines.size() == 3U &&
+                painter.lines[0].start == Point{10.0, 59.5} &&
+                painter.lines[0].end == Point{110.0, 59.5} &&
+                painter.lines[0].color == Color::rgba(20, 30, 40) &&
+                painter.lines[1].start == Point{12.0, 57.5} &&
+                painter.lines[1].end == Point{108.0, 57.5} &&
+                painter.lines[1].color == Color::rgba(230, 240, 250) &&
+                painter.lines[2].start == Point{13.0, 24.0} &&
+                painter.lines[2].end == Point{107.0, 24.0},
+            "keyline replay must preserve authored edge order and distinguish outer from inset geometry");
+
+    std::shared_ptr<MaterialPanel> panel =
+        make_control<MaterialPanel>(StableId("material.keyline.atomic"));
+    (*panel).set_material(material);
+    SurfaceMaterial over_budget = material;
+    over_budget.keylines.resize(SurfaceMaterial::maximum_keylines + 1U);
+    bool rejected = false;
+    try {
+        (*panel).set_material(over_budget);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && (*panel).material() == material,
+            "over-budget keylines must reject atomically without replacing the retained material");
+
+    const MaterialFillLayer fill =
+        MaterialFillLayer::solid(Color::rgba(255, 255, 255));
+    rejected = false;
+    try {
+        static_cast<void>(SurfaceMaterial::from_parts(
+            &fill, 1U, nullptr, 0U, nullptr, nullptr,
+            over_budget.keylines.data(), over_budget.keylines.size(), 0.0));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected,
+            "generated pointer/count material construction must reject a ninth keyline");
+}
+
 void test_material_validation_is_atomic() {
     std::shared_ptr<gui_forms::MaterialPanel> panel = make_control<MaterialPanel>(StableId("material.atomic"));
     const SurfaceMaterial valid = specimen_material();
@@ -519,6 +570,7 @@ int main() {
         test_generated_pointer_count_construction_is_owned_and_bounded();
         test_css_angle_gradient_resolves_against_rectangular_bounds();
         test_independent_edge_borders_are_owned_and_inset();
+        test_ordered_outer_and_inset_keylines_are_bounded();
         test_material_validation_is_atomic();
         test_retained_replay_preserves_material_operations();
         test_repeating_material_survives_record_and_replay();

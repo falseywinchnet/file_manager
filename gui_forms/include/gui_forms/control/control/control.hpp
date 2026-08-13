@@ -422,6 +422,12 @@ public:
     // painting so text, wrapping, hit geometry, and carets remain coherent.
     [[nodiscard]] double effective_text_scale() const noexcept;
     [[nodiscard]] FontSpec effective_font(FontSpec authored) const noexcept;
+    // Resolves an already-effective FontSpec (normally from effective_font)
+    // through the attached terminal provider without applying text scale a
+    // second time.
+    [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
+        std::string_view utf8, FontSpec effective) const;
+    [[nodiscard]] double snap_text_baseline(double logical_baseline) const noexcept;
     [[nodiscard]] const Theme& effective_theme() const noexcept;
     [[nodiscard]] std::shared_ptr<const Theme> theme_override() const noexcept {
         return theme_override_;
@@ -487,6 +493,12 @@ public:
 
     [[nodiscard]] bool visible() const noexcept { return visible_; }
     void set_visible(bool visible);
+    // Layout collapse is assigned only by a retained parent layout. It does
+    // not mutate authored visibility, but it removes the subtree from the
+    // effective visual/input/semantic surface until the parent reveals it.
+    [[nodiscard]] bool layout_collapsed() const noexcept {
+        return layout_collapsed_;
+    }
     [[nodiscard]] bool enabled() const noexcept { return enabled_; }
     void set_enabled(bool enabled);
     [[nodiscard]] bool focusable() const noexcept { return focusable_; }
@@ -657,6 +669,7 @@ protected:
     // it is protected because application absolute positioning is expressed
     // through requested bounds or a public layout control.
     void set_child_layout(const Ptr& child, Rect bounds);
+    void set_child_layout_collapsed(const Ptr& child, bool collapsed);
     // Custom retained layout controls establish their own child slots after
     // arranging only themselves. Calling the public base arrange would also
     // run the default Dock/Anchor engine and create competing layout owners.
@@ -808,6 +821,7 @@ private:
     std::shared_ptr<const detail::DisplayChunk> display_chunk_;
     Insets last_painted_visual_outsets_{};
     bool visible_{true};
+    bool layout_collapsed_{};
     bool enabled_{true};
     bool focusable_{};
     bool causes_validation_{true};

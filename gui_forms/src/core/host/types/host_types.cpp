@@ -47,6 +47,42 @@ struct HostDialogKindVisitor final {
 
 } // namespace
 
+WindowChromeRegionValidation validate_window_chrome_drag_regions(
+    const Window& window, std::span<const std::string> drag_region_ids) {
+    std::unordered_set<std::string_view> unique;
+    for (std::size_t index = 0U; index < drag_region_ids.size(); ++index) {
+        const std::string& stable_id = drag_region_ids[index];
+        if (stable_id.empty()) {
+            return {WindowChromeRegionError::empty_id, index, {}};
+        }
+        if (!unique.insert(stable_id).second) {
+            return {WindowChromeRegionError::duplicate_id, index, stable_id};
+        }
+        if (!window.find(stable_id)) {
+            return {WindowChromeRegionError::unresolved_id, index, stable_id};
+        }
+    }
+    return {};
+}
+
+WindowChromeHit resolve_window_chrome_hit(
+    Window& window, Point position,
+    std::span<const std::string> drag_region_ids) {
+    WindowChromeHit result;
+    const Control::Ptr target = window.hit_test(position);
+    if (!target) return result;
+    result.target_stable_id = std::string((*target).stable_id().value());
+    for (const std::string& region_id : drag_region_ids) {
+        const Control::Ptr region = window.find(region_id);
+        if (region && region.get() == target.get()) {
+            result.role = WindowChromeHitRole::drag_region;
+            result.matched_drag_region_id = region_id;
+            return result;
+        }
+    }
+    return result;
+}
+
 const char* host_dispatch_error_name(HostDispatchError error) noexcept {
     switch (error) {
     case HostDispatchError::none: return "none";

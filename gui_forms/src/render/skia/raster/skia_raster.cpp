@@ -778,6 +778,17 @@ Size SkiaRaster::measure_text_utf8(std::string_view text,
 #endif
 }
 
+ResolvedTextLayout SkiaRaster::resolve_text_layout_utf8(
+    std::string_view text, FontSpec font_spec) {
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    return (*impl_).text_engine.resolve(text, font_spec);
+#else
+    ResolvedTextLayout result = estimate_text_layout_utf8(text, font_spec);
+    result.logical_size = measure_text_utf8(text, font_spec);
+    return result;
+#endif
+}
+
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
     const Impl::ImageMap::const_iterator found = (*impl_).images.find(image.value);
     if (SkCanvas* canvas = (*impl_).canvas();

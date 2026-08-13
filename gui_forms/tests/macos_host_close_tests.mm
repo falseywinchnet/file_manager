@@ -550,6 +550,10 @@ int main() {
         final_host_snapshot.find("\"window_drag_region_configured\":true") ==
             std::string::npos ||
         final_host_snapshot.find("\"window_drag_region_resolved\":true") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"window_drag_region_count\":1") ==
+            std::string::npos ||
+        final_host_snapshot.find("\"window_drag_region_resolved_count\":1") ==
             std::string::npos) {
         return 8;
     }

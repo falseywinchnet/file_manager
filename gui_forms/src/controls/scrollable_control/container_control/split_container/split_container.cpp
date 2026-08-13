@@ -19,6 +19,39 @@ void require_finite_nonnegative(double value, const char* message) {
     if (!std::isfinite(value) || value < 0.0) throw std::invalid_argument(message);
 }
 
+void validate_splitter_geometry(const SplitSeamGeometry& geometry) {
+    if (!std::isfinite(geometry.visible_thickness) ||
+        geometry.visible_thickness <= 0.0 ||
+        geometry.visible_thickness >
+            SplitSeamGeometry::maximum_visible_thickness) {
+        throw std::invalid_argument(
+            "split seam visible thickness is outside its bounded range");
+    }
+    if (!std::isfinite(geometry.hit_before) || geometry.hit_before < 0.0 ||
+        geometry.hit_before > SplitSeamGeometry::maximum_hit_extension ||
+        !std::isfinite(geometry.hit_after) || geometry.hit_after < 0.0 ||
+        geometry.hit_after > SplitSeamGeometry::maximum_hit_extension) {
+        throw std::invalid_argument(
+            "split seam hit extents are outside their bounded range");
+    }
+    if (!std::isfinite(geometry.minimum_hit_target) ||
+        geometry.minimum_hit_target <= 0.0 ||
+        geometry.minimum_hit_target >
+            SplitSeamGeometry::maximum_hit_target) {
+        throw std::invalid_argument(
+            "split seam minimum hit target is outside its bounded range");
+    }
+    const double guaranteed_hit_extent =
+        geometry.hit_before + geometry.hit_after +
+        (geometry.thickness_policy == SplitSeamThicknessPolicy::logical
+             ? geometry.visible_thickness
+             : 0.0);
+    if (guaranteed_hit_extent < geometry.minimum_hit_target) {
+        throw std::invalid_argument(
+            "split seam hit extents do not satisfy its declared minimum target");
+    }
+}
+
 } // namespace
 
 SplitContainer::SplitContainer(StableId stable_id)
@@ -61,10 +94,17 @@ void SplitContainer::set_splitter_width(double width) {
         throw std::invalid_argument("splitter width must be finite and positive");
     }
     if (splitter_width_ == width) return;
-    splitter_width_ = width;
-    if (splitter_hit_width_ < width) splitter_hit_width_ = width;
-    static_cast<SplitterGrip&>(*splitter_).set_visible_width(width);
-    invalidate(invalidation::bounds);
+    SplitSeamGeometry next = splitter_geometry_;
+    const double target = std::max(splitter_hit_width_, width);
+    next.visible_thickness = width;
+    next.minimum_hit_target = target;
+    const double extra = next.thickness_policy ==
+            SplitSeamThicknessPolicy::logical
+        ? std::max(0.0, target - width)
+        : target;
+    next.hit_before = extra * 0.5;
+    next.hit_after = extra - next.hit_before;
+    set_splitter_geometry(next);
 }
 
 void SplitContainer::set_splitter_hit_width(double width) {
@@ -73,11 +113,48 @@ void SplitContainer::set_splitter_hit_width(double width) {
         throw std::invalid_argument(
             "splitter hit width must be finite and positive");
     }
-    width = std::max(width, splitter_width_);
-    if (splitter_hit_width_ == width) return;
-    splitter_hit_width_ = width;
-    invalidate(Dirty::arrange | Dirty::hit_test | Dirty::semantics |
-               Dirty::accessibility);
+    const double target = std::max(width, splitter_geometry_.visible_thickness);
+    if (splitter_hit_width_ == target) return;
+    SplitSeamGeometry next = splitter_geometry_;
+    next.minimum_hit_target = target;
+    const double extra = next.thickness_policy ==
+            SplitSeamThicknessPolicy::logical
+        ? std::max(0.0, target - next.visible_thickness)
+        : target;
+    next.hit_before = extra * 0.5;
+    next.hit_after = extra - next.hit_before;
+    set_splitter_geometry(next);
+}
+
+void SplitContainer::set_splitter_geometry(SplitSeamGeometry geometry) {
+    require_mutable();
+    validate_splitter_geometry(geometry);
+    if (splitter_geometry_ == geometry) return;
+    splitter_geometry_ = geometry;
+    splitter_width_ = geometry.visible_thickness;
+    splitter_hit_width_ = geometry.minimum_hit_target;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
+               Dirty::hit_test | Dirty::semantics | Dirty::accessibility);
+}
+
+SplitSeamSnapshot SplitContainer::splitter_seam_snapshot() const noexcept {
+    const double scale = window() != nullptr ? (*window()).scale() : 1.0;
+    const double visible = effective_splitter_width();
+    SplitSeamSnapshot result;
+    result.orientation = orientation_;
+    result.geometry = splitter_geometry_;
+    result.state = static_cast<const SplitterGrip&>(*splitter_).seam_state();
+    result.hit_bounds = (*splitter_).committed_arranged_bounds();
+    result.device_scale = scale;
+    result.visible_device_pixels = visible * scale;
+    if (orientation_ == Orientation::vertical) {
+        result.visible_bounds = {effective_distance_, 0.0, visible,
+                                 committed_arranged_bounds().height};
+    } else {
+        result.visible_bounds = {0.0, effective_distance_,
+                                 committed_arranged_bounds().width, visible};
+    }
+    return result;
 }
 
 void SplitContainer::set_first_minimum(double extent) {
@@ -199,7 +276,7 @@ void SplitContainer::set_second_collapsed(bool collapsed,
         collapse_panel_, collapse_target_is_collapsed());
     const double total = axis_extent(committed_arranged_bounds());
     effective_distance_ = collapsed
-        ? std::max(0.0, total - splitter_width_)
+        ? std::max(0.0, total - effective_splitter_width())
         : constrained_distance(requested_distance_, total);
     invalidate(invalidation::bounds);
     const SplitChangeEvent change{old, effective_distance_,
@@ -272,8 +349,9 @@ Size SplitContainer::measure(Size available) {
 void SplitContainer::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     const double total = axis_extent(final_bounds);
+    const double visible_width = effective_splitter_width();
     reconcile_automatic_collapse(total);
-    const double available = std::max(0.0, total - splitter_width_);
+    const double available = std::max(0.0, total - visible_width);
     double desired = requested_distance_ < 0.0 ? available * 0.5
                                                : requested_distance_;
     if (previous_axis_extent_ > 0.0 && total != previous_axis_extent_ &&
@@ -286,16 +364,19 @@ void SplitContainer::arrange(Rect final_bounds) {
         requested_distance_ = effective_distance_;
     }
     const double second_extent = std::max(0.0, available - effective_distance_);
-    const double hit_width = std::min(total, std::max(splitter_width_,
-                                                      splitter_hit_width_));
+    const double hit_width = std::min(
+        total, splitter_geometry_.hit_before + visible_width +
+                   splitter_geometry_.hit_after);
     const double hit_origin = std::clamp(
-        effective_distance_ + (splitter_width_ - hit_width) * 0.5,
-        0.0, std::max(0.0, total - hit_width));
+        effective_distance_ - splitter_geometry_.hit_before, 0.0,
+        std::max(0.0, total - hit_width));
+    static_cast<SplitterGrip&>(*splitter_).set_visible_geometry(
+        effective_distance_ - hit_origin, visible_width);
     if (orientation_ == Orientation::vertical) {
         set_child_layout(first_panel_,
             {0.0, 0.0, effective_distance_, final_bounds.height});
         set_child_layout(second_panel_,
-            {effective_distance_ + splitter_width_, 0.0, second_extent,
+            {effective_distance_ + visible_width, 0.0, second_extent,
              final_bounds.height});
         set_child_layout(splitter_,
             {hit_origin, 0.0, hit_width, final_bounds.height});
@@ -303,7 +384,7 @@ void SplitContainer::arrange(Rect final_bounds) {
         set_child_layout(first_panel_,
             {0.0, 0.0, final_bounds.width, effective_distance_});
         set_child_layout(second_panel_,
-            {0.0, effective_distance_ + splitter_width_, final_bounds.width,
+            {0.0, effective_distance_ + visible_width, final_bounds.width,
              second_extent});
         set_child_layout(splitter_,
             {0.0, hit_origin, final_bounds.width, hit_width});
@@ -318,13 +399,18 @@ void SplitContainer::arrange(Rect final_bounds) {
 }
 
 void SplitContainer::on_pointer_preview(PointerEvent& event) {
+    if ((pointer_tracking_ || collapse_tab_tracking_) &&
+        !(*splitter_).has_pointer_capture() &&
+        event.action != PointerAction::up) {
+        cancel_splitter_interaction(false);
+    }
     const bool on_collapse_tab = collapse_panel_ != SplitFixedPanel::none &&
                                  collapse_tab_bounds().contains(event.position);
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary && on_collapse_tab) {
         collapse_tab_tracking_ = true;
         pointer_tracking_ = false;
-        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(true);
+        static_cast<SplitterGrip&>(*splitter_).set_actuator_pressed(true);
         if (window() != nullptr) (*window()).request_focus(splitter_);
         (*splitter_).set_pointer_capture(true);
         event.handled = true;
@@ -333,7 +419,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
     if (collapse_tab_tracking_) {
         if (event.action == PointerAction::up) {
             collapse_tab_tracking_ = false;
-            static_cast<SplitterGrip&>(*splitter_).set_interaction_active(false);
+            static_cast<SplitterGrip&>(*splitter_).set_actuator_pressed(false);
             (*splitter_).set_pointer_capture(false);
             if (on_collapse_tab) {
                 toggle_collapse_target(SplitCollapseOrigin::user);
@@ -347,7 +433,8 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.button == PointerButton::primary &&
         (*splitter_).absolute_bounds().contains(event.position)) {
         pointer_tracking_ = true;
-        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(true);
+        pointer_start_distance_ = effective_distance_;
+        static_cast<SplitterGrip&>(*splitter_).set_dragging(true);
         pointer_offset_ = pointer_axis(event.position) - effective_distance_;
         if (window() != nullptr) (*window()).request_focus(splitter_);
         (*splitter_).set_pointer_capture(true);
@@ -358,7 +445,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.handled = true;
     } else if (event.action == PointerAction::up && pointer_tracking_) {
         pointer_tracking_ = false;
-        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(false);
+        static_cast<SplitterGrip&>(*splitter_).set_dragging(false);
         set_distance(pointer_axis(event.position) - pointer_offset_,
                      SplitChangeReason::pointer);
         event.handled = true;
@@ -368,6 +455,12 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
 void SplitContainer::on_key_preview(KeyEvent& event) {
     if (event.action != KeyAction::down || window() == nullptr ||
         (*window()).focused_control() != splitter_) return;
+    if (event.physical_key == PhysicalKey::escape &&
+        (pointer_tracking_ || collapse_tab_tracking_)) {
+        cancel_splitter_interaction(pointer_tracking_);
+        event.handled = true;
+        return;
+    }
     if (collapse_panel_ != SplitFixedPanel::none &&
         (event.physical_key == PhysicalKey::enter ||
          event.physical_key == PhysicalKey::space)) {
@@ -400,13 +493,23 @@ SemanticDescriptor SplitContainer::semantic_descriptor() const {
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     descriptor.value = std::to_string(effective_distance_);
+    descriptor.numeric_value = effective_distance_;
+    const double total = axis_extent(committed_arranged_bounds());
+    descriptor.minimum_value = constrained_distance(0.0, total);
+    descriptor.maximum_value = constrained_distance(total, total);
+    descriptor.actions = {SemanticAction::focus};
+    if (!splitter_fixed_ && !first_collapsed_ && !second_collapsed_) {
+        descriptor.actions.push_back(SemanticAction::decrement);
+        descriptor.actions.push_back(SemanticAction::increment);
+        descriptor.actions.push_back(SemanticAction::set_value);
+    }
     if (collapse_panel_ != SplitFixedPanel::none) {
         const bool collapsed = collapse_target_is_collapsed();
         descriptor.description = collapsed
             ? "Split pane collapsed; activate to restore its remembered extent"
             : "Split pane expanded; activate to collapse it";
-        descriptor.actions = {SemanticAction::focus,
-            collapsed ? SemanticAction::expand : SemanticAction::collapse};
+        descriptor.actions.push_back(
+            collapsed ? SemanticAction::expand : SemanticAction::collapse);
         if (!collapsed) descriptor.states |= SemanticState::expanded;
     }
     descriptor.exposed = true;
@@ -415,6 +518,10 @@ SemanticDescriptor SplitContainer::semantic_descriptor() const {
 
 bool SplitContainer::on_semantic_action(SemanticAction action,
                                         std::string_view value) {
+    if (!effectively_enabled()) return false;
+    if (action == SemanticAction::focus && window() != nullptr) {
+        return (*window()).request_focus(splitter_);
+    }
     if (action == SemanticAction::expand &&
         collapse_panel_ != SplitFixedPanel::none &&
         collapse_target_is_collapsed()) {
@@ -427,7 +534,48 @@ bool SplitContainer::on_semantic_action(SemanticAction action,
         toggle_collapse_target(SplitCollapseOrigin::user);
         return true;
     }
+    if (!splitter_fixed_ && !first_collapsed_ && !second_collapsed_) {
+        if (action == SemanticAction::increment) {
+            set_distance(effective_distance_ + keyboard_increment_,
+                         SplitChangeReason::semantic);
+            return true;
+        }
+        if (action == SemanticAction::decrement) {
+            set_distance(std::max(0.0,
+                                  effective_distance_ - keyboard_increment_),
+                         SplitChangeReason::semantic);
+            return true;
+        }
+        if (action == SemanticAction::set_value) {
+            try {
+                std::size_t consumed{};
+                const std::string owned(value);
+                const double requested = std::stod(owned, &consumed);
+                if (consumed != owned.size() || !std::isfinite(requested) ||
+                    requested < 0.0) {
+                    return false;
+                }
+                set_distance(requested, SplitChangeReason::semantic);
+                return true;
+            } catch (...) {
+                return false;
+            }
+        }
+    }
     return ContainerControl::on_semantic_action(action, value);
+}
+
+void SplitContainer::on_detaching_from_window(Window& former_window) noexcept {
+    cancel_splitter_interaction(false);
+    static_cast<SplitterGrip&>(*splitter_).reset_interaction();
+    ContainerControl::on_detaching_from_window(former_window);
+}
+
+void SplitContainer::on_detached_from_window() noexcept {
+    pointer_tracking_ = false;
+    collapse_tab_tracking_ = false;
+    static_cast<SplitterGrip&>(*splitter_).reset_interaction();
+    ContainerControl::on_detached_from_window();
 }
 
 double SplitContainer::axis_extent(Rect bounds) const noexcept {
@@ -440,9 +588,19 @@ double SplitContainer::pointer_axis(Point point) const noexcept {
                                                   : point.y - absolute.y;
 }
 
+double SplitContainer::effective_splitter_width() const noexcept {
+    if (splitter_geometry_.thickness_policy ==
+        SplitSeamThicknessPolicy::logical) {
+        return splitter_geometry_.visible_thickness;
+    }
+    const double scale = window() != nullptr ? (*window()).scale() : 1.0;
+    return 1.0 / std::max(scale, std::numeric_limits<double>::epsilon());
+}
+
 double SplitContainer::constrained_distance(double requested,
                                             double total_extent) const noexcept {
-    const double available = std::max(0.0, total_extent - splitter_width_);
+    const double available =
+        std::max(0.0, total_extent - effective_splitter_width());
     if (first_collapsed_) return 0.0;
     if (second_collapsed_) return available;
     if (!std::isfinite(requested) || requested < 0.0) requested = available * 0.5;
@@ -468,7 +626,22 @@ double SplitContainer::constrained_distance(double requested,
         }
         lower = upper = std::clamp(compromise, 0.0, available);
     }
-    return std::clamp(requested, lower, upper);
+    double resolved = std::clamp(requested, lower, upper);
+    if (splitter_geometry_.thickness_policy ==
+        SplitSeamThicknessPolicy::device_pixel_hairline) {
+        const double scale = window() != nullptr ? (*window()).scale() : 1.0;
+        const double snapped = std::round(resolved * scale) / scale;
+        if (snapped >= lower && snapped <= upper) {
+            resolved = snapped;
+        } else if (snapped < lower) {
+            const double inside = std::ceil(lower * scale) / scale;
+            if (inside <= upper) resolved = inside;
+        } else {
+            const double inside = std::floor(upper * scale) / scale;
+            if (inside >= lower) resolved = inside;
+        }
+    }
+    return resolved;
 }
 
 Rect SplitContainer::collapse_tab_bounds() const noexcept {
@@ -543,6 +716,29 @@ void SplitContainer::set_distance(double distance, SplitChangeReason reason) {
     publish_change(splitter_changed_, change);
 }
 
+void SplitContainer::cancel_splitter_interaction(
+    const bool restore_distance) noexcept {
+    const bool was_tracking = pointer_tracking_ || collapse_tab_tracking_;
+    pointer_tracking_ = false;
+    collapse_tab_tracking_ = false;
+    SplitterGrip& grip = static_cast<SplitterGrip&>(*splitter_);
+    grip.set_dragging(false);
+    grip.set_actuator_pressed(false);
+    if ((*splitter_).has_pointer_capture()) {
+        try {
+            (*splitter_).set_pointer_capture(false);
+        } catch (...) {
+        }
+    }
+    if (restore_distance && was_tracking &&
+        pointer_start_distance_ != effective_distance_) {
+        try {
+            set_distance(pointer_start_distance_, SplitChangeReason::cancel);
+        } catch (...) {
+        }
+    }
+}
+
 void SplitContainer::transfer_focus_from(
     const std::shared_ptr<SplitterPanel>& panel) {
     if (window() == nullptr) return;
@@ -555,7 +751,8 @@ void SplitContainer::transfer_focus_from(
 void SplitContainer::update_splitter_cursor() {
     SplitterGrip& splitter = static_cast<SplitterGrip&>(*splitter_);
     splitter.set_orientation(orientation_);
-    splitter.set_visible_width(splitter_width_);
+    splitter.set_visible_geometry(splitter_geometry_.hit_before,
+                                  effective_splitter_width());
 }
 
 } // namespace gui_forms

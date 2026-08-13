@@ -456,11 +456,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
     BOOL _transparentFullSizeContent;
-    std::string _windowDragRegionId;
+    std::vector<std::string> _windowDragRegionIds;
 }
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model
        transparentFullSizeContent:(BOOL)transparentFullSizeContent
-               windowDragRegionId:(std::string)windowDragRegionId;
+              windowDragRegionIds:(std::vector<std::string>)windowDragRegionIds;
 - (BOOL)initializeHost;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
 - (HostDispatchResult)dispatchHostPayload:(HostEventPayload)payload
@@ -777,7 +777,7 @@ private:
 
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model
        transparentFullSizeContent:(BOOL)transparentFullSizeContent
-               windowDragRegionId:(std::string)windowDragRegionId {
+              windowDragRegionIds:(std::vector<std::string>)windowDragRegionIds {
     self = [super initWithFrame:NSMakeRect(0.0, 0.0, 980.0, 680.0)];
     if (self != nil) {
         _model = std::move(model);
@@ -790,7 +790,7 @@ private:
         _accessibilityCacheGeneration = 0;
         _nativeCallbackFaults = 0;
         _transparentFullSizeContent = transparentFullSizeContent;
-        _windowDragRegionId = std::move(windowDragRegionId);
+        _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
@@ -848,6 +848,7 @@ private:
                 _raster, @"NotoSansCJKjp-Regular", @"otf") &&
             register_bundle_fallback_typeface(
                 _raster, @"NotoEmoji-Regular", @"ttf");
+        (*_model).set_text_metrics_provider(fonts_ready ? &_raster : nullptr);
         (*_model).metrics().set_renderer(
             fonts_ready
                 ? "Skia CPU m152 · HarfBuzz 14.2.1 · FreeType 2.14.2 · bundled fonts + CJK/emoji fallback"
@@ -1071,6 +1072,9 @@ private:
     if (_hostServices != nullptr) {
         (*_hostServices).shutdown();
         _hostServices.reset();
+    }
+    if (_model != nullptr) {
+        (*_model).set_text_metrics_provider(nullptr);
     }
     _model.reset();
 }
@@ -1532,16 +1536,12 @@ private:
 
 - (void)mouseDown:(NSEvent*)event {
     [self.window makeFirstResponder:self];
-    if (event.buttonNumber == 0 && !_windowDragRegionId.empty() && _model) {
+    if (event.buttonNumber == 0 && !_windowDragRegionIds.empty() && _model) {
         const GFPoint point = [self modelPointForEvent:event];
-        const gui_forms::Control::Ptr region =
-            (*_model).find(_windowDragRegionId);
-        const gui_forms::Control::Ptr target = (*_model).hit_test(point);
-        // Exact-target matching is deliberate. A button/editor/splitter (or
-        // any future interactive descendant) keeps its portable input simply
-        // by remaining the hit-test winner. Authors may make decorative
-        // descendants transparent when the backdrop should remain draggable.
-        if (region && target && region.get() == target.get()) {
+        const gui_forms::WindowChromeHit hit =
+            gui_forms::resolve_window_chrome_hit(
+                *_model, point, _windowDragRegionIds);
+        if (hit.begins_native_drag()) {
             [self.window performWindowDragWithEvent:event];
             return;
         }
@@ -1733,9 +1733,16 @@ private:
         [nativeWindow standardWindowButton:NSWindowZoomButton] != nil;
     const bool nativeTitlePresent = nativeWindow != nil &&
         nativeWindow.title.length != 0;
-    const bool dragRegionConfigured = !_windowDragRegionId.empty();
-    const bool dragRegionResolved = dragRegionConfigured && _model &&
-        static_cast<bool>((*_model).find(_windowDragRegionId));
+    const bool dragRegionConfigured = !_windowDragRegionIds.empty();
+    std::size_t resolvedDragRegions{};
+    if (_model) {
+        for (const std::string& regionId : _windowDragRegionIds) {
+            resolvedDragRegions +=
+                static_cast<bool>((*_model).find(regionId)) ? 1U : 0U;
+        }
+    }
+    const bool dragRegionResolved =
+        dragRegionConfigured && resolvedDragRegions == _windowDragRegionIds.size();
     return "{\"session\":" + session + ",\"services\":" + services +
         ",\"titlebar_presentation\":\"" +
         (_transparentFullSizeContent
@@ -1758,6 +1765,10 @@ private:
         (dragRegionConfigured ? "true" : "false") +
         ",\"window_drag_region_resolved\":" +
         (dragRegionResolved ? "true" : "false") +
+        ",\"window_drag_region_count\":" +
+        std::to_string(_windowDragRegionIds.size()) +
+        ",\"window_drag_region_resolved_count\":" +
+        std::to_string(resolvedDragRegions) +
         ",\"native_callback_faults\":" +
         std::to_string(_nativeCallbackFaults) + "}";
 }
@@ -1979,6 +1990,17 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
     if (!model) {
         return 2;
     }
+    std::vector<std::string> windowDragRegionIds;
+    if (!options.window_drag_region_id.empty()) {
+        windowDragRegionIds.push_back(options.window_drag_region_id);
+    }
+    windowDragRegionIds.insert(windowDragRegionIds.end(),
+                               options.window_drag_region_ids.begin(),
+                               options.window_drag_region_ids.end());
+    if (!validate_window_chrome_drag_regions(
+            *model, windowDragRegionIds).accepted()) {
+        return 2;
+    }
     @autoreleasepool {
         NSApplication* application = [NSApplication sharedApplication];
         [application setActivationPolicy:NSApplicationActivationPolicyRegular];
@@ -2008,7 +2030,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         GUIFormsView* view = [[GUIFormsView alloc]
             initWithModel:std::move(model)
             transparentFullSizeContent:transparentFullSizeContent
-            windowDragRegionId:std::move(options.window_drag_region_id)];
+            windowDragRegionIds:std::move(windowDragRegionIds)];
         [view installCloseRequestHandler:std::move(options.close_request)];
         GUIFormsWindowDelegate* delegate =
             [[GUIFormsWindowDelegate alloc] initWithView:view
@@ -2091,6 +2113,17 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
     }
     for (const MacApplicationWindow& entry : windows) {
         if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
+        std::vector<std::string> dragRegionIds;
+        if (!entry.options.window_drag_region_id.empty()) {
+            dragRegionIds.push_back(entry.options.window_drag_region_id);
+        }
+        dragRegionIds.insert(dragRegionIds.end(),
+                             entry.options.window_drag_region_ids.begin(),
+                             entry.options.window_drag_region_ids.end());
+        if (!validate_window_chrome_drag_regions(
+                *entry.model, dragRegionIds).accepted()) {
+            return 2;
+        }
         std::string_view owner = entry.owner_id;
         for (std::size_t depth = 0; !owner.empty(); ++depth) {
             if (depth >= windows.size()) return 2;
@@ -2136,11 +2169,18 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                       initWithContentRect:frame styleMask:style
                                   backing:NSBackingStoreBuffered defer:NO];
             [nativeWindow setReleasedWhenClosed:NO];
+            std::vector<std::string> windowDragRegionIds;
+            if (!entry.options.window_drag_region_id.empty()) {
+                windowDragRegionIds.push_back(
+                    std::move(entry.options.window_drag_region_id));
+            }
+            for (std::string& regionId : entry.options.window_drag_region_ids) {
+                windowDragRegionIds.push_back(std::move(regionId));
+            }
             GUIFormsView* view = [[GUIFormsView alloc]
                 initWithModel:std::move(entry.model)
                 transparentFullSizeContent:transparentFullSizeContent
-                windowDragRegionId:std::move(
-                    entry.options.window_drag_region_id)];
+                windowDragRegionIds:std::move(windowDragRegionIds)];
             [view installCloseRequestHandler:std::move(entry.options.close_request)];
             const BOOL primary = entry.owner_id.empty() && !entry.tool_window;
             GUIFormsWindowDelegate* delegate =
