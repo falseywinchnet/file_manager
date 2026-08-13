@@ -3,8 +3,8 @@
 Date: 2026-08-13  
 Status: **MEASURED PARTIAL** — portable solver, retained panel, headless File
 Manager geometry corpus, native macOS build, Windows cross-build, public
-inspection, and font policy are green. Native macOS interaction review remains
-pending the serialized Screen Sharing turn.
+inspection, font policy, and native macOS interaction review are green. Windows
+native interaction and profile-qualified raster evidence remain open.
 
 ## Question and boundary
 
@@ -188,8 +188,42 @@ build evidence, not Windows native interaction evidence.
 
 ## Native dogfood
 
-Pending the serialized Screen Sharing turn. No native appearance, pointer,
-window-resize, or physical large-text claim is made yet.
+Environment: M4 Mac mini, macOS native AppKit/Skia host, Release app, controlled
+through Screen Sharing at fit and actual-size zoom. The lab was launched from
+the logged-in Aqua Terminal through a unique temporary symlink below
+`CodexRuns`; only the lab and that symlink were closed/removed afterward.
+
+**MEASURED:** every declared surface preset was exercised: 1450×850, 1200×760,
+960×680, 720×520, 480×360, 300×240, and 150×150. The first native pass found a
+fixture defect: the buttons changed the retained `Window` client size, which
+the AppKit host correctly reasserted from its physical client. The fixture now
+keeps its review window stable and previews the exact selected product-surface
+extent inside it. A focused model test prevents that regression. The corrected
+native pass showed:
+
+- reference and ordinary presets retain the title/menu/shelf/navigation/status
+  hierarchy, both side panes, 3-pixel seams, remaining object field, overlay,
+  and live `VisualInspectorView`;
+- 300×240 removes Selection first while keeping the tree and focused primary
+  field; 150×150 removes both side panes and remains a bounded primary surface;
+- explicit `Reveal` at 300×240 restores Selection and reports honest overflow;
+  `Auto` returns to the authored Selection-first collapse;
+- 100/125/150/200% presets progressively grow the measured title, menu, shelf,
+  navigation, and status line boxes before any short-height collapse. Native
+  review also found that the fixture's long non-wrapping primary button and
+  verbose review-only reveal labels clipped at 200%; those fixture strings were
+  shortened and the final focused test/build stayed green;
+- taking the window inactive and active again did not change allocation,
+  collapse order, color roles, or legibility. The native title bar alone follows
+  AppKit active-state treatment, as intended.
+
+At reference size, the sapphire title, compact pearl command bands, graphite
+navigation/status, white object field, and asymmetric side panes preserve the
+HTML prototype's title/body/control hierarchy and density relationships. This
+is a layout-contract lab, not pixel parity evidence: inspector text is
+intentionally diagnostic-dense, OS Login Items notifications occluded part of
+the rightmost pane in some fit-to-window captures, and no screenshots are used
+as authoritative threshold or device-pixel measurements.
 
 ## Remaining limits
 

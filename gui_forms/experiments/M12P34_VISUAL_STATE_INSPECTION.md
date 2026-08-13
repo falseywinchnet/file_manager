@@ -1,4 +1,4 @@
-# M12-P27 — bounded visual-state inspection
+# M12-P34 — bounded visual-state inspection
 
 Status: **MEASURED PARTIAL**. Date: 2026-08-13.
 

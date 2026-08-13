@@ -118,6 +118,24 @@ void test_size_matrix_collapse_thresholds_and_bounded_extreme() {
             "extreme collapse must preserve the primary path and remove collapsed panes from task semantics");
 }
 
+void test_native_preset_preview_keeps_controller_window_stable() {
+    std::unique_ptr<Window> window =
+        gui_forms::responsive_tracks_lab::make_responsive_tracks_lab();
+    const std::shared_ptr<Button> preset =
+        find_as<Button>(*window, "responsive.preset.300");
+    const std::shared_ptr<ResponsiveTrackPanel> surface =
+        find_as<ResponsiveTrackPanel>(*window, "responsive.surface");
+    require(preset && surface && (*preset).perform_click(),
+            "the native width/height preset must remain invokable");
+    window->perform_layout();
+    require(near((*surface).arranged_bounds().width, 300.0) &&
+                near((*surface).arranged_bounds().height, 240.0) &&
+                near(window->client_size().width, 1450.0) &&
+                near(window->client_size().height,
+                     850.0 + gui_forms::responsive_tracks_lab::controller_height),
+            "native presets must preview an exact product surface without losing the stable controller strip");
+}
+
 void test_text_scale_matrix_reflows_before_row_collapse() {
     std::unique_ptr<Window> window =
         gui_forms::responsive_tracks_lab::make_responsive_tracks_lab();
@@ -184,6 +202,7 @@ void test_resize_cycles_inspection_and_revision_stability() {
 int main() {
     test_reference_geometry_and_house_relationships();
     test_size_matrix_collapse_thresholds_and_bounded_extreme();
+    test_native_preset_preview_keeps_controller_window_stable();
     test_text_scale_matrix_reflows_before_row_collapse();
     test_resize_cycles_inspection_and_revision_stability();
     std::cout << "responsive-tracks-lab-tests: pass\n";

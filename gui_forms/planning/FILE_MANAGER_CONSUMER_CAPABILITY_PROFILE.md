@@ -308,7 +308,7 @@ committed GUI.Forms request; when a terminal installs an exact public
 bundled face, actual shaped fallback runs, and logical metrics without leaking
 backend identity types. Provider absence stays explicitly estimated. Semantic
 pixel probes, cost attribution, and profile-qualified PNG export remain open. Evidence:
-`../experiments/M12P27_VISUAL_STATE_INSPECTION.md`.
+`../experiments/M12P34_VISUAL_STATE_INSPECTION.md`.
 
 **MEASURED PARTIAL (2026-08-13, FM-L7/FM-R02/FM-R03/FM-R05/FM-R06/FM-R11/
 FM-R12/FM-V01/FM-V02/FM-V08/FM-X04/FM-X06):** retained `SurfaceMaterial` now
@@ -394,9 +394,13 @@ semantics while preserving retained identity. The Responsive Tracks Lab and
 headless matrix reproduce 40/23/66/40/remaining/24 reference bands,
 218+3/fluid/3+288 grouped columns, deterministic Selection/Tree thresholds,
 100/125/150/200% reflow-before-collapse, stable resize cycles, and a bounded
-150×150 primary field. Command-group overflow, FM-LY06 scroll-plane focus
-reveal, Windows native review, and profile-qualified raster evidence remain
-open. Evidence: `../experiments/M12P33_FIXED_RESPONSIVE_TRACKS.md`.
+150×150 primary field. Native macOS dogfood exercised every size/text-scale
+preset, explicit reveal/auto restoration, live inspector/overlay, and
+inactive/active presentation; it also corrected a fixture-only host/preset
+preview mismatch before acceptance. Command-group overflow, FM-LY06
+scroll-plane focus reveal, Windows native review, and profile-qualified raster
+evidence remain open. Evidence:
+`../experiments/M12P33_FIXED_RESPONSIVE_TRACKS.md`.
 
 ## 16. Promotion summary
 

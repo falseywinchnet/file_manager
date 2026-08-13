@@ -203,6 +203,12 @@ public:
     void set_surface(std::shared_ptr<ResponsiveTrackPanel> value) {
         surface_ = std::move(value);
     }
+    void set_surface_size(Size value) {
+        if (surface_size_ == value) return;
+        surface_size_ = value;
+        invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
+                   Dirty::semantics | Dirty::accessibility);
+    }
     void add_controller(std::shared_ptr<Button> value) {
         controllers_.push_back(std::move(value));
     }
@@ -220,22 +226,24 @@ public:
             x += width + 5.0;
         }
         if (surface_) set_child_layout(surface_, {0.0, controller_height,
-            final_bounds.width,
-            std::max(0.0, final_bounds.height - controller_height)});
+            std::min(surface_size_.width, final_bounds.width),
+            std::min(surface_size_.height,
+                     std::max(0.0, final_bounds.height - controller_height))});
     }
 
 private:
     std::shared_ptr<ResponsiveTrackPanel> surface_;
+    Size surface_size_{1450.0, 850.0};
     std::vector<std::shared_ptr<Button>> controllers_;
     std::vector<SubscriptionToken> subscriptions_;
 };
 
 struct SelectSize final {
+    std::weak_ptr<LabRoot> root;
     Size surface_size;
-    void operator()(ButtonBase& source) const {
-        if (Window* owner = source.attached_window()) {
-            (*owner).resize({surface_size.width,
-                             surface_size.height + controller_height});
+    void operator()(ButtonBase&) const {
+        if (const std::shared_ptr<LabRoot> owner = root.lock()) {
+            (*owner).set_surface_size(surface_size);
         }
     }
 };
@@ -336,7 +344,7 @@ std::unique_ptr<Window> make_responsive_tracks_lab() {
     (*content).set_margin({});
     std::shared_ptr<Button> primary = make_control<Button>(
         StableId("responsive.content.primary"),
-        "Facade Study · current location and object field");
+        "Facade Study");
     (*primary).set_font({FontRole::content, 10.0, 400, false});
     std::shared_ptr<LayoutDiagnosticsView> diagnostics =
         make_control<LayoutDiagnosticsView>(
@@ -403,7 +411,7 @@ std::unique_ptr<Window> make_responsive_tracks_lab() {
         (*root).add_child(button);
         (*root).add_controller(button);
         (*root).retain((*button).clicked().subscribe(
-            *root, SelectSize{size}));
+            *root, SelectSize{root, size}));
     }
     for (const double scale : {1.0, 1.25, 1.5, 2.0}) {
         const std::string label =
@@ -418,7 +426,7 @@ std::unique_ptr<Window> make_responsive_tracks_lab() {
     }
     for (const auto& [label, reveal] :
          std::vector<std::pair<std::string, bool>>{
-             {"Reveal selection", true}, {"Auto collapse", false}}) {
+             {"Reveal", true}, {"Auto", false}}) {
         std::shared_ptr<Button> button = make_control<Button>(
             StableId("responsive.reveal." + std::to_string(reveal)), label);
         (*button).set_font({FontRole::control, 8.0, 700, false});
