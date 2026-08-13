@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 #include <unordered_set>
@@ -147,14 +148,14 @@ void BreadcrumbTrail::begin_edit(std::string text, bool select_all) {
 }
 
 double BreadcrumbTrail::natural_width(
-    const BreadcrumbSegment& segment) const noexcept {
-    std::size_t scalars{};
-    for (const unsigned char byte : segment.text) {
-        if ((byte & 0xc0U) != 0x80U) ++scalars;
+    const BreadcrumbSegment& segment) const {
+    FontSpec font = effective_font(font_);
+    if (!segments_.empty() && &segment == &segments_.back()) {
+        font.weight = 700;
     }
-    return std::clamp(24.0 + static_cast<double>(scalars) *
-                                 font_.size * 0.58,
-                      44.0, 220.0);
+    const double text_width =
+        resolve_text_layout_utf8(segment.text, font).logical_size.width;
+    return std::clamp(23.0 + text_width, 38.0, 220.0);
 }
 
 void BreadcrumbTrail::rebuild_layout(double width, double height) {
@@ -276,8 +277,8 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
     Panel::on_paint(painter, damage);
     if (editing_) return;
     const FontSpec font = effective_font(font_);
-    const double baseline = std::max(font.size,
-        committed_arranged_bounds().height * 0.5 + font.size * 0.34);
+    const double baseline = snap_text_baseline(std::max(
+        font.size, committed_arranged_bounds().height * 0.5 + font.size * 0.34));
     painter.save();
     painter.clip_rect(local_bounds());
 
@@ -292,8 +293,15 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
         Color foreground = style().text;
         std::string_view text;
         if (item.kind == VisibleKind::edit) {
-            face = hovered || active ? style().accent : style().accent_light;
-            foreground = active ? style().highlight : style().text;
+            const Color terminal_top = hovered || active
+                ? style().accent_light
+                : style().accent;
+            const std::array<GradientStop, 2> stops{{
+                {0.0, terminal_top}, {1.0, style().dark_border}}};
+            painter.fill_linear_gradient(
+                item.bounds, {item.bounds.x, item.bounds.y},
+                {item.bounds.x, item.bounds.y + item.bounds.height}, stops);
+            foreground = style().highlight;
             text = "./";
         } else if (item.kind == VisibleKind::overflow) {
             face = hovered ? style().face_light : style().face;
@@ -304,11 +312,21 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
             if (hovered || active) face = style().face_light;
             text = segment.text;
         }
-        painter.fill_rect(item.bounds, face);
-        const double text_width = painter.measure_text_utf8(text, font).width;
-        const double text_x = item.bounds.x +
-            std::max(7.0, (item.bounds.width - text_width) * 0.5);
-        painter.draw_text_utf8({text_x, baseline}, text, font, foreground);
+        if (item.kind != VisibleKind::edit) painter.fill_rect(item.bounds, face);
+        FontSpec item_font = font;
+        if (item.kind == VisibleKind::edit ||
+            (item.kind == VisibleKind::segment &&
+             item.segment_index + 1U == segments_.size())) {
+            item_font.weight = 700;
+        }
+        const double text_width =
+            painter.measure_text_utf8(text, item_font).width;
+        const double text_x = item.kind == VisibleKind::segment
+            ? item.bounds.x + 9.0
+            : item.bounds.x + std::max(0.0,
+                (item.bounds.width - text_width) * 0.5);
+        painter.draw_text_utf8(
+            {text_x, baseline}, text, item_font, foreground);
     }
 
     // Shared edges and focus rings are the foreground geometry of the one

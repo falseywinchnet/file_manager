@@ -36,6 +36,15 @@ struct MacHostOptions {
     // converting an interactive descendant into non-client input. The singular
     // spelling above remains source-compatible and is evaluated first.
     std::vector<std::string> window_drag_region_ids;
+    // Application-mode secondary windows may be constructed and attached
+    // before the run loop while remaining hidden until their owner invokes
+    // them. hide_on_close keeps a reusable owned surface alive instead of
+    // turning its native close button into a one-shot lifetime boundary.
+    bool initially_visible{true};
+    bool hide_on_close{};
+    bool minimizable{true};
+    std::function<void(std::function<void()> show,
+                       std::function<void()> hide)> visibility_ready;
     bool print_metrics_on_close{true};
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};

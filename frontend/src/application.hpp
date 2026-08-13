@@ -1,6 +1,7 @@
 #pragma once
 
 #include "file_manager/file_operations.hpp"
+#include "file_manager/document_picker.hpp"
 #include "file_manager/filesystem_model.hpp"
 #include "file_manager/internal_drag.hpp"
 #include "file_manager/checksum.hpp"
@@ -45,6 +46,10 @@ public:
     [[nodiscard]] std::unique_ptr<gui_forms::Window> make_window();
     void bind_host(std::function<void()> wake,
                    std::function<void()> request_close);
+    void bind_secondary_surfaces(
+        std::function<void(const std::filesystem::path&)> show_open_picker,
+        std::function<void()> show_about_window);
+    void document_picker_completed(const DocumentPickerResult& result);
     void drain_ui();
     void stop();
 
@@ -92,6 +97,7 @@ private:
     void toggle_folder_tree();
     void toggle_selection_pane();
     void show_about();
+    void show_open_picker();
     void post_worker(std::function<void()> work);
     void post_ui(std::function<void()> work);
     void worker_loop();
@@ -316,6 +322,7 @@ private:
     std::shared_ptr<gui_forms::ContextMenu> object_menu_;
     std::shared_ptr<gui_forms::ContextMenu> background_menu_;
     std::shared_ptr<gui_forms::Command> command_open_;
+    std::shared_ptr<gui_forms::Command> command_choose_open_;
     std::shared_ptr<gui_forms::Command> command_new_folder_;
     std::shared_ptr<gui_forms::Command> command_copy_;
     std::shared_ptr<gui_forms::Command> command_move_;
@@ -367,6 +374,8 @@ private:
     std::queue<std::function<void()>> ui_queue_;
     std::function<void()> wake_;
     std::function<void()> request_close_;
+    std::function<void(const std::filesystem::path&)> show_open_picker_;
+    std::function<void()> show_about_window_;
     std::string sort_mode_{"name"};
 };
 

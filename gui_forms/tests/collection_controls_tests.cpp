@@ -38,7 +38,9 @@ public:
     }
     void stroke_rounded_rect(Rect, double, Color, double) override {}
     void fill_linear_gradient(Rect, Point, Point,
-                              std::span<const GradientStop>) override {}
+                              std::span<const GradientStop>) override {
+        paint_order.push_back('G');
+    }
     void draw_line(Point from, Point to, Color, double) override {
         lines.emplace_back(from, to);
         paint_order.push_back('L');
@@ -227,12 +229,15 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
     ImageRecordingPainter painter;
     window.paint(painter, {0.0, 0.0, 160.0, 28.0});
     const auto final_face = std::find(
-        painter.paint_order.rbegin(), painter.paint_order.rend(), 'F').base();
+        painter.paint_order.rbegin(), painter.paint_order.rend(), 'G').base();
     const auto joint_lines = static_cast<std::size_t>(std::count(
         final_face, painter.paint_order.end(), 'L'));
     require(final_face != painter.paint_order.begin() &&
                 joint_lines == (constrained.size() - 1U) * 2U &&
-                std::find(final_face, painter.paint_order.end(), 'F') ==
+                std::find_if(final_face, painter.paint_order.end(),
+                    [](char operation) {
+                        return operation == 'F' || operation == 'G';
+                    }) ==
                     painter.paint_order.end(),
             "BreadcrumbTrail must paint two connected lines per shared chevron edge after every overlapping face");
 

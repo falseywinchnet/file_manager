@@ -110,7 +110,7 @@ private:
     void editor_committed(std::string text);
     void editor_cancelled();
     void rebuild_layout(double width, double height);
-    [[nodiscard]] double natural_width(const BreadcrumbSegment& segment) const noexcept;
+    [[nodiscard]] double natural_width(const BreadcrumbSegment& segment) const;
     [[nodiscard]] std::optional<std::size_t> segment_index(
         std::string_view stable_id) const noexcept;
     [[nodiscard]] std::optional<std::size_t> visible_index_at(Point absolute) const noexcept;
@@ -130,7 +130,7 @@ private:
     SubscriptionToken editor_cancel_;
     std::optional<std::size_t> hovered_visible_;
     std::optional<std::size_t> pressed_visible_;
-    FontSpec font_{FontRole::control, 10.5, 600, false};
+    FontSpec font_{FontRole::control, 10.5, 400, false};
     bool editing_{};
     bool tab_completion_available_{};
     bool focused_{};
@@ -141,8 +141,8 @@ private:
     Event<> edit_cancelled_;
     Event<> edit_completion_requested_;
 
-    static constexpr double edge_overlap_ = 8.0;
-    static constexpr double edit_width_ = 36.0;
+    static constexpr double edge_overlap_ = 9.0;
+    static constexpr double edit_width_ = 30.0;
 };
 
 } // namespace gui_forms

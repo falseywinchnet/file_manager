@@ -1717,7 +1717,7 @@ void test_application_command_truth_across_files_search_and_settings() {
         "fm.application.menu.menu.popup.row.file.settings");
     const auto* settings_open = find_semantic(
         semantics.roots,
-        "fm.application.menu.menu.popup.row.file.open");
+        "fm.application.menu.menu.popup.row.file.choose-open");
     require(settings_back && settings_back->name == "Back to files" &&
                 settings_open && !has_action(
                     *settings_open, gui_forms::SemanticAction::press) &&

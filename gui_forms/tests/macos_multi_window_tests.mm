@@ -72,30 +72,33 @@ private:
     std::string& snapshot_;
 };
 
-class CloseControllerThenProduct final {
+class ExerciseReusableWindow final {
 public:
-    explicit CloseControllerThenProduct(
-        const std::function<void()>& close_product) noexcept
-        : close_product_(close_product) {}
+    ExerciseReusableWindow(const std::function<void()>& close_controller,
+                           const std::function<void()>& close_product,
+                           std::uint64_t& visibility_ready) noexcept
+        : close_controller_(close_controller), close_product_(close_product),
+          visibility_ready_(visibility_ready) {}
 
-    void operator()(
-        VoidHostCallback,
-        VoidHostCallback request_close,
-        ShowDialogCallback,
-        ShowTooltipCallback,
-        VoidHostCallback,
-        ReadClipboardCallback,
-        WriteClipboardCallback) const {
-        const std::function<void()> primary_close = close_product_;
-        request_close();
+    void operator()(VoidHostCallback show, VoidHostCallback) const {
+        ++visibility_ready_;
+        show();
+        const std::function<void()> close_controller = close_controller_;
+        const std::function<void()> close_product = close_product_;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
                        dispatch_get_main_queue(), ^{
-                           if (primary_close) primary_close();
+                           if (close_controller) close_controller();
+                       });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC),
+                       dispatch_get_main_queue(), ^{
+                           if (close_product) close_product();
                        });
     }
 
 private:
+    const std::function<void()>& close_controller_;
     const std::function<void()>& close_product_;
+    std::uint64_t& visibility_ready_;
 };
 
 } // namespace
@@ -110,6 +113,8 @@ int main() {
     std::string product_snapshot;
     std::string controller_snapshot;
     std::function<void()> close_product;
+    std::function<void()> close_controller;
+    std::uint64_t visibility_ready{};
 
     MacApplicationWindow product;
     product.stable_id = "test.window.product";
@@ -133,7 +138,11 @@ int main() {
     controller.options.initial_size = {220.0, 130.0};
     controller.options.minimum_size = {160.0, 100.0};
     controller.options.closed = CountClosed(controller_closed);
-    controller.options.host_ready = CloseControllerThenProduct(close_product);
+    controller.options.initially_visible = false;
+    controller.options.hide_on_close = true;
+    controller.options.host_ready = CaptureCloseRequest(close_controller);
+    controller.options.visibility_ready = ExerciseReusableWindow(
+        close_controller, close_product, visibility_ready);
     controller.options.final_snapshot =
         StoreCombinedSnapshot(controller_snapshot);
     controller.tool_window = true;
@@ -143,6 +152,7 @@ int main() {
     windows.push_back(std::move(controller));
     const int result = gui_forms::host::run_macos_application(std::move(windows));
     if (result != 0 || product_closed != 1U || controller_closed != 1U ||
+        visibility_ready != 1U ||
         product_snapshot.empty() || controller_snapshot.empty()) {
         return 2;
     }

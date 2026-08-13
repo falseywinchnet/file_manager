@@ -70,6 +70,23 @@ public:
     return style;
 }
 
+[[nodiscard]] gui_forms::BasicControlStyle breadcrumb_style() {
+    gui_forms::BasicControlStyle style;
+    style.face = gui_forms::Color::rgba(231, 237, 246);
+    style.face_light = gui_forms::Color::rgba(250, 253, 255);
+    style.paper = gui_forms::Color::rgba(255, 255, 255);
+    style.highlight = gui_forms::Color::rgba(255, 255, 255);
+    style.border = gui_forms::Color::rgba(119, 140, 171);
+    style.dark_border = gui_forms::Color::rgba(23, 45, 105);
+    style.text = gui_forms::Color::rgba(29, 45, 75);
+    style.disabled_text = gui_forms::Color::rgba(132, 143, 153);
+    style.accent = gui_forms::Color::rgba(58, 104, 203);
+    style.accent_light = gui_forms::Color::rgba(105, 143, 222);
+    style.link = gui_forms::Color::rgba(25, 82, 139);
+    style.visited_link = gui_forms::Color::rgba(93, 65, 145);
+    return style;
+}
+
 class CriteriaConsolePanel final : public gui_forms::Panel {
 public:
     CriteriaConsolePanel()
@@ -461,6 +478,8 @@ void Application::install_dynamic_controls() {
     breadcrumb_ = gui_forms::make_control<gui_forms::BreadcrumbTrail>(
         gui_forms::StableId("fm.path.breadcrumb"), "fm.path.editor");
     breadcrumb_->set_requested_bounds({0, 0, 620, 26});
+    breadcrumb_->set_border_style(gui_forms::BorderStyle::none);
+    breadcrumb_->set_style(breadcrumb_style());
     breadcrumb_->set_accessible_name("Current location breadcrumb");
     breadcrumb_->set_accessible_description(
         "Navigate stable path segments or switch to exact path entry");
@@ -476,7 +495,7 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.search.current-folder"));
     search_box_->set_requested_bounds({0, 0, 228, 30});
     search_box_->set_placeholder_text("Search this subtree");
-    search_box_->set_accessible_name("Search current subtree with Engine");
+    search_box_->set_accessible_name("Search current subtree");
     form_.file_manager_app_shell_location_search_host->clear_children();
     form_.file_manager_app_shell_location_search_host->add_child(search_box_);
     form_.file_manager_app_shell_location_search_host->set_flex_grow(*search_box_, 1.0);
@@ -868,6 +887,11 @@ void Application::install_command_surfaces() {
         [this] { request_open(); });
     command_open_->set_shortcut("Enter");
     command_open_->set_default_action(true);
+    command_choose_open_ = make_command(
+        "file.choose-open", "Open…",
+        "Choose a local file in the File Manager document picker",
+        [this] { show_open_picker(); });
+    command_choose_open_->set_shortcut("Cmd+O");
     command_new_folder_ = make_command(
         "file.new-folder", "New folder",
         "Create a collision-safe folder in the current location",
@@ -1015,7 +1039,7 @@ void Application::install_command_surfaces() {
 
     menu_strip_->set_items({
         {"fm.menu.file", "File", {
-            {"file.open", MenuItemKind::command, command_open_},
+            {"file.choose-open", MenuItemKind::command, command_choose_open_},
             {"file.new-folder", MenuItemKind::command, command_new_folder_},
             {"file.separator.settings", MenuItemKind::separator},
             {"file.settings", MenuItemKind::command, command_settings_},
@@ -1197,6 +1221,7 @@ void Application::install_accelerators() {
         return focused == objects_ || focused == correspondence_ || focused == tree_;
     };
 
+    bind(command_choose_open_, {gui_forms::PhysicalKey::o, primary}, true);
     bind(command_open_, {gui_forms::PhysicalKey::enter,
                          gui_forms::Modifier::none}, true,
          focused_is_object_surface);
@@ -1643,22 +1668,38 @@ void Application::show_about() {
     const std::string version = FILE_MANAGER_VERSION;
     set_status("File Manager · " + version + " development build",
                "local filesystem authority · GUI.Forms + Web.Forms");
-    if (!window_ || !window_->host_services()) return;
-    gui_forms::HostMessageDialogRequest message;
-    message.title = "About File Manager";
-    message.message =
-        "File Manager " + version + "\n\n"
-        "Daily-navigation development build.\n"
-        "Read-only Home and Volumes navigation; protected operations remain scoped.\n"
-        "Frontend: Web.Forms source compiled to retained GUI.Forms C++.\n"
-        "Search and settings cross the admitted Orchestrator contracts.";
-    message.buttons = gui_forms::HostMessageButtons::ok;
-    message.icon = gui_forms::HostMessageIcon::information;
-    gui_forms::HostDialogRequest request;
-    request.request_id = next_host_request_id_++;
-    request.owner_id = "file-manager.about";
-    request.payload = std::move(message);
-    (void)window_->host_services()->show_dialog(request);
+    if (show_about_window_) show_about_window_();
+}
+
+void Application::show_open_picker() {
+    set_status("Choose a file", "File Manager document picker · current root authority");
+    if (show_open_picker_) show_open_picker_(location_);
+}
+
+void Application::bind_secondary_surfaces(
+    std::function<void(const std::filesystem::path&)> show_open_picker,
+    std::function<void()> show_about_window) {
+    show_open_picker_ = std::move(show_open_picker);
+    show_about_window_ = std::move(show_about_window);
+}
+
+void Application::document_picker_completed(
+    const DocumentPickerResult& result) {
+    if (!result.accepted() || result.selections.empty()) {
+        if (result.terminal == DocumentPickerTerminal::cancelled) {
+            set_status("Open cancelled", "No filesystem selection changed");
+        }
+        return;
+    }
+    const DocumentSelectionObservation& selection = result.selections.front();
+    if (!selection.existing || !selection.identity.available()) {
+        set_status("Open refused", "Picker selection no longer has an exact identity");
+        return;
+    }
+    pending_selection_identity_ = selection.identity;
+    set_status("Opening " + selection.path.filename().string(),
+               "picker result revalidated · revealing in current location surface");
+    request_navigation(selection.path.parent_path(), true);
 }
 
 void Application::update_command_state() {
@@ -1691,6 +1732,9 @@ void Application::update_command_state() {
 
     command_open_->set_enabled(files_active && entry &&
                                entry->kind != EntryKind::symlink);
+    command_choose_open_->set_enabled(files_active);
+    command_choose_open_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
     command_open_->set_availability_reason(!files_active
         ? hidden_workspace_reason : !entry
             ? "Select one visible object" : entry->kind == EntryKind::symlink
@@ -1843,7 +1887,7 @@ void Application::update_command_state() {
         command_up_->state().enabled);
     search_box_->set_enabled(files_active && engine_search_available());
     search_box_->set_placeholder_text(engine_search_available()
-        ? "Search this indexed subtree"
+        ? "Search this subtree"
         : "Search unavailable · root not indexed");
 }
 

@@ -1778,27 +1778,40 @@ private:
 @interface GUIFormsWindowDelegate : NSObject <NSWindowDelegate> {
     __weak GUIFormsView* _view;
     BOOL _stopsApplicationOnClose;
+    BOOL _hideOnClose;
     std::function<void()> _closedHandler;
 }
 - (instancetype)initWithView:(GUIFormsView*)view
       stopsApplicationOnClose:(BOOL)stopsApplicationOnClose
+                  hideOnClose:(BOOL)hideOnClose
                  closedHandler:(std::function<void()>)closedHandler;
+- (void)prepareForApplicationShutdown;
 @end
 
 @implementation GUIFormsWindowDelegate
 - (instancetype)initWithView:(GUIFormsView*)view
       stopsApplicationOnClose:(BOOL)stopsApplicationOnClose
+                  hideOnClose:(BOOL)hideOnClose
                  closedHandler:(std::function<void()>)closedHandler {
     self = [super init];
     if (self != nil) {
         _view = view;
         _stopsApplicationOnClose = stopsApplicationOnClose;
+        _hideOnClose = hideOnClose;
         _closedHandler = std::move(closedHandler);
     }
     return self;
 }
 - (BOOL)windowShouldClose:(NSWindow*)sender {
-    return _view == nil || [_view requestClose];
+    if (_view != nil && ![_view requestClose]) return NO;
+    if (_hideOnClose) {
+        [sender orderOut:nil];
+        return NO;
+    }
+    return YES;
+}
+- (void)prepareForApplicationShutdown {
+    _hideOnClose = NO;
 }
 - (void)windowWillClose:(NSNotification*)notification {
     [_view notifyClosed];
@@ -1909,6 +1922,39 @@ private:
     NSWindow* window_;
 };
 
+class RequestNativeShow final {
+public:
+    explicit RequestNativeShow(NSWindow* window) noexcept : window_(window) {}
+
+    void operator()() const
+    {
+        NSWindow* window = window_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [window makeKeyAndOrderFront:nil];
+            [NSApp activateIgnoringOtherApps:YES];
+        });
+    }
+
+private:
+    NSWindow* window_;
+};
+
+class RequestNativeHide final {
+public:
+    explicit RequestNativeHide(NSWindow* window) noexcept : window_(window) {}
+
+    void operator()() const
+    {
+        NSWindow* window = window_;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [window orderOut:nil];
+        });
+    }
+
+private:
+    NSWindow* window_;
+};
+
 class ShowNativeDialog final {
 public:
     explicit ShowNativeDialog(GUIFormsView* view) noexcept : view_(view) {}
@@ -1987,7 +2033,7 @@ private:
 
 
 int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
-    if (!model) {
+    if (!model || !options.initially_visible || options.hide_on_close) {
         return 2;
     }
     std::vector<std::string> windowDragRegionIds;
@@ -2035,6 +2081,7 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         GUIFormsWindowDelegate* delegate =
             [[GUIFormsWindowDelegate alloc] initWithView:view
                                  stopsApplicationOnClose:YES
+                                             hideOnClose:NO
                                             closedHandler:std::move(options.closed)];
         [nativeWindow setDelegate:delegate];
         [nativeWindow setTitle:[NSString stringWithUTF8String:options.title.c_str()]];
@@ -2062,6 +2109,10 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
                 HideNativeTooltip(view),
                 ReadNativeClipboard(view),
                 WriteNativeClipboard(view));
+        }
+        if (options.visibility_ready) {
+            options.visibility_ready(RequestNativeShow(nativeWindow),
+                                     RequestNativeHide(nativeWindow));
         }
         // Match every host: one FIFO initialization turn runs after portable
         // attach/service publication and before first visible presentation.
@@ -2109,7 +2160,12 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             (!entry.owner_id.empty() && entry.owner_id == entry.stable_id)) {
             return 2;
         }
-        if (entry.owner_id.empty() && !entry.tool_window) ++primary_count;
+        if (entry.owner_id.empty() && !entry.tool_window) {
+            if (!entry.options.initially_visible || entry.options.hide_on_close) {
+                return 2;
+            }
+            ++primary_count;
+        }
     }
     for (const MacApplicationWindow& entry : windows) {
         if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
@@ -2156,7 +2212,9 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 MacTitlebarPresentation::transparent_full_size_content;
             NSWindowStyleMask style = NSWindowStyleMaskTitled |
                 NSWindowStyleMaskClosable | NSWindowStyleMaskResizable;
-            if (!entry.tool_window) style |= NSWindowStyleMaskMiniaturizable;
+            if (!entry.tool_window && entry.options.minimizable) {
+                style |= NSWindowStyleMaskMiniaturizable;
+            }
             else style |= NSWindowStyleMaskUtilityWindow;
             if (transparentFullSizeContent) {
                 style |= NSWindowStyleMaskFullSizeContentView;
@@ -2186,6 +2244,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             GUIFormsWindowDelegate* delegate =
                 [[GUIFormsWindowDelegate alloc] initWithView:view
                                      stopsApplicationOnClose:primary
+                                                 hideOnClose:entry.options.hide_on_close
                                                 closedHandler:std::move(entry.options.closed)];
             [nativeWindow setDelegate:delegate];
             [nativeWindow setTitle:native_string(entry.options.title)];
@@ -2216,6 +2275,12 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 std::distance(windows.begin(), owner));
             NSWindow* ownerWindow = nativeWindows[ownerIndex];
             [ownerWindow addChildWindow:nativeWindow ordered:NSWindowAbove];
+            if (!entry.options.initially_visible) {
+                // addChildWindow:ordered: may order a previously hidden child
+                // onscreen. Preserve the portable initial-visibility contract
+                // after establishing native ownership.
+                [nativeWindow orderOut:nil];
+            }
             NSScreen* screen = ownerWindow.screen ?: NSScreen.mainScreen;
             NSRect frame = nativeWindow.frame;
             const NSRect ownerFrame = ownerWindow.frame;
@@ -2253,13 +2318,20 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                     ReadNativeClipboard(view),
                     WriteNativeClipboard(view));
             }
+            if (entry.options.visibility_ready) {
+                entry.options.visibility_ready(
+                    RequestNativeShow(nativeWindow),
+                    RequestNativeHide(nativeWindow));
+            }
             [view drainPostedWork];
             if (entry.options.dispatch_pending) entry.options.dispatch_pending();
             [view collectDamage];
-            if (entry.owner_id.empty() && !entry.tool_window) {
-                [nativeWindow makeKeyAndOrderFront:nil];
-            } else {
-                [nativeWindow orderFront:nil];
+            if (entry.options.initially_visible) {
+                if (entry.owner_id.empty() && !entry.tool_window) {
+                    [nativeWindow makeKeyAndOrderFront:nil];
+                } else {
+                    [nativeWindow orderFront:nil];
+                }
             }
             if (entry.options.close_after_launch_for_testing) {
                 dispatch_async(dispatch_get_main_queue(), ^{
@@ -2274,8 +2346,13 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
         // surviving owned/tool windows while their independent host sessions
         // and delegates are still intact, so each root receives one real
         // HostClosedEvent and its callback observes the actual close point.
+        for (GUIFormsWindowDelegate* delegate in delegates) {
+            [delegate prepareForApplicationShutdown];
+        }
         for (NSWindow* nativeWindow in nativeWindows) {
-            if (nativeWindow.isVisible) [nativeWindow close];
+            if (nativeWindow.isVisible || !nativeWindow.isReleasedWhenClosed) {
+                [nativeWindow close];
+            }
         }
 
         for (std::size_t index = 0; index < windows.size(); ++index) {

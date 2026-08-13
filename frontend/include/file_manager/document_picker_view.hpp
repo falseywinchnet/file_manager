@@ -28,6 +28,7 @@ public:
 
     void set_orchestrator_session_valid(bool valid);
     void confirm_overwrite();
+    void present(const std::filesystem::path& initial_location);
 
 private:
     void reload();
@@ -37,6 +38,10 @@ private:
 
     FileSelectionController controller_;
     std::shared_ptr<gui_forms::ScaledPanel> root_;
+    std::shared_ptr<gui_forms::Control> title_bar_;
+    std::shared_ptr<gui_forms::Label> title_;
+    std::shared_ptr<gui_forms::Label> subtitle_;
+    std::shared_ptr<gui_forms::Control> navigation_bar_;
     std::shared_ptr<gui_forms::Button> back_to_root_;
     std::shared_ptr<gui_forms::Button> up_;
     std::shared_ptr<gui_forms::TextBox> path_;

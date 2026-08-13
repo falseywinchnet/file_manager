@@ -9,6 +9,17 @@ rules. Items marked **GIVEN** may constrain implementation. Items marked
 **CANDIDATE** require the named gate and, where reversal cost is high, a numbered
 ADR with grand-architect approval before they become **DECIDED**.
 
+**GIVEN design-language refinement, 2026-08-13:** controls are recursively
+nested authored systems rather than visually indivisible widget atoms. The
+grand architect's authoritative-region rule, control-DNA/style-addressability
+requirements, and microfeature conservation protocol are recorded in
+[`DESIGN_LANGUAGE_SYSTEM_MODEL.md`](DESIGN_LANGUAGE_SYSTEM_MODEL.md),
+[`CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md`](CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md),
+[`AUTHORITATIVE_CONTROL_REGIONS.md`](AUTHORITATIVE_CONTROL_REGIONS.md), and
+[`MICROFEATURE_CONSERVATION_PROTOCOL.md`](MICROFEATURE_CONSERVATION_PROTOCOL.md).
+Those records do not freeze Web.Forms grammar, but they invalidate a theme
+strategy based only on opaque stock-control classes plus bespoke paint hooks.
+
 **GIVEN refinement, 2026-08-10:** the sibling `../../web_forms/` project now
 owns the proposed authoritative round-trippable authoring source as bounded
 browser-valid HTML/CSS. Its no-authored-JavaScript profile and nested ambient

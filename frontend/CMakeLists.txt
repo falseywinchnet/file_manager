@@ -141,7 +141,10 @@ target_compile_definitions(file_manager_application PRIVATE
     FILE_MANAGER_GUI_FORMS_MANIFEST_ID="gui-forms-fm0-macos-arm64-2026-08-10")
 
 add_executable(file_manager MACOSX_BUNDLE src/main.cpp)
-target_link_libraries(file_manager PRIVATE file_manager_application)
+target_sources(file_manager PRIVATE src/about_view.cpp)
+target_link_libraries(file_manager PRIVATE
+    file_manager_application
+    FileManager::DocumentPickerView)
 target_compile_features(file_manager PRIVATE cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

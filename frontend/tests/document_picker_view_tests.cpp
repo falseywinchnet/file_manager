@@ -32,14 +32,19 @@ int main() {
     request.filters = {{"text", "Text files", {"txt"}}};
     request.active_filter_id = "text";
     file_manager::DocumentPickerView view(std::move(request));
-    gui_forms::Window window(view.root_control(), {760, 520});
+    gui_forms::Window window(view.root_control(), {760, 560});
     window.perform_layout();
 
-    require(window.find("file-manager.picker.path") &&
+    const auto picker_title = window.find("file-manager.picker.title");
+    require(picker_title && picker_title->authored_surface_material() &&
+                picker_title->committed_arranged_bounds().height == 40.0 &&
+                window.find("file-manager.picker.title.name") &&
+                window.find("file-manager.picker.navigation") &&
+                window.find("file-manager.picker.path") &&
                 window.find("file-manager.picker.objects") &&
                 window.find("file-manager.picker.accept") &&
                 window.find("file-manager.picker.cancel"),
-            "installed view must compose the bounded GUI.Forms control set");
+            "installed view must compose the bounded File Manager DNA control set");
     require(view.controller().browser().entries.size() == 2U,
             "view must expose direct-filesystem folder and filtered file rows");
 

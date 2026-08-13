@@ -6,6 +6,49 @@
 namespace file_manager {
 namespace {
 
+gui_forms::SurfaceMaterial watercolor_title_material() {
+    using gui_forms::Color;
+    using gui_forms::GradientStop;
+    using gui_forms::MaterialFillLayer;
+    gui_forms::SurfaceMaterial material;
+    material.fills = {
+        MaterialFillLayer::linear_css_angle(92.0, {
+            GradientStop{0.0, Color::rgba(23, 52, 127)},
+            GradientStop{0.55, Color::rgba(58, 104, 203)},
+            GradientStop{1.0, Color::rgba(217, 104, 114)},
+        }),
+        MaterialFillLayer::radial({0.18, -0.90}, {0.42, 1.35}, {
+            GradientStop{0.0, Color::rgba(146, 217, 255, 116)},
+            GradientStop{1.0, Color::rgba(146, 217, 255, 0)},
+        }),
+        MaterialFillLayer::radial({0.62, 1.60}, {0.38, 1.10}, {
+            GradientStop{0.0, Color::rgba(214, 178, 255, 106)},
+            GradientStop{1.0, Color::rgba(214, 178, 255, 0)},
+        }),
+        MaterialFillLayer::radial({0.95, 1.0}, {0.28, 0.80}, {
+            GradientStop{0.0, Color::rgba(255, 195, 142, 100)},
+            GradientStop{1.0, Color::rgba(255, 195, 142, 0)},
+        }),
+    };
+    material.border_edges.bottom =
+        gui_forms::MaterialBorder{Color::rgba(23, 45, 105), 1.0};
+    return material;
+}
+
+gui_forms::SurfaceMaterial graphite_navigation_material() {
+    using gui_forms::Color;
+    using gui_forms::GradientStop;
+    gui_forms::SurfaceMaterial material;
+    material.fills = {gui_forms::MaterialFillLayer::linear_css_angle(180.0, {
+        GradientStop{0.0, Color::rgba(98, 108, 115)},
+        GradientStop{0.52, Color::rgba(75, 84, 90)},
+        GradientStop{1.0, Color::rgba(66, 74, 79)},
+    })};
+    material.border_edges.bottom =
+        gui_forms::MaterialBorder{Color::rgba(32, 45, 53), 1.0};
+    return material;
+}
+
 gui_forms::ObjectGlyph glyph(const DirectoryEntry& entry) {
     if (entry.directory) return gui_forms::ObjectGlyph::folder;
     switch (entry.kind) {
@@ -50,6 +93,16 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     : controller_(std::move(request)),
       root_(std::make_shared<gui_forms::ScaledPanel>(
           gui_forms::StableId("file-manager.picker"))),
+      title_bar_(std::make_shared<gui_forms::Control>(
+          gui_forms::StableId("file-manager.picker.title"))),
+      title_(std::make_shared<gui_forms::Label>(
+          gui_forms::StableId("file-manager.picker.title.name"),
+          "Open a file")),
+      subtitle_(std::make_shared<gui_forms::Label>(
+          gui_forms::StableId("file-manager.picker.title.subtitle"),
+          "local filesystem · bounded selection authority")),
+      navigation_bar_(std::make_shared<gui_forms::Control>(
+          gui_forms::StableId("file-manager.picker.navigation"))),
       back_to_root_(std::make_shared<gui_forms::Button>(
           gui_forms::StableId("file-manager.picker.root"), "Root")),
       up_(std::make_shared<gui_forms::Button>(
@@ -71,9 +124,21 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
           accept_title(controller_.request().profile))),
       cancel_(std::make_shared<gui_forms::Button>(
           gui_forms::StableId("file-manager.picker.cancel"), "Cancel")) {
-    root_->set_requested_bounds({0, 0, 760, 520});
-    root_->set_design_size({760, 520});
+    root_->set_requested_bounds({0, 0, 760, 560});
+    root_->set_design_size({760, 560});
     root_->set_border_style(gui_forms::BorderStyle::line);
+    root_->set_background(gui_forms::Color::rgba(231, 237, 246));
+
+    title_bar_->set_authored_surface_material(watercolor_title_material());
+    title_bar_->set_accessible_name("Open dialog title bar");
+    title_->set_font({gui_forms::FontRole::control, 15.0, 700, false});
+    title_->set_foreground(gui_forms::Color::rgba(255, 255, 255));
+    title_->set_hit_test_transparent(true);
+    subtitle_->set_font({gui_forms::FontRole::control, 10.0, 400, false});
+    subtitle_->set_foreground(gui_forms::Color::rgba(225, 237, 255));
+    subtitle_->set_hit_test_transparent(true);
+    navigation_bar_->set_authored_surface_material(
+        graphite_navigation_material());
 
     back_to_root_->set_accessible_name("Go to picker root");
     up_->set_accessible_name("Go to parent folder");
@@ -93,16 +158,20 @@ DocumentPickerView::DocumentPickerView(DocumentPickerRequest request)
     accept_->set_accessible_description(
         "Acceptance revalidates filesystem identity and Orchestrator session");
 
-    root_->add_at(back_to_root_, {16, 16, 70, 32});
-    root_->add_at(up_, {94, 16, 58, 32});
-    root_->add_at(path_, {160, 16, 584, 32});
-    root_->add_at(objects_, {16, 60, 728, 354});
-    root_->add_at(filter_, {16, 426, 220, 32});
-    root_->add_at(hidden_, {248, 426, 130, 32});
-    root_->add_at(filename_, {390, 426, 354, 32});
-    root_->add_at(status_, {16, 470, 470, 34});
-    root_->add_at(cancel_, {588, 470, 74, 34});
-    root_->add_at(accept_, {670, 470, 74, 34});
+    root_->add_at(title_bar_, {1, 1, 758, 40});
+    root_->add_at(title_, {76, 9, 190, 23});
+    root_->add_at(subtitle_, {272, 12, 390, 18});
+    root_->add_at(navigation_bar_, {1, 41, 758, 50});
+    root_->add_at(back_to_root_, {12, 50, 70, 32});
+    root_->add_at(up_, {90, 50, 58, 32});
+    root_->add_at(path_, {156, 50, 592, 32});
+    root_->add_at(objects_, {12, 101, 736, 366});
+    root_->add_at(filter_, {12, 477, 220, 32});
+    root_->add_at(hidden_, {244, 477, 130, 32});
+    root_->add_at(filename_, {386, 477, 362, 32});
+    root_->add_at(status_, {12, 519, 470, 30});
+    root_->add_at(cancel_, {584, 517, 78, 34});
+    root_->add_at(accept_, {670, 517, 78, 34});
 
     subscriptions_.push_back(back_to_root_->clicked().subscribe(
         [this](gui_forms::ButtonBase&) {
@@ -193,6 +262,14 @@ void DocumentPickerView::set_orchestrator_session_valid(const bool valid) {
 
 void DocumentPickerView::confirm_overwrite() {
     accept(true);
+}
+
+void DocumentPickerView::present(
+    const std::filesystem::path& initial_location) {
+    navigate_path(initial_location);
+    objects_->clear_selection();
+    status_->set_text(std::to_string(controller_.browser().entries.size()) +
+                      " visible objects · direct filesystem");
 }
 
 void DocumentPickerView::reload() {
