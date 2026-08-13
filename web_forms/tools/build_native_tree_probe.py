@@ -27,7 +27,7 @@ def main() -> int:
             WEB_FORMS_ROOT / "boards/apps/standard_shell/standard_shell.wf.html"
         ),
         read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         ),
         output,
         unit,
@@ -43,15 +43,28 @@ def main() -> int:
     executable = output / "native_tree_probe"
     command = [
         "/usr/bin/c++", "-std=c++20", "-Wall", "-Wextra", "-Werror",
+        "-DWEB_FORMS_FIDELITY_SKIA=1",
         "-I", str(REPOSITORY_ROOT / "gui_forms/include"),
+        "-I", str(REPOSITORY_ROOT / "gui_forms/src"),
         "-I", str(output),
     ]
     command.extend(str(source) for source in sources)
     command.extend(
         [
             str(gui_forms_build / "libgui_forms_controls.a"),
-            str(gui_forms_build / "libgui_forms_core.a"),
             str(gui_forms_build / "libgui_drawing_core.a"),
+            str(gui_forms_build / "libgui_forms_skia.a"),
+            str(gui_forms_build / "skia-cpu-release/libskia.a"),
+            str(gui_forms_build / "skia-cpu-release/libskcms.a"),
+            str(gui_forms_build / "skia-cpu-release/libpng.a"),
+            str(gui_forms_build / "skia-cpu-release/libzlib.a"),
+            str(gui_forms_build / "libgui_forms_text_engine.a"),
+            str(gui_forms_build / "libgui_forms_core.a"),
+            str(gui_forms_build / "third_party/harfbuzz/libharfbuzz.a"),
+            str(gui_forms_build / "third_party/freetype/libfreetype.a"),
+            "-framework", "CoreFoundation",
+            "-framework", "CoreGraphics",
+            "-framework", "CoreText",
             "-o", str(executable),
         ]
     )

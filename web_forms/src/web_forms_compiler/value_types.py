@@ -142,24 +142,67 @@ def _space_tokens(value: str) -> list[dict[str, object]]:
     return tokens
 
 
-def _gradient(value: str) -> dict[str, object] | None:
-    match = re.fullmatch(r"(linear-gradient|radial-gradient|repeating-linear-gradient|repeating-radial-gradient)\((.*)\)", value, re.IGNORECASE)
+def _gradient_layer(value: str) -> list[dict[str, object]] | None:
+    match = re.fullmatch(
+        r"(linear-gradient|radial-gradient|repeating-linear-gradient|repeating-radial-gradient)\((.*)\)",
+        value,
+        re.IGNORECASE,
+    )
     if match is None:
         return None
     function_name = match.group(1).lower()
     parts = _split_top_level(match.group(2))
     tokens = [_token("keyword", text=function_name)]
+    if function_name in {"linear-gradient", "repeating-linear-gradient"}:
+        angle = _scalar_token(parts[0]) if parts else None
+        if angle is not None and angle["kind"] == "angle_deg":
+            tokens.append(angle)
+            parts = parts[1:]
+    else:
+        # Bounded standard radial prelude: `ellipse RX RY at CX CY`.
+        # Percent radii/centres map exactly to GUI.Forms' normalized ellipse.
+        prelude = _split_whitespace(parts[0]) if parts else []
+        if prelude and prelude[0].lower() == "ellipse":
+            if len(prelude) != 6 or prelude[3].lower() != "at":
+                return None
+            geometry = [_scalar_token(item) for item in (prelude[1], prelude[2], prelude[4], prelude[5])]
+            if any(item is None or item["kind"] != "percent" for item in geometry):
+                return None
+            tokens.extend(
+                [_token("keyword", text="ellipse"), geometry[0], geometry[1],
+                 _token("keyword", text="at"), geometry[2], geometry[3]]
+            )
+            parts = parts[1:]
     for part in parts:
-        scalar = _scalar_token(part)
-        if scalar is not None:
-            tokens.append(scalar)
-            continue
-        color = _packed_color(part)
+        stop = _split_whitespace(part)
+        if len(stop) not in {1, 2}:
+            return None
+        color = _packed_color(stop[0])
         if color is None:
             return None
         tokens.append(_token("color_rgba", data=color))
+        if len(stop) == 2:
+            position = _scalar_token(stop[1])
+            if position is None or position["kind"] not in {"percent", "logical_px"}:
+                return None
+            tokens.append(position)
     if sum(1 for token in tokens if token["kind"] == "color_rgba") < 2:
         return None
+    return tokens
+
+
+def _gradient(value: str) -> dict[str, object] | None:
+    layers = _split_top_level(value)
+    if not layers or len(layers) > 7:
+        return None
+    tokens: list[dict[str, object]] = []
+    for index, layer in enumerate(layers):
+        parsed = _gradient_layer(layer)
+        if parsed is None:
+            return None
+        if index:
+            tokens.append(_token("separator"))
+        tokens.extend(parsed)
     return {"kind": "gradient", "tokens": tokens}
 
 

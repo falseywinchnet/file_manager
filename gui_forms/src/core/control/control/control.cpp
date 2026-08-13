@@ -2467,6 +2467,7 @@ void Control::on_drag_preview(DragEvent&) {}
 void Control::on_drag(DragEvent&) {}
 void Control::on_drag_bubble(DragEvent&) {}
 void Control::on_focus_changed(bool) {}
+void Control::on_focus_cue_changed(bool) {}
 void Control::on_activate() {}
 void Control::on_attached_to_window() {}
 void Control::on_attachment_committed() noexcept {}

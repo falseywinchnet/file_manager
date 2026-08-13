@@ -1,0 +1,219 @@
+{
+  "schema": "web.forms.gui-capabilities/0.1-experimental",
+  "target": "gui.forms.observed-2026-08-13",
+  "revision": 3,
+  "observed_on": "2026-08-13",
+  "evidence_scope": "public renderer-neutral GUI.Forms contracts and named M12-P28 through M12-P35 experiments; adapter status remains distinct from primitive availability",
+  "features": {
+    "construction.generated-material-parts": {
+      "status": "supported",
+      "evidence": "focused GUI.Forms material tests prove bounded pointer/count stop, fill, shadow, border, and retained ownership used by the current Stage 2 adapter",
+      "fallback": "none"
+    },
+    "construction.generated-control-state-recipes": {
+      "status": "supported",
+      "evidence": "GUI.Forms ButtonBase owns a validated retained ControlStateRecipes set; focused tests prove normal, hot, pressed, disabled, whole-visual translation, and external focus geometry",
+      "fallback": "use the named GUI.Forms theme role and report the authored-state loss"
+    },
+    "construction.generated-native-tree": {
+      "status": "supported",
+      "evidence": "experimental Stage 2 composes only exact manifest-backed material, layout, typography, state, and decoration projections into one deterministic typed retained tree",
+      "fallback": "none; refuse the entire tree when any retained node cannot be projected"
+    },
+    "control.command-overflow": {
+      "status": "supported",
+      "evidence": "CommandOverflowPanel now owns bounded whole-group priority collapse, focus protection, a conditionally layout-collapsed overflow actuator, stable-ID projection snapshots, and Web.Forms metadata lowering; popup command composition remains consumer domain logic",
+      "fallback": "none; source must author unique group priorities and an explicit actuator"
+    },
+    "control.connected-topology": {
+      "status": "supported",
+      "evidence": "M12-P31 proves explicit bounded ConnectedControlTopology, atomic connect_button_group, singular seams, independent focus and semantic ownership, native macOS review, and Windows cross-build; Web.Forms validates explicit group axes and direct membership and emits connect_button_group without coordinate inference",
+      "fallback": "none; refuse inferred coordinate-based connection"
+    },
+    "control.dropdown-button": {
+      "status": "supported",
+      "evidence": "public DropDownButton retains menu or split anatomy and Web.Forms now emits the typed control directly from explicit data-wf-control/data-wf-dropdown-mode metadata with generated state materials and typography",
+      "fallback": "ordinary Button only when source does not require disclosure semantics"
+    },
+    "control.split-seam-geometry": {
+      "status": "supported",
+      "evidence": "M12-P32 proves bounded SplitSeamGeometry and physical proximity behavior; Web.Forms now validates and lowers explicit two-pane orientation, ownership, geometry, constraints, collapse policy, threshold, and transition duration into a typed SplitContainer",
+      "fallback": "none; legacy width setters cannot represent asymmetric physical proximity policy"
+    },
+    "decoration.after": {
+      "status": "supported",
+      "evidence": "Control owns bounded after-content decoration; owner-relative anchors, rotation, symmetric ordering, semantic exclusion, and atomic invalid rejection have focused coverage",
+      "fallback": "none for semantic geometry; explicit text separator may be authored separately"
+    },
+    "decoration.before": {
+      "status": "supported",
+      "evidence": "Control owns bounded before-content decoration in a retained paint layer; focused native and generated-code tests prove ordering with the symmetric after-content layer",
+      "fallback": "none for nonsemantic box decoration"
+    },
+    "effect.bounded-shadow": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial bounded outer shadows are generated exactly, retained in display chunks, and covered by material and damage tests",
+      "fallback": "none"
+    },
+    "effect.inset-shadow": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial retains inset identity; display chunks preserve it and a pixel-checked Skia CPU smoke test proves the live rounded complement remains clipped to its owner",
+      "fallback": "none"
+    },
+    "geometry.rounded-corners": {
+      "status": "supported",
+      "evidence": "generated SurfaceMaterial corner radii retain rounded clip, fill, border, focus, and shadow geometry",
+      "fallback": "none"
+    },
+    "host.active-window-state": {
+      "status": "supported",
+      "evidence": "M12-P29 proves HostActivationEvent updates retained Window active state and authored material can distinguish active and inactive chrome without disabling content",
+      "fallback": "base active material with reported inactive-state loss"
+    },
+    "host.custom-chrome-drag-regions": {
+      "status": "supported",
+      "evidence": "M12-P29 proves plural stable-ID drag regions and exact retained hit resolution; Web.Forms now emits the authored IDs as typed generated metadata and File Manager passes that list to the full-size-content host without a product hard-code",
+      "fallback": "standard native title bar when the application host does not opt into full-size authored content"
+    },
+    "identity.typed-hierarchical": {
+      "status": "supported",
+      "evidence": "native tree Stage 2 requires every retained node ID, rejects normalized member collisions, emits one typed member per ID, and preserves exact StableId spelling",
+      "fallback": "none"
+    },
+    "inspection.visual-state-snapshot": {
+      "status": "supported",
+      "evidence": "M12-P34 proves bounded renderer-neutral Window visual snapshots with stable identity, geometry, clipping, state, material, resolved text summary, committed paint, redaction, and deterministic JSON",
+      "fallback": "none for design-time native comparison; production output need not display the inspector"
+    },
+    "layout.flex": {
+      "status": "supported",
+      "evidence": "FlowLayoutPanel publishes retained direction, wrapping, bounded gaps, alignment, padding, and per-child grow; focused tests prove live-frame center, space-between, stretch, and ratio growth",
+      "fallback": "none"
+    },
+    "layout.grid": {
+      "status": "supported",
+      "evidence": "TableLayoutPanel publishes bounded absolute, weighted fraction, auto tracks, retained inter-track spacing, deterministic cells, and fill docking",
+      "fallback": "none"
+    },
+    "layout.priority-collapse": {
+      "status": "supported",
+      "evidence": "M12-P33 proves authored unique collapse priorities and layout-collapsed state distinct from visibility; Web.Forms now validates and lowers explicit per-track priorities into ResponsiveTrackPanel while CommandOverflowPanel owns the separate whole-group policy",
+      "fallback": "none; do not infer priority from DOM order or coordinates"
+    },
+    "layout.responsive-tracks": {
+      "status": "supported",
+      "evidence": "M12-P33 proves ResponsiveTrackPanel fixed, content, and weighted remaining tracks; Web.Forms now validates explicit track identity/orientation/gap/bounds/weight/priority metadata and generates typed panels, specs, and child-track relationships",
+      "fallback": "retain exact flex or grid lowering when source does not request responsive track semantics"
+    },
+    "motion.bounded-state-transition": {
+      "status": "supported",
+      "evidence": "GUI.Forms SplitContainer uses AnimationTimeline and bounded frame leases for inspectable 90 ms collapse-tab geometry interpolation with immediate reduced-motion substitution; Web.Forms accepts and emits bounded explicit split transition milliseconds",
+      "fallback": "immediate deterministic state transition"
+    },
+    "paint.advanced-mask-blend": {
+      "status": "unavailable",
+      "evidence": "M12-P28 explicitly excludes arbitrary masks, isolated groups, and general blend modes; the accepted four material specimens do not require them",
+      "fallback": "none; require a measured named specimen before admitting compositing breadth"
+    },
+    "paint.css-angle-gradient": {
+      "status": "supported",
+      "evidence": "MaterialFillLayer CSS-angle geometry resolves gradient-line endpoints from current rectangular bounds and is covered by a focused retained paint test",
+      "fallback": "use authored background-color"
+    },
+    "paint.linear-gradient": {
+      "status": "supported",
+      "evidence": "MaterialFillLayer, retained multi-stop linear gradients, and generated pointer/count stop construction are composed by native tree Stage 2",
+      "fallback": "none"
+    },
+    "paint.ordered-fill-layers": {
+      "status": "supported",
+      "evidence": "M12-P28 proves up to eight ordered layers and Web.Forms Stage 2 now reverses bounded CSS topmost-first gradient lists into GUI.Forms back-to-front replay over the authored solid fallback; the File Manager title, shelf, location, and status specimens are generated without application material replacement",
+      "fallback": "none when authored layer order is visually significant"
+    },
+    "paint.ordered-keylines": {
+      "status": "supported",
+      "evidence": "M12-P28 proves up to eight ordered per-edge MaterialKeyline records with color, width, inset, rounded clipping, atomic validation, inspection JSON, and cross-renderer probes; Web.Forms now validates a bounded ordered edge/color/width/inset record list and lowers it into every retained material recipe for the authored node",
+      "fallback": "one ordinary border only when no second line on an edge is authored"
+    },
+    "paint.radial-gradient": {
+      "status": "supported",
+      "evidence": "M12-P28 proves bounded elliptical radial rendering and Web.Forms Stage 2 lowers explicit percentage ellipse radii/centres and positioned stops into normalized MaterialFillLayer geometry",
+      "fallback": "use authored background-color only when the source declares that fallback acceptable"
+    },
+    "paint.repeating-linear-gradient": {
+      "status": "supported",
+      "evidence": "M12-P28 proves bounded logical-period replay and Web.Forms Stage 2 lowers an explicit CSS angle plus complete logical-pixel stop positions into one finite GUI.Forms repeat vector and normalized period",
+      "fallback": "none when the repeated filament or texture is required"
+    },
+    "paint.side-border": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial publishes independently retained square-edge borders; rounded edge joins and mixed shorthand cascade expansion remain refused",
+      "fallback": "none"
+    },
+    "paint.uniform-border": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial publishes a retained uniform MaterialBorder",
+      "fallback": "omit only when the authored width is zero"
+    },
+    "resource.local-png": {
+      "status": "supported",
+      "evidence": "GUI.Forms owns bounded window ImageRegistry registration and PNG is the sole admitted runtime decoder; Web.Forms now validates source-local canonical 1x/2x PNGs, intrinsic dimensions, count and byte budgets, includes their bytes in source identity, emits deterministic embedded ImageList registration, and binds authored image keys to controls",
+      "fallback": "none for required authored art"
+    },
+    "state.active": {
+      "status": "supported",
+      "evidence": "GUI.Forms retained pressed state selects generated owned recipes; Web.Forms bounds whole-visual translate state projection",
+      "fallback": "base style with reported state-material degradation"
+    },
+    "state.disabled": {
+      "status": "supported",
+      "evidence": "GUI.Forms retains authored/effective enabled state independently, excludes disabled controls from focus and activation, and ButtonBase selects the generated disabled visual recipe; Web.Forms emits the bounded disabled material delta",
+      "fallback": "base authored material only when source has no disabled-state visual requirement"
+    },
+    "state.focus-visible": {
+      "status": "supported",
+      "evidence": "Window retains keyboard, pointer, and semantic focus-cue modality independently of actual focus; ButtonBase and derived controls use it for authored focus outlines",
+      "fallback": "none for the bounded button focus-visible profile"
+    },
+    "state.hover": {
+      "status": "supported",
+      "evidence": "GUI.Forms retained hot state selects generated owned recipes through its existing pointer state machine",
+      "fallback": "base style with reported state-material degradation"
+    },
+    "surface.authored-material": {
+      "status": "supported",
+      "evidence": "SurfaceMaterial plus the Control authored-background hook exist, bounded construction is measured, and the experimental generator publishes exact or refused base-surface projections",
+      "fallback": "named GUI.Forms baseline role with reported loss"
+    },
+    "surface.nested-ambient-context": {
+      "status": "supported",
+      "evidence": "Stage 1 records owned and revealed edges; native tree Stage 2 applies authored layers to the same retained layout owner and clears Forms defaults before authored geometry",
+      "fallback": "none; loose overlay is rejected"
+    },
+    "transform.rotate": {
+      "status": "supported",
+      "evidence": "Control owner-decoration recipes retain bounded rotation around the CSS-default box center and recompute endpoints from live owner geometry",
+      "fallback": "none for breadcrumb chevron geometry"
+    },
+    "transform.translate": {
+      "status": "supported",
+      "evidence": "generated button recipes project one bounded logical translate as a paint-only whole-visual offset with measured outsets",
+      "fallback": "omit with reported active-state degradation"
+    },
+    "typography.bundled-font-pack": {
+      "status": "supported",
+      "evidence": "GUI.Forms registers exact-hash Carlito, Cousine, Portsmouth Rapids, Noto CJK, and Noto Emoji faces by stable role; Web.Forms admits only matching local font declarations",
+      "fallback": "none"
+    },
+    "typography.resolved-runs": {
+      "status": "supported",
+      "evidence": "M12-P30 proves renderer-neutral ResolvedTextLayout and TextMetricsProvider, exact bundled primary and fallback run families, shared measurement and paint metrics, baseline snapping, inspection, native macOS review, and Windows cross-build",
+      "fallback": "explicit estimated metrics with no fabricated family or run identity when no provider is installed"
+    },
+    "typography.retained": {
+      "status": "supported",
+      "evidence": "Label and ButtonBase retain font size, weight, italic state, letter spacing, line spacing, alignment, and bounded text case projection; Label retains foreground and wrapping",
+      "fallback": "none"
+    }
+  }
+}

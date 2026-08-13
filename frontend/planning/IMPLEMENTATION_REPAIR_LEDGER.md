@@ -3831,3 +3831,69 @@ M4 pointer/keyboard pass. Keep a row here even when a control is removed.
   for that missing evidence. Keep FM-R009/native comparison open. Continue
   read-only prototype/source auditing and automated implementation work; retry
   Screen Sharing only after the Neo Computer Use gate is manually unlocked.
+- **FM-R047 ADVANCED MASK/BLEND AUDIT / NOT REQUIRED:** The accepted File
+  Manager HTML/CSS and the generated GUI.Forms material graph require ordered
+  clipped solid/linear/radial/repeating fills, borders, keylines and
+  inset/outset shadows, but no arbitrary mask, blend mode, isolated group,
+  backdrop filter or color matrix. The pinned fidelity oracle reports zero
+  material-mismatch nodes. Do not add speculative compositing vocabulary; a
+  future accepted specimen must supply a bounded source grammar, renderer-
+  neutral semantics and cross-renderer evidence before that decision reopens.
+- **FM-R048 COMMAND OVERFLOW / GENERATED RETAINED CONTRACT:** GUI.Forms now
+  owns explicit whole-group priority collapse and publishes a stable-ID
+  `CommandOverflowSnapshot`; Web.Forms emits the panel, group extents,
+  priorities, actuator and real drop-down controls. Frontend removed its
+  duplicate shelf projection and only composes the authorized live overflow
+  menu from collapsed group IDs. Focus protection and atomic invalid metadata
+  are covered in focused tests; full M4 and MinGW gates are green.
+- **FM-R049 PHYSICAL SEAM INTERPOLATION / ACCEPTED GAP CLOSED:** The collapse
+  actuator now interpolates quiet `7 x 28`, near `9 x 34` and engaged `12 x
+  42` geometry over an authored 90 ms ease-out transition. Seam and hit bounds
+  remain fixed; only an in-flight transition owns a frame lease; reduced motion
+  and zero duration complete immediately. Web.Forms projects duration with the
+  pane geometry. Focused half-duration/completion/reduced-motion tests and the
+  complete 86-test GUI.Forms suite pass.
+- **FM-R050 STAGE 3 STATIC TOPOLOGY / POST-GENERATION REBUILD REMOVED:** The
+  authored source now contains the outer responsive tracks, three retained
+  split containers, fixed/collapse/min/max/hit/transition policy, tree header
+  slots, command presentation and title drag region. Frontend aliases the two
+  generated workspace splits and no longer clears/rebuilds the workspace or
+  inspector composition. Remaining replacement calls target explicit live
+  hosts for menu, breadcrumb, search, tree, object view, preview, property list
+  and settings/services content; those remain application state, not a visual
+  compiler gap. M4 frontend tests pass after the topology migration. Windows
+  native visual review remains separate from the green full MinGW build.
+- **FM-R051 STAGE 3 SOURCE CLOSURE / CONNECTED STOCK, KEYLINES, AND LOCAL ART:**
+  Web.Forms now validates and lowers explicit connected button topology and
+  ordered per-edge keylines. Its new PNG-only local-resource lane bounds source
+  containment, logical/intrinsic dimensions, density, count and aggregate
+  bytes; image bytes participate in the source digest; generated code embeds
+  and registers the 1x/2x variants and attaches the retained `ImageList`.
+  File Manager's eight permanent shelf/navigation icons now come from this
+  source lane, and application C++ no longer installs their image list. Dynamic
+  object/tree/preview art remains product model work. The navigation group is
+  source-authored as one connected three-button stock. Web.Forms passes 37/37;
+  GUI.Forms 86/86; frontend 11/11; complete MinGW/Skia builds and the generated
+  File Manager tree compiles under MinGW warnings-as-errors.
+- **FM-R052 FIDELITY MATRIX / MEASURED, NOT LAUNDERED:** The stable-ID oracle
+  now compares source digest, parent/kind/topology/resource identity, bounds,
+  clips, state, resolved text/baselines, semantic materials, keylines, and
+  eight actual RGBA probes per visible node. Eleven M4 profiles cover ordinary,
+  720-wide, 150x150, 125/150/200-percent text, inactive, hover, pressed,
+  focused and disabled. All profiles preserve exact source identity and
+  structure. The ordinary profile has zero state/material mismatches but 69
+  strict geometry, 23 typography and 32 raster mismatch nodes. At 150x150 the
+  native projection collapses both command groups and exposes the overflow
+  actuator; raw HTML accepts the viewport but does not execute the retained
+  priority solver, producing 31 state mismatches and five material mismatches
+  at clipped descendants. This is the remaining Stage 3 Web.Forms
+  preview-adapter question, not evidence for masks/blending or another
+  GUI.Forms primitive.
+- **FM-R053 GENERATED RESOURCE BIND ORDER / REGRESSION CAUGHT AND CLOSED:** A
+  final cleanup moved publication of `Application::window_` after generated
+  `ImageList` attachment. The full interaction campaign then segfaulted
+  consistently because attachment invalidation can synchronously enter already
+  installed application callbacks. Restoring window publication before
+  `bind_native_resources` made the focused campaign pass three consecutive
+  runs, after which the complete 11-test frontend gate passed. The ordering is
+  documented beside the call; no resource or control ownership was weakened.

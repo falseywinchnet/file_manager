@@ -58,7 +58,7 @@ def main() -> int:
         ),
     ]
     compiler = shutil.which("c++")
-    manifest = read_capabilities(ROOT / "capabilities/gui_forms_observed_001.json")
+    manifest = read_capabilities(ROOT / "capabilities/gui_forms_observed_002.json")
     print(f"environment python={platform.python_version()} system={platform.system()} machine={platform.machine()} iterations={args.iterations}")
     for name, source, styles in specimens:
         stage_one_times: list[float] = []

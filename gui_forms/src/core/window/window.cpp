@@ -546,6 +546,10 @@ void Window::set_focus_cue_visible(bool visible) {
     focus_cue_visible_ = visible;
     if (focused && (*focused).is_alive() &&
         (*focused).attached_window() == this) {
+        (*focused).on_focus_cue_changed(visible);
+    }
+    if (focused && (*focused).is_alive() &&
+        (*focused).attached_window() == this) {
         (*focused).invalidate(Dirty::paint);
     }
 }

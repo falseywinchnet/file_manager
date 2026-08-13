@@ -408,269 +408,45 @@ Application::~Application() {
 std::unique_ptr<gui_forms::Window> Application::make_window() {
     auto window = std::make_unique<gui_forms::Window>(
         form_.root_control(), gui_forms::Size{1340, 850});
+    // Image-list attachment invalidates live controls and can synchronously
+    // enter installed application callbacks; publish the owning window first.
     window_ = window.get();
+    web_forms_generated_file_manager_sapphire::bind_native_resources(
+        form_, *window_);
     install_house_art();
-    install_house_materials();
     install_accelerators();
-    subscriptions_.push_back(
-        form_.file_manager_app_shell_commands->arranged_bounds_changed().subscribe(
-            [this](const gui_forms::Rect& bounds) {
-                update_command_shelf_projection(bounds.width);
-            }));
     return window;
 }
 
 void Application::install_command_shelf_controls() {
-    const auto replace_drop_down = [](const std::shared_ptr<gui_forms::Button>& old,
-                                      const std::shared_ptr<gui_forms::FlowLayoutPanel>& owner) {
-        const auto index = owner->child_index(old->runtime_id());
-        if (!index) {
-            throw std::logic_error(
-                "generated command shelf button has no direct layout owner");
-        }
-        auto replacement = std::make_shared<gui_forms::DropDownButton>(
-            gui_forms::StableId(std::string(old->stable_id().value())),
-            old->text(), gui_forms::DropDownButtonMode::menu);
-        replacement->set_name(old->name());
-        replacement->set_requested_bounds(old->requested_bounds());
-        replacement->set_minimum_size(old->minimum_size());
-        replacement->set_maximum_size(old->maximum_size());
-        replacement->set_margin(old->margin());
-        replacement->set_content_padding(old->content_padding());
-        replacement->set_font(old->font());
-        replacement->set_text_line_spacing(old->text_line_spacing());
-        replacement->set_text_alignment(old->text_alignment());
-        replacement->set_image_alignment(old->image_alignment());
-        replacement->set_text_image_relation(old->text_image_relation());
-        replacement->set_image_gap(old->image_gap());
-        replacement->set_accessible_name(old->accessible_name());
-        replacement->set_accessible_description(old->accessible_description());
-        replacement->set_tab_index(old->tab_index());
-        replacement->set_tab_stop(old->tab_stop());
-        replacement->set_visual_style(old->visual_style());
-        replacement->set_flat_border_width(old->flat_border_width());
-        if (old->visual_recipes_override()) {
-            replacement->set_visual_recipes(*old->visual_recipes_override());
-        }
-        static_cast<void>(owner->remove_child(old->runtime_id()));
-        owner->add_child(replacement);
-        owner->set_child_index(replacement->runtime_id(), *index);
-        return replacement;
-    };
+    shelf_move_copy_button_ =
+        form_.file_manager_app_shell_commands_selection_group_actions_copy;
+    shelf_view_button_ =
+        form_.file_manager_app_shell_commands_arrange_group_actions_details;
+    shelf_sort_button_ =
+        form_.file_manager_app_shell_commands_arrange_group_actions_refresh;
+    shelf_overflow_button_ = form_.file_manager_app_shell_commands_overflow;
 
-    shelf_move_copy_button_ = replace_drop_down(
-        form_.file_manager_app_shell_commands_selection_group_actions_copy,
-        form_.file_manager_app_shell_commands_selection_group_actions);
-    form_.file_manager_app_shell_commands_selection_group_actions_copy =
-        shelf_move_copy_button_;
-    shelf_view_button_ = replace_drop_down(
-        form_.file_manager_app_shell_commands_arrange_group_actions_details,
-        form_.file_manager_app_shell_commands_arrange_group_actions);
-    form_.file_manager_app_shell_commands_arrange_group_actions_details =
-        shelf_view_button_;
-    shelf_sort_button_ = replace_drop_down(
-        form_.file_manager_app_shell_commands_arrange_group_actions_refresh,
-        form_.file_manager_app_shell_commands_arrange_group_actions);
-    form_.file_manager_app_shell_commands_arrange_group_actions_refresh =
-        shelf_sort_button_;
-
-    for (const auto& button : {shelf_move_copy_button_, shelf_view_button_,
-                               shelf_sort_button_}) {
-        button->set_drop_down_width(16.0);
-    }
-    shelf_move_copy_button_->set_text("Move / copy");
-    shelf_view_button_->set_text("View");
     shelf_view_button_->set_accessible_description(
         "Current presentation: Small icons. Choose the object presentation");
-    shelf_sort_button_->set_text("Sort: Name");
-
-    shelf_overflow_button_ = std::make_shared<gui_forms::DropDownButton>(
-        gui_forms::StableId("fm.shelf.more"), "More",
-        gui_forms::DropDownButtonMode::menu);
-    shelf_overflow_button_->set_name("fm.shelf.more");
-    shelf_overflow_button_->set_requested_bounds({0, 0, 72, 43});
-    shelf_overflow_button_->set_minimum_size({72, 43});
-    shelf_overflow_button_->set_maximum_size({0, 43});
-    shelf_overflow_button_->set_visible(false);
     shelf_overflow_button_->set_accessible_name("More command shelf actions");
     shelf_overflow_button_->set_accessible_description(
         "Shows shelf commands hidden by the current window width");
-    form_.file_manager_app_shell_commands->add_child(shelf_overflow_button_);
     form_.file_manager_app_shell_commands_selection_group->set_accessible_name(
         "Selection commands");
     form_.file_manager_app_shell_commands_arrange_group->set_accessible_name(
         "Arrange and inspect commands");
 
-    // Web.Forms authored the two Office Pearl group widths before content-aware
-    // collapse was available. Preserve that ordinary-width geography; the
-    // explicit projection below removes whole lower-priority groups before a
-    // narrow surface can clip them.
-    form_.file_manager_app->set_minimum_size({150, 150});
-    form_.file_manager_app_shell->set_minimum_size({0, 150});
-    form_.file_manager_app_shell_commands_selection_group->set_minimum_size({176, 60});
-    form_.file_manager_app_shell_commands_selection_group->set_auto_size_mode(
-        gui_forms::AutoSizeMode::grow_only);
-    form_.file_manager_app_shell_commands_selection_group->set_requested_bounds(
-        {0, 0, 176, 60});
-    form_.file_manager_app_shell_commands_arrange_group->set_minimum_size({306, 60});
-    form_.file_manager_app_shell_commands_arrange_group->set_auto_size_mode(
-        gui_forms::AutoSizeMode::grow_only);
-    form_.file_manager_app_shell_commands_arrange_group->set_requested_bounds(
-        {0, 0, 306, 60});
 }
 
 void Application::install_house_art() {
     if (!window_) return;
     object_images_ = house_art::make_image_list(*window_, 42.0);
     tree_images_ = house_art::make_image_list(*window_, 17.0);
-    command_images_ = house_art::make_image_list(*window_, 28.0);
     preview_images_ = house_art::make_image_list(*window_, 72.0);
     objects_->set_image_list(object_images_);
     tree_->set_image_list(tree_images_);
     preview_house_icon_->set_image_list(preview_images_);
-
-    const auto image_button = [this](
-        const std::shared_ptr<gui_forms::Button>& button,
-        const house_art::Icon icon,
-        const gui_forms::TextImageRelation relation =
-            gui_forms::TextImageRelation::image_above_text) {
-        button->set_image_list(command_images_);
-        button->set_image_key(std::string(house_art::key(icon)));
-        button->set_text_image_relation(relation);
-        button->set_image_gap(1.0);
-        button->set_image_alignment(gui_forms::ContentAlignment::middle_center);
-        button->set_text_alignment(gui_forms::ContentAlignment::middle_center);
-        button->set_content_padding(
-            std::dynamic_pointer_cast<gui_forms::DropDownButton>(button)
-                ? gui_forms::Insets{5.0, 2.0, 21.0, 2.0}
-                : gui_forms::Insets{5.0, 2.0, 5.0, 2.0});
-    };
-    image_button(form_.file_manager_app_shell_commands_selection_group_actions_copy,
-                 house_art::Icon::transfer);
-    image_button(form_.file_manager_app_shell_commands_selection_group_actions_delete,
-                 house_art::Icon::remove);
-    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_details,
-                 house_art::Icon::view);
-    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_refresh,
-                 house_art::Icon::sort);
-    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_settings,
-                 house_art::Icon::properties);
-    image_button(form_.file_manager_app_shell_location_navigation_back,
-                 house_art::Icon::back,
-                 gui_forms::TextImageRelation::overlay);
-    image_button(form_.file_manager_app_shell_location_navigation_forward,
-                 house_art::Icon::forward,
-                 gui_forms::TextImageRelation::overlay);
-    image_button(form_.file_manager_app_shell_location_navigation_up,
-                 house_art::Icon::up,
-                 gui_forms::TextImageRelation::overlay);
-    for (const auto& button : {
-             form_.file_manager_app_shell_location_navigation_back,
-             form_.file_manager_app_shell_location_navigation_forward,
-             form_.file_manager_app_shell_location_navigation_up}) {
-        button->set_text({});
-    }
-
-    if (command_images_->contains_key(house_art::key(house_art::Icon::app))) {
-        auto mark = std::make_shared<HouseImage>(
-            gui_forms::StableId("fm.house.application-mark"), "File Manager");
-        mark->set_requested_bounds({0.0, 0.0, 30.0, 30.0});
-        mark->set_minimum_size({30.0, 30.0});
-        mark->set_maximum_size({30.0, 30.0});
-        mark->set_image_list(command_images_);
-        mark->set_image_key(std::string(house_art::key(house_art::Icon::app)));
-        mark->set_image_alignment(gui_forms::ContentAlignment::middle_center);
-        mark->set_text_image_relation(gui_forms::TextImageRelation::overlay);
-        mark->set_content_padding({4.0, 4.0, 4.0, 4.0});
-        mark->set_visual_style(gui_forms::ButtonVisualStyle::flat);
-        mark->set_flat_border_width(0.0);
-        mark->set_style(transparent_image_style());
-
-        // The compiled HTML mark is a nested flow-label projection. Its child
-        // currently receives a native slot but does not paint. Put the House
-        // image directly in the title flow so the mark is a real retained
-        // surface and preserve the authored title/service geometry around it.
-        const auto& title = form_.file_manager_app_shell_title;
-        title->clear_children();
-        // The macOS full-size-content host keeps native traffic lights over
-        // the retained title material. Reserve their conventional leading
-        // space while preserving the 40 pt authored title band as the window
-        // drag backdrop. Decorative descendants pass hit testing back to it.
-        title->set_padding({76.0, 0.0, 8.0, 0.0});
-        title->add_child(mark);
-        form_.file_manager_app_shell_title_copy->set_hit_test_transparent(true);
-        title->add_child(form_.file_manager_app_shell_title_copy);
-        title->set_flex_grow(*form_.file_manager_app_shell_title_copy, 1.0);
-        title->add_child(form_.file_manager_app_shell_title_service);
-    }
-}
-
-void Application::install_house_materials() {
-    using gui_forms::Color;
-    using gui_forms::GradientStop;
-    using gui_forms::MaterialCoordinateSpace;
-    using gui_forms::MaterialFillLayer;
-    using gui_forms::SurfaceMaterial;
-
-    SurfaceMaterial title;
-    title.fills = {
-        MaterialFillLayer::linear_css_angle(92.0, std::vector<GradientStop>{
-            {0.0, Color::rgba(23, 52, 127)},
-            {0.32, Color::rgba(40, 91, 181)},
-            {0.58, Color::rgba(58, 104, 203)},
-            {0.78, Color::rgba(135, 98, 180)},
-            {1.0, Color::rgba(217, 104, 114)}}),
-        MaterialFillLayer::radial({0.18, -0.9}, {0.42, 1.25},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(146, 217, 255, 116)},
-                {1.0, Color::rgba(146, 217, 255, 0)}}),
-        MaterialFillLayer::radial({0.62, 1.6}, {0.38, 1.1},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(214, 178, 255, 106)},
-                {1.0, Color::rgba(214, 178, 255, 0)}}),
-        MaterialFillLayer::radial({0.95, 1.0}, {0.26, 0.78},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(255, 195, 142, 100)},
-                {1.0, Color::rgba(255, 195, 142, 0)}}),
-    };
-    form_.file_manager_app_shell_title->set_authored_surface_material(
-        std::move(title));
-
-    SurfaceMaterial shelf;
-    shelf.fills = {
-        MaterialFillLayer::linear({0.0, 0.0}, {0.0, 1.0},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(255, 255, 255)},
-                {0.56, Color::rgba(244, 247, 250)},
-                {1.0, Color::rgba(213, 225, 235)}}),
-        MaterialFillLayer::radial({0.15, -0.2}, {0.34, 0.85},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(214, 243, 255, 128)},
-                {1.0, Color::rgba(214, 243, 255, 0)}}),
-    };
-    form_.file_manager_app_shell_commands->set_authored_surface_material(
-        std::move(shelf));
-
-    SurfaceMaterial graphite;
-    graphite.fills = {
-        MaterialFillLayer::linear({0.0, 0.0}, {0.0, 1.0},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(98, 108, 115)},
-                {0.52, Color::rgba(75, 84, 90)},
-                {1.0, Color::rgba(66, 74, 79)}}),
-        MaterialFillLayer::repeating_linear(
-            {0.0, 0.0}, {3.0, 3.0},
-            std::vector<GradientStop>{
-                {0.0, Color::rgba(255, 255, 255, 10)},
-                {0.33, Color::rgba(255, 255, 255, 10)},
-                {0.34, Color::rgba(255, 255, 255, 0)},
-                {1.0, Color::rgba(255, 255, 255, 0)}},
-            MaterialCoordinateSpace::logical),
-    };
-    form_.file_manager_app_shell_location->set_authored_surface_material(
-        graphite);
-    form_.file_manager_app_shell_status->set_authored_surface_material(
-        std::move(graphite));
 }
 
 void Application::install_dynamic_controls() {
@@ -705,7 +481,6 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_location_search_host->add_child(search_box_);
     form_.file_manager_app_shell_location_search_host->set_flex_grow(*search_box_, 1.0);
 
-    form_.file_manager_app_shell_workspace_sidebar_label->set_text("FOLDERS");
     tree_root_mode_button_ = std::make_shared<gui_forms::DropDownButton>(
         gui_forms::StableId("fm.navigation.root-mode"), "Home-rooted",
         gui_forms::DropDownButtonMode::menu);
@@ -719,50 +494,14 @@ void Application::install_dynamic_controls() {
     tree_root_mode_button_->set_accessible_name("Folder tree root mode");
     tree_root_mode_button_->set_accessible_description(
         "Switch immediately between the honest Home and Volumes trees");
-
-    auto tree_header = std::make_shared<gui_forms::TableLayoutPanel>(
-        gui_forms::StableId("fm.navigation.header"));
-    tree_header->set_column_count(2);
-    tree_header->set_row_count(1);
-    tree_header->set_column_style(
-        0, {gui_forms::TableSizeMode::percent, 100.0});
-    tree_header->set_column_style(
-        1, {gui_forms::TableSizeMode::absolute, 112.0});
-    tree_header->set_row_style(
-        0, {gui_forms::TableSizeMode::absolute, 27.0});
-    tree_header->set_grow_style(gui_forms::TableLayoutGrowStyle::fixed_size);
-    tree_header->set_requested_bounds({0, 0, 218, 27});
-    tree_header->set_minimum_size({0, 27});
-    tree_header->set_maximum_size({0, 27});
-    tree_header->set_margin({0, 0, 0, 0});
-    tree_header->set_padding({0, 0, 0, 0});
-
-    const auto& tree_caption =
-        form_.file_manager_app_shell_workspace_sidebar_label;
-    const auto removed_caption =
-        form_.file_manager_app_shell_workspace_sidebar->remove_child(
-            tree_caption->runtime_id());
-    if (!removed_caption) {
-        throw std::logic_error("authored folder caption has no sidebar owner");
-    }
-    tree_caption->set_dock(gui_forms::DockStyle::fill);
-    tree_caption->set_margin({0, 0, 0, 0});
     tree_root_mode_button_->set_dock(gui_forms::DockStyle::fill);
-    tree_root_mode_button_->set_margin({0, 0, 0, 0});
-    tree_header->add_child(tree_caption);
-    tree_header->set_cell_position(*tree_caption, {0, 0});
-    tree_header->add_child(tree_root_mode_button_);
-    tree_header->set_cell_position(*tree_root_mode_button_, {1, 0});
-    form_.file_manager_app_shell_workspace_sidebar->clear_children();
-    form_.file_manager_app_shell_workspace_sidebar->add_child(tree_header);
-    form_.file_manager_app_shell_workspace_sidebar->add_child(
-        form_.file_manager_app_shell_workspace_sidebar_root);
-    form_.file_manager_app_shell_workspace_sidebar->add_child(
-        form_.file_manager_app_shell_workspace_sidebar_parent);
-    form_.file_manager_app_shell_workspace_sidebar->add_child(
-        form_.file_manager_app_shell_workspace_sidebar_tree_label);
-    form_.file_manager_app_shell_workspace_sidebar->add_child(
-        form_.file_manager_app_shell_workspace_sidebar_tree_host);
+    tree_root_mode_button_->set_margin({});
+    form_.file_manager_app_shell_workspace_sidebar_header_root_mode_host
+        ->clear_children();
+    form_.file_manager_app_shell_workspace_sidebar_header_root_mode_host
+        ->add_child(tree_root_mode_button_);
+    form_.file_manager_app_shell_workspace_sidebar_header_root_mode_host
+        ->set_flex_grow(*tree_root_mode_button_, 1.0);
     form_.file_manager_app_shell_workspace_sidebar->set_flex_grow(
         *form_.file_manager_app_shell_workspace_sidebar_tree_host, 1.0);
 
@@ -856,9 +595,9 @@ void Application::install_dynamic_controls() {
     content_surface_->add_child(criteria_console_);
     content_surface_->add_child(objects_);
     content_surface_->add_child(correspondence_);
-    form_.file_manager_app_shell_workspace_content_objects->clear_children();
-    form_.file_manager_app_shell_workspace_content_objects->add_child(content_surface_);
-    form_.file_manager_app_shell_workspace_content_objects->set_flex_grow(
+    form_.file_manager_app_shell_workspace_selection_content_objects->clear_children();
+    form_.file_manager_app_shell_workspace_selection_content_objects->add_child(content_surface_);
+    form_.file_manager_app_shell_workspace_selection_content_objects->set_flex_grow(
         *content_surface_, 1.0);
 
     preview_picture_ = std::make_shared<gui_forms::PictureBox>(
@@ -891,18 +630,18 @@ void Application::install_dynamic_controls() {
     preview_house_icon_->set_flat_border_width(0.0);
     preview_house_icon_->set_style(transparent_image_style());
     preview_house_icon_->set_visible(false);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->clear_children();
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->clear_children();
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->add_child(
         preview_picture_);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->add_child(
         preview_text_);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->add_child(
         preview_house_icon_);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->add_child(
-        form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph);
-    form_.file_manager_app_shell_workspace_inspector_preview->set_minimum_size(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->add_child(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview->set_minimum_size(
         {0, 224});
-    form_.file_manager_app_shell_workspace_inspector_preview_surface->set_minimum_size(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface->set_minimum_size(
         {0, 174});
 
     rename_box_ = std::make_shared<gui_forms::TextBox>(
@@ -951,72 +690,26 @@ void Application::install_dynamic_controls() {
     expected_checksum_box_->set_maximum_length(64);
     expected_checksum_box_->set_placeholder_text("64 hexadecimal characters (optional)");
     expected_checksum_box_->set_enabled(false);
-    form_.file_manager_app_shell_workspace_inspector_facts->clear_children();
-    inspector_surface_ = std::make_shared<gui_forms::Panel>(
-        gui_forms::StableId("fm.selection.surface"));
-    inspector_surface_->set_background(gui_forms::Color::rgba(235, 240, 246));
-    inspector_surface_->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace_inspector_label->set_dock(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts->clear_children();
+    form_.file_manager_app_shell_workspace_selection_inspector_label->set_dock(
         gui_forms::DockStyle::top);
-    form_.file_manager_app_shell_workspace_inspector_label->set_minimum_size({0, 27});
-    form_.file_manager_app_shell_workspace_inspector_preview->set_dock(
+    form_.file_manager_app_shell_workspace_selection_inspector_label->set_minimum_size({0, 27});
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview->set_dock(
         gui_forms::DockStyle::top);
-    form_.file_manager_app_shell_workspace_inspector_preview->set_requested_bounds(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview->set_requested_bounds(
         {0, 0, 288, 224});
     property_list_->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace_inspector->clear_children();
     property_list_->set_header_content(
-        form_.file_manager_app_shell_workspace_inspector_preview, 224.0);
-    inspector_surface_->add_child(
-        form_.file_manager_app_shell_workspace_inspector_label);
-    inspector_surface_->add_child(property_list_);
-    form_.file_manager_app_shell_workspace_inspector->add_child(inspector_surface_);
-    form_.file_manager_app_shell_workspace_inspector->set_flex_grow(
-        *inspector_surface_, 1.0);
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview, 224.0);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts->add_child(
+        property_list_);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts->set_flex_grow(
+        *property_list_, 1.0);
+    form_.file_manager_app_shell_workspace_selection_inspector->set_flex_grow(
+        *form_.file_manager_app_shell_workspace_selection_inspector_facts, 1.0);
 
-    workspace_split_ = std::make_shared<gui_forms::SplitContainer>(
-        gui_forms::StableId("fm.workspace.folder-tree"));
-    workspace_split_->initialize_control_tree();
-    workspace_split_->set_splitter_width(3.0);
-    workspace_split_->set_splitter_hit_width(12.0);
-    workspace_split_->set_splitter_distance(218.0);
-    workspace_split_->set_collapse_panel(gui_forms::SplitFixedPanel::first);
-    workspace_split_->set_automatic_collapse_threshold(700.0);
-    workspace_split_->set_first_minimum(150.0);
-    workspace_split_->set_first_maximum(360.0);
-    workspace_split_->set_second_minimum(320.0);
-
-    selection_split_ = std::make_shared<gui_forms::SplitContainer>(
-        gui_forms::StableId("fm.workspace.selection"));
-    selection_split_->initialize_control_tree();
-    selection_split_->set_splitter_width(3.0);
-    selection_split_->set_splitter_hit_width(12.0);
-    selection_split_->set_splitter_distance(790.0);
-    selection_split_->set_fixed_panel(gui_forms::SplitFixedPanel::second);
-    selection_split_->set_collapse_panel(gui_forms::SplitFixedPanel::second);
-    selection_split_->set_automatic_collapse_threshold(900.0);
-    selection_split_->set_first_minimum(260.0);
-    selection_split_->set_second_minimum(248.0);
-    selection_split_->set_second_maximum(420.0);
-
-    form_.file_manager_app_shell_workspace_sidebar->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace_content->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace_inspector->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace->clear_children();
-    workspace_split_->first_panel()->add_child(
-        form_.file_manager_app_shell_workspace_sidebar);
-    selection_split_->first_panel()->add_child(
-        form_.file_manager_app_shell_workspace_content);
-    selection_split_->second_panel()->add_child(
-        form_.file_manager_app_shell_workspace_inspector);
-    selection_split_->set_dock(gui_forms::DockStyle::fill);
-    workspace_split_->second_panel()->add_child(selection_split_);
-    workspace_split_->set_dock(gui_forms::DockStyle::fill);
-    form_.file_manager_app_shell_workspace->add_child(workspace_split_);
-    form_.file_manager_app_shell_workspace->set_cell_position(
-        *workspace_split_, {0U, 0U});
-    form_.file_manager_app_shell_workspace->set_column_span(
-        *workspace_split_, 5U);
+    workspace_split_ = form_.file_manager_app_shell_workspace;
+    selection_split_ = form_.file_manager_app_shell_workspace_selection;
 
     form_.file_manager_app_shell_commands_new_folder->set_enabled(
         operations_ != nullptr);
@@ -1025,9 +718,9 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_commands_move->set_enabled(false);
     form_.file_manager_app_shell_commands_paste->set_enabled(false);
     form_.file_manager_app_shell_commands_selection_group_actions_delete->set_enabled(false);
-    form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(false);
-    form_.file_manager_app_shell_workspace_inspector_commands_open->set_enabled(false);
-    form_.file_manager_app_shell_workspace_inspector_commands_checksum->set_enabled(false);
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results->set_enabled(false);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_open->set_enabled(false);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum->set_enabled(false);
     form_.file_manager_app_shell_settings->set_visible(false);
     form_.file_manager_app_shell_settings_actions_apply->set_enabled(false);
     form_.file_manager_app_shell_settings_actions_cancel->set_enabled(false);
@@ -1075,11 +768,11 @@ void Application::install_dynamic_controls() {
              std::static_pointer_cast<gui_forms::Control>(
                  form_.file_manager_app_shell_workspace_sidebar_tree_label),
              std::static_pointer_cast<gui_forms::Control>(
-                 form_.file_manager_app_shell_workspace_inspector_facts_label),
+                 form_.file_manager_app_shell_workspace_selection_inspector_facts_label),
              std::static_pointer_cast<gui_forms::Control>(
-                 form_.file_manager_app_shell_workspace_inspector_commands_label),
+                 form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_label),
              std::static_pointer_cast<gui_forms::Control>(
-                 form_.file_manager_app_shell_workspace_inspector_commands)}) {
+                 form_.file_manager_app_shell_workspace_selection_inspector_facts_commands)}) {
         legacy->set_visible(false);
     }
     form_.file_manager_app_shell_commands_arrange_group_actions_settings->set_accessible_description(
@@ -1104,7 +797,7 @@ void Application::install_dynamic_controls() {
         operations_ ? "Two-step recoverable quarantine; never permanent deletion"
                     : mutation_description);
 
-    form_.file_manager_app_shell_workspace_content_heading->set_visible(false);
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_visible(false);
     rebuild_breadcrumb();
     install_command_surfaces();
 }
@@ -1131,36 +824,19 @@ void Application::show_menu(
     menu->show(owner, {bounds.x, bounds.y + bounds.height});
 }
 
-void Application::update_command_shelf_projection(
-    const double available_width) {
-    constexpr std::uint8_t full = 0U;
-    constexpr std::uint8_t selection_and_more = 1U;
-    constexpr std::uint8_t more_only = 2U;
-    const std::uint8_t next = available_width >= 530.0
-        ? full : available_width >= 280.0 ? selection_and_more : more_only;
-    if (command_shelf_projection_ == next) return;
-    command_shelf_projection_ = next;
-
-    const bool show_selection = next != more_only;
-    const bool show_arrange = next == full;
-    form_.file_manager_app_shell_commands_selection_group->set_visible(
-        show_selection);
-    form_.file_manager_app_shell_commands_arrange_group->set_visible(show_arrange);
-    shelf_overflow_button_->set_visible(next != full);
-    shelf_overflow_button_->set_text(next == more_only ? "Commands" : "More");
-    shelf_overflow_button_->set_accessible_description(
-        next == more_only
-            ? "Shows all permanent command shelf actions at this window width"
-            : "Shows Arrange and Inspect commands hidden by this window width");
-    if (shelf_overflow_menu_ && shelf_overflow_menu_->is_open()) {
-        shelf_overflow_menu_->close();
-    }
-}
-
 void Application::show_command_shelf_overflow() {
     using gui_forms::MenuItemKind;
     std::vector<gui_forms::MenuItemSpec> items;
-    if (command_shelf_projection_ == 2U) {
+    const gui_forms::CommandOverflowSnapshot projection =
+        form_.file_manager_app_shell_commands->layout_snapshot();
+    const bool selection_collapsed = std::any_of(
+        projection.groups.begin(), projection.groups.end(),
+        [](const gui_forms::CommandOverflowGroupResult& group) {
+            return group.stable_id ==
+                       "file-manager-app.shell.commands.selection-group" &&
+                   group.collapsed;
+        });
+    if (selection_collapsed) {
         items.push_back({"move-copy", MenuItemKind::submenu, {}, "Move / copy", {
             {"copy", MenuItemKind::command, command_copy_},
             {"move", MenuItemKind::command, command_move_},
@@ -2241,19 +1917,19 @@ void Application::install_handlers() {
           execute(command_delete_, "fm.button.selection.delete"));
     click(form_.file_manager_app_shell_commands_arrange_group_actions_settings,
           execute(command_properties_, "fm.button.view.properties"));
-    click(form_.file_manager_app_shell_workspace_content_heading_more_results,
+    click(form_.file_manager_app_shell_workspace_selection_content_heading_more_results,
           [this] {
               if (criteria_showing_) request_engine_criteria(true);
               else request_engine_search(true);
           });
     click(criteria_add_button_, [this] { add_criteria_module(); });
-    click(form_.file_manager_app_shell_workspace_inspector_commands_open,
+    click(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_open,
           execute(command_open_, "fm.button.file.open"));
-    click(form_.file_manager_app_shell_workspace_inspector_commands_checksum,
+    click(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum,
           execute(command_checksum_, "fm.button.commands.sha256"));
-    click(form_.file_manager_app_shell_workspace_inspector_commands_terminal,
+    click(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_terminal,
           execute(command_terminal_, "fm.button.commands.terminal"));
-    click(form_.file_manager_app_shell_workspace_inspector_commands_copy_path,
+    click(form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_copy_path,
           execute(command_copy_path_, "fm.button.commands.copy-path"));
     click(form_.file_manager_app_shell_settings_actions_back,
           [this] { hide_settings(); });
@@ -3278,11 +2954,11 @@ void Application::apply_runtime_settings() {
             *settings_snapshot_, "appearance.reduce_motion").value_or(false);
         window_->set_presentation_settings(presentation);
     }
-    form_.file_manager_app_shell_workspace_inspector_commands_checksum
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum
         ->set_visible(checksum_visible_);
-    form_.file_manager_app_shell_workspace_inspector_commands_expected_host
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_expected_host
         ->set_visible(checksum_visible_);
-    form_.file_manager_app_shell_workspace_inspector_commands_terminal
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_terminal
         ->set_visible(terminal_visible_);
     const auto default_view = setting_as<std::string>(
         *settings_snapshot_, "navigation.default_view").value_or("icons");
@@ -3314,7 +2990,7 @@ void Application::request_navigation(std::filesystem::path path,
     search_cursor_.reset();
     criteria_cursor_.reset();
     search_order_.clear();
-    form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(false);
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results->set_enabled(false);
     if (search_showing_) {
         search_showing_ = false;
         filter_.clear();
@@ -3386,11 +3062,11 @@ void Application::apply_directory(DirectorySnapshot snapshot,
     correspondence_->set_visible(false);
     criteria_console_->set_visible(false);
     objects_->set_visible(true);
-    form_.file_manager_app_shell_workspace_content_heading->set_visible(false);
-    form_.file_manager_app_shell_workspace_content_heading->set_minimum_size({0, 0});
-    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_visible(false);
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_minimum_size({0, 0});
+    form_.file_manager_app_shell_workspace_selection_content_heading_copy_title->set_text(
         leaf_name(location_));
-    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_count->set_text(
         std::to_string(snapshot.entries.size()) +
         (snapshot.entries.size() == 1 ? " object" : " objects"));
 
@@ -3658,11 +3334,11 @@ void Application::prepare_criteria_surface() {
     objects_->set_visible(true);
     criteria_showing_ = true;
     criteria_console_->set_visible(true);
-    form_.file_manager_app_shell_workspace_content_heading->set_minimum_size({0, 27});
-    form_.file_manager_app_shell_workspace_content_heading->set_visible(true);
-    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_minimum_size({0, 27});
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_visible(true);
+    form_.file_manager_app_shell_workspace_selection_content_heading_copy_title->set_text(
         "Criteria · " + leaf_name(location_));
-    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_count->set_text(
         "waiting for committed catalogue");
     update_criteria_action_state();
     update_mutation_controls();
@@ -3810,9 +3486,9 @@ void Application::request_engine_criteria(const bool next_page) {
         objects_->set_items({});
         objects_->clear_selection();
         update_selection({});
-        form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+        form_.file_manager_app_shell_workspace_selection_content_heading_count->set_text(
             "invalid or disabled criteria");
-        form_.file_manager_app_shell_workspace_content_heading_more_results
+        form_.file_manager_app_shell_workspace_selection_content_heading_more_results
             ->set_enabled(false);
         update_command_state();
         set_status("Criteria not applied",
@@ -3825,7 +3501,7 @@ void Application::request_engine_criteria(const bool next_page) {
         return;
     }
     criteria_loading_ = true;
-    form_.file_manager_app_shell_workspace_content_heading_more_results
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results
         ->set_enabled(false);
     update_command_state();
     const auto engine_root_id = engine_root_id_;
@@ -3863,7 +3539,7 @@ void Application::request_engine_criteria(const bool next_page) {
             self->post_ui([self, generation, message] {
                 if (generation != self->search_generation_.load()) return;
                 self->criteria_loading_ = false;
-                self->form_.file_manager_app_shell_workspace_content_heading_more_results
+                self->form_.file_manager_app_shell_workspace_selection_content_heading_more_results
                     ->set_enabled(self->criteria_cursor_.has_value());
                 self->update_command_state();
                 self->set_status("Criteria unavailable", message);
@@ -3892,7 +3568,7 @@ void Application::request_engine_search(const bool next_page) {
         search_order_.clear();
     }
     search_loading_ = true;
-    form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(false);
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results->set_enabled(false);
     update_command_state();
     const auto engine_root_id = engine_root_id_;
     auto relative = std::filesystem::relative(location_, protected_root_).generic_string();
@@ -3926,7 +3602,7 @@ void Application::request_engine_search(const bool next_page) {
             self->post_ui([self, generation, message] {
                 if (generation != self->search_generation_.load()) return;
                 self->search_loading_ = false;
-                self->form_.file_manager_app_shell_workspace_content_heading_more_results
+                self->form_.file_manager_app_shell_workspace_selection_content_heading_more_results
                     ->set_enabled(self->search_cursor_.has_value());
                 self->update_command_state();
                 self->set_status("Search unavailable", message);
@@ -3944,7 +3620,7 @@ void Application::apply_engine_criteria(
     criteria_loading_ = false;
     if (page.source != "catalogue") {
         criteria_cursor_.reset();
-        form_.file_manager_app_shell_workspace_content_heading_more_results
+        form_.file_manager_app_shell_workspace_selection_content_heading_more_results
             ->set_enabled(false);
         update_command_state();
         set_status("Criteria source refused",
@@ -4023,11 +3699,11 @@ void Application::apply_engine_criteria(
         update_selection({});
     }
     criteria_cursor_ = std::move(page.cursor);
-    form_.file_manager_app_shell_workspace_content_heading_more_results
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results
         ->set_enabled(!page.complete && criteria_cursor_.has_value());
-    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_copy_title->set_text(
         "Criteria · " + leaf_name(location_));
-    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_count->set_text(
         std::to_string(entries_.size()) +
         (entries_.size() == 1U ? " object" : " objects"));
     criteria_title_->set_text(
@@ -4164,8 +3840,8 @@ void Application::apply_engine_search(
     correspondence_->set_items(std::move(correspondence_items));
     objects_->set_visible(false);
     correspondence_->set_visible(true);
-    form_.file_manager_app_shell_workspace_content_heading->set_minimum_size({0, 27});
-    form_.file_manager_app_shell_workspace_content_heading->set_visible(true);
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_minimum_size({0, 27});
+    form_.file_manager_app_shell_workspace_selection_content_heading->set_visible(true);
     std::vector<std::string> retained_selection;
     for (const auto& stable_id : previous_selection) {
         if (entries_.contains(stable_id)) retained_selection.push_back(stable_id);
@@ -4179,11 +3855,11 @@ void Application::apply_engine_search(
         update_selection({});
     }
     search_cursor_ = std::move(page.cursor);
-    form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(
+    form_.file_manager_app_shell_workspace_selection_content_heading_more_results->set_enabled(
         !page.complete && search_cursor_.has_value());
-    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_copy_title->set_text(
         "Search · " + query);
-    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+    form_.file_manager_app_shell_workspace_selection_content_heading_count->set_text(
         std::to_string(entries_.size()) +
         (entries_.size() == 1 ? " result" : " results"));
     update_mutation_controls();
@@ -4228,7 +3904,7 @@ void Application::reset_preview() {
     preview_text_->set_text({});
     preview_text_->set_visible(false);
     preview_house_icon_->set_visible(false);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
         ->set_visible(true);
 }
 
@@ -4240,15 +3916,15 @@ void Application::request_preview(const DirectoryEntry& entry) {
     preview_house_icon_->set_accessible_name(
         kind_text(entry) + " material icon");
     preview_house_icon_->set_visible(true);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
         ->set_visible(false);
     if (!builtin_previews_enabled_) {
-        form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
             kind_text(entry) + " · built-in preview disabled");
         return;
     }
     if (entry.directory || entry.kind == EntryKind::symlink) return;
-    form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
         kind_text(entry) + " · loading preview…");
     const auto root = navigation_root_;
     post_worker([self = shared_from_this(), root, entry, generation] {
@@ -4279,9 +3955,9 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
     if (result.kind == PreviewKind::text) {
         preview_text_->set_text(std::move(result.text_utf8));
         preview_text_->set_visible(true);
-        form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
             ->set_visible(false);
-        form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
             kind_text(*selected) + " · bounded UTF-8 preview");
         return;
     }
@@ -4291,9 +3967,9 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
             preview_image_id_ = loaded.image;
             preview_picture_->set_image(loaded.image);
             preview_picture_->set_visible(true);
-            form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+            form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
                 ->set_visible(false);
-            form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+            form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
                 "Image · bounded PNG preview");
             return;
         }
@@ -4305,9 +3981,9 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
     preview_house_icon_->set_accessible_name(
         kind_text(*selected) + " material icon");
     preview_house_icon_->set_visible(true);
-    form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
         ->set_visible(false);
-    form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
         kind_text(*selected) + " · " + result.message);
 }
 
@@ -4318,7 +3994,7 @@ void Application::update_selection(const std::string_view stable_id) {
     if (checksum_in_flight_) {
         checksum_generation_.fetch_add(1);
         checksum_in_flight_ = false;
-        form_.file_manager_app_shell_workspace_inspector_commands_checksum
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum
             ->set_text("SHA-256");
     }
     update_mutation_controls();
@@ -4326,11 +4002,11 @@ void Application::update_selection(const std::string_view stable_id) {
         preview_generation_.fetch_add(1);
         reset_preview();
         const auto count = objects_->selected_ids().size();
-        form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
             ->set_text("MULTI");
-        form_.file_manager_app_shell_workspace_inspector_preview_name->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name->set_text(
             std::to_string(count) + " objects selected");
-        form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
             "Properties with multiple values are not synthesized");
         property_list_->set_value("fm.property.name", "—");
         if (const auto editor = property_list_->editor("fm.property.name")) {
@@ -4347,15 +4023,15 @@ void Application::update_selection(const std::string_view stable_id) {
     if (found == entries_.end()) {
         preview_generation_.fetch_add(1);
         reset_preview();
-        form_.file_manager_app_shell_workspace_inspector_preview_surface_glyph
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_surface_glyph
             ->set_text("—");
-        form_.file_manager_app_shell_workspace_inspector_preview_name->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name->set_text(
             "Nothing selected");
-        form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
             "Choose an item to inspect it");
-        form_.file_manager_app_shell_workspace_inspector_facts_path->set_text("Path · —");
-        form_.file_manager_app_shell_workspace_inspector_facts_size->set_text("Size · —");
-        form_.file_manager_app_shell_workspace_inspector_facts_modified->set_text(
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_path->set_text("Path · —");
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_size->set_text("Size · —");
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_modified->set_text(
             "Modified · —");
         property_list_->set_value("fm.property.name", "—");
         if (const auto editor = property_list_->editor("fm.property.name")) {
@@ -4369,14 +4045,14 @@ void Application::update_selection(const std::string_view stable_id) {
         return;
     }
     const auto& entry = found->second;
-    form_.file_manager_app_shell_workspace_inspector_preview_name->set_text(entry.name);
-    form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_name->set_text(entry.name);
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_preview_kind->set_text(
         kind_text(entry));
-    form_.file_manager_app_shell_workspace_inspector_facts_path->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_path->set_text(
         "Path · " + entry.path.string());
-    form_.file_manager_app_shell_workspace_inspector_facts_size->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_size->set_text(
         "Size · " + entry.secondary_text);
-    form_.file_manager_app_shell_workspace_inspector_facts_modified->set_text(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_modified->set_text(
         "Modified · " + entry.modified_text);
     property_list_->set_value("fm.property.name", entry.name);
     property_list_->set_value("fm.property.kind", kind_text(entry));
@@ -4406,15 +4082,15 @@ void Application::update_mutation_controls() {
         pending_transfer_->entry.path.parent_path() != location_);
     form_.file_manager_app_shell_commands_selection_group_actions_delete->set_enabled(
         available && one_selected);
-    form_.file_manager_app_shell_workspace_inspector_commands_open->set_enabled(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_open->set_enabled(
         entry.has_value() && entry->kind != EntryKind::symlink);
-    form_.file_manager_app_shell_workspace_inspector_commands_checksum->set_enabled(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum->set_enabled(
         checksum_visible_ && (checksum_in_flight_ ||
         (entry.has_value() && !entry->directory &&
          entry->kind != EntryKind::symlink)));
-    form_.file_manager_app_shell_workspace_inspector_commands_terminal->set_enabled(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_terminal->set_enabled(
         terminal_visible_);
-    form_.file_manager_app_shell_workspace_inspector_commands_copy_path->set_enabled(
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_copy_path->set_enabled(
         true);
     update_command_state();
 }
@@ -4423,7 +4099,7 @@ void Application::request_checksum() {
     if (checksum_in_flight_) {
         checksum_generation_.fetch_add(1);
         checksum_in_flight_ = false;
-        form_.file_manager_app_shell_workspace_inspector_commands_checksum
+        form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum
             ->set_text("SHA-256");
         update_mutation_controls();
         set_status("Checksum cancellation requested",
@@ -4435,7 +4111,7 @@ void Application::request_checksum() {
     const auto expected = std::string(expected_checksum_box_->text());
     const auto generation = checksum_generation_.fetch_add(1) + 1U;
     checksum_in_flight_ = true;
-    form_.file_manager_app_shell_workspace_inspector_commands_checksum
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum
         ->set_text("Cancel hash");
     update_mutation_controls();
     set_status("Computing SHA-256 · " + entry->name,
@@ -4478,7 +4154,7 @@ void Application::apply_checksum(ChecksumResult result, std::string expected,
                                  const std::uint64_t generation) {
     if (generation != checksum_generation_.load()) return;
     checksum_in_flight_ = false;
-    form_.file_manager_app_shell_workspace_inspector_commands_checksum
+    form_.file_manager_app_shell_workspace_selection_inspector_facts_commands_checksum
         ->set_text("SHA-256");
     update_mutation_controls();
     if (!result.succeeded()) {

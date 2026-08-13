@@ -2,9 +2,8 @@
 
 Date: 2026-08-10
 
-Status: **MEASURED parser/descriptor/component projections plus complete
-experimental native GUI.Forms trees; browser/native raster fidelity remains
-unmeasured**.
+Status: **MEASURED parser/descriptor/component projections, complete native
+GUI.Forms trees, and stable-ID browser/native fidelity comparison**.
 
 ## Claim under test
 
@@ -40,20 +39,29 @@ python3 -m unittest discover -s web_forms/tests -v
 python3 web_forms/tools/measure_dogfood.py --iterations 50
 ```
 
-**MEASURED on the Neo macOS arm64 host:** all 27 Stage 1 rejection/acceptance,
+**MEASURED on the Neo macOS arm64 host:** all 37 Stage 1 rejection/acceptance,
 separation, determinism, CLI, Stage 2, house-profile, and C++17 compile tests
-pass. The suite also compiles and executes the generated GUI.Forms button
+pass. The suite includes real Chromium capture, native snapshot normalization,
+dimension-separated fidelity comparison, and source-private compound-child
+normalization. It also compiles and executes the generated GUI.Forms button
 material/state projection as C++20 against the public native seam, and compiles
 the generated layout, typography, decoration, and complete-tree projections. Sapphire and
 Parchment produce identical content, geometry, and typography records and
 different material records.
 
-**MEASURED on the M4 Mac mini:** the complete 62-test GUI.Forms suite passes
+**MEASURED on the M4 Mac mini:** the complete 86-test GUI.Forms suite passes
 after the authored background hook, state recipes, signed focus outlines,
 focus-cue modality, inset shadows, side borders, relational flex, grid tracks,
 complete box geometry, typography, and owner-decoration changes. This includes
 display-chunk caching, invalidation damage, lifecycle, retained lifetime,
 native host, Skia/CoreGraphics, and the File Manager demoboard tests.
+
+The later source-closure tranche adds explicit connected groups, ordered
+keylines and bounded local PNG resources. It includes deterministic resource
+bytes in IR identity, emits 1x/2x `ImageList` registration, compiles the
+generated File Manager tree on both macOS and MinGW, and exercises an
+11-profile browser/native matrix with semantic materials and per-node raster
+probes. See `FIDELITY_ORACLE_001.md` for the measured differences.
 
 Fifty warm in-process iterations under Python 3.14.6 measured after typed-value
 lowering replaced runtime CSS strings:
@@ -206,15 +214,18 @@ initial zero margin/padding before authored box values, and the probe passes at
 210px. That is direct evidence for compiling the nested landscape instead of
 stacking stock defaults.
 
-The next gaps are native/browser element-bound and raster comparison under a
-pinned viewport/font/scale profile, rounded joins for independently colored
-side borders if a specimen requires them, and production API/ABI selection.
+The pinned browser/native oracle now compares authored identity, structure,
+state, element bounds/clips, typography and semantic materials. The File
+Manager reference has zero material-mismatch nodes; remaining geometry and
+typography deltas stay explicit for targeted follow-up. Rounded joins for
+independently colored side borders remain conditional on a specimen actually
+requiring them. Production API/ABI selection remains separate.
 
 ## Scope of inference
 
-This experiment does not establish native WYSIWYG, cross-rasterizer text parity,
-complete accessibility, resource decoding, virtual collections, general CSS
-coverage, performance of a large atlas, or backward compatibility. It does
-establish a generated retained tree, real GUI.Forms construction, nested
-logical geometry, and fail-closed capability composition without runtime source
-interpretation.
+This experiment does not establish pixel-identical WYSIWYG,
+cross-rasterizer text parity, complete accessibility, resource decoding,
+virtual collections, general CSS coverage, performance of a large atlas, or
+backward compatibility. It does establish a generated retained tree, real
+GUI.Forms construction, nested logical geometry, semantic material equality,
+and fail-closed capability composition without runtime source interpretation.

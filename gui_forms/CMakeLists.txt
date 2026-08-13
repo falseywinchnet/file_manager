@@ -267,6 +267,7 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.cpp
     src/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.cpp
     src/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.cpp
+    src/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.cpp
     src/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.cpp
     src/controls/scrollable_control/container_control/tab_control/tab_control.cpp
     src/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.cpp
@@ -1597,6 +1598,14 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_controls)
     add_test(NAME gui_forms_responsive_track_panel_tests
              COMMAND gui_forms_responsive_track_panel_tests)
+
+    add_executable(gui_forms_command_overflow_panel_tests
+        tests/command_overflow_panel_tests.cpp
+    )
+    target_link_libraries(gui_forms_command_overflow_panel_tests PRIVATE
+        gui_forms_controls)
+    add_test(NAME gui_forms_command_overflow_panel_tests
+             COMMAND gui_forms_command_overflow_panel_tests)
 
     add_executable(gui_forms_tab_control_tests
         tests/tab_control_tests.cpp

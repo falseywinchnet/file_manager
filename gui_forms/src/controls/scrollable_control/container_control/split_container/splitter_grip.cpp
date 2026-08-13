@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -20,10 +21,18 @@ constexpr Point engaged_shadow_offset{0.0, 2.0};
 constexpr double engaged_shadow_blur = 3.0;
 constexpr double engaged_shadow_reach = engaged_shadow_blur * 3.0;
 
+AnimationSpec seam_transition_spec(FrameInterval duration) {
+    AnimationSpec specification;
+    specification.duration = duration;
+    specification.easing = EasingCurve::ease_out;
+    return specification;
+}
+
 } // namespace
 
 SplitterGrip::SplitterGrip(StableId stable_id)
-    : Control(std::move(stable_id)) {
+    : Control(std::move(stable_id)),
+      transition_timeline_(seam_transition_spec(transition_duration_)) {
     set_focusable(true);
 }
 
@@ -54,13 +63,38 @@ void SplitterGrip::set_collapse_appearance(SplitFixedPanel panel,
 void SplitterGrip::set_dragging(const bool dragging) {
     if (dragging_ == dragging) return;
     dragging_ = dragging;
+    retarget_transition();
     invalidate(Dirty::paint);
 }
 
 void SplitterGrip::set_actuator_pressed(const bool pressed) {
     if (actuator_pressed_ == pressed) return;
     actuator_pressed_ = pressed;
+    retarget_transition();
     invalidate(Dirty::paint);
+}
+
+void SplitterGrip::set_transition_duration(FrameInterval duration) {
+    require_mutable();
+    if (duration < FrameInterval::zero() ||
+        duration > std::chrono::milliseconds(1000)) {
+        throw std::invalid_argument(
+            "split seam transition duration must be between zero and 1000 milliseconds");
+    }
+    if (transition_duration_ == duration) return;
+    transition_duration_ = duration;
+    if (duration == FrameInterval::zero()) {
+        complete_transition();
+        invalidate(Dirty::paint);
+        return;
+    }
+    transition_timeline_.set_specification(seam_transition_spec(duration));
+    if (transition_active_) {
+        transition_from_ = presented_actuator_;
+        transition_progress_ = 0.0;
+        transition_timeline_.start(FrameClock::now());
+        update_transition_registration();
+    }
 }
 
 void SplitterGrip::reset_interaction() noexcept {
@@ -69,6 +103,12 @@ void SplitterGrip::reset_interaction() noexcept {
     dragging_ = false;
     actuator_pressed_ = false;
     focused_ = false;
+    transition_frames_.disconnect();
+    transition_active_ = false;
+    transition_progress_ = 1.0;
+    transition_to_ = target_actuator_size();
+    transition_from_ = transition_to_;
+    presented_actuator_ = transition_to_;
 }
 
 SplitSeamState SplitterGrip::seam_state() const noexcept {
@@ -82,8 +122,8 @@ SplitSeamState SplitterGrip::seam_state() const noexcept {
 }
 
 Rect SplitterGrip::actuator_bounds() const noexcept {
-    return actuator_bounds(expanded_actuator_width,
-                           expanded_actuator_extent);
+    return actuator_bounds(presented_actuator_.width,
+                           presented_actuator_.height);
 }
 
 Insets SplitterGrip::visual_outsets() const noexcept {
@@ -119,12 +159,102 @@ void SplitterGrip::on_pointer(PointerEvent& event) {
     if (near_ == near && hot_ == hot) return;
     near_ = near;
     hot_ = hot;
+    retarget_transition();
     invalidate(Dirty::paint);
 }
 
 void SplitterGrip::on_focus_changed(bool focused) {
     focused_ = focused;
+    retarget_transition();
     invalidate(invalidation::focus);
+}
+
+void SplitterGrip::on_focus_cue_changed(bool) {
+    if (!focused_) return;
+    retarget_transition();
+    invalidate(invalidation::focus);
+}
+
+Size SplitterGrip::target_actuator_size() const noexcept {
+    // The owner publishes pressed/dragging immediately before capture in the
+    // same routed event. Geometry may retarget from those retained flags; the
+    // painted engaged state still requires actual capture below.
+    const bool focus_cue = focused_ && window() != nullptr &&
+        (*window()).focus_cue_visible();
+    if (hot_ || dragging_ || actuator_pressed_ || focus_cue) {
+        return {expanded_actuator_width, expanded_actuator_extent};
+    }
+    if (near_) return {near_actuator_width, near_actuator_extent};
+    return {rest_actuator_width, rest_actuator_extent};
+}
+
+void SplitterGrip::complete_transition() noexcept {
+    transition_frames_.disconnect();
+    transition_active_ = false;
+    transition_progress_ = 1.0;
+    presented_actuator_ = transition_to_;
+    transition_from_ = transition_to_;
+}
+
+void SplitterGrip::update_transition_registration() {
+    transition_frames_.disconnect();
+    if (!transition_active_ || window() == nullptr) return;
+    const FrameTime now = FrameClock::now();
+    transition_frames_ = (*window()).activate_surface(
+        shared_from_this(), std::chrono::milliseconds(16),
+        now + std::chrono::milliseconds(16));
+}
+
+void SplitterGrip::retarget_transition() {
+    const Size target = target_actuator_size();
+    if (target == transition_to_ && transition_active_) return;
+    transition_from_ = presented_actuator_;
+    transition_to_ = target;
+    const bool reduced = window() != nullptr &&
+        (*window()).presentation_settings().reduced_motion;
+    if (transition_from_ == transition_to_ || window() == nullptr || reduced ||
+        transition_duration_ == FrameInterval::zero()) {
+        complete_transition();
+        return;
+    }
+    transition_progress_ = 0.0;
+    transition_active_ = true;
+    transition_timeline_.start(FrameClock::now());
+    update_transition_registration();
+}
+
+void SplitterGrip::on_attached_to_window() {
+    Control::on_attached_to_window();
+    transition_to_ = target_actuator_size();
+    transition_from_ = transition_to_;
+    presented_actuator_ = transition_to_;
+    transition_progress_ = 1.0;
+    transition_active_ = false;
+}
+
+void SplitterGrip::on_detached_from_window() noexcept {
+    transition_frames_.disconnect();
+    transition_active_ = false;
+    Control::on_detached_from_window();
+}
+
+void SplitterGrip::on_frame(FrameTime now) {
+    if (!transition_active_) return;
+    if (window() != nullptr &&
+        (*window()).presentation_settings().reduced_motion) {
+        complete_transition();
+        invalidate(Dirty::paint);
+        return;
+    }
+    const AnimationSample sample = transition_timeline_.sample(now);
+    transition_progress_ = std::clamp(sample.progress, 0.0, 1.0);
+    presented_actuator_ = {
+        transition_from_.width +
+            (transition_to_.width - transition_from_.width) * transition_progress_,
+        transition_from_.height +
+            (transition_to_.height - transition_from_.height) * transition_progress_};
+    if (sample.finished) complete_transition();
+    invalidate(Dirty::paint);
 }
 
 bool SplitterGrip::engaged() const noexcept {
@@ -196,14 +326,9 @@ void SplitterGrip::on_paint(Painter& painter, Rect) {
     if (collapse_panel_ == SplitFixedPanel::none) return;
 
     const bool expanded_grip = engaged();
-    const bool near_grip = !expanded_grip && near_;
     const bool first = collapse_panel_ == SplitFixedPanel::first;
     std::string arrow;
-    const Rect tab = expanded_grip
-        ? actuator_bounds(expanded_actuator_width, expanded_actuator_extent)
-        : (near_grip
-            ? actuator_bounds(near_actuator_width, near_actuator_extent)
-            : actuator_bounds(rest_actuator_width, rest_actuator_extent));
+    const Rect tab = actuator_bounds();
     Point text_origin;
     if (orientation_ == Orientation::vertical) {
         arrow = first ? (collapsed_ ? "▶" : "◀")

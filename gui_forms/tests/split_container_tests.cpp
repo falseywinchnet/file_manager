@@ -2,6 +2,7 @@
 #include "gui_forms/container_controls.hpp"
 #include "gui_forms/window.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -12,6 +13,7 @@
 namespace {
 
 using namespace gui_forms;
+using namespace std::chrono_literals;
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
@@ -293,6 +295,7 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
     split->set_collapse_panel(SplitFixedPanel::second);
     Window window(split, {400.0, 180.0});
     window.perform_layout();
+    split->set_splitter_transition_duration(0ms);
     const Control::Ptr grip = split->splitter_control();
     const Rect seam = grip->absolute_bounds();
     const Insets outsets = grip->visual_outsets();
@@ -564,8 +567,9 @@ void test_proximity_states_cancel_disable_detach_and_semantics() {
     near_event.pointer_id = 7U;
     static_cast<void>(window.dispatch_pointer(near_event));
     require(split->splitter_seam_snapshot().state == SplitSeamState::near &&
-                window.focused_control() == field && !window.next_wake(),
-            "quiet proximity must reveal near state without stealing focus or scheduling perpetual frames");
+                split->splitter_seam_snapshot().transition_active &&
+                window.focused_control() == field && window.next_wake(),
+            "quiet proximity must reveal near state without stealing focus and schedule only its bounded transition");
 
     PointerEvent hot_event = near_event;
     hot_event.position = {hit.x + hit.width * 0.5,
@@ -643,6 +647,86 @@ void test_proximity_states_cancel_disable_detach_and_semantics() {
             "detaching a captured seam must release capture and clear every proximity interaction flag");
 }
 
+void test_bounded_seam_interpolation_and_reduced_motion() {
+    auto split = make_control<SplitContainer>(StableId("split.transition"));
+    split->set_splitter_distance(140.0);
+    split->set_collapse_panel(SplitFixedPanel::second);
+    Window window(split, {360.0, 180.0});
+    window.perform_layout();
+
+    const SplitSeamSnapshot resting = split->splitter_seam_snapshot();
+    require(near(resting.transition_duration_milliseconds, 90.0) &&
+                !resting.transition_active &&
+                near(resting.actuator_bounds.width, 7.0) &&
+                near(resting.actuator_bounds.height, 28.0),
+            "collapse-tab interpolation must default to a quiescent 90-millisecond retained rest geometry");
+
+    const Rect hit = split->splitter_control()->absolute_bounds();
+    PointerEvent hover;
+    hover.action = PointerAction::move;
+    hover.position = {hit.x + hit.width * 0.5,
+                      hit.y + hit.height * 0.5};
+    hover.pointer_id = 41U;
+    static_cast<void>(window.dispatch_pointer(hover));
+
+    const SplitSeamSnapshot started = split->splitter_seam_snapshot();
+    require(started.state == SplitSeamState::hot &&
+                started.transition_active &&
+                near(started.transition_progress, 0.0) &&
+                near(started.actuator_bounds.width, 7.0) &&
+                window.next_wake().has_value(),
+            "hot proximity must start from the committed rest geometry and own one bounded frame lease");
+
+    split->splitter_control()->on_frame(FrameClock::now() + 45ms);
+    const SplitSeamSnapshot middle = split->splitter_seam_snapshot();
+    require(middle.transition_active &&
+                middle.transition_progress > 0.0 &&
+                middle.transition_progress < 1.0 &&
+                middle.actuator_bounds.width > 7.0 &&
+                middle.actuator_bounds.width < 12.0 &&
+                middle.actuator_bounds.height > 28.0 &&
+                middle.actuator_bounds.height < 42.0,
+            "a half-duration frame must expose inspectable in-flight actuator geometry without moving the seam or hit target");
+    require(middle.visible_bounds == resting.visible_bounds &&
+                middle.hit_bounds == resting.hit_bounds,
+            "visual interpolation must remain orthogonal to physical seam and proximity geometry");
+
+    split->splitter_control()->on_frame(FrameClock::now() + 180ms);
+    const SplitSeamSnapshot finished = split->splitter_seam_snapshot();
+    require(!finished.transition_active &&
+                near(finished.transition_progress, 1.0) &&
+                near(finished.actuator_bounds.width, 12.0) &&
+                near(finished.actuator_bounds.height, 42.0) &&
+                !window.next_wake().has_value(),
+            "the 90-millisecond transition must commit exact engaged geometry and revoke its final frame lease");
+
+    PresentationSettings calm = window.presentation_settings();
+    calm.reduced_motion = true;
+    window.set_presentation_settings(calm);
+    PointerEvent leave = hover;
+    leave.action = PointerAction::leave;
+    static_cast<void>(split->splitter_control()->on_pointer(leave));
+    const SplitSeamSnapshot reduced = split->splitter_seam_snapshot();
+    require(!reduced.transition_active &&
+                near(reduced.actuator_bounds.width, 7.0) &&
+                near(reduced.actuator_bounds.height, 28.0) &&
+                !window.next_wake().has_value(),
+            "reduced motion must replace interpolation with an immediate exact state change");
+
+    split->set_splitter_transition_duration(0ms);
+    require(split->splitter_transition_duration() == 0ms,
+            "consumers must be able to explicitly select immediate seam presentation");
+    const FrameInterval before = split->splitter_transition_duration();
+    bool rejected{};
+    try {
+        split->set_splitter_transition_duration(1001ms);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && split->splitter_transition_duration() == before,
+            "over-budget seam duration must be rejected atomically");
+}
+
 } // namespace
 
 int main() {
@@ -658,6 +742,7 @@ int main() {
         test_content_aware_maximum_extents();
         test_physical_hairline_asymmetric_hit_geometry_and_atomic_rejection();
         test_proximity_states_cancel_disable_detach_and_semantics();
+        test_bounded_seam_interpolation_and_reduced_motion();
         std::cout << "split-container-tests: pass\n";
         return 0;
     } catch (const std::exception& error) {

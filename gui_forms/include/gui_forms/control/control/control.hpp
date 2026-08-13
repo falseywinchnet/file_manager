@@ -652,6 +652,9 @@ public:
     virtual void on_drag(DragEvent& event);
     virtual void on_drag_bubble(DragEvent& event);
     virtual void on_focus_changed(bool focused);
+    // Window focus visibility is input-modality state, distinct from actual
+    // focus. Controls with bounded focus-cue presentation may retarget here.
+    virtual void on_focus_cue_changed(bool visible);
     virtual void on_activate();
 
 protected:

@@ -362,11 +362,16 @@ void test_application_controls_navigate_real_directories() {
                 root_mode->text() ==
                     tree_fixture.root().filename().string() + "-rooted",
             "tree header must expose the active honest root mode");
-    const auto tree_header = window->find("fm.navigation.header");
+    const auto tree_header = window->find(
+        "file-manager-app.shell.workspace.sidebar.header");
+    const auto tree_root_mode_host = window->find(
+        "file-manager-app.shell.workspace.sidebar.header.root-mode-host");
     const auto tree_caption = window->find(
-        "file-manager-app.shell.workspace.sidebar.label");
-    const bool one_tree_header_band = tree_header && tree_caption &&
-        root_mode->parent() == tree_header && tree_caption->parent() == tree_header &&
+        "file-manager-app.shell.workspace.sidebar.header.label");
+    const bool one_tree_header_band = tree_header && tree_root_mode_host &&
+        tree_caption && root_mode->parent() == tree_root_mode_host &&
+        tree_root_mode_host->parent() == tree_header &&
+        tree_caption->parent() == tree_header &&
         tree_header->committed_arranged_bounds().height == 27.0 &&
         root_mode->committed_arranged_bounds().width == 112.0 &&
         root_mode->committed_arranged_bounds().height == 27.0 &&
@@ -432,7 +437,7 @@ void test_application_controls_navigate_real_directories() {
         std::dynamic_pointer_cast<gui_forms::Button>(
             window->find("fm.inspector.preview.house-icon"));
     const auto preview_glyph = window->find(
-        "file-manager-app.shell.workspace.inspector.preview.surface.glyph");
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview.surface.glyph");
     require_eventually(*application,
         [&] {
             return preview_house_icon && preview_house_icon->visible() &&
@@ -728,13 +733,15 @@ void test_application_command_surfaces_and_house_mark() {
     const auto properties = std::dynamic_pointer_cast<gui_forms::PropertyList>(
         window->find("fm.selection.properties"));
     const auto preview = window->find(
-        "file-manager-app.shell.workspace.inspector.preview");
+        "file-manager-app.shell.workspace.selection.inspector.facts.preview");
     require(properties && preview &&
                 properties->header_content() == preview &&
                 preview->parent() == properties,
             "preview and properties must share the PropertyList scroll owner");
-    const auto tree_seam = window->find("fm.workspace.folder-tree.splitter");
-    const auto selection_seam = window->find("fm.workspace.selection.splitter");
+    const auto tree_seam = window->find(
+        "file-manager-app.shell.workspace.splitter");
+    const auto selection_seam = window->find(
+        "file-manager-app.shell.workspace.selection.splitter");
     require(tree_seam && selection_seam &&
                 tree_seam->committed_arranged_bounds().width == 12.0 &&
                 selection_seam->committed_arranged_bounds().width == 12.0 &&
@@ -744,14 +751,17 @@ void test_application_command_surfaces_and_house_mark() {
                 selection_seam->visual_outsets().right == 9.0,
             "real tree and selection seams must keep 3/12 geometry plus complete engaged shadow outsets");
 
-    const auto mark = window->find("fm.house.application-mark");
+    const auto mark = window->find("file-manager-app.shell.title.mark");
+    const auto mark_front = window->find(
+        "file-manager-app.shell.title.mark.front");
     require(mark && mark->committed_arranged_bounds().width == 30.0 &&
-                mark->committed_arranged_bounds().height == 30.0,
-            "House application mark must own a fixed visible title slot");
-    ImageRecordingPainter painter;
-    mark->on_paint(painter, {0.0, 0.0, 30.0, 30.0});
-    require(painter.images == 1U,
-            "House application mark must emit one native image draw");
+                mark->committed_arranged_bounds().height == 30.0 &&
+                mark_front &&
+                mark_front->committed_arranged_bounds().width == 27.0 &&
+                mark_front->committed_arranged_bounds().height == 25.0 &&
+                mark_front->authored_surface_material().has_value() &&
+                mark_front->authored_surface_material()->fills.size() >= 2U,
+            "generated Web.Forms application mark must retain its fixed title slot and layered face without post-generation replacement");
 
     auto objects = std::dynamic_pointer_cast<gui_forms::ObjectView>(
         window->find("fm.objects.current-folder"));
@@ -781,7 +791,7 @@ void test_application_command_surfaces_and_house_mark() {
     const auto arrange_caption = std::dynamic_pointer_cast<gui_forms::Label>(
         window->find("file-manager-app.shell.commands.arrange-group.label"));
     const auto more = std::dynamic_pointer_cast<gui_forms::DropDownButton>(
-        window->find("fm.shelf.more"));
+        window->find("file-manager-app.shell.commands.overflow"));
     const auto view_button = std::dynamic_pointer_cast<gui_forms::DropDownButton>(
         window->find(
             "file-manager-app.shell.commands.arrange-group.actions.details"));
@@ -802,7 +812,8 @@ void test_application_command_surfaces_and_house_mark() {
                 arrange_group->visible() && selection_caption &&
                 selection_caption->text() == "SELECTION" && arrange_caption &&
                 arrange_caption->text() == "ARRANGE & INSPECT" && more &&
-                !more->visible() && view_button && sort_button &&
+                more->visible() && more->layout_collapsed() &&
+                !more->effectively_visible() && view_button && sort_button &&
                 move_copy_button && delete_button && properties_button,
             "ordinary shelf must retain two labelled groups and three real drop-down commands");
     for (const auto& button : {
@@ -1027,13 +1038,17 @@ void test_application_command_surfaces_and_house_mark() {
 
     window->resize({400.0, 850.0});
     window->perform_layout();
-    require(selection_group->visible() && !arrange_group->visible() &&
-                more->visible() && more->text() == "More" &&
+    require(selection_group->visible() &&
+                !selection_group->layout_collapsed() &&
+                arrange_group->visible() && arrange_group->layout_collapsed() &&
+                more->visible() && !more->layout_collapsed() &&
+                more->text() == "More" &&
                 selection_caption->effectively_visible() &&
                 !arrange_caption->effectively_visible(),
             "medium shelf must retain Selection and collapse lower-priority Arrange into More");
     require(window->perform_semantic_action(
-                "fm.shelf.more", gui_forms::SemanticAction::show_menu) &&
+                "file-manager-app.shell.commands.overflow",
+                gui_forms::SemanticAction::show_menu) &&
                 window->find("fm.shelf.more-menu.popup.row.view") &&
                 window->find("fm.shelf.more-menu.popup.row.sort") &&
                 window->find("fm.shelf.more-menu.popup.row.properties"),
@@ -1045,11 +1060,15 @@ void test_application_command_surfaces_and_house_mark() {
 
     window->resize({220.0, 850.0});
     window->perform_layout();
-    require(!selection_group->visible() && !arrange_group->visible() &&
-                more->visible() && more->text() == "Commands",
-            "narrow shelf must collapse both command groups into one honest Commands menu");
+    require(selection_group->visible() &&
+                selection_group->layout_collapsed() &&
+                arrange_group->visible() && arrange_group->layout_collapsed() &&
+                more->visible() && !more->layout_collapsed() &&
+                more->text() == "More",
+            "narrow shelf must collapse both command groups into the authored More menu");
     require(window->perform_semantic_action(
-                "fm.shelf.more", gui_forms::SemanticAction::show_menu) &&
+                "file-manager-app.shell.commands.overflow",
+                gui_forms::SemanticAction::show_menu) &&
                 window->find("fm.shelf.more-menu.popup.row.move-copy") &&
                 window->find("fm.shelf.more-menu.popup.row.delete") &&
                 window->find("fm.shelf.more-menu.popup.row.view") &&
@@ -1087,9 +1106,12 @@ void test_application_command_surfaces_and_house_mark() {
 
     window->resize({1340.0, 850.0});
     window->perform_layout();
-    require(selection_group->visible() && arrange_group->visible() &&
+    require(selection_group->visible() &&
+                !selection_group->layout_collapsed() &&
+                arrange_group->visible() && !arrange_group->layout_collapsed() &&
                 selection_caption->effectively_visible() &&
-                arrange_caption->effectively_visible() && !more->visible() &&
+                arrange_caption->effectively_visible() && more->visible() &&
+                more->layout_collapsed() && !more->effectively_visible() &&
                 sort_button->text() == "Sort: Kind" &&
                 selection_group->committed_arranged_bounds().width >= 176.0 &&
                 arrange_group->committed_arranged_bounds().width >= 306.0 &&
@@ -1404,7 +1426,8 @@ void test_application_command_truth_across_files_search_and_settings() {
     window->resize({220.0, 850.0});
     window->perform_layout();
     require(window->perform_semantic_action(
-                "fm.shelf.more", gui_forms::SemanticAction::show_menu),
+                "file-manager-app.shell.commands.overflow",
+                gui_forms::SemanticAction::show_menu),
             "narrow staged-transfer fixture must open the permanent Commands projection");
     gui_forms::SemanticSnapshot narrow_semantics = window->semantic_snapshot();
     {
@@ -2050,7 +2073,8 @@ void test_property_name_rename_is_protected_and_collision_safe() {
     window->resize({220.0, 850.0});
     window->perform_layout();
     require(window->perform_semantic_action(
-                "fm.shelf.more", gui_forms::SemanticAction::show_menu),
+                "file-manager-app.shell.commands.overflow",
+                gui_forms::SemanticAction::show_menu),
             "narrow protected shelf must open its Commands menu");
     require(window->find("fm.shelf.more-menu.popup.row.move-copy") != nullptr,
             "narrow Commands menu must retain the Move/Copy member");

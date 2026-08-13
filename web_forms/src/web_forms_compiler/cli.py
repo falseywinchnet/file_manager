@@ -15,6 +15,14 @@ from .gui_typography_stage2 import generate_gui_typography
 from .gui_decoration_stage2 import generate_gui_decorations
 from .gui_tree_stage2 import generate_gui_tree
 from .profile import profile_manifest
+from .fidelity import (
+    FidelityTolerance,
+    capture_browser_snapshot,
+    compare_fidelity_snapshots,
+    normalize_native_snapshot,
+    read_fidelity_snapshot,
+    write_json,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -91,6 +99,51 @@ def _parser() -> argparse.ArgumentParser:
 
     profile = subparsers.add_parser("profile", help="Emit the machine-readable Stage 1 source profile")
     profile.add_argument("--output", type=Path)
+
+    browser_fidelity = subparsers.add_parser(
+        "capture-browser-fidelity",
+        help="Capture stable-ID geometry, typography, material, and state from Chromium",
+    )
+    browser_fidelity.add_argument("html", type=Path)
+    browser_fidelity.add_argument("--style", action="append", type=Path, default=[])
+    browser_fidelity.add_argument("--root-id")
+    browser_fidelity.add_argument("--state", default="reference")
+    browser_fidelity.add_argument("--viewport", default="1080x720")
+    browser_fidelity.add_argument("--device-scale", type=float, default=1.0)
+    browser_fidelity.add_argument("--text-scale", type=float, default=1.0)
+    browser_fidelity.add_argument("--inactive", action="store_true")
+    browser_fidelity.add_argument(
+        "--interaction",
+        choices=("reference", "hover", "pressed", "focused", "disabled"),
+        default="reference",
+    )
+    browser_fidelity.add_argument("--interaction-target", default="")
+    browser_fidelity.add_argument("--reduced-motion", action="store_true")
+    browser_fidelity.add_argument("--chrome", type=Path)
+    browser_fidelity.add_argument("--output", required=True, type=Path)
+
+    native_fidelity = subparsers.add_parser(
+        "normalize-native-fidelity",
+        help="Normalize a GUI.Forms visual-inspection snapshot into the fidelity schema",
+    )
+    native_fidelity.add_argument("snapshot", type=Path)
+    native_fidelity.add_argument("--projection", type=Path)
+    native_fidelity.add_argument("--root-id")
+    native_fidelity.add_argument("--source-digest", default="")
+    native_fidelity.add_argument("--state", default="reference")
+    native_fidelity.add_argument("--output", required=True, type=Path)
+
+    compare_fidelity = subparsers.add_parser(
+        "compare-fidelity",
+        help="Compare browser and GUI.Forms fidelity snapshots by stable ID",
+    )
+    compare_fidelity.add_argument("browser", type=Path)
+    compare_fidelity.add_argument("native", type=Path)
+    compare_fidelity.add_argument("--geometry-tolerance", type=float, default=0.51)
+    compare_fidelity.add_argument("--clip-tolerance", type=float, default=0.51)
+    compare_fidelity.add_argument("--baseline-tolerance", type=float, default=1.0)
+    compare_fidelity.add_argument("--raster-color-tolerance", type=int, default=120)
+    compare_fidelity.add_argument("--output", required=True, type=Path)
     return parser
 
 
@@ -182,6 +235,59 @@ def main(argv: list[str] | None = None) -> int:
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(rendered, encoding="utf-8")
                 print(args.output)
+            return 0
+        if args.command == "capture-browser-fidelity":
+            viewport_match = __import__("re").fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", args.viewport)
+            if viewport_match is None:
+                from .diagnostics import fail
+                fail("WFV017", "viewport must use WIDTHxHEIGHT", str(args.html))
+            snapshot = capture_browser_snapshot(
+                args.html,
+                styles=args.style or None,
+                root_id=args.root_id,
+                state=args.state,
+                viewport=(int(viewport_match.group(1)), int(viewport_match.group(2))),
+                device_scale=args.device_scale,
+                text_scale=args.text_scale,
+                window_active=not args.inactive,
+                interaction=args.interaction,
+                interaction_target=args.interaction_target,
+                reduced_motion=args.reduced_motion,
+                chrome=args.chrome,
+            )
+            write_json(snapshot, args.output)
+            print(args.output)
+            return 0
+        if args.command == "normalize-native-fidelity":
+            native = json.loads(args.snapshot.read_text(encoding="utf-8"))
+            projection = (
+                json.loads(args.projection.read_text(encoding="utf-8"))
+                if args.projection is not None
+                else None
+            )
+            snapshot = normalize_native_snapshot(
+                native,
+                projection=projection,
+                root_id=args.root_id,
+                source_digest=args.source_digest,
+                state=args.state,
+            )
+            write_json(snapshot, args.output)
+            print(args.output)
+            return 0
+        if args.command == "compare-fidelity":
+            report = compare_fidelity_snapshots(
+                read_fidelity_snapshot(args.browser),
+                read_fidelity_snapshot(args.native),
+                FidelityTolerance(
+                    geometry=args.geometry_tolerance,
+                    clip=args.clip_tolerance,
+                    baseline=args.baseline_tolerance,
+                    raster_color_distance=args.raster_color_tolerance,
+                ),
+            )
+            write_json(report, args.output)
+            print(args.output)
             return 0
         ir = compile_source(args.html, args.style or None)
         write_ir(ir, args.emit_ir)

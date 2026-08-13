@@ -60,6 +60,25 @@ Keep responsibilities distinct:
   in CSS;
 - C++ owns domain behavior, commands, models, validation, and side effects.
 
+The current non-CSS visual/topology lane is intentionally small:
+
+- `data-wf-connected-axis="horizontal|vertical"` applies only to a container
+  with two through 256 direct button/drop-down children;
+- responsive-track, split-view and command-overflow attributes encode bounded
+  retained layout policy, while `data-wf-window-drag-region` identifies
+  authored native-chrome drag surfaces;
+- dropdown controls carry explicit mode and optional bounded disclosure width;
+- `data-wf-keylines` is an ordered, semicolon-separated list of at most eight
+  `edge #rrggbb[aa] width inset` records;
+- `data-wf-image-list`, `data-wf-image-key`, `data-wf-image-src`, optional
+  `data-wf-image-src-2x`, and logical width/height admit source-local canonical
+  PNGs only. Stage 1 bounds dimensions, count and bytes and includes the image
+  bytes in source identity; Stage 2 emits the `ImageList` registration.
+
+These attributes are compiler semantics, not JavaScript hooks. Ordinary raw
+HTML does not execute connected-stock, priority-collapse or generated
+`ImageList` behavior; the fidelity oracle records that preview boundary.
+
 The nested source tree is also semantic input. Each child receives a compiled
 ambient layout, surface, typography, theme, accommodation, and effective-state
 context from its parent. The native result must preserve that landscape rather
@@ -116,21 +135,21 @@ python3 web_forms/tools/webforms.py build \
 
 python3 web_forms/tools/webforms.py report \
   /tmp/standard-shell.wfir.json \
-  --manifest web_forms/capabilities/gui_forms_observed_001.json
+  --manifest web_forms/capabilities/gui_forms_observed_002.json
 
 python3 web_forms/tools/webforms.py generate-gui-materials \
   /tmp/standard-shell.wfir.json \
-  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --manifest web_forms/capabilities/gui_forms_observed_002.json \
   --output-dir /tmp/standard-shell-native-materials
 
 python3 web_forms/tools/webforms.py generate-gui-layouts \
   /tmp/standard-shell.wfir.json \
-  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --manifest web_forms/capabilities/gui_forms_observed_002.json \
   --output-dir /tmp/standard-shell-native-layouts
 
 python3 web_forms/tools/webforms.py generate-gui-tree \
   /tmp/standard-shell.wfir.json \
-  --manifest web_forms/capabilities/gui_forms_observed_001.json \
+  --manifest web_forms/capabilities/gui_forms_observed_002.json \
   --output-dir /tmp/standard-shell-native-tree \
   --unit standard_shell_sapphire
 
@@ -138,6 +157,13 @@ python3 web_forms/tools/webforms.py profile
 
 python3 -m unittest discover -s web_forms/tests -v
 python3 web_forms/tools/measure_dogfood.py --iterations 50
+
+python3 web_forms/tools/measure_fidelity_matrix.py \
+  frontend/ui/boards/file_manager/file_manager.wf.html \
+  --native-probe web_forms/.build/native_fidelity_probe/file_manager_sapphire/native_fidelity_probe \
+  --projection web_forms/.build/native_fidelity_probe/file_manager_sapphire/file_manager_sapphire.gui_tree.json \
+  --font-directory gui_forms/assets/fonts \
+  --output-dir web_forms/.build/fidelity_matrix/file_manager_sapphire
 ```
 
 [`experiments/DOGFOOD_001.md`](experiments/DOGFOOD_001.md) records the first

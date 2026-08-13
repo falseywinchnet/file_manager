@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import base64
 from hashlib import sha256
 import json
 from pathlib import Path
+import struct
 from typing import Any
 
 from .css_source import compute_styles, parse_css
 from .diagnostics import Diagnostic, WebFormsError
 from .html_source import HtmlDocument, parse_html
+from .keylines import parse_keylines
 from .profile import IR_SCHEMA, PROFILE
 
 
@@ -65,6 +68,102 @@ def _feature_policy(feature: str) -> str:
     return "required"
 
 
+def _local_png_resources(
+    source: Path, nodes: list[dict[str, Any]], digest: Any
+) -> list[dict[str, Any]]:
+    source_root = source.parent.resolve()
+    records: dict[tuple[str, str, float], dict[str, Any]] = {}
+    total_bytes = 0
+    for node in nodes:
+        attributes = node["attributes"]
+        first = attributes.get("data-wf-image-src")
+        if first is None:
+            continue
+        list_name = attributes["data-wf-image-list"]
+        key = attributes["data-wf-image-key"]
+        logical_width = float(attributes.get("data-wf-image-width", "0"))
+        logical_height = float(attributes.get("data-wf-image-height", "0"))
+        if not (0.0 < logical_width <= 512.0 and 0.0 < logical_height <= 512.0):
+            raise WebFormsError([Diagnostic(
+                "WFR001", "local PNG logical width/height must be in (0,512]",
+                str(source)
+            )])
+        for relative, density in ((first, 1.0),
+                                  (attributes.get("data-wf-image-src-2x"), 2.0)):
+            if relative is None:
+                continue
+            path = (source_root / relative).resolve()
+            if not path.is_relative_to(source_root) or not path.is_file():
+                raise WebFormsError([Diagnostic(
+                    "WFR002", f"local PNG {relative!r} is absent or leaves the source root",
+                    str(source)
+                )])
+            encoded = path.read_bytes()
+            if len(encoded) > 2 * 1024 * 1024:
+                raise WebFormsError([Diagnostic(
+                    "WFR003", "one local PNG exceeds the two-megabyte source limit",
+                    str(path)
+                )])
+            if (len(encoded) < 33 or encoded[:8] != b"\x89PNG\r\n\x1a\n" or
+                    encoded[12:16] != b"IHDR"):
+                raise WebFormsError([Diagnostic(
+                    "WFR004", "local image resource is not a canonical PNG with first IHDR",
+                    str(path)
+                )])
+            width, height = struct.unpack(">II", encoded[16:24])
+            if width != round(logical_width * density) or height != round(logical_height * density):
+                raise WebFormsError([Diagnostic(
+                    "WFR005", "PNG intrinsic size must equal logical size times density",
+                    str(path)
+                )])
+            identity = (list_name, key, density)
+            record = {
+                "list": list_name,
+                "key": key,
+                "density": density,
+                "logical_size": [logical_width, logical_height],
+                "path": relative,
+                "sha256": sha256(encoded).hexdigest(),
+                "encoded_bytes": len(encoded),
+                "encoded_base64": base64.b64encode(encoded).decode("ascii"),
+                "intrinsic_size": [width, height],
+                "controls": [node["id"]],
+            }
+            previous = records.get(identity)
+            if previous is not None:
+                if previous["sha256"] != record["sha256"] or previous["logical_size"] != record["logical_size"]:
+                    raise WebFormsError([Diagnostic(
+                        "WFR006", "one image-list key/density maps to conflicting PNG resources",
+                        str(source)
+                    )])
+                previous["controls"].append(node["id"])
+                continue
+            records[identity] = record
+            total_bytes += len(encoded)
+            digest.update(b"PNG\0")
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(encoded)
+    if len(records) > 256 or total_bytes > 16 * 1024 * 1024:
+        raise WebFormsError([Diagnostic(
+            "WFR007", "local PNG resource count or aggregate byte limit exceeded",
+            str(source)
+        )])
+    by_list: dict[str, list[dict[str, Any]]] = {}
+    for record in records.values():
+        by_list.setdefault(record["list"], []).append(record)
+    for list_name, entries in by_list.items():
+        sizes = {tuple(item["logical_size"]) for item in entries}
+        if len(sizes) != 1:
+            raise WebFormsError([Diagnostic(
+                "WFR008", f"image list {list_name!r} has inconsistent logical sizes",
+                str(source)
+            )])
+    return sorted(records.values(), key=lambda item: (
+        item["list"], item["key"], item["density"]
+    ))
+
+
 def compile_source(html_path: Path, style_paths: list[Path] | None = None) -> dict[str, Any]:
     html_path = html_path.resolve()
     document = parse_html(html_path)
@@ -114,6 +213,8 @@ def compile_source(html_path: Path, style_paths: list[Path] | None = None) -> di
             }
         )
 
+    local_png_resources = _local_png_resources(html_path, nodes, digest)
+
     properties = {
         item["name"]
         for domain in styles["pools"].values()
@@ -124,6 +225,30 @@ def compile_source(html_path: Path, style_paths: list[Path] | None = None) -> di
     states.update(state for decoration in styles["decorations"] for state in decoration["states"])
     pseudo_elements = {item["pseudo"] for item in styles["decorations"] if item["pseudo"]}
     features: set[str] = {"surface.nested-ambient-context", "identity.typed-hierarchical"}
+    for node in nodes:
+        attributes = node["attributes"]
+        control = attributes.get("data-wf-control")
+        if control == "command-overflow":
+            features.add("control.command-overflow")
+        elif control == "dropdown-button":
+            features.add("control.dropdown-button")
+        elif control == "responsive-tracks":
+            features.add("layout.responsive-tracks")
+        if control == "split-view" and "data-wf-split-orientation" in attributes:
+            features.add("control.split-seam-geometry")
+            if float(attributes.get("data-wf-split-transition-ms", "0")) > 0.0:
+                features.add("motion.bounded-state-transition")
+        if "data-wf-track-collapse-priority" in attributes:
+            features.add("layout.priority-collapse")
+        if attributes.get("data-wf-window-drag-region") == "true":
+            features.add("host.custom-chrome-drag-regions")
+        if "data-wf-connected-axis" in attributes:
+            features.add("control.connected-topology")
+        if "data-wf-keylines" in attributes:
+            parse_keylines(attributes["data-wf-keylines"], str(html_path))
+            features.add("paint.ordered-keylines")
+        if "data-wf-image-src" in attributes:
+            features.add("resource.local-png")
     for domain_name, records in styles["pools"].items():
         for record in records:
             for item in record["properties"]:
@@ -139,8 +264,12 @@ def compile_source(html_path: Path, style_paths: list[Path] | None = None) -> di
                     ]
                     if angle_tokens and angle_tokens[0]["number"] % 90.0 != 0.0:
                         features.add("paint.css-angle-gradient")
+                if "repeating-linear-gradient(" in value:
+                    features.add("paint.repeating-linear-gradient")
                 if "radial-gradient(" in value:
                     features.add("paint.radial-gradient")
+                if name == "background-image" and value.count("gradient(") > 1:
+                    features.add("paint.ordered-fill-layers")
                 if name == "box-shadow":
                     shadow_keywords = {
                         token["text"] for token in item["typed"]["tokens"]
@@ -179,6 +308,7 @@ def compile_source(html_path: Path, style_paths: list[Path] | None = None) -> di
             "digest": digest.hexdigest(),
         },
         "document": {"title": document.title, "nodes": nodes},
+        "resources": {"local_png": local_png_resources},
         "styles": styles,
         "requirements": {
             "elements": sorted(elements),

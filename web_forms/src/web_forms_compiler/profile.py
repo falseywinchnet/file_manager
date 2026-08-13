@@ -53,6 +53,34 @@ WF_ATTRIBUTES = frozenset(
         "data-wf-control", "data-wf-style-exposure", "data-wf-command",
         "data-wf-owner", "data-wf-state", "data-wf-surface", "data-wf-field",
         "data-wf-item-template", "data-wf-preview-state", "data-wf-variant",
+        "data-wf-dropdown-mode", "data-wf-dropdown-width",
+        "data-wf-overflow-actuator",
+        "data-wf-overflow-gap", "data-wf-overflow-minimum",
+        "data-wf-overflow-preferred", "data-wf-overflow-maximum",
+        "data-wf-overflow-priority", "data-wf-window-drag-region",
+        "data-wf-responsive-orientation", "data-wf-responsive-gap",
+        "data-wf-track-index", "data-wf-track-mode",
+        "data-wf-track-minimum", "data-wf-track-preferred",
+        "data-wf-track-maximum", "data-wf-track-weight",
+        "data-wf-track-collapse-priority",
+        "data-wf-image-key", "data-wf-image-relation",
+        "data-wf-image-gap", "data-wf-image-alignment",
+        "data-wf-text-alignment", "data-wf-content-padding-left",
+        "data-wf-content-padding-top", "data-wf-content-padding-right",
+        "data-wf-content-padding-bottom",
+        "data-wf-split-orientation", "data-wf-split-panel",
+        "data-wf-split-distance", "data-wf-split-visible-thickness",
+        "data-wf-split-hit-before", "data-wf-split-hit-after",
+        "data-wf-split-minimum-hit-target", "data-wf-split-first-minimum",
+        "data-wf-split-second-minimum", "data-wf-split-first-maximum",
+        "data-wf-split-second-maximum", "data-wf-split-fixed-panel",
+        "data-wf-split-collapse-panel",
+        "data-wf-split-automatic-collapse-threshold",
+        "data-wf-split-transition-ms",
+        "data-wf-connected-axis", "data-wf-keylines",
+        "data-wf-image-list", "data-wf-image-src",
+        "data-wf-image-src-2x", "data-wf-image-width",
+        "data-wf-image-height",
     }
 )
 
@@ -61,6 +89,7 @@ CONTROL_KINDS = frozenset(
         "panel", "stack", "toolbar", "breadcrumb", "tree-view", "list-view",
         "object-view", "status-bar", "split-view", "menu-bar", "text-box",
         "search-box", "button", "label", "image", "virtual-list",
+        "dropdown-button", "command-overflow", "responsive-tracks",
     }
 )
 

@@ -59,7 +59,11 @@ int main(const int argc, char** argv) {
         options.titlebar_presentation =
             gui_forms::host::MacTitlebarPresentation::
                 transparent_full_size_content;
-        options.window_drag_region_id = "file-manager-app.shell.title";
+        for (const std::string_view stable_id :
+             web_forms_generated_file_manager_sapphire::NativeForm::
+                 window_drag_region_ids) {
+            options.window_drag_region_ids.emplace_back(stable_id);
+        }
         options.print_metrics_on_close = true;
         options.host_ready = [application](std::function<void()> wake,
                                            std::function<void()> request_close,

@@ -87,8 +87,12 @@ struct SplitSeamSnapshot final {
     SplitSeamState state{SplitSeamState::idle};
     Rect visible_bounds;
     Rect hit_bounds;
+    Rect actuator_bounds;
     double device_scale{1.0};
     double visible_device_pixels{3.0};
+    double transition_duration_milliseconds{90.0};
+    double transition_progress{1.0};
+    bool transition_active{};
 };
 
 class SplitContainer final : public ContainerControl {
@@ -126,6 +130,8 @@ public:
     // the preferred API when asymmetric hit extents or a physical hairline are
     // required; the width-only setters above remain compatibility shorthands.
     void set_splitter_geometry(SplitSeamGeometry geometry);
+    [[nodiscard]] FrameInterval splitter_transition_duration() const noexcept;
+    void set_splitter_transition_duration(FrameInterval duration);
     [[nodiscard]] SplitSeamSnapshot splitter_seam_snapshot() const noexcept;
     [[nodiscard]] double first_minimum() const noexcept { return first_minimum_; }
     void set_first_minimum(double extent);

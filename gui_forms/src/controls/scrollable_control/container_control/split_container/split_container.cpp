@@ -3,6 +3,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <numeric>
@@ -143,10 +144,17 @@ SplitSeamSnapshot SplitContainer::splitter_seam_snapshot() const noexcept {
     SplitSeamSnapshot result;
     result.orientation = orientation_;
     result.geometry = splitter_geometry_;
-    result.state = static_cast<const SplitterGrip&>(*splitter_).seam_state();
+    const SplitterGrip& grip = static_cast<const SplitterGrip&>(*splitter_);
+    result.state = grip.seam_state();
     result.hit_bounds = (*splitter_).committed_arranged_bounds();
+    result.actuator_bounds = grip.actuator_bounds();
     result.device_scale = scale;
     result.visible_device_pixels = visible * scale;
+    result.transition_duration_milliseconds =
+        std::chrono::duration<double, std::milli>(
+            grip.transition_duration()).count();
+    result.transition_progress = grip.transition_progress();
+    result.transition_active = grip.transition_active();
     if (orientation_ == Orientation::vertical) {
         result.visible_bounds = {effective_distance_, 0.0, visible,
                                  committed_arranged_bounds().height};
@@ -155,6 +163,15 @@ SplitSeamSnapshot SplitContainer::splitter_seam_snapshot() const noexcept {
                                  committed_arranged_bounds().width, visible};
     }
     return result;
+}
+
+FrameInterval SplitContainer::splitter_transition_duration() const noexcept {
+    return static_cast<const SplitterGrip&>(*splitter_).transition_duration();
+}
+
+void SplitContainer::set_splitter_transition_duration(FrameInterval duration) {
+    require_mutable();
+    static_cast<SplitterGrip&>(*splitter_).set_transition_duration(duration);
 }
 
 void SplitContainer::set_first_minimum(double extent) {

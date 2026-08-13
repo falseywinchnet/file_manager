@@ -9,7 +9,8 @@ Status: **MEASURED**
 Can GUI.Forms render the accepted File Manager pane boundary as a quiet
 physical seam while retaining a substantially larger, accessible input target
 and truthful proximity/drag/focus state, without changing pane layout on hover
-or introducing an idle animation loop?
+or introducing an idle animation loop, while retaining the accepted short
+collapse-tab interpolation?
 
 ## Reference judgment
 
@@ -30,7 +31,8 @@ a File Manager-specific grip would duplicate working behavior.
 
 The missing reusable contract was an explicit physical thickness policy,
 asymmetric hit extents, bounded atomic geometry validation, inspectable seam
-state/geometry, drag cancellation, and adjustable semantic actions.
+state/geometry, drag cancellation, adjustable semantic actions, and a bounded
+motion-policy-aware actuator interpolation.
 
 ## Admitted public contract
 
@@ -41,8 +43,11 @@ state/geometry, drag cancellation, and adjustable semantic actions.
   extents, declared minimum hit target, and hard public complexity limits;
 - `SplitSeamState::{idle, near, hot, dragging, focused, disabled, collapsed}`;
 - `SplitSeamSnapshot`, with authored geometry, orientation, local visible and
-  hit bounds, display scale, and physical visible-pixel count;
+  hit/actuator bounds, display scale, physical visible-pixel count, transition
+  duration/progress and active state;
 - `set_splitter_geometry` and `splitter_seam_snapshot`;
+- `splitter_transition_duration` and a bounded atomic
+  `set_splitter_transition_duration`;
 - semantic focus/increment/decrement/set-value in addition to the existing
   collapse/expand actions.
 
@@ -80,8 +85,13 @@ the pointer. Escape releases capture and restores the drag-start value.
 Disabling or detaching a captured seam releases capture; detachment also clears
 every retained proximity flag. Arrow keys, Shift+Arrow, semantic increment,
 decrement and set-value all reach the same constrained distance model. No seam
-state schedules a timer or active surface. The opt-in visual inspector polls
-independently at 250 ms while it is open.
+state owns an idle timer or active surface. A state change retargets the
+actuator from its currently presented geometry to quiet `7 x 28`, near
+`9 x 34`, or engaged `12 x 42` geometry over the authored duration (90 ms by
+default) with ease-out timing. Only an in-flight transition owns a frame lease;
+completion, detach, zero duration or reduced-motion policy revokes it. Seam and
+hit bounds never interpolate. The opt-in visual inspector polls independently
+at 250 ms while it is open.
 
 ## Dedicated demoboard
 
@@ -126,7 +136,9 @@ geometry, both overlap edges, trace paint width, atomic invalid/over-budget
 rejection, proximity without focus theft, captured drag, Escape restoration,
 disable and detach revocation, collapsed state, semantic range actions,
 horizontal transposition, minimum resize, inspector chunk bounds, and absence
-of a seam-owned wake.
+of a seam-owned idle wake. The transition test samples the 90 ms path at 45 ms,
+proves in-flight actuator geometry and an unchanged seam/hit target, then proves
+exact completion and lease revocation; reduced motion completes immediately.
 
 The Windows cross-build target
 `gui_forms_seam_proximity_lab_windows` compiles and links successfully against
@@ -160,10 +172,6 @@ did not introduce a stale hover or capture state. No native defect was found.
 
 ## Remaining boundary
 
-- The reference's approximately 90 ms tab interpolation is not built into
-  `SplitContainer`. Current transitions are immediate and deterministic; an
-  authored bounded animation can be layered later without changing geometry or
-  input policy. This is a fidelity gap, not simulated support.
 - Host accessibility publication remains governed by the broader GUI.Forms
   semantic bridge. This slice proves the renderer-neutral role, numeric value,
   range and actions; it does not claim a new VoiceOver/UIA conformance run.

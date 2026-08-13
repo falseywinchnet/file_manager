@@ -8,6 +8,7 @@ from .diagnostics import Diagnostic, WebFormsError
 
 
 CAPABILITY_SCHEMA = "web.forms.gui-capabilities/0.1-experimental"
+CAPABILITY_STATUSES = frozenset({"supported", "primitive-present", "unavailable"})
 
 
 def read_capabilities(path: Path) -> dict[str, Any]:
@@ -17,13 +18,31 @@ def read_capabilities(path: Path) -> dict[str, Any]:
         raise WebFormsError([Diagnostic("WFM001", f"cannot read capability manifest: {error}", str(path))]) from error
     if not isinstance(value, dict) or value.get("schema") != CAPABILITY_SCHEMA:
         raise WebFormsError([Diagnostic("WFM002", f"expected capability schema {CAPABILITY_SCHEMA!r}", str(path))])
+    target = value.get("target")
+    features = value.get("features")
+    if not isinstance(target, str) or not target.strip():
+        raise WebFormsError([Diagnostic("WFM003", "manifest target must be a nonempty string", str(path))])
+    if not isinstance(features, dict):
+        raise WebFormsError([Diagnostic("WFM004", "manifest features must be an object", str(path))])
+    for name, entry in features.items():
+        if not isinstance(name, str) or not name or not isinstance(entry, dict):
+            raise WebFormsError([Diagnostic("WFM005", "manifest feature entries must be named objects", str(path))])
+        status = entry.get("status")
+        evidence = entry.get("evidence")
+        fallback = entry.get("fallback")
+        if status not in CAPABILITY_STATUSES:
+            raise WebFormsError([Diagnostic("WFM006", f"feature {name!r} has invalid status {status!r}", str(path))])
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise WebFormsError([Diagnostic("WFM007", f"feature {name!r} requires evidence", str(path))])
+        if not isinstance(fallback, str) or not fallback.strip():
+            raise WebFormsError([Diagnostic("WFM008", f"feature {name!r} requires an explicit fallback", str(path))])
     return value
 
 
 def assess_capabilities(ir: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     declared = manifest.get("features", {})
     if not isinstance(declared, dict):
-        raise WebFormsError([Diagnostic("WFM003", "manifest features must be an object", "<manifest>")])
+        raise WebFormsError([Diagnostic("WFM004", "manifest features must be an object", "<manifest>")])
     results = []
     counts = {"supported": 0, "degraded": 0, "adapter-required": 0, "unavailable": 0, "unknown": 0}
     policies = ir["requirements"].get("feature_policies", {})

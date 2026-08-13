@@ -36,8 +36,8 @@
 html { width: 100%; height: 100%; }
 
 body {
-  min-width: 1080px;
-  min-height: 720px;
+  min-width: 150px;
+  min-height: 150px;
   height: 100%;
   margin: 0;
   padding: 18px;
@@ -63,7 +63,7 @@ button {
   width: 100%;
   max-width: 1450px;
   height: 100%;
-  min-height: 682px;
+  min-height: 150px;
   margin: 0 auto;
   overflow: hidden;
   display: flex;
@@ -77,13 +77,17 @@ button {
 .title-bar {
   height: 40px;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 0 8px 0 76px;
   display: flex;
   align-items: center;
   gap: 8px;
   color: #ffffff;
   background-color: var(--sapphire);
-  background-image: linear-gradient(100deg, var(--sapphire), var(--sapphire-two), var(--sunset));
+  background-image:
+    radial-gradient(ellipse 26% 78% at 95% 100%, #ffc38e64 0%, #ffc38e00 100%),
+    radial-gradient(ellipse 38% 110% at 62% 160%, #d6b2ff6a 0%, #d6b2ff00 100%),
+    radial-gradient(ellipse 42% 125% at 18% -90%, #92d9ff74 0%, #92d9ff00 100%),
+    linear-gradient(92deg, #17347f 0%, #285bb5 32%, #3a68cb 58%, #8762b4 78%, #d96872 100%);
   border-bottom: 2px solid #172d69;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.42);
 }
@@ -183,7 +187,9 @@ button {
   align-items: stretch;
   gap: 4px;
   background-color: #e7edf6;
-  background-image: linear-gradient(180deg, #fafdff, #fafdff, #edf3f9, #d5e1eb);
+  background-image:
+    radial-gradient(ellipse 34% 85% at 15% -20%, #d6f3ff80 0%, #d6f3ff00 100%),
+    linear-gradient(180deg, #ffffff 0%, #f4f7fa 56%, #d5e1eb 100%);
   border-top: 2px solid var(--aqua);
   border-bottom: 1px solid var(--line);
 }
@@ -273,16 +279,19 @@ button {
   align-items: stretch;
   gap: 7px;
   background-color: var(--graphite);
+  background-image:
+    repeating-linear-gradient(135deg, #ffffff0a 0px, #ffffff0a 1.400071px, #ffffff00 1.442498px, #ffffff00 4.242641px),
+    linear-gradient(180deg, #626c73 0%, #4b545a 52%, #424a4f 100%);
   border-top: 1px solid #768288;
   border-bottom: 1px solid var(--graphite-dark);
 }
 
 .navigation-cluster {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
   display: flex;
-  gap: 4px;
+  gap: 0;
 }
 
 .nav-command {
@@ -295,7 +304,7 @@ button {
   background-color: #d4e0e8;
   background-image: linear-gradient(180deg, #f8fcff, #bfcfdd);
   border: 1px solid #243942;
-  border-radius: 2px;
+  border-radius: 0;
   box-shadow: inset 0 1px 0 #ffffff;
 }
 
@@ -330,9 +339,20 @@ button {
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 218px 3px 1fr 3px 288px;
+  grid-template-columns: 218px 1fr;
+  column-gap: 3px;
   grid-template-rows: 1fr;
-  background-color: var(--paper);
+  background-color: #8799ad;
+}
+
+.workspace-selection {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 288px;
+  column-gap: 3px;
+  grid-template-rows: 1fr;
+  background-color: #8799ad;
 }
 
 .sidebar,
@@ -343,6 +363,35 @@ button {
   display: flex;
   flex-direction: column;
   background-color: #ebf0f6;
+}
+
+.tree-header {
+  height: 27px;
+  min-height: 27px;
+  display: flex;
+  background-color: #d6dfeb;
+}
+
+.tree-header .pane-caption {
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-root-mode-host {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  height: 27px;
+  display: flex;
+  background-color: #d6dfeb;
+}
+
+.tree-root-mode-placeholder {
+  width: 100%;
+  padding: 7px 14px 0 7px;
+  color: #263c5e;
+  font-size: 9px;
+  white-space: nowrap;
 }
 
 .pane-caption {
@@ -382,19 +431,6 @@ button {
 .tree-placeholder {
   padding: 9px;
   color: var(--muted);
-}
-
-.split-seam {
-  width: 3px;
-  min-width: 3px;
-  height: 100%;
-  padding: 0;
-  color: #334f72;
-  font-size: 10px;
-  background-color: #8799ad;
-  background-image: linear-gradient(90deg, #7a8ea8, #eef3f8, #637993);
-  border: 0px solid transparent;
-  border-radius: 0;
 }
 
 .content {
@@ -493,6 +529,8 @@ button {
 }
 
 .facts {
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   background-color: #ebf0f6;
@@ -610,7 +648,9 @@ button {
   grid-template-columns: 1fr 1fr;
   color: #f1f5f6;
   background-color: #4b5459;
-  background-image: linear-gradient(180deg, #606a70, #454e53);
+  background-image:
+    repeating-linear-gradient(135deg, #ffffff0a 0px, #ffffff0a 1.400071px, #ffffff00 1.442498px, #ffffff00 4.242641px),
+    linear-gradient(180deg, #626c73 0%, #4b545a 52%, #424a4f 100%);
   border-top: 1px solid #3a464d;
 }
 

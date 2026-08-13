@@ -59,7 +59,7 @@ class CliTest(unittest.TestCase):
 
     def test_gui_material_projection_requires_and_uses_manifest(self) -> None:
         source = ROOT / "boards/controls/button/button.wf.html"
-        manifest = ROOT / "capabilities/gui_forms_observed_001.json"
+        manifest = ROOT / "capabilities/gui_forms_observed_002.json"
         with tempfile.TemporaryDirectory() as temporary_name:
             output = Path(temporary_name)
             ir = output / "button.wfir.json"

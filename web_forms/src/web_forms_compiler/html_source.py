@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .diagnostics import Diagnostic, WebFormsError
+from .keylines import parse_keylines
 from .profile import (
     ALLOWED_ELEMENTS, CLASS_PATTERN, CONTROL_KINDS, GLOBAL_ATTRIBUTES,
     ID_PATTERN, INTERACTIVE_ELEMENTS, MAX_ATTRIBUTES_PER_NODE,
@@ -140,11 +141,150 @@ class BoundedHtmlParser(HTMLParser):
         surface = attributes.get("data-wf-surface")
         if surface is not None and surface not in {"reveal-parent", "own-surface", "baked-into-parent"}:
             self.issue("WFH025", "invalid surface ownership mode")
+        dropdown_mode = attributes.get("data-wf-dropdown-mode")
+        if dropdown_mode is not None and (
+            control_kind != "dropdown-button" or dropdown_mode not in {"menu", "split"}
+        ):
+            self.issue("WFH039", "dropdown mode requires dropdown-button and must be menu or split")
+        if "data-wf-dropdown-width" in attributes and control_kind != "dropdown-button":
+            self.issue("WFH056", "dropdown width requires dropdown-button")
+        overflow_actuator = attributes.get("data-wf-overflow-actuator")
+        if overflow_actuator is not None and overflow_actuator != "true":
+            self.issue("WFH040", "overflow actuator must be the literal true")
+        drag_region = attributes.get("data-wf-window-drag-region")
+        if drag_region is not None and drag_region != "true":
+            self.issue("WFH041", "window drag region must be the literal true")
+        responsive_orientation = attributes.get("data-wf-responsive-orientation")
+        if responsive_orientation is not None and (
+            control_kind != "responsive-tracks"
+            or responsive_orientation not in {"horizontal", "vertical"}
+        ):
+            self.issue(
+                "WFH043",
+                "responsive orientation requires responsive-tracks and must be horizontal or vertical",
+            )
+        track_mode = attributes.get("data-wf-track-mode")
+        if track_mode is not None and track_mode not in {
+            "fixed", "content", "remaining"
+        }:
+            self.issue("WFH044", "track mode must be fixed, content, or remaining")
+        image_key = attributes.get("data-wf-image-key")
+        if image_key is not None and (
+            tag != "button" or not CLASS_PATTERN.fullmatch(image_key)
+        ):
+            self.issue(
+                "WFH046",
+                "image key requires a button and a bounded lowercase token",
+            )
+        connected_axis = attributes.get("data-wf-connected-axis")
+        if connected_axis is not None and connected_axis not in {
+            "horizontal", "vertical"
+        }:
+            self.issue("WFH052", "connected axis must be horizontal or vertical")
+        keylines = attributes.get("data-wf-keylines")
+        if keylines is not None:
+            if surface not in {"own-surface", "baked-into-parent"}:
+                self.issue(
+                    "WFH055",
+                    "keylines require an owned or parent-baked surface",
+                )
+            try:
+                parse_keylines(keylines, str(self.path))
+            except WebFormsError as error:
+                self.diagnostics.extend(error.diagnostics)
+        image_list = attributes.get("data-wf-image-list")
+        image_source = attributes.get("data-wf-image-src")
+        dense_image_source = attributes.get("data-wf-image-src-2x")
+        if any(value is not None for value in (
+            image_list, image_source, dense_image_source,
+            attributes.get("data-wf-image-width"),
+            attributes.get("data-wf-image-height"),
+        )):
+            if (tag != "button" or image_key is None or image_list is None or
+                    image_source is None or
+                    not CLASS_PATTERN.fullmatch(image_list)):
+                self.issue(
+                    "WFH053",
+                    "local image resources require a button, image key/list, and 1x PNG source",
+                )
+        image_relation = attributes.get("data-wf-image-relation")
+        if image_relation is not None and image_relation not in {
+            "overlay", "image-above-text", "image-before-text",
+            "text-above-image", "text-before-image",
+        }:
+            self.issue("WFH047", "image relation is outside the bounded control vocabulary")
+        for alignment_name in (
+            "data-wf-image-alignment", "data-wf-text-alignment"
+        ):
+            alignment = attributes.get(alignment_name)
+            if alignment is not None and alignment not in {
+                "top-left", "top-center", "top-right", "middle-left",
+                "middle-center", "middle-right", "bottom-left",
+                "bottom-center", "bottom-right",
+            }:
+                self.issue("WFH048", f"{alignment_name} has an invalid alignment")
+        split_orientation = attributes.get("data-wf-split-orientation")
+        if split_orientation is not None and (
+            control_kind != "split-view"
+            or split_orientation not in {"horizontal", "vertical"}
+        ):
+            self.issue(
+                "WFH049",
+                "split orientation requires split-view and must be horizontal or vertical",
+            )
+        split_panel = attributes.get("data-wf-split-panel")
+        if split_panel is not None and split_panel not in {"first", "second"}:
+            self.issue("WFH050", "split panel must be first or second")
+        for panel_name in (
+            "data-wf-split-fixed-panel", "data-wf-split-collapse-panel"
+        ):
+            panel = attributes.get(panel_name)
+            if panel is not None and panel not in {"none", "first", "second"}:
+                self.issue("WFH051", f"{panel_name} must be none, first, or second")
+        for numeric_name in (
+            "data-wf-overflow-gap", "data-wf-overflow-minimum",
+            "data-wf-dropdown-width",
+            "data-wf-overflow-preferred", "data-wf-overflow-maximum",
+            "data-wf-overflow-priority", "data-wf-responsive-gap",
+            "data-wf-track-index", "data-wf-track-minimum",
+            "data-wf-track-preferred", "data-wf-track-maximum",
+            "data-wf-track-weight", "data-wf-track-collapse-priority",
+            "data-wf-image-gap", "data-wf-content-padding-left",
+            "data-wf-content-padding-top", "data-wf-content-padding-right",
+            "data-wf-content-padding-bottom",
+            "data-wf-split-distance", "data-wf-split-visible-thickness",
+            "data-wf-split-hit-before", "data-wf-split-hit-after",
+            "data-wf-split-minimum-hit-target", "data-wf-split-first-minimum",
+            "data-wf-split-second-minimum", "data-wf-split-first-maximum",
+            "data-wf-split-second-maximum",
+            "data-wf-split-automatic-collapse-threshold",
+            "data-wf-split-transition-ms",
+            "data-wf-image-width", "data-wf-image-height",
+        ):
+            raw = attributes.get(numeric_name)
+            if raw is None:
+                continue
+            try:
+                number = float(raw)
+            except ValueError:
+                number = -1.0
+            if not (0.0 <= number <= 1_000_000.0):
+                self.issue("WFH042", f"{numeric_name} must be a bounded nonnegative number")
+        for integer_name, maximum in (
+            ("data-wf-track-index", 63),
+            ("data-wf-track-collapse-priority", 65535),
+        ):
+            raw = attributes.get(integer_name)
+            if raw is not None and (not raw.isdigit() or int(raw) > maximum):
+                self.issue(
+                    "WFH045",
+                    f"{integer_name} must be an integer between zero and {maximum}",
+                )
 
         if (tag in INTERACTIVE_ELEMENTS or control_kind is not None or exposure == "exposed") and stable_id is None:
             self.issue("WFH026", f"addressable <{tag}> requires a stable id")
 
-        for url_attribute in ("src", "href"):
+        for url_attribute in ("src", "href", "data-wf-image-src", "data-wf-image-src-2x"):
             value = attributes.get(url_attribute)
             if value is None:
                 continue
@@ -220,6 +360,7 @@ class BoundedHtmlParser(HTMLParser):
         if total_text > MAX_TEXT_BYTES:
             self.issue("WFH036", "text byte limit exceeded")
         self._validate_id_tree()
+        self._validate_connected_groups()
         if self.diagnostics:
             raise WebFormsError(self.diagnostics)
         return HtmlDocument(self.path, self.nodes, self.title, self.style_links, self.inline_styles)
@@ -241,6 +382,24 @@ class BoundedHtmlParser(HTMLParser):
                 self.issue(
                     "WFH037",
                     f"stable id {stable_id!r} must extend retained parent {parent_id!r}",
+                    node.line,
+                    node.column,
+                )
+
+    def _validate_connected_groups(self) -> None:
+        for node in self.nodes:
+            if "data-wf-connected-axis" not in node.attributes:
+                continue
+            children = [child for child in self.nodes if child.parent == node.index]
+            if len(children) < 2 or len(children) > 256 or any(
+                child.tag != "button" or child.attributes.get("data-wf-control") not in {
+                    None, "button", "dropdown-button"
+                }
+                for child in children
+            ):
+                self.issue(
+                    "WFH054",
+                    "connected group requires two through 256 direct button/dropdown children",
                     node.line,
                     node.column,
                 )

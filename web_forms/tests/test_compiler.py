@@ -81,6 +81,74 @@ class CompilerTest(unittest.TestCase):
         self.assertEqual(sapphire["styles"]["pools"]["typography"], parchment["styles"]["pools"]["typography"])
         self.assertNotEqual(sapphire["styles"]["pools"]["material"], parchment["styles"]["pools"]["material"])
 
+    def test_native_tree_projects_initial_display_none_without_frontend_surgery(self) -> None:
+        ir = compile_source(
+            WEB_FORMS_ROOT.parent / "frontend/ui/boards/file_manager/file_manager.wf.html"
+        )
+        manifest = read_capabilities(
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
+        )
+        with tempfile.TemporaryDirectory() as temporary_name:
+            paths = generate_gui_tree(
+                ir, manifest, Path(temporary_name), "file_manager_hidden_probe"
+            )
+            source = paths[1].read_text(encoding="utf-8")
+            header = paths[0].read_text(encoding="utf-8")
+            report = json.loads(paths[2].read_text(encoding="utf-8"))
+        hidden = "file-manager-app.shell.settings"
+        self.assertIn(hidden, report["initially_hidden_nodes"])
+        self.assertIn(
+            "form.file_manager_app_shell_settings->set_visible(false);",
+            source,
+        )
+        self.assertIn(
+            "file-manager-app.shell.commands.new-folder",
+            report["initially_hidden_nodes"],
+        )
+        self.assertNotIn(
+            "file-manager-app.shell.commands.overflow",
+            report["initially_hidden_nodes"],
+        )
+        self.assertEqual(
+            ["file-manager-app.shell.title"], report["window_drag_region_ids"]
+        )
+        self.assertIn(
+            'window_drag_region_ids{{"file-manager-app.shell.title"}}',
+            header,
+        )
+        self.assertIn("gui_forms::CommandOverflowPanel", source)
+        self.assertIn("gui_forms::ResponsiveTrackPanel", source)
+        self.assertIn("gui_forms::SplitContainer", source)
+        self.assertIn("gui_forms::DropDownButton", source)
+        self.assertEqual(3, source.count("set_drop_down_width(16.0)"))
+        self.assertIn("set_group_spec", source)
+        self.assertIn("set_overflow_actuator", source)
+        self.assertIn("set_track_specs", source)
+        self.assertIn("set_child_track", source)
+        self.assertIn("first_panel()->add_child", source)
+        self.assertIn("second_panel()->add_child", source)
+        self.assertIn('set_image_key("transfer")', source)
+        self.assertIn(
+            "set_text_image_relation(gui_forms::TextImageRelation::image_above_text)",
+            source,
+        )
+        self.assertIn("set_content_padding({5.0, 2.0, 21.0, 2.0})", source)
+        self.assertIn("gui_forms::connect_button_group", source)
+        self.assertIn('resource_house_commands->add_png("transfer"', source)
+        self.assertIn('resource_house_commands->set_variant_png("transfer"', source)
+        self.assertIn("bind_native_resources", source)
+        self.assertEqual(1, report["responsive_track_count"])
+        self.assertEqual(3, report["split_container_count"])
+        self.assertEqual(1, report["connected_group_count"])
+        self.assertEqual(16, report["local_png_resource_count"])
+        self.assertEqual(1, report["local_png_list_count"])
+        self.assertEqual(16, len(ir["resources"]["local_png"]))
+        self.assertIn("control.connected-topology", ir["requirements"]["features"])
+        self.assertIn("resource.local-png", ir["requirements"]["features"])
+        self.assertIn('"Appearance && Access"', source)
+        self.assertIn('"ARRANGE & INSPECT"', source)
+        self.assertIn("set_use_mnemonic(false)", source)
+
     def test_stage_one_is_deterministic(self) -> None:
         self.assertEqual(compile_source(self.breadcrumb), compile_source(self.breadcrumb))
 
@@ -249,7 +317,7 @@ class CompilerTest(unittest.TestCase):
             self.skipTest("no C++ compiler available")
         ir = compile_source(self.button)
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -328,6 +396,18 @@ class CompilerTest(unittest.TestCase):
                         gui_forms_root
                         / "src/core/surface_material/types/surface_material_types.cpp"
                     ),
+                    str(
+                        gui_forms_root
+                        / "src/core/typography/resolution/typography_resolution.cpp"
+                    ),
+                    str(
+                        gui_forms_root
+                        / "src/core/text/text_store/text_store.cpp"
+                    ),
+                    str(
+                        gui_forms_root
+                        / "src/core/text/unicode/unicode_grapheme.cpp"
+                    ),
                     str(gui_forms_root / "src/core/types/painter/painter.cpp"),
                     str(gui_forms_root / "src/core/theme/theme/theme.cpp"),
                     str(probe),
@@ -350,7 +430,7 @@ class CompilerTest(unittest.TestCase):
             self.skipTest("no C++ compiler available")
         ir = compile_source(self.shell)
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -387,12 +467,42 @@ class CompilerTest(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
+    def test_file_manager_layered_materials_project_in_css_paint_order(self) -> None:
+        source_path = (
+            WEB_FORMS_ROOT.parent
+            / "frontend/ui/boards/file_manager/file_manager.wf.html"
+        )
+        ir = compile_source(source_path)
+        manifest = read_capabilities(
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
+        )
+        with tempfile.TemporaryDirectory() as temporary_name:
+            _, source, report_path = generate_gui_materials(
+                ir, manifest, Path(temporary_name), "file_manager_layers"
+            )
+            report = json.loads(report_path.read_text())
+            emitted = source.read_text()
+        self.assertEqual(0, report["unavailable_style_count"])
+        self.assertGreaterEqual(emitted.count("MaterialFillLayer::radial("), 4)
+        self.assertGreaterEqual(
+            emitted.count("MaterialFillLayer::repeating_linear("), 2
+        )
+        title_linear = emitted.index(
+            "MaterialFillLayer::linear_css_angle(\n        92.0"
+        )
+        title_radial = emitted.index("MaterialFillLayer::radial(", title_linear)
+        self.assertLess(
+            title_linear,
+            title_radial,
+            "CSS topmost-first images must be reversed into GUI.Forms back-to-front replay",
+        )
+
     def test_relational_flex_layout_projects_into_gui_forms(self) -> None:
         compiler = shutil.which("c++")
         if compiler is None:
             self.skipTest("no C++ compiler available")
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -511,7 +621,32 @@ class CompilerTest(unittest.TestCase):
 
     def test_current_gui_forms_manifest_is_ready_for_dogfood_native_lowering(self) -> None:
         ir = compile_source(self.breadcrumb)
-        manifest = read_capabilities(WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json")
+        manifest = read_capabilities(WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json")
+        self.assertEqual("gui.forms.observed-2026-08-13", manifest["target"])
+        self.assertEqual(3, manifest["revision"])
+        expected_stack_one = {
+            "control.connected-topology": "supported",
+            "control.split-seam-geometry": "supported",
+            "host.custom-chrome-drag-regions": "supported",
+            "inspection.visual-state-snapshot": "supported",
+            "layout.priority-collapse": "supported",
+            "layout.responsive-tracks": "supported",
+            "paint.ordered-fill-layers": "supported",
+            "paint.ordered-keylines": "supported",
+            "resource.local-png": "supported",
+            "typography.resolved-runs": "supported",
+        }
+        self.assertEqual(
+            expected_stack_one,
+            {
+                name: manifest["features"][name]["status"]
+                for name in expected_stack_one
+            },
+        )
+        self.assertEqual(
+            "unavailable",
+            manifest["features"]["paint.advanced-mask-blend"]["status"],
+        )
         assessment = assess_capabilities(ir, manifest)
         self.assertTrue(assessment["ready_for_native_lowering"])
         by_name = {item["feature"]: item for item in assessment["features"]}
@@ -519,12 +654,88 @@ class CompilerTest(unittest.TestCase):
         self.assertEqual("supported", by_name["decoration.after"]["classification"])
         self.assertEqual("supported", by_name["effect.inset-shadow"]["classification"])
 
+    def test_ordered_keylines_and_connected_groups_lower_without_inference(self) -> None:
+        temporary, source = self._temporary_source(
+            '<div id="test.stock" data-wf-connected-axis="horizontal">'
+            '<button id="test.stock.first" data-wf-keylines="bottom #ffffff99 1 0; bottom #172d69 1 1" data-wf-surface="own-surface">First</button>'
+            '<button id="test.stock.second" data-wf-surface="own-surface">Second</button>'
+            '</div>',
+            'body { color: #111111; background-color: #ffffff; font-family: "Carlito", sans-serif; font-size: 12px; } '
+            'div { display: flex; } button { color: #111111; background-color: #ddeeff; border: 1px solid #334455; }',
+        )
+        manifest = read_capabilities(
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
+        )
+        with temporary, tempfile.TemporaryDirectory() as output_name:
+            ir = compile_source(source)
+            paths = generate_gui_tree(
+                ir, manifest, Path(output_name), "keyline_stock"
+            )
+            emitted = paths[1].read_text(encoding="utf-8") + (
+                Path(output_name) / "keyline_stock.gui_materials.wf.cpp"
+            ).read_text(encoding="utf-8")
+            report = json.loads(paths[2].read_text(encoding="utf-8"))
+        self.assertIn("paint.ordered-keylines", ir["requirements"]["features"])
+        self.assertIn("control.connected-topology", ir["requirements"]["features"])
+        self.assertIn("gui_forms::MaterialEdge::bottom", emitted)
+        self.assertIn("apply_native_recipe_keylines", emitted)
+        self.assertIn("gui_forms::connect_button_group", emitted)
+        self.assertEqual(1, report["connected_group_count"])
+
+    def test_connected_keyline_and_local_png_source_contracts_fail_closed(self) -> None:
+        self.assert_rejected(
+            '<button id="test.bad-width" data-wf-dropdown-width="16">Bad</button>',
+            'body { color: #111111; }',
+            "WFH056",
+        )
+        self.assert_rejected(
+            '<div id="test.stock" data-wf-connected-axis="horizontal">'
+            '<button id="test.stock.only">Only</button></div>',
+            'body { color: #111111; }',
+            "WFH054",
+        )
+        self.assert_rejected(
+            '<button id="test.bad" data-wf-keylines="middle #ffffff 1 0">Bad</button>',
+            'body { color: #111111; }',
+            "WFK002",
+        )
+        self.assert_rejected(
+            '<button id="test.art" data-wf-image-key="icon" '
+            'data-wf-image-list="icons" data-wf-image-src="missing.png" '
+            'data-wf-image-width="16" data-wf-image-height="16">Art</button>',
+            'body { color: #111111; }',
+            "WFR002",
+        )
+
+    def test_gui_forms_manifest_validation_is_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_name:
+            path = Path(temporary_name) / "invalid.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "web.forms.gui-capabilities/0.1-experimental",
+                        "target": "gui.forms.invalid",
+                        "features": {
+                            "paint.unproved": {
+                                "status": "probably",
+                                "evidence": "",
+                                "fallback": "",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(WebFormsError) as captured:
+                read_capabilities(path)
+        self.assertEqual("WFM006", captured.exception.diagnostics[0].code)
+
     def test_retained_typography_projects_shared_font_and_text_geometry(self) -> None:
         compiler = shutil.which("c++")
         if compiler is None:
             self.skipTest("no C++ compiler available")
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -558,7 +769,7 @@ class CompilerTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("no C++ compiler available")
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:
@@ -632,7 +843,7 @@ class CompilerTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("no C++ compiler available")
         manifest = read_capabilities(
-            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_001.json"
+            WEB_FORMS_ROOT / "capabilities/gui_forms_observed_002.json"
         )
         gui_forms_root = WEB_FORMS_ROOT.parent / "gui_forms"
         with tempfile.TemporaryDirectory() as temporary_name:

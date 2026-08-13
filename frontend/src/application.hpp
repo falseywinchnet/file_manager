@@ -56,7 +56,6 @@ private:
     void install_dynamic_controls();
     void install_command_shelf_controls();
     void install_house_art();
-    void install_house_materials();
     void install_command_surfaces();
     void install_accelerators();
     void install_handlers();
@@ -65,7 +64,6 @@ private:
         std::function<void()> action);
     void show_menu(const std::shared_ptr<gui_forms::ContextMenu>& menu,
                    const gui_forms::Control::Ptr& owner);
-    void update_command_shelf_projection(double available_width);
     void show_command_shelf_overflow();
     void update_command_state();
     void focus_active_object_surface();
@@ -273,7 +271,6 @@ private:
     std::shared_ptr<gui_forms::SplitContainer> workspace_split_;
     std::shared_ptr<gui_forms::SplitContainer> selection_split_;
     std::shared_ptr<gui_forms::Panel> content_surface_;
-    std::shared_ptr<gui_forms::Panel> inspector_surface_;
     std::shared_ptr<gui_forms::PropertyList> settings_property_list_;
     std::shared_ptr<gui_forms::BreadcrumbTrail> breadcrumb_;
     std::shared_ptr<gui_forms::TextBox> path_box_;
@@ -288,7 +285,6 @@ private:
     std::shared_ptr<gui_forms::Button> criteria_add_button_;
     std::shared_ptr<gui_forms::ImageList> object_images_;
     std::shared_ptr<gui_forms::ImageList> tree_images_;
-    std::shared_ptr<gui_forms::ImageList> command_images_;
     std::shared_ptr<gui_forms::ImageList> preview_images_;
     std::shared_ptr<gui_forms::CorrespondenceView> correspondence_;
     std::shared_ptr<gui_forms::PropertyList> property_list_;
@@ -358,7 +354,6 @@ private:
     std::vector<gui_forms::SubscriptionToken> settings_subscriptions_;
     std::vector<gui_forms::AcceleratorToken> accelerator_tokens_;
     gui_forms::Window* window_{};
-    std::uint8_t command_shelf_projection_{0xffU};
     gui_forms::ImageId preview_image_id_{};
 
     std::thread worker_;

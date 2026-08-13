@@ -8,6 +8,7 @@ from typing import Any
 
 from .capabilities import assess_capabilities
 from .diagnostics import Diagnostic, WebFormsError
+from .keylines import parse_keylines
 from .profile import IR_SCHEMA
 from .stage2 import _symbol, validate_generated_cpp
 
@@ -51,9 +52,21 @@ class ColorValue:
 
 
 @dataclass(frozen=True)
+class GradientStopValue:
+    offset: float
+    color: ColorValue
+
+
+@dataclass(frozen=True)
 class GradientValue:
+    kind: str
     angle_degrees: float
-    stops: tuple[ColorValue, ...]
+    stops: tuple[GradientStopValue, ...]
+    center_x: float = 0.5
+    center_y: float = 0.5
+    radius_x: float = 0.5
+    radius_y: float = 0.5
+    repeat_period: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -83,7 +96,7 @@ class ShadowValue:
 @dataclass(frozen=True)
 class MaterialValue:
     color: ColorValue
-    gradient: GradientValue | None
+    gradients: tuple[GradientValue, ...]
     border: BorderValue | None
     border_edges: BorderEdgesValue | None
     shadows: tuple[ShadowValue, ...]
@@ -134,24 +147,115 @@ def _single_color(item: dict[str, Any], purpose: str) -> ColorValue:
     return _color(tokens[0])
 
 
-def _gradient(item: dict[str, Any]) -> GradientValue | None:
+def _gradient_stops(
+    tokens: list[dict[str, Any]], *, repeating: bool
+) -> tuple[tuple[GradientStopValue, ...], float]:
+    raw: list[tuple[ColorValue, dict[str, Any] | None]] = []
+    position = 0
+    while position < len(tokens):
+        if tokens[position].get("kind") != "color_rgba":
+            raise _diagnostic("WFGM016", "gradient requires color stops")
+        color = _color(tokens[position])
+        position += 1
+        stop_position = None
+        if position < len(tokens) and tokens[position].get("kind") in {
+            "percent", "logical_px"
+        }:
+            stop_position = tokens[position]
+            position += 1
+        raw.append((color, stop_position))
+    if len(raw) < 2 or len(raw) > 32:
+        raise _diagnostic("WFGM017", "gradient stop count is outside the retained limit")
+    authored = [item[1] for item in raw]
+    if any(item is None for item in authored) and any(item is not None for item in authored):
+        raise _diagnostic(
+            "WFGM018", "bounded gradient stops must either all have positions or all omit them"
+        )
+    if all(item is None for item in authored):
+        denominator = len(raw) - 1
+        return tuple(
+            GradientStopValue(index / denominator, color)
+            for index, (color, _) in enumerate(raw)
+        ), 0.0
+    required_kind = "logical_px" if repeating else "percent"
+    if any(item is None or item.get("kind") != required_kind for item in authored):
+        suffix = "logical-pixel" if repeating else "percent"
+        raise _diagnostic("WFGM019", f"gradient requires {suffix} stop positions")
+    values = [float(item.get("number", 0.0)) for item in authored if item is not None]
+    if any(right < left for left, right in zip(values, values[1:])):
+        raise _diagnostic("WFGM019", "gradient stop positions must be nondecreasing")
+    if repeating:
+        period = values[-1]
+        if values[0] != 0.0 or period <= 0.0 or period > 256.0:
+            raise _diagnostic(
+                "WFGM019", "repeating gradient must span 0px through a period at most 256px"
+            )
+        return tuple(
+            GradientStopValue(value / period, raw[index][0])
+            for index, value in enumerate(values)
+        ), period
+    if values[0] < 0.0 or values[-1] > 100.0:
+        raise _diagnostic("WFGM019", "gradient percent stops must remain within 0 through 100")
+    return tuple(
+        GradientStopValue(value / 100.0, raw[index][0])
+        for index, value in enumerate(values)
+    ), 0.0
+
+
+def _gradient_layer(tokens: list[dict[str, Any]]) -> GradientValue:
+    if not tokens or tokens[0].get("kind") != "keyword":
+        raise _diagnostic("WFGM014", "background-image is not a supported gradient")
+    function = tokens[0].get("text")
+    if function == "repeating-radial-gradient":
+        raise _diagnostic("WFGM015", "repeating radial gradients are not in the bounded native projection")
+    if function not in {"linear-gradient", "radial-gradient", "repeating-linear-gradient"}:
+        raise _diagnostic("WFGM015", "background-image gradient kind is not supported")
+    position = 1
+    angle = 180.0
+    center_x = center_y = radius_x = radius_y = 0.5
+    if function in {"linear-gradient", "repeating-linear-gradient"}:
+        if position < len(tokens) and tokens[position].get("kind") == "angle_deg":
+            angle = float(tokens[position].get("number", 0.0)) % 360.0
+            position += 1
+    elif position < len(tokens) and tokens[position].get("text") == "ellipse":
+        if position + 5 >= len(tokens) or tokens[position + 3].get("text") != "at":
+            raise _diagnostic("WFGM015", "radial ellipse geometry is malformed")
+        values = tokens[position + 1 : position + 6]
+        if any(values[index].get("kind") != "percent" for index in (0, 1, 3, 4)):
+            raise _diagnostic("WFGM015", "radial ellipse geometry requires percentages")
+        radius_x = float(values[0].get("number", 0.0)) / 100.0
+        radius_y = float(values[1].get("number", 0.0)) / 100.0
+        center_x = float(values[3].get("number", 0.0)) / 100.0
+        center_y = float(values[4].get("number", 0.0)) / 100.0
+        if radius_x <= 0.0 or radius_y <= 0.0 or radius_x > 8.0 or radius_y > 8.0:
+            raise _diagnostic("WFGM015", "radial radii must be positive and at most 800 percent")
+        position += 6
+    repeating = function == "repeating-linear-gradient"
+    stops, repeat_period = _gradient_stops(tokens[position:], repeating=repeating)
+    kind = "repeating_linear" if repeating else (
+        "radial" if function == "radial-gradient" else "linear"
+    )
+    return GradientValue(
+        kind, angle, stops, center_x, center_y, radius_x, radius_y, repeat_period
+    )
+
+
+def _gradients(item: dict[str, Any]) -> tuple[GradientValue, ...]:
     typed = item["typed"]
     tokens = typed["tokens"]
     if typed["kind"] == "keyword" and len(tokens) == 1 and tokens[0].get("text") == "none":
-        return None
+        return tuple()
     if typed["kind"] != "gradient" or not tokens:
-        raise _diagnostic("WFGM014", "background-image is not a supported linear gradient")
-    if tokens[0].get("text") != "linear-gradient":
-        raise _diagnostic("WFGM015", "only nonrepeating linear gradients are in the first native projection")
-    position = 1
-    angle = 180.0
-    if position < len(tokens) and tokens[position].get("kind") == "angle_deg":
-        angle = float(tokens[position].get("number", 0.0)) % 360.0
-        position += 1
-    colors = tuple(_color(token) for token in tokens[position:])
-    if len(colors) < 2 or len(colors) > 32:
-        raise _diagnostic("WFGM017", "gradient stop count is outside the retained limit")
-    return GradientValue(angle, colors)
+        raise _diagnostic("WFGM014", "background-image is not a supported gradient list")
+    groups: list[list[dict[str, Any]]] = [[]]
+    for token in tokens:
+        if token.get("kind") == "separator":
+            groups.append([])
+        else:
+            groups[-1].append(token)
+    if any(not group for group in groups) or len(groups) > 7:
+        raise _diagnostic("WFGM014", "gradient layer count is outside the retained limit")
+    return tuple(_gradient_layer(group) for group in groups)
 
 
 def _parse_border_item(item: dict[str, Any], purpose: str) -> BorderValue | None:
@@ -289,7 +393,7 @@ def _lower_material(record: dict[str, Any]) -> MaterialValue:
             "unsupported surface properties: " + ", ".join(sorted(unsupported)),
         )
     gradient_item = properties.get("background-image")
-    gradient = None if gradient_item is None else _gradient(gradient_item)
+    gradients = tuple() if gradient_item is None else _gradients(gradient_item)
     border, border_edges = _border(properties)
     corner_radius = _corner_radius(properties.get("border-radius"))
     if border_edges is not None and corner_radius != 0.0:
@@ -299,7 +403,7 @@ def _lower_material(record: dict[str, Any]) -> MaterialValue:
         )
     return MaterialValue(
         _single_color(background, "background-color"),
-        gradient,
+        gradients,
         border,
         border_edges,
         _shadows(properties.get("box-shadow")),
@@ -419,12 +523,14 @@ def _emit_color(value: ColorValue) -> str:
 
 
 def _emit_material(lines: list[str], symbol: str, material: MaterialValue) -> None:
-    if material.gradient is not None:
-        lines.append(f"static const gui_forms::GradientStop material_{symbol}_stops[] = {{")
-        denominator = len(material.gradient.stops) - 1
-        for stop_index, color in enumerate(material.gradient.stops):
-            offset = stop_index / denominator
-            lines.append(f"    {{{_number(offset)}, {_emit_color(color)}}},")
+    for gradient_index, gradient in enumerate(material.gradients):
+        lines.append(
+            f"static const gui_forms::GradientStop material_{symbol}_gradient_{gradient_index}_stops[] = {{"
+        )
+        for stop in gradient.stops:
+            lines.append(
+                f"    {{{_number(stop.offset)}, {_emit_color(stop.color)}}},"
+            )
         lines.append("};")
         lines.append("")
     lines.append(f"static const gui_forms::MaterialFillLayer material_{symbol}_fills[] = {{")
@@ -432,15 +538,40 @@ def _emit_material(lines: list[str], symbol: str, material: MaterialValue) -> No
         "    gui_forms::MaterialFillLayer::solid("
         f"{_emit_color(material.color)}),"
     )
-    if material.gradient is not None:
-        gradient = material.gradient
-        lines.append("    gui_forms::MaterialFillLayer::linear_css_angle(")
-        lines.append(f"        {_number(gradient.angle_degrees)},")
-        lines.append(
-            f"        material_{symbol}_stops, "
-            f"sizeof(material_{symbol}_stops) / sizeof(material_{symbol}_stops[0]),"
-        )
-        lines.append("        gui_forms::GradientSpreadMode::pad),")
+    # CSS lists the topmost background first. GUI.Forms replays retained fill
+    # layers from back to front, so emit the authored images in reverse order
+    # above the solid fallback.
+    for gradient_index in reversed(range(len(material.gradients))):
+        gradient = material.gradients[gradient_index]
+        stops = f"material_{symbol}_gradient_{gradient_index}_stops"
+        count = f"sizeof({stops}) / sizeof({stops}[0])"
+        if gradient.kind == "linear":
+            lines.append("    gui_forms::MaterialFillLayer::linear_css_angle(")
+            lines.append(f"        {_number(gradient.angle_degrees)},")
+            lines.append(f"        {stops}, {count},")
+            lines.append("        gui_forms::GradientSpreadMode::pad),")
+        elif gradient.kind == "radial":
+            lines.append("    gui_forms::MaterialFillLayer::radial(")
+            lines.append(
+                f"        {{{_number(gradient.center_x)}, {_number(gradient.center_y)}}},"
+            )
+            lines.append(
+                f"        {{{_number(gradient.radius_x)}, {_number(gradient.radius_y)}}},"
+            )
+            lines.append(f"        {stops}, {count},")
+            lines.append("        gui_forms::MaterialCoordinateSpace::normalized),")
+        elif gradient.kind == "repeating_linear":
+            angle = math.radians(gradient.angle_degrees)
+            end_x = math.sin(angle) * gradient.repeat_period
+            end_y = -math.cos(angle) * gradient.repeat_period
+            lines.append("    gui_forms::MaterialFillLayer::repeating_linear(")
+            lines.append(
+                f"        {{0.0, 0.0}}, {{{_number(end_x)}, {_number(end_y)}}},"
+            )
+            lines.append(f"        {stops}, {count},")
+            lines.append("        gui_forms::MaterialCoordinateSpace::logical),")
+        else:
+            raise AssertionError(f"unknown gradient kind {gradient.kind}")
     lines.append("};")
     lines.append("")
     if material.shadows:
@@ -734,7 +865,9 @@ def generate_gui_materials(
     button_recipes: dict[int, dict[str, RecipeValue]] = {}
     button_records: list[dict[str, Any]] = []
     for node in document_nodes:
-        if not node["runtime"] or node["control"] != "button":
+        if not node["runtime"] or node["control"] not in {
+            "button", "dropdown-button"
+        }:
             continue
         if not state_recipe_enabled:
             button_records.append(
@@ -772,6 +905,13 @@ def generate_gui_materials(
                     "diagnostics": notes,
                 }
             )
+    node_keylines = {
+        node["index"]: parse_keylines(
+            node["attributes"]["data-wf-keylines"], "<ir>"
+        )
+        for node in document_nodes
+        if "data-wf-keylines" in node.get("attributes", {})
+    }
     header_lines = [
         "#pragma once",
         "",
@@ -783,8 +923,10 @@ def generate_gui_materials(
         "",
         "bool has_native_surface_material(std::size_t style_index) noexcept;",
         "gui_forms::SurfaceMaterial make_native_surface_material(std::size_t style_index);",
+        "void apply_native_material_keylines(std::size_t node_index, gui_forms::SurfaceMaterial& material);",
         "bool has_native_button_state_recipes(std::size_t node_index) noexcept;",
         "gui_forms::ControlStateRecipes make_native_button_state_recipes(std::size_t node_index);",
+        "void apply_native_recipe_keylines(std::size_t node_index, gui_forms::ControlStateRecipes& recipes);",
         "",
         f"}}  // namespace {namespace}",
         "",
@@ -800,6 +942,18 @@ def generate_gui_materials(
     ]
     for index, material in exact.items():
         _emit_material(source_lines, str(index), material)
+    for node_index, keylines in node_keylines.items():
+        source_lines.append(
+            f"static const gui_forms::MaterialKeyline node_{node_index}_keylines[] = {{"
+        )
+        for keyline in keylines:
+            color = ColorValue(*keyline["color"])
+            source_lines.append(
+                "    {gui_forms::MaterialEdge::"
+                f"{keyline['edge']}, {_emit_color(color)}, "
+                f"{_number(keyline['width'])}, {_number(keyline['inset'])}}},"
+            )
+        source_lines.extend(["};", ""])
     for node_index, recipes in button_recipes.items():
         for state in RETAINED_RECIPE_STATES:
             symbol = f"button_{node_index}_{state}"
@@ -863,6 +1017,43 @@ def generate_gui_materials(
             "    }",
             "}",
             "",
+            "namespace {",
+            "[[maybe_unused]] void apply_keylines(gui_forms::SurfaceMaterial& material,",
+            "                    const gui_forms::MaterialKeyline* keylines,",
+            "                    std::size_t keyline_count) {",
+            "    const gui_forms::MaterialBorder* border =",
+            "        material.border ? &*material.border : nullptr;",
+            "    const gui_forms::MaterialBorderEdges* edges =",
+            "        material.border_edges.empty() ? nullptr : &material.border_edges;",
+            "    material = gui_forms::SurfaceMaterial::from_parts(",
+            "        material.fills.data(), material.fills.size(),",
+            "        material.shadows.data(), material.shadows.size(),",
+            "        border, edges, keylines, keyline_count, material.corner_radius);",
+            "}",
+            "}  // namespace",
+            "",
+            "void apply_native_material_keylines(",
+            "    std::size_t node_index, gui_forms::SurfaceMaterial& material) {",
+            "    (void)material;",
+            "    switch (node_index) {",
+        ]
+    )
+    for node_index in node_keylines:
+        source_lines.extend(
+            [
+                f"    case {node_index}U:",
+                f"        apply_keylines(material, node_{node_index}_keylines,",
+                f"                       sizeof(node_{node_index}_keylines) / sizeof(node_{node_index}_keylines[0]));",
+                "        return;",
+            ]
+        )
+    source_lines.extend(
+        [
+            "    default:",
+            "        return;",
+            "    }",
+            "}",
+            "",
             "bool has_native_button_state_recipes(std::size_t node_index) noexcept {",
             "    switch (node_index) {",
         ]
@@ -897,6 +1088,13 @@ def generate_gui_materials(
             "    }",
             "}",
             "",
+            "void apply_native_recipe_keylines(",
+            "    std::size_t node_index, gui_forms::ControlStateRecipes& recipes) {",
+            "    for (gui_forms::ControlVisualRecipe& recipe : recipes.values) {",
+            "        apply_native_material_keylines(node_index, recipe.material);",
+            "    }",
+            "}",
+            "",
             f"}}  // namespace {namespace}",
             "",
         ]
@@ -918,6 +1116,10 @@ def generate_gui_materials(
         "styles": records,
         "native_button_state_recipe_count": len(button_recipes),
         "buttons": button_records,
+        "keyline_nodes": [
+            {"node": node_index, "count": len(keylines)}
+            for node_index, keylines in sorted(node_keylines.items())
+        ],
         "capability_assessment": assess_capabilities(ir, manifest),
     }
     report_path.write_text(

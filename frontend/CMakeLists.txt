@@ -28,10 +28,12 @@ find_package(Python3 3.11 REQUIRED COMPONENTS Interpreter)
 set(FILE_MANAGER_WEB_FORMS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../web_forms")
 set(FILE_MANAGER_WEB_FORMS_TOOL "${FILE_MANAGER_WEB_FORMS_ROOT}/tools/webforms.py")
 set(FILE_MANAGER_WEB_FORMS_CAPABILITIES
-    "${FILE_MANAGER_WEB_FORMS_ROOT}/capabilities/gui_forms_observed_001.json")
+    "${FILE_MANAGER_WEB_FORMS_ROOT}/capabilities/gui_forms_observed_002.json")
 set(FILE_MANAGER_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/ui/boards/file_manager")
 set(FILE_MANAGER_UI_HTML "${FILE_MANAGER_UI_ROOT}/file_manager.wf.html")
 set(FILE_MANAGER_UI_CSS "${FILE_MANAGER_UI_ROOT}/file_manager.wf.css")
+file(GLOB FILE_MANAGER_UI_RESOURCES CONFIGURE_DEPENDS
+    "${FILE_MANAGER_UI_ROOT}/assets/house/*.png")
 set(FILE_MANAGER_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/file_manager_sapphire")
 set(FILE_MANAGER_IR "${CMAKE_CURRENT_BINARY_DIR}/generated/file_manager.wfir.json")
 set(FILE_MANAGER_UNIT "file_manager_sapphire")
@@ -67,6 +69,7 @@ add_custom_command(
     DEPENDS
         "${FILE_MANAGER_UI_HTML}"
         "${FILE_MANAGER_UI_CSS}"
+        ${FILE_MANAGER_UI_RESOURCES}
         "${FILE_MANAGER_WEB_FORMS_TOOL}"
         "${FILE_MANAGER_WEB_FORMS_CAPABILITIES}"
         ${FILE_MANAGER_WEB_FORMS_COMPILER_SOURCES}
