@@ -52,6 +52,10 @@ public:
     [[nodiscard]] std::optional<std::size_t> active_index() const noexcept {
         return active_index_;
     }
+    [[nodiscard]] std::string_view selected_item_id() const noexcept {
+        return selected_item_id_;
+    }
+    void set_selected_item_id(std::string_view stable_id);
     bool open(std::size_t index);
     void close() noexcept;
     [[nodiscard]] bool is_open() const noexcept;
@@ -95,6 +99,7 @@ private:
     std::unique_ptr<ContextMenu> popup_;
     std::optional<std::size_t> active_index_;
     std::optional<std::size_t> hot_index_;
+    std::string selected_item_id_;
     bool focused_{};
     bool switching_{};
     bool use_mnemonic_{true};

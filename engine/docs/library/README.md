@@ -3,7 +3,7 @@
 Status: **OBSERVED source inventory with DECIDED boundaries and explicitly labeled open gates**.
 
 Open `index.html` directly in a browser. The checked-in atlas contains 20
-Go packages and 1091 production declarations, plus architecture,
+Go packages and 1096 production declarations, plus architecture,
 protocol, operations, source locations, verification entry points, and an
 AI-readable Markdown mirror. It uses no server and performs no network access.
 

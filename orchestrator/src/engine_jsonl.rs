@@ -506,6 +506,10 @@ impl<C: EngineJsonlCaller> EngineJsonlSearchAdapter<C> {
         let cursor = request.cursor.as_ref().and_then(|cursor| {
             (cursor.source == EngineSearchCursorSource::Catalogue).then_some(&cursor.value)
         });
+        let mut filters = request.filters.clone();
+        if !request.text.is_empty() {
+            filters.insert("name".to_owned(), request.text.clone());
+        }
         json!({
             "text": "",
             "scope": {
@@ -515,7 +519,7 @@ impl<C: EngineJsonlCaller> EngineJsonlSearchAdapter<C> {
             },
             "limit": request.budget.max_results,
             "cursor": cursor,
-            "filters": {"name": request.text},
+            "filters": filters,
             "channels": ["exact"]
         })
     }
@@ -755,6 +759,7 @@ mod tests {
     use crate::engine_contract::{EngineSearchBudget, EngineSearchRequest};
     use crate::engine_port::EngineSearchProvider;
     use serde_json::json;
+    use std::collections::BTreeMap;
     use std::io::{BufReader, Cursor};
     use std::process::{Command, Stdio};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -784,6 +789,31 @@ mod tests {
         ) -> Result<serde_json::Value, EngineJsonlError> {
             thread::sleep(Duration::from_millis(100));
             Ok(json!({}))
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingCaller {
+        method: String,
+        params: Option<serde_json::Value>,
+    }
+
+    impl EngineJsonlCaller for RecordingCaller {
+        fn call(
+            &mut self,
+            method: &str,
+            params: &serde_json::Value,
+        ) -> Result<serde_json::Value, EngineJsonlError> {
+            self.method = method.to_owned();
+            self.params = Some(params.clone());
+            Ok(json!({
+                "generation": 7,
+                "results": [],
+                "next_cursor": null,
+                "partial": false,
+                "warnings": [],
+                "plan": {"unavailable_roots": [], "stale_roots": []}
+            }))
         }
     }
 
@@ -850,6 +880,27 @@ mod tests {
         assert_eq!(projected.next_cursor.as_deref(), Some("next-7"));
         assert_eq!(projected.stale_roots, ["docs"]);
         assert!(projected.is_well_formed());
+    }
+
+    #[test]
+    fn exact_filter_only_request_projects_the_frozen_engine_filter_map() {
+        let mut request = search_request();
+        request.text.clear();
+        request.filters.insert("kind".to_owned(), "file".to_owned());
+        request
+            .filters
+            .insert("size_min".to_owned(), "4096".to_owned());
+        let mut adapter = EngineJsonlSearchAdapter::new(RecordingCaller::default());
+        let projected = adapter.query_catalogue(&request);
+        assert_eq!(projected.terminal, TerminalStatus::Success);
+        let caller = adapter.into_peer();
+        assert_eq!(caller.method, "engine.query");
+        let params = caller.params.expect("recorded exact query parameters");
+        assert_eq!(params["text"], "");
+        assert_eq!(
+            params["filters"],
+            json!({"kind": "file", "size_min": "4096"})
+        );
     }
 
     #[test]
@@ -945,6 +996,7 @@ mod tests {
             relative_path: None,
             descendants: true.into(),
             text: "ledger.txt".to_owned(),
+            filters: BTreeMap::default(),
             cursor: None,
             budget: EngineSearchBudget::default(),
         }

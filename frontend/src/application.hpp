@@ -24,9 +24,12 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace file_manager {
+
+class ApplicationInteractionProbe;
 
 class Application final : public std::enable_shared_from_this<Application> {
 public:
@@ -46,19 +49,44 @@ public:
     void stop();
 
 private:
+    friend class ApplicationInteractionProbe;
+
     using NativeForm = web_forms_generated_file_manager_sapphire::NativeForm;
 
     void install_dynamic_controls();
+    void install_command_shelf_controls();
+    void install_house_art();
+    void install_house_materials();
     void install_command_surfaces();
+    void install_accelerators();
     void install_handlers();
     std::shared_ptr<gui_forms::Command> make_command(
         std::string id, std::string text, std::string description,
         std::function<void()> action);
     void show_menu(const std::shared_ptr<gui_forms::ContextMenu>& menu,
                    const gui_forms::Control::Ptr& owner);
+    void update_command_shelf_projection(double available_width);
+    void show_command_shelf_overflow();
     void update_command_state();
+    void focus_active_object_surface();
     void rebuild_breadcrumb();
+    void show_breadcrumb_overflow();
     void set_path_editing(bool editing);
+    void request_path_suggestions(std::string text);
+    void enumerate_path_suggestions(
+        std::uint64_t generation, std::string requested_text,
+        std::vector<std::filesystem::path> admitted_roots,
+        std::filesystem::path current_location,
+        std::filesystem::path home_root,
+        std::filesystem::path candidate);
+    void apply_path_suggestions(
+        std::uint64_t generation, std::string requested_text,
+        std::string preview, std::vector<std::filesystem::path> paths,
+        std::string notice = {});
+    void show_path_suggestion_popup();
+    void close_path_suggestion_popup(bool restore_focus = false);
+    void accept_path_suggestion(std::size_t index);
+    void accept_active_path_suggestion();
     void rebuild_object_order();
     void set_view_mode(gui_forms::ObjectViewMode mode);
     void set_sort_mode(std::string mode);
@@ -75,6 +103,7 @@ private:
     void show_settings();
     void hide_settings();
     void select_settings_tab(std::string tab, std::string title);
+    void update_settings_tab_state();
     void apply_settings_state(
         fileman::orchestrator::SettingsSchemaInfo schema,
         fileman::orchestrator::SettingsSnapshotInfo snapshot,
@@ -96,12 +125,28 @@ private:
     void update_settings_actions();
     void apply_runtime_settings();
     void request_navigation(std::filesystem::path path, bool add_history);
+    void request_tree_expansion(std::filesystem::path path);
     void apply_directory(DirectorySnapshot snapshot, bool add_history);
     void navigate_back();
     void navigate_forward();
     void navigate_up();
     void toggle_view_mode();
     void apply_filter();
+    void toggle_criteria_mode();
+    void show_criteria();
+    void prepare_criteria_surface();
+    void add_criteria_module();
+    void remove_criteria_module(std::string_view module_id);
+    void update_criteria_action_state();
+    [[nodiscard]] std::optional<
+        std::vector<fileman::orchestrator::SearchExactFilter>>
+    criteria_filters();
+    void request_engine_criteria(bool next_page = false);
+    void apply_engine_criteria(
+        fileman::orchestrator::SearchPageInfo page,
+        std::vector<fileman::orchestrator::SearchExactFilter> filters,
+        std::uint64_t generation,
+        bool append);
     void request_engine_search(bool next_page = false);
     void apply_engine_search(fileman::orchestrator::SearchPageInfo page,
                              std::string query,
@@ -117,6 +162,7 @@ private:
     void apply_checksum(ChecksumResult result, std::string expected,
                         std::uint64_t generation);
     void request_open();
+    [[nodiscard]] DirectoryEntry terminal_target() const;
     void request_terminal();
     void copy_current_path();
     void run_platform_command(PlatformCommandKind kind,
@@ -129,6 +175,7 @@ private:
     void request_create_folder();
     void begin_rename();
     void commit_rename(std::string basename);
+    void commit_property_name(std::string basename);
     void cancel_rename();
     void capture_transfer(bool move);
     void paste_transfer();
@@ -141,10 +188,24 @@ private:
     void apply_operation(OperationResult result);
     void apply_transfer(OperationResult result, std::uint64_t generation);
     void show_operation_failure(const OperationResult& result);
+    void show_tree_root_menu();
+    void select_tree_root_mode(const std::filesystem::path& root);
     void rebuild_tree(const DirectorySnapshot& snapshot);
+    void append_tree_children(std::vector<gui_forms::TreeViewItem>& items,
+                              const std::filesystem::path& parent,
+                              std::size_t depth,
+                              std::string& selected_id);
+    [[nodiscard]] std::string navigation_label(
+        const std::filesystem::path& root) const;
+    [[nodiscard]] bool mutation_scope_active() const;
+    [[nodiscard]] bool engine_search_available() const;
     void set_status(std::string text, std::string summary);
 
     std::filesystem::path protected_root_;
+    std::filesystem::path home_root_;
+    std::optional<std::filesystem::path> volumes_root_;
+    std::vector<std::filesystem::path> navigation_roots_;
+    std::filesystem::path navigation_root_;
     std::filesystem::path location_;
     std::string engine_root_id_;
     std::string filter_;
@@ -152,11 +213,17 @@ private:
     std::atomic_uint64_t search_generation_{};
     std::atomic_uint64_t preview_generation_{};
     std::atomic_uint64_t checksum_generation_{};
+    std::atomic_uint64_t path_suggestion_generation_{};
     std::uint64_t applied_generation_{};
     std::vector<std::filesystem::path> history_;
     std::size_t history_index_{};
     std::unordered_map<std::string, DirectoryEntry> entries_;
     std::unordered_map<std::string, std::filesystem::path> tree_locations_;
+    std::unordered_map<std::string, std::vector<DirectoryEntry>>
+        tree_directory_entries_;
+    std::unordered_set<std::string> tree_expanded_paths_;
+    std::atomic_uint64_t tree_generation_{};
+    std::filesystem::path tree_root_mode_;
     std::unique_ptr<FileOperationService> operations_;
     std::optional<ObjectIdentity> pending_selection_identity_;
     std::optional<std::string> pending_delete_id_;
@@ -168,6 +235,7 @@ private:
     std::optional<PendingTransfer> pending_transfer_;
     std::atomic_uint64_t transfer_generation_{};
     bool transfer_in_flight_{};
+    bool property_rename_in_flight_{};
     std::string pointer_drag_hover_id_;
     InternalDragController pointer_drag_;
     std::optional<fileman::orchestrator::SettingsSchemaInfo> settings_schema_;
@@ -176,6 +244,8 @@ private:
     std::unordered_map<std::string, fileman::orchestrator::SettingValue>
         pending_settings_;
     std::string settings_tab_{"general"};
+    std::optional<gui_forms::ControlStateRecipes> settings_tab_normal_recipes_;
+    std::optional<gui_forms::ControlStateRecipes> settings_tab_selected_recipes_;
     bool settings_open_{};
     bool settings_loading_{};
     bool settings_apply_in_flight_{};
@@ -187,10 +257,14 @@ private:
     bool show_extensions_{true};
     bool checksum_visible_{true};
     bool terminal_visible_{true};
+    bool tree_model_syncing_{};
     bool builtin_previews_enabled_{true};
     bool search_showing_{};
     bool search_loading_{};
+    bool criteria_showing_{};
+    bool criteria_loading_{};
     std::optional<fileman::orchestrator::SearchCursorInfo> search_cursor_;
+    std::optional<fileman::orchestrator::SearchCursorInfo> criteria_cursor_;
     std::vector<std::string> search_order_;
     std::uint64_t next_host_request_id_{1};
 
@@ -201,25 +275,46 @@ private:
     std::shared_ptr<gui_forms::Panel> content_surface_;
     std::shared_ptr<gui_forms::Panel> inspector_surface_;
     std::shared_ptr<gui_forms::PropertyList> settings_property_list_;
-    std::shared_ptr<gui_forms::FlowLayoutPanel> breadcrumb_;
-    std::shared_ptr<gui_forms::Button> path_edit_button_;
+    std::shared_ptr<gui_forms::BreadcrumbTrail> breadcrumb_;
     std::shared_ptr<gui_forms::TextBox> path_box_;
     std::shared_ptr<gui_forms::TextBox> search_box_;
+    std::shared_ptr<gui_forms::Button> tree_root_mode_button_;
     std::shared_ptr<gui_forms::TreeView> tree_;
     std::shared_ptr<gui_forms::ObjectView> objects_;
+    std::shared_ptr<gui_forms::Panel> criteria_console_;
+    std::shared_ptr<gui_forms::Label> criteria_title_;
+    std::shared_ptr<gui_forms::InstrumentRack> criteria_rack_;
+    std::shared_ptr<gui_forms::Label> criteria_action_state_;
+    std::shared_ptr<gui_forms::Button> criteria_add_button_;
+    std::shared_ptr<gui_forms::ImageList> object_images_;
+    std::shared_ptr<gui_forms::ImageList> tree_images_;
+    std::shared_ptr<gui_forms::ImageList> command_images_;
     std::shared_ptr<gui_forms::CorrespondenceView> correspondence_;
     std::shared_ptr<gui_forms::PropertyList> property_list_;
     std::shared_ptr<gui_forms::PictureBox> preview_picture_;
     std::shared_ptr<gui_forms::Label> preview_text_;
     std::shared_ptr<gui_forms::TextBox> expected_checksum_box_;
     std::shared_ptr<gui_forms::TextBox> rename_box_;
-    std::vector<std::shared_ptr<gui_forms::Button>> breadcrumb_buttons_;
-    std::vector<std::shared_ptr<gui_forms::Label>> breadcrumb_separators_;
+    std::shared_ptr<gui_forms::DropDownButton> shelf_move_copy_button_;
+    std::shared_ptr<gui_forms::DropDownButton> shelf_view_button_;
+    std::shared_ptr<gui_forms::DropDownButton> shelf_sort_button_;
+    std::shared_ptr<gui_forms::DropDownButton> shelf_overflow_button_;
+    std::unordered_map<std::string, std::filesystem::path> breadcrumb_paths_;
+    std::shared_ptr<gui_forms::ContextMenu> breadcrumb_overflow_menu_;
+    std::vector<std::shared_ptr<gui_forms::Command>> breadcrumb_overflow_commands_;
+    std::shared_ptr<gui_forms::AnchoredPopupLayer> path_suggestion_layer_;
+    std::shared_ptr<gui_forms::Panel> path_suggestion_content_;
+    std::shared_ptr<gui_forms::Label> path_resolution_preview_;
+    std::shared_ptr<gui_forms::ListBox> path_suggestion_list_;
+    std::vector<std::filesystem::path> path_suggestion_paths_;
+    gui_forms::PopupToken path_suggestion_popup_;
     std::vector<std::shared_ptr<gui_forms::Command>> commands_;
     std::vector<std::shared_ptr<gui_forms::ContextMenu>> menus_;
     std::shared_ptr<gui_forms::ContextMenu> move_copy_menu_;
     std::shared_ptr<gui_forms::ContextMenu> view_menu_;
     std::shared_ptr<gui_forms::ContextMenu> sort_menu_;
+    std::shared_ptr<gui_forms::ContextMenu> shelf_overflow_menu_;
+    std::shared_ptr<gui_forms::ContextMenu> tree_root_menu_;
     std::shared_ptr<gui_forms::ContextMenu> object_menu_;
     std::shared_ptr<gui_forms::ContextMenu> background_menu_;
     std::shared_ptr<gui_forms::Command> command_open_;
@@ -236,8 +331,13 @@ private:
     std::shared_ptr<gui_forms::Command> command_forward_;
     std::shared_ptr<gui_forms::Command> command_up_;
     std::shared_ptr<gui_forms::Command> command_root_;
+    std::shared_ptr<gui_forms::Command> command_tree_home_;
+    std::shared_ptr<gui_forms::Command> command_tree_volumes_;
+    std::vector<std::shared_ptr<gui_forms::Command>> command_tree_admitted_roots_;
+    std::vector<std::filesystem::path> tree_admitted_root_paths_;
     std::shared_ptr<gui_forms::Command> command_icons_;
     std::shared_ptr<gui_forms::Command> command_details_;
+    std::shared_ptr<gui_forms::Command> command_criteria_;
     std::shared_ptr<gui_forms::Command> command_sort_name_;
     std::shared_ptr<gui_forms::Command> command_sort_kind_;
     std::shared_ptr<gui_forms::Command> command_sort_size_;
@@ -252,8 +352,11 @@ private:
     std::shared_ptr<gui_forms::Command> command_close_;
     std::vector<gui_forms::SubscriptionToken> subscriptions_;
     std::vector<gui_forms::SubscriptionToken> breadcrumb_subscriptions_;
+    std::vector<gui_forms::SubscriptionToken> path_suggestion_subscriptions_;
     std::vector<gui_forms::SubscriptionToken> settings_subscriptions_;
+    std::vector<gui_forms::AcceleratorToken> accelerator_tokens_;
     gui_forms::Window* window_{};
+    std::uint8_t command_shelf_projection_{0xffU};
     gui_forms::ImageId preview_image_id_{};
 
     std::thread worker_;
@@ -261,7 +364,7 @@ private:
     std::condition_variable worker_cv_;
     std::queue<std::function<void()>> worker_queue_;
     std::atomic_bool stopping_{};
-    bool details_mode_{true};
+    bool details_mode_{};
 
     std::mutex ui_mutex_;
     std::queue<std::function<void()>> ui_queue_;

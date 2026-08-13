@@ -205,6 +205,11 @@ struct SearchCursorInfo {
     std::string value;
 };
 
+struct SearchExactFilter {
+    std::string field;
+    std::string value;
+};
+
 struct SearchPageInfo {
     std::string terminal;
     std::string source;
@@ -325,7 +330,8 @@ public:
         std::optional<std::string> relative_path,
         std::string text,
         std::uint32_t maximum_results = 128,
-        std::optional<SearchCursorInfo> cursor = std::nullopt);
+        std::optional<SearchCursorInfo> cursor = std::nullopt,
+        std::vector<SearchExactFilter> filters = {});
     [[nodiscard]] SettingsSchemaInfo settings_schema();
     [[nodiscard]] SettingsSnapshotInfo settings_snapshot();
     [[nodiscard]] SettingsCommitInfo apply_setting(std::uint64_t expected_revision,

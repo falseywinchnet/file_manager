@@ -99,8 +99,30 @@ void MenuStrip::set_items(std::vector<MenuStripItemSpec> items) {
     }
     close();
     items_ = std::move(items);
+    const bool selection_retained = std::any_of(
+        items_.begin(), items_.end(), [this](const MenuStripItemSpec& item) {
+            return item.stable_id == selected_item_id_ && item.visible;
+        });
+    if (!selection_retained) selected_item_id_.clear();
     hot_index_.reset();
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void MenuStrip::set_selected_item_id(std::string_view stable_id) {
+    require_mutable();
+    if (!stable_id.empty()) {
+        const auto found = std::find_if(
+            items_.begin(), items_.end(), [stable_id](const MenuStripItemSpec& item) {
+                return item.stable_id == stable_id;
+            });
+        if (found == items_.end() || !found->visible) {
+            throw std::out_of_range(
+                "MenuStrip selected item must identify a visible top-level item");
+        }
+    }
+    if (selected_item_id_ == stable_id) return;
+    selected_item_id_ = stable_id;
+    invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
 }
 
 void MenuStrip::set_use_mnemonic(bool value) {
@@ -245,14 +267,15 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
         const Rect item = bounds[index];
         const bool active = active_index_ == index;
         const bool hot = hot_index_ == index;
+        const bool selected = selected_item_id_ == items_[index].stable_id;
         ControlVisualContext item_context =
-            visual_context(hot, active, active, focused_);
+            visual_context(hot, active, selected, focused_ && hot);
         if (!items_[index].enabled) {
             item_context.surface = ControlSurfaceState::disabled;
         }
         const ControlVisualRecipe& item_recipe = effective_theme().resolve(
             ControlVisualRole::menu_item, item_context);
-        if (active || hot) {
+        if (active || hot || selected) {
             paint_surface_material(
                 painter,
                 {item.x + 1.0, 1.0, item.width - 2.0,
@@ -261,7 +284,8 @@ void MenuStrip::on_paint(Painter& painter, Rect) {
         }
         const Color ink = item_recipe.text;
         const FontSpec font = effective_font({FontRole::control, 10.5,
-                            static_cast<std::uint16_t>(active ? 700U : 400U),
+                            static_cast<std::uint16_t>(active || selected
+                                ? 700U : 400U),
                             false, 0.12});
         painter.draw_text_utf8({item.x + item_padding_ *
                                              effective_text_scale(),
@@ -379,8 +403,10 @@ std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
         if (effectively_enabled() && items_[index].enabled) {
             node.states |= SemanticState::enabled;
         }
-        if (active_index_ == index) {
+        if (selected_item_id_ == items_[index].stable_id) {
             node.states |= SemanticState::selected;
+        }
+        if (active_index_ == index) {
             node.states |= SemanticState::expanded;
         }
         if (focused_ && hot_index_ == index) node.states |= SemanticState::focused;

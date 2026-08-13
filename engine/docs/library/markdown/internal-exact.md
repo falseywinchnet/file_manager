@@ -62,7 +62,7 @@ No declaration documentation comment is present.
 
 ### Inspect
 
-Kind: `function`. Source: `internal/exact/query.go:298`.
+Kind: `function`. Source: `internal/exact/query.go:321`.
 
 ```go
 func Inspect(snapshot *catalog.Snapshot, ref api.ObjectRef) (catalog.Record, error)
@@ -72,7 +72,7 @@ No declaration documentation comment is present.
 
 ### InspectIndex
 
-Kind: `function`. Source: `internal/exact/query.go:309`.
+Kind: `function`. Source: `internal/exact/query.go:332`.
 
 ```go
 func InspectIndex(snapshot *catalog.Snapshot, rootID api.RootID, source Index, ref api.ObjectRef) (catalog.Record, error)
@@ -82,7 +82,7 @@ No declaration documentation comment is present.
 
 ### Query
 
-Kind: `function`. Source: `internal/exact/query.go:114`.
+Kind: `function`. Source: `internal/exact/query.go:134`.
 
 ```go
 func Query(ctx context.Context, snapshot *catalog.Snapshot, query api.Query) (matches []Match, next string, err error)
@@ -92,7 +92,7 @@ No declaration documentation comment is present.
 
 ### QueryIndex
 
-Kind: `function`. Source: `internal/exact/query.go:125`.
+Kind: `function`. Source: `internal/exact/query.go:145`.
 
 ```go
 func QueryIndex(ctx context.Context, snapshot *catalog.Snapshot, generation api.Generation, rootID api.RootID, source Index, query api.Query) (matches []Match, next string, err error)
@@ -102,7 +102,7 @@ No declaration documentation comment is present.
 
 ### canPageExactName
 
-Kind: `function`. Source: `internal/exact/query.go:464`.
+Kind: `function`. Source: `internal/exact/query.go:490`.
 
 ```go
 func canPageExactName(snapshot *catalog.Snapshot, scopeRelative string, query api.Query, p predicates, order []api.SortKey) bool
@@ -112,17 +112,17 @@ No declaration documentation comment is present.
 
 ### candidateIndices
 
-Kind: `function`. Source: `internal/exact/query.go:450`.
+Kind: `function`. Source: `internal/exact/query.go:473`.
 
 ```go
-func candidateIndices(source Index, predicates predicates) ([]uint32, bool, error)
+func candidateIndices(ctx context.Context, source Index, predicates predicates) ([]uint32, bool, error)
 ```
 
 No declaration documentation comment is present.
 
 ### compareField
 
-Kind: `function`. Source: `internal/exact/query.go:550`.
+Kind: `function`. Source: `internal/exact/query.go:576`.
 
 ```go
 func compareField(left, right catalog.Row, field string) int
@@ -132,7 +132,7 @@ No declaration documentation comment is present.
 
 ### compareInt64
 
-Kind: `function`. Source: `internal/exact/query.go:565`.
+Kind: `function`. Source: `internal/exact/query.go:591`.
 
 ```go
 func compareInt64(left, right int64) int
@@ -142,7 +142,7 @@ No declaration documentation comment is present.
 
 ### contains
 
-Kind: `function`. Source: `internal/exact/query.go:657`.
+Kind: `function`. Source: `internal/exact/query.go:683`.
 
 ```go
 func contains(root, path string) bool
@@ -152,7 +152,7 @@ No declaration documentation comment is present.
 
 ### cursorOffset
 
-Kind: `function`. Source: `internal/exact/query.go:622`.
+Kind: `function`. Source: `internal/exact/query.go:648`.
 
 ```go
 func cursorOffset(encoded string, generation api.Generation, fingerprint string, candidates int) (int, error)
@@ -162,7 +162,7 @@ No declaration documentation comment is present.
 
 ### eligible
 
-Kind: `function`. Source: `internal/exact/query.go:470`.
+Kind: `function`. Source: `internal/exact/query.go:496`.
 
 ```go
 func eligible(snapshot *catalog.Snapshot, root api.RootSpec, row catalog.Row, scope string, descendants bool, p predicates) bool
@@ -172,7 +172,7 @@ No declaration documentation comment is present.
 
 ### encodeCursor
 
-Kind: `function`. Source: `internal/exact/query.go:649`.
+Kind: `function`. Source: `internal/exact/query.go:675`.
 
 ```go
 func encodeCursor(value cursor) (string, error)
@@ -182,7 +182,7 @@ No declaration documentation comment is present.
 
 ### evidenceCount
 
-Kind: `function`. Source: `internal/exact/query.go:575`.
+Kind: `function`. Source: `internal/exact/query.go:601`.
 
 ```go
 func evidenceCount(p predicates) int
@@ -192,7 +192,7 @@ No declaration documentation comment is present.
 
 ### fillEvidence
 
-Kind: `function`. Source: `internal/exact/query.go:589`.
+Kind: `function`. Source: `internal/exact/query.go:615`.
 
 ```go
 func fillEvidence(result []api.Evidence, record catalog.Record, p predicates)
@@ -202,7 +202,7 @@ No declaration documentation comment is present.
 
 ### fingerprint
 
-Kind: `function`. Source: `internal/exact/query.go:608`.
+Kind: `function`. Source: `internal/exact/query.go:634`.
 
 ```go
 func fingerprint(query api.Query, root api.RootSpec, scope string, order []api.SortKey) string
@@ -212,7 +212,7 @@ No declaration documentation comment is present.
 
 ### isCanonicalPathOrder
 
-Kind: `function`. Source: `internal/exact/query.go:604`.
+Kind: `function`. Source: `internal/exact/query.go:630`.
 
 ```go
 func isCanonicalPathOrder(order []api.SortKey) bool
@@ -222,7 +222,7 @@ No declaration documentation comment is present.
 
 ### less
 
-Kind: `function`. Source: `internal/exact/query.go:533`.
+Kind: `function`. Source: `internal/exact/query.go:559`.
 
 ```go
 func less(left, right catalog.Row, order []api.SortKey) bool
@@ -232,7 +232,7 @@ No declaration documentation comment is present.
 
 ### normalizeOrder
 
-Kind: `function`. Source: `internal/exact/query.go:509`.
+Kind: `function`. Source: `internal/exact/query.go:535`.
 
 ```go
 func normalizeOrder(order []api.SortKey) ([]api.SortKey, error)
@@ -242,7 +242,7 @@ No declaration documentation comment is present.
 
 ### parseInteger
 
-Kind: `function`. Source: `internal/exact/query.go:442`.
+Kind: `function`. Source: `internal/exact/query.go:465`.
 
 ```go
 func parseInteger(value, field string) (int64, error)
@@ -252,7 +252,7 @@ No declaration documentation comment is present.
 
 ### parseNonnegative
 
-Kind: `function`. Source: `internal/exact/query.go:431`.
+Kind: `function`. Source: `internal/exact/query.go:454`.
 
 ```go
 func parseNonnegative(value, field string) (int64, error)
@@ -262,7 +262,7 @@ No declaration documentation comment is present.
 
 ### parsePredicates
 
-Kind: `function`. Source: `internal/exact/query.go:371`.
+Kind: `function`. Source: `internal/exact/query.go:394`.
 
 ```go
 func parsePredicates(root api.RootSpec, filters map[string]string) (predicates, error)
@@ -272,7 +272,7 @@ No declaration documentation comment is present.
 
 ### scopePath
 
-Kind: `function`. Source: `internal/exact/query.go:495`.
+Kind: `function`. Source: `internal/exact/query.go:521`.
 
 ```go
 func scopePath(root api.RootSpec, requested string) (string, error)
@@ -290,9 +290,19 @@ type Index interface
 
 Index is the exact, generation-pinned read surface shared by the exhaustive M1 control and the off-heap M2 segment reader. Storage failures remain explicit errors; they are never translated into an empty result.
 
+### referenceIndex.CandidateAll
+
+Kind: `method`. Source: `internal/exact/query.go:69`.
+
+```go
+func (r referenceIndex) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error)
+```
+
+No declaration documentation comment is present.
+
 ### referenceIndex.CandidateID
 
-Kind: `method`. Source: `internal/exact/query.go:91`.
+Kind: `method`. Source: `internal/exact/query.go:111`.
 
 ```go
 func (r referenceIndex) CandidateID(id api.ObjectID, maximum int) ([]uint32, bool, error)
@@ -302,7 +312,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex.CandidateName
 
-Kind: `method`. Source: `internal/exact/query.go:68`.
+Kind: `method`. Source: `internal/exact/query.go:88`.
 
 ```go
 func (r referenceIndex) CandidateName(name string, maximum int) ([]uint32, bool, error)
@@ -312,7 +322,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex.CandidateNamePage
 
-Kind: `method`. Source: `internal/exact/query.go:76`.
+Kind: `method`. Source: `internal/exact/query.go:96`.
 
 ```go
 func (r referenceIndex) CandidateNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error)
@@ -322,7 +332,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex.PathIndex
 
-Kind: `method`. Source: `internal/exact/query.go:99`.
+Kind: `method`. Source: `internal/exact/query.go:119`.
 
 ```go
 func (r referenceIndex) PathIndex(path string) (uint32, bool, error)
@@ -332,7 +342,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex.Record
 
-Kind: `method`. Source: `internal/exact/query.go:109`.
+Kind: `method`. Source: `internal/exact/query.go:129`.
 
 ```go
 func (r referenceIndex) Record(index uint32) (catalog.Record, bool, error)
@@ -342,7 +352,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex.Row
 
-Kind: `method`. Source: `internal/exact/query.go:104`.
+Kind: `method`. Source: `internal/exact/query.go:124`.
 
 ```go
 func (r referenceIndex) Row(index uint32) (catalog.Row, bool, error)
@@ -382,7 +392,7 @@ No declaration documentation comment is present.
 
 ### referenceIndex
 
-Kind: `struct`. Source: `internal/exact/query.go:66`.
+Kind: `struct`. Source: `internal/exact/query.go:67`.
 
 ```go
 type referenceIndex struct

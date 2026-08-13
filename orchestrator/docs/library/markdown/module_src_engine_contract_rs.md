@@ -25,7 +25,7 @@ Source: [src/engine_contract.rs](../../../src/engine_contract.rs)
 
 ## Source inventory
 
-### [ENGINE_SEMANTIC_MAJOR](../../../src/engine_contract.rs#L5)
+### [ENGINE_SEMANTIC_MAJOR](../../../src/engine_contract.rs#L6)
 
 `const` · `pub`
 
@@ -33,7 +33,7 @@ Source: [src/engine_contract.rs](../../../src/engine_contract.rs)
 pub const ENGINE_SEMANTIC_MAJOR: u16 = 0;
 ```
 
-### [ENGINE_SEMANTIC_MINOR](../../../src/engine_contract.rs#L6)
+### [ENGINE_SEMANTIC_MINOR](../../../src/engine_contract.rs#L7)
 
 `const` · `pub`
 
@@ -41,7 +41,7 @@ pub const ENGINE_SEMANTIC_MAJOR: u16 = 0;
 pub const ENGINE_SEMANTIC_MINOR: u16 = 1;
 ```
 
-### [ENGINE_LIVE_SEMANTIC_MAJOR](../../../src/engine_contract.rs#L7)
+### [ENGINE_LIVE_SEMANTIC_MAJOR](../../../src/engine_contract.rs#L8)
 
 `const` · `pub`
 
@@ -49,7 +49,7 @@ pub const ENGINE_SEMANTIC_MINOR: u16 = 1;
 pub const ENGINE_LIVE_SEMANTIC_MAJOR: u16 = 0;
 ```
 
-### [ENGINE_LIVE_SEMANTIC_MINOR](../../../src/engine_contract.rs#L8)
+### [ENGINE_LIVE_SEMANTIC_MINOR](../../../src/engine_contract.rs#L9)
 
 `const` · `pub`
 
@@ -57,7 +57,7 @@ pub const ENGINE_LIVE_SEMANTIC_MAJOR: u16 = 0;
 pub const ENGINE_LIVE_SEMANTIC_MINOR: u16 = 1;
 ```
 
-### [LIVE_QUERY_DEFAULT_RESULTS](../../../src/engine_contract.rs#L10)
+### [LIVE_QUERY_DEFAULT_RESULTS](../../../src/engine_contract.rs#L11)
 
 `const` · `pub`
 
@@ -65,7 +65,7 @@ pub const ENGINE_LIVE_SEMANTIC_MINOR: u16 = 1;
 pub const LIVE_QUERY_DEFAULT_RESULTS: u32 = 128;
 ```
 
-### [LIVE_QUERY_MAX_RESULTS](../../../src/engine_contract.rs#L11)
+### [LIVE_QUERY_MAX_RESULTS](../../../src/engine_contract.rs#L12)
 
 `const` · `pub`
 
@@ -73,7 +73,7 @@ pub const LIVE_QUERY_DEFAULT_RESULTS: u32 = 128;
 pub const LIVE_QUERY_MAX_RESULTS: u32 = 1_000;
 ```
 
-### [LIVE_QUERY_DEFAULT_VISITED_ENTRIES](../../../src/engine_contract.rs#L12)
+### [LIVE_QUERY_DEFAULT_VISITED_ENTRIES](../../../src/engine_contract.rs#L13)
 
 `const` · `pub`
 
@@ -81,7 +81,7 @@ pub const LIVE_QUERY_MAX_RESULTS: u32 = 1_000;
 pub const LIVE_QUERY_DEFAULT_VISITED_ENTRIES: u64 = 100_000;
 ```
 
-### [LIVE_QUERY_MAX_VISITED_ENTRIES](../../../src/engine_contract.rs#L13)
+### [LIVE_QUERY_MAX_VISITED_ENTRIES](../../../src/engine_contract.rs#L14)
 
 `const` · `pub`
 
@@ -89,7 +89,7 @@ pub const LIVE_QUERY_DEFAULT_VISITED_ENTRIES: u64 = 100_000;
 pub const LIVE_QUERY_MAX_VISITED_ENTRIES: u64 = 1_000_000;
 ```
 
-### [LIVE_QUERY_DEFAULT_STAT_CALLS](../../../src/engine_contract.rs#L14)
+### [LIVE_QUERY_DEFAULT_STAT_CALLS](../../../src/engine_contract.rs#L15)
 
 `const` · `pub`
 
@@ -97,7 +97,7 @@ pub const LIVE_QUERY_MAX_VISITED_ENTRIES: u64 = 1_000_000;
 pub const LIVE_QUERY_DEFAULT_STAT_CALLS: u64 = 4_096;
 ```
 
-### [LIVE_QUERY_MAX_STAT_CALLS](../../../src/engine_contract.rs#L15)
+### [LIVE_QUERY_MAX_STAT_CALLS](../../../src/engine_contract.rs#L16)
 
 `const` · `pub`
 
@@ -105,7 +105,7 @@ pub const LIVE_QUERY_DEFAULT_STAT_CALLS: u64 = 4_096;
 pub const LIVE_QUERY_MAX_STAT_CALLS: u64 = 65_536;
 ```
 
-### [LIVE_QUERY_DEFAULT_WALL_TIME_MS](../../../src/engine_contract.rs#L16)
+### [LIVE_QUERY_DEFAULT_WALL_TIME_MS](../../../src/engine_contract.rs#L17)
 
 `const` · `pub`
 
@@ -113,7 +113,7 @@ pub const LIVE_QUERY_MAX_STAT_CALLS: u64 = 65_536;
 pub const LIVE_QUERY_DEFAULT_WALL_TIME_MS: u64 = 250;
 ```
 
-### [LIVE_QUERY_MAX_WALL_TIME_MS](../../../src/engine_contract.rs#L17)
+### [LIVE_QUERY_MAX_WALL_TIME_MS](../../../src/engine_contract.rs#L18)
 
 `const` · `pub`
 
@@ -121,7 +121,7 @@ pub const LIVE_QUERY_DEFAULT_WALL_TIME_MS: u64 = 250;
 pub const LIVE_QUERY_MAX_WALL_TIME_MS: u64 = 5_000;
 ```
 
-### [LIVE_QUERY_DEFAULT_OPEN_DIRECTORIES](../../../src/engine_contract.rs#L18)
+### [LIVE_QUERY_DEFAULT_OPEN_DIRECTORIES](../../../src/engine_contract.rs#L19)
 
 `const` · `pub`
 
@@ -129,7 +129,7 @@ pub const LIVE_QUERY_MAX_WALL_TIME_MS: u64 = 5_000;
 pub const LIVE_QUERY_DEFAULT_OPEN_DIRECTORIES: u16 = 8;
 ```
 
-### [LIVE_QUERY_MAX_OPEN_DIRECTORIES](../../../src/engine_contract.rs#L19)
+### [LIVE_QUERY_MAX_OPEN_DIRECTORIES](../../../src/engine_contract.rs#L20)
 
 `const` · `pub`
 
@@ -137,7 +137,23 @@ pub const LIVE_QUERY_DEFAULT_OPEN_DIRECTORIES: u16 = 8;
 pub const LIVE_QUERY_MAX_OPEN_DIRECTORIES: u16 = 32;
 ```
 
-### [EngineFlag](../../../src/engine_contract.rs#L23)
+### [EXACT_FILTER_MAXIMUM](../../../src/engine_contract.rs#L21)
+
+`const` · `pub`
+
+```rust
+pub const EXACT_FILTER_MAXIMUM: usize = 7;
+```
+
+### [EXACT_FILTER_VALUE_MAXIMUM_BYTES](../../../src/engine_contract.rs#L22)
+
+`const` · `pub`
+
+```rust
+pub const EXACT_FILTER_VALUE_MAXIMUM_BYTES: usize = 16_384;
+```
+
+### [EngineFlag](../../../src/engine_contract.rs#L26)
 
 `struct` · `pub`
 
@@ -145,7 +161,7 @@ pub const LIVE_QUERY_MAX_OPEN_DIRECTORIES: u16 = 32;
 pub struct EngineFlag(bool);
 ```
 
-### [new](../../../src/engine_contract.rs#L27)
+### [new](../../../src/engine_contract.rs#L30)
 
 `fn` · `pub`
 
@@ -153,7 +169,7 @@ pub struct EngineFlag(bool);
 pub const fn new(value: bool) -> Self
 ```
 
-### [is_set](../../../src/engine_contract.rs#L32)
+### [is_set](../../../src/engine_contract.rs#L35)
 
 `fn` · `pub`
 
@@ -161,7 +177,7 @@ pub const fn new(value: bool) -> Self
 pub const fn is_set(self) -> bool
 ```
 
-### [from](../../../src/engine_contract.rs#L38)
+### [from](../../../src/engine_contract.rs#L41)
 
 `fn` · `private`
 
@@ -169,7 +185,7 @@ pub const fn is_set(self) -> bool
 fn from(value: bool) -> Self
 ```
 
-### [EngineCapabilityState](../../../src/engine_contract.rs#L45)
+### [EngineCapabilityState](../../../src/engine_contract.rs#L48)
 
 `enum` · `pub`
 
@@ -177,7 +193,7 @@ fn from(value: bool) -> Self
 pub enum EngineCapabilityState
 ```
 
-### [EngineCapability](../../../src/engine_contract.rs#L54)
+### [EngineCapability](../../../src/engine_contract.rs#L57)
 
 `struct` · `pub`
 
@@ -185,7 +201,7 @@ pub enum EngineCapabilityState
 pub struct EngineCapability
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L65)
+### [is_well_formed](../../../src/engine_contract.rs#L68)
 
 `fn` · `pub`
 
@@ -193,7 +209,7 @@ pub struct EngineCapability
 pub fn is_well_formed(&self) -> bool
 ```
 
-### [EngineCurrentness](../../../src/engine_contract.rs#L76)
+### [EngineCurrentness](../../../src/engine_contract.rs#L79)
 
 `enum` · `pub`
 
@@ -201,7 +217,7 @@ pub fn is_well_formed(&self) -> bool
 pub enum EngineCurrentness
 ```
 
-### [EngineWorkSnapshot](../../../src/engine_contract.rs#L87)
+### [EngineWorkSnapshot](../../../src/engine_contract.rs#L90)
 
 `struct` · `pub`
 
@@ -209,7 +225,7 @@ pub enum EngineCurrentness
 pub struct EngineWorkSnapshot
 ```
 
-### [EngineStatusSnapshot](../../../src/engine_contract.rs#L99)
+### [EngineStatusSnapshot](../../../src/engine_contract.rs#L102)
 
 `struct` · `pub`
 
@@ -217,7 +233,7 @@ pub struct EngineWorkSnapshot
 pub struct EngineStatusSnapshot
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L110)
+### [is_well_formed](../../../src/engine_contract.rs#L113)
 
 `fn` · `pub`
 
@@ -225,7 +241,7 @@ pub struct EngineStatusSnapshot
 pub fn is_well_formed(&self) -> bool
 ```
 
-### [capability](../../../src/engine_contract.rs#L125)
+### [capability](../../../src/engine_contract.rs#L128)
 
 `fn` · `pub`
 
@@ -233,7 +249,7 @@ pub fn is_well_formed(&self) -> bool
 pub fn capability(&self, id: &str) -> Option<&EngineCapability>
 ```
 
-### [EngineQueryResultFixture](../../../src/engine_contract.rs#L133)
+### [EngineQueryResultFixture](../../../src/engine_contract.rs#L136)
 
 `struct` · `pub`
 
@@ -241,7 +257,7 @@ pub fn capability(&self, id: &str) -> Option<&EngineCapability>
 pub struct EngineQueryResultFixture
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L156)
+### [is_well_formed](../../../src/engine_contract.rs#L159)
 
 `fn` · `pub`
 
@@ -249,7 +265,7 @@ pub struct EngineQueryResultFixture
 pub fn is_well_formed(&self) -> bool
 ```
 
-### [EngineSearchBudget](../../../src/engine_contract.rs#L173)
+### [EngineSearchBudget](../../../src/engine_contract.rs#L176)
 
 `struct` · `pub`
 
@@ -257,7 +273,7 @@ pub fn is_well_formed(&self) -> bool
 pub struct EngineSearchBudget
 ```
 
-### [default](../../../src/engine_contract.rs#L183)
+### [default](../../../src/engine_contract.rs#L186)
 
 `fn` · `private`
 
@@ -265,7 +281,7 @@ pub struct EngineSearchBudget
 fn default() -> Self
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L197)
+### [is_well_formed](../../../src/engine_contract.rs#L200)
 
 `fn` · `pub`
 
@@ -273,7 +289,7 @@ fn default() -> Self
 pub const fn is_well_formed(&self) -> bool
 ```
 
-### [EngineSearchRequest](../../../src/engine_contract.rs#L214)
+### [EngineSearchRequest](../../../src/engine_contract.rs#L217)
 
 `struct` · `pub`
 
@@ -281,7 +297,7 @@ pub const fn is_well_formed(&self) -> bool
 pub struct EngineSearchRequest
 ```
 
-### [EngineSearchCursorSource](../../../src/engine_contract.rs#L228)
+### [EngineSearchCursorSource](../../../src/engine_contract.rs#L233)
 
 `enum` · `pub`
 
@@ -289,7 +305,7 @@ pub struct EngineSearchRequest
 pub enum EngineSearchCursorSource
 ```
 
-### [EngineSearchCursor](../../../src/engine_contract.rs#L234)
+### [EngineSearchCursor](../../../src/engine_contract.rs#L239)
 
 `struct` · `pub`
 
@@ -297,7 +313,7 @@ pub enum EngineSearchCursorSource
 pub struct EngineSearchCursor
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L241)
+### [is_well_formed](../../../src/engine_contract.rs#L246)
 
 `fn` · `pub`
 
@@ -305,7 +321,7 @@ pub struct EngineSearchCursor
 pub fn is_well_formed(&self) -> bool
 ```
 
-### [EngineResultSource](../../../src/engine_contract.rs#L258)
+### [EngineResultSource](../../../src/engine_contract.rs#L283)
 
 `enum` · `pub`
 
@@ -313,7 +329,7 @@ pub fn is_well_formed(&self) -> bool
 pub enum EngineResultSource
 ```
 
-### [EngineLiveWork](../../../src/engine_contract.rs#L263)
+### [EngineLiveWork](../../../src/engine_contract.rs#L288)
 
 `struct` · `pub`
 
@@ -321,7 +337,7 @@ pub enum EngineResultSource
 pub struct EngineLiveWork
 ```
 
-### [EngineLiveQueryResultFixture](../../../src/engine_contract.rs#L270)
+### [EngineLiveQueryResultFixture](../../../src/engine_contract.rs#L295)
 
 `struct` · `pub`
 
@@ -329,10 +345,34 @@ pub struct EngineLiveWork
 pub struct EngineLiveQueryResultFixture
 ```
 
-### [is_well_formed](../../../src/engine_contract.rs#L292)
+### [is_well_formed](../../../src/engine_contract.rs#L317)
 
 `fn` · `pub`
 
 ```rust
 pub fn is_well_formed(&self) -> bool
+```
+
+### [request](../../../src/engine_contract.rs#L349)
+
+`fn` · `private`
+
+```rust
+fn request() -> EngineSearchRequest
+```
+
+### [filter_only_exact_request_is_well_formed](../../../src/engine_contract.rs#L363)
+
+`fn` · `private`
+
+```rust
+fn filter_only_exact_request_is_well_formed()
+```
+
+### [filtered_request_rejects_live_cursor_and_unknown_fields](../../../src/engine_contract.rs#L368)
+
+`fn` · `private`
+
+```rust
+fn filtered_request_rejects_live_cursor_and_unknown_fields()
 ```

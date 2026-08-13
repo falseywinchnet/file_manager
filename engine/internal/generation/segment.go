@@ -2,6 +2,7 @@ package generation
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
@@ -476,6 +477,25 @@ func (r *Reader) CandidateName(name string, maximum int) ([]uint32, bool, error)
 			return nil, false, err
 		}
 		result[index] = ordinal
+	}
+	return result, false, nil
+}
+
+func (r *Reader) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error) {
+	if maximum < 0 {
+		return nil, false, errors.New("negative exact candidate budget")
+	}
+	if r.header.bindingCount > uint64(maximum) {
+		return nil, true, nil
+	}
+	result := make([]uint32, int(r.header.bindingCount))
+	for index := range result {
+		if index&1023 == 0 {
+			if err := ctx.Err(); err != nil {
+				return nil, false, err
+			}
+		}
+		result[index] = uint32(index)
 	}
 	return result, false, nil
 }

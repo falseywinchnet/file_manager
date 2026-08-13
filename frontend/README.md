@@ -1,7 +1,8 @@
 # File Manager frontend
 
-Status: **File Manager 1.0 protected-root M4 build; the rejected 2026-08-10
-0.001-alpha surface is retained as negative evidence, not shipped behavior**.
+Status: **0.001-alpha under active repair. The owner rejected the premature
+File Manager 1.0 claim; real-root navigation and House Composite fidelity are
+being dogfooded before any later promotion**.
 
 This directory contains the C++ application called **File Manager**. It
 normally consumes Orchestrator as the integration/policy authority while using
@@ -33,11 +34,10 @@ implements New Folder, inline Rename, internal drag, staged no-overwrite Copy,
 same-volume Move, two-step recoverable Delete, and one-step identity-checked
 Undo under ADR-017 and ADR-020.
 
-The 2026-08-11 repair replaced the rejected synthetic navigation and generic
-shell with the accepted dense House Composite geography, removed `Places` and
-`Recent locations` from both authored and native trees, installed a complete
-command/menu vocabulary, and exercised the current signed bundle in the M4
-Aqua session. The rejected build remains documented under
+The repair removes the rejected synthetic navigation and rebuilds toward the
+accepted dense House Composite geography. `Places` and `Recent locations` are
+absent from both authored and native trees; Home and Volumes are the honest
+daily navigation roots. The rejected build remains documented under
 [`planning/OWNER_CORRECTION_2026-08-11.md`](planning/OWNER_CORRECTION_2026-08-11.md)
 and the first dogfood record; it is not counted as 1.0 evidence.
 
@@ -60,9 +60,26 @@ Build on the M4 after installing the named GUI.Forms package:
 '
 ```
 
-Launch `frontend/build/File Manager.app` from Terminal inside the M4 Screen
-Sharing desktop with `--root <protected-directory>`. A disposable mutation run
-must opt in explicitly:
+After a green M4 build, promote the exact bundle into the non-repository
+dogfood area. This preserves earlier candidates, ad-hoc signs and verifies the
+new copy, records its executable hash in an atomic current-candidate manifest,
+and installs three plainly separated launchers:
+
+```sh
+/bin/sh frontend/tools/stage_m4_dogfood.sh \
+  "frontend/build/File Manager.app"
+```
+
+Run `~/Developer/CodexRuns/run-file-manager-daily.command` from Terminal inside
+the M4 Screen Sharing desktop for ordinary read-only Home and Volumes browsing.
+Use `run-file-manager-protected-read-only.command` for the contained
+`fmsandbox` plus `fm1-contained` Engine profile. Each launcher refuses a
+missing, hash-mismatched, or invalidly signed candidate before asking
+LaunchServices to open it.
+
+A disposable mutation run must use the separately named
+`run-file-manager-mutation-sandbox.command`, or opt in explicitly at the
+command line:
 
 ```sh
 open -n "frontend/build/File Manager.app" --args \
@@ -81,8 +98,8 @@ find_package(FileManagerDocumentPicker 1.0 REQUIRED CONFIG)
 target_link_libraries(my_app PRIVATE FileManager::DocumentPickerView)
 ```
 
-The corrective 1.0 build, control audit, cross-component test results, and M4
-Screen Sharing observations are recorded under
+Corrective control audits, cross-component test results, and M4 Screen Sharing
+observations are recorded under
 [`results/2026-08-11-m4-dogfood/`](results/2026-08-11-m4-dogfood/). The
 [`2026-08-10 record`](results/2026-08-10-m4-dogfood/) remains the rejected
 baseline and negative evidence.

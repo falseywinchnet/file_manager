@@ -55,6 +55,7 @@ type predicates struct {
 // M1 control and the off-heap M2 segment reader. Storage failures remain
 // explicit errors; they are never translated into an empty result.
 type Index interface {
+	CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error)
 	CandidateName(name string, maximum int) ([]uint32, bool, error)
 	CandidateNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error)
 	CandidateID(id api.ObjectID, maximum int) ([]uint32, bool, error)
@@ -64,6 +65,25 @@ type Index interface {
 }
 
 type referenceIndex struct{ shard *catalog.Shard }
+
+func (r referenceIndex) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error) {
+	if maximum < 0 {
+		return nil, false, errors.New("negative exact candidate budget")
+	}
+	if r.shard.Len() > maximum {
+		return nil, true, nil
+	}
+	result := make([]uint32, r.shard.Len())
+	for index := range result {
+		if index&1023 == 0 {
+			if err := ctx.Err(); err != nil {
+				return nil, false, err
+			}
+		}
+		result[index] = uint32(index)
+	}
+	return result, false, nil
+}
 
 func (r referenceIndex) CandidateName(name string, maximum int) ([]uint32, bool, error) {
 	indices := r.shard.NameRange(name)
@@ -149,8 +169,8 @@ func QueryIndex(ctx context.Context, snapshot *catalog.Snapshot, generation api.
 	if err != nil {
 		return nil, "", err
 	}
-	if predicates.name == "" && predicates.path == "" {
-		return nil, "", api.NewFault(api.ErrorInvalidQuery, "the M1 exact engine requires filters.name or filters.path")
+	if len(query.Filters) == 0 {
+		return nil, "", api.NewFault(api.ErrorInvalidQuery, "the exact engine requires at least one filter")
 	}
 	scopePath, err := scopePath(projection.Spec, query.Scope.Path)
 	if err != nil {
@@ -210,8 +230,11 @@ func QueryIndex(ctx context.Context, snapshot *catalog.Snapshot, generation api.
 		return matches, next, nil
 	}
 
-	indices, exceeded, err := candidateIndices(source, predicates)
+	indices, exceeded, err := candidateIndices(ctx, source, predicates)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, "", err
+		}
 		return nil, "", api.WrapFault(api.ErrorIntegrity, "read exact candidate index", err)
 	}
 	if exceeded {
@@ -447,7 +470,7 @@ func parseInteger(value, field string) (int64, error) {
 	return parsed, nil
 }
 
-func candidateIndices(source Index, predicates predicates) ([]uint32, bool, error) {
+func candidateIndices(ctx context.Context, source Index, predicates predicates) ([]uint32, bool, error) {
 	if predicates.path != "" {
 		index, ok, err := source.PathIndex(predicates.path)
 		if err != nil {
@@ -457,6 +480,9 @@ func candidateIndices(source Index, predicates predicates) ([]uint32, bool, erro
 			return nil, false, nil
 		}
 		return []uint32{index}, false, nil
+	}
+	if predicates.name == "" {
+		return source.CandidateAll(ctx, MaximumCandidates)
 	}
 	return source.CandidateName(predicates.name, MaximumCandidates)
 }

@@ -62,7 +62,7 @@ No declaration documentation comment is present.
 
 ### New
 
-Kind: `function`. Source: `internal/service/service.go:50`.
+Kind: `function`. Source: `internal/service/service.go:51`.
 
 ```go
 func New(guard *sandbox.Guard) (*Service, error)
@@ -70,9 +70,19 @@ func New(guard *sandbox.Guard) (*Service, error)
 
 New constructs an in-memory development service beneath an explicit sandbox guard.
 
+### NewLaunchdPersistent
+
+Kind: `function`. Source: `internal/service/service.go:129`.
+
+```go
+func NewLaunchdPersistent(guard *sandbox.Guard, directory string) (*Service, error)
+```
+
+NewLaunchdPersistent opens the durable service for the host-bound launchd command projection. It rejects development sandbox guards so a command-line test process cannot manufacture the installed-supervisor capability.
+
 ### NewPersistent
 
-Kind: `function`. Source: `internal/service/service.go:66`.
+Kind: `function`. Source: `internal/service/service.go:67`.
 
 ```go
 func NewPersistent(guard *sandbox.Guard, directory string) (*Service, error)
@@ -132,7 +142,7 @@ No declaration documentation comment is present.
 
 ### metadataScanner
 
-Kind: `interface`. Source: `internal/service/service.go:41`.
+Kind: `interface`. Source: `internal/service/service.go:42`.
 
 ```go
 type metadataScanner interface
@@ -162,7 +172,7 @@ ApplyRootsExpected prevents a stale administrative controller from overwriting a
 
 ### Service.Close
 
-Kind: `method`. Source: `internal/service/service.go:129`.
+Kind: `method`. Source: `internal/service/service.go:145`.
 
 ```go
 func (s *Service) Close() error
@@ -202,7 +212,7 @@ Integrity checks the current exact catalogue or durable generation without repai
 
 ### Service.Persistent
 
-Kind: `method`. Source: `internal/service/service.go:126`.
+Kind: `method`. Source: `internal/service/service.go:142`.
 
 ```go
 func (s *Service) Persistent() bool
@@ -272,7 +282,7 @@ Reconcile performs a complete authoritative metadata scan of an approved root an
 
 ### Service.SandboxRoot
 
-Kind: `method`. Source: `internal/service/service.go:135`.
+Kind: `method`. Source: `internal/service/service.go:151`.
 
 ```go
 func (s *Service) SandboxRoot() string
@@ -702,7 +712,7 @@ No declaration documentation comment is present.
 
 ### _
 
-Kind: `variable`. Source: `internal/service/service.go:45`.
+Kind: `variable`. Source: `internal/service/service.go:46`.
 
 ```go
 var _ api.Engine = (*Service)(nil)
@@ -712,7 +722,7 @@ No declaration documentation comment is present.
 
 ### _
 
-Kind: `variable`. Source: `internal/service/service.go:46`.
+Kind: `variable`. Source: `internal/service/service.go:47`.
 
 ```go
 var _ api.ManagedEngine = (*Service)(nil)

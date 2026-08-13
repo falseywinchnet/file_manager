@@ -27,20 +27,26 @@ public:
     void translate(Point) override {}
     void clip_rect(Rect) override {}
     void clip_rounded_rect(Rect, double) override {}
-    void fill_rect(Rect bounds, Color) override { fills.push_back(bounds); }
+    void fill_rect(Rect bounds, Color) override {
+        fills.push_back(bounds);
+        paint_order.push_back('F');
+    }
     void fill_rounded_rect(Rect, double, Color) override {}
     void stroke_rect(Rect bounds, Color, double) override {
         strokes.push_back(bounds);
+        paint_order.push_back('S');
     }
     void stroke_rounded_rect(Rect, double, Color, double) override {}
     void fill_linear_gradient(Rect, Point, Point,
                               std::span<const GradientStop>) override {}
     void draw_line(Point from, Point to, Color, double) override {
         lines.emplace_back(from, to);
+        paint_order.push_back('L');
     }
     void draw_text_utf8(Point origin, std::string_view text, FontSpec, Color) override {
         texts.emplace_back(text);
         text_origins.push_back(origin);
+        paint_order.push_back('T');
     }
     void draw_image(ImageId image, Rect destination, double opacity) override {
         images.push_back(image);
@@ -56,6 +62,7 @@ public:
     std::vector<std::string> texts;
     std::vector<Point> text_origins;
     std::vector<std::pair<Point, Point>> lines;
+    std::vector<char> paint_order;
 };
 
 void require(bool condition, const char* message) {
@@ -219,8 +226,15 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
 
     ImageRecordingPainter painter;
     window.paint(painter, {0.0, 0.0, 160.0, 28.0});
-    require(!painter.lines.empty(),
-            "BreadcrumbTrail must paint connected shared chevron edges");
+    const auto final_face = std::find(
+        painter.paint_order.rbegin(), painter.paint_order.rend(), 'F').base();
+    const auto joint_lines = static_cast<std::size_t>(std::count(
+        final_face, painter.paint_order.end(), 'L'));
+    require(final_face != painter.paint_order.begin() &&
+                joint_lines == (constrained.size() - 1U) * 2U &&
+                std::find(final_face, painter.paint_order.end(), 'F') ==
+                    painter.paint_order.end(),
+            "BreadcrumbTrail must paint two connected lines per shared chevron edge after every overlapping face");
 
     bool duplicate_rejected{};
     try {

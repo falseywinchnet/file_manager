@@ -931,16 +931,34 @@ int main() {
                 (*objects).selected_ids().size() == 2U,
             "object context menu did not preserve the existing multiselection");
     require((*product).dispatch_key({gui_forms::KeyAction::down,
-                                   gui_forms::PhysicalKey::end}) &&
-                (*product).dispatch_key({gui_forms::KeyAction::down,
-                                       gui_forms::PhysicalKey::enter}) &&
-                (*product).find("fm.context.object.popup.panel.0") == nullptr &&
-                (*product).focus_scope_depth() == 0U &&
-                (*product).focused_control() == objects &&
-                (*std::dynamic_pointer_cast<gui_forms::Label>(
-                    (*product).find("fm.status.authority"))).text().find(
-                    "properties active") != std::string::npos,
-            "keyboard context command did not execute and restore collection focus");
+                                   gui_forms::PhysicalKey::end}),
+            "object context menu must handle End");
+    require((*product).dispatch_key({gui_forms::KeyAction::down,
+                                   gui_forms::PhysicalKey::enter}),
+            "object context menu must handle Enter");
+    const auto context_popup_after_enter =
+        (*product).find("fm.context.object.popup.panel.0");
+    const auto context_focus_after_enter = (*product).focused_control();
+    const auto context_authority_after_enter =
+        std::dynamic_pointer_cast<gui_forms::Label>(
+            (*product).find("fm.status.authority"));
+    if (context_popup_after_enter || (*product).focus_scope_depth() != 0U ||
+        context_focus_after_enter != property_list || !context_authority_after_enter ||
+        (*context_authority_after_enter).text().find("properties active") ==
+            std::string::npos) {
+        throw std::runtime_error(
+            "object context post-Enter mismatch: popup=" +
+            std::to_string(static_cast<bool>(context_popup_after_enter)) +
+            " scope-depth=" +
+            std::to_string((*product).focus_scope_depth()) + " focus=" +
+            (context_focus_after_enter
+                 ? std::string((*context_focus_after_enter).stable_id().value())
+                 : std::string("<none>")) +
+            " authority=" +
+            (context_authority_after_enter
+                 ? (*context_authority_after_enter).text()
+                 : std::string("<missing>")));
+    }
 
     const gui_forms::Rect object_bounds = (*objects).absolute_bounds();
     secondary_click(*product, {object_bounds.x + object_bounds.width - 6.0,

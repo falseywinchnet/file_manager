@@ -4,6 +4,7 @@ use fileman_orchestrator::engine_port::{
     EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy,
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
@@ -116,6 +117,7 @@ fn configure_and_query<R: BufRead, W: Write>(
             relative_path: None,
             descendants: true.into(),
             text: name.to_owned(),
+            filters: BTreeMap::default(),
             cursor: None,
             budget: EngineSearchBudget::default(),
         },

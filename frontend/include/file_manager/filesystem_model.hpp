@@ -64,6 +64,11 @@ struct DirectorySnapshot final {
     }
 };
 
+struct NavigationTarget final {
+    std::filesystem::path root;
+    std::filesystem::path path;
+};
+
 using CancellationCheck = std::function<bool()>;
 
 [[nodiscard]] std::filesystem::path canonical_existing_directory(
@@ -77,6 +82,11 @@ rebase_path_from_equivalent_root(
 [[nodiscard]] bool path_route_has_symlink(
     const std::filesystem::path& canonical_root,
     const std::filesystem::path& candidate);
+[[nodiscard]] std::optional<NavigationTarget> resolve_navigation_target(
+    const std::vector<std::filesystem::path>& admitted_roots,
+    const std::filesystem::path& current_location,
+    const std::filesystem::path& home_root,
+    const std::filesystem::path& requested);
 [[nodiscard]] ObjectIdentity observe_identity(
     const std::filesystem::path& path);
 [[nodiscard]] DirectorySnapshot read_directory(

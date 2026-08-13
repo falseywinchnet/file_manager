@@ -120,26 +120,31 @@ add_subdirectory(
     "${CMAKE_CURRENT_SOURCE_DIR}/../orchestrator/conformance/clients/cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/orchestrator-cpp-client")
 
-add_executable(file_manager MACOSX_BUNDLE
+add_library(file_manager_application STATIC
     src/application.cpp
-    src/main.cpp
     ${FILE_MANAGER_GENERATED_SOURCES}
     ${FILE_MANAGER_GENERATED_HEADERS})
-target_include_directories(file_manager PRIVATE
+target_include_directories(file_manager_application PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${FILE_MANAGER_GENERATED_DIR})
-target_link_libraries(file_manager PRIVATE
+target_link_libraries(file_manager_application PUBLIC
     FileManager::FrontendModel
     fileman::orchestrator_client
     GUIForms::Application)
-target_compile_features(file_manager PRIVATE cxx_std_20)
-target_compile_definitions(file_manager PRIVATE
-    FILE_MANAGER_VERSION="${PROJECT_VERSION}"
+target_compile_features(file_manager_application PUBLIC cxx_std_20)
+target_compile_definitions(file_manager_application PRIVATE
+    FILE_MANAGER_VERSION="0.001-alpha"
     FILE_MANAGER_GUI_FORMS_MANIFEST_ID="gui-forms-fm0-macos-arm64-2026-08-10")
+
+add_executable(file_manager MACOSX_BUNDLE src/main.cpp)
+target_link_libraries(file_manager PRIVATE file_manager_application)
+target_compile_features(file_manager PRIVATE cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(file_manager_frontend_model PRIVATE
+        -Wall -Wextra -Werror -Wpedantic)
+    target_compile_options(file_manager_application PRIVATE
         -Wall -Wextra -Werror -Wpedantic)
     target_compile_options(file_manager PRIVATE
         -Wall -Wextra -Werror -Wpedantic)
@@ -171,6 +176,8 @@ add_custom_command(TARGET file_manager POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${GUIForms_FONT_DIR}"
             "$<TARGET_BUNDLE_DIR:file_manager>/Contents/Resources/fonts"
+    COMMAND /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.0.1"
+            "$<TARGET_BUNDLE_DIR:file_manager>/Contents/Info.plist"
     VERBATIM)
 
 install(TARGETS file_manager BUNDLE DESTINATION .)
@@ -297,4 +304,39 @@ if(FILE_MANAGER_BUILD_TESTS)
     endif()
     add_test(NAME file_manager_document_picker_view_tests
              COMMAND file_manager_document_picker_view_tests)
+
+    add_executable(file_manager_house_art_tests
+        tests/house_art_tests.cpp)
+    target_include_directories(file_manager_house_art_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(file_manager_house_art_tests PRIVATE
+        FileManager::FrontendModel
+        GUIForms::Application)
+    target_compile_features(file_manager_house_art_tests PRIVATE cxx_std_20)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(file_manager_house_art_tests PRIVATE
+            -Wall -Wextra -Werror -Wpedantic)
+    endif()
+    add_test(NAME file_manager_house_art_tests
+             COMMAND file_manager_house_art_tests)
+
+    add_executable(file_manager_application_interaction_tests
+        tests/application_interaction_tests.cpp)
+    target_link_libraries(file_manager_application_interaction_tests PRIVATE
+        file_manager_application)
+    target_compile_features(file_manager_application_interaction_tests PRIVATE
+        cxx_std_20)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(file_manager_application_interaction_tests PRIVATE
+            -Wall -Wextra -Werror -Wpedantic)
+    endif()
+    add_test(NAME file_manager_application_interaction_tests
+             COMMAND file_manager_application_interaction_tests)
+
+    if(APPLE)
+        add_test(NAME file_manager_dogfood_launcher_tests
+            COMMAND /bin/sh
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/dogfood_launcher_tests.sh
+                ${CMAKE_CURRENT_SOURCE_DIR})
+    endif()
 endif()

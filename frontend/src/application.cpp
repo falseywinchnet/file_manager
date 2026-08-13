@@ -1,9 +1,12 @@
 #include "application.hpp"
 
 #include "fileman_orchestrator/client.hpp"
+#include "house_art.hpp"
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <iomanip>
@@ -14,6 +17,175 @@
 
 namespace file_manager {
 namespace {
+
+class ApplicationMark final : public gui_forms::Button {
+public:
+    ApplicationMark()
+        : gui_forms::Button(gui_forms::StableId("fm.house.application-mark")) {
+        set_focusable(false);
+        set_accessible_name("File Manager");
+    }
+
+    [[nodiscard]] gui_forms::SemanticDescriptor semantic_descriptor()
+        const override {
+        gui_forms::SemanticDescriptor descriptor;
+        descriptor.role = gui_forms::SemanticRole::image;
+        descriptor.name = accessible_name();
+        descriptor.exposed = true;
+        return descriptor;
+    }
+
+    bool on_semantic_action(gui_forms::SemanticAction,
+                            std::string_view) override {
+        return false;
+    }
+
+    [[nodiscard]] bool hit_test_local(gui_forms::Point) const override {
+        return false;
+    }
+};
+
+class CriteriaConsolePanel final : public gui_forms::Panel {
+public:
+    CriteriaConsolePanel()
+        : gui_forms::Panel(gui_forms::StableId("fm.criteria.console")) {
+        set_background(gui_forms::Color::rgba(228, 237, 243));
+        set_accessible_name("Criteria virtual folder instrument rack");
+        set_auto_size(true);
+        set_auto_size_mode(gui_forms::AutoSizeMode::grow_and_shrink);
+    }
+
+    std::shared_ptr<gui_forms::Label> title;
+    std::shared_ptr<gui_forms::InstrumentRack> rack;
+
+    [[nodiscard]] gui_forms::Size measure(
+        const gui_forms::Size available) override {
+        const double scale = effective_text_scale();
+        const double rack_width = std::max(1.0, available.width - 16.0 * scale);
+        const double desired = 29.0 * scale +
+            (rack ? rack->preferred_height(rack_width) : 0.0) + 7.0 * scale;
+        return {available.width, std::min(available.height, desired)};
+    }
+
+    void arrange(const gui_forms::Rect final_bounds) override {
+        arrange_self(final_bounds);
+        const double scale = effective_text_scale();
+        if (title) {
+            set_child_layout(title, {8.0 * scale, 4.0 * scale,
+                                     std::max(0.0, final_bounds.width -
+                                                       16.0 * scale),
+                                     21.0 * scale});
+        }
+        if (rack) {
+            set_child_layout(rack, {8.0 * scale, 28.0 * scale,
+                                    std::max(0.0, final_bounds.width -
+                                                      16.0 * scale),
+                                    std::max(0.0, final_bounds.height -
+                                                      35.0 * scale)});
+        }
+    }
+
+    void on_paint(gui_forms::Painter& painter,
+                  const gui_forms::Rect damage) override {
+        gui_forms::Panel::on_paint(painter, damage);
+        const double scale = effective_text_scale();
+        painter.fill_rect({0.0, 0.0, committed_arranged_bounds().width,
+                           1.0 * scale},
+                          gui_forms::Color::rgba(250, 253, 255));
+        painter.draw_line(
+            {0.0, committed_arranged_bounds().height - 0.5 * scale},
+            {committed_arranged_bounds().width,
+             committed_arranged_bounds().height - 0.5 * scale},
+            gui_forms::Color::rgba(92, 119, 140), scale);
+    }
+};
+
+gui_forms::InstrumentFieldSpec criteria_choice_field(
+    std::string id, std::string name, std::string value,
+    std::vector<std::string> choices, const double weight = 1.0) {
+    return {std::move(id), std::move(name), std::move(value),
+            gui_forms::InstrumentFieldEditor::choice, std::move(choices), {},
+            weight, true};
+}
+
+gui_forms::InstrumentFieldSpec criteria_text_field(
+    std::string id, std::string name, std::string value,
+    const double weight = 1.0) {
+    return {std::move(id), std::move(name), std::move(value),
+            gui_forms::InstrumentFieldEditor::text, {}, {}, weight, true};
+}
+
+gui_forms::InstrumentModuleSpec kind_criteria_module() {
+    return {"fm.criteria.kind", "Kind",
+            {criteria_choice_field("field", "Field", "Kind", {"Kind"}, 0.75),
+             criteria_choice_field("operator", "Operator", "is", {"is"}, 0.5),
+             criteria_choice_field("value", "Value", "Files",
+                                   {"Files", "Folders", "Symbolic links",
+                                    "Other"},
+                                   1.25)},
+            "committed exact filter", gui_forms::InstrumentModuleState::live,
+            10, true, true};
+}
+
+gui_forms::InstrumentModuleSpec modified_criteria_module() {
+    return {"fm.criteria.modified", "Modified",
+            {criteria_choice_field("field", "Field", "Modified",
+                                   {"Modified"}, 0.85),
+             criteria_choice_field("operator", "Operator", "after",
+                                   {"after", "before"}, 0.75),
+             criteria_text_field("value", "Date (YYYY-MM-DD)", "2026-01-01",
+                                 1.4)},
+            "committed exact filter", gui_forms::InstrumentModuleState::live,
+            20, true, true};
+}
+
+gui_forms::InstrumentModuleSpec size_criteria_module() {
+    return {"fm.criteria.size", "Size",
+            {criteria_choice_field("field", "Field", "Size", {"Size"}, 0.7),
+             criteria_choice_field("operator", "Operator", "at least",
+                                   {"at least", "at most"}, 0.95),
+             criteria_text_field("value", "Bytes", "0", 1.35)},
+            "committed exact filter", gui_forms::InstrumentModuleState::live,
+            30, true, true};
+}
+
+std::optional<std::int64_t> parse_criteria_date(std::string_view value) {
+    if (value.size() != 10U || value[4] != '-' || value[7] != '-') return {};
+    const auto digit = [](const char character) -> int {
+        return character >= '0' && character <= '9' ? character - '0' : -1;
+    };
+    int parts[8]{};
+    for (const auto [source, target] :
+         {std::pair{0U, 0U}, {1U, 1U}, {2U, 2U}, {3U, 3U},
+          {5U, 4U}, {6U, 5U}, {8U, 6U}, {9U, 7U}}) {
+        parts[target] = digit(value[source]);
+        if (parts[target] < 0) return {};
+    }
+    const int year_value = parts[0] * 1000 + parts[1] * 100 +
+        parts[2] * 10 + parts[3];
+    const unsigned month_value = static_cast<unsigned>(parts[4] * 10 + parts[5]);
+    const unsigned day_value = static_cast<unsigned>(parts[6] * 10 + parts[7]);
+    if (year_value < 1970 || year_value > 2261) return {};
+    const std::chrono::year_month_day date{
+        std::chrono::year{year_value}, std::chrono::month{month_value},
+        std::chrono::day{day_value}};
+    if (!date.ok()) return {};
+    const auto days = std::chrono::sys_days{date}.time_since_epoch().count();
+    constexpr std::int64_t nanoseconds_per_day = 86'400'000'000'000LL;
+    return static_cast<std::int64_t>(days) * nanoseconds_per_day;
+}
+
+std::optional<std::int64_t> parse_criteria_size(std::string_view value) {
+    if (value.empty()) return {};
+    std::int64_t result{};
+    const auto parsed = std::from_chars(value.data(), value.data() + value.size(),
+                                        result);
+    if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() ||
+        result < 0) {
+        return {};
+    }
+    return result;
+}
 
 gui_forms::ObjectGlyph object_glyph(const EntryKind kind) {
     switch (kind) {
@@ -61,6 +233,20 @@ std::string search_stable_id(const std::filesystem::path& path,
     std::ostringstream stream;
     stream << "engine-result-" << std::hex << identity.device << '-'
            << identity.inode << '-' << hash;
+    return stream.str();
+}
+
+std::string breadcrumb_stable_id(const std::filesystem::path& path) {
+    constexpr std::uint64_t offset = 14695981039346656037ULL;
+    constexpr std::uint64_t prime = 1099511628211ULL;
+    std::uint64_t hash = offset;
+    for (const unsigned char value : path.generic_string()) {
+        hash ^= value;
+        hash *= prime;
+    }
+    std::ostringstream stream;
+    stream << "fm.path.segment." << std::hex << std::setw(16)
+           << std::setfill('0') << hash;
     return stream.str();
 }
 
@@ -148,12 +334,35 @@ Application::Application(std::filesystem::path protected_root,
                          const bool mutations_enabled,
                          std::string engine_root_id)
     : protected_root_(canonical_existing_directory(protected_root)),
+      home_root_(protected_root_),
+      navigation_root_(protected_root_),
       location_(protected_root_),
       engine_root_id_(std::move(engine_root_id)),
       form_(web_forms_generated_file_manager_sapphire::make_native_form()) {
-    if (engine_root_id_.empty()) {
-        throw std::invalid_argument("--engine-root-id must be nonempty");
+    install_command_shelf_controls();
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        home_root_ = canonical_existing_directory(home);
     }
+    navigation_roots_.push_back(home_root_);
+    std::error_code volumes_error;
+    if (std::filesystem::is_directory("/Volumes", volumes_error) &&
+        !volumes_error) {
+        volumes_root_ = canonical_existing_directory("/Volumes");
+        if (*volumes_root_ != home_root_) {
+            navigation_roots_.push_back(*volumes_root_);
+        }
+    }
+    const bool launch_root_admitted = std::any_of(
+        navigation_roots_.begin(), navigation_roots_.end(),
+        [this](const auto& root) { return path_is_within(root, protected_root_); });
+    if (!launch_root_admitted) navigation_roots_.push_back(protected_root_);
+    const auto initial_target = resolve_navigation_target(
+        navigation_roots_, protected_root_, home_root_, protected_root_);
+    if (!initial_target) {
+        throw std::logic_error("launch root was not admitted for navigation");
+    }
+    navigation_root_ = initial_target->root;
+    tree_root_mode_ = navigation_root_;
     if (mutations_enabled) {
         if (!quarantine_root) {
             throw std::invalid_argument(
@@ -175,7 +384,279 @@ std::unique_ptr<gui_forms::Window> Application::make_window() {
     auto window = std::make_unique<gui_forms::Window>(
         form_.root_control(), gui_forms::Size{1340, 850});
     window_ = window.get();
+    install_house_art();
+    install_house_materials();
+    install_accelerators();
+    subscriptions_.push_back(
+        form_.file_manager_app_shell_commands->arranged_bounds_changed().subscribe(
+            [this](const gui_forms::Rect& bounds) {
+                update_command_shelf_projection(bounds.width);
+            }));
     return window;
+}
+
+void Application::install_command_shelf_controls() {
+    const auto replace_drop_down = [](const std::shared_ptr<gui_forms::Button>& old,
+                                      const std::shared_ptr<gui_forms::FlowLayoutPanel>& owner) {
+        const auto index = owner->child_index(old->runtime_id());
+        if (!index) {
+            throw std::logic_error(
+                "generated command shelf button has no direct layout owner");
+        }
+        auto replacement = std::make_shared<gui_forms::DropDownButton>(
+            gui_forms::StableId(std::string(old->stable_id().value())),
+            old->text(), gui_forms::DropDownButtonMode::menu);
+        replacement->set_name(old->name());
+        replacement->set_requested_bounds(old->requested_bounds());
+        replacement->set_minimum_size(old->minimum_size());
+        replacement->set_maximum_size(old->maximum_size());
+        replacement->set_margin(old->margin());
+        replacement->set_content_padding(old->content_padding());
+        replacement->set_font(old->font());
+        replacement->set_text_line_spacing(old->text_line_spacing());
+        replacement->set_text_alignment(old->text_alignment());
+        replacement->set_image_alignment(old->image_alignment());
+        replacement->set_text_image_relation(old->text_image_relation());
+        replacement->set_image_gap(old->image_gap());
+        replacement->set_accessible_name(old->accessible_name());
+        replacement->set_accessible_description(old->accessible_description());
+        replacement->set_tab_index(old->tab_index());
+        replacement->set_tab_stop(old->tab_stop());
+        replacement->set_visual_style(old->visual_style());
+        replacement->set_flat_border_width(old->flat_border_width());
+        if (old->visual_recipes_override()) {
+            replacement->set_visual_recipes(*old->visual_recipes_override());
+        }
+        static_cast<void>(owner->remove_child(old->runtime_id()));
+        owner->add_child(replacement);
+        owner->set_child_index(replacement->runtime_id(), *index);
+        return replacement;
+    };
+
+    shelf_move_copy_button_ = replace_drop_down(
+        form_.file_manager_app_shell_commands_selection_group_actions_copy,
+        form_.file_manager_app_shell_commands_selection_group_actions);
+    form_.file_manager_app_shell_commands_selection_group_actions_copy =
+        shelf_move_copy_button_;
+    shelf_view_button_ = replace_drop_down(
+        form_.file_manager_app_shell_commands_arrange_group_actions_details,
+        form_.file_manager_app_shell_commands_arrange_group_actions);
+    form_.file_manager_app_shell_commands_arrange_group_actions_details =
+        shelf_view_button_;
+    shelf_sort_button_ = replace_drop_down(
+        form_.file_manager_app_shell_commands_arrange_group_actions_refresh,
+        form_.file_manager_app_shell_commands_arrange_group_actions);
+    form_.file_manager_app_shell_commands_arrange_group_actions_refresh =
+        shelf_sort_button_;
+
+    for (const auto& button : {shelf_move_copy_button_, shelf_view_button_,
+                               shelf_sort_button_}) {
+        button->set_drop_down_width(16.0);
+    }
+    shelf_move_copy_button_->set_text("Move / copy");
+    shelf_view_button_->set_text("View");
+    shelf_view_button_->set_accessible_description(
+        "Current presentation: Small icons. Choose the object presentation");
+    shelf_sort_button_->set_text("Sort: Name");
+
+    shelf_overflow_button_ = std::make_shared<gui_forms::DropDownButton>(
+        gui_forms::StableId("fm.shelf.more"), "More",
+        gui_forms::DropDownButtonMode::menu);
+    shelf_overflow_button_->set_name("fm.shelf.more");
+    shelf_overflow_button_->set_requested_bounds({0, 0, 72, 43});
+    shelf_overflow_button_->set_minimum_size({72, 43});
+    shelf_overflow_button_->set_maximum_size({0, 43});
+    shelf_overflow_button_->set_visible(false);
+    shelf_overflow_button_->set_accessible_name("More command shelf actions");
+    shelf_overflow_button_->set_accessible_description(
+        "Shows shelf commands hidden by the current window width");
+    form_.file_manager_app_shell_commands->add_child(shelf_overflow_button_);
+    form_.file_manager_app_shell_commands_selection_group->set_accessible_name(
+        "Selection commands");
+    form_.file_manager_app_shell_commands_arrange_group->set_accessible_name(
+        "Arrange and inspect commands");
+
+    // Web.Forms authored the two Office Pearl group widths before content-aware
+    // collapse was available. Preserve that ordinary-width geography; the
+    // explicit projection below removes whole lower-priority groups before a
+    // narrow surface can clip them.
+    form_.file_manager_app->set_minimum_size({150, 150});
+    form_.file_manager_app_shell->set_minimum_size({0, 150});
+    form_.file_manager_app_shell_commands_selection_group->set_minimum_size({176, 60});
+    form_.file_manager_app_shell_commands_selection_group->set_auto_size_mode(
+        gui_forms::AutoSizeMode::grow_only);
+    form_.file_manager_app_shell_commands_selection_group->set_requested_bounds(
+        {0, 0, 176, 60});
+    form_.file_manager_app_shell_commands_arrange_group->set_minimum_size({306, 60});
+    form_.file_manager_app_shell_commands_arrange_group->set_auto_size_mode(
+        gui_forms::AutoSizeMode::grow_only);
+    form_.file_manager_app_shell_commands_arrange_group->set_requested_bounds(
+        {0, 0, 306, 60});
+}
+
+void Application::install_house_art() {
+    if (!window_) return;
+    object_images_ = house_art::make_image_list(*window_, 42.0);
+    tree_images_ = house_art::make_image_list(*window_, 17.0);
+    command_images_ = house_art::make_image_list(*window_, 22.0);
+    objects_->set_image_list(object_images_);
+    tree_->set_image_list(tree_images_);
+
+    const auto image_button = [this](
+        const std::shared_ptr<gui_forms::Button>& button,
+        const house_art::Icon icon,
+        const gui_forms::TextImageRelation relation =
+            gui_forms::TextImageRelation::image_above_text) {
+        button->set_image_list(command_images_);
+        button->set_image_key(std::string(house_art::key(icon)));
+        button->set_text_image_relation(relation);
+        button->set_image_gap(1.0);
+        button->set_image_alignment(gui_forms::ContentAlignment::middle_center);
+        button->set_text_alignment(gui_forms::ContentAlignment::middle_center);
+        button->set_content_padding(
+            std::dynamic_pointer_cast<gui_forms::DropDownButton>(button)
+                ? gui_forms::Insets{5.0, 2.0, 21.0, 2.0}
+                : gui_forms::Insets{5.0, 2.0, 5.0, 2.0});
+    };
+    image_button(form_.file_manager_app_shell_commands_selection_group_actions_copy,
+                 house_art::Icon::transfer);
+    image_button(form_.file_manager_app_shell_commands_selection_group_actions_delete,
+                 house_art::Icon::remove);
+    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_details,
+                 house_art::Icon::view);
+    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_refresh,
+                 house_art::Icon::sort);
+    image_button(form_.file_manager_app_shell_commands_arrange_group_actions_settings,
+                 house_art::Icon::properties);
+    image_button(form_.file_manager_app_shell_location_navigation_back,
+                 house_art::Icon::back,
+                 gui_forms::TextImageRelation::overlay);
+    image_button(form_.file_manager_app_shell_location_navigation_forward,
+                 house_art::Icon::forward,
+                 gui_forms::TextImageRelation::overlay);
+    image_button(form_.file_manager_app_shell_location_navigation_up,
+                 house_art::Icon::up,
+                 gui_forms::TextImageRelation::overlay);
+    for (const auto& button : {
+             form_.file_manager_app_shell_location_navigation_back,
+             form_.file_manager_app_shell_location_navigation_forward,
+             form_.file_manager_app_shell_location_navigation_up}) {
+        button->set_text({});
+    }
+
+    if (command_images_->contains_key(house_art::key(house_art::Icon::app))) {
+        auto mark = std::make_shared<ApplicationMark>();
+        mark->set_requested_bounds({0.0, 0.0, 30.0, 30.0});
+        mark->set_minimum_size({30.0, 30.0});
+        mark->set_maximum_size({30.0, 30.0});
+        mark->set_image_list(command_images_);
+        mark->set_image_key(std::string(house_art::key(house_art::Icon::app)));
+        mark->set_image_alignment(gui_forms::ContentAlignment::middle_center);
+        mark->set_text_image_relation(gui_forms::TextImageRelation::overlay);
+        mark->set_content_padding({4.0, 4.0, 4.0, 4.0});
+        mark->set_visual_style(gui_forms::ButtonVisualStyle::flat);
+        mark->set_flat_border_width(0.0);
+        gui_forms::BasicControlStyle transparent;
+        const auto clear = gui_forms::Color::rgba(0, 0, 0, 0);
+        transparent.face = clear;
+        transparent.face_light = clear;
+        transparent.paper = clear;
+        transparent.highlight = clear;
+        transparent.border = clear;
+        transparent.dark_border = clear;
+        transparent.text = clear;
+        transparent.disabled_text = clear;
+        transparent.accent = clear;
+        transparent.accent_light = clear;
+        transparent.link = clear;
+        transparent.visited_link = clear;
+        mark->set_style(transparent);
+
+        // The compiled HTML mark is a nested flow-label projection. Its child
+        // currently receives a native slot but does not paint. Put the House
+        // image directly in the title flow so the mark is a real retained
+        // surface and preserve the authored title/service geometry around it.
+        const auto& title = form_.file_manager_app_shell_title;
+        title->clear_children();
+        // The macOS full-size-content host keeps native traffic lights over
+        // the retained title material. Reserve their conventional leading
+        // space while preserving the 40 pt authored title band as the window
+        // drag backdrop. Decorative descendants pass hit testing back to it.
+        title->set_padding({76.0, 0.0, 8.0, 0.0});
+        title->add_child(mark);
+        form_.file_manager_app_shell_title_copy->set_hit_test_transparent(true);
+        title->add_child(form_.file_manager_app_shell_title_copy);
+        title->set_flex_grow(*form_.file_manager_app_shell_title_copy, 1.0);
+        title->add_child(form_.file_manager_app_shell_title_service);
+    }
+}
+
+void Application::install_house_materials() {
+    using gui_forms::Color;
+    using gui_forms::GradientStop;
+    using gui_forms::MaterialCoordinateSpace;
+    using gui_forms::MaterialFillLayer;
+    using gui_forms::SurfaceMaterial;
+
+    SurfaceMaterial title;
+    title.fills = {
+        MaterialFillLayer::linear_css_angle(92.0, std::vector<GradientStop>{
+            {0.0, Color::rgba(23, 52, 127)},
+            {0.32, Color::rgba(40, 91, 181)},
+            {0.58, Color::rgba(58, 104, 203)},
+            {0.78, Color::rgba(135, 98, 180)},
+            {1.0, Color::rgba(217, 104, 114)}}),
+        MaterialFillLayer::radial({0.18, -0.9}, {0.42, 1.25},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(146, 217, 255, 116)},
+                {1.0, Color::rgba(146, 217, 255, 0)}}),
+        MaterialFillLayer::radial({0.62, 1.6}, {0.38, 1.1},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(214, 178, 255, 106)},
+                {1.0, Color::rgba(214, 178, 255, 0)}}),
+        MaterialFillLayer::radial({0.95, 1.0}, {0.26, 0.78},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(255, 195, 142, 100)},
+                {1.0, Color::rgba(255, 195, 142, 0)}}),
+    };
+    form_.file_manager_app_shell_title->set_authored_surface_material(
+        std::move(title));
+
+    SurfaceMaterial shelf;
+    shelf.fills = {
+        MaterialFillLayer::linear({0.0, 0.0}, {0.0, 1.0},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(255, 255, 255)},
+                {0.56, Color::rgba(244, 247, 250)},
+                {1.0, Color::rgba(213, 225, 235)}}),
+        MaterialFillLayer::radial({0.15, -0.2}, {0.34, 0.85},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(214, 243, 255, 128)},
+                {1.0, Color::rgba(214, 243, 255, 0)}}),
+    };
+    form_.file_manager_app_shell_commands->set_authored_surface_material(
+        std::move(shelf));
+
+    SurfaceMaterial graphite;
+    graphite.fills = {
+        MaterialFillLayer::linear({0.0, 0.0}, {0.0, 1.0},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(98, 108, 115)},
+                {0.52, Color::rgba(75, 84, 90)},
+                {1.0, Color::rgba(66, 74, 79)}}),
+        MaterialFillLayer::repeating_linear(
+            {0.0, 0.0}, {3.0, 3.0},
+            std::vector<GradientStop>{
+                {0.0, Color::rgba(255, 255, 255, 10)},
+                {0.33, Color::rgba(255, 255, 255, 10)},
+                {0.34, Color::rgba(255, 255, 255, 0)},
+                {1.0, Color::rgba(255, 255, 255, 0)}},
+            MaterialCoordinateSpace::logical),
+    };
+    form_.file_manager_app_shell_location->set_authored_surface_material(
+        graphite);
+    form_.file_manager_app_shell_status->set_authored_surface_material(
+        std::move(graphite));
 }
 
 void Application::install_dynamic_controls() {
@@ -187,23 +668,19 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_menu->add_child(menu_strip_);
     form_.file_manager_app_shell_menu->set_flex_grow(*menu_strip_, 1.0);
 
-    path_box_ = std::make_shared<gui_forms::TextBox>(
-        gui_forms::StableId("fm.path.editor"), protected_root_.string());
-    path_box_->set_requested_bounds({0, 0, 620, 26});
-    path_box_->set_placeholder_text("Enter a path inside this launch scope");
-    path_box_->set_accessible_name("Current location path");
-    path_box_->set_visible(false);
-    breadcrumb_ = std::make_shared<gui_forms::FlowLayoutPanel>(
-        gui_forms::StableId("fm.path.breadcrumb"));
+    breadcrumb_ = gui_forms::make_control<gui_forms::BreadcrumbTrail>(
+        gui_forms::StableId("fm.path.breadcrumb"), "fm.path.editor");
     breadcrumb_->set_requested_bounds({0, 0, 620, 26});
-    breadcrumb_->set_wrap_contents(false);
-    breadcrumb_->set_cross_alignment(gui_forms::FlowCrossAlignment::stretch);
     breadcrumb_->set_accessible_name("Current location breadcrumb");
+    breadcrumb_->set_accessible_description(
+        "Navigate stable path segments or switch to exact path entry");
+    path_box_ = breadcrumb_->editor();
+    path_box_->set_text(protected_root_.string());
+    path_box_->set_placeholder_text("Enter a path in Home or Volumes");
+    path_box_->set_accessible_name("Current location path");
     form_.file_manager_app_shell_location_path_host->clear_children();
     form_.file_manager_app_shell_location_path_host->add_child(breadcrumb_);
-    form_.file_manager_app_shell_location_path_host->add_child(path_box_);
     form_.file_manager_app_shell_location_path_host->set_flex_grow(*breadcrumb_, 1.0);
-    form_.file_manager_app_shell_location_path_host->set_flex_grow(*path_box_, 1.0);
 
     search_box_ = std::make_shared<gui_forms::TextBox>(
         gui_forms::StableId("fm.search.current-folder"));
@@ -214,11 +691,26 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_location_search_host->add_child(search_box_);
     form_.file_manager_app_shell_location_search_host->set_flex_grow(*search_box_, 1.0);
 
+    form_.file_manager_app_shell_workspace_sidebar_label->set_text("FOLDERS");
+    tree_root_mode_button_ = std::make_shared<gui_forms::Button>(
+        gui_forms::StableId("fm.navigation.root-mode"), "Home-rooted ▾");
+    tree_root_mode_button_->set_visual_style(gui_forms::ButtonVisualStyle::flat);
+    tree_root_mode_button_->set_requested_bounds({0, 0, 96, 27});
+    tree_root_mode_button_->set_minimum_size({96, 27});
+    tree_root_mode_button_->set_accessible_name("Folder tree root mode");
+    tree_root_mode_button_->set_accessible_description(
+        "Switch immediately between the honest Home and Volumes trees");
+
     tree_ = std::make_shared<gui_forms::TreeView>(
         gui_forms::StableId("fm.navigation.tree"));
     tree_->set_requested_bounds({0, 0, 178, 340});
-    tree_->set_accessible_name("Folders in protected root");
+    tree_->set_font({gui_forms::FontRole::content, 10.0, 400, false});
+    tree_->set_accessible_name("Folders in the selected honest root mode");
     form_.file_manager_app_shell_workspace_sidebar_tree_host->clear_children();
+    form_.file_manager_app_shell_workspace_sidebar_tree_host->set_flow_direction(
+        gui_forms::FlowDirection::top_down);
+    form_.file_manager_app_shell_workspace_sidebar_tree_host->add_child(
+        tree_root_mode_button_);
     form_.file_manager_app_shell_workspace_sidebar_tree_host->add_child(tree_);
     form_.file_manager_app_shell_workspace_sidebar_tree_host->set_flex_grow(*tree_, 1.0);
 
@@ -226,9 +718,64 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.objects.current-folder"));
     objects_->set_requested_bounds({0, 0, 736, 455});
     objects_->set_view_mode(gui_forms::ObjectViewMode::icons);
-    objects_->set_icon_cell_size({104, 78});
+    objects_->set_icon_cell_size({96, 78});
+    objects_->set_show_secondary_text(false);
+    objects_->set_font({gui_forms::FontRole::content, 10.0, 400, false});
     objects_->set_selection_mode(gui_forms::ObjectSelectionMode::multiple);
     objects_->set_accessible_name("Objects in current folder");
+
+    auto criteria_console = std::make_shared<CriteriaConsolePanel>();
+    criteria_console_ = criteria_console;
+    criteria_title_ = std::make_shared<gui_forms::Label>(
+        gui_forms::StableId("fm.criteria.title"),
+        "CURRENT SUBTREE   ·   EXACT VIRTUAL FOLDER   ·   COMMITTED CATALOGUE");
+    criteria_title_->set_font(
+        {gui_forms::FontRole::control, 8.5, 700, false, 0.32});
+    criteria_title_->set_accessible_name("Criteria virtual folder derivation");
+    criteria_rack_ = std::make_shared<gui_forms::InstrumentRack>(
+        gui_forms::StableId("fm.criteria.rack"));
+    criteria_rack_->set_accessible_name("Exact metadata predicate rack");
+    criteria_rack_->set_accessible_description(
+        "Committed intrinsic metadata filters over one Engine catalogue generation");
+    criteria_rack_->set_modules(
+        {kind_criteria_module(), modified_criteria_module()});
+
+    auto criteria_actions = std::make_shared<gui_forms::TableLayoutPanel>(
+        gui_forms::StableId("fm.criteria.actions"));
+    criteria_actions->set_column_count(1);
+    criteria_actions->set_row_count(2);
+    criteria_actions->set_column_style(
+        0, {gui_forms::TableSizeMode::percent, 100.0});
+    criteria_actions->set_row_style(
+        0, {gui_forms::TableSizeMode::percent, 100.0});
+    criteria_actions->set_row_style(
+        1, {gui_forms::TableSizeMode::absolute, 28.0});
+    criteria_actions->set_grow_style(
+        gui_forms::TableLayoutGrowStyle::fixed_size);
+    criteria_action_state_ = std::make_shared<gui_forms::Label>(
+        gui_forms::StableId("fm.criteria.actions.state"),
+        "2 exact filters · catalogue only");
+    criteria_action_state_->set_font(
+        {gui_forms::FontRole::control, 8.0, 600, false});
+    criteria_action_state_->set_margin({5.0, 2.0, 5.0, 1.0});
+    criteria_action_state_->set_dock(gui_forms::DockStyle::fill);
+    criteria_actions->add_child(criteria_action_state_);
+    criteria_actions->set_cell_position(*criteria_action_state_, {0, 0});
+    criteria_add_button_ = std::make_shared<gui_forms::Button>(
+        gui_forms::StableId("fm.criteria.add"), "+ module");
+    criteria_add_button_->set_visual_style(gui_forms::ButtonVisualStyle::standard);
+    criteria_add_button_->set_accessible_name("Add an admitted criterion module");
+    criteria_add_button_->set_margin({3.0, 1.0, 3.0, 1.0});
+    criteria_add_button_->set_dock(gui_forms::DockStyle::fill);
+    criteria_actions->add_child(criteria_add_button_);
+    criteria_actions->set_cell_position(*criteria_add_button_, {0, 1});
+    criteria_rack_->set_action_content(criteria_actions, 154.0);
+    criteria_console->title = criteria_title_;
+    criteria_console->rack = criteria_rack_;
+    criteria_console->add_child(criteria_title_);
+    criteria_console->add_child(criteria_rack_);
+    criteria_console_->set_dock(gui_forms::DockStyle::top);
+    criteria_console_->set_visible(false);
 
     correspondence_ = std::make_shared<gui_forms::CorrespondenceView>(
         gui_forms::StableId("fm.search.correspondence"));
@@ -243,6 +790,7 @@ void Application::install_dynamic_controls() {
     content_surface_->set_dock(gui_forms::DockStyle::fill);
     objects_->set_dock(gui_forms::DockStyle::fill);
     correspondence_->set_dock(gui_forms::DockStyle::fill);
+    content_surface_->add_child(criteria_console_);
     content_surface_->add_child(objects_);
     content_surface_->add_child(correspondence_);
     form_.file_manager_app_shell_workspace_content_objects->clear_children();
@@ -277,21 +825,6 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_workspace_inspector_preview_surface->set_minimum_size(
         {0, 174});
 
-    expected_checksum_box_ = std::make_shared<gui_forms::TextBox>(
-        gui_forms::StableId("fm.checksum.expected"));
-    expected_checksum_box_->set_requested_bounds({0, 0, 190, 28});
-    expected_checksum_box_->set_maximum_length(64);
-    expected_checksum_box_->set_placeholder_text("Expected SHA-256 (optional)");
-    expected_checksum_box_->set_accessible_name("Expected SHA-256 digest");
-    expected_checksum_box_->set_accessible_description(
-        "Optional exact 64-character hexadecimal SHA-256 value");
-    form_.file_manager_app_shell_workspace_inspector_commands_expected_host
-        ->clear_children();
-    form_.file_manager_app_shell_workspace_inspector_commands_expected_host
-        ->add_child(expected_checksum_box_);
-    form_.file_manager_app_shell_workspace_inspector_commands_expected_host
-        ->set_flex_grow(*expected_checksum_box_, 1.0);
-
     rename_box_ = std::make_shared<gui_forms::TextBox>(
         gui_forms::StableId("fm.operations.rename"));
     rename_box_->set_requested_bounds({0, 0, 200, 30});
@@ -306,16 +839,38 @@ void Application::install_dynamic_controls() {
     property_list_ = std::make_shared<gui_forms::PropertyList>(
         gui_forms::StableId("fm.selection.properties"));
     property_list_->set_accessible_name("Selection properties");
-    property_list_->set_label_width(72.0);
+    property_list_->set_label_width(104.0);
     property_list_->set_requested_bounds({0, 0, 270, 170});
     property_list_->set_groups({
         {"fm.property.group.identity", "IDENTITY", {
+            {"fm.property.name", "Name", "—",
+             "Rename this exact filesystem object inside the protected mutation scope",
+             gui_forms::PropertyEditorKind::text},
             {"fm.property.kind", "Kind", "—", "Selected object kind"},
             {"fm.property.location", "Location", "—", "Exact local path"},
             {"fm.property.size", "Size", "—", "Observed object size"},
             {"fm.property.modified", "Modified", "—", "Filesystem modification time"},
         }},
+        {"fm.property.group.verification", "VERIFICATION", {
+            {"fm.property.expected-sha256", "Expected SHA-256", "",
+             "Optional exact 64-character hexadecimal digest compared with the next completed SHA-256 result",
+             gui_forms::PropertyEditorKind::text},
+        }},
     });
+    if (const auto name_editor = std::dynamic_pointer_cast<gui_forms::TextBox>(
+            property_list_->editor("fm.property.name"))) {
+        name_editor->set_maximum_length(255);
+        name_editor->set_enabled(false);
+    }
+    expected_checksum_box_ = std::dynamic_pointer_cast<gui_forms::TextBox>(
+        property_list_->editor("fm.property.expected-sha256"));
+    if (!expected_checksum_box_) {
+        throw std::logic_error(
+            "Selection PropertyList did not create the expected SHA-256 editor");
+    }
+    expected_checksum_box_->set_maximum_length(64);
+    expected_checksum_box_->set_placeholder_text("64 hexadecimal characters (optional)");
+    expected_checksum_box_->set_enabled(false);
     form_.file_manager_app_shell_workspace_inspector_facts->clear_children();
     inspector_surface_ = std::make_shared<gui_forms::Panel>(
         gui_forms::StableId("fm.selection.surface"));
@@ -330,10 +885,10 @@ void Application::install_dynamic_controls() {
         {0, 0, 288, 224});
     property_list_->set_dock(gui_forms::DockStyle::fill);
     form_.file_manager_app_shell_workspace_inspector->clear_children();
+    property_list_->set_header_content(
+        form_.file_manager_app_shell_workspace_inspector_preview, 224.0);
     inspector_surface_->add_child(
         form_.file_manager_app_shell_workspace_inspector_label);
-    inspector_surface_->add_child(
-        form_.file_manager_app_shell_workspace_inspector_preview);
     inspector_surface_->add_child(property_list_);
     form_.file_manager_app_shell_workspace_inspector->add_child(inspector_surface_);
     form_.file_manager_app_shell_workspace_inspector->set_flex_grow(
@@ -343,7 +898,7 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.workspace.folder-tree"));
     workspace_split_->initialize_control_tree();
     workspace_split_->set_splitter_width(3.0);
-    workspace_split_->set_splitter_hit_width(9.0);
+    workspace_split_->set_splitter_hit_width(12.0);
     workspace_split_->set_splitter_distance(218.0);
     workspace_split_->set_collapse_panel(gui_forms::SplitFixedPanel::first);
     workspace_split_->set_automatic_collapse_threshold(700.0);
@@ -355,7 +910,7 @@ void Application::install_dynamic_controls() {
         gui_forms::StableId("fm.workspace.selection"));
     selection_split_->initialize_control_tree();
     selection_split_->set_splitter_width(3.0);
-    selection_split_->set_splitter_hit_width(9.0);
+    selection_split_->set_splitter_hit_width(12.0);
     selection_split_->set_splitter_distance(790.0);
     selection_split_->set_fixed_panel(gui_forms::SplitFixedPanel::second);
     selection_split_->set_collapse_panel(gui_forms::SplitFixedPanel::second);
@@ -401,6 +956,13 @@ void Application::install_dynamic_controls() {
     form_.file_manager_app_shell_settings_body_page_host->set_requested_bounds(
         {0, 0, 760, 330});
     form_.file_manager_app_shell_settings_actions->set_wrap_contents(false);
+    settings_tab_selected_recipes_ =
+        form_.file_manager_app_shell_settings_body_tabs_general
+            ->visual_recipes_override();
+    settings_tab_normal_recipes_ =
+        form_.file_manager_app_shell_settings_body_tabs_appearance
+            ->visual_recipes_override();
+    update_settings_tab_state();
     form_.file_manager_app_shell_settings_actions_status->set_minimum_size({160, 27});
     auto settings_back =
         form_.file_manager_app_shell_settings_actions->remove_child(
@@ -441,7 +1003,7 @@ void Application::install_dynamic_controls() {
         legacy->set_visible(false);
     }
     form_.file_manager_app_shell_commands_arrange_group_actions_settings->set_accessible_description(
-        "Open the File Manager-owned tabbed surface for Orchestrator settings and service facts");
+        "Reveal and focus the factual Selection and Properties pane");
     const std::string mutation_description = operations_
         ? "Available only inside the explicit protected mutation profile"
         : "Read-only launch; use an explicit protected mutation profile";
@@ -489,6 +1051,59 @@ void Application::show_menu(
     menu->show(owner, {bounds.x, bounds.y + bounds.height});
 }
 
+void Application::update_command_shelf_projection(
+    const double available_width) {
+    constexpr std::uint8_t full = 0U;
+    constexpr std::uint8_t selection_and_more = 1U;
+    constexpr std::uint8_t more_only = 2U;
+    const std::uint8_t next = available_width >= 530.0
+        ? full : available_width >= 280.0 ? selection_and_more : more_only;
+    if (command_shelf_projection_ == next) return;
+    command_shelf_projection_ = next;
+
+    const bool show_selection = next != more_only;
+    const bool show_arrange = next == full;
+    form_.file_manager_app_shell_commands_selection_group->set_visible(
+        show_selection);
+    form_.file_manager_app_shell_commands_arrange_group->set_visible(show_arrange);
+    shelf_overflow_button_->set_visible(next != full);
+    shelf_overflow_button_->set_text(next == more_only ? "Commands" : "More");
+    shelf_overflow_button_->set_accessible_description(
+        next == more_only
+            ? "Shows all permanent command shelf actions at this window width"
+            : "Shows Arrange and Inspect commands hidden by this window width");
+    if (shelf_overflow_menu_ && shelf_overflow_menu_->is_open()) {
+        shelf_overflow_menu_->close();
+    }
+}
+
+void Application::show_command_shelf_overflow() {
+    using gui_forms::MenuItemKind;
+    std::vector<gui_forms::MenuItemSpec> items;
+    if (command_shelf_projection_ == 2U) {
+        items.push_back({"move-copy", MenuItemKind::submenu, {}, "Move / copy", {
+            {"copy", MenuItemKind::command, command_copy_},
+            {"move", MenuItemKind::command, command_move_},
+        }});
+        items.push_back({"delete", MenuItemKind::command, command_delete_});
+        items.push_back({"separator.arrange", MenuItemKind::separator});
+    }
+    items.push_back({"view", MenuItemKind::submenu, {}, "View", {
+        {"small-icons", MenuItemKind::radio, command_icons_},
+        {"details", MenuItemKind::radio, command_details_},
+        {"criteria", MenuItemKind::check, command_criteria_},
+    }});
+    items.push_back({"sort", MenuItemKind::submenu, {}, "Sort", {
+        {"name", MenuItemKind::radio, command_sort_name_},
+        {"kind", MenuItemKind::radio, command_sort_kind_},
+        {"size", MenuItemKind::radio, command_sort_size_},
+        {"modified", MenuItemKind::radio, command_sort_modified_},
+    }});
+    items.push_back({"properties", MenuItemKind::command, command_properties_});
+    shelf_overflow_menu_->set_items(std::move(items));
+    show_menu(shelf_overflow_menu_, shelf_overflow_button_);
+}
+
 void Application::install_command_surfaces() {
     using gui_forms::MenuItemKind;
 
@@ -534,15 +1149,8 @@ void Application::install_command_surfaces() {
         "Reveal and focus the factual Selection and Properties pane",
         [this] { show_properties(); });
     command_select_all_ = make_command(
-        "edit.select-all", "Select all", "Select all visible objects",
-        [this] {
-            if (search_showing_) {
-                set_status("Search selection is single-row",
-                           "correspondence rows retain one focused factual result");
-            } else {
-                objects_->select_all();
-            }
-        });
+        "edit.select-all", "Select all", "Select all visible folder objects",
+        [this] { objects_->select_all(); });
     command_select_all_->set_shortcut("Cmd+A");
 
     command_back_ = make_command(
@@ -554,12 +1162,35 @@ void Application::install_command_surfaces() {
         [this] { navigate_forward(); });
     command_forward_->set_shortcut("Alt+Right");
     command_up_ = make_command(
-        "go.up", "Up", "Navigate to the parent inside this launch scope",
+        "go.up", "Up", "Navigate to the parent inside the current admitted root",
         [this] { navigate_up(); });
     command_up_->set_shortcut("Alt+Up");
     command_root_ = make_command(
-        "go.scope-root", "Scope root", "Return to the launch scope root",
-        [this] { request_navigation(protected_root_, true); });
+        "go.home", "Home", "Return to the user Home folder",
+        [this] { request_navigation(home_root_, true); });
+    command_tree_home_ = make_command(
+        "tree-root.home", "Home-rooted",
+        "Show the honest user Home hierarchy in the folder tree",
+        [this] { select_tree_root_mode(home_root_); });
+    if (volumes_root_) {
+        command_tree_volumes_ = make_command(
+            "tree-root.volumes", "Volumes-rooted",
+            "Show the honest mounted Volumes hierarchy in the folder tree",
+            [this] { select_tree_root_mode(*volumes_root_); });
+    }
+    for (std::size_t index = 0; index < navigation_roots_.size(); ++index) {
+        const auto& root = navigation_roots_[index];
+        if (root == home_root_ || (volumes_root_ && root == *volumes_root_)) {
+            continue;
+        }
+        auto command = make_command(
+            "tree-root.admitted." + std::to_string(index),
+            leaf_name(root) + "-rooted",
+            "Show the explicit admitted hierarchy in the folder tree",
+            [this, root] { select_tree_root_mode(root); });
+        command_tree_admitted_roots_.push_back(std::move(command));
+        tree_admitted_root_paths_.push_back(root);
+    }
 
     command_icons_ = make_command(
         "view.small-icons", "Small icons", "Use the compact icon object field",
@@ -567,6 +1198,10 @@ void Application::install_command_surfaces() {
     command_details_ = make_command(
         "view.details", "Details", "Use the factual details object field",
         [this] { set_view_mode(gui_forms::ObjectViewMode::details); });
+    command_criteria_ = make_command(
+        "view.criteria", "Criteria",
+        "Build an exact metadata virtual folder over the current indexed subtree",
+        [this] { toggle_criteria_mode(); });
     command_sort_name_ = make_command(
         "sort.name", "Name", "Sort objects by name",
         [this] { set_sort_mode("name"); });
@@ -580,8 +1215,12 @@ void Application::install_command_surfaces() {
         "sort.modified", "Modified", "Sort objects by observed modification time",
         [this] { set_sort_mode("modified"); });
     command_refresh_ = make_command(
-        "view.refresh", "Refresh", "Read the current local folder again",
-        [this] { request_navigation(location_, false); });
+        "view.refresh", "Refresh", "Refresh the visible local content",
+        [this] {
+            if (criteria_showing_) request_engine_criteria();
+            else if (search_showing_) request_engine_search();
+            else request_navigation(location_, false);
+        });
     command_toggle_tree_ = make_command(
         "view.folder-tree", "Folder tree", "Show or collapse the folder tree",
         [this] { toggle_folder_tree(); });
@@ -652,6 +1291,7 @@ void Application::install_command_surfaces() {
         {"fm.menu.view", "View", {
             {"view.icons", MenuItemKind::radio, command_icons_},
             {"view.details", MenuItemKind::radio, command_details_},
+            {"view.criteria", MenuItemKind::check, command_criteria_},
             {"view.sort", MenuItemKind::submenu, {}, "Sort", {
                 {"view.sort.name", MenuItemKind::radio, command_sort_name_},
                 {"view.sort.kind", MenuItemKind::radio, command_sort_kind_},
@@ -667,7 +1307,7 @@ void Application::install_command_surfaces() {
             {"go.back", MenuItemKind::command, command_back_},
             {"go.forward", MenuItemKind::command, command_forward_},
             {"go.up", MenuItemKind::command, command_up_},
-            {"go.scope-root", MenuItemKind::command, command_root_},
+            {"go.home", MenuItemKind::command, command_root_},
         }},
         {"fm.menu.commands", "Commands", {
             {"commands.sha256", MenuItemKind::command, command_checksum_},
@@ -678,17 +1318,18 @@ void Application::install_command_surfaces() {
             {"help.about", MenuItemKind::command, about},
         }},
     });
+    menu_strip_->set_selected_item_id("fm.menu.home");
 
     move_copy_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.shelf.move-copy");
     move_copy_menu_->set_items({
         {"copy", MenuItemKind::command, command_copy_},
         {"move", MenuItemKind::command, command_move_},
-        {"paste", MenuItemKind::command, command_paste_},
     });
     view_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.shelf.view");
     view_menu_->set_items({
         {"small-icons", MenuItemKind::radio, command_icons_},
         {"details", MenuItemKind::radio, command_details_},
+        {"criteria", MenuItemKind::check, command_criteria_},
     });
     sort_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.shelf.sort");
     sort_menu_->set_items({
@@ -697,6 +1338,34 @@ void Application::install_command_surfaces() {
         {"size", MenuItemKind::radio, command_sort_size_},
         {"modified", MenuItemKind::radio, command_sort_modified_},
     });
+    shelf_overflow_menu_ = std::make_shared<gui_forms::ContextMenu>(
+        "fm.shelf.more-menu");
+    const auto project_open = [this](
+        const std::shared_ptr<gui_forms::ContextMenu>& menu,
+        const std::shared_ptr<gui_forms::DropDownButton>& button) {
+        subscriptions_.push_back(menu->open_changed().subscribe(
+            [button](const bool open) { button->set_drop_down_open(open); }));
+    };
+    project_open(move_copy_menu_, shelf_move_copy_button_);
+    project_open(view_menu_, shelf_view_button_);
+    project_open(sort_menu_, shelf_sort_button_);
+    project_open(shelf_overflow_menu_, shelf_overflow_button_);
+    tree_root_menu_ = std::make_shared<gui_forms::ContextMenu>(
+        "fm.navigation.root-mode-menu");
+    std::vector<gui_forms::MenuItemSpec> tree_root_items{
+        {"home", MenuItemKind::radio, command_tree_home_},
+    };
+    if (command_tree_volumes_) {
+        tree_root_items.push_back(
+            {"volumes", MenuItemKind::radio, command_tree_volumes_});
+    }
+    for (std::size_t index = 0;
+         index < command_tree_admitted_roots_.size(); ++index) {
+        tree_root_items.push_back({
+            "admitted." + std::to_string(index), MenuItemKind::radio,
+            command_tree_admitted_roots_[index]});
+    }
+    tree_root_menu_->set_items(std::move(tree_root_items));
     object_menu_ = std::make_shared<gui_forms::ContextMenu>("fm.context.object");
     object_menu_->set_items({
         {"open", MenuItemKind::command, command_open_},
@@ -722,26 +1391,100 @@ void Application::install_command_surfaces() {
         {"separator.properties", MenuItemKind::separator},
         {"properties", MenuItemKind::command, command_properties_},
     });
-    menus_ = {move_copy_menu_, view_menu_, sort_menu_, object_menu_, background_menu_};
+    breadcrumb_overflow_menu_ = std::make_shared<gui_forms::ContextMenu>(
+        "fm.path.overflow-menu");
+    menus_ = {move_copy_menu_, view_menu_, sort_menu_, shelf_overflow_menu_,
+              tree_root_menu_,
+              object_menu_, background_menu_, breadcrumb_overflow_menu_};
     update_command_state();
 }
 
+void Application::install_accelerators() {
+    if (!window_) return;
+    accelerator_tokens_.clear();
+
+#if defined(__APPLE__)
+    constexpr auto primary = gui_forms::Modifier::meta;
+    constexpr std::string_view primary_text = "Cmd";
+#else
+    constexpr auto primary = gui_forms::Modifier::control;
+    constexpr std::string_view primary_text = "Ctrl";
+#endif
+
+    command_paste_->set_shortcut(std::string(primary_text) + "+V");
+    command_select_all_->set_shortcut(std::string(primary_text) + "+A");
+
+    const auto bind = [this](const std::shared_ptr<gui_forms::Command>& command,
+                             const gui_forms::KeyGesture gesture,
+                             const bool before_focused_route = false,
+                             std::function<bool()> predicate = {}) {
+        std::weak_ptr<gui_forms::Command> weak = command;
+        const std::string source = "fm.accelerator." + command->stable_id();
+        accelerator_tokens_.push_back(window_->register_accelerator(
+            *command, gesture,
+            [weak, source, predicate = std::move(predicate)] {
+                if (predicate && !predicate()) return false;
+                const auto locked = weak.lock();
+                return locked && locked->execute(source);
+            },
+            gui_forms::AcceleratorOptions{before_focused_route}));
+    };
+    const auto focused_is_object_surface = [this] {
+        if (!window_) return false;
+        const auto focused = window_->focused_control();
+        return focused == objects_ || focused == correspondence_;
+    };
+    const auto focused_is_navigation_surface = [this] {
+        if (!window_) return false;
+        const auto focused = window_->focused_control();
+        return focused == objects_ || focused == correspondence_ || focused == tree_;
+    };
+
+    bind(command_open_, {gui_forms::PhysicalKey::enter,
+                         gui_forms::Modifier::none}, true,
+         focused_is_object_surface);
+    const auto focused_is_not_text_editor = [this] {
+        return window_ &&
+            !std::dynamic_pointer_cast<gui_forms::TextBox>(
+                window_->focused_control());
+    };
+    bind(command_paste_, {gui_forms::PhysicalKey::v, primary}, false,
+         focused_is_not_text_editor);
+#if defined(__APPLE__)
+    bind(command_delete_, {gui_forms::PhysicalKey::backspace,
+                           gui_forms::Modifier::none}, false,
+         focused_is_not_text_editor);
+#endif
+    bind(command_delete_, {gui_forms::PhysicalKey::delete_forward,
+                           gui_forms::Modifier::none}, false,
+         focused_is_not_text_editor);
+    bind(command_rename_, {gui_forms::PhysicalKey::f2,
+                           gui_forms::Modifier::none}, false,
+         focused_is_not_text_editor);
+    bind(command_select_all_, {gui_forms::PhysicalKey::a, primary}, true,
+         [this] { return window_ && window_->focused_control() == objects_; });
+
+    const auto bind_navigation = [&](const std::shared_ptr<gui_forms::Command>& command,
+                                     const std::uint32_t key) {
+        bind(command, {key, gui_forms::Modifier::alt}, true,
+             focused_is_navigation_surface);
+        bind(command, {key, gui_forms::Modifier::alt}, false,
+             focused_is_not_text_editor);
+    };
+    bind_navigation(command_back_, gui_forms::PhysicalKey::left);
+    bind_navigation(command_forward_, gui_forms::PhysicalKey::right);
+    bind_navigation(command_up_, gui_forms::PhysicalKey::up);
+}
+
 void Application::rebuild_breadcrumb() {
-    breadcrumb_subscriptions_.clear();
-    breadcrumb_buttons_.clear();
-    breadcrumb_separators_.clear();
-    breadcrumb_->clear_children();
+    breadcrumb_paths_.clear();
+    breadcrumb_overflow_commands_.clear();
+    if (breadcrumb_overflow_menu_) breadcrumb_overflow_menu_->set_items({});
 
     std::vector<std::pair<std::string, std::filesystem::path>> segments;
-    std::string root_label = leaf_name(protected_root_);
-    if (const char* home = std::getenv("HOME"); home && *home) {
-        if (std::filesystem::path(home).lexically_normal() == protected_root_) {
-            root_label = "Home";
-        }
-    }
-    segments.emplace_back(root_label, protected_root_);
-    const auto relative = location_.lexically_relative(protected_root_);
-    auto accumulated = protected_root_;
+    segments.emplace_back(navigation_label(navigation_root_), navigation_root_);
+    const auto relative = location_.lexically_relative(navigation_root_);
+    auto accumulated = navigation_root_;
     if (!relative.empty() && relative != ".") {
         for (const auto& component : relative) {
             accumulated /= component;
@@ -749,61 +1492,316 @@ void Application::rebuild_breadcrumb() {
         }
     }
 
+    std::vector<gui_forms::BreadcrumbSegment> model;
+    model.reserve(segments.size());
     for (std::size_t index = 0; index < segments.size(); ++index) {
         const auto& [text, path] = segments[index];
-        auto button = std::make_shared<gui_forms::Button>(
-            gui_forms::StableId("fm.path.segment." + std::to_string(index)), text);
-        button->set_visual_style(gui_forms::ButtonVisualStyle::flat);
-        button->set_requested_bounds(
-            {0, 0, std::max(48.0, 15.0 + 6.6 * static_cast<double>(text.size())), 26});
-        button->set_accessible_description("Navigate to " + path.string());
-        breadcrumb_subscriptions_.push_back(button->clicked().subscribe(
-            [this, path](gui_forms::ButtonBase&) {
-                request_navigation(path, true);
-            }));
-        breadcrumb_->add_child(button);
-        breadcrumb_buttons_.push_back(std::move(button));
-        if (index + 1U < segments.size()) {
-            auto separator = std::make_shared<gui_forms::Label>(
-                gui_forms::StableId("fm.path.separator." + std::to_string(index)), "›");
-            separator->set_requested_bounds({0, 0, 14, 26});
-            separator->set_alignment(gui_forms::HorizontalAlignment::center);
-            separator->set_vertical_alignment(gui_forms::VerticalAlignment::center);
-            breadcrumb_->add_child(separator);
-            breadcrumb_separators_.push_back(std::move(separator));
-        }
+        const std::string stable_id = breadcrumb_stable_id(path);
+        breadcrumb_paths_.insert_or_assign(stable_id, path);
+        model.push_back({
+            stable_id, text,
+            index + 1U == segments.size()
+                ? "Current exact location " + path.string()
+                : "Navigate to " + path.string(),
+            true});
     }
-    path_edit_button_ = std::make_shared<gui_forms::Button>(
-        gui_forms::StableId("fm.path.edit"), "./");
-    path_edit_button_->set_visual_style(gui_forms::ButtonVisualStyle::flat);
-    path_edit_button_->set_requested_bounds({0, 0, 34, 26});
-    path_edit_button_->set_accessible_name("Edit complete path");
-    path_edit_button_->set_accessible_description(
-        "Switch this breadcrumb to one inline exact-path editor");
-    breadcrumb_subscriptions_.push_back(path_edit_button_->clicked().subscribe(
-        [this](gui_forms::ButtonBase&) { set_path_editing(true); }));
-    breadcrumb_->add_child(path_edit_button_);
+    breadcrumb_->set_segments(std::move(model));
+    path_box_->set_text(location_.string());
     set_path_editing(false);
+}
+
+void Application::show_breadcrumb_overflow() {
+    breadcrumb_subscriptions_.clear();
+    breadcrumb_overflow_commands_.clear();
+    std::vector<gui_forms::MenuItemSpec> items;
+    for (const std::string& id : breadcrumb_->hidden_segment_ids()) {
+        const auto path = breadcrumb_paths_.find(id);
+        const auto segment = std::find_if(
+            breadcrumb_->segments().begin(), breadcrumb_->segments().end(),
+            [&id](const gui_forms::BreadcrumbSegment& candidate) {
+                return candidate.stable_id == id;
+            });
+        if (path == breadcrumb_paths_.end() ||
+            segment == breadcrumb_->segments().end()) {
+            continue;
+        }
+        auto command = std::make_shared<gui_forms::Command>(
+            id + ".navigate", segment->text);
+        command->set_description("Navigate to " + path->second.string());
+        breadcrumb_subscriptions_.push_back(command->invoked().subscribe(
+            [this, target = path->second](const gui_forms::CommandInvocation&) {
+                request_navigation(target, true);
+            }));
+        items.push_back({id, gui_forms::MenuItemKind::command, command});
+        breadcrumb_overflow_commands_.push_back(std::move(command));
+    }
+    if (items.empty()) return;
+    breadcrumb_overflow_menu_->set_items(std::move(items));
+    show_menu(breadcrumb_overflow_menu_, breadcrumb_);
 }
 
 void Application::set_path_editing(const bool editing) {
     if (rename_box_) rename_box_->set_visible(false);
-    breadcrumb_->set_visible(!editing);
-    path_box_->set_visible(editing);
-    if (!editing) return;
-    path_box_->set_text(location_.string());
+    breadcrumb_->set_visible(true);
+    if (!editing) {
+        path_suggestion_generation_.fetch_add(1);
+        close_path_suggestion_popup();
+        breadcrumb_->set_editing(false);
+        if (window_ && window_->focused_control() == path_box_) {
+            static_cast<void>(window_->request_focus(breadcrumb_));
+        }
+        return;
+    }
+    const std::string location_text = location_.string();
+    breadcrumb_->begin_edit(location_text);
+}
+
+void Application::request_path_suggestions(std::string text) {
+    if (!breadcrumb_->editing()) return;
+    const std::uint64_t generation =
+        path_suggestion_generation_.fetch_add(1) + 1U;
+    breadcrumb_->set_tab_completion_available(false);
+    close_path_suggestion_popup();
+    if (text.empty()) {
+        apply_path_suggestions(generation, {}, {}, {},
+                               "Enter a path in Home or Volumes");
+        return;
+    }
+
+    std::filesystem::path expanded(text);
+    if (text == "~") expanded = home_root_;
+    else if (text.starts_with("~/")) expanded = home_root_ / text.substr(2);
+    else if (!expanded.is_absolute()) expanded = location_ / expanded;
+    expanded = expanded.lexically_normal();
+
+    const std::string requested_text = text;
+    apply_path_suggestions(
+        generation, requested_text,
+        "Checking: " + expanded.string(), {},
+        "Reading matching local folders…");
+    enumerate_path_suggestions(
+        generation, std::move(text), navigation_roots_, location_, home_root_,
+        std::move(expanded));
+}
+
+void Application::enumerate_path_suggestions(
+    const std::uint64_t generation, std::string requested_text,
+    std::vector<std::filesystem::path> admitted_roots,
+    std::filesystem::path current_location,
+    std::filesystem::path home_root,
+    std::filesystem::path candidate) {
+    post_worker([self = shared_from_this(), generation,
+                 requested_text = std::move(requested_text),
+                 admitted_roots = std::move(admitted_roots),
+                 current_location = std::move(current_location),
+                 home_root = std::move(home_root),
+                 candidate = std::move(candidate)]() mutable {
+        try {
+            const auto target = resolve_navigation_target(
+                admitted_roots, current_location, home_root, candidate);
+            if (self->stopping_.load() ||
+                self->path_suggestion_generation_.load() != generation) {
+                return;
+            }
+            if (!target) {
+                self->post_ui([self, generation,
+                               requested_text = std::move(requested_text),
+                               preview = "Not admitted: " + candidate.string()]() mutable {
+                    self->apply_path_suggestions(
+                        generation, std::move(requested_text),
+                        std::move(preview), {},
+                        "Outside Home, Volumes, and explicit launch roots");
+                });
+                return;
+            }
+            auto root = target->root;
+            candidate = target->path;
+            std::error_code type_error;
+            const bool candidate_is_directory =
+                std::filesystem::is_directory(candidate, type_error) &&
+                !type_error;
+            std::filesystem::path parent = candidate_is_directory
+                ? candidate : candidate.parent_path();
+            const std::string prefix = candidate_is_directory
+                ? std::string{} : candidate.filename().string();
+            auto snapshot = read_directory(
+                root, parent, prefix, generation,
+                [self, generation] {
+                    return self->stopping_.load() ||
+                        self->path_suggestion_generation_.load() != generation;
+                }, self->show_hidden_);
+            if (snapshot.cancelled) return;
+            std::vector<std::filesystem::path> suggestions;
+            suggestions.reserve(
+                std::min<std::size_t>(snapshot.entries.size(), 12U));
+            for (const DirectoryEntry& entry : snapshot.entries) {
+                if (!entry.directory) continue;
+                suggestions.push_back(entry.path);
+                if (suggestions.size() == 12U) break;
+            }
+            const std::string notice = snapshot.error.empty()
+                ? (suggestions.empty() ? "No matching local folders"
+                                       : std::string{})
+                : snapshot.error;
+            const std::string preview = snapshot.available()
+                ? (candidate_is_directory
+                    ? "Resolved: " + snapshot.location.string()
+                    : "Proposed: " + candidate.string())
+                : "Unavailable: " + candidate.string();
+            self->post_ui([self, generation,
+                           requested_text = std::move(requested_text),
+                           preview,
+                           suggestions = std::move(suggestions), notice]() mutable {
+                self->apply_path_suggestions(
+                    generation, std::move(requested_text), std::move(preview),
+                    std::move(suggestions), notice);
+            });
+        } catch (const std::exception& error) {
+            const std::string notice =
+                std::string("Suggestion lookup failed: ") + error.what();
+            const std::string preview =
+                "Unavailable: " + candidate.string();
+            self->post_ui([self, generation,
+                           requested_text = std::move(requested_text),
+                           preview, notice]() mutable {
+                self->apply_path_suggestions(
+                    generation, std::move(requested_text), std::move(preview),
+                    {}, notice);
+            });
+        }
+    });
+}
+
+void Application::apply_path_suggestions(
+    const std::uint64_t generation, std::string requested_text,
+    std::string preview, std::vector<std::filesystem::path> paths,
+    std::string notice) {
+    if (generation != path_suggestion_generation_.load() ||
+        !breadcrumb_->editing() || path_box_->text() != requested_text) {
+        return;
+    }
+    close_path_suggestion_popup();
+    path_suggestion_paths_ = std::move(paths);
+    path_suggestion_subscriptions_.clear();
+
+    path_suggestion_content_ = std::make_shared<gui_forms::Panel>(
+        gui_forms::StableId("fm.path.suggestions.content"));
+    path_suggestion_content_->set_background(gui_forms::Color::rgba(247, 249, 244));
+    path_suggestion_content_->set_border_style(gui_forms::BorderStyle::line);
+
+    path_resolution_preview_ = std::make_shared<gui_forms::Label>(
+        gui_forms::StableId("fm.path.resolution-preview"),
+        preview.empty() ? notice : preview +
+            (notice.empty() ? std::string{} : " · " + notice));
+    path_resolution_preview_->set_requested_bounds({0, 0, 420, 28});
+    path_resolution_preview_->set_padding({8, 0, 8, 0});
+    path_resolution_preview_->set_dock(gui_forms::DockStyle::top);
+    path_resolution_preview_->set_accessible_name(
+        "Canonical path resolution preview");
+    path_suggestion_content_->add_child(path_resolution_preview_);
+
+    if (!path_suggestion_paths_.empty()) {
+        std::vector<std::string> labels;
+        std::vector<std::string> identities;
+        labels.reserve(path_suggestion_paths_.size());
+        identities.reserve(path_suggestion_paths_.size());
+        for (const auto& path : path_suggestion_paths_) {
+            labels.push_back(path.filename().string());
+            identities.push_back(breadcrumb_stable_id(path) + ".suggestion");
+        }
+        path_suggestion_list_ = std::make_shared<gui_forms::ListBox>(
+            gui_forms::StableId("fm.path.suggestions.list"));
+        path_suggestion_list_->set_focusable(false);
+        path_suggestion_list_->set_items(std::move(labels));
+        path_suggestion_list_->set_item_stable_ids(std::move(identities));
+        path_suggestion_list_->set_item_height(24.0);
+        path_suggestion_list_->set_requested_bounds(
+            {0, 0, 420,
+             4.0 + 24.0 * static_cast<double>(
+                 std::min<std::size_t>(path_suggestion_paths_.size(), 6U))});
+        path_suggestion_list_->set_dock(gui_forms::DockStyle::fill);
+        path_suggestion_list_->select_index(0U);
+        path_suggestion_content_->add_child(path_suggestion_list_);
+        path_suggestion_subscriptions_.push_back(
+            path_suggestion_list_->item_activated().subscribe(
+                [this](const std::size_t index) {
+                    accept_path_suggestion(index);
+                }));
+    } else {
+        path_suggestion_list_.reset();
+    }
+    breadcrumb_->set_tab_completion_available(
+        !path_suggestion_paths_.empty());
+    show_path_suggestion_popup();
+}
+
+void Application::show_path_suggestion_popup() {
+    if (!window_ || !breadcrumb_->editing() || !path_suggestion_content_) return;
+    gui_forms::AnchoredPopupPlacement placement;
+    placement.preferred_size = {
+        std::clamp(breadcrumb_->absolute_bounds().width, 280.0, 620.0),
+        28.0 + (path_suggestion_list_
+            ? path_suggestion_list_->requested_bounds().height : 0.0)};
+    placement.gap = 2.0;
+    path_suggestion_layer_ = gui_forms::make_control<gui_forms::AnchoredPopupLayer>(
+        gui_forms::StableId("fm.path.suggestions.layer"), breadcrumb_, placement);
+    path_suggestion_layer_->set_content(path_suggestion_content_);
+    path_suggestion_layer_->set_accessible_name("Path completion suggestions");
+    path_suggestion_layer_->set_requested_bounds(
+        {0, 0, window_->client_size().width, window_->client_size().height});
+    path_suggestion_subscriptions_.push_back(
+        path_suggestion_layer_->dismiss_requested().subscribe(
+            [this](const gui_forms::PopupDismissReason reason) {
+                (void)reason;
+                path_box_->set_text(location_.string());
+                set_path_editing(false);
+            }));
+    path_suggestion_popup_ = window_->open_popup(
+        breadcrumb_, path_suggestion_layer_);
+}
+
+void Application::close_path_suggestion_popup(const bool restore_focus) {
+    path_suggestion_popup_.disconnect();
+    path_suggestion_subscriptions_.clear();
+    path_suggestion_layer_.reset();
+    path_suggestion_content_.reset();
+    path_resolution_preview_.reset();
+    path_suggestion_list_.reset();
+    if (breadcrumb_) breadcrumb_->set_tab_completion_available(false);
+    if (restore_focus && breadcrumb_->editing() && window_) {
+        static_cast<void>(window_->request_focus(path_box_));
+    }
+}
+
+void Application::accept_path_suggestion(const std::size_t index) {
+    if (index >= path_suggestion_paths_.size() || !breadcrumb_->editing()) return;
+    path_box_->set_text(path_suggestion_paths_[index].string());
     path_box_->select_all();
-    if (window_) window_->request_focus(path_box_);
+    if (window_) static_cast<void>(window_->request_focus(path_box_));
+}
+
+void Application::accept_active_path_suggestion() {
+    if (path_suggestion_list_ && path_suggestion_list_->selected_index()) {
+        accept_path_suggestion(*path_suggestion_list_->selected_index());
+    }
 }
 
 void Application::set_view_mode(const gui_forms::ObjectViewMode mode) {
     details_mode_ = mode == gui_forms::ObjectViewMode::details;
     objects_->set_view_mode(mode);
+    objects_->set_show_secondary_text(details_mode_);
     form_.file_manager_app_shell_commands_arrange_group_actions_details->set_text(
-        details_mode_ ? "▤ View: details ▾" : "▦ View: small icons ▾");
+        "View");
+    form_.file_manager_app_shell_commands_arrange_group_actions_details
+        ->set_accessible_description(
+            details_mode_
+                ? "Current presentation: Details. Choose the object presentation"
+                : "Current presentation: Small icons. Choose the object presentation");
     update_command_state();
     set_status(details_mode_ ? "Details view" : "Small icons view",
-               "current local folder · retained view state");
+               criteria_showing_
+                   ? "exact virtual folder · retained presentation state"
+                   : "current local folder · retained presentation state");
 }
 
 void Application::rebuild_object_order() {
@@ -850,7 +1848,7 @@ void Application::set_sort_mode(std::string mode) {
     title.front() = static_cast<char>(
         std::toupper(static_cast<unsigned char>(title.front())));
     form_.file_manager_app_shell_commands_arrange_group_actions_refresh->set_text(
-        "≡ Sort: " + title + " ▾");
+        "Sort: " + title);
     update_command_state();
     set_status("Sorted by " + title,
                "folders first · exact observed fields · stable name fallback");
@@ -886,15 +1884,15 @@ void Application::toggle_selection_pane() {
 
 void Application::show_about() {
     const std::string version = FILE_MANAGER_VERSION;
-    set_status("File Manager · " + version + " protected-root build",
+    set_status("File Manager · " + version + " development build",
                "local filesystem authority · GUI.Forms + Web.Forms");
     if (!window_ || !window_->host_services()) return;
     gui_forms::HostMessageDialogRequest message;
     message.title = "About File Manager";
     message.message =
         "File Manager " + version + "\n\n"
-        "Protected-root M4 build.\n"
-        "Local-machine file navigation and protected operations.\n"
+        "Daily-navigation development build.\n"
+        "Read-only Home and Volumes navigation; protected operations remain scoped.\n"
         "Frontend: Web.Forms source compiled to retained GUI.Forms C++.\n"
         "Search and settings cross the admitted Orchestrator contracts.";
     message.buttons = gui_forms::HostMessageButtons::ok;
@@ -908,53 +1906,176 @@ void Application::show_about() {
 
 void Application::update_command_state() {
     if (!command_open_) return;
+    const bool files_active = !settings_open_;
+    const bool correspondence_active = search_showing_ ||
+        correspondence_->visible();
+    const bool folder_presentation_active = files_active && objects_->visible() &&
+        !correspondence_->visible();
     const bool one = objects_->selected_ids().size() == 1U;
     const auto entry = selected_entry();
-    const bool mutation_ready = operations_ && !rename_box_->visible() &&
-        !transfer_in_flight_;
+    const bool mutation_ready = files_active && mutation_scope_active() &&
+        !rename_box_->visible() &&
+        !transfer_in_flight_ && !property_rename_in_flight_;
     const bool paste_ready = mutation_ready && pending_transfer_ &&
         pending_transfer_->entry.path.parent_path() != location_;
-    const std::string mutation_reason = operations_
-        ? "Select one object and wait for the active operation"
-        : "This launch is read-only; protected mutations were not enabled";
+    const std::string hidden_workspace_reason =
+        "Return to Files before using file workspace commands";
+    const std::string mutation_authority_reason = !files_active
+        ? hidden_workspace_reason
+        : !operations_
+        ? "This launch is read-only; protected mutations were not enabled"
+        : !mutation_scope_active()
+            ? "Mutations are available only inside the explicitly protected root"
+            : rename_box_->visible()
+                ? "Finish or cancel the active rename first"
+                : transfer_in_flight_ || property_rename_in_flight_
+                    ? "Wait for the active protected operation"
+                    : std::string{};
 
-    command_open_->set_enabled(entry && entry->kind != EntryKind::symlink);
+    command_open_->set_enabled(files_active && entry &&
+                               entry->kind != EntryKind::symlink);
+    command_open_->set_availability_reason(!files_active
+        ? hidden_workspace_reason : !entry
+            ? "Select one visible object" : entry->kind == EntryKind::symlink
+                ? "Symbolic-link activation is not admitted" : std::string{});
     command_new_folder_->set_enabled(mutation_ready);
     command_copy_->set_enabled(mutation_ready && one);
     command_move_->set_enabled(mutation_ready && one);
     command_paste_->set_enabled(paste_ready);
-    command_undo_->set_enabled(operations_ && operations_->undo_available());
+    command_undo_->set_enabled(files_active && operations_ &&
+                               operations_->undo_available());
     command_delete_->set_enabled(mutation_ready && one);
     command_rename_->set_enabled(mutation_ready && one);
-    for (const auto& command : {command_new_folder_, command_copy_, command_move_,
-                                command_paste_, command_undo_, command_delete_,
+    command_new_folder_->set_availability_reason(command_new_folder_->state().enabled
+        ? std::string{} : mutation_authority_reason);
+    const std::string selection_mutation_reason =
+        !mutation_authority_reason.empty()
+            ? mutation_authority_reason : "Select one object";
+    for (const auto& command : {command_copy_, command_move_, command_delete_,
                                 command_rename_}) {
-        if (command && !command->state().enabled) {
-            command->set_availability_reason(mutation_reason);
-        }
+        command->set_availability_reason(command->state().enabled
+            ? std::string{} : selection_mutation_reason);
     }
-    command_back_->set_enabled(!history_.empty() && history_index_ > 0U);
+    command_paste_->set_availability_reason(command_paste_->state().enabled
+        ? std::string{} : !mutation_authority_reason.empty()
+            ? mutation_authority_reason : !pending_transfer_
+                ? "Copy or move one object first"
+                : "Navigate to a different destination folder");
+    command_undo_->set_availability_reason(command_undo_->state().enabled
+        ? std::string{} : !files_active
+            ? hidden_workspace_reason : !operations_
+                ? "This launch is read-only; protected mutations were not enabled"
+                : "No recoverable operation is available to undo");
+    command_properties_->set_enabled(files_active);
+    command_properties_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
+    command_select_all_->set_enabled(
+        folder_presentation_active && !objects_->items().empty());
+    command_select_all_->set_availability_reason(!files_active
+        ? hidden_workspace_reason : correspondence_active
+            ? "Search results support one factual selection at a time"
+            : objects_->items().empty()
+                ? "The current folder has no visible objects" : std::string{});
+
+    command_back_->set_enabled(files_active && !history_.empty() &&
+                               history_index_ > 0U);
     command_forward_->set_enabled(
-        !history_.empty() && history_index_ + 1U < history_.size());
-    command_up_->set_enabled(location_ != protected_root_);
-    command_root_->set_enabled(location_ != protected_root_);
+        files_active && !history_.empty() &&
+        history_index_ + 1U < history_.size());
+    command_up_->set_enabled(files_active && location_ != navigation_root_);
+    command_root_->set_enabled(files_active && location_ != home_root_);
+    command_back_->set_availability_reason(command_back_->state().enabled
+        ? std::string{} : !files_active ? hidden_workspace_reason
+                                        : "No previous location");
+    command_forward_->set_availability_reason(command_forward_->state().enabled
+        ? std::string{} : !files_active ? hidden_workspace_reason
+                                        : "No forward location");
+    command_up_->set_availability_reason(command_up_->state().enabled
+        ? std::string{} : !files_active ? hidden_workspace_reason
+                                        : "Already at the admitted root");
+    command_root_->set_availability_reason(command_root_->state().enabled
+        ? std::string{} : !files_active ? hidden_workspace_reason
+                                        : "Already at Home");
+    for (const auto& command : {command_icons_, command_details_,
+                                command_sort_name_, command_sort_kind_,
+                                command_sort_size_, command_sort_modified_}) {
+        command->set_enabled(folder_presentation_active);
+        command->set_availability_reason(folder_presentation_active
+            ? std::string{} : !files_active
+                ? hidden_workspace_reason
+                : "Folder presentation is unavailable for correspondence results");
+    }
     command_icons_->set_checked(!details_mode_);
     command_details_->set_checked(details_mode_);
+    command_criteria_->set_enabled(files_active && engine_search_available());
+    command_criteria_->set_checked(criteria_showing_);
+    command_criteria_->set_availability_reason(command_criteria_->state().enabled
+        ? std::string{} : !files_active ? hidden_workspace_reason
+        : "Criteria requires an admitted Engine catalogue root");
     command_sort_name_->set_checked(sort_mode_ == "name");
     command_sort_kind_->set_checked(sort_mode_ == "kind");
     command_sort_size_->set_checked(sort_mode_ == "size");
     command_sort_modified_->set_checked(sort_mode_ == "modified");
+    command_refresh_->set_enabled(
+        files_active && !search_loading_ && !criteria_loading_);
+    command_refresh_->set_description(criteria_showing_
+        ? "Repeat the visible exact Criteria query"
+        : search_showing_ ? "Repeat the visible Engine search query"
+                          : "Read the current local folder again");
+    command_refresh_->set_availability_reason(!files_active
+        ? hidden_workspace_reason : search_loading_ || criteria_loading_
+            ? "The current Engine query is still loading" : std::string{});
+    command_toggle_tree_->set_enabled(files_active);
+    command_toggle_selection_->set_enabled(files_active);
+    command_toggle_tree_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
+    command_toggle_selection_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
     command_toggle_tree_->set_checked(!workspace_split_->first_collapsed());
     command_toggle_selection_->set_checked(!selection_split_->second_collapsed());
     command_checksum_->set_visible(checksum_visible_);
-    command_checksum_->set_enabled(checksum_in_flight_ ||
-        (entry && !entry->directory && entry->kind != EntryKind::symlink));
+    command_checksum_->set_enabled(files_active && (checksum_in_flight_ ||
+        (entry && !entry->directory && entry->kind != EntryKind::symlink)));
+    command_checksum_->set_availability_reason(command_checksum_->state().enabled
+        ? std::string{} : !files_active
+            ? hidden_workspace_reason
+            : "Select one regular file to compute SHA-256");
     command_checksum_->set_text(checksum_in_flight_ ? "Cancel SHA-256" : "SHA-256…");
+    expected_checksum_box_->set_enabled(
+        checksum_visible_ && files_active && !checksum_in_flight_ && entry &&
+        !entry->directory && entry->kind != EntryKind::symlink);
     command_terminal_->set_visible(terminal_visible_);
-    command_terminal_->set_enabled(!entry || entry->directory);
+    command_terminal_->set_enabled(files_active);
+    command_terminal_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
+    command_copy_path_->set_enabled(files_active);
+    command_copy_path_->set_availability_reason(
+        files_active ? std::string{} : hidden_workspace_reason);
+    command_settings_->set_text(settings_open_ ? "Back to files" : "Settings…");
+    command_settings_->set_description(settings_open_
+        ? "Return to the File Manager workspace"
+        : "Open File Manager settings and Orchestrator service controls");
+    command_close_->set_enabled(static_cast<bool>(request_close_));
+    command_close_->set_availability_reason(request_close_
+        ? std::string{} : "The native window close route is not bound yet");
+
+    shelf_view_button_->set_enabled(folder_presentation_active);
+    shelf_sort_button_->set_enabled(folder_presentation_active);
+    shelf_view_button_->set_accessible_description(folder_presentation_active
+        ? details_mode_
+            ? "Current presentation: Details. Choose the object presentation"
+            : "Current presentation: Small icons. Choose the object presentation"
+        : correspondence_active
+            ? "Folder presentation is unavailable for correspondence results"
+            : hidden_workspace_reason);
+    shelf_sort_button_->set_accessible_description(folder_presentation_active
+        ? "Sort visible folder objects by one factual field"
+        : correspondence_active
+            ? "Folder sorting is unavailable for correspondence results"
+            : hidden_workspace_reason);
 
     form_.file_manager_app_shell_commands_selection_group_actions_copy->set_enabled(
-        mutation_ready && (one || paste_ready));
+        mutation_ready && one);
     form_.file_manager_app_shell_commands_selection_group_actions_delete->set_enabled(
         mutation_ready && one);
     form_.file_manager_app_shell_location_navigation_back->set_enabled(
@@ -963,6 +2084,18 @@ void Application::update_command_state() {
         command_forward_->state().enabled);
     form_.file_manager_app_shell_location_navigation_up->set_enabled(
         command_up_->state().enabled);
+    search_box_->set_enabled(files_active && engine_search_available());
+    search_box_->set_placeholder_text(engine_search_available()
+        ? "Search this indexed subtree"
+        : "Search unavailable · root not indexed");
+}
+
+void Application::focus_active_object_surface() {
+    if (!window_) return;
+    const auto target = correspondence_->effectively_visible()
+        ? std::static_pointer_cast<gui_forms::Control>(correspondence_)
+        : std::static_pointer_cast<gui_forms::Control>(objects_);
+    static_cast<void>(window_->request_focus(target));
 }
 
 void Application::install_handlers() {
@@ -971,48 +2104,76 @@ void Application::install_handlers() {
         subscriptions_.push_back(button->clicked().subscribe(
             [action = std::move(action)](gui_forms::ButtonBase&) { action(); }));
     };
-    click(form_.file_manager_app_shell_location_navigation_back, [this] { navigate_back(); });
-    click(form_.file_manager_app_shell_location_navigation_forward, [this] { navigate_forward(); });
-    click(form_.file_manager_app_shell_location_navigation_up, [this] { navigate_up(); });
+    const auto execute = [](std::shared_ptr<gui_forms::Command> command,
+                            std::string source) {
+        return [command = std::move(command), source = std::move(source)] {
+            static_cast<void>(command->execute(source));
+        };
+    };
+    click(form_.file_manager_app_shell_location_navigation_back,
+          execute(command_back_, "fm.button.go.back"));
+    click(form_.file_manager_app_shell_location_navigation_forward,
+          execute(command_forward_, "fm.button.go.forward"));
+    click(form_.file_manager_app_shell_location_navigation_up,
+          execute(command_up_, "fm.button.go.up"));
     click(form_.file_manager_app_shell_commands_home,
-          [this] { request_navigation(protected_root_, true); });
-    click(form_.file_manager_app_shell_commands_arrange_group_actions_refresh,
-          [this] {
-              show_menu(sort_menu_,
-                  form_.file_manager_app_shell_commands_arrange_group_actions_refresh);
-          });
-    click(form_.file_manager_app_shell_commands_arrange_group_actions_details,
-          [this] {
-              show_menu(view_menu_,
-                  form_.file_manager_app_shell_commands_arrange_group_actions_details);
-          });
+          [this] { request_navigation(home_root_, true); });
+    subscriptions_.push_back(shelf_sort_button_->drop_down_requested().subscribe(
+        [this](gui_forms::DropDownButton&) {
+            show_menu(sort_menu_, shelf_sort_button_);
+        }));
+    subscriptions_.push_back(shelf_sort_button_->drop_down_close_requested().subscribe(
+        [this](gui_forms::DropDownButton&) { sort_menu_->close(); }));
+    subscriptions_.push_back(shelf_view_button_->drop_down_requested().subscribe(
+        [this](gui_forms::DropDownButton&) {
+            show_menu(view_menu_, shelf_view_button_);
+        }));
+    subscriptions_.push_back(shelf_view_button_->drop_down_close_requested().subscribe(
+        [this](gui_forms::DropDownButton&) { view_menu_->close(); }));
     click(form_.file_manager_app_shell_commands_new_folder,
           [this] { request_create_folder(); });
     click(form_.file_manager_app_shell_commands_rename,
           [this] { begin_rename(); });
-    click(form_.file_manager_app_shell_commands_selection_group_actions_copy,
-          [this] {
-              show_menu(move_copy_menu_,
-                  form_.file_manager_app_shell_commands_selection_group_actions_copy);
-          });
+    subscriptions_.push_back(
+        shelf_move_copy_button_->drop_down_requested().subscribe(
+            [this](gui_forms::DropDownButton&) {
+                show_menu(move_copy_menu_, shelf_move_copy_button_);
+            }));
+    subscriptions_.push_back(
+        shelf_move_copy_button_->drop_down_close_requested().subscribe(
+            [this](gui_forms::DropDownButton&) { move_copy_menu_->close(); }));
+    subscriptions_.push_back(
+        shelf_overflow_button_->drop_down_requested().subscribe(
+            [this](gui_forms::DropDownButton&) {
+                show_command_shelf_overflow();
+            }));
+    subscriptions_.push_back(
+        shelf_overflow_button_->drop_down_close_requested().subscribe(
+            [this](gui_forms::DropDownButton&) {
+                shelf_overflow_menu_->close();
+            }));
     click(form_.file_manager_app_shell_commands_move,
           [this] { capture_transfer(true); });
     click(form_.file_manager_app_shell_commands_paste,
           [this] { paste_transfer(); });
     click(form_.file_manager_app_shell_commands_selection_group_actions_delete,
-          [this] { request_quarantine(); });
+          execute(command_delete_, "fm.button.selection.delete"));
     click(form_.file_manager_app_shell_commands_arrange_group_actions_settings,
-          [this] { show_properties(); });
+          execute(command_properties_, "fm.button.view.properties"));
     click(form_.file_manager_app_shell_workspace_content_heading_more_results,
-          [this] { request_engine_search(true); });
+          [this] {
+              if (criteria_showing_) request_engine_criteria(true);
+              else request_engine_search(true);
+          });
+    click(criteria_add_button_, [this] { add_criteria_module(); });
     click(form_.file_manager_app_shell_workspace_inspector_commands_open,
-          [this] { request_open(); });
+          execute(command_open_, "fm.button.file.open"));
     click(form_.file_manager_app_shell_workspace_inspector_commands_checksum,
-          [this] { request_checksum(); });
+          execute(command_checksum_, "fm.button.commands.sha256"));
     click(form_.file_manager_app_shell_workspace_inspector_commands_terminal,
-          [this] { request_terminal(); });
+          execute(command_terminal_, "fm.button.commands.terminal"));
     click(form_.file_manager_app_shell_workspace_inspector_commands_copy_path,
-          [this] { copy_current_path(); });
+          execute(command_copy_path_, "fm.button.commands.copy-path"));
     click(form_.file_manager_app_shell_settings_actions_back,
           [this] { hide_settings(); });
     click(form_.file_manager_app_shell_settings_actions_cancel,
@@ -1050,14 +2211,50 @@ void Application::install_handlers() {
     tab(form_.file_manager_app_shell_settings_body_tabs_advanced,
         "advanced", "Advanced");
     click(form_.file_manager_app_shell_workspace_sidebar_root,
-          [this] { request_navigation(protected_root_, true); });
+          [this] { request_navigation(home_root_, true); });
     click(form_.file_manager_app_shell_workspace_sidebar_parent,
           [this] { navigate_up(); });
+    click(tree_root_mode_button_, [this] { show_tree_root_menu(); });
 
-    subscriptions_.push_back(path_box_->committed().subscribe(
+    subscriptions_.push_back(breadcrumb_->segment_activated().subscribe(
+        [this](const std::string& id) {
+            const auto path = breadcrumb_paths_.find(id);
+            if (path != breadcrumb_paths_.end()) {
+                request_navigation(path->second, true);
+            }
+        }));
+    subscriptions_.push_back(breadcrumb_->overflow_activated().subscribe(
+        [this] { show_breadcrumb_overflow(); }));
+    subscriptions_.push_back(breadcrumb_->edit_committed().subscribe(
         [this](const std::string& text) { request_navigation(text, true); }));
-    subscriptions_.push_back(path_box_->cancelled().subscribe(
+    subscriptions_.push_back(breadcrumb_->edit_started().subscribe(
+        [this](const std::string& text) { request_path_suggestions(text); }));
+    subscriptions_.push_back(breadcrumb_->edit_cancelled().subscribe(
         [this] {
+            path_box_->set_text(location_.string());
+            set_path_editing(false);
+        }));
+    subscriptions_.push_back(breadcrumb_->edit_completion_requested().subscribe(
+        [this] { accept_active_path_suggestion(); }));
+    subscriptions_.push_back(path_box_->text_changed().subscribe(
+        [this](const std::string& text) {
+            if (breadcrumb_->editing()) request_path_suggestions(text);
+        }));
+    subscriptions_.push_back(path_box_->focus_observed().subscribe(
+        [this](const bool focused) {
+            if (!focused && breadcrumb_->editing()) {
+                path_box_->set_text(location_.string());
+                set_path_editing(false);
+            }
+        }));
+    subscriptions_.push_back(form_.root_control()->pointer_preview_observed().subscribe(
+        [this](const gui_forms::PointerEvent& event) {
+            if (!breadcrumb_->editing() ||
+                event.action != gui_forms::PointerAction::down ||
+                event.button != gui_forms::PointerButton::primary ||
+                breadcrumb_->absolute_bounds().contains(event.position)) {
+                return;
+            }
             path_box_->set_text(location_.string());
             set_path_editing(false);
         }));
@@ -1067,6 +2264,19 @@ void Application::install_handlers() {
         search_box_->set_text({});
         apply_filter();
     }));
+    subscriptions_.push_back(criteria_rack_->field_committed().subscribe(
+        [this](const gui_forms::InstrumentFieldChange&) {
+            if (criteria_showing_) request_engine_criteria();
+        }));
+    subscriptions_.push_back(criteria_rack_->module_toggled().subscribe(
+        [this](const gui_forms::InstrumentModuleToggle&) {
+            update_criteria_action_state();
+            if (criteria_showing_) request_engine_criteria();
+        }));
+    subscriptions_.push_back(criteria_rack_->remove_requested().subscribe(
+        [this](const gui_forms::InstrumentModuleRequest& request) {
+            remove_criteria_module(request.module_id);
+        }));
     subscriptions_.push_back(rename_box_->committed().subscribe(
         [this](const std::string& basename) { commit_rename(basename); }));
     subscriptions_.push_back(rename_box_->cancelled().subscribe(
@@ -1076,7 +2286,10 @@ void Application::install_handlers() {
             update_selection(change.current_id);
         }));
     subscriptions_.push_back(objects_->item_activated().subscribe(
-        [this](const std::string& stable_id) { activate(stable_id); }));
+        [this](const std::string& stable_id) {
+            objects_->set_selected_id(stable_id);
+            static_cast<void>(command_open_->execute("fm.objects.activation"));
+        }));
     subscriptions_.push_back(objects_->context_requested().subscribe(
         [this](const gui_forms::ObjectContextRequest& request) {
             if (request.stable_id.empty()) {
@@ -1094,15 +2307,47 @@ void Application::install_handlers() {
         }));
     subscriptions_.push_back(tree_->item_activated().subscribe(
         [this](const std::string& stable_id) { activate(stable_id); }));
+    subscriptions_.push_back(tree_->selection_changed().subscribe(
+        [this](const gui_forms::TreeSelectionChange& change) {
+            if (!tree_model_syncing_ && !change.current_id.empty()) {
+                activate(change.current_id);
+            }
+        }));
+    subscriptions_.push_back(tree_->expansion_changed().subscribe(
+        [this](const gui_forms::TreeExpansionChange& change) {
+            if (tree_model_syncing_) return;
+            const auto found = tree_locations_.find(change.stable_id);
+            if (found == tree_locations_.end()) return;
+            const auto key = found->second.generic_string();
+            if (change.expanded) {
+                tree_expanded_paths_.insert(key);
+                request_tree_expansion(found->second);
+            } else {
+                tree_expanded_paths_.erase(key);
+            }
+        }));
+    subscriptions_.push_back(property_list_->value_committed().subscribe(
+        [this](const gui_forms::PropertyValueChange& change) {
+            if (change.row_id == "fm.property.name" &&
+                change.current_value != change.previous_value) {
+                commit_property_name(change.current_value);
+            }
+        }));
     subscriptions_.push_back(correspondence_->selection_changed().subscribe(
         [this](const gui_forms::CorrespondenceSelectionChange& change) {
             objects_->set_selected_id(change.current_id);
         }));
     subscriptions_.push_back(correspondence_->item_activated().subscribe(
-        [this](const std::string& stable_id) { activate(stable_id); }));
+        [this](const std::string& stable_id) {
+            correspondence_->set_selected_id(stable_id);
+            objects_->set_selected_id(stable_id);
+            static_cast<void>(command_open_->execute(
+                "fm.correspondence.activation"));
+        }));
     subscriptions_.push_back(correspondence_->context_requested().subscribe(
         [this](const gui_forms::ObjectContextRequest& request) {
             if (request.stable_id.empty()) {
+                correspondence_->set_selected_id({});
                 objects_->clear_selection();
                 update_selection({});
                 background_menu_->show(correspondence_, request.screen_position);
@@ -1125,6 +2370,7 @@ void Application::bind_host(std::function<void()> wake,
         wake_ = std::move(wake);
         request_close_ = std::move(request_close);
     }
+    update_command_state();
     request_bootstrap();
     request_settings();
     request_navigation(protected_root_, true);
@@ -1299,6 +2545,7 @@ void Application::show_settings() {
     if (!settings_schema_ || !settings_snapshot_) request_settings();
     if (settings_tab_ == "services" && !services_snapshot_) request_services();
     rebuild_settings_page();
+    update_command_state();
     set_status("Settings", "ORC-SET-001 · typed optimistic transactions");
 }
 
@@ -1308,12 +2555,17 @@ void Application::hide_settings() {
     form_.file_manager_app_shell_commands->set_visible(true);
     form_.file_manager_app_shell_location->set_visible(true);
     form_.file_manager_app_shell_workspace->set_visible(true);
-    if (window_) window_->request_focus(objects_);
-    set_status("Files", "direct filesystem · protected root");
+    update_command_state();
+    focus_active_object_surface();
+    set_status("Files", "direct filesystem · " +
+        navigation_label(navigation_root_) +
+        (mutation_scope_active() ? " · protected operations admitted"
+                                 : " · read-only observation"));
 }
 
 void Application::select_settings_tab(std::string tab, std::string title) {
     settings_tab_ = std::move(tab);
+    update_settings_tab_state();
     form_.file_manager_app_shell_settings_body_page_title->set_text(
         std::move(title));
     form_.file_manager_app_shell_settings_body_page_description->set_text(
@@ -1322,6 +2574,40 @@ void Application::select_settings_tab(std::string tab, std::string title) {
         request_services();
     } else {
         rebuild_settings_page();
+    }
+}
+
+void Application::update_settings_tab_state() {
+    const std::pair<std::shared_ptr<gui_forms::Button>, std::string_view> tabs[]{
+        {form_.file_manager_app_shell_settings_body_tabs_general, "general"},
+        {form_.file_manager_app_shell_settings_body_tabs_appearance,
+         "appearance_access"},
+        {form_.file_manager_app_shell_settings_body_tabs_navigation,
+         "navigation_views"},
+        {form_.file_manager_app_shell_settings_body_tabs_search,
+         "search_indexing"},
+        {form_.file_manager_app_shell_settings_body_tabs_services, "services"},
+        {form_.file_manager_app_shell_settings_body_tabs_handlers,
+         "handlers_commands"},
+        {form_.file_manager_app_shell_settings_body_tabs_previews,
+         "previews_extensions"},
+        {form_.file_manager_app_shell_settings_body_tabs_applications,
+         "applications"},
+        {form_.file_manager_app_shell_settings_body_tabs_privacy,
+         "privacy_data"},
+        {form_.file_manager_app_shell_settings_body_tabs_advanced, "advanced"},
+    };
+    for (const auto& [button, id] : tabs) {
+        const bool active = settings_tab_ == id;
+        button->set_selected(active);
+        button->set_accessible_description(active
+            ? "Current settings category"
+            : "Open this settings category");
+        if (active && settings_tab_selected_recipes_) {
+            button->set_visual_recipes(*settings_tab_selected_recipes_);
+        } else if (!active && settings_tab_normal_recipes_) {
+            button->set_visual_recipes(*settings_tab_normal_recipes_);
+        }
     }
 }
 
@@ -1549,8 +2835,9 @@ void Application::rebuild_services_page() {
                 const bool root_command = service.id == "engine" &&
                     (command.id == "reconcile" || command.id == "rebuild");
                 const bool root_admitted = !root_command ||
+                    (!engine_root_id_.empty() &&
                     std::find(service.roots.begin(), service.roots.end(),
-                              engine_root_id_) != service.roots.end();
+                              engine_root_id_) != service.roots.end());
                 rows.emplace_back(
                     "fm.services." + service.id + ".command." + command.id,
                     command.title, command.title,
@@ -1597,8 +2884,9 @@ void Application::rebuild_services_page() {
                 const bool root_command = service.id == "engine" &&
                     (command.id == "reconcile" || command.id == "rebuild");
                 const bool root_admitted = !root_command ||
+                    (!engine_root_id_.empty() &&
                     std::find(service.roots.begin(), service.roots.end(),
-                              engine_root_id_) != service.roots.end();
+                              engine_root_id_) != service.roots.end());
                 const auto row_id = "fm.services." + service.id +
                     ".command." + command.id;
                 auto button = std::make_shared<gui_forms::Button>(
@@ -1722,16 +3010,29 @@ void Application::reset_settings_page() {
     if (!settings_schema_ || !settings_snapshot_ || settings_apply_in_flight_) {
         return;
     }
+    bool changed = false;
     for (const auto& field : settings_schema_->fields) {
         if (field.presentation_tab == settings_tab_ &&
             field.availability == "available") {
+            const auto pending = pending_settings_.find(field.id);
             const auto* committed = settings_snapshot_->find(field.id);
+            const auto& effective = pending != pending_settings_.end()
+                ? pending->second
+                : committed ? *committed : field.default_value;
+            if (effective == field.default_value) continue;
+            changed = true;
             if (committed && *committed == field.default_value) {
                 pending_settings_.erase(field.id);
             } else {
                 pending_settings_[field.id] = field.default_value;
             }
         }
+    }
+    if (!changed) {
+        update_settings_actions();
+        form_.file_manager_app_shell_settings_actions_status->set_text(
+            "Page values already match declared defaults");
+        return;
     }
     rebuild_settings_page();
     form_.file_manager_app_shell_settings_actions_status->set_text(
@@ -1814,7 +3115,36 @@ void Application::update_settings_actions() {
         ready && !pending_settings_.empty());
     form_.file_manager_app_shell_settings_actions_cancel->set_enabled(
         ready && !pending_settings_.empty());
-    form_.file_manager_app_shell_settings_actions_reset->set_enabled(ready);
+    bool page_has_available = false;
+    bool page_differs_from_default = false;
+    if (ready) {
+        for (const auto& field : settings_schema_->fields) {
+            if (field.presentation_tab != settings_tab_ ||
+                field.availability != "available") {
+                continue;
+            }
+            page_has_available = true;
+            const auto pending = pending_settings_.find(field.id);
+            const auto* committed = settings_snapshot_->find(field.id);
+            const auto& effective = pending != pending_settings_.end()
+                ? pending->second
+                : committed ? *committed : field.default_value;
+            if (effective != field.default_value) {
+                page_differs_from_default = true;
+                break;
+            }
+        }
+    }
+    const bool reset_ready = ready && page_differs_from_default;
+    form_.file_manager_app_shell_settings_actions_reset->set_enabled(reset_ready);
+    form_.file_manager_app_shell_settings_actions_reset
+        ->set_accessible_description(reset_ready
+            ? "Stage declared defaults for the current settings page"
+            : !ready
+                ? "Settings values are not ready"
+                : !page_has_available
+                    ? "This page has no available settings to reset"
+                    : "Page values already match declared defaults");
     if (ready && !pending_settings_.empty()) {
         form_.file_manager_app_shell_settings_actions_status->set_text(
             std::to_string(pending_settings_.size()) +
@@ -1879,9 +3209,20 @@ void Application::apply_runtime_settings() {
 
 void Application::request_navigation(std::filesystem::path path,
                                      const bool add_history) {
+    const auto target = resolve_navigation_target(
+        navigation_roots_, location_, home_root_, path);
+    if (!target) {
+        path_box_->set_text(location_.string());
+        set_path_editing(false);
+        set_status("Location not admitted",
+                   "read-only roots are Home, Volumes, and explicit launch roots");
+        return;
+    }
     search_generation_.fetch_add(1);
     search_loading_ = false;
+    criteria_loading_ = false;
     search_cursor_.reset();
+    criteria_cursor_.reset();
     search_order_.clear();
     form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(false);
     if (search_showing_) {
@@ -1889,9 +3230,14 @@ void Application::request_navigation(std::filesystem::path path,
         filter_.clear();
         search_box_->set_text({});
     }
+    if (criteria_showing_) criteria_showing_ = false;
+    set_path_editing(false);
     const auto generation = requested_generation_.fetch_add(1) + 1;
-    const auto root = protected_root_;
-    set_status("Reading " + path.string(), "direct filesystem · protected root");
+    const auto root = target->root;
+    path = target->path;
+    set_status("Reading " + path.string(),
+               "direct filesystem · " + navigation_label(root) +
+                   " · read-only observation");
     post_worker([self = shared_from_this(), root, path = std::move(path),
                  generation, add_history] {
         auto snapshot = read_directory(root, path, {}, generation,
@@ -1902,6 +3248,26 @@ void Application::request_navigation(std::filesystem::path path,
         if (snapshot.cancelled) return;
         self->post_ui([self, snapshot = std::move(snapshot), add_history]() mutable {
             self->apply_directory(std::move(snapshot), add_history);
+        });
+    });
+}
+
+void Application::request_tree_expansion(std::filesystem::path path) {
+    const auto target = resolve_navigation_target(
+        navigation_roots_, location_, home_root_, path);
+    if (!target) return;
+    const auto generation = tree_generation_.fetch_add(1) + 1U;
+    const auto root = target->root;
+    path = target->path;
+    post_worker([self = shared_from_this(), root, path = std::move(path),
+                 generation] {
+        auto snapshot = read_directory(root, path, {}, generation,
+            [self] { return self->stopping_.load(); }, self->show_hidden_);
+        if (snapshot.cancelled || !snapshot.available()) return;
+        self->post_ui([self, snapshot = std::move(snapshot)]() mutable {
+            self->tree_directory_entries_[snapshot.location.generic_string()] =
+                snapshot.entries;
+            self->rebuild_tree(snapshot);
         });
     });
 }
@@ -1918,11 +3284,17 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         set_status("Location unavailable", snapshot.error);
         return;
     }
-    location_ = std::move(snapshot.location);
+    const bool returning_from_virtual_surface =
+        correspondence_->effectively_visible() || criteria_console_->visible();
+    // The snapshot is also the authoritative cache input for rebuild_tree()
+    // below. Preserve its paths until that retained model has consumed them.
+    location_ = snapshot.location;
+    navigation_root_ = snapshot.root;
     path_box_->set_text(location_.string());
     rebuild_breadcrumb();
     correspondence_->set_items({});
     correspondence_->set_visible(false);
+    criteria_console_->set_visible(false);
     objects_->set_visible(true);
     form_.file_manager_app_shell_workspace_content_heading->set_visible(false);
     form_.file_manager_app_shell_workspace_content_heading->set_minimum_size({0, 0});
@@ -1965,7 +3337,8 @@ void Application::apply_directory(DirectorySnapshot snapshot,
             if (!stem.empty()) display_name = stem;
         }
         items.push_back({entry.stable_id, std::move(display_name), entry.secondary_text,
-                         kind_text(entry), object_glyph(entry.kind), true, {}});
+                         kind_text(entry), object_glyph(entry.kind), true,
+                         std::string(house_art::object_key(entry.kind))});
     }
     objects_->set_items(std::move(items));
     rebuild_object_order();
@@ -1988,61 +3361,140 @@ void Application::apply_directory(DirectorySnapshot snapshot,
         !history_.empty() && history_index_ > 0);
     form_.file_manager_app_shell_location_navigation_forward->set_enabled(
         !history_.empty() && history_index_ + 1 < history_.size());
-    form_.file_manager_app_shell_location_navigation_up->set_enabled(location_ != protected_root_);
+    form_.file_manager_app_shell_location_navigation_up->set_enabled(
+        location_ != navigation_root_);
     form_.file_manager_app_shell_workspace_sidebar_parent->set_enabled(
-        location_ != protected_root_);
+        location_ != navigation_root_);
     update_mutation_controls();
     update_command_state();
+    if (returning_from_virtual_surface) focus_active_object_surface();
     set_status(snapshot.entries.empty() ? "This folder is empty" :
                    std::to_string(snapshot.entries.size()) +
                        (snapshot.entries.size() == 1 ? " object" : " objects"),
-               "direct filesystem · protected root");
+               "direct filesystem · " + navigation_label(navigation_root_) +
+                   (mutation_scope_active()
+                        ? " · protected operations admitted"
+                        : " · read-only observation"));
+}
+
+void Application::show_tree_root_menu() {
+    show_menu(tree_root_menu_, tree_root_mode_button_);
+}
+
+void Application::select_tree_root_mode(const std::filesystem::path& root) {
+    const auto admitted = std::find(navigation_roots_.begin(),
+                                    navigation_roots_.end(), root);
+    if (admitted == navigation_roots_.end()) return;
+    tree_root_mode_ = *admitted;
+    tree_expanded_paths_.clear();
+    tree_expanded_paths_.insert(tree_root_mode_.generic_string());
+    const auto current = tree_directory_entries_.find(location_.generic_string());
+    DirectorySnapshot snapshot;
+    snapshot.root = navigation_root_;
+    snapshot.location = location_;
+    if (current != tree_directory_entries_.end()) snapshot.entries = current->second;
+    rebuild_tree(snapshot);
+    request_tree_expansion(tree_root_mode_);
 }
 
 void Application::rebuild_tree(const DirectorySnapshot& snapshot) {
     std::vector<gui_forms::TreeViewItem> items;
+    tree_directory_entries_[snapshot.location.generic_string()] = snapshot.entries;
     tree_locations_.clear();
-    const auto root_id = "fm.location.root";
-    std::string root_label = leaf_name(protected_root_);
-    if (const char* home = std::getenv("HOME"); home && *home &&
-        std::filesystem::path(home).lexically_normal() == protected_root_) {
-        root_label = "Home";
+    const auto mode_label = navigation_label(tree_root_mode_) + "-rooted ▾";
+    tree_root_mode_button_->set_text(mode_label);
+    tree_root_mode_button_->set_accessible_description(
+        "Current mode: " + mode_label +
+        ". Switch immediately between honest admitted roots");
+    command_tree_home_->set_checked(tree_root_mode_ == home_root_);
+    if (command_tree_volumes_) {
+        command_tree_volumes_->set_checked(
+            volumes_root_ && tree_root_mode_ == *volumes_root_);
     }
-    form_.file_manager_app_shell_workspace_sidebar_label->set_text(
-        root_label == "Home" ? "FOLDERS · HOME-ROOTED"
-                             : "FOLDERS · SCOPE-ROOTED");
-    items.push_back({root_id, root_label, 0, true, true, true, {}});
-    tree_locations_.emplace(root_id, protected_root_);
-
-    auto accumulated = protected_root_;
-    std::size_t depth = 1U;
-    std::string selected_id = root_id;
-    const auto relative = location_.lexically_relative(protected_root_);
-    if (!relative.empty() && relative != ".") {
-        std::size_t index{};
-        for (const auto& component : relative) {
-            accumulated /= component;
-            const auto stable_id = "fm.location.path." + std::to_string(index++);
-            items.push_back({stable_id, component.string(), depth++, true,
-                             true, true, {}});
-            tree_locations_.emplace(stable_id, accumulated);
-            selected_id = stable_id;
+    for (std::size_t index = 0;
+         index < command_tree_admitted_roots_.size(); ++index) {
+        command_tree_admitted_roots_[index]->set_checked(
+            tree_admitted_root_paths_[index] == tree_root_mode_);
+    }
+    std::string selected_id;
+    std::size_t root_index = static_cast<std::size_t>(
+        std::distance(navigation_roots_.begin(),
+                      std::find(navigation_roots_.begin(),
+                                navigation_roots_.end(), tree_root_mode_)));
+    for (const auto& root : {tree_root_mode_}) {
+        std::string root_id;
+        if (root == home_root_) {
+            root_id = "fm.location.home";
+        } else if (volumes_root_ && root == *volumes_root_) {
+            root_id = "fm.location.volumes";
+        } else {
+            root_id = "fm.location.admitted." + std::to_string(root_index);
+        }
+        const bool expanded = path_is_within(root, location_) ||
+            tree_expanded_paths_.contains(root.generic_string());
+        const auto root_icon = root == home_root_
+            ? house_art::key(house_art::Icon::home)
+            : volumes_root_ && root == *volumes_root_
+                ? house_art::key(house_art::Icon::drive)
+                : house_art::key(house_art::Icon::folder);
+        items.push_back({root_id, navigation_label(root), 0, true,
+                         expanded, true, std::string(root_icon)});
+        tree_locations_.emplace(root_id, root);
+        if (location_ == root) selected_id = root_id;
+        if (expanded) {
+            append_tree_children(items, root, 1U, selected_id);
         }
     }
-    for (const auto& entry : snapshot.entries) {
+    tree_model_syncing_ = true;
+    try {
+        tree_->set_items(std::move(items));
+        tree_->set_selected_id(selected_id);
+    } catch (...) {
+        tree_model_syncing_ = false;
+        throw;
+    }
+    tree_model_syncing_ = false;
+}
+
+void Application::append_tree_children(
+    std::vector<gui_forms::TreeViewItem>& items,
+    const std::filesystem::path& parent,
+    const std::size_t depth,
+    std::string& selected_id) {
+    const auto cached = tree_directory_entries_.find(parent.generic_string());
+    if (cached == tree_directory_entries_.end()) return;
+    for (const auto& entry : cached->second) {
         if (!entry.directory) continue;
-        items.push_back({entry.stable_id, entry.name, depth, true, false, true, {}});
+        const std::string tree_stable_id = "fm.tree." + entry.stable_id;
+        const bool on_current_ancestry =
+            entry.path == location_ || path_is_within(entry.path, location_);
+        const bool expanded = on_current_ancestry ||
+            tree_expanded_paths_.contains(entry.path.generic_string());
+        items.push_back({tree_stable_id, entry.name, depth, true,
+                         expanded, true,
+                         std::string(house_art::key(house_art::Icon::folder))});
+        tree_locations_[tree_stable_id] = entry.path;
+        if (entry.path == location_) selected_id = tree_stable_id;
+        if (expanded) {
+            append_tree_children(items, entry.path, depth + 1U, selected_id);
+        }
     }
-    const std::filesystem::path volumes("/Volumes");
-    const bool volumes_in_scope = path_is_within(protected_root_, volumes);
-    items.push_back({"fm.location.volumes",
-                     volumes_in_scope ? "Volumes" : "Volumes · outside launch scope",
-                     0, volumes_in_scope, false, volumes_in_scope, {}});
-    if (volumes_in_scope) {
-        tree_locations_.emplace("fm.location.volumes", volumes);
-    }
-    tree_->set_items(std::move(items));
-    tree_->set_selected_id(selected_id);
+}
+
+std::string Application::navigation_label(
+    const std::filesystem::path& root) const {
+    if (root == home_root_) return "Home";
+    if (volumes_root_ && root == *volumes_root_) return "Volumes";
+    return leaf_name(root);
+}
+
+bool Application::mutation_scope_active() const {
+    return operations_ && path_is_within(protected_root_, location_);
+}
+
+bool Application::engine_search_available() const {
+    return !engine_root_id_.empty() &&
+        path_is_within(protected_root_, location_);
 }
 
 void Application::navigate_back() {
@@ -2058,7 +3510,7 @@ void Application::navigate_forward() {
 }
 
 void Application::navigate_up() {
-    if (location_ == protected_root_) return;
+    if (location_ == navigation_root_) return;
     const auto parent = location_.parent_path();
     request_navigation(parent, true);
 }
@@ -2073,13 +3525,271 @@ void Application::apply_filter() {
     if (filter_.empty()) {
         request_navigation(location_, false);
     } else {
+        criteria_showing_ = false;
+        criteria_loading_ = false;
+        criteria_cursor_.reset();
+        criteria_console_->set_visible(false);
         request_engine_search();
     }
+}
+
+void Application::toggle_criteria_mode() {
+    if (criteria_showing_) {
+        request_navigation(location_, false);
+        return;
+    }
+    show_criteria();
+}
+
+void Application::show_criteria() {
+    if (!engine_search_available()) {
+        set_status("Criteria unavailable for this location",
+                   "no committed Engine root is admitted here · direct navigation remains available");
+        return;
+    }
+    prepare_criteria_surface();
+    request_engine_criteria();
+}
+
+void Application::prepare_criteria_surface() {
+    filter_.clear();
+    search_box_->set_text({});
+    search_showing_ = false;
+    search_loading_ = false;
+    search_cursor_.reset();
+    criteria_cursor_.reset();
+    search_order_.clear();
+    entries_.clear();
+    correspondence_->set_items({});
+    correspondence_->set_visible(false);
+    objects_->set_items({});
+    objects_->clear_selection();
+    update_selection({});
+    objects_->set_visible(true);
+    criteria_showing_ = true;
+    criteria_console_->set_visible(true);
+    form_.file_manager_app_shell_workspace_content_heading->set_minimum_size({0, 27});
+    form_.file_manager_app_shell_workspace_content_heading->set_visible(true);
+    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+        "Criteria · " + leaf_name(location_));
+    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+        "waiting for committed catalogue");
+    update_criteria_action_state();
+    update_mutation_controls();
+    update_command_state();
+}
+
+void Application::add_criteria_module() {
+    auto modules = criteria_rack_->modules();
+    const auto contains = [&modules](const std::string_view id) {
+        return std::any_of(modules.begin(), modules.end(),
+            [id](const auto& module) { return module.stable_id == id; });
+    };
+    if (!contains("fm.criteria.kind")) {
+        modules.push_back(kind_criteria_module());
+    } else if (!contains("fm.criteria.modified")) {
+        modules.push_back(modified_criteria_module());
+    } else if (!contains("fm.criteria.size")) {
+        modules.push_back(size_criteria_module());
+    } else {
+        return;
+    }
+    criteria_rack_->set_modules(std::move(modules));
+    update_criteria_action_state();
+    if (criteria_showing_) request_engine_criteria();
+}
+
+void Application::remove_criteria_module(const std::string_view module_id) {
+    auto modules = criteria_rack_->modules();
+    const auto removed = std::erase_if(modules, [module_id](const auto& module) {
+        return module.stable_id == module_id;
+    });
+    if (removed == 0U) return;
+    criteria_rack_->set_modules(std::move(modules));
+    update_criteria_action_state();
+    if (criteria_showing_) request_engine_criteria();
+}
+
+void Application::update_criteria_action_state() {
+    const auto& modules = criteria_rack_->modules();
+    const auto enabled = static_cast<std::size_t>(std::count_if(
+        modules.begin(), modules.end(),
+        [](const auto& module) { return module.enabled; }));
+    criteria_action_state_->set_text(
+        std::to_string(enabled) +
+        (enabled == 1U ? " exact filter" : " exact filters") +
+        " · catalogue only");
+    criteria_action_state_->set_accessible_description(
+        "No content, plugin, fuzzy, or live-filesystem predicate is active");
+    const bool all_present = modules.size() >= 3U;
+    criteria_add_button_->set_enabled(!all_present);
+    criteria_add_button_->set_accessible_description(all_present
+        ? "All three admitted intrinsic metadata modules are already present"
+        : "Add the next missing Kind, Modified, or Size module");
+}
+
+std::optional<std::vector<fileman::orchestrator::SearchExactFilter>>
+Application::criteria_filters() {
+    std::vector<fileman::orchestrator::SearchExactFilter> filters;
+    bool valid = true;
+    const auto value = [](const gui_forms::InstrumentModuleSpec& module,
+                          const std::string_view field_id) -> std::string_view {
+        const auto found = std::find_if(module.fields.begin(), module.fields.end(),
+            [field_id](const auto& field) { return field.stable_id == field_id; });
+        return found == module.fields.end() ? std::string_view{} : found->value;
+    };
+    for (const auto& module : criteria_rack_->modules()) {
+        if (!module.enabled) {
+            criteria_rack_->set_module_state(
+                module.stable_id, gui_forms::InstrumentModuleState::live,
+                "disabled · no filter emitted");
+            continue;
+        }
+        std::string validation;
+        std::string field;
+        std::string emitted;
+        if (module.stable_id == "fm.criteria.kind") {
+            field = "kind";
+            const auto selected = value(module, "value");
+            if (selected == "Files") emitted = "file";
+            else if (selected == "Folders") emitted = "directory";
+            else if (selected == "Symbolic links") emitted = "symlink";
+            else if (selected == "Other") emitted = "other";
+            else validation = "Choose Files, Folders, Symbolic links, or Other";
+        } else if (module.stable_id == "fm.criteria.modified") {
+            const auto date = parse_criteria_date(value(module, "value"));
+            if (!date) {
+                validation = "Use a real date from 1970 through 2261 as YYYY-MM-DD";
+            } else {
+                const auto operation = value(module, "operator");
+                field = operation == "after" ? "modified_after" :
+                    operation == "before" ? "modified_before" : std::string{};
+                if (field.empty()) validation = "Choose after or before";
+                else emitted = std::to_string(*date);
+            }
+        } else if (module.stable_id == "fm.criteria.size") {
+            const auto size = parse_criteria_size(value(module, "value"));
+            if (!size) {
+                validation = "Enter a nonnegative whole-byte count";
+            } else {
+                const auto operation = value(module, "operator");
+                field = operation == "at least" ? "size_min" :
+                    operation == "at most" ? "size_max" : std::string{};
+                if (field.empty()) validation = "Choose at least or at most";
+                else emitted = std::to_string(*size);
+            }
+        } else {
+            validation = "This criterion module is not admitted";
+        }
+        criteria_rack_->set_field_validation(
+            module.stable_id, "value", validation);
+        criteria_rack_->set_module_state(
+            module.stable_id,
+            validation.empty() ? gui_forms::InstrumentModuleState::live
+                               : gui_forms::InstrumentModuleState::invalid,
+            validation.empty() ? "committed exact filter" : validation);
+        if (!validation.empty()) {
+            valid = false;
+        } else {
+            filters.push_back({std::move(field), std::move(emitted)});
+        }
+    }
+    if (!valid || filters.empty()) return std::nullopt;
+    return filters;
+}
+
+void Application::request_engine_criteria(const bool next_page) {
+    if (next_page && criteria_loading_) return;
+    std::uint64_t generation{};
+    std::optional<fileman::orchestrator::SearchCursorInfo> cursor;
+    if (next_page) {
+        if (!criteria_showing_ || !criteria_cursor_) return;
+        generation = search_generation_.load();
+        cursor = criteria_cursor_;
+    } else {
+        generation = search_generation_.fetch_add(1U) + 1U;
+        criteria_cursor_.reset();
+    }
+    auto filters = criteria_filters();
+    update_criteria_action_state();
+    if (!filters) {
+        criteria_loading_ = false;
+        criteria_cursor_.reset();
+        entries_.clear();
+        search_order_.clear();
+        objects_->set_items({});
+        objects_->clear_selection();
+        update_selection({});
+        form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+            "invalid or disabled criteria");
+        form_.file_manager_app_shell_workspace_content_heading_more_results
+            ->set_enabled(false);
+        update_command_state();
+        set_status("Criteria not applied",
+                   "enable at least one locally valid exact metadata filter");
+        return;
+    }
+    if (!engine_search_available()) {
+        set_status("Criteria unavailable for this location",
+                   "no committed Engine root is admitted here");
+        return;
+    }
+    criteria_loading_ = true;
+    form_.file_manager_app_shell_workspace_content_heading_more_results
+        ->set_enabled(false);
+    update_command_state();
+    const auto engine_root_id = engine_root_id_;
+    auto relative = std::filesystem::relative(location_, protected_root_)
+                        .generic_string();
+    std::optional<std::string> relative_path;
+    if (!relative.empty() && relative != ".") relative_path = std::move(relative);
+    std::uint32_t maximum_results = 100;
+    if (settings_snapshot_) {
+        const auto configured = setting_as<std::uint64_t>(
+            *settings_snapshot_, "search.result_limit").value_or(100);
+        maximum_results = static_cast<std::uint32_t>(
+            std::clamp<std::uint64_t>(configured, 25, 500));
+    }
+    set_status(next_page ? "Loading more criteria results…"
+                         : "Applying committed exact criteria…",
+               "Orchestrator → Engine catalogue · current subtree · no live fallback");
+    post_worker([self = shared_from_this(), engine_root_id, relative_path,
+                 filters = std::move(*filters), maximum_results, generation,
+                 cursor, append = next_page]() mutable {
+        try {
+            auto client = fileman::orchestrator::Client::connect_default(
+                "file-manager-criteria-1.0");
+            auto page = client.search_subtree(
+                engine_root_id, relative_path, {}, maximum_results, cursor,
+                filters);
+            self->post_ui([self, page = std::move(page),
+                           filters = std::move(filters), generation,
+                           append]() mutable {
+                self->apply_engine_criteria(
+                    std::move(page), std::move(filters), generation, append);
+            });
+        } catch (const std::exception& error) {
+            const std::string message = error.what();
+            self->post_ui([self, generation, message] {
+                if (generation != self->search_generation_.load()) return;
+                self->criteria_loading_ = false;
+                self->form_.file_manager_app_shell_workspace_content_heading_more_results
+                    ->set_enabled(self->criteria_cursor_.has_value());
+                self->update_command_state();
+                self->set_status("Criteria unavailable", message);
+            });
+        }
+    });
 }
 
 void Application::request_engine_search(const bool next_page) {
     const auto query = filter_;
     if (query.empty() || (next_page && search_loading_)) return;
+    if (!engine_search_available()) {
+        set_status("Search unavailable for this location",
+                   "no Engine root is admitted here · direct navigation remains available");
+        return;
+    }
     std::optional<fileman::orchestrator::SearchCursorInfo> cursor;
     std::uint64_t generation{};
     if (next_page) {
@@ -2093,6 +3803,7 @@ void Application::request_engine_search(const bool next_page) {
     }
     search_loading_ = true;
     form_.file_manager_app_shell_workspace_content_heading_more_results->set_enabled(false);
+    update_command_state();
     const auto engine_root_id = engine_root_id_;
     auto relative = std::filesystem::relative(location_, protected_root_).generic_string();
     std::optional<std::string> relative_path;
@@ -2127,10 +3838,137 @@ void Application::request_engine_search(const bool next_page) {
                 self->search_loading_ = false;
                 self->form_.file_manager_app_shell_workspace_content_heading_more_results
                     ->set_enabled(self->search_cursor_.has_value());
+                self->update_command_state();
                 self->set_status("Search unavailable", message);
             });
         }
     });
+}
+
+void Application::apply_engine_criteria(
+    fileman::orchestrator::SearchPageInfo page,
+    std::vector<fileman::orchestrator::SearchExactFilter>,
+    const std::uint64_t generation,
+    const bool append) {
+    if (generation != search_generation_.load() || !criteria_showing_) return;
+    criteria_loading_ = false;
+    if (page.source != "catalogue") {
+        criteria_cursor_.reset();
+        form_.file_manager_app_shell_workspace_content_heading_more_results
+            ->set_enabled(false);
+        update_command_state();
+        set_status("Criteria source refused",
+                   "filtered virtual folders require a committed catalogue; live fallback was not accepted");
+        return;
+    }
+    if (!append) {
+        entries_.clear();
+        search_order_.clear();
+    }
+    const std::vector<std::string> previous_selection(
+        objects_->selected_ids().begin(), objects_->selected_ids().end());
+    std::size_t rejected{};
+    std::size_t duplicate{};
+    for (const auto& result : page.results) {
+        auto path = result.path.lexically_normal();
+        if (!path_is_within(protected_root_, path)) {
+            const auto rebased = rebase_path_from_equivalent_root(
+                protected_root_, path);
+            if (rebased) path = *rebased;
+        }
+        if (result.unavailable || !path_is_within(protected_root_, path) ||
+            path_route_has_symlink(protected_root_, path.parent_path())) {
+            ++rejected;
+            continue;
+        }
+        const auto identity = observe_identity(path);
+        if (!identity.available()) {
+            ++rejected;
+            continue;
+        }
+        const auto kind = engine_entry_kind(result.kind, path);
+        const bool directory = kind == EntryKind::folder;
+        const auto stable_id = search_stable_id(path, identity);
+        if (entries_.contains(stable_id)) {
+            ++duplicate;
+            continue;
+        }
+        entries_.emplace(stable_id, DirectoryEntry{
+            stable_id, path, result.name,
+            directory ? "Folder" : format_bytes(result.size),
+            "Catalogue observation", identity, kind, directory});
+        search_order_.push_back(stable_id);
+    }
+    std::vector<gui_forms::ObjectViewItem> items;
+    items.reserve(search_order_.size());
+    for (const auto& stable_id : search_order_) {
+        const auto found = entries_.find(stable_id);
+        if (found == entries_.end()) continue;
+        const auto& entry = found->second;
+        auto display_name = entry.name;
+        if (!show_extensions_ && !entry.directory &&
+            entry.kind != EntryKind::symlink) {
+            const auto stem = entry.path.stem().string();
+            if (!stem.empty()) display_name = stem;
+        }
+        items.push_back({stable_id, std::move(display_name),
+                         entry.secondary_text, kind_text(entry),
+                         object_glyph(entry.kind), true,
+                         std::string(house_art::object_key(entry.kind))});
+    }
+    objects_->set_items(std::move(items));
+    rebuild_object_order();
+    correspondence_->set_items({});
+    correspondence_->set_visible(false);
+    objects_->set_visible(true);
+    criteria_console_->set_visible(true);
+    std::vector<std::string> retained_selection;
+    for (const auto& stable_id : previous_selection) {
+        if (entries_.contains(stable_id)) retained_selection.push_back(stable_id);
+    }
+    if (!retained_selection.empty()) {
+        objects_->set_selected_ids(std::move(retained_selection));
+    } else {
+        objects_->clear_selection();
+        update_selection({});
+    }
+    criteria_cursor_ = std::move(page.cursor);
+    form_.file_manager_app_shell_workspace_content_heading_more_results
+        ->set_enabled(!page.complete && criteria_cursor_.has_value());
+    form_.file_manager_app_shell_workspace_content_heading_copy_title->set_text(
+        "Criteria · " + leaf_name(location_));
+    form_.file_manager_app_shell_workspace_content_heading_count->set_text(
+        std::to_string(entries_.size()) +
+        (entries_.size() == 1U ? " object" : " objects"));
+    criteria_title_->set_text(
+        "CURRENT SUBTREE   ·   EXACT VIRTUAL FOLDER   ·   CATALOGUE GENERATION " +
+        (page.generation ? std::to_string(*page.generation) : "UNREPORTED"));
+    update_mutation_controls();
+    update_command_state();
+    std::string provenance = "installed Engine catalogue";
+    if (page.generation) {
+        provenance += " · generation " + std::to_string(*page.generation);
+    } else {
+        provenance += " · generation unreported";
+    }
+    provenance += " · exact intrinsic metadata filters";
+    if (!page.complete) provenance += " · more results available";
+    if (append) provenance += " · appended page";
+    if (rejected != 0U) {
+        provenance += " · " + std::to_string(rejected) +
+            (rejected == 1U ? " stale/out-of-root result refused"
+                             : " stale/out-of-root results refused");
+    }
+    if (duplicate != 0U) {
+        provenance += " · " + std::to_string(duplicate) +
+            (duplicate == 1U ? " duplicate skipped" : " duplicates skipped");
+    }
+    set_status(entries_.empty() ? "No objects meet every criterion"
+                                : std::to_string(entries_.size()) +
+                                      (entries_.size() == 1U
+                                           ? " criteria object"
+                                           : " criteria objects"),
+               std::move(provenance));
 }
 
 void Application::apply_engine_search(
@@ -2208,7 +4046,8 @@ void Application::apply_engine_search(
             if (!stem.empty()) display_name = stem;
         }
         items.push_back({stable_id, std::move(display_name), entry.secondary_text,
-                         kind_text(entry), object_glyph(entry.kind), true, {}});
+                         kind_text(entry), object_glyph(entry.kind), true,
+                         std::string(house_art::object_key(entry.kind))});
         auto relative_path = entry.path.lexically_relative(protected_root_)
                                  .generic_string();
         if (relative_path.empty()) relative_path = entry.path.generic_string();
@@ -2315,7 +4154,7 @@ void Application::request_preview(const DirectoryEntry& entry) {
     if (entry.directory || entry.kind == EntryKind::symlink) return;
     form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
         kind_text(entry) + " · loading preview…");
-    const auto root = protected_root_;
+    const auto root = navigation_root_;
     post_worker([self = shared_from_this(), root, entry, generation] {
         auto result = load_preview(root, entry.path, entry.identity,
             [self, generation] {
@@ -2373,6 +4212,7 @@ void Application::apply_preview(PreviewResult result, std::string stable_id,
 
 void Application::update_selection(const std::string_view stable_id) {
     pending_delete_id_.reset();
+    property_list_->set_value("fm.property.expected-sha256", {});
     if (rename_box_->visible()) cancel_rename();
     if (checksum_in_flight_) {
         checksum_generation_.fetch_add(1);
@@ -2391,6 +4231,10 @@ void Application::update_selection(const std::string_view stable_id) {
             std::to_string(count) + " objects selected");
         form_.file_manager_app_shell_workspace_inspector_preview_kind->set_text(
             "Properties with multiple values are not synthesized");
+        property_list_->set_value("fm.property.name", "—");
+        if (const auto editor = property_list_->editor("fm.property.name")) {
+            editor->set_enabled(false);
+        }
         property_list_->set_value("fm.property.kind", "Multiple kinds");
         property_list_->set_value("fm.property.location", location_.string());
         property_list_->set_value("fm.property.size", "Multiple values");
@@ -2412,6 +4256,10 @@ void Application::update_selection(const std::string_view stable_id) {
         form_.file_manager_app_shell_workspace_inspector_facts_size->set_text("Size · —");
         form_.file_manager_app_shell_workspace_inspector_facts_modified->set_text(
             "Modified · —");
+        property_list_->set_value("fm.property.name", "—");
+        if (const auto editor = property_list_->editor("fm.property.name")) {
+            editor->set_enabled(false);
+        }
         property_list_->set_value("fm.property.kind", "—");
         property_list_->set_value("fm.property.location", "—");
         property_list_->set_value("fm.property.size", "—");
@@ -2429,6 +4277,7 @@ void Application::update_selection(const std::string_view stable_id) {
         "Size · " + entry.secondary_text);
     form_.file_manager_app_shell_workspace_inspector_facts_modified->set_text(
         "Modified · " + entry.modified_text);
+    property_list_->set_value("fm.property.name", entry.name);
     property_list_->set_value("fm.property.kind", kind_text(entry));
     property_list_->set_value("fm.property.location", entry.path.string());
     property_list_->set_value("fm.property.size", entry.secondary_text);
@@ -2440,8 +4289,11 @@ void Application::update_selection(const std::string_view stable_id) {
 void Application::update_mutation_controls() {
     const bool one_selected = objects_->selected_ids().size() == 1;
     const auto entry = selected_entry();
-    const bool available = operations_ != nullptr && !rename_box_->visible() &&
-        !transfer_in_flight_;
+    const bool available = mutation_scope_active() && !rename_box_->visible() &&
+        !transfer_in_flight_ && !property_rename_in_flight_;
+    if (const auto editor = property_list_->editor("fm.property.name")) {
+        editor->set_enabled(available && one_selected);
+    }
     form_.file_manager_app_shell_commands_rename->set_enabled(
         available && one_selected);
     form_.file_manager_app_shell_commands_selection_group_actions_copy->set_enabled(
@@ -2460,7 +4312,7 @@ void Application::update_mutation_controls() {
         (entry.has_value() && !entry->directory &&
          entry->kind != EntryKind::symlink)));
     form_.file_manager_app_shell_workspace_inspector_commands_terminal->set_enabled(
-        terminal_visible_ && (!entry.has_value() || entry->directory));
+        terminal_visible_);
     form_.file_manager_app_shell_workspace_inspector_commands_copy_path->set_enabled(
         true);
     update_command_state();
@@ -2487,7 +4339,7 @@ void Application::request_checksum() {
     update_mutation_controls();
     set_status("Computing SHA-256 · " + entry->name,
                "bounded 256 KiB stream · stable revision required");
-    const auto root = protected_root_;
+    const auto root = navigation_root_;
     post_worker([self = shared_from_this(), root, entry = *entry, expected,
                  generation] {
         std::uint64_t last_report{};
@@ -2621,15 +4473,19 @@ void Application::request_open() {
     run_platform_command(PlatformCommandKind::open_default, *entry);
 }
 
-void Application::request_terminal() {
-    auto entry = selected_entry();
-    if (entry && !entry->directory) return;
-    if (!entry) {
-        entry = DirectoryEntry{"fm.location.current", location_,
-            leaf_name(location_), "Folder", "Current location",
-            observe_identity(location_), EntryKind::folder, true};
+DirectoryEntry Application::terminal_target() const {
+    if (auto entry = selected_entry(); entry && entry->directory &&
+            entry->kind != EntryKind::symlink) {
+        return *entry;
     }
-    run_platform_command(PlatformCommandKind::open_terminal_here, *entry);
+    return DirectoryEntry{"fm.location.current", location_,
+        leaf_name(location_), "Folder", "Current location",
+        observe_identity(location_), EntryKind::folder, true};
+}
+
+void Application::request_terminal() {
+    run_platform_command(PlatformCommandKind::open_terminal_here,
+                         terminal_target());
 }
 
 void Application::copy_current_path() {
@@ -2649,7 +4505,7 @@ void Application::run_platform_command(const PlatformCommandKind kind,
                                        const DirectoryEntry& entry) {
     PlatformCommandPlan plan;
     auto planned = make_platform_command_plan(
-        kind, protected_root_, entry.path, entry.identity, plan);
+        kind, navigation_root_, entry.path, entry.identity, plan);
     if (planned.code != "ok") {
         apply_platform_command(kind, std::move(planned), entry.path);
         return;
@@ -2691,7 +4547,7 @@ void Application::apply_platform_command(const PlatformCommandKind kind,
 }
 
 void Application::request_create_folder() {
-    if (!operations_) return;
+    if (!mutation_scope_active()) return;
     const auto parent = location_;
     set_status("Creating a folder", "protected operation · collision-safe");
     post_worker([self = shared_from_this(), parent] {
@@ -2703,7 +4559,7 @@ void Application::request_create_folder() {
 }
 
 void Application::begin_rename() {
-    if (!operations_ || objects_->selected_ids().size() != 1) return;
+    if (!mutation_scope_active() || objects_->selected_ids().size() != 1) return;
     const auto stable_id = std::string(objects_->selected_ids().front());
     const auto found = entries_.find(stable_id);
     if (found == entries_.end()) return;
@@ -2711,7 +4567,6 @@ void Application::begin_rename() {
     pending_delete_id_.reset();
     rename_box_->set_text(found->second.name);
     breadcrumb_->set_visible(false);
-    path_box_->set_visible(false);
     rename_box_->set_visible(true);
     rename_box_->select_all();
     update_mutation_controls();
@@ -2721,7 +4576,7 @@ void Application::begin_rename() {
 }
 
 void Application::commit_rename(std::string basename) {
-    if (!operations_ || !rename_target_id_) return;
+    if (!mutation_scope_active() || !rename_target_id_) return;
     const auto found = entries_.find(*rename_target_id_);
     if (found == entries_.end()) {
         cancel_rename();
@@ -2732,7 +4587,7 @@ void Application::commit_rename(std::string basename) {
     rename_box_->set_visible(false);
     set_path_editing(false);
     update_mutation_controls();
-    if (window_) window_->request_focus(objects_);
+    focus_active_object_surface();
     set_status("Renaming " + entry.name,
                "revalidating no-follow filesystem identity");
     post_worker([self = shared_from_this(), entry,
@@ -2745,16 +4600,53 @@ void Application::commit_rename(std::string basename) {
     });
 }
 
+void Application::commit_property_name(std::string basename) {
+    const auto entry = selected_entry();
+    if (!entry) {
+        property_list_->set_value("fm.property.name", "—");
+        return;
+    }
+    if (!mutation_scope_active() || property_rename_in_flight_) {
+        property_list_->set_value("fm.property.name", entry->name);
+        return;
+    }
+    if (basename == entry->name) return;
+
+    property_rename_in_flight_ = true;
+    pending_delete_id_.reset();
+    update_mutation_controls();
+    set_status("Renaming " + entry->name,
+               "property edit · revalidating no-follow filesystem identity");
+    post_worker([self = shared_from_this(), entry = *entry,
+                 basename = std::move(basename)]() mutable {
+        auto result = self->operations_->rename_object(
+            entry.path, entry.identity, basename);
+        self->post_ui([self, entry = std::move(entry),
+                       result = std::move(result)]() mutable {
+            self->property_rename_in_flight_ = false;
+            if (!result.succeeded()) {
+                const auto selected = self->selected_entry();
+                if (selected && selected->stable_id == entry.stable_id) {
+                    self->property_list_->set_value(
+                        "fm.property.name", entry.name);
+                }
+            }
+            self->update_mutation_controls();
+            self->apply_operation(std::move(result));
+        });
+    });
+}
+
 void Application::cancel_rename() {
     rename_target_id_.reset();
     rename_box_->set_visible(false);
     set_path_editing(false);
     update_mutation_controls();
-    if (window_) window_->request_focus(objects_);
+    focus_active_object_surface();
 }
 
 void Application::capture_transfer(const bool move) {
-    if (!operations_ || transfer_in_flight_ ||
+    if (!mutation_scope_active() || transfer_in_flight_ ||
         objects_->selected_ids().size() != 1) {
         return;
     }
@@ -2771,7 +4663,7 @@ void Application::capture_transfer(const bool move) {
 }
 
 void Application::paste_transfer() {
-    if (!operations_ || transfer_in_flight_ || !pending_transfer_ ||
+    if (!mutation_scope_active() || transfer_in_flight_ || !pending_transfer_ ||
         pending_transfer_->entry.path.parent_path() == location_) {
         return;
     }
@@ -2805,7 +4697,7 @@ void Application::paste_transfer() {
 }
 
 void Application::observe_object_pointer(const gui_forms::PointerEvent& event) {
-    if (!operations_ || transfer_in_flight_) return;
+    if (!mutation_scope_active() || transfer_in_flight_) return;
     const auto item_id = objects_->item_id_at(event.position);
     if (event.action == gui_forms::PointerAction::down &&
         event.button == gui_forms::PointerButton::primary) {
@@ -2860,7 +4752,12 @@ void Application::observe_object_pointer(const gui_forms::PointerEvent& event) {
 void Application::request_internal_drop(const DirectoryEntry& source,
                                         const DirectoryEntry& destination,
                                         const bool copy) {
-    if (!operations_ || transfer_in_flight_ || !destination.directory) return;
+    if (!mutation_scope_active() || transfer_in_flight_ ||
+        !destination.directory ||
+        !path_is_within(protected_root_, source.path) ||
+        !path_is_within(protected_root_, destination.path)) {
+        return;
+    }
     pending_transfer_.reset();
     const auto generation = transfer_generation_.fetch_add(1) + 1;
     transfer_in_flight_ = true;
@@ -2891,7 +4788,7 @@ void Application::request_internal_drop(const DirectoryEntry& source,
 }
 
 void Application::request_quarantine() {
-    if (!operations_ || objects_->selected_ids().size() != 1) return;
+    if (!mutation_scope_active() || objects_->selected_ids().size() != 1) return;
     const auto stable_id = std::string(objects_->selected_ids().front());
     const auto found = entries_.find(stable_id);
     if (found == entries_.end()) return;
@@ -2990,6 +4887,11 @@ void Application::activate(const std::string_view stable_id) {
     }
     const auto found = entries_.find(std::string(stable_id));
     if (found == entries_.end()) return;
+    if (found->second.kind == EntryKind::symlink) {
+        set_status("Open unavailable",
+                   "symbolic-link activation is not admitted");
+        return;
+    }
     if (found->second.directory) {
         request_navigation(found->second.path, true);
     } else {

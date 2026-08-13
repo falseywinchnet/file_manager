@@ -31,21 +31,21 @@
     <section id="file-manager-app.shell.commands" class="command-shelf" data-wf-control="toolbar" data-wf-surface="own-surface">
       <div id="file-manager-app.shell.commands.selection-group" class="command-group" data-wf-surface="own-surface">
         <div id="file-manager-app.shell.commands.selection-group.actions" class="command-actions" data-wf-surface="own-surface">
-          <button id="file-manager-app.shell.commands.selection-group.actions.copy" class="shelf-command arrow" data-wf-command="move-copy-selection" data-wf-surface="own-surface">⇢ Move / copy ▾</button>
-          <button id="file-manager-app.shell.commands.selection-group.actions.delete" class="shelf-command danger" data-wf-command="delete-selection" data-wf-surface="own-surface">⌫ Delete</button>
+          <button id="file-manager-app.shell.commands.selection-group.actions.copy" class="shelf-command arrow" data-wf-command="move-copy-selection" data-wf-surface="own-surface">Move / copy ▾</button>
+          <button id="file-manager-app.shell.commands.selection-group.actions.delete" class="shelf-command danger" data-wf-command="delete-selection" data-wf-surface="own-surface">Delete</button>
         </div>
         <span id="file-manager-app.shell.commands.selection-group.label" class="command-group-label">SELECTION</span>
       </div>
       <div id="file-manager-app.shell.commands.arrange-group" class="command-group arrange-group" data-wf-surface="own-surface">
         <div id="file-manager-app.shell.commands.arrange-group.actions" class="command-actions" data-wf-surface="own-surface">
-          <button id="file-manager-app.shell.commands.arrange-group.actions.details" class="shelf-command arrow" data-wf-command="choose-view" data-wf-surface="own-surface">▦ View ▾</button>
-          <button id="file-manager-app.shell.commands.arrange-group.actions.refresh" class="shelf-command arrow sort-command" data-wf-command="choose-sort" data-wf-surface="own-surface">≡ Sort: name ▾</button>
-          <button id="file-manager-app.shell.commands.arrange-group.actions.settings" class="shelf-command" data-wf-command="show-properties" data-wf-surface="own-surface">ⓘ Properties</button>
+          <button id="file-manager-app.shell.commands.arrange-group.actions.details" class="shelf-command arrow" data-wf-command="choose-view" data-wf-surface="own-surface">View ▾</button>
+          <button id="file-manager-app.shell.commands.arrange-group.actions.refresh" class="shelf-command arrow sort-command" data-wf-command="choose-sort" data-wf-surface="own-surface">Sort: name ▾</button>
+          <button id="file-manager-app.shell.commands.arrange-group.actions.settings" class="shelf-command" data-wf-command="show-properties" data-wf-surface="own-surface">Properties</button>
         </div>
         <span id="file-manager-app.shell.commands.arrange-group.label" class="command-group-label">ARRANGE &amp; INSPECT</span>
       </div>
 
-      <button id="file-manager-app.shell.commands.home" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Scope root</button>
+      <button id="file-manager-app.shell.commands.home" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Home</button>
       <button id="file-manager-app.shell.commands.new-folder" class="hidden-control" data-wf-command="new-folder" data-wf-surface="own-surface">New folder</button>
       <button id="file-manager-app.shell.commands.rename" class="hidden-control" data-wf-command="rename-selection" data-wf-surface="own-surface">Rename</button>
       <button id="file-manager-app.shell.commands.move" class="hidden-control" data-wf-command="move-selection" data-wf-surface="own-surface">Move</button>
@@ -55,9 +55,9 @@
 
     <section id="file-manager-app.shell.location" class="location-row" data-wf-control="toolbar" data-wf-surface="own-surface">
       <div id="file-manager-app.shell.location.navigation" class="navigation-cluster">
-        <button id="file-manager-app.shell.location.navigation.back" class="nav-command" data-wf-command="navigate-back" data-wf-surface="own-surface" aria-label="Back">←</button>
-        <button id="file-manager-app.shell.location.navigation.forward" class="nav-command" data-wf-command="navigate-forward" data-wf-surface="own-surface" aria-label="Forward">→</button>
-        <button id="file-manager-app.shell.location.navigation.up" class="nav-command" data-wf-command="navigate-up" data-wf-surface="own-surface" aria-label="Up">↑</button>
+        <button id="file-manager-app.shell.location.navigation.back" class="nav-command" data-wf-command="navigate-back" data-wf-surface="own-surface" aria-label="Back"></button>
+        <button id="file-manager-app.shell.location.navigation.forward" class="nav-command" data-wf-command="navigate-forward" data-wf-surface="own-surface" aria-label="Forward"></button>
+        <button id="file-manager-app.shell.location.navigation.up" class="nav-command" data-wf-command="navigate-up" data-wf-surface="own-surface" aria-label="Up"></button>
       </div>
       <span id="file-manager-app.shell.location.label" class="hidden-control" data-wf-surface="own-surface">LOCATION</span>
       <div id="file-manager-app.shell.location.path-host" class="path-host" data-wf-control="panel" data-wf-surface="own-surface">
@@ -70,8 +70,8 @@
 
     <section id="file-manager-app.shell.workspace" class="workspace" data-wf-control="split-view" data-wf-surface="own-surface">
       <aside id="file-manager-app.shell.workspace.sidebar" class="sidebar" data-wf-control="stack" data-wf-surface="own-surface">
-        <p id="file-manager-app.shell.workspace.sidebar.label" class="pane-caption" data-wf-surface="own-surface">FOLDERS · scope-rooted</p>
-        <button id="file-manager-app.shell.workspace.sidebar.root" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Scope root</button>
+        <p id="file-manager-app.shell.workspace.sidebar.label" class="pane-caption" data-wf-surface="own-surface">FOLDERS · HOME / VOLUMES</p>
+        <button id="file-manager-app.shell.workspace.sidebar.root" class="hidden-control" data-wf-command="navigate-root" data-wf-surface="own-surface">Home</button>
         <button id="file-manager-app.shell.workspace.sidebar.parent" class="hidden-control" data-wf-command="navigate-up" data-wf-surface="own-surface">Parent folder</button>
         <p id="file-manager-app.shell.workspace.sidebar.tree-label" class="hidden-control" data-wf-surface="own-surface">FOLDERS</p>
         <div id="file-manager-app.shell.workspace.sidebar.tree-host" class="tree-host" data-wf-control="panel" data-wf-surface="own-surface">

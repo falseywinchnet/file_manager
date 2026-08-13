@@ -274,6 +274,45 @@ func (t *TieredIndexCandidate) RunCount() int              { return len(t.runs) 
 func (t *TieredIndexCandidate) ChangeCount() uint64        { return t.changes }
 func (t *TieredIndexCandidate) IndexBytes() uint64         { return t.indexBytes }
 
+func (t *TieredIndexCandidate) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error) {
+	if maximum < 0 {
+		return nil, false, errors.New("negative exact candidate budget")
+	}
+	work := t.base.Len()
+	for _, run := range t.runs {
+		if run.header.metadata.Records > math.MaxUint64-work {
+			return nil, true, nil
+		}
+		work += run.header.metadata.Records
+	}
+	if work > uint64(maximum) || t.length > uint64(maximum) {
+		return nil, true, nil
+	}
+	result := make([]uint32, 0, int(t.length))
+	iterator := t.rowIterator()
+	for {
+		row, exists, err := iterator.next(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !exists {
+			break
+		}
+		ordinal, present, err := t.PathIndex(filepath.Join(t.root.Path, row.RelativePath))
+		if err != nil {
+			return nil, false, err
+		}
+		if !present {
+			return nil, false, errors.New("tiered live row has no exact ordinal")
+		}
+		result = append(result, ordinal)
+	}
+	if uint64(len(result)) != t.length {
+		return nil, false, errors.New("tiered all-candidate count differs from live length")
+	}
+	return result, false, nil
+}
+
 // PrimeIndexCache uses a caller-owned aggregate budget and favors newest runs,
 // which path liveness checks consult first. A run is cached only in full.
 func (t *TieredIndexCandidate) PrimeIndexCache(maximumBytes uint64) (uint64, error) {

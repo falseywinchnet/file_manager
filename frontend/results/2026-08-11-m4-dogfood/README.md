@@ -1,8 +1,14 @@
-# File Manager 1.0 corrective M4 dogfood
+# File Manager protected-slice prototype corrective M4 dogfood
 
-Status: **PASSED for the ADR-016 through ADR-020 protected-root macOS
-profile**. This is not Developer-ID distribution, daily-root replacement, or
-Windows/Linux promotion.
+Status: **SUPERSEDED protected-slice evidence; rejected as File Manager 1.0
+promotion evidence**. The exercised ADR-016 through ADR-020 protected-root
+macOS slice passed the measurements recorded below, but the owner subsequently
+classified the application as `0.001-alpha`. See
+[`../../planning/OWNER_CORRECTION_2026-08-11.md`](../../planning/OWNER_CORRECTION_2026-08-11.md)
+and
+[`../../planning/IMPLEMENTATION_REPAIR_LEDGER.md`](../../planning/IMPLEMENTATION_REPAIR_LEDGER.md).
+This is not Developer-ID distribution, daily-root replacement, or Windows/Linux
+promotion.
 
 Date: 2026-08-11.
 
@@ -37,7 +43,7 @@ in Brave on the M4; the browser was not launched on the Neo.
 | Surface | Exercised result |
 |---|---|
 | File/Home/Edit menus | Open, New Folder, Settings, Close, selection transfer, Delete, Properties, Select All, Rename, Paste and Undo route to one shared command state; unavailable mutations explain the read-only or selection prerequisite. |
-| View/Go/Commands/Help menus | Small icons/details, four factual sorts, refresh, both pane toggles, back/forward/up/root, SHA-256, Terminal Here, Copy Path and About execute their admitted action. About reports File Manager 1.0.0. |
+| View/Go/Commands/Help menus | Small icons/details, four factual sorts, refresh, both pane toggles, back/forward/up/root, SHA-256, Terminal Here, Copy Path and About executed their then-admitted action. The rejected build's About surface reported `1.0.0`; that version claim is superseded and is not current product truth. |
 | Shelf | Move/Copy opens the transfer menu; Delete uses two-step quarantine; View and Sort open checked menus; Properties restores/focuses the factual inspector. Buttons are context-disabled, not placeholders. |
 | Location | Back, Forward and Up follow retained history; the breadcrumb enters inline exact-path editing; direct paths are contained beneath the launch root; search performs an exact Orchestrator Engine subtree request. |
 | Folder/object field | Tree activation, object selection, folder activation, details/icons, four sorts, multi-selection, empty folders, refresh and out-of-root/symlink refusal were exercised. The final persisted default is compact small icons. |
@@ -91,7 +97,7 @@ in Brave on the M4; the browser was not launched on the Neo.
   100, default view icons.
 - Installed Orchestrator SHA-256:
   `f7dbc8060cc2b7cf743a164efaad56b9ad9f3ea5cce1fff4c390bf4e8894f79a`.
-- Final app bundle: version `1.0.0`, arm64, strict deep ad-hoc signature valid,
+- Rejected historical app bundle: version `1.0.0`, arm64, strict deep ad-hoc signature valid,
   identifier `local.filemanager.frontend`, executable SHA-256
   `edbcd2999b1cfe3890a399ad987e118bf42fbbdb1a74e0449cae3b0ce1b1993f`.
 - Final process observed running from
@@ -101,8 +107,10 @@ in Brave on the M4; the browser was not launched on the Neo.
 
 ## Honest boundary
 
-This record proves the contained protected-root File Manager 1.0 profile
-selected by ADR-020. The app is ad-hoc signed for M4 dogfood. Developer ID,
+This record proves only that the named contained protected-root slice exercised
+the behaviors and measurements above. It does **not** prove File Manager 1.0,
+visual fidelity, complete control behavior, or real-world daily usability. The
+app was ad-hoc signed for M4 dogfood. Developer ID,
 notarization, installer/update/uninstall, broad daily-root admission,
 crash-restart operation recovery, VoiceOver promotion, dynamic handlers and
 commands, plugin previews, application registry, other platforms, and Malkuth

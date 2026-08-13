@@ -1003,7 +1003,8 @@ SearchPageInfo Client::search_subtree(
     std::optional<std::string> relative_path,
     std::string text,
     const std::uint32_t maximum_results,
-    std::optional<SearchCursorInfo> cursor) {
+    std::optional<SearchCursorInfo> cursor,
+    std::vector<SearchExactFilter> filters) {
     if (maximum_results == 0 || maximum_results > 1'000) {
         fail("search result limit is outside the contract bound");
     }
@@ -1012,9 +1013,49 @@ SearchPageInfo Client::search_subtree(
                     cursor->source != "live_filesystem"))) {
         fail("search cursor is outside the closed source/value shape");
     }
+    if (text.empty() && filters.empty()) {
+        fail("search requires text or at least one exact metadata filter");
+    }
+    if (filters.size() > 7) {
+        fail("search exact-filter count exceeds the contract bound");
+    }
+    std::map<std::string, std::string, std::less<>> exact_filters;
+    for (auto& filter : filters) {
+        const bool known = filter.field == "name" || filter.field == "path" ||
+                           filter.field == "kind" || filter.field == "size_min" ||
+                           filter.field == "size_max" ||
+                           filter.field == "modified_after" ||
+                           filter.field == "modified_before";
+        if (!known || filter.value.empty() || filter.value.size() > 16'384) {
+            fail("search exact filter is outside the frozen field/value shape");
+        }
+        const auto inserted = exact_filters.emplace(
+            std::move(filter.field), std::move(filter.value));
+        if (!inserted.second) {
+            fail("search exact filters contain a duplicate field");
+        }
+    }
+    if (!text.empty() && exact_filters.find("name") != exact_filters.end()) {
+        fail("search text and exact filters both define name");
+    }
+    if (!exact_filters.empty() && cursor && cursor->source != "catalogue") {
+        fail("filtered search cursor must remain on the catalogue lane");
+    }
+    std::string filters_json;
+    if (!exact_filters.empty()) {
+        filters_json = ",\"filters\":{";
+        bool first = true;
+        for (const auto& [field, value] : exact_filters) {
+            if (!first) filters_json += ',';
+            first = false;
+            filters_json += json_escape(field) + ':' + json_escape(value);
+        }
+        filters_json += '}';
+    }
     const auto params = "{\"query_id\":\"cpp-live\",\"root_id\":" + json_escape(root_id) +
                         (relative_path ? ",\"relative_path\":" + json_escape(*relative_path) : "") +
                         ",\"descendants\":true,\"text\":" + json_escape(text) +
+                        filters_json +
                         (cursor ? ",\"cursor\":{\"source\":" +
                                       json_escape(cursor->source) +
                                       ",\"value\":" + json_escape(cursor->value) + "}"
@@ -1486,7 +1527,8 @@ std::vector<AvailabilityInfo> Client::availability() { throw ClientError("unsupp
 BootstrapSnapshot Client::bootstrap() { throw ClientError("unsupported platform"); }
 SearchPageInfo Client::search(std::string, std::string) { throw ClientError("unsupported platform"); }
 SearchPageInfo Client::search_subtree(std::string, std::optional<std::string>, std::string,
-                                      std::uint32_t, std::optional<SearchCursorInfo>) {
+                                      std::uint32_t, std::optional<SearchCursorInfo>,
+                                      std::vector<SearchExactFilter>) {
     throw ClientError("unsupported platform");
 }
 SettingsSchemaInfo Client::settings_schema() { throw ClientError("unsupported platform"); }

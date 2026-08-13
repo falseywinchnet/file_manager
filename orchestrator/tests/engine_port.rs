@@ -6,6 +6,7 @@ use fileman_orchestrator::engine_contract::{
 use fileman_orchestrator::engine_port::{
     EngineSearchBroker, EngineSearchOutcome, EngineSearchPolicy, EngineSearchProvider,
 };
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -97,6 +98,30 @@ fn continuation_cursor_source_prevents_midstream_route_switching() {
     assert_eq!(provider.live_calls, 0);
 }
 
+#[test]
+fn exact_metadata_filters_never_widen_into_the_live_lane() {
+    const POLICIES: [EngineSearchPolicy; 3] = [
+        EngineSearchPolicy::PreferCatalogue,
+        EngineSearchPolicy::CatalogueOnly,
+        EngineSearchPolicy::LiveOnly,
+    ];
+    let provider = FakeEngine::new("query_provider_unavailable.json");
+    let mut broker = EngineSearchBroker::new(provider);
+    let mut filtered = request();
+    filtered.text.clear();
+    filtered.filters = BTreeMap::from([("kind".to_owned(), "file".to_owned())]);
+    assert!(filtered.is_well_formed());
+    for policy in POLICIES {
+        let outcome = broker.search(&filtered, policy);
+        assert!(matches!(outcome, EngineSearchOutcome::Catalogue(_)));
+        assert_eq!(outcome.terminal(), TerminalStatus::Unavailable);
+    }
+
+    let provider = broker.into_provider();
+    assert_eq!(provider.catalogue_calls, POLICIES.len());
+    assert_eq!(provider.live_calls, 0);
+}
+
 impl FakeEngine {
     fn new(catalogue_fixture: &str) -> Self {
         Self {
@@ -124,6 +149,7 @@ fn request() -> EngineSearchRequest {
         relative_path: None,
         descendants: true.into(),
         text: "ledger".to_owned(),
+        filters: BTreeMap::new(),
         cursor: None,
         budget: EngineSearchBudget::default(),
     }

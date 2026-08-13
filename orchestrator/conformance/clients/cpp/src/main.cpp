@@ -8,13 +8,14 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "usage: orchestrator-cpp-client [RUNTIME_DIR] "
                      "probe|shutdown|search ROOT_ID TEXT [MAX_RESULTS "
-                     "[CURSOR_SOURCE CURSOR]]\n";
+                     "[CURSOR_SOURCE CURSOR]]|criteria ROOT_ID FIELD VALUE "
+                     "[MAX_RESULTS]\n";
         return 2;
     }
     try {
         const std::string first = argv[1];
         const bool default_runtime = first == "probe" || first == "shutdown" ||
-            first == "search";
+            first == "search" || first == "criteria";
         const int command_index = default_runtime ? 1 : 2;
         if (command_index >= argc) {
             std::cerr << "missing command\n";
@@ -94,6 +95,43 @@ int main(int argc, char** argv) {
                       << " source=" << page.source
                       << " complete=" << (page.complete ? "true" : "false")
                       << " results=" << page.names.size();
+            if (!page.names.empty()) std::cout << " first=" << page.names.front();
+            if (page.cursor) {
+                std::cout << " cursor_source=" << page.cursor->source
+                          << " cursor=" << page.cursor->value;
+            }
+            std::cout << '\n';
+        } else if (command == "criteria") {
+            const int remaining = argc - argument_index;
+            if (remaining != 3 && remaining != 4) {
+                std::cerr << "criteria requires ROOT_ID FIELD VALUE [MAX_RESULTS]\n";
+                return 2;
+            }
+            auto maximum = 128U;
+            if (remaining == 4) {
+                const auto parsed = std::stoul(argv[argument_index + 3]);
+                if (parsed == 0UL || parsed > 1'000UL) {
+                    std::cerr << "MAX_RESULTS must be in the closed range 1..1000\n";
+                    return 2;
+                }
+                maximum = static_cast<std::uint32_t>(parsed);
+            }
+            std::vector<fileman::orchestrator::SearchExactFilter> filters;
+            filters.push_back({argv[argument_index + 1],
+                               argv[argument_index + 2]});
+            const auto page = client.search_subtree(
+                argv[argument_index], std::nullopt, {}, maximum,
+                std::nullopt, std::move(filters));
+            std::cout << "terminal=" << page.terminal
+                      << " source=" << page.source
+                      << " complete=" << (page.complete ? "true" : "false")
+                      << " generation=";
+            if (page.generation) {
+                std::cout << *page.generation;
+            } else {
+                std::cout << "none";
+            }
+            std::cout << " results=" << page.names.size();
             if (!page.names.empty()) std::cout << " first=" << page.names.front();
             if (page.cursor) {
                 std::cout << " cursor_source=" << page.cursor->source

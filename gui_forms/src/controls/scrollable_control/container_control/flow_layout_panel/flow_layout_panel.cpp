@@ -321,9 +321,25 @@ Size FlowLayoutPanel::measure(Size available) {
     available = {std::max(0.0, available.width),
                  std::max(0.0, available.height)};
     if (auto_size()) {
-        const Size desired = layout_children(available, false);
-        return {std::min(available.width, desired.width),
-                std::min(available.height, desired.height)};
+        Size desired = layout_children(available, false);
+        if (auto_size_mode() == AutoSizeMode::grow_only) {
+            const Rect requested = requested_bounds();
+            desired.width = std::max(desired.width, requested.width);
+            desired.height = std::max(desired.height, requested.height);
+        }
+        Size result{std::min(available.width, desired.width),
+                    std::min(available.height, desired.height)};
+        const Size minimum = minimum_size();
+        const Size maximum = maximum_size();
+        result.width = std::max(result.width, minimum.width);
+        result.height = std::max(result.height, minimum.height);
+        if (maximum.width > 0.0) {
+            result.width = std::min(result.width, maximum.width);
+        }
+        if (maximum.height > 0.0) {
+            result.height = std::min(result.height, maximum.height);
+        }
+        return result;
     }
     const Rect requested = requested_bounds();
     return {std::min(available.width,

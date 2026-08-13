@@ -137,6 +137,88 @@ func TestExactQueryRejectsUndefinedLexicalSemantics(t *testing.T) {
 	}
 }
 
+func TestMetadataOnlyQueryIsBoundedPagedAndGenerationBound(t *testing.T) {
+	store, root := queryFixture(t)
+	request := api.Query{
+		Scope:   api.Scope{Root: root.ID, Descendants: true},
+		Filters: map[string]string{"kind": "file", "size_min": "2"},
+		Limit:   1,
+	}
+	first, cursor, err := Query(context.Background(), store.Snapshot(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) != 1 || cursor == "" || first[0].Record.Path != filepath.Join(root.Path, "b", "other") ||
+		len(first[0].Evidence) != 1 || first[0].Evidence[0].Kind != api.EvidenceMetadata {
+		t.Fatalf("metadata first page = %#v, cursor %q", first, cursor)
+	}
+	request.Cursor = cursor
+	second, next, err := Query(context.Background(), store.Snapshot(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second) != 1 || next != "" || second[0].Record.Path != filepath.Join(root.Path, "b", "same") || second[0].Rank != 2 {
+		t.Fatalf("metadata second page = %#v, cursor %q", second, next)
+	}
+	if _, err := store.MarkStale(root.ID, "metadata fixture generation advance"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Query(context.Background(), store.Snapshot(), request); err == nil {
+		t.Fatal("old metadata cursor was accepted against a newer generation")
+	} else {
+		var fault *api.Fault
+		if !errors.As(err, &fault) || fault.Code != api.ErrorGenerationExpired {
+			t.Fatalf("metadata cursor error = %v", err)
+		}
+	}
+}
+
+func TestMetadataOnlyQueryHonorsScopeAndCandidateBudget(t *testing.T) {
+	store, root := queryFixture(t)
+	request := api.Query{
+		Scope:   api.Scope{Root: root.ID, Path: "a", Descendants: false},
+		Filters: map[string]string{"kind": "file"},
+	}
+	matches, _, err := Query(context.Background(), store.Snapshot(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 || matches[0].Record.Path != filepath.Join(root.Path, "a", "same") {
+		t.Fatalf("scoped metadata matches = %#v", matches)
+	}
+
+	snapshot := store.Snapshot()
+	projection := snapshot.Roots[root.ID]
+	limited := candidateBudgetIndex{Index: referenceIndex{projection.Shard}}
+	_, _, err = QueryIndex(context.Background(), snapshot, snapshot.Generation, root.ID, limited, api.Query{
+		Scope:   api.Scope{Root: root.ID, Descendants: true},
+		Filters: map[string]string{"kind": "file"},
+	})
+	var fault *api.Fault
+	if !errors.As(err, &fault) || fault.Code != api.ErrorResourceBudget {
+		t.Fatalf("metadata candidate budget error = %v", err)
+	}
+}
+
+func TestMetadataOnlyQueryPreservesCancellation(t *testing.T) {
+	store, root := queryFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err := Query(ctx, store.Snapshot(), api.Query{
+		Scope:   api.Scope{Root: root.ID, Descendants: true},
+		Filters: map[string]string{"kind": "file"},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("metadata cancellation error = %v", err)
+	}
+}
+
+type candidateBudgetIndex struct{ Index }
+
+func (candidateBudgetIndex) CandidateAll(context.Context, int) ([]uint32, bool, error) {
+	return nil, true, nil
+}
+
 func TestInspectRequiresAddressForHardLinks(t *testing.T) {
 	root := api.RootSpec{ID: "root", Path: filepath.Join(t.TempDir(), "root")}
 	rootObject := fixtureObject(0, api.ObjectDirectory, 0)

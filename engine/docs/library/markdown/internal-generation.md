@@ -194,7 +194,7 @@ No declaration documentation comment is present.
 
 ### componentBufferSize
 
-Kind: `constant`. Source: `internal/generation/segment.go:21`.
+Kind: `constant`. Source: `internal/generation/segment.go:22`.
 
 ```go
 const componentBufferSize = 256 << 10
@@ -734,7 +734,7 @@ No declaration documentation comment is present.
 
 ### Open
 
-Kind: `function`. Source: `internal/generation/segment.go:269`.
+Kind: `function`. Source: `internal/generation/segment.go:270`.
 
 ```go
 func Open(path string, root api.RootSpec) (*Reader, error)
@@ -784,7 +784,7 @@ No declaration documentation comment is present.
 
 ### Write
 
-Kind: `function`. Source: `internal/generation/segment.go:35`.
+Kind: `function`. Source: `internal/generation/segment.go:36`.
 
 ```go
 func Write(path string, generation api.Generation, shard *catalog.Shard) (Metadata, error)
@@ -794,7 +794,7 @@ Write creates one immutable segment. The caller supplies a new path in the same 
 
 ### WriteConsolidatedDeltaCandidate
 
-Kind: `function`. Source: `internal/generation/overlay_candidate.go:427`.
+Kind: `function`. Source: `internal/generation/overlay_candidate.go:456`.
 
 ```go
 func WriteConsolidatedDeltaCandidate(ctx context.Context, path string, overlay *OverlayCandidate) (DeltaMetadata, error)
@@ -844,7 +844,7 @@ WriteDeltaFromTieredCandidate streams the next authoritative reference diff with
 
 ### WritePacedConsolidatedDeltaCandidate
 
-Kind: `function`. Source: `internal/generation/overlay_candidate.go:440`.
+Kind: `function`. Source: `internal/generation/overlay_candidate.go:469`.
 
 ```go
 func WritePacedConsolidatedDeltaCandidate( ctx context.Context, path string, overlay *OverlayCandidate, pacing ConsolidationPacingCandidate, ) (DeltaMetadata, error)
@@ -874,7 +874,7 @@ WriteTieredCohortFromBase writes the net change between the immutable base and a
 
 ### addBudget
 
-Kind: `function`. Source: `internal/generation/overlay_candidate.go:698`.
+Kind: `function`. Source: `internal/generation/overlay_candidate.go:727`.
 
 ```go
 func addBudget(maximum, changes int) (int, bool)
@@ -984,7 +984,7 @@ No declaration documentation comment is present.
 
 ### digestReader
 
-Kind: `function`. Source: `internal/generation/segment.go:792`.
+Kind: `function`. Source: `internal/generation/segment.go:812`.
 
 ```go
 func digestReader(input io.Reader) ([sha256.Size]byte, error)
@@ -1144,7 +1144,7 @@ No declaration documentation comment is present.
 
 ### openFile
 
-Kind: `function`. Source: `internal/generation/segment.go:285`.
+Kind: `function`. Source: `internal/generation/segment.go:286`.
 
 ```go
 func openFile(file *os.File, root api.RootSpec) (*Reader, error)
@@ -1154,7 +1154,7 @@ No declaration documentation comment is present.
 
 ### pageTieredNameCandidates
 
-Kind: `function`. Source: `internal/generation/tiered_index_candidate.go:662`.
+Kind: `function`. Source: `internal/generation/tiered_index_candidate.go:701`.
 
 ```go
 func pageTieredNameCandidates(candidates []uint32, offset, limit, maximum int) ([]uint32, int, bool, error)
@@ -1314,7 +1314,7 @@ No declaration documentation comment is present.
 
 ### writeComponent
 
-Kind: `function`. Source: `internal/generation/segment.go:236`.
+Kind: `function`. Source: `internal/generation/segment.go:237`.
 
 ```go
 func writeComponent(file segmentFile, id componentID, count uint64, write func(io.Writer) error) (descriptor, error)
@@ -1364,7 +1364,7 @@ No declaration documentation comment is present.
 
 ### writePacedConsolidatedDeltaCandidate
 
-Kind: `function`. Source: `internal/generation/overlay_candidate.go:452`.
+Kind: `function`. Source: `internal/generation/overlay_candidate.go:481`.
 
 ```go
 func writePacedConsolidatedDeltaCandidate( ctx context.Context, path string, overlay *OverlayCandidate, pacing ConsolidationPacingCandidate, ) (DeltaMetadata, error)
@@ -1374,7 +1374,7 @@ No declaration documentation comment is present.
 
 ### writeSegment
 
-Kind: `function`. Source: `internal/generation/segment.go:63`.
+Kind: `function`. Source: `internal/generation/segment.go:64`.
 
 ```go
 func writeSegment(file segmentFile, generation api.Generation, shard *catalog.Shard) (Metadata, error)
@@ -1394,7 +1394,7 @@ No declaration documentation comment is present.
 
 ### segmentFile
 
-Kind: `interface`. Source: `internal/generation/segment.go:54`.
+Kind: `interface`. Source: `internal/generation/segment.go:55`.
 
 ```go
 type segmentFile interface
@@ -1662,9 +1662,19 @@ func (s DiffSummary) Changes() uint64
 
 No declaration documentation comment is present.
 
+### OverlayCandidate.CandidateAll
+
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:247`.
+
+```go
+func (o *OverlayCandidate) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error)
+```
+
+No declaration documentation comment is present.
+
 ### OverlayCandidate.CandidateID
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:323`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:352`.
 
 ```go
 func (o *OverlayCandidate) CandidateID(id api.ObjectID, maximum int) ([]uint32, bool, error)
@@ -1674,7 +1684,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.CandidateName
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:247`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:276`.
 
 ```go
 func (o *OverlayCandidate) CandidateName(name string, maximum int) ([]uint32, bool, error)
@@ -1684,7 +1694,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.CandidateNamePage
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:255`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:284`.
 
 ```go
 func (o *OverlayCandidate) CandidateNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error)
@@ -1734,7 +1744,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.IterateRows
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:406`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:435`.
 
 ```go
 func (o *OverlayCandidate) IterateRows(ctx context.Context, emit func(catalog.Row) error) error
@@ -1754,7 +1764,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.PathIndex
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:361`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:390`.
 
 ```go
 func (o *OverlayCandidate) PathIndex(path string) (uint32, bool, error)
@@ -1764,7 +1774,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.Record
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:386`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:415`.
 
 ```go
 func (o *OverlayCandidate) Record(index uint32) (catalog.Record, bool, error)
@@ -1794,7 +1804,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.Row
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:372`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:401`.
 
 ```go
 func (o *OverlayCandidate) Row(index uint32) (catalog.Row, bool, error)
@@ -1814,7 +1824,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.candidatePath
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:687`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:716`.
 
 ```go
 func (o *OverlayCandidate) candidatePath(ordinal uint32) (string, error)
@@ -1824,7 +1834,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.consolidatedChanges
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:470`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:499`.
 
 ```go
 func (o *OverlayCandidate) consolidatedChanges( ctx context.Context, emit func(Change) error, pacing ConsolidationPacingCandidate, ) (DiffSummary, error)
@@ -1834,7 +1844,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.filterBaseOrdinals
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:626`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:655`.
 
 ```go
 func (o *OverlayCandidate) filterBaseOrdinals(ordinals []uint32) ([]uint32, error)
@@ -1844,7 +1854,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.liveNameRange
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:640`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:669`.
 
 ```go
 func (o *OverlayCandidate) liveNameRange(name string) (int, int)
@@ -1854,7 +1864,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.mergePathOrdered
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:652`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:681`.
 
 ```go
 func (o *OverlayCandidate) mergePathOrdered(left, right []uint32) ([]uint32, error)
@@ -1864,7 +1874,7 @@ No declaration documentation comment is present.
 
 ### OverlayCandidate.rowIterator
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:561`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:590`.
 
 ```go
 func (o *OverlayCandidate) rowIterator() *overlayRowIterator
@@ -1874,7 +1884,7 @@ No declaration documentation comment is present.
 
 ### Reader.CacheBytes
 
-Kind: `method`. Source: `internal/generation/segment.go:320`.
+Kind: `method`. Source: `internal/generation/segment.go:321`.
 
 ```go
 func (r *Reader) CacheBytes() uint64
@@ -1882,9 +1892,19 @@ func (r *Reader) CacheBytes() uint64
 
 No declaration documentation comment is present.
 
+### Reader.CandidateAll
+
+Kind: `method`. Source: `internal/generation/segment.go:484`.
+
+```go
+func (r *Reader) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error)
+```
+
+No declaration documentation comment is present.
+
 ### Reader.CandidateID
 
-Kind: `method`. Source: `internal/generation/segment.go:547`.
+Kind: `method`. Source: `internal/generation/segment.go:567`.
 
 ```go
 func (r *Reader) CandidateID(id api.ObjectID, maximum int) ([]uint32, bool, error)
@@ -1894,7 +1914,7 @@ No declaration documentation comment is present.
 
 ### Reader.CandidateName
 
-Kind: `method`. Source: `internal/generation/segment.go:460`.
+Kind: `method`. Source: `internal/generation/segment.go:461`.
 
 ```go
 func (r *Reader) CandidateName(name string, maximum int) ([]uint32, bool, error)
@@ -1904,7 +1924,7 @@ No declaration documentation comment is present.
 
 ### Reader.CandidateNamePage
 
-Kind: `method`. Source: `internal/generation/segment.go:483`.
+Kind: `method`. Source: `internal/generation/segment.go:503`.
 
 ```go
 func (r *Reader) CandidateNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error)
@@ -1914,7 +1934,7 @@ No declaration documentation comment is present.
 
 ### Reader.Check
 
-Kind: `method`. Source: `internal/generation/segment.go:758`.
+Kind: `method`. Source: `internal/generation/segment.go:778`.
 
 ```go
 func (r *Reader) Check(expected [sha256.Size]byte) error
@@ -1924,7 +1944,7 @@ Check verifies every logical component and, when supplied, the whole-file digest
 
 ### Reader.Close
 
-Kind: `method`. Source: `internal/generation/segment.go:375`.
+Kind: `method`. Source: `internal/generation/segment.go:376`.
 
 ```go
 func (r *Reader) Close() error
@@ -1934,7 +1954,7 @@ No declaration documentation comment is present.
 
 ### Reader.Digest
 
-Kind: `method`. Source: `internal/generation/segment.go:316`.
+Kind: `method`. Source: `internal/generation/segment.go:317`.
 
 ```go
 func (r *Reader) Digest() [sha256.Size]byte
@@ -1944,7 +1964,7 @@ No declaration documentation comment is present.
 
 ### Reader.Filename
 
-Kind: `method`. Source: `internal/generation/segment.go:367`.
+Kind: `method`. Source: `internal/generation/segment.go:368`.
 
 ```go
 func (r *Reader) Filename(ordinal uint32) (string, bool, error)
@@ -1954,7 +1974,7 @@ Filename resolves only the exact binding name. Candidate builders use this narro
 
 ### Reader.ID
 
-Kind: `method`. Source: `internal/generation/segment.go:515`.
+Kind: `method`. Source: `internal/generation/segment.go:535`.
 
 ```go
 func (r *Reader) ID(id api.ObjectID, limit uint32) ([]catalog.Record, error)
@@ -1964,7 +1984,7 @@ ID returns exact hard-link bindings in identity/path order.
 
 ### Reader.Len
 
-Kind: `method`. Source: `internal/generation/segment.go:317`.
+Kind: `method`. Source: `internal/generation/segment.go:318`.
 
 ```go
 func (r *Reader) Len() uint64
@@ -1974,7 +1994,7 @@ No declaration documentation comment is present.
 
 ### Reader.LightDirectoryCount
 
-Kind: `method`. Source: `internal/generation/segment.go:319`.
+Kind: `method`. Source: `internal/generation/segment.go:320`.
 
 ```go
 func (r *Reader) LightDirectoryCount() uint64
@@ -1984,7 +2004,7 @@ No declaration documentation comment is present.
 
 ### Reader.Metadata
 
-Kind: `method`. Source: `internal/generation/segment.go:314`.
+Kind: `method`. Source: `internal/generation/segment.go:315`.
 
 ```go
 func (r *Reader) Metadata() Metadata
@@ -1994,7 +2014,7 @@ No declaration documentation comment is present.
 
 ### Reader.Name
 
-Kind: `method`. Source: `internal/generation/segment.go:432`.
+Kind: `method`. Source: `internal/generation/segment.go:433`.
 
 ```go
 func (r *Reader) Name(name string, limit uint32) ([]catalog.Record, error)
@@ -2004,7 +2024,7 @@ Name returns at most limit exact byte-sensitive name matches in canonical name/p
 
 ### Reader.ObjectCount
 
-Kind: `method`. Source: `internal/generation/segment.go:318`.
+Kind: `method`. Source: `internal/generation/segment.go:319`.
 
 ```go
 func (r *Reader) ObjectCount() uint64
@@ -2014,7 +2034,7 @@ No declaration documentation comment is present.
 
 ### Reader.Path
 
-Kind: `method`. Source: `internal/generation/segment.go:385`.
+Kind: `method`. Source: `internal/generation/segment.go:386`.
 
 ```go
 func (r *Reader) Path(path string) (catalog.Record, bool, error)
@@ -2024,7 +2044,7 @@ No declaration documentation comment is present.
 
 ### Reader.PathIndex
 
-Kind: `method`. Source: `internal/generation/segment.go:394`.
+Kind: `method`. Source: `internal/generation/segment.go:395`.
 
 ```go
 func (r *Reader) PathIndex(path string) (uint32, bool, error)
@@ -2034,7 +2054,7 @@ No declaration documentation comment is present.
 
 ### Reader.Record
 
-Kind: `method`. Source: `internal/generation/segment.go:322`.
+Kind: `method`. Source: `internal/generation/segment.go:323`.
 
 ```go
 func (r *Reader) Record(ordinal uint32) (catalog.Record, bool, error)
@@ -2044,7 +2064,7 @@ No declaration documentation comment is present.
 
 ### Reader.Root
 
-Kind: `method`. Source: `internal/generation/segment.go:315`.
+Kind: `method`. Source: `internal/generation/segment.go:316`.
 
 ```go
 func (r *Reader) Root() api.RootSpec
@@ -2054,7 +2074,7 @@ No declaration documentation comment is present.
 
 ### Reader.Row
 
-Kind: `method`. Source: `internal/generation/segment.go:330`.
+Kind: `method`. Source: `internal/generation/segment.go:331`.
 
 ```go
 func (r *Reader) Row(ordinal uint32) (catalog.Row, bool, error)
@@ -2064,7 +2084,7 @@ No declaration documentation comment is present.
 
 ### Reader.bindingAt
 
-Kind: `method`. Source: `internal/generation/segment.go:655`.
+Kind: `method`. Source: `internal/generation/segment.go:675`.
 
 ```go
 func (r *Reader) bindingAt(ordinal uint32) (storedBinding, error)
@@ -2074,7 +2094,7 @@ No declaration documentation comment is present.
 
 ### Reader.idBoundary
 
-Kind: `method`. Source: `internal/generation/segment.go:595`.
+Kind: `method`. Source: `internal/generation/segment.go:615`.
 
 ```go
 func (r *Reader) idBoundary(target identity.Observation, after bool) (uint64, error)
@@ -2084,7 +2104,7 @@ No declaration documentation comment is present.
 
 ### Reader.idOrdinalAt
 
-Kind: `method`. Source: `internal/generation/segment.go:711`.
+Kind: `method`. Source: `internal/generation/segment.go:731`.
 
 ```go
 func (r *Reader) idOrdinalAt(index uint64) (uint32, error)
@@ -2094,7 +2114,7 @@ No declaration documentation comment is present.
 
 ### Reader.nameAt
 
-Kind: `method`. Source: `internal/generation/segment.go:731`.
+Kind: `method`. Source: `internal/generation/segment.go:751`.
 
 ```go
 func (r *Reader) nameAt(ordinal uint32) (string, error)
@@ -2104,7 +2124,7 @@ No declaration documentation comment is present.
 
 ### Reader.nameBoundary
 
-Kind: `method`. Source: `internal/generation/segment.go:574`.
+Kind: `method`. Source: `internal/generation/segment.go:594`.
 
 ```go
 func (r *Reader) nameBoundary(name string, after bool) (uint64, error)
@@ -2114,7 +2134,7 @@ No declaration documentation comment is present.
 
 ### Reader.nameOrdinalAt
 
-Kind: `method`. Source: `internal/generation/segment.go:707`.
+Kind: `method`. Source: `internal/generation/segment.go:727`.
 
 ```go
 func (r *Reader) nameOrdinalAt(index uint64) (uint32, error)
@@ -2124,7 +2144,7 @@ No declaration documentation comment is present.
 
 ### Reader.objectAt
 
-Kind: `method`. Source: `internal/generation/segment.go:678`.
+Kind: `method`. Source: `internal/generation/segment.go:698`.
 
 ```go
 func (r *Reader) objectAt(ordinal uint32) (catalog.Object, error)
@@ -2134,7 +2154,7 @@ No declaration documentation comment is present.
 
 ### Reader.orderOrdinalAt
 
-Kind: `method`. Source: `internal/generation/segment.go:715`.
+Kind: `method`. Source: `internal/generation/segment.go:735`.
 
 ```go
 func (r *Reader) orderOrdinalAt(component componentID, index uint64) (uint32, error)
@@ -2144,7 +2164,7 @@ No declaration documentation comment is present.
 
 ### Reader.pathAt
 
-Kind: `method`. Source: `internal/generation/segment.go:690`.
+Kind: `method`. Source: `internal/generation/segment.go:710`.
 
 ```go
 func (r *Reader) pathAt(index uint64) (string, uint32, error)
@@ -2154,7 +2174,7 @@ No declaration documentation comment is present.
 
 ### Reader.pathIndexRelative
 
-Kind: `method`. Source: `internal/generation/segment.go:404`.
+Kind: `method`. Source: `internal/generation/segment.go:405`.
 
 ```go
 func (r *Reader) pathIndexRelative(target string) (uint32, bool, error)
@@ -2164,7 +2184,7 @@ pathIndexRelative avoids repeating absolute-path normalization when a checked wr
 
 ### Reader.readBoundedString
 
-Kind: `method`. Source: `internal/generation/segment.go:743`.
+Kind: `method`. Source: `internal/generation/segment.go:763`.
 
 ```go
 func (r *Reader) readBoundedString(descriptor descriptor, offset, length uint64) (string, error)
@@ -2174,7 +2194,7 @@ No declaration documentation comment is present.
 
 ### Reader.readString
 
-Kind: `method`. Source: `internal/generation/segment.go:739`.
+Kind: `method`. Source: `internal/generation/segment.go:759`.
 
 ```go
 func (r *Reader) readString(id componentID, offset, length uint64) (string, error)
@@ -2184,7 +2204,7 @@ No declaration documentation comment is present.
 
 ### Reader.recordAt
 
-Kind: `method`. Source: `internal/generation/segment.go:621`.
+Kind: `method`. Source: `internal/generation/segment.go:641`.
 
 ```go
 func (r *Reader) recordAt(ordinal uint32) (catalog.Record, error)
@@ -2532,9 +2552,19 @@ func (s *TieredCandidateStore) reclaimLocked() error
 
 No declaration documentation comment is present.
 
+### TieredIndexCandidate.CandidateAll
+
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:277`.
+
+```go
+func (t *TieredIndexCandidate) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error)
+```
+
+No declaration documentation comment is present.
+
 ### TieredIndexCandidate.CandidateID
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:803`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:842`.
 
 ```go
 func (t *TieredIndexCandidate) CandidateID(id api.ObjectID, maximum int) ([]uint32, bool, error)
@@ -2544,7 +2574,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.CandidateName
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:501`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:540`.
 
 ```go
 func (t *TieredIndexCandidate) CandidateName(name string, maximum int) ([]uint32, bool, error)
@@ -2554,7 +2584,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.CandidateNamePage
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:506`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:545`.
 
 ```go
 func (t *TieredIndexCandidate) CandidateNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error)
@@ -2614,7 +2644,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.PathIndex
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:311`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:350`.
 
 ```go
 func (t *TieredIndexCandidate) PathIndex(path string) (uint32, bool, error)
@@ -2624,7 +2654,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.PrimeIndexCache
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:279`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:318`.
 
 ```go
 func (t *TieredIndexCandidate) PrimeIndexCache(maximumBytes uint64) (uint64, error)
@@ -2634,7 +2664,7 @@ PrimeIndexCache uses a caller-owned aggregate budget and favors newest runs, whi
 
 ### TieredIndexCandidate.Record
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:427`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:466`.
 
 ```go
 func (t *TieredIndexCandidate) Record(index uint32) (catalog.Record, bool, error)
@@ -2654,7 +2684,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.Row
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:343`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:382`.
 
 ```go
 func (t *TieredIndexCandidate) Row(index uint32) (catalog.Row, bool, error)
@@ -2674,7 +2704,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.applyNameCandidateRun
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:762`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:801`.
 
 ```go
 func (t *TieredIndexCandidate) applyNameCandidateRun(runIndex int, candidates []tieredNameCandidate, hashOrder []int) error
@@ -2684,7 +2714,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.cachedNamePage
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:556`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:595`.
 
 ```go
 func (t *TieredIndexCandidate) cachedNamePage(name string, offset, limit, maximum int) ([]uint32, int, bool, error, bool)
@@ -2694,7 +2724,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.lookupRelative
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:295`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:334`.
 
 ```go
 func (t *TieredIndexCandidate) lookupRelative(relativePath string) (uint32, DeltaIndexedRecord, bool, error)
@@ -2704,7 +2734,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.mergeCandidateSources
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:837`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:876`.
 
 ```go
 func (t *TieredIndexCandidate) mergeCandidateSources( sources []tieredCandidateSource, mode byte, name string, observed identity.Observation, offset, limit, maximum int, ) ([]uint32, int, bool, error)
@@ -2714,7 +2744,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.mergeNameCandidateSources
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:683`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:722`.
 
 ```go
 func (t *TieredIndexCandidate) mergeNameCandidateSources( sources []tieredCandidateSource, name string, offset, limit, maximum int, ) ([]uint32, int, bool, error)
@@ -2724,7 +2754,7 @@ mergeNameCandidateSources batch-validates candidate paths against each run's has
 
 ### TieredIndexCandidate.nameCacheProvesLive
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:566`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:605`.
 
 ```go
 func (t *TieredIndexCandidate) nameCacheProvesLive(index uint32) bool
@@ -2734,7 +2764,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.pageProofFor
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:646`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:685`.
 
 ```go
 func (t *TieredIndexCandidate) pageProofFor(index uint32) (catalog.Row, bool)
@@ -2744,7 +2774,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.pathProofFor
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:404`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:443`.
 
 ```go
 func (t *TieredIndexCandidate) pathProofFor(index uint32) (catalog.Row, bool)
@@ -2754,7 +2784,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.pathProofForPath
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:395`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:434`.
 
 ```go
 func (t *TieredIndexCandidate) pathProofForPath(relativePath string) (uint32, bool)
@@ -2764,7 +2794,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.rememberNameProofsLocked
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:579`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:618`.
 
 ```go
 func (t *TieredIndexCandidate) rememberNameProofsLocked(ordinals []uint32)
@@ -2774,7 +2804,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.rememberPageProof
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:605`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:644`.
 
 ```go
 func (t *TieredIndexCandidate) rememberPageProof(name string, offset int, ordinals []uint32) error
@@ -2784,7 +2814,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.rememberPathProof
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:386`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:425`.
 
 ```go
 func (t *TieredIndexCandidate) rememberPathProof(index uint32, row catalog.Row)
@@ -2794,7 +2824,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.rowAtVirtual
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:368`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:407`.
 
 ```go
 func (t *TieredIndexCandidate) rowAtVirtual(index uint32) (catalog.Row, bool, error)
@@ -2814,7 +2844,7 @@ No declaration documentation comment is present.
 
 ### TieredIndexCandidate.runForOrdinal
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:413`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:452`.
 
 ```go
 func (t *TieredIndexCandidate) runForOrdinal(index uint32) int
@@ -2824,7 +2854,7 @@ No declaration documentation comment is present.
 
 ### overlayRowIterator.next
 
-Kind: `method`. Source: `internal/generation/overlay_candidate.go:565`.
+Kind: `method`. Source: `internal/generation/overlay_candidate.go:594`.
 
 ```go
 func (i *overlayRowIterator) next(ctx context.Context) (catalog.Row, bool, error)
@@ -2884,7 +2914,7 @@ No declaration documentation comment is present.
 
 ### tieredCandidateSource.advance
 
-Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:460`.
+Kind: `method`. Source: `internal/generation/tiered_index_candidate.go:499`.
 
 ```go
 func (s *tieredCandidateSource) advance(mode byte) error
@@ -2954,7 +2984,7 @@ No declaration documentation comment is present.
 
 ### ConsolidationPacingCandidate
 
-Kind: `struct`. Source: `internal/generation/overlay_candidate.go:433`.
+Kind: `struct`. Source: `internal/generation/overlay_candidate.go:462`.
 
 ```go
 type ConsolidationPacingCandidate struct
@@ -3034,7 +3064,7 @@ No declaration documentation comment is present.
 
 ### Metadata
 
-Kind: `struct`. Source: `internal/generation/segment.go:23`.
+Kind: `struct`. Source: `internal/generation/segment.go:24`.
 
 ```go
 type Metadata struct
@@ -3064,7 +3094,7 @@ No declaration documentation comment is present.
 
 ### Reader
 
-Kind: `struct`. Source: `internal/generation/segment.go:258`.
+Kind: `struct`. Source: `internal/generation/segment.go:259`.
 
 ```go
 type Reader struct
@@ -3224,7 +3254,7 @@ No declaration documentation comment is present.
 
 ### overlayRowIterator
 
-Kind: `struct`. Source: `internal/generation/overlay_candidate.go:553`.
+Kind: `struct`. Source: `internal/generation/overlay_candidate.go:582`.
 
 ```go
 type overlayRowIterator struct
@@ -3284,7 +3314,7 @@ No declaration documentation comment is present.
 
 ### storedBinding
 
-Kind: `struct`. Source: `internal/generation/segment.go:648`.
+Kind: `struct`. Source: `internal/generation/segment.go:668`.
 
 ```go
 type storedBinding struct
@@ -3294,7 +3324,7 @@ No declaration documentation comment is present.
 
 ### tieredCandidateSource
 
-Kind: `struct`. Source: `internal/generation/tiered_index_candidate.go:439`.
+Kind: `struct`. Source: `internal/generation/tiered_index_candidate.go:478`.
 
 ```go
 type tieredCandidateSource struct
@@ -3324,7 +3354,7 @@ No declaration documentation comment is present.
 
 ### tieredNameCandidate
 
-Kind: `struct`. Source: `internal/generation/tiered_index_candidate.go:451`.
+Kind: `struct`. Source: `internal/generation/tiered_index_candidate.go:490`.
 
 ```go
 type tieredNameCandidate struct

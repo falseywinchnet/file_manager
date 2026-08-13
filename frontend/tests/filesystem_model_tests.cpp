@@ -67,6 +67,40 @@ int main() {
         return 1;
     }
 
+    const auto sibling_root = canonical.parent_path() /
+        (canonical.filename().string() + "-sibling");
+    std::filesystem::create_directories(sibling_root / "Mounted");
+    const std::vector<std::filesystem::path> navigation_roots{
+        canonical, sibling_root};
+    const auto relative_target = file_manager::resolve_navigation_target(
+        navigation_roots, canonical, canonical, "Folder/Nested");
+    if (!require(relative_target && relative_target->root == canonical &&
+                 relative_target->path == canonical / "Folder" / "Nested",
+                 "relative navigation must resolve within the current admitted root")) {
+        return 1;
+    }
+    const auto home_target = file_manager::resolve_navigation_target(
+        navigation_roots, sibling_root, canonical, "~/Folder");
+    if (!require(home_target && home_target->root == canonical &&
+                 home_target->path == canonical / "Folder",
+                 "tilde navigation must resolve against the admitted Home root")) {
+        return 1;
+    }
+    const auto sibling_target = file_manager::resolve_navigation_target(
+        navigation_roots, canonical, canonical, sibling_root / "Mounted");
+    if (!require(sibling_target && sibling_target->root == sibling_root,
+                 "navigation must switch to another explicitly admitted root")) {
+        return 1;
+    }
+    if (!require(!file_manager::resolve_navigation_target(
+                     navigation_roots, canonical, canonical,
+                     canonical.parent_path()),
+                 "navigation outside every admitted root must fail closed")) {
+        return 1;
+    }
+    std::error_code cleanup_error;
+    std::filesystem::remove_all(sibling_root, cleanup_error);
+
     const auto snapshot = file_manager::read_directory(canonical, canonical, {}, 7);
     if (!require(snapshot.available(), "fixture root must enumerate")) return 1;
     if (!require(snapshot.generation == 7, "generation must be retained")) return 1;

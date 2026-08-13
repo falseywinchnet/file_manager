@@ -129,7 +129,7 @@ pub const fn new(provider: P) -> Self
 pub fn search( &mut self, request: &EngineSearchRequest, policy: EngineSearchPolicy, ) -> EngineSearchOutcome
 ```
 
-### [into_provider](../../../src/engine_port.rs#L90)
+### [into_provider](../../../src/engine_port.rs#L96)
 
 `fn` · `pub`
 
@@ -137,7 +137,7 @@ pub fn search( &mut self, request: &EngineSearchRequest, policy: EngineSearchPol
 pub fn into_provider(self) -> P
 ```
 
-### [provider_mut](../../../src/engine_port.rs#L94)
+### [provider_mut](../../../src/engine_port.rs#L100)
 
 `fn` · `pub`
 
@@ -145,7 +145,7 @@ pub fn into_provider(self) -> P
 pub const fn provider_mut(&mut self) -> &mut P
 ```
 
-### [search](../../../src/engine_port.rs#L100)
+### [search](../../../src/engine_port.rs#L106)
 
 `fn` · `private`
 
@@ -153,7 +153,7 @@ pub const fn provider_mut(&mut self) -> &mut P
 fn search(&mut self, request: &EngineSearchRequest) -> EngineSearchOutcome
 ```
 
-### [live_available](../../../src/engine_port.rs#L104)
+### [live_available](../../../src/engine_port.rs#L110)
 
 `fn` · `private`
 
@@ -161,7 +161,7 @@ fn search(&mut self, request: &EngineSearchRequest) -> EngineSearchOutcome
 fn live_available(&self) -> bool
 ```
 
-### [may_fall_back_to_live](../../../src/engine_port.rs#L109)
+### [may_fall_back_to_live](../../../src/engine_port.rs#L115)
 
 `fn` · `private`
 
@@ -169,7 +169,7 @@ fn live_available(&self) -> bool
 const fn may_fall_back_to_live(terminal: TerminalStatus) -> bool
 ```
 
-### [fallback_terminal_allowlist_is_narrow_and_authority_safe](../../../src/engine_port.rs#L125)
+### [fallback_terminal_allowlist_is_narrow_and_authority_safe](../../../src/engine_port.rs#L131)
 
 `fn` · `private`
 

@@ -345,7 +345,7 @@ pub const fn peer_mut(&mut self) -> &mut C
 fn catalogue_params(request: &EngineSearchRequest) -> Value
 ```
 
-### [live_params](../../../src/engine_jsonl.rs#L523)
+### [live_params](../../../src/engine_jsonl.rs#L527)
 
 `fn` · `private`
 
@@ -353,7 +353,7 @@ fn catalogue_params(request: &EngineSearchRequest) -> Value
 fn live_params(request: &EngineSearchRequest) -> Value
 ```
 
-### [query_catalogue](../../../src/engine_jsonl.rs#L542)
+### [query_catalogue](../../../src/engine_jsonl.rs#L546)
 
 `fn` · `private`
 
@@ -361,7 +361,7 @@ fn live_params(request: &EngineSearchRequest) -> Value
 fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResultFixture
 ```
 
-### [query_live](../../../src/engine_jsonl.rs#L595)
+### [query_live](../../../src/engine_jsonl.rs#L599)
 
 `fn` · `private`
 
@@ -369,7 +369,7 @@ fn query_catalogue(&mut self, request: &EngineSearchRequest) -> EngineQueryResul
 fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResultFixture
 ```
 
-### [catalogue_failure](../../../src/engine_jsonl.rs#L644)
+### [catalogue_failure](../../../src/engine_jsonl.rs#L648)
 
 `fn` · `private`
 
@@ -377,7 +377,7 @@ fn query_live(&mut self, request: &EngineSearchRequest) -> EngineLiveQueryResult
 fn catalogue_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> EngineQueryResultFixture
 ```
 
-### [live_failure](../../../src/engine_jsonl.rs#L667)
+### [live_failure](../../../src/engine_jsonl.rs#L671)
 
 `fn` · `private`
 
@@ -385,7 +385,7 @@ fn catalogue_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> 
 fn live_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> EngineLiveQueryResultFixture
 ```
 
-### [project_engine_error](../../../src/engine_jsonl.rs#L695)
+### [project_engine_error](../../../src/engine_jsonl.rs#L699)
 
 `fn` · `pub(crate)`
 
@@ -393,7 +393,7 @@ fn live_failure( terminal: TerminalStatus, code: &str, message: &str, ) -> Engin
 pub(crate) fn project_engine_error( error: EngineJsonlError, operation: &str, ) -> (TerminalStatus, String, String)
 ```
 
-### [error_kind](../../../src/engine_jsonl.rs#L730)
+### [error_kind](../../../src/engine_jsonl.rs#L734)
 
 `fn` · `private`
 
@@ -401,7 +401,7 @@ pub(crate) fn project_engine_error( error: EngineJsonlError, operation: &str, ) 
 const fn error_kind(error: &EngineJsonlError) -> &'static str
 ```
 
-### [PanickingCaller](../../../src/engine_jsonl.rs#L765)
+### [PanickingCaller](../../../src/engine_jsonl.rs#L770)
 
 `struct` · `private`
 
@@ -409,7 +409,7 @@ const fn error_kind(error: &EngineJsonlError) -> &'static str
 struct PanickingCaller;
 ```
 
-### [call](../../../src/engine_jsonl.rs#L768)
+### [call](../../../src/engine_jsonl.rs#L773)
 
 `fn` · `private`
 
@@ -417,7 +417,7 @@ struct PanickingCaller;
 fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serde_json::Value, EngineJsonlError>
 ```
 
-### [SlowCaller](../../../src/engine_jsonl.rs#L777)
+### [SlowCaller](../../../src/engine_jsonl.rs#L782)
 
 `struct` · `private`
 
@@ -425,7 +425,7 @@ fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serd
 struct SlowCaller;
 ```
 
-### [call](../../../src/engine_jsonl.rs#L780)
+### [call](../../../src/engine_jsonl.rs#L785)
 
 `fn` · `private`
 
@@ -433,7 +433,23 @@ struct SlowCaller;
 fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serde_json::Value, EngineJsonlError>
 ```
 
-### [bounded_peer_correlates_one_successful_response](../../../src/engine_jsonl.rs#L791)
+### [RecordingCaller](../../../src/engine_jsonl.rs#L796)
+
+`struct` · `private`
+
+```rust
+struct RecordingCaller
+```
+
+### [call](../../../src/engine_jsonl.rs#L802)
+
+`fn` · `private`
+
+```rust
+fn call( &mut self, method: &str, params: &serde_json::Value, ) -> Result<serde_json::Value, EngineJsonlError>
+```
+
+### [bounded_peer_correlates_one_successful_response](../../../src/engine_jsonl.rs#L821)
 
 `fn` · `private`
 
@@ -441,7 +457,7 @@ fn call( &mut self, _method: &str, _params: &serde_json::Value, ) -> Result<serd
 fn bounded_peer_correlates_one_successful_response()
 ```
 
-### [remote_fault_is_not_an_empty_success](../../../src/engine_jsonl.rs#L808)
+### [remote_fault_is_not_an_empty_success](../../../src/engine_jsonl.rs#L838)
 
 `fn` · `private`
 
@@ -449,7 +465,7 @@ fn bounded_peer_correlates_one_successful_response()
 fn remote_fault_is_not_an_empty_success()
 ```
 
-### [response_identity_mismatch_fails_closed](../../../src/engine_jsonl.rs#L819)
+### [response_identity_mismatch_fails_closed](../../../src/engine_jsonl.rs#L849)
 
 `fn` · `private`
 
@@ -457,7 +473,7 @@ fn remote_fault_is_not_an_empty_success()
 fn response_identity_mismatch_fails_closed()
 ```
 
-### [oversized_response_is_rejected_without_unbounded_allocation](../../../src/engine_jsonl.rs#L830)
+### [oversized_response_is_rejected_without_unbounded_allocation](../../../src/engine_jsonl.rs#L860)
 
 `fn` · `private`
 
@@ -465,7 +481,7 @@ fn response_identity_mismatch_fails_closed()
 fn oversized_response_is_rejected_without_unbounded_allocation()
 ```
 
-### [exact_wire_result_projects_generation_cursor_and_partial_roots](../../../src/engine_jsonl.rs#L842)
+### [exact_wire_result_projects_generation_cursor_and_partial_roots](../../../src/engine_jsonl.rs#L872)
 
 `fn` · `private`
 
@@ -473,7 +489,15 @@ fn oversized_response_is_rejected_without_unbounded_allocation()
 fn exact_wire_result_projects_generation_cursor_and_partial_roots()
 ```
 
-### [unavailable_live_method_projects_typed_unsupported_result](../../../src/engine_jsonl.rs#L856)
+### [exact_filter_only_request_projects_the_frozen_engine_filter_map](../../../src/engine_jsonl.rs#L886)
+
+`fn` · `private`
+
+```rust
+fn exact_filter_only_request_projects_the_frozen_engine_filter_map()
+```
+
+### [unavailable_live_method_projects_typed_unsupported_result](../../../src/engine_jsonl.rs#L907)
 
 `fn` · `private`
 
@@ -481,7 +505,7 @@ fn exact_wire_result_projects_generation_cursor_and_partial_roots()
 fn unavailable_live_method_projects_typed_unsupported_result()
 ```
 
-### [missing_catalogue_projects_unavailable_not_unsupported](../../../src/engine_jsonl.rs#L867)
+### [missing_catalogue_projects_unavailable_not_unsupported](../../../src/engine_jsonl.rs#L918)
 
 `fn` · `private`
 
@@ -489,7 +513,7 @@ fn unavailable_live_method_projects_typed_unsupported_result()
 fn missing_catalogue_projects_unavailable_not_unsupported()
 ```
 
-### [engine_worker_panic_is_contained_and_marks_worker_unavailable](../../../src/engine_jsonl.rs#L878)
+### [engine_worker_panic_is_contained_and_marks_worker_unavailable](../../../src/engine_jsonl.rs#L929)
 
 `fn` · `private`
 
@@ -497,7 +521,7 @@ fn missing_catalogue_projects_unavailable_not_unsupported()
 fn engine_worker_panic_is_contained_and_marks_worker_unavailable()
 ```
 
-### [engine_worker_timeout_kills_the_owned_child_and_fails_closed](../../../src/engine_jsonl.rs#L903)
+### [engine_worker_timeout_kills_the_owned_child_and_fails_closed](../../../src/engine_jsonl.rs#L954)
 
 `fn` · `private`
 
@@ -505,7 +529,7 @@ fn engine_worker_panic_is_contained_and_marks_worker_unavailable()
 fn engine_worker_timeout_kills_the_owned_child_and_fails_closed()
 ```
 
-### [search_request](../../../src/engine_jsonl.rs#L941)
+### [search_request](../../../src/engine_jsonl.rs#L992)
 
 `fn` · `private`
 

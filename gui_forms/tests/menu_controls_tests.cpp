@@ -312,13 +312,39 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
             {"view.details", MenuItemKind::radio, details},
         }},
     });
+    (*strip).set_selected_item_id("menustrip.view");
+    require((*strip).selected_item_id() == "menustrip.view",
+            "MenuStrip must retain one selected command category independently of popup state");
     Window window(root, {420.0, 240.0});
+
+    const std::vector<SemanticNode> selected_closed =
+        (*strip).semantic_virtual_children();
+    require(!has_semantic_state(selected_closed[0].states,
+                                SemanticState::selected) &&
+                !has_semantic_state(selected_closed[0].states,
+                                    SemanticState::expanded) &&
+                has_semantic_state(selected_closed[1].states,
+                                   SemanticState::selected) &&
+                !has_semantic_state(selected_closed[1].states,
+                                    SemanticState::expanded),
+            "closed MenuStrip must publish selected category without falsely expanding it");
 
     require(window.request_focus(strip), "menu strip must accept keyboard focus");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
                 (*strip).is_open() && (*strip).active_index() == 0U &&
                 window.focus_scope_depth() == 1U,
             "Down on the menu bar must open its focused retained menu");
+    const std::vector<SemanticNode> file_open =
+        (*strip).semantic_virtual_children();
+    require(has_semantic_state(file_open[0].states,
+                               SemanticState::expanded) &&
+                !has_semantic_state(file_open[0].states,
+                                    SemanticState::selected) &&
+                has_semantic_state(file_open[1].states,
+                                   SemanticState::selected) &&
+                !has_semantic_state(file_open[1].states,
+                                    SemanticState::expanded),
+            "transient File expansion must not steal or falsely expand the selected View category");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
                 (*strip).is_open() && (*strip).active_index() == 1U &&
                 (*window.focused_control()).stable_id().value() ==
@@ -355,6 +381,37 @@ void test_menu_strip_retained_switching_commands_and_semantics() {
                 (*strip).active_index() == 0U,
             "moving across the open menu bar must switch menus without click-through");
     (*strip).close();
+
+    (*strip).set_items({
+        {"menustrip.file", "File", {
+            {"file.open", MenuItemKind::command, open},
+        }},
+        {"menustrip.view", "View", {
+            {"view.icons", MenuItemKind::radio, icons},
+        }},
+    });
+    require((*strip).selected_item_id() == "menustrip.view",
+            "MenuStrip model replacement must retain a still-visible selected stable identity");
+    (*strip).set_items({
+        {"menustrip.file", "File", {
+            {"file.open", MenuItemKind::command, open},
+        }},
+    });
+    require((*strip).selected_item_id().empty(),
+            "MenuStrip model replacement must clear a selected identity that no longer exists");
+    bool hidden_selection_rejected{};
+    try {
+        (*strip).set_items({
+            {"menustrip.file", "File", {
+                {"file.open", MenuItemKind::command, open},
+            }, true, false},
+        });
+        (*strip).set_selected_item_id("menustrip.file");
+    } catch (const std::out_of_range&) {
+        hidden_selection_rejected = true;
+    }
+    require(hidden_selection_rejected,
+            "MenuStrip must reject a hidden selected top-level identity");
 }
 
 void test_menu_mnemonics_strip_markers_and_popup_activation() {

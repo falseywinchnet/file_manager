@@ -244,6 +244,35 @@ func (o *OverlayCandidate) ChangeCount() uint64        { return o.changeCount }
 func (o *OverlayCandidate) ChangedPathCount() int      { return len(o.changedPaths) }
 func (o *OverlayCandidate) RetainedRowCount() int      { return len(o.rows) }
 
+func (o *OverlayCandidate) CandidateAll(ctx context.Context, maximum int) ([]uint32, bool, error) {
+	if maximum < 0 {
+		return nil, false, errors.New("negative exact candidate budget")
+	}
+	work := o.baseLength + uint64(len(o.changedPaths))
+	if work > uint64(maximum) || o.length > uint64(maximum) {
+		return nil, true, nil
+	}
+	result := make([]uint32, 0, int(o.length))
+	err := o.IterateRows(ctx, func(row catalog.Row) error {
+		ordinal, exists, err := o.PathIndex(filepath.Join(o.root.Path, row.RelativePath))
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return errors.New("overlay live row has no exact ordinal")
+		}
+		result = append(result, ordinal)
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if uint64(len(result)) != o.length {
+		return nil, false, errors.New("overlay all-candidate count differs from live length")
+	}
+	return result, false, nil
+}
+
 func (o *OverlayCandidate) CandidateName(name string, maximum int) ([]uint32, bool, error) {
 	if maximum < 0 {
 		return nil, false, errors.New("negative exact candidate budget")

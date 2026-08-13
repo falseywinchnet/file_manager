@@ -45,6 +45,8 @@ cmake --build /tmp/fileman-orchestrator-cpp-build
   /absolute/private/runtime-leaf probe
 /tmp/fileman-orchestrator-cpp-build/orchestrator-cpp-client \
   /absolute/private/runtime-leaf search docs needle
+/tmp/fileman-orchestrator-cpp-build/orchestrator-cpp-client \
+  /absolute/private/runtime-leaf criteria docs kind file 3
 ```
 
 On macOS the runtime argument may be omitted to use the same stable Application

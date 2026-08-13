@@ -57,6 +57,12 @@ impl<P: EngineSearchProvider> EngineSearchBroker<P> {
         request: &EngineSearchRequest,
         policy: EngineSearchPolicy,
     ) -> EngineSearchOutcome {
+        // The frozen live-filesystem lane currently supports bounded name/path
+        // text only. Never widen a filtered catalogue request by silently
+        // dropping its exact metadata predicates during fallback.
+        if !request.filters.is_empty() {
+            return EngineSearchOutcome::Catalogue(self.provider.query_catalogue(request));
+        }
         if let Some(cursor) = request.cursor.as_ref() {
             return match cursor.source {
                 EngineSearchCursorSource::Catalogue => {

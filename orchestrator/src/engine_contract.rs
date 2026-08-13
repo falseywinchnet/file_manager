@@ -1,6 +1,7 @@
 use crate::common::{ContractRef, TerminalStatus};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub const ENGINE_SEMANTIC_MAJOR: u16 = 0;
 pub const ENGINE_SEMANTIC_MINOR: u16 = 1;
@@ -17,6 +18,8 @@ pub const LIVE_QUERY_DEFAULT_WALL_TIME_MS: u64 = 250;
 pub const LIVE_QUERY_MAX_WALL_TIME_MS: u64 = 5_000;
 pub const LIVE_QUERY_DEFAULT_OPEN_DIRECTORIES: u16 = 8;
 pub const LIVE_QUERY_MAX_OPEN_DIRECTORIES: u16 = 32;
+pub const EXACT_FILTER_MAXIMUM: usize = 7;
+pub const EXACT_FILTER_VALUE_MAXIMUM_BYTES: usize = 16_384;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -218,6 +221,8 @@ pub struct EngineSearchRequest {
     pub relative_path: Option<String>,
     pub descendants: EngineFlag,
     pub text: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub filters: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<EngineSearchCursor>,
     pub budget: EngineSearchBudget,
@@ -239,16 +244,36 @@ pub struct EngineSearchCursor {
 impl EngineSearchRequest {
     #[must_use]
     pub fn is_well_formed(&self) -> bool {
-        !self.query_id.is_empty()
-            && !self.root_id.is_empty()
-            && !self.text.is_empty()
-            && self.budget.is_well_formed()
+        if self.query_id.is_empty()
+            || self.root_id.is_empty()
+            || (self.text.is_empty() && self.filters.is_empty())
+            || (!self.text.is_empty() && self.filters.contains_key("name"))
+            || self.filters.len() > EXACT_FILTER_MAXIMUM
+        {
+            return false;
+        }
+        self.filters.iter().all(|(field, value)| {
+            matches!(
+                field.as_str(),
+                "name"
+                    | "path"
+                    | "kind"
+                    | "size_min"
+                    | "size_max"
+                    | "modified_after"
+                    | "modified_before"
+            ) && !value.is_empty()
+                && value.len() <= EXACT_FILTER_VALUE_MAXIMUM_BYTES
+        }) && self.budget.is_well_formed()
             && self
                 .cursor
                 .as_ref()
                 .is_none_or(|cursor| !cursor.value.is_empty())
             && self.relative_path.as_ref().is_none_or(|path| {
                 !path.starts_with('/') && !path.split('/').any(|part| part == "..")
+            })
+            && self.cursor.as_ref().is_none_or(|cursor| {
+                self.filters.is_empty() || cursor.source == EngineSearchCursorSource::Catalogue
             })
     }
 }
@@ -311,5 +336,50 @@ impl EngineLiveQueryResultFixture {
             }
             _ => self.results.is_empty() && self.error.is_some(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        EngineSearchBudget, EngineSearchCursor, EngineSearchCursorSource, EngineSearchRequest,
+    };
+    use std::collections::BTreeMap;
+
+    fn request() -> EngineSearchRequest {
+        EngineSearchRequest {
+            query_id: "criteria-contract-test".to_owned(),
+            root_id: "docs".to_owned(),
+            relative_path: None,
+            descendants: true.into(),
+            text: String::new(),
+            filters: BTreeMap::from([("kind".to_owned(), "file".to_owned())]),
+            cursor: None,
+            budget: EngineSearchBudget::default(),
+        }
+    }
+
+    #[test]
+    fn filter_only_exact_request_is_well_formed() {
+        assert!(request().is_well_formed());
+    }
+
+    #[test]
+    fn filtered_request_rejects_live_cursor_and_unknown_fields() {
+        let mut live_cursor = request();
+        live_cursor.cursor = Some(EngineSearchCursor {
+            source: EngineSearchCursorSource::LiveFilesystem,
+            value: "live-cursor".to_owned(),
+        });
+        assert!(!live_cursor.is_well_formed());
+
+        let mut unknown = request();
+        unknown.filters = BTreeMap::from([("content".to_owned(), "quartz".to_owned())]);
+        assert!(!unknown.is_well_formed());
+
+        let mut duplicate_name = request();
+        duplicate_name.text = "ledger".to_owned();
+        duplicate_name.filters = BTreeMap::from([("name".to_owned(), "other".to_owned())]);
+        assert!(!duplicate_name.is_well_formed());
     }
 }

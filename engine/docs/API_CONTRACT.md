@@ -123,9 +123,12 @@ language**.
   reused projections stale until reconciliation.
 - `scan.reconcile` performs a metadata-only full scan, prunes more-specific
   child roots, and publishes one immutable in-memory reader generation.
-- `query` currently requires `filters.name` or `filters.path`. Optional exact
-  filters are `kind`, `size_min`, `size_max`, `modified_after`, and
+- `query` requires at least one exact filter. Supported filters are `name`,
+  `path`, `kind`, `size_min`, `size_max`, `modified_after`, and
   `modified_before`; sort keys are `name`, `path`, `size`, and `modified`.
+  A metadata-only query performs a cancellable catalogue scan and refuses the
+  request when the complete candidate set exceeds the same 100,000-record
+  ceiling; it never silently truncates candidates.
 - Query pages are limited to 1,000 results. The reference candidate budget is
   100,000; exceeding it returns `RESOURCE_BUDGET_EXCEEDED`, never a silently
   truncated success.

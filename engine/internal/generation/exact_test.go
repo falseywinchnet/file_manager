@@ -51,6 +51,7 @@ func TestExactPipelineMatchesReferenceOverDurableReader(t *testing.T) {
 		{Scope: api.Scope{Root: root.ID, Descendants: true}, Filters: map[string]string{"name": "repeated"}, Limit: 17},
 		{Scope: api.Scope{Root: root.ID, Descendants: true}, Filters: map[string]string{"path": filepath.Join("dir-0000050", "file-000000501")}},
 		{Scope: api.Scope{Root: root.ID, Descendants: true}, Filters: map[string]string{"name": "repeated", "size_min": "300"}, Order: []api.SortKey{{Field: "size", Direction: api.SortDescending}}, Limit: 9},
+		{Scope: api.Scope{Root: root.ID, Descendants: true}, Filters: map[string]string{"kind": "file", "size_min": "990"}, Limit: 7},
 	}
 	for _, query := range queries {
 		want, wantCursor, err := exact.Query(context.Background(), reference, query)

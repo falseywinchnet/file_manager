@@ -207,6 +207,26 @@ void test_flow_item_spacing_is_explicit_bounded_layout_state() {
             "FlowLayoutPanel item spacing must reject invalid geometry atomically");
 }
 
+void test_flow_auto_size_mode_preserves_authored_extent() {
+    std::shared_ptr<gui_forms::FlowLayoutPanel> flow =
+        make_control<FlowLayoutPanel>(StableId("layout.flow.auto-size-mode"));
+    std::shared_ptr<Button> child =
+        sized_button("layout.flow.auto-size-mode.child", 72.0, 43.0);
+    (*flow).set_padding({5.0, 2.0, 5.0, 0.0});
+    (*flow).set_requested_bounds({0.0, 0.0, 176.0, 60.0});
+    (*flow).set_minimum_size({100.0, 50.0});
+    (*flow).set_auto_size(true);
+    (*flow).add_child(child);
+
+    require((*flow).auto_size_mode() == AutoSizeMode::grow_only &&
+                (*flow).measure({500.0, 500.0}) == Size{176.0, 60.0},
+            "GrowOnly FlowLayoutPanel AutoSize must retain authored extent");
+
+    (*flow).set_auto_size_mode(AutoSizeMode::grow_and_shrink);
+    require((*flow).measure({500.0, 500.0}) == Size{100.0, 50.0},
+            "GrowAndShrink FlowLayoutPanel AutoSize must derive content while honoring minimum size");
+}
+
 void test_flow_alignment_projects_relational_flex_geometry() {
     std::shared_ptr<gui_forms::FlowLayoutPanel> centered =
         make_control<FlowLayoutPanel>(StableId("layout.flow.centered"));
@@ -724,6 +744,7 @@ int main() {
         test_margin_padding_validation_and_retained_slots();
         test_flow_direction_break_visibility_and_resize();
         test_flow_item_spacing_is_explicit_bounded_layout_state();
+        test_flow_auto_size_mode_preserves_authored_extent();
         test_flow_alignment_projects_relational_flex_geometry();
         test_layout_panels_revalidate_snapshot_after_measure_callback();
         test_table_mixed_tracks_spans_and_lookup();

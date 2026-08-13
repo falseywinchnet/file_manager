@@ -26,7 +26,7 @@ int main(const int argc, char** argv) {
     try {
         auto root = default_root();
         std::optional<std::filesystem::path> quarantine;
-        std::string engine_root_id = "fm1-contained";
+        std::string engine_root_id;
         bool allow_mutations = false;
         for (int index = 1; index < argc; ++index) {
             const std::string_view argument(argv[index]);
@@ -55,7 +55,11 @@ int main(const int argc, char** argv) {
         gui_forms::host::MacHostOptions options;
         options.title = "File Manager";
         options.initial_size = {1340, 850};
-        options.minimum_size = {1080, 720};
+        options.minimum_size = {150, 150};
+        options.titlebar_presentation =
+            gui_forms::host::MacTitlebarPresentation::
+                transparent_full_size_content;
+        options.window_drag_region_id = "file-manager-app.shell.title";
         options.print_metrics_on_close = true;
         options.host_ready = [application](std::function<void()> wake,
                                            std::function<void()> request_close,

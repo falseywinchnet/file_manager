@@ -280,6 +280,10 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
         committed_arranged_bounds().height * 0.5 + font.size * 0.34);
     painter.save();
     painter.clip_rect(local_bounds());
+
+    // Paint every overlapping face before its shared chevron edge. Drawing a
+    // joint inside this loop lets the next face erase that joint because each
+    // successor deliberately overlaps the preceding face by edge_overlap_.
     for (std::size_t index = 0; index < visible_items_.size(); ++index) {
         const VisibleItem& item = visible_items_[index];
         const bool active = focused_ && visible_stable_id(item) == active_id_;
@@ -305,6 +309,13 @@ void BreadcrumbTrail::on_paint(Painter& painter, Rect damage) {
         const double text_x = item.bounds.x +
             std::max(7.0, (item.bounds.width - text_width) * 0.5);
         painter.draw_text_utf8({text_x, baseline}, text, font, foreground);
+    }
+
+    // Shared edges and focus rings are the foreground geometry of the one
+    // continuous location instrument, so no later face may cover them.
+    for (std::size_t index = 0; index < visible_items_.size(); ++index) {
+        const VisibleItem& item = visible_items_[index];
+        const bool active = focused_ && visible_stable_id(item) == active_id_;
         if (index + 1U < visible_items_.size()) {
             const double edge_x = item.bounds.x + item.bounds.width - edge_overlap_;
             const double middle = item.bounds.y + item.bounds.height * 0.5;

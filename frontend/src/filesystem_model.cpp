@@ -164,6 +164,44 @@ bool path_route_has_symlink(const std::filesystem::path& canonical_root,
         has_symlink_component(canonical_root, lexical);
 }
 
+std::optional<NavigationTarget> resolve_navigation_target(
+    const std::vector<std::filesystem::path>& admitted_roots,
+    const std::filesystem::path& current_location,
+    const std::filesystem::path& home_root,
+    const std::filesystem::path& requested) {
+    if (requested.empty() || admitted_roots.empty()) return {};
+
+    auto expanded = requested;
+    const auto text = requested.string();
+    if (text == "~") {
+        expanded = home_root;
+    } else if (text.starts_with("~/")) {
+        expanded = home_root / text.substr(2);
+    } else if (!expanded.is_absolute()) {
+        expanded = current_location / expanded;
+    }
+    expanded = expanded.lexically_normal();
+
+    std::optional<NavigationTarget> best;
+    std::size_t best_depth{};
+    for (const auto& supplied_root : admitted_roots) {
+        const auto root = supplied_root.lexically_normal();
+        auto candidate = expanded;
+        if (!path_is_within(root, candidate)) {
+            const auto rebased = rebase_path_from_equivalent_root(root, candidate);
+            if (!rebased) continue;
+            candidate = *rebased;
+        }
+        const auto depth = static_cast<std::size_t>(
+            std::distance(root.begin(), root.end()));
+        if (!best || depth > best_depth) {
+            best = NavigationTarget{root, std::move(candidate)};
+            best_depth = depth;
+        }
+    }
+    return best;
+}
+
 ObjectIdentity observe_identity(const std::filesystem::path& path) {
     struct stat observed {};
     if (::lstat(path.c_str(), &observed) != 0) return {};
