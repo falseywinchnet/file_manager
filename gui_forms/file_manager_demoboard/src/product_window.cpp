@@ -940,7 +940,7 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     refs.workspace_split = outer;
     (*outer).initialize_control_tree();
     (*outer).set_splitter_width(3);
-    (*outer).set_splitter_hit_width(9);
+    (*outer).set_splitter_hit_width(12);
     (*outer).set_splitter_distance(218);
     (*outer).set_collapse_panel(SplitFixedPanel::first);
     (*outer).set_automatic_collapse_threshold(700);
@@ -955,7 +955,7 @@ std::shared_ptr<SplitContainer> make_workspace(ProductRefs& refs) {
     (*inner).initialize_control_tree();
     refs.selection_split = inner;
     (*inner).set_splitter_width(3);
-    (*inner).set_splitter_hit_width(9);
+    (*inner).set_splitter_hit_width(12);
     (*inner).set_fixed_panel(SplitFixedPanel::second);
     (*inner).set_splitter_distance(935);
     (*inner).set_collapse_panel(SplitFixedPanel::second);

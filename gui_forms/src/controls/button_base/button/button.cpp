@@ -74,6 +74,13 @@ void Button::set_visual_style(ButtonVisualStyle style) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void Button::set_selected(bool selected) {
+    require_mutable();
+    if (selected_ == selected) return;
+    selected_ = selected;
+    invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
+}
+
 void Button::set_flat_border_width(double width) {
     require_mutable();
     if (!std::isfinite(width) || width < 0.0) {
@@ -95,7 +102,8 @@ void Button::on_paint(Painter& painter, Rect) {
             role = ControlVisualRole::command_button;
         }
         paint_themed_button(painter, bounds, role, default_button_,
-                            visual_style_ == ButtonVisualStyle::command);
+                            visual_style_ == ButtonVisualStyle::command,
+                            selected_);
         return;
     }
     switch (visual_style_) {
@@ -145,6 +153,12 @@ void Button::on_paint(Painter& painter, Rect) {
     }
 }
 
+SemanticDescriptor Button::semantic_descriptor() const {
+    SemanticDescriptor descriptor = ButtonBase::semantic_descriptor();
+    if (selected_) descriptor.states |= SemanticState::selected;
+    return descriptor;
+}
+
 Insets Button::visual_outsets() const noexcept {
     if (has_style_override()) return {};
     ControlVisualRole role = ControlVisualRole::button;
@@ -154,7 +168,7 @@ Insets Button::visual_outsets() const noexcept {
         role = ControlVisualRole::command_button;
     }
     const ControlVisualContext context = visual_context(
-        hovered_visual(), pressed_visual(), false, focus_cue_visible(),
+        hovered_visual(), pressed_visual(), selected_, focus_cue_visible(),
         default_button_);
     return resolved_visual_outsets(role, context);
 }

@@ -1254,6 +1254,8 @@ bool Window::dispatch_pointer(PointerEvent event) {
         }
         metrics_.record_callback_emitted();
         (*control).on_pointer_preview(event);
+        (*control).publish_change(
+            (*control).pointer_preview_observed_, event);
         if (event.handled) {
             return true;
         }

@@ -1,12 +1,12 @@
 # ObjectView
 
-- Status: **OBSERVED: bundle 005 split and secondary-text enhancement; M4 build, focused tests, and Screen Sharing pass**
+- Status: **OBSERVED: FM-R013 two-line/full-name/focus source slice; focused and installed-consumer M4 tests pass; current Screen Sharing visual proof pending**
 - Kind: **class / visual retained control**
 - Hierarchy: `Panel → ObjectView`
 - Declaration: `include/gui_forms/controls/panel/object_view/object_view.hpp:61`
 - Definition: `src/controls/panel/object_view/object_view.cpp`
 
-ObjectView is a virtualized retained collection surface with icon-grid and details projections over one stable item model. It owns single or multiple selection, focus and range anchors, keyboard/pointer/context behavior, configurable cell geometry, optional secondary text, and virtual item semantics.
+ObjectView is a virtualized retained collection surface with icon-grid and details projections over one stable item model. Icon labels use no more than two centered Unicode 17 grapheme-safe lines and disclose a truncated complete name on hover or keyboard focus; details labels remain single-line and column-bounded. Selection owns a semantic fill plus boundary, while keyboard focus is an independent dotted non-color cue. It also owns single or multiple selection, range anchors, keyboard/pointer/context behavior, configurable cell geometry, optional secondary text, and virtual item semantics.
 
 ## Visual evidence
 
@@ -268,7 +268,7 @@ Commits viewport geometry, clamps scrolling, and ensures focused content remains
 void on_paint(Painter& painter, Rect local_damage) override
 ```
 
-Records only visible icon cells or detail rows with imagery, text, selection, hover, and focus.
+Records only visible icon cells or detail rows with imagery, bounded text, explicit selection, independent dotted keyboard focus, and complete-name inspection for truncated items.
 
 ### `on_pointer` (public)
 

@@ -30,12 +30,15 @@ public:
         return visual_style_;
     }
     void set_visual_style(ButtonVisualStyle style);
+    [[nodiscard]] bool selected() const noexcept { return selected_; }
+    void set_selected(bool selected);
     [[nodiscard]] double flat_border_width() const noexcept {
         return flat_border_width_;
     }
     void set_flat_border_width(double width);
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
     void notify_default(bool value) override;
@@ -48,6 +51,7 @@ private:
     DialogResult dialog_result_{DialogResult::none};
     Event<DialogResult> dialog_result_changed_;
     ButtonVisualStyle visual_style_{ButtonVisualStyle::standard};
+    bool selected_{};
     double flat_border_width_{1.0};
 };
 

@@ -122,13 +122,15 @@ struct ContextMenu::Impl final {
             : Control(std::move(id)), impl_(impl), depth_(depth), index_(index),
               item_(item) {
             set_paint_plane(PaintPlane::overlay);
+            set_enabled(item.kind != MenuItemKind::separator && enabled_item());
             set_focusable(item.kind != MenuItemKind::separator && enabled_item());
-            set_cursor(item.kind == MenuItemKind::separator
-                ? std::optional<CursorKind>{} : CursorKind::hand);
+            set_cursor(item.kind != MenuItemKind::separator && enabled_item()
+                ? std::optional<CursorKind>{CursorKind::hand}
+                : std::optional<CursorKind>{});
         }
 
         [[nodiscard]] bool enabled_item() const noexcept {
-            return item_.kind == MenuItemKind::submenu || item_.command_state.enabled;
+            return snapshot_enabled(item_);
         }
 
         void set_hot(bool hot) {
@@ -264,6 +266,10 @@ struct ContextMenu::Impl final {
             if (!enabled_item() && !item_.command_state.availability_reason.empty()) {
                 if (!descriptor.description.empty()) descriptor.description += " · ";
                 descriptor.description += item_.command_state.availability_reason;
+            } else if (!enabled_item() &&
+                       item_.kind == MenuItemKind::submenu) {
+                if (!descriptor.description.empty()) descriptor.description += " · ";
+                descriptor.description += "No commands are currently available";
             }
             if (item_.command_state.checked) descriptor.states |= SemanticState::checked;
             if (item_.kind == MenuItemKind::submenu &&
@@ -271,7 +277,9 @@ struct ContextMenu::Impl final {
                 descriptor.states |= SemanticState::expanded;
             }
             descriptor.exposed = true;
-            descriptor.actions = item_.kind == MenuItemKind::submenu
+            descriptor.actions = !enabled_item()
+                ? std::vector<SemanticAction>{}
+                : item_.kind == MenuItemKind::submenu
                 ? std::vector<SemanticAction>{SemanticAction::focus,
                                               SemanticAction::expand,
                                               SemanticAction::collapse}
@@ -294,7 +302,7 @@ struct ContextMenu::Impl final {
                 return true;
             }
             if (action == SemanticAction::expand &&
-                item_.kind == MenuItemKind::submenu) {
+                item_.kind == MenuItemKind::submenu && enabled_item()) {
                 impl_.open_submenu(depth_, index_, true);
                 return true;
             }
@@ -536,7 +544,8 @@ struct ContextMenu::Impl final {
     void open_submenu(std::size_t depth, std::size_t index, bool focus_first) {
         if (depth >= panels.size() || index >= panels[depth].rows.size()) return;
         const MenuSnapshot& item = (*panels[depth].items)[index];
-        if (item.kind != MenuItemKind::submenu || item.children.empty()) return;
+        if (item.kind != MenuItemKind::submenu || item.children.empty() ||
+            !snapshot_enabled(item)) return;
         if (panels[depth].child_source_index != index ||
             panels.size() <= depth + 1U) {
             const Rect parent = (*panels[depth].panel).absolute_bounds();
@@ -628,11 +637,23 @@ struct ContextMenu::Impl final {
             !item.command_state.enabled) return;
         const std::string source_id = std::string(
             (*panels[depth].rows[index]).stable_id().value());
+        const std::string item_id = item.stable_id;
         const std::string command_id = (*item.command).stable_id();
-        if (!(*item.command).execute(source_id)) return;
-        MenuItemInvocation invocation{owner.stable_id_, item.stable_id,
-                                      command_id, source_id};
-        owner.item_invoked_.emit(invocation);
+        const std::shared_ptr<Command> command = item.command;
+        // Release containment and restore the invoker before application code
+        // runs. A command may deliberately focus its resulting surface; doing
+        // this after execution would overwrite that destination with the menu
+        // invoker during popup teardown.
+        if (window && focus_scope) {
+            static_cast<void>((*window).end_focus_scope(focus_scope));
+        }
+        focus_scope = {};
+        const bool executed = (*command).execute(source_id);
+        if (executed && owner.is_alive()) {
+            MenuItemInvocation invocation{owner.stable_id_, item_id,
+                                          command_id, source_id};
+            owner.item_invoked_.emit(invocation);
+        }
         close();
     }
 

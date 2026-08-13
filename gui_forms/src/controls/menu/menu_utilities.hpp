@@ -113,9 +113,19 @@ inline std::vector<MenuSnapshot> snapshot_items(
     return result;
 }
 
+[[nodiscard]] inline bool snapshot_enabled(
+    const MenuSnapshot& item) noexcept {
+    if (item.kind == MenuItemKind::separator) return false;
+    if (item.kind != MenuItemKind::submenu) return item.command_state.enabled;
+    return std::any_of(item.children.begin(), item.children.end(),
+                       [](const MenuSnapshot& child) {
+                           return snapshot_enabled(child);
+                       });
+}
+
 inline Color menu_ink(const MenuSnapshot& item,
                       const BasicControlStyle& style) noexcept {
-    if (item.kind != MenuItemKind::submenu && !item.command_state.enabled) {
+    if (!snapshot_enabled(item)) {
         return style.disabled_text;
     }
     if (item.command_state.destructive) return Color::rgba(145, 44, 42);

@@ -551,9 +551,10 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
 void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,
                                      ControlVisualRole role,
                                      bool default_cue,
-                                     bool command_alignment) const {
+                                     bool command_alignment,
+                                     bool selected) const {
     const ControlVisualContext context = visual_context(
-        hovered_, pressed_visual(), false, focus_cue_visible(), default_cue);
+        hovered_, pressed_visual(), selected, focus_cue_visible(), default_cue);
     const ControlVisualRecipe& recipe = resolve_visual_recipe(role, context);
     const Rect visual_bounds{
         bounds.x + recipe.visual_offset.x,
@@ -566,7 +567,7 @@ void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,
     const Point offset = context.surface == ControlSurfaceState::pressed
         ? recipe.pressed_content_offset : Point{};
     const std::string display = display_text();
-    paint_button_content(painter, visual_bounds, display, recipe.text, offset, false,
+    paint_button_content(painter, visual_bounds, display, recipe.text, offset, selected,
                          command_alignment);
 }
 

@@ -141,7 +141,8 @@ protected:
                               bool command_alignment = false) const;
     void paint_themed_button(Painter& painter, Rect bounds,
                              ControlVisualRole role, bool default_cue,
-                             bool command_alignment = false) const;
+                             bool command_alignment = false,
+                             bool selected = false) const;
     [[nodiscard]] const ControlVisualRecipe& resolve_visual_recipe(
         ControlVisualRole role, ControlVisualContext context) const noexcept;
     [[nodiscard]] Insets resolved_visual_outsets(

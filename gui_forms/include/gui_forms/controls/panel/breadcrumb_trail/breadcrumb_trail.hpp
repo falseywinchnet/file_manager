@@ -48,6 +48,10 @@ public:
     [[nodiscard]] std::shared_ptr<TextBox> editor() const noexcept {
         return editor_;
     }
+    [[nodiscard]] bool tab_completion_available() const noexcept {
+        return tab_completion_available_;
+    }
+    void set_tab_completion_available(bool available);
     [[nodiscard]] std::string_view overflow_stable_id() const noexcept {
         return overflow_stable_id_;
     }
@@ -64,13 +68,20 @@ public:
     [[nodiscard]] Event<const std::string&>& edit_committed() noexcept {
         return edit_committed_;
     }
+    [[nodiscard]] Event<const std::string&>& edit_started() noexcept {
+        return edit_started_;
+    }
     [[nodiscard]] Event<>& edit_cancelled() noexcept {
         return edit_cancelled_;
+    }
+    [[nodiscard]] Event<>& edit_completion_requested() noexcept {
+        return edit_completion_requested_;
     }
 
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
+    void on_key_preview(KeyEvent& event) override;
     void on_key(KeyEvent& event) override;
     void on_focus_changed(bool focused) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
@@ -121,11 +132,14 @@ private:
     std::optional<std::size_t> pressed_visible_;
     FontSpec font_{FontRole::control, 10.5, 600, false};
     bool editing_{};
+    bool tab_completion_available_{};
     bool focused_{};
     Event<const std::string&> segment_activated_;
     Event<> overflow_activated_;
     Event<const std::string&> edit_committed_;
+    Event<const std::string&> edit_started_;
     Event<> edit_cancelled_;
+    Event<> edit_completion_requested_;
 
     static constexpr double edge_overlap_ = 8.0;
     static constexpr double edit_width_ = 36.0;

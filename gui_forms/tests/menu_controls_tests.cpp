@@ -28,6 +28,11 @@ const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
     return nullptr;
 }
 
+bool has_action(const SemanticNode& node, const SemanticAction action) {
+    return std::find(node.actions.begin(), node.actions.end(), action) !=
+           node.actions.end();
+}
+
 class RecordCommandIdAndSource final {
 public:
     explicit RecordCommandIdAndSource(std::string& trace) : trace_(trace) {}
@@ -130,12 +135,23 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
         snapshot.roots, "object.context.popup.row.details");
     const SemanticNode* delete_node = find_semantic(
         snapshot.roots, "object.context.popup.row.delete");
+    const Control::Ptr delete_row = window.find(
+        "object.context.popup.row.delete");
     require(menu_node && (*menu_node).role == SemanticRole::menu && details_node &&
                 (*details_node).role == SemanticRole::menu_item &&
                 has_semantic_state((*details_node).states, SemanticState::checked) &&
                 delete_node && (*delete_node).description.find("read-only") !=
                     std::string::npos,
             "menu semantics must publish menu/item/check and availability facts");
+    require(delete_row && !(*delete_row).focusable() && !(*delete_row).cursor() &&
+                !has_semantic_state((*delete_node).states,
+                                    SemanticState::enabled) &&
+                !has_action(*delete_node, SemanticAction::focus) &&
+                !has_action(*delete_node, SemanticAction::press) &&
+                !window.request_focus(delete_row) &&
+                !window.perform_semantic_action(
+                    "object.context.popup.row.delete", SemanticAction::press),
+            "disabled menu rows must explain unavailability without a hand cursor or actionable semantics");
 
     require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
                 (*window.focused_control()).stable_id().value() ==
@@ -168,14 +184,56 @@ void test_context_menu_command_snapshot_keyboard_nesting_and_restore() {
                 nested_trace == "view.icons" && !menu.is_open(),
             "nested keyboard activation must converge on shared command authority");
 
+    (*icons).set_enabled(false);
+    (*details).set_enabled(false);
+    menu.show(owner, {120.0, 80.0});
+    const SemanticSnapshot disabled_submenu_snapshot =
+        window.semantic_snapshot();
+    const SemanticNode* disabled_submenu = find_semantic(
+        disabled_submenu_snapshot.roots,
+        "object.context.popup.row.view");
+    const Control::Ptr disabled_submenu_row = window.find(
+        "object.context.popup.row.view");
+    require(disabled_submenu && disabled_submenu_row &&
+                !disabled_submenu_row->focusable() &&
+                !disabled_submenu_row->cursor() &&
+                disabled_submenu->description.find(
+                    "No commands are currently available") !=
+                    std::string::npos &&
+                disabled_submenu->actions.empty() &&
+                !window.perform_semantic_action(
+                    "object.context.popup.row.view",
+                    SemanticAction::expand) &&
+                window.find("object.context.popup.panel.1") == nullptr,
+            "submenu with no actionable descendant must explain and enforce its disabled state");
+    menu.close();
+    (*icons).set_enabled(true);
+    (*details).set_enabled(true);
+
     menu.show(owner, {120.0, 80.0});
     require(window.dispatch_pointer({PointerAction::down,
                                      PointerButton::primary,
                                      {2.0, 2.0}}) &&
                 !menu.is_open() && window.focused_control() == owner,
             "click-away must revoke the popup and restore focus");
-    require(open_changes == 6U,
-            "three complete open/close cycles must publish six ordered state changes");
+    require(open_changes == 8U,
+            "four complete open/close cycles must publish eight ordered state changes");
+
+    std::shared_ptr<gui_forms::Button> destination = make_control<Button>(
+        StableId("command.focus-destination"), "Destination");
+    (*destination).set_requested_bounds({210.0, 20.0, 120.0, 32.0});
+    (*root).add_child(destination);
+    std::shared_ptr<gui_forms::Command> focus_command =
+        std::make_shared<Command>("command.focus", "Focus destination");
+    SubscriptionToken focus_invoked = (*focus_command).invoked().subscribe(
+        [&window, destination](const CommandInvocation&) {
+            static_cast<void>(window.request_focus(destination));
+        });
+    menu.set_items({{"focus", MenuItemKind::command, focus_command}});
+    menu.show(owner, {120.0, 80.0});
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                !menu.is_open() && window.focused_control() == destination,
+            "menu teardown must not overwrite the focus destination deliberately chosen by an invoked command");
 }
 
 void test_context_menu_scroll_and_validation_bounds() {

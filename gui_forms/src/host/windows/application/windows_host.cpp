@@ -512,6 +512,10 @@ std::uint32_t physical_key(WPARAM key) noexcept {
     case VK_PRIOR: return PhysicalKey::page_up;
     case VK_END: return PhysicalKey::end;
     case VK_NEXT: return PhysicalKey::page_down;
+    case VK_DELETE: return PhysicalKey::delete_forward;
+    case VK_F1: return PhysicalKey::f1;
+    case VK_F2: return PhysicalKey::f2;
+    case VK_F4: return PhysicalKey::f4;
     case VK_RIGHT: return PhysicalKey::right;
     case VK_LEFT: return PhysicalKey::left;
     case VK_DOWN: return PhysicalKey::down;

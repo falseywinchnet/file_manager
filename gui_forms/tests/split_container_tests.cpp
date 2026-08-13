@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -19,6 +20,34 @@ void require(bool condition, const char* message) {
 bool near(double left, double right) {
     return std::abs(left - right) < 0.001;
 }
+
+class GripRecordingPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect bounds, Color) override { fills.push_back(bounds); }
+    void stroke_rect(Rect bounds, Color, double) override {
+        strokes.push_back(bounds);
+    }
+    void draw_box_shadow(Rect bounds, double, Point, double, double,
+                         Color) override {
+        shadows.push_back(bounds);
+    }
+    void draw_line(Point, Point, Color, double) override { ++lines; }
+    void draw_text_utf8(Point, std::string_view text, FontSpec,
+                        Color) override {
+        texts.emplace_back(text);
+    }
+    void draw_image(ImageId, Rect, double) override {}
+
+    std::vector<Rect> fills;
+    std::vector<Rect> strokes;
+    std::vector<Rect> shadows;
+    std::vector<std::string> texts;
+    std::size_t lines{};
+};
 
 class CountSplitReasons final {
 public:
@@ -256,6 +285,106 @@ void test_seam_tab_pointer_keyboard_and_semantic_collapse() {
             "Space must restore a collapsed pane through the focused seam tab");
 }
 
+void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
+    auto split = make_control<SplitContainer>(StableId("split.grip.visual"));
+    split->set_splitter_width(3.0);
+    split->set_splitter_hit_width(9.0);
+    split->set_splitter_distance(120.0);
+    split->set_collapse_panel(SplitFixedPanel::second);
+    Window window(split, {400.0, 180.0});
+    window.perform_layout();
+    const Control::Ptr grip = split->splitter_control();
+    const Rect seam = grip->absolute_bounds();
+    const Insets outsets = grip->visual_outsets();
+    require(near(seam.width, 9.0) && near(outsets.left, 10.5) &&
+                near(outsets.right, 10.5) && near(outsets.top, 0.0) &&
+                near(outsets.bottom, 0.0),
+            "vertical seam must retain a nine-unit hit strip and declare the complete engaged shadow outsets");
+
+    GripRecordingPainter rest;
+    grip->on_paint(rest, {0.0, 0.0, seam.width, seam.height});
+    require(rest.fills.size() == 2U && near(rest.fills[0].width, 3.0) &&
+                near(rest.fills[1].width, 7.0) &&
+                near(rest.fills[1].height, 28.0) && rest.shadows.empty() &&
+                rest.texts.size() == 1U,
+            "rest seam must paint a three-unit rail and quiet seven-by-twenty-eight actuator");
+
+    const Point center{seam.x + seam.width * 0.5,
+                       seam.y + seam.height * 0.5};
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none, center}));
+    GripRecordingPainter hot;
+    grip->on_paint(hot, {0.0, 0.0, seam.width, seam.height});
+    require(hot.fills.size() == 2U && near(hot.fills[1].width, 12.0) &&
+                near(hot.fills[1].height, 42.0) &&
+                near(hot.fills[1].x, -1.5) && hot.shadows.size() == 1U &&
+                hot.lines >= 3U,
+            "pointer proximity must enlarge, deepen, and increase contrast before activation");
+
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none, {20.0, 20.0}}));
+    GripRecordingPainter left;
+    grip->on_paint(left, {0.0, 0.0, seam.width, seam.height});
+    require(left.fills.size() == 2U && near(left.fills[1].width, 7.0) &&
+                near(left.fills[1].height, 28.0) && left.shadows.empty(),
+            "leaving the actuator proximity must restore its quiet rest geometry");
+
+    require(window.request_focus(grip),
+            "splitter grip must accept keyboard focus");
+    static_cast<void>(window.dispatch_key(
+        {KeyAction::down, PhysicalKey::a}));
+    GripRecordingPainter focused;
+    grip->on_paint(focused, {0.0, 0.0, seam.width, seam.height});
+    require(focused.fills.size() == 2U &&
+                near(focused.fills[1].width, 12.0) &&
+                near(focused.fills[1].height, 42.0) &&
+                focused.shadows.size() == 1U,
+            "keyboard focus cue must expose the same enlarged mechanical grip");
+
+    static_cast<void>(window.request_focus({}));
+    PointerEvent down;
+    down.action = PointerAction::down;
+    down.button = PointerButton::primary;
+    down.position = center;
+    require(window.dispatch_pointer(down),
+            "collapse actuator press must route through the expanded activation box");
+    GripRecordingPainter pressed;
+    grip->on_paint(pressed, {0.0, 0.0, seam.width, seam.height});
+    require(pressed.fills.size() == 2U &&
+                near(pressed.fills[1].width, 12.0) &&
+                near(pressed.fills[1].height, 42.0) &&
+                pressed.shadows.size() == 1U,
+            "pressed collapse actuator must retain its pre-activation engaged treatment");
+    PointerEvent up = down;
+    up.action = PointerAction::up;
+    require(window.dispatch_pointer(up) && split->second_collapsed(),
+            "engaged grip release must preserve the existing pane-collapse action");
+
+    auto horizontal = make_control<SplitContainer>(
+        StableId("split.grip.horizontal"));
+    horizontal->set_orientation(Orientation::horizontal);
+    horizontal->set_splitter_width(3.0);
+    horizontal->set_splitter_hit_width(9.0);
+    horizontal->set_splitter_distance(50.0);
+    horizontal->set_collapse_panel(SplitFixedPanel::first);
+    Window horizontal_window(horizontal, {180.0, 120.0});
+    horizontal_window.perform_layout();
+    const Control::Ptr horizontal_grip = horizontal->splitter_control();
+    const Insets horizontal_outsets = horizontal_grip->visual_outsets();
+    GripRecordingPainter horizontal_rest;
+    horizontal_grip->on_paint(
+        horizontal_rest, {0.0, 0.0,
+                          horizontal_grip->absolute_bounds().width,
+                          horizontal_grip->absolute_bounds().height});
+    require(near(horizontal_outsets.top, 8.5) &&
+                near(horizontal_outsets.bottom, 12.5) &&
+                horizontal_rest.fills.size() == 2U &&
+                near(horizontal_rest.fills[0].height, 3.0) &&
+                near(horizontal_rest.fills[1].width, 28.0) &&
+                near(horizontal_rest.fills[1].height, 7.0),
+            "horizontal grip must transpose the same seam, actuator, and asymmetric shadow outsets");
+}
+
 void test_automatic_accommodation_and_user_override() {
     std::shared_ptr<gui_forms::SplitContainer> split = make_control<SplitContainer>(StableId("split.accommodation"));
     (*split).set_splitter_distance(250.0);
@@ -343,6 +472,7 @@ int main() {
         test_collapse_focus_restore_and_fixed_panel_resize();
         test_horizontal_orientation_and_thread_guard();
         test_seam_tab_pointer_keyboard_and_semantic_collapse();
+        test_seam_grip_rest_proximity_focus_press_and_orientation_paint();
         test_automatic_accommodation_and_user_override();
         test_content_aware_maximum_extents();
         std::cout << "split-container-tests: pass\n";

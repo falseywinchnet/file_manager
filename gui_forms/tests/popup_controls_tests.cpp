@@ -81,6 +81,15 @@ void test_layer_dismissal_focus_and_resize() {
                 (*content).absolute_bounds() == Rect{50.0, 30.0, 140.0, 80.0},
             "popup layer must contain focus and resolve against the live owner");
 
+    require(window.dispatch_pointer({PointerAction::down,
+                                     PointerButton::primary,
+                                     {175.0, 122.0}}) &&
+                dismissals.empty(),
+            "pointer down inside the exact popup anchor must pass through rather than be misclassified as click-away");
+    static_cast<void>(window.dispatch_pointer({PointerAction::up,
+                                               PointerButton::primary,
+                                               {175.0, 122.0}}));
+
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
                                      {10.0, 120.0}}) &&
                 dismissals == std::vector<PopupDismissReason>{

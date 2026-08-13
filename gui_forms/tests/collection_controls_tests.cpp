@@ -27,17 +27,20 @@ public:
     void translate(Point) override {}
     void clip_rect(Rect) override {}
     void clip_rounded_rect(Rect, double) override {}
-    void fill_rect(Rect, Color) override {}
+    void fill_rect(Rect bounds, Color) override { fills.push_back(bounds); }
     void fill_rounded_rect(Rect, double, Color) override {}
-    void stroke_rect(Rect, Color, double) override {}
+    void stroke_rect(Rect bounds, Color, double) override {
+        strokes.push_back(bounds);
+    }
     void stroke_rounded_rect(Rect, double, Color, double) override {}
     void fill_linear_gradient(Rect, Point, Point,
                               std::span<const GradientStop>) override {}
     void draw_line(Point from, Point to, Color, double) override {
         lines.emplace_back(from, to);
     }
-    void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override {
+    void draw_text_utf8(Point origin, std::string_view text, FontSpec, Color) override {
         texts.emplace_back(text);
+        text_origins.push_back(origin);
     }
     void draw_image(ImageId image, Rect destination, double opacity) override {
         images.push_back(image);
@@ -48,13 +51,18 @@ public:
     std::vector<ImageId> images;
     std::vector<Rect> destinations;
     std::vector<double> opacities;
+    std::vector<Rect> fills;
+    std::vector<Rect> strokes;
     std::vector<std::string> texts;
+    std::vector<Point> text_origins;
     std::vector<std::pair<Point, Point>> lines;
 };
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
+
+Point semantic_center(const ObjectView& view, std::string_view stable_id);
 
 class AppendTreeExpansion final {
 public:
@@ -156,6 +164,7 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
     std::size_t overflow_count{};
     std::string committed;
     std::size_t cancelled{};
+    std::size_t starts{};
     SubscriptionToken activation = (*trail).segment_activated().subscribe(
         test_support::RecordValue<std::string>(activated));
     SubscriptionToken overflow = (*trail).overflow_activated().subscribe(
@@ -164,6 +173,11 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
         test_support::RecordValue<std::string>(committed));
     SubscriptionToken cancel = (*trail).edit_cancelled().subscribe(
         [&cancelled] { ++cancelled; });
+    SubscriptionToken start = (*trail).edit_started().subscribe(
+        [&starts](const std::string&) { ++starts; });
+    std::size_t completions{};
+    SubscriptionToken completion = (*trail).edit_completion_requested().subscribe(
+        [&completions] { ++completions; });
     require((*trail).on_semantic_child_action(
                 "path.root", SemanticAction::press, {}) &&
                 activated == "path.root",
@@ -181,7 +195,8 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
             "Home and Enter must activate the first stable breadcrumb segment");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::end}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
-                (*trail).editing() && (*trail).editor()->visible(),
+                (*trail).editing() && (*trail).editor()->visible() &&
+                starts == 1U,
             "End and Enter must replace the trail presentation with its owned editor");
     window.perform_layout();
     const Rect trail_bounds = (*trail).committed_arranged_bounds();
@@ -191,6 +206,10 @@ void test_breadcrumb_identity_overflow_edit_and_input() {
                 editor_bounds.height == trail_bounds.height - 2.0,
             "breadcrumb editing must preserve outer identity and row geometry");
     (*trail).editor()->set_text("/Users/example/Projects");
+    (*trail).set_tab_completion_available(true);
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::tab}) &&
+                completions == 1U && (*trail).editing(),
+            "Tab must enter the typed completion route without traversing focus when a suggestion is available");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 committed == "/Users/example/Projects" && (*trail).editing(),
             "path commit must publish exact editor text while the caller decides admissibility");
@@ -302,11 +321,135 @@ void test_tree_and_object_view_consume_keyed_image_list() {
                 !painter.destinations[0].empty() &&
                 !painter.destinations[1].empty(),
             "TreeView and ObjectView must paint shared keyed ImageList resources instead of private glyph paths");
-    require(std::any_of(painter.texts.begin(), painter.texts.end(),
-                        [](const std::string& text) {
-                            return text.ends_with("…");
-                        }),
-            "ObjectView icon labels must elide instead of painting across adjacent cells");
+    require(painter.texts.size() == 3U && painter.texts.front() == "Folder" &&
+                painter.texts[1] + " " + painter.texts[2] ==
+                    "An impossibly long local object name that cannot fit",
+            "ObjectView icon labels must use the admitted second line before eliding complete text");
+}
+
+void test_object_label_wrapping_focus_and_full_name_inspection() {
+    std::shared_ptr<gui_forms::ObjectView> objects =
+        make_control<ObjectView>(StableId("objects.labels"));
+    (*objects).set_requested_bounds({0.0, 0.0, 190.0, 170.0});
+    (*objects).set_icon_cell_size({90.0, 78.0});
+    (*objects).set_show_secondary_text(false);
+    const std::string complete_name =
+        "Résumé資料 archive evidence package with immutable identity.txt";
+    (*objects).set_items({
+        {"labels.long", complete_name, {}, "Complete UTF-8 fixture name",
+         ObjectGlyph::document},
+        {"labels.wrap", "North Shore Recordings", {}, "Two-line fixture",
+         ObjectGlyph::folder},
+    });
+    Window window(objects, {190.0, 170.0});
+    window.perform_layout();
+
+    ImageRecordingPainter rest;
+    window.paint(rest, {0.0, 0.0, 190.0, 170.0});
+    require(rest.texts.size() == 4U &&
+                rest.texts[0] == "Résumé資料" &&
+                rest.texts[1].ends_with("…") &&
+                rest.texts[2] == "North Shore" &&
+                rest.texts[3] == "Recordings",
+            "icon labels must paint at most two centered UTF-8-safe lines and elide only retained overflow");
+    require(rest.text_origins[1].y > rest.text_origins[0].y &&
+                rest.text_origins[3].y > rest.text_origins[2].y &&
+                std::all_of(rest.text_origins.begin(), rest.text_origins.end(),
+                    [](const Point point) {
+                        return point.x >= 4.0 && point.x < 186.0;
+                    }),
+            "two-line icon labels must retain stable baselines inside their cells");
+
+    const Point first = semantic_center(*objects, "labels.long");
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none, first}));
+    ImageRecordingPainter hovered;
+    window.paint(hovered, {0.0, 0.0, 190.0, 170.0});
+    std::string inspected_name;
+    for (std::size_t index = 4U; index < hovered.texts.size(); ++index) {
+        if (!inspected_name.empty()) inspected_name += ' ';
+        inspected_name += hovered.texts[index];
+    }
+    const Rect inspection_border = hovered.strokes.back();
+    require(inspected_name == complete_name && hovered.strokes.size() == 3U &&
+                inspection_border.x >= 4.0 &&
+                inspection_border.x + inspection_border.width <= 186.0 &&
+                inspection_border.y >= 4.0 &&
+                inspection_border.y + inspection_border.height <= 166.0,
+            "hovered truncated item must disclose its complete name in a bounded wrapped inspection surface");
+    require((*objects).selected_ids().empty(),
+            "full-name hover inspection must not mutate selection authority");
+
+    PointerEvent down{PointerAction::down, PointerButton::primary, first};
+    PointerEvent up{PointerAction::up, PointerButton::primary, first};
+    require(window.dispatch_pointer(down) && window.dispatch_pointer(up),
+            "pointer fixture must focus and select its item");
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::leave, PointerButton::none, {189.0, 169.0}}));
+    ImageRecordingPainter pointer_focused;
+    window.paint(pointer_focused, {0.0, 0.0, 190.0, 170.0});
+    require(pointer_focused.lines.empty() && pointer_focused.strokes.size() == 3U,
+            "pointer focus must preserve the selection boundary without masquerading as keyboard focus");
+
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right,
+                                 Modifier::control}) &&
+                (*objects).focused_id() == "labels.wrap" &&
+                (*objects).selected_id() == "labels.long",
+            "modified keyboard navigation must move focus independently of stable selection");
+    ImageRecordingPainter keyboard_short;
+    window.paint(keyboard_short, {0.0, 0.0, 190.0, 170.0});
+    require(keyboard_short.lines.size() >= 40U &&
+                keyboard_short.strokes.size() == 3U,
+            "selection boundary and dotted keyboard focus must remain visibly distinct on separate cells");
+
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::left,
+                                 Modifier::control}) &&
+                (*objects).focused_id() == "labels.long" &&
+                (*objects).selected_id() == "labels.long",
+            "keyboard fixture must return independent focus without rewriting selection");
+    static_cast<void>(window.dispatch_pointer(
+        {PointerAction::move, PointerButton::none,
+         semantic_center(*objects, "labels.wrap")}));
+    ImageRecordingPainter keyboard_long;
+    window.paint(keyboard_long, {0.0, 0.0, 190.0, 170.0});
+    std::string keyboard_inspected_name;
+    for (std::size_t index = 4U; index < keyboard_long.texts.size(); ++index) {
+        if (!keyboard_inspected_name.empty()) keyboard_inspected_name += ' ';
+        keyboard_inspected_name += keyboard_long.texts[index];
+    }
+    require(keyboard_long.lines.size() >= 40U &&
+                keyboard_inspected_name == complete_name,
+            "non-truncated hover must not suppress complete-name inspection for the keyboard-focused item");
+
+    (*objects).set_view_mode(ObjectViewMode::details);
+    ImageRecordingPainter details;
+    window.paint(details, {0.0, 0.0, 190.0, 170.0});
+    require(!details.texts.empty() && details.texts.front().ends_with("…") &&
+                details.text_origins.front().x == 42.0,
+            "details-mode names must remain single-line and width-bounded before the metadata column");
+
+    std::shared_ptr<gui_forms::ObjectView> grapheme_objects =
+        make_control<ObjectView>(StableId("objects.graphemes"));
+    (*grapheme_objects).set_requested_bounds({0.0, 0.0, 94.0, 90.0});
+    (*grapheme_objects).set_icon_cell_size({90.0, 78.0});
+    (*grapheme_objects).set_show_secondary_text(false);
+    const std::string joined_family =
+        "👨‍👩‍👧‍👦‍👨‍👩‍👧‍👦";
+    const TextStore joined_family_store(joined_family);
+    require(joined_family_store.grapheme_count() == GraphemeIndex(1U),
+            "Unicode 17 fixture must be one extended grapheme cluster");
+    (*grapheme_objects).set_items({
+        {"graphemes.long", "Prefix " + joined_family + " suffix", {},
+         "ZWJ truncation fixture", ObjectGlyph::document},
+    });
+    Window grapheme_window(grapheme_objects, {94.0, 90.0});
+    grapheme_window.perform_layout();
+    ImageRecordingPainter graphemes;
+    grapheme_window.paint(graphemes, {0.0, 0.0, 94.0, 90.0});
+    require(graphemes.texts.size() == 2U &&
+                graphemes.texts[0] == "Prefix" &&
+                graphemes.texts[1] == "…",
+            "icon-label elision must drop an overwide grapheme whole rather than split its ZWJ sequence");
 }
 
 void test_object_virtualization_view_preservation_and_input() {
@@ -703,6 +846,43 @@ void test_correspondence_keyboard_pin_semantics_and_activation() {
             "semantic expansion must enter the same one-pin state path for unavailable evidence");
 }
 
+void test_correspondence_background_pointer_contract() {
+    std::shared_ptr<gui_forms::CorrespondenceView> records =
+        make_control<CorrespondenceView>(StableId("correspondence.background"));
+    (*records).set_requested_bounds({0.0, 0.0, 820.0, 360.0});
+    (*records).set_items(correspondence_fixture(1U));
+    (*records).set_selected_id("correspondence.0");
+    Window window(records, {820.0, 360.0});
+    window.perform_layout();
+
+    std::vector<ObjectContextRequest> requests;
+    SubscriptionToken context = (*records).context_requested().subscribe(
+        [&requests](const ObjectContextRequest& request) {
+            requests.push_back(request);
+        });
+    const Rect bounds = (*records).absolute_bounds();
+    const Point background{bounds.x + bounds.width * .5,
+                           bounds.y + bounds.height - 12.0};
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, background}) &&
+                window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::primary, background}) &&
+                (*records).selected_id().empty() && requests.empty() &&
+                window.focused_control() == records,
+            "primary correspondence background click must focus the collection and clear selection without opening a menu");
+
+    (*records).set_selected_id("correspondence.0");
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::secondary, background}) &&
+                window.dispatch_pointer(
+                    {PointerAction::up, PointerButton::secondary, background}) &&
+                (*records).selected_id().empty() && requests.size() == 1U &&
+                requests.front().stable_id.empty() &&
+                requests.front().screen_position.x == background.x &&
+                requests.front().screen_position.y == background.y,
+            "secondary correspondence background click must clear selection and emit one exact empty-target context request");
+}
+
 } // namespace
 
 int main() {
@@ -711,11 +891,13 @@ int main() {
         test_tree_visibility_identity_and_navigation();
         test_tree_model_validation();
         test_tree_and_object_view_consume_keyed_image_list();
+        test_object_label_wrapping_focus_and_full_name_inspection();
         test_object_virtualization_view_preservation_and_input();
         test_object_multiselection_pointer_keyboard_and_semantics();
         test_shared_command_binding();
         test_correspondence_virtualization_and_anchor_stability();
         test_correspondence_keyboard_pin_semantics_and_activation();
+        test_correspondence_background_pointer_contract();
         std::cout << "gui_forms_collection_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

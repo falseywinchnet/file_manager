@@ -104,6 +104,17 @@ void AnchoredPopupLayer::arrange(Rect final_bounds) {
     set_child_layout(content_, resolved_.bounds);
 }
 
+bool AnchoredPopupLayer::hit_test_local(Point local_point) const {
+    const Control::Ptr anchor = anchor_.lock();
+    const Rect bounds = absolute_bounds();
+    const Point absolute{bounds.x + local_point.x, bounds.y + local_point.y};
+    if (anchor && (*anchor).effectively_visible() &&
+        (*anchor).absolute_bounds().contains(absolute)) {
+        return false;
+    }
+    return Panel::hit_test_local(local_point);
+}
+
 void AnchoredPopupLayer::on_pointer(PointerEvent& event) {
     if (dismiss_on_click_away_ && event.action == PointerAction::down &&
         event.button == PointerButton::primary) {

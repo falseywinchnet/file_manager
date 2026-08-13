@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/object_view/object_view.hpp"
 
 #include "../collection_control_utilities.hpp"
+#include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -15,28 +16,226 @@ namespace gui_forms {
 
 namespace {
 
+struct IconLabelLayout final {
+    std::vector<std::string> lines;
+    bool truncated{};
+};
+
+bool ascii_space(const char value) noexcept {
+    return value == ' ' || value == '\t' || value == '\n' || value == '\r';
+}
+
+std::string_view trim_ascii_space(std::string_view value) noexcept {
+    while (!value.empty() && ascii_space(value.front())) value.remove_prefix(1U);
+    while (!value.empty() && ascii_space(value.back())) value.remove_suffix(1U);
+    return value;
+}
+
+std::size_t maximum_fitting_end(Painter& painter, std::string_view text,
+                                FontSpec font, const double maximum_width) {
+    if (text.empty() || maximum_width <= 0.0) return 0U;
+    if (painter.measure_text_utf8(text, font).width <= maximum_width) {
+        return text.size();
+    }
+    const TextStore store(text);
+    std::size_t grapheme = store.grapheme_count().value();
+    while (grapheme > 0U) {
+        --grapheme;
+        const std::size_t end =
+            store.utf8_offset(GraphemeIndex(grapheme)).value();
+        if (end != 0U && painter.measure_text_utf8(
+                text.substr(0U, end), font).width <= maximum_width) {
+            return end;
+        }
+    }
+    return 0U;
+}
+
+std::size_t preferred_break(std::string_view text,
+                            const std::size_t fitting_end) noexcept {
+    if (fitting_end >= text.size()) return fitting_end;
+    for (std::size_t index = fitting_end; index > 0U; --index) {
+        if (ascii_space(text[index - 1U])) return index - 1U;
+    }
+    return fitting_end;
+}
+
 std::string elide_object_name(Painter& painter, std::string_view text,
                               FontSpec font, const double maximum_width) {
-    if (maximum_width <= 0.0 ||
-        painter.measure_text_utf8(text, font).width <= maximum_width) {
+    if (text.empty() || maximum_width <= 0.0) return {};
+    if (painter.measure_text_utf8(text, font).width <= maximum_width) {
         return std::string(text);
     }
     constexpr std::string_view ellipsis = "…";
-    std::string prefix(text);
-    while (!prefix.empty()) {
-        std::size_t scalar = prefix.size() - 1U;
-        while (scalar > 0U &&
-               (static_cast<unsigned char>(prefix[scalar]) & 0xc0U) == 0x80U) {
-            --scalar;
-        }
-        prefix.resize(scalar);
-        std::string candidate(prefix);
+    if (painter.measure_text_utf8(ellipsis, font).width > maximum_width) {
+        return {};
+    }
+    const TextStore store(text);
+    std::size_t grapheme = store.grapheme_count().value();
+    while (grapheme > 0U) {
+        --grapheme;
+        const std::size_t end =
+            store.utf8_offset(GraphemeIndex(grapheme)).value();
+        std::string candidate(text.substr(0U, end));
         candidate.append(ellipsis);
         if (painter.measure_text_utf8(candidate, font).width <= maximum_width) {
             return candidate;
         }
     }
     return std::string(ellipsis);
+}
+
+IconLabelLayout icon_label_layout(Painter& painter, std::string_view text,
+                                  FontSpec font, const double maximum_width) {
+    IconLabelLayout result;
+    if (text.empty() || maximum_width <= 0.0) return result;
+    if (painter.measure_text_utf8(text, font).width <= maximum_width) {
+        result.lines.emplace_back(text);
+        return result;
+    }
+
+    // Prefer a balanced authored word break whenever the complete name fits
+    // in two lines. This keeps stable baselines without needlessly eliding a
+    // name that the accepted two-line object cell can disclose.
+    std::size_t balanced_break{};
+    double balanced_delta = std::numeric_limits<double>::max();
+    for (std::size_t index = 1U; index + 1U < text.size(); ++index) {
+        if (!ascii_space(text[index])) continue;
+        const std::string_view first = trim_ascii_space(text.substr(0U, index));
+        const std::string_view second = trim_ascii_space(text.substr(index + 1U));
+        if (first.empty() || second.empty()) continue;
+        const double first_width = painter.measure_text_utf8(first, font).width;
+        const double second_width = painter.measure_text_utf8(second, font).width;
+        if (first_width > maximum_width || second_width > maximum_width) continue;
+        const double delta = std::abs(first_width - second_width);
+        if (delta < balanced_delta) {
+            balanced_delta = delta;
+            balanced_break = index;
+        }
+    }
+    if (balanced_break != 0U) {
+        result.lines.emplace_back(trim_ascii_space(
+            text.substr(0U, balanced_break)));
+        result.lines.emplace_back(trim_ascii_space(
+            text.substr(balanced_break + 1U)));
+        return result;
+    }
+
+    const std::size_t fit = maximum_fitting_end(
+        painter, text, font, maximum_width);
+    if (fit == 0U) {
+        result.lines.push_back(elide_object_name(
+            painter, text, font, maximum_width));
+        result.truncated = true;
+        return result;
+    }
+    const std::size_t split = preferred_break(text, fit);
+    const std::size_t first_end = split == 0U ? fit : split;
+    std::string_view first = trim_ascii_space(text.substr(0U, first_end));
+    std::size_t remainder_start = first_end;
+    while (remainder_start < text.size() &&
+           ascii_space(text[remainder_start])) {
+        ++remainder_start;
+    }
+    result.lines.emplace_back(first);
+    const std::string_view remainder = text.substr(remainder_start);
+    const std::string second = elide_object_name(
+        painter, remainder, font, maximum_width);
+    if (!second.empty()) result.lines.push_back(second);
+    result.truncated = second != remainder;
+    return result;
+}
+
+std::vector<std::string> wrap_complete_name(Painter& painter,
+                                            std::string_view text,
+                                            FontSpec font,
+                                            const double maximum_width) {
+    std::vector<std::string> lines;
+    std::string_view remaining = text;
+    while (!remaining.empty()) {
+        const std::size_t fit = maximum_fitting_end(
+            painter, remaining, font, maximum_width);
+        if (fit >= remaining.size()) {
+            lines.emplace_back(remaining);
+            break;
+        }
+        const std::size_t split = preferred_break(remaining, fit);
+        const std::size_t end = split == 0U ? fit : split;
+        if (end == 0U) {
+            const TextStore store(remaining);
+            const std::size_t forced = store.utf8_offset(
+                GraphemeIndex(std::min<std::size_t>(
+                    1U, store.grapheme_count().value()))).value();
+            lines.emplace_back(remaining.substr(0U, forced));
+            remaining.remove_prefix(forced);
+            continue;
+        }
+        lines.emplace_back(trim_ascii_space(remaining.substr(0U, end)));
+        remaining.remove_prefix(end);
+        while (!remaining.empty() && ascii_space(remaining.front())) {
+            remaining.remove_prefix(1U);
+        }
+    }
+    return lines;
+}
+
+void paint_complete_name_inspection(Painter& painter,
+                                    const ObjectViewItem& item,
+                                    Rect anchor, Rect viewport,
+                                    FontSpec authored_font,
+                                    const BasicControlStyle& style) {
+    if (item.name.empty() || viewport.width <= 20.0 || viewport.height <= 20.0) {
+        return;
+    }
+    const FontSpec inspection_font{
+        authored_font.role, std::max(8.0, authored_font.size - 2.0),
+        400, false, authored_font.letter_spacing};
+    const double maximum_text_width = std::max(
+        8.0, std::min(244.0, viewport.width - 20.0));
+    const std::vector<std::string> lines = wrap_complete_name(
+        painter, item.name, inspection_font, maximum_text_width);
+    if (lines.empty()) return;
+    double text_width{};
+    double line_height = std::max(
+        inspection_font.size * 1.25,
+        painter.measure_text_utf8("Ag", inspection_font).height);
+    for (const std::string& line : lines) {
+        text_width = std::max(
+            text_width, painter.measure_text_utf8(line, inspection_font).width);
+    }
+    const double bubble_width = std::min(
+        std::max(20.0, viewport.width - 8.0), std::max(72.0, text_width + 16.0));
+    const double bubble_height = line_height * static_cast<double>(lines.size()) + 12.0;
+    double x = anchor.x + (anchor.width - bubble_width) * .5;
+    x = std::clamp(x, viewport.x + 4.0,
+                   std::max(viewport.x + 4.0,
+                            viewport.x + viewport.width - bubble_width - 4.0));
+    double y = anchor.y + anchor.height - 8.0;
+    if (y + bubble_height > viewport.y + viewport.height - 4.0) {
+        y = anchor.y - bubble_height + 8.0;
+    }
+    y = std::clamp(y, viewport.y + 4.0,
+                   std::max(viewport.y + 4.0,
+                            viewport.y + viewport.height - bubble_height - 4.0));
+    const Rect bubble{x, y, bubble_width, bubble_height};
+    const std::array<GradientStop, 2U> stops{
+        GradientStop{0.0, style.paper},
+        GradientStop{1.0, style.face_light}};
+    painter.fill_linear_gradient(
+        bubble, {bubble.x, bubble.y}, {bubble.x, bubble.y + bubble.height},
+        stops);
+    painter.draw_inset_box_shadow(
+        bubble, 0.0, {0.0, 1.0}, 2.0, 0.0,
+        collection_detail::with_alpha(style.dark_border, 52));
+    painter.stroke_rect({bubble.x + .5, bubble.y + .5,
+                         bubble.width - 1.0, bubble.height - 1.0},
+                        style.dark_border, 1.0);
+    double baseline = bubble.y + 6.0 + line_height * .82;
+    for (const std::string& line : lines) {
+        painter.draw_text_utf8({bubble.x + 8.0, baseline}, line,
+                               inspection_font, style.text);
+        baseline += line_height;
+    }
 }
 
 } // namespace
@@ -504,6 +703,8 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
     const std::size_t first = top_row_ * columns();
     const std::size_t end = std::min(items_.size(),
         (top_row_ + visible_row_count() + 1U) * columns());
+    std::optional<std::size_t> hovered_truncated;
+    std::optional<std::size_t> focused_truncated;
     for (std::size_t index = first; index < end; ++index) {
         const ObjectViewItem& item = items_[index];
         const Rect cell = item_bounds(index);
@@ -513,10 +714,16 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                            std::max(0.0, cell.height - 2.0)});
         const bool selected = is_selected(item.stable_id);
         const bool active = focused_ && item.stable_id == focused_id_;
-        if (selected) painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
-                                         cell.width - 2.0, cell.height - 2.0},
-                                        focused_ ? style().accent_light
-                                                 : with_alpha(style().accent_light, 190));
+        if (selected) {
+            painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
+                               cell.width - 2.0, cell.height - 2.0},
+                              focused_ ? style().accent_light
+                                       : with_alpha(style().accent_light, 190));
+            painter.stroke_rect({cell.x + 1.5, cell.y + 1.5,
+                                 std::max(0.0, cell.width - 3.0),
+                                 std::max(0.0, cell.height - 3.0)},
+                                style().accent, 1.0);
+        }
         else if (hovered_index_ == index) {
             painter.fill_rect({cell.x + 1.0, cell.y + 1.0,
                                cell.width - 2.0, cell.height - 2.0}, style().face_light);
@@ -529,22 +736,39 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                     painter, item, index, selected, glyph_bounds)) {
                 paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
             }
-            const std::string display_name = elide_object_name(
+            const IconLabelLayout label = icon_label_layout(
                 painter, item.name, font, std::max(0.0, cell.width - 8.0));
-            const Size measured = painter.measure_text_utf8(display_name, font);
-            const double text_x = cell.x + std::max(4.0, (cell.width - measured.width) * .5);
-            painter.draw_text_utf8({text_x, cell.y +
-                                    std::max(65.0, 48.0 + font.size)},
-                                   display_name, font,
-                                   item.enabled ? style().text : style().disabled_text);
-            if (show_secondary_text_ && !item.secondary_text.empty()) {
+            const double line_height = std::max(
+                font.size * 1.2,
+                painter.measure_text_utf8("Ag", font).height);
+            double baseline = cell.y + std::max(57.0, 47.0 + font.size);
+            for (const std::string& line : label.lines) {
+                const Size measured = painter.measure_text_utf8(line, font);
+                const double text_x = cell.x +
+                    std::max(4.0, (cell.width - measured.width) * .5);
+                painter.draw_text_utf8(
+                    {text_x, baseline}, line, font,
+                    item.enabled ? style().text : style().disabled_text);
+                baseline += line_height;
+            }
+            if (label.truncated) {
+                if (hovered_index_ == index) hovered_truncated = index;
+                if (active && window() && (*window()).focus_cue_visible()) {
+                    focused_truncated = index;
+                }
+            }
+            if (show_secondary_text_ && !item.secondary_text.empty() &&
+                cell.height >= 90.0 && baseline + 8.0 < cell.y + cell.height) {
                 FontSpec authored_secondary{font_.role,
                                             std::max(8.0, font_.size - 1.5),
                                             400, false};
                 const FontSpec secondary = effective_font(authored_secondary);
-                painter.draw_text_utf8({cell.x + 5.0, cell.y + cell.height - 6.0},
-                                       item.secondary_text, secondary,
-                                       style().disabled_text);
+                const std::string display_secondary = elide_object_name(
+                    painter, item.secondary_text, secondary,
+                    std::max(0.0, cell.width - 10.0));
+                painter.draw_text_utf8(
+                    {cell.x + 5.0, cell.y + cell.height - 5.0},
+                    display_secondary, secondary, style().disabled_text);
             }
         } else {
             const Rect glyph_bounds{cell.x + 6.0, cell.y + 3.0, 24.0,
@@ -553,25 +777,50 @@ void ObjectView::on_paint(Painter& painter, Rect damage) {
                     painter, item, index, selected, glyph_bounds)) {
                 paint_glyph(painter, glyph_bounds, item.glyph, item.enabled);
             }
-            painter.draw_text_utf8({cell.x + 38.0, cell.y + cell.height * .5 + 4.0},
-                                   item.name, font, item.enabled ? style().text
-                                                                 : style().disabled_text);
-            if (show_secondary_text_ && !item.secondary_text.empty()) {
-                painter.draw_text_utf8({cell.x + std::max(180.0, cell.width * .68),
-                                        cell.y + cell.height * .5 + 4.0},
-                                       item.secondary_text, font, style().disabled_text);
+            const bool paint_secondary = show_secondary_text_ &&
+                !item.secondary_text.empty() && cell.width >= 112.0;
+            const double secondary_x = paint_secondary
+                ? std::max(cell.x + 92.0, cell.x + cell.width * .68)
+                : cell.x + cell.width - 6.0;
+            const double name_width = std::max(
+                0.0, secondary_x - (cell.x + 38.0) -
+                    (paint_secondary ? 8.0 : 0.0));
+            const std::string display_name = elide_object_name(
+                painter, item.name, font, name_width);
+            painter.draw_text_utf8(
+                {cell.x + 38.0, cell.y + cell.height * .5 + 4.0},
+                display_name, font,
+                item.enabled ? style().text : style().disabled_text);
+            const bool name_truncated = display_name != item.name;
+            if (name_truncated) {
+                if (hovered_index_ == index) hovered_truncated = index;
+                if (active && window() && (*window()).focus_cue_visible()) {
+                    focused_truncated = index;
+                }
+            }
+            if (paint_secondary) {
+                const std::string display_secondary = elide_object_name(
+                    painter, item.secondary_text, font,
+                    std::max(0.0, cell.x + cell.width - 6.0 - secondary_x));
+                painter.draw_text_utf8(
+                    {secondary_x, cell.y + cell.height * .5 + 4.0},
+                    display_secondary, font, style().disabled_text);
             }
             painter.draw_line({cell.x + 2.0, cell.y + cell.height - 1.0},
                               {cell.x + cell.width - 2.0, cell.y + cell.height - 1.0},
                               with_alpha(style().border, 80), 1.0);
         }
-        if (active) {
-            painter.stroke_rect({cell.x + 2.5, cell.y + 2.5,
-                                 std::max(0.0, cell.width - 5.0),
-                                 std::max(0.0, cell.height - 5.0)},
-                                style().accent, 1.0);
+        if (active && window() && (*window()).focus_cue_visible()) {
+            paint_focus(painter, cell, style().text);
         }
         painter.restore();
+    }
+    const std::optional<std::size_t> inspection = hovered_truncated
+        ? hovered_truncated : focused_truncated;
+    if (inspection && *inspection < items_.size()) {
+        paint_complete_name_inspection(
+            painter, items_[*inspection], item_bounds(*inspection), bounds,
+            font, style());
     }
     painter.restore();
 }

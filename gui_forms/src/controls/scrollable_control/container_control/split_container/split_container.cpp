@@ -324,6 +324,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.button == PointerButton::primary && on_collapse_tab) {
         collapse_tab_tracking_ = true;
         pointer_tracking_ = false;
+        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(true);
         if (window() != nullptr) (*window()).request_focus(splitter_);
         (*splitter_).set_pointer_capture(true);
         event.handled = true;
@@ -332,6 +333,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
     if (collapse_tab_tracking_) {
         if (event.action == PointerAction::up) {
             collapse_tab_tracking_ = false;
+            static_cast<SplitterGrip&>(*splitter_).set_interaction_active(false);
             (*splitter_).set_pointer_capture(false);
             if (on_collapse_tab) {
                 toggle_collapse_target(SplitCollapseOrigin::user);
@@ -345,6 +347,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.button == PointerButton::primary &&
         (*splitter_).absolute_bounds().contains(event.position)) {
         pointer_tracking_ = true;
+        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(true);
         pointer_offset_ = pointer_axis(event.position) - effective_distance_;
         if (window() != nullptr) (*window()).request_focus(splitter_);
         (*splitter_).set_pointer_capture(true);
@@ -355,6 +358,7 @@ void SplitContainer::on_pointer_preview(PointerEvent& event) {
         event.handled = true;
     } else if (event.action == PointerAction::up && pointer_tracking_) {
         pointer_tracking_ = false;
+        static_cast<SplitterGrip&>(*splitter_).set_interaction_active(false);
         set_distance(pointer_axis(event.position) - pointer_offset_,
                      SplitChangeReason::pointer);
         event.handled = true;
@@ -469,14 +473,10 @@ double SplitContainer::constrained_distance(double requested,
 
 Rect SplitContainer::collapse_tab_bounds() const noexcept {
     const Rect bounds = (*splitter_).absolute_bounds();
-    if (orientation_ == Orientation::vertical) {
-        const double height = std::min(34.0, bounds.height);
-        return {bounds.x, bounds.y + std::max(0.0, (bounds.height - height) * 0.5),
-                bounds.width, height};
-    }
-    const double width = std::min(34.0, bounds.width);
-    return {bounds.x + std::max(0.0, (bounds.width - width) * 0.5), bounds.y,
-            width, bounds.height};
+    const Rect actuator =
+        static_cast<const SplitterGrip&>(*splitter_).actuator_bounds();
+    return {bounds.x + actuator.x, bounds.y + actuator.y,
+            actuator.width, actuator.height};
 }
 
 bool SplitContainer::collapse_target_is_collapsed() const noexcept {

@@ -119,9 +119,18 @@ void BreadcrumbTrail::set_editing(bool editing) {
     require_mutable();
     if (editing_ == editing) return;
     editing_ = editing;
+    if (!editing_) tab_completion_available_ = false;
     if (editor_) (*editor_).set_visible(editing_);
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics |
                Dirty::accessibility);
+}
+
+void BreadcrumbTrail::set_tab_completion_available(bool available) {
+    require_mutable();
+    available = available && editing_;
+    if (tab_completion_available_ == available) return;
+    tab_completion_available_ = available;
+    invalidate(Dirty::semantics | Dirty::accessibility);
 }
 
 void BreadcrumbTrail::begin_edit(std::string text, bool select_all) {
@@ -134,6 +143,7 @@ void BreadcrumbTrail::begin_edit(std::string text, bool select_all) {
     set_editing(true);
     if (select_all) (*editor_).select_all();
     if (window()) static_cast<void>((*window()).request_focus(editor_));
+    publish_change(edit_started_, std::string((*editor_).text()));
 }
 
 double BreadcrumbTrail::natural_width(
@@ -367,6 +377,16 @@ void BreadcrumbTrail::on_pointer(PointerEvent& event) {
         event.handled = released.has_value();
         pressed_visible_.reset();
     }
+}
+
+void BreadcrumbTrail::on_key_preview(KeyEvent& event) {
+    if (!editing_ || !tab_completion_available_ || !enabled() ||
+        event.action != KeyAction::down ||
+        event.physical_key != PhysicalKey::tab) {
+        return;
+    }
+    publish_change(edit_completion_requested_);
+    event.handled = true;
 }
 
 void BreadcrumbTrail::on_key(KeyEvent& event) {

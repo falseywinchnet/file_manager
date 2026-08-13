@@ -1150,6 +1150,125 @@ void test_button_disclosure_semantics() {
             "expanded disclosure button must publish state and collapse action");
 }
 
+void test_button_selected_state() {
+    auto button = make_control<Button>(StableId("button.selected"), "Selected tab");
+    require(!(*button).selected() &&
+                !has_semantic_state((*button).semantic_descriptor().states,
+                                    SemanticState::selected),
+            "ordinary Button must begin without selected state");
+    (*button).set_selected(true);
+    require((*button).selected() &&
+                has_semantic_state((*button).semantic_descriptor().states,
+                                   SemanticState::selected),
+            "retained Button selected state must publish through semantics");
+}
+
+void test_drop_down_button_routes_pointer_keyboard_and_semantics() {
+    auto ordinary = make_control<Button>(StableId("button.drop-down.measure-control"),
+                                         "View");
+    const Size ordinary_desired = ordinary->measure({400.0, 100.0});
+    auto auto_sized = make_control<DropDownButton>(
+        StableId("button.drop-down.auto-size"), "View",
+        DropDownButtonMode::menu);
+    const Size drop_down_desired = auto_sized->measure({400.0, 100.0});
+    require(drop_down_desired.width == ordinary_desired.width + 16.0,
+            "auto-sized drop-down must reserve its disclosure width exactly once");
+
+    auto root = make_control<Panel>(StableId("button.drop-down.root"));
+    auto menu = make_control<DropDownButton>(
+        StableId("button.drop-down.menu"), "View",
+        DropDownButtonMode::menu);
+    auto split = make_control<DropDownButton>(
+        StableId("button.drop-down.split"), "Refresh",
+        DropDownButtonMode::split);
+    (*menu).set_requested_bounds({10.0, 10.0, 100.0, 32.0});
+    (*split).set_requested_bounds({120.0, 10.0, 120.0, 32.0});
+    root->add_child(menu);
+    root->add_child(split);
+    Window window(root, {250.0, 52.0});
+    window.perform_layout();
+
+    std::size_t menu_requests{};
+    std::size_t split_requests{};
+    std::size_t split_clicks{};
+    SubscriptionToken menu_requested = menu->drop_down_requested().subscribe(
+        callbacks::IncrementCounter<std::size_t, DropDownButton&>(menu_requests));
+    SubscriptionToken split_requested = split->drop_down_requested().subscribe(
+        callbacks::IncrementCounter<std::size_t, DropDownButton&>(split_requests));
+    SubscriptionToken split_clicked = split->clicked().subscribe(
+        callbacks::IncrementCounter<std::size_t, ButtonBase&>(split_clicks));
+
+    click(window, menu);
+    require(menu_requests == 1U,
+            "menu-mode drop-down button must route ordinary activation to disclosure");
+
+    const Rect split_bounds = split->absolute_bounds();
+    const Point primary{split_bounds.x + 12.0,
+                        split_bounds.y + split_bounds.height * 0.5};
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, primary}) &&
+                window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, primary}) &&
+                split_clicks == 1U && split_requests == 0U,
+            "split drop-down primary region must preserve the ordinary Click path");
+    const Point disclosure{split_bounds.x + split_bounds.width - 3.0,
+                           split_bounds.y + split_bounds.height * 0.5};
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, disclosure}) &&
+                window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, disclosure}) &&
+                split_clicks == 1U && split_requests == 1U,
+            "split drop-down trailing region must request its menu without primary Click");
+    require(window.dispatch_pointer(
+                {PointerAction::down, PointerButton::primary, primary}) &&
+                window.dispatch_pointer(
+                {PointerAction::up, PointerButton::primary, disclosure}) &&
+                split_clicks == 2U && split_requests == 1U,
+            "split activation ownership must follow the pressed region rather than release drift");
+
+    require(window.request_focus(menu) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::down,
+                                     Modifier::alt}) &&
+                menu_requests == 2U,
+            "Alt+Down must request the focused drop-down menu");
+    require(menu->on_semantic_action(SemanticAction::show_menu, {}) &&
+                menu_requests == 3U,
+            "semantic show-menu must share the validated disclosure route");
+
+    menu->set_drop_down_open(true);
+    const SemanticDescriptor open = menu->semantic_descriptor();
+    require(has_semantic_state(open.states, SemanticState::expanded) &&
+                std::find(open.actions.begin(), open.actions.end(),
+                          SemanticAction::show_menu) != open.actions.end() &&
+                std::find(open.actions.begin(), open.actions.end(),
+                          SemanticAction::collapse) != open.actions.end(),
+            "open drop-down button must expose menu, expanded, and collapse semantics");
+    std::size_t close_requests{};
+    SubscriptionToken close_requested = menu->drop_down_close_requested().subscribe(
+        callbacks::IncrementCounter<std::size_t, DropDownButton&>(close_requests));
+    require(menu->on_semantic_action(SemanticAction::collapse, {}) &&
+                close_requests == 1U,
+            "semantic collapse must request closure from the popup owner");
+
+    RecordingPainter painter;
+    menu->on_paint(painter, menu->absolute_bounds());
+    require(painter.lines >= 3U,
+            "open drop-down paint must include a chevron and bounded open edge");
+
+    menu->set_enabled(false);
+    require(!menu->perform_drop_down() && menu_requests == 3U,
+            "disabled drop-down button must retain discoverability without invocation");
+
+    bool width_rejected{};
+    try {
+        split->set_drop_down_width(8.0);
+    } catch (const std::invalid_argument&) {
+        width_rejected = true;
+    }
+    require(width_rejected && split->drop_down_width() == 16.0,
+            "drop-down width must reject invalid geometry without mutation");
+}
+
 void test_image_list_state_density_ownership_and_button_layout() {
     std::shared_ptr<gui_forms::Button> button = make_control<Button>(StableId("button.images"), "Launch");
     (*button).set_requested_bounds({0.0, 0.0, 150.0, 36.0});
@@ -1268,6 +1387,8 @@ int main() {
         test_picture_box_modes_registry_and_semantics();
         test_public_drawing_metrics_and_control_tag();
         test_button_disclosure_semantics();
+        test_button_selected_state();
+        test_drop_down_button_routes_pointer_keyboard_and_semantics();
         test_image_list_state_density_ownership_and_button_layout();
         std::cout << "gui_forms_basic_controls_tests: all tests passed\n";
         return EXIT_SUCCESS;

@@ -237,6 +237,7 @@ add_library(gui_forms_controls STATIC
     src/controls/label/label.cpp
     src/controls/button_base/button_base.cpp
     src/controls/button_base/button/button.cpp
+    src/controls/button_base/button/drop_down_button/drop_down_button.cpp
     src/controls/button_base/check_box/check_box.cpp
     src/controls/button_base/radio_button/radio_button.cpp
     src/controls/button_base/link_label/link_label.cpp

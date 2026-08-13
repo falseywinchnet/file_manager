@@ -703,10 +703,10 @@ void CorrespondenceView::on_pointer(PointerEvent& event) {
         pressed_index_ = index_at(event.position);
         pressed_button_ = event.button;
         pressed_click_count_ = event.click_count;
+        if (window()) {
+            static_cast<void>((*window()).request_focus(shared_from_this()));
+        }
         if (pressed_index_) {
-            if (window()) {
-                static_cast<void>((*window()).request_focus(shared_from_this()));
-            }
             set_selected_id(items_[*pressed_index_].stable_id);
             focus_index(*pressed_index_,
                         CorrespondenceExpansionReason::keyboard_focus);
@@ -726,6 +726,11 @@ void CorrespondenceView::on_pointer(PointerEvent& event) {
             } else {
                 set_pinned_id(item.stable_id == pinned_id_ ? std::string_view{}
                                                            : item.stable_id);
+            }
+        } else if (!released && !pressed_index_) {
+            set_selected_id({});
+            if (pressed_button_ == PointerButton::secondary && is_alive()) {
+                context_requested_.emit({{}, event.position});
             }
         }
         pressed_index_.reset();

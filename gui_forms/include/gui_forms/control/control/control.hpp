@@ -568,6 +568,12 @@ public:
     [[nodiscard]] Event<const PointerEvent&>& pointer_observed() noexcept {
         return pointer_observed_;
     }
+    // Reports this control's participation in the preview route before the
+    // eventual target callback. Compound/application roots use it for bounded
+    // click-away state transitions without replacing Window hit testing.
+    [[nodiscard]] Event<const PointerEvent&>& pointer_preview_observed() noexcept {
+        return pointer_preview_observed_;
+    }
     [[nodiscard]] Event<bool>& focus_observed() noexcept {
         return focus_observed_;
     }
@@ -833,6 +839,7 @@ private:
     Event<ControlValidationEvent&> validating_;
     Event<> validated_;
     Event<const PointerEvent&> pointer_observed_;
+    Event<const PointerEvent&> pointer_preview_observed_;
     Event<bool> focus_observed_;
     Event<Rect> arranged_bounds_changed_;
     Event<HelpRequestEvent&> help_requested_;
