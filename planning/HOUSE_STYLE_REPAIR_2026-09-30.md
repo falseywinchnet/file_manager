@@ -131,3 +131,34 @@ exceptions to the literal anonymous-execution prohibition. Cross-platform CI
 for this new checkpoint, final native visual acceptance, and any validation
 explicitly listed as pending in the component receipts remain outstanding.
 Existing published archives are historical artifacts, not rebuilt by this push.
+
+### Final pre-shutdown handoff
+
+**MEASURED:** the final fresh frontend build and its latency-benchmark target
+compiled; all 12 frontend suites passed in 2.47 seconds. The interaction suite
+includes shutdown revocation. A source-to-source raster comparison preserved
+exact bytes for 136 icon cases. See the final section of
+`frontend/results/2026-09-30-house-style/README.md` and `final-ctest.txt`.
+
+**MEASURED:** SwiftEdit's final localized production and test sequencing edits
+compiled and passed all six suites in 2.64 seconds against the preserved
+`house-style-review` provider pair. The refreshed `house-style-final` pair was
+not used for another clean SwiftEdit integration before shutdown. The latest
+integrated review-stage GUI SHA-256 is
+`11C972A9569D340DB6CAFE89910B526F08D0D4109CB622A0C5434208886BC303`;
+CLI SHA-256 is
+`E14DB1A875C031DA0FAFA149B375DED7D90FDC647725A242B52E5656ED062A7A`.
+Those supersede the earlier review-stage executable hashes above.
+
+**OPEN:** frontend's exhaustive remaining compound-expression review did not
+finish before the shutdown freeze. Known follow-up includes effectful
+`undo_last()` assertions in `file_operations_tests.cpp` and some leaf-test
+filesystem/conversion chains. This checkpoint must not be described as complete
+house-style acceptance. The broader visual, platform and performance limits
+remain as recorded; passing tests do not close them.
+
+**OBSERVED:** implementation checkpoint `37552ac` was pushed to File Manager's
+`codex/native-dogfood` branch. SwiftEdit checkpoint `e9d2715` was pushed to
+`master` in the new private `falseywinchnet/swiftedit` repository. Plan Paint
+was not changed or pushed by this correction. Native CI runs remotely after the
+File Manager push; its result was pending at this handoff.

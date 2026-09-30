@@ -74,3 +74,79 @@ compound expressions. Finish the authored shell-tool review; macOS-only
 launcher execution is not established by a Windows build. Run a final coherent
 build/test checkpoint and record the exact changed-file list. The root chat
 will independently review before any commit or publication.
+
+
+## Final handoff before owner shutdown deadline
+
+**MEASURED:** fresh Release/Ninja/GCC 16.2 C++20 build in
+`frontend/.build/frontend-style-final` completed against the complete
+`.build/sdk-checkpoints/house-style-review/windows-x64/gui-forms-sdk`.
+Final `cmake --build ... --target all file_manager_application_latency_benchmark
+--parallel 2` passed, including the excluded-by-default benchmark target.
+All **12/12 CTest suites passed in 2.47 seconds**, including application
+interaction in 1.88 seconds and the new object ordering regression.
+`final-ctest.txt` preserves the final test output. This final section supersedes
+the earlier in-progress build/checkpoint descriptions.
+
+**MEASURED:** all 45 first-party frontend C++ files under include/src/tests/examples
+had **zero spelling findings/review candidates** in the root checker. The initial
+33-file non-picker baseline had 3,022. These scopes differ because the final scan
+also includes sibling-owned picker and interaction files and new private files.
+Zero lexical findings is not proof of every semantic house-style rule.
+
+**OBSERVED corrections:** named worker/completion/cancellation records expose
+captured state; retained UI listeners use named methods and explicit bindings.
+Three directory workers receive show-hidden snapshots on UI submission rather
+than reading the UI-owned mutable boolean. Undo availability now reaches the UI
+through OperationResult instead of reading the worker's mutable undo record.
+`drain_ui` checks stop before every pending callback, including a batch already
+removed from the queue; the sibling's reentrant-stop regression passes.
+Worker jobs deliberately drain during join, preserving admitted mutation
+semantics; cancellable reads still observe the atomic stop/generation flags.
+Runtime explicitly stops Application before releasing its ownership. Generic
+worker-error completion borrows the owner under that stop/join guarantee.
+
+**OBSERVED:** object sorting selects the mode before stable_sort and compares
+folded bytes without allocating lowercase strings during comparisons. Named
+mode regressions cover folders first, kind/size/modified order, stable equal-fold
+names, prefix names, UTF-8 bytes and missing-observation name fallback. Directory
+ordering keeps its distinct exact-name tie-break. Scalar results are calculated
+before return; owner records have explicit initial state; Windows argument
+storage, benchmark fixture storage and ordinary preview/platform fixtures have
+cleanup owners. Assertion failures now unwind the checksum/preview/platform/drag
+test main boundaries. The benchmark compiles; it was not run as a new performance
+measurement or used to launch a native window.
+
+**MEASURED raster equivalence:** starting-HEAD versus revised house_art.hpp
+produced identical concatenated BGRA for all 17 icons at extents
+17, 22, 34, 42, 44, 72, 84 and 144 (136 cases). Both outputs have SHA-256
+`8902e68889608bf3b7d5f8342f790724e08e0145c2cb0b6bafb3a958505d1b08`.
+The temporary comparison programs and byte outputs remain ignored under
+`frontend/.build/house-art-equivalence`. Icon extent validation now rejects
+nonfinite/out-of-range logical dimensions before image-list allocation and
+bounds private raster extents before allocating the pixel buffer.
+
+**MEASURED/OBSERVED tooling:** seven authored .sh/.command files passed MSYS
+`sh -n`. Their quoted-path, failure and manifest-validation flow was reviewed.
+macOS launcher execution and native macOS compilation were not available in this
+Windows checkpoint. Existing Windows symlink privilege skips remain; native
+junction checks execute. No running application, frozen SDK, Plan Paint source,
+commit, release or publication was changed by this frontend chat.
+
+**Remaining semantic review, explicitly not certified:** the owner shutdown
+instruction froze source immediately after passing validation. The full remaining
+compound-expression review was not exhaustively completed. In particular,
+file_operations_tests.cpp still contains effectful undo_last() calls embedded
+inside some assertions; filesystem observation/conversion chains remain in some
+leaf tests. These are outstanding style refinements, not newly reported test
+failures. Visual prototype fidelity, rich breadcrumb material, native visual
+verification, live installed-service probes and performance measurements remain
+open and are not established by this handoff. The integration chat owns commit
+and push and has been told these limits.
+
+### Application-chat changed source inventory
+
+- `frontend/src/application_jobs.hpp`
+- `frontend/src/directory_name_order.hpp`
+- `frontend/src/object_order.hpp`
+- `frontend/tests/object_order_tests.cpp`
