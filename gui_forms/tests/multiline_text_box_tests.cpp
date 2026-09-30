@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 #include "headless_host.hpp"
 #include "support/typography_painter.hpp"
+#include "support/named_callbacks.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -247,6 +248,46 @@ void dpi_transition_remeasures_same_provider() {
         "return DPI transition remeasures and clamps viewport");
 }
 
+void clear_history_establishes_save_boundary() {
+    Fixture f;
+    f.field->set_text("alpha\r\nbeta\r\ngamma\r\ndelta\r\nepsilon");
+    require(f.field->replace_selection("1") && f.field->replace_selection("2") &&
+        f.field->undo() && f.field->can_undo() && f.field->can_redo(),
+        "save-boundary fixture has both undo and redo history");
+    f.field->select(Utf8Offset(2), Utf8Offset(f.field->text().size()));
+    f.field->set_read_only(true);
+    f.paint();
+    const std::string text(f.field->text());
+    const TextSelection selection = f.field->selection();
+    const Point viewport = f.field->scroll_offset();
+    const Dirty dirty = f.field->dirty();
+    const auto metric_calls = f.metrics.calls;
+    std::size_t text_events{}, selection_events{};
+    const auto text_subscription = f.field->text_changed().subscribe(
+        test_support::IncrementCounter<std::size_t, const std::string&>(text_events));
+    const auto selection_subscription = f.field->selection_changed().subscribe(
+        test_support::IncrementCounter<std::size_t, const TextSelection&>(selection_events));
+
+    f.field->clear_undo_history();
+    f.field->clear_undo_history();
+    require(!f.field->can_undo() && !f.field->can_redo(), "clear history removes both directions and is idempotent");
+    require(f.field->text() == text && f.field->selection() == selection &&
+        f.field->scroll_offset() == viewport && f.field->dirty() == dirty &&
+        f.metrics.calls == metric_calls && text_events == 0 && selection_events == 0,
+        "clearing history preserves document, selection, viewport and notifications");
+    f.field->set_read_only(false);
+    require(!f.field->undo() && !f.field->redo(), "old states cannot cross save boundary");
+    require(f.field->replace_selection("replacement") && f.field->undo() &&
+        f.field->text() == text && f.field->selection() == selection && !f.field->can_undo(),
+        "next edit can undo exactly to successful-save boundary");
+    require(f.field->redo() && f.field->text() != text, "redo works after new post-save edit");
+
+    auto single = make_control<TextBox>(StableId("single.history"), "saved");
+    require(single->replace_selection(" edit"), "single-line edit");
+    single->clear_undo_history();
+    require(single->text() == "saved edit" && !single->undo(), "single-line history boundary preserves value");
+}
+
 void bounded_workload() {
     Fixture f;
     std::string many;
@@ -275,6 +316,7 @@ int main() {
         wrapping_metrics_and_hit_testing();
         clipboard_and_limits();
         dpi_transition_remeasures_same_provider();
+        clear_history_establishes_save_boundary();
         bounded_workload();
         std::cout << "gui_forms_multiline_text_box_tests: passed\n";
         return 0;

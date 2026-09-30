@@ -103,6 +103,15 @@ Consumers validate before replacement and report refusal without truncation.
 No stable C ABI, large-document decision, IME/bidi/accessibility parity or final
 application acceptance is inferred.
 
+**OBSERVED source addition, 2026-09-30:** ORC-GUI-001's development TextBox
+surface includes `clear_undo_history()` for an explicit consumer-owned
+successful-save boundary. It clears undo/redo without changing document text,
+selection or presentation and emits no edit notifications. Save success and
+modified-state policy stay with the consumer. The provider negotiation record
+documents focused tests and unchanged object layout; a matching provider build
+is still required for the new symbol. This is source availability only: no SDK
+installation or released application update is recorded by this addition.
+
 ### Ordinary frontend text correction — 2026-09-29
 
 The owner directed the bounded ORC-FE-001 predicate reconciliation in

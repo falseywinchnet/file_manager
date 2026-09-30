@@ -238,6 +238,13 @@ void TextBox::clear_redo() noexcept {
     redo_.clear();
 }
 
+void TextBox::clear_undo_history() {
+    require_mutable();
+    undo_.clear();
+    redo_.clear();
+    history_bytes_ = 0U;
+}
+
 bool TextBox::undo() {
     require_mutable();
     if (read_only_ || undo_.empty()) {

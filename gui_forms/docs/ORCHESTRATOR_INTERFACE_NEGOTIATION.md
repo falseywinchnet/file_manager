@@ -346,3 +346,49 @@ control, browser engine, or Notepad-specific state is introduced.
 for inspection. Focused evidence is in
 `../experiments/MULTILINE_TEXT_BOX_2026-09-29.md`. Canonical development registry
 and installed SDK publication remain parent-owned coordination steps.
+
+## SwiftEdit successful-save history boundary — 2026-09-30
+
+**GIVEN consumer requirement:** SwiftEdit needs to discard pre-save undo/redo
+only after a save succeeds, without replacing text or disturbing document
+presentation. Save success and the application's modified state remain consumer
+policy. GUI.Forms does not save files or infer whether a document was saved.
+
+The additive development C++ method `TextBox::clear_undo_history()` clears both
+history directions and their byte accounting. It follows the existing mutable
+UI-thread/lifetime guard, works for single-line and multiline controls including
+read-only controls, and is idempotent. It preserves text, selection, viewport,
+layout/paint dirtiness and caret state and emits no text/selection events.
+Subsequent edits may undo back to this boundary; earlier states are unavailable.
+Consumers update their own dirty indicators and command availability following
+successful save and the explicit reset.
+
+No private fields, virtual entries or C ABI methods are added. Existing C++
+object layout remains unchanged. A consumer calling the new symbol requires a
+matching newly built provider library; the installed and staged SDKs are not
+updated as part of this source change. Publication and consumer rebuild remain
+parent/build-coordinated.
+
+**OBSERVED current capability report, not a broader implementation approval:**
+
+| SwiftEdit requirement | Current public support |
+|---|---|
+| Clear undo on successful save | New explicit `clear_undo_history()` development source API; consumer owns save policy |
+| Grapheme counts | Public `TextStore::grapheme_count()`; no direct cached TextBox count getter. Constructing TextStore from TextBox text copies/analyzes it |
+| Intelligent wrapping | Space/tab wrap with grapheme fallback; no general Unicode line-break or language-aware wrapping contract |
+| Visible draggable scrollbars | Generic ScrollBar control exists; TextBox itself exposes only wheel/caret scrolling and offset inspection, without scrollbar integration or a public scroll setter |
+| Visible Unicode controls | No show-invisibles or control-character visualization API |
+| Discontiguous selection | Not supported; one UTF-8 anchor/caret range |
+| Editable documents below 16 MiB; paged read-only at or above 16 MiB | Not supported by TextBox. The 1 MiB/4096-byte-line multiline limits apply in read-only mode too; contiguous storage and whole-text history are not a paged document provider |
+
+The size, virtual document, scrollbar, visualization and selection requirements
+need separately scoped provider contracts and evidence. They are not satisfied
+by silently lifting the current limits or moving a private editor into SwiftEdit.
+
+**MEASURED:** native Windows Release focused build with two jobs succeeded;
+`gui_forms_input_controls_tests` and `gui_forms_multiline_text_box_tests` passed
+2/2 in 0.38 seconds. The new history-boundary fixture starts with both history
+directions populated, verifies read-only/idempotent clearing with no text,
+selection, viewport, dirtiness, metric or event changes, then proves new edits
+undo exactly to the boundary and redo normally. A single-line case preserves
+its value too. No SDK install or staged/application DLL replacement occurred.

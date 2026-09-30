@@ -97,6 +97,9 @@ public:
     [[nodiscard]] bool can_redo() const noexcept { return !redo_.empty(); }
     bool undo();
     bool redo();
+    // Establish a new history boundary without replacing text, moving the
+    // selection/viewport, or publishing text/selection change events.
+    void clear_undo_history();
     bool replace_selection(std::string_view replacement);
     bool delete_selection();
     bool copy();
