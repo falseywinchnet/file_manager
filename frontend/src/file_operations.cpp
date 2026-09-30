@@ -26,13 +26,14 @@ bool absolute_route_has_symlink(const std::filesystem::path& path) {
     for (const auto& component : path.relative_path()) {
         if (component == ".") continue;
         cursor /= component;
-        std::error_code error;
-        const auto status = std::filesystem::symlink_status(cursor, error);
-        if (error) {
+        const ObjectIdentity identity = observe_identity(cursor);
+        if (!identity.available()) {
             throw std::invalid_argument(
-                "operation root route is not fully observable: " + error.message());
+                "operation root route is not fully observable");
         }
-        if (std::filesystem::is_symlink(status)) return true;
+        // The native no-follow identity treats Windows reparse points as
+        // links, including directory links not reported by MinGW's status.
+        if (identity.type == std::filesystem::file_type::symlink) return true;
     }
     return false;
 }

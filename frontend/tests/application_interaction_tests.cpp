@@ -637,9 +637,28 @@ void test_application_controls_navigate_real_directories() {
         [&] {
             const auto preview = std::dynamic_pointer_cast<gui_forms::Label>(
                 window->find("fm.path.resolution-preview"));
+#if defined(__linux__)
+            // The real '/' root is admitted on Linux. This spelling is inside
+            // that scope but missing; it must not be mislabeled out-of-scope.
+            return preview && preview->text().starts_with("Unavailable: ");
+#else
             return preview && preview->text().starts_with("Not admitted: ");
+#endif
         },
-        "out-of-root spelling must complete admission work asynchronously and publish refusal");
+        "invalid spelling must complete resolution asynchronously and publish its actual failure");
+#if defined(__linux__)
+    require(window->dispatch_key({gui_forms::KeyAction::down,
+                                  gui_forms::PhysicalKey::enter}) && !breadcrumb->editing(),
+            "missing Linux path must finish its edit transaction");
+    require_eventually(*application,
+        [&] {
+            const auto status = std::dynamic_pointer_cast<gui_forms::Label>(
+                window->find("file-manager-app.shell.status.ready"));
+            return path_editor->text() == tree_fixture.root().string() &&
+                status && status->text() == "Location unavailable";
+        },
+        "missing Linux path must retain the previous location after asynchronous failure");
+#else
     require(window->dispatch_key({gui_forms::KeyAction::down,
                                   gui_forms::PhysicalKey::enter}) &&
                 !breadcrumb->editing() &&
@@ -649,6 +668,7 @@ void test_application_controls_navigate_real_directories() {
         window->find("file-manager-app.shell.status.ready"));
     require(status_ready && status_ready->text() == "Location not admitted",
             "invalid path rollback must remain explicit in the status surface");
+#endif
 
     require(window->perform_semantic_action(
                 breadcrumb->edit_stable_id(),
